@@ -22,7 +22,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import ScienceIcon from '@mui/icons-material/Science';
 
 import PaymentWidget from '../components/payment/PaymentWidget';
-import { setToken, getToken } from '../api/client';
+import { buildApiUrl, getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
 const PaymentTest = () => {
@@ -58,13 +58,13 @@ const PaymentTest = () => {
       };
       
       logger.log('📤 Отправляем запрос авторизации:', {
-        url: 'http://localhost:8000/api/v1/auth/login',
+        url: buildApiUrl('/auth/login'),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginData)
       });
 
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -367,7 +367,7 @@ const PaymentTest = () => {
             <Typography variant="body2">
               <strong>Поддерживаемые провайдеры:</strong> Click (UZS), Payme (UZS), Kaspi (KZT)
               <br />
-              <strong>Backend:</strong> http://localhost:8000
+              <strong>Backend:</strong> {getApiOrigin()}
               <br />
               <strong>Frontend:</strong> http://localhost:5173
             </Typography>

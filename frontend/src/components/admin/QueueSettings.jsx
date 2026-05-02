@@ -45,6 +45,54 @@ const ICON_MAP = {
   'Zap': Zap
 };
 
+const normalizeNumber = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getNumberSetting = (collection, key, fallback) => (
+  normalizeNumber(collection?.[key], fallback)
+);
+
+const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+const getDoctorDisplayName = (doctor) => (
+  doctor?.user?.full_name || doctor?.user?.username || `Врач #${doctor?.id || '—'}`
+);
+
+const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
+  const specialty = normalizeText(specialtyKey);
+  const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
+    .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
+    .sort((left, right) => {
+      const leftScore = [
+        left?.active === false ? 1 : 0,
+        left?.user ? 0 : 1,
+        left?.cabinet ? 0 : 1,
+        normalizeNumber(left?.id, Number.MAX_SAFE_INTEGER),
+      ];
+      const rightScore = [
+        right?.active === false ? 1 : 0,
+        right?.user ? 0 : 1,
+        right?.cabinet ? 0 : 1,
+        normalizeNumber(right?.id, Number.MAX_SAFE_INTEGER),
+      ];
+
+      for (let index = 0; index < leftScore.length; index += 1) {
+        if (leftScore[index] !== rightScore[index]) {
+          return leftScore[index] - rightScore[index];
+        }
+      }
+
+      return 0;
+    });
+
+  return {
+    doctor: candidates[0] || null,
+    candidates,
+  };
+};
+
 const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,7 +147,15 @@ const QueueSettings = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/queue/settings');
-      setSettings(response.data);
+      const data = response.data || {};
+      setSettings({
+        timezone: data.timezone || 'Asia/Tashkent',
+        queue_start_hour: normalizeNumber(data.queue_start_hour, 7),
+        auto_close_time: data.auto_close_time || '09:00',
+        start_numbers: data.start_numbers || {},
+        max_per_day: data.max_per_day || {},
+        dev_mode_enabled: Boolean(data.dev_mode_enabled),
+      });
     } catch (error) {
       logger.error('Ошибка загрузки настроек очередей:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек очередей' });
@@ -145,9 +201,9 @@ const QueueSettings = () => {
       setTesting(true);
       setTestResult(null);
 
-      // ⭐ SSOT: Находим врача по специальности из загруженных данных
-      const doctor = doctors.find((d) => d.specialty === specialty);
-      const doctorId = doctor?.id || doctor?.user_id;
+      // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
+      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
+      const doctorId = doctor?.id;
 
       if (!doctorId) {
         setMessage({ type: 'error', text: `Врач для специальности "${specialty}" не найден` });
@@ -160,8 +216,20 @@ const QueueSettings = () => {
         date: new Date().toISOString().split('T')[0]
       });
 
-      setTestResult(response.data.test_data);
-      setMessage({ type: 'success', text: 'Тест очереди выполнен успешно' });
+      setTestResult({
+        ...(response.data.test_data || {}),
+        selected_doctor_id: doctor.id,
+        selected_doctor_name: getDoctorDisplayName(doctor),
+        selected_doctor_cabinet: doctor.cabinet || 'Не указан',
+        matched_doctors_count: candidates.length,
+      });
+      setMessage({
+        type: 'success',
+        text:
+          candidates.length > 1
+            ? `Тест выполнен: использован врач "${getDoctorDisplayName(doctor)}" из ${candidates.length} кандидатов`
+            : 'Тест очереди выполнен успешно',
+      });
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
       setMessage({ type: 'error', text: 'Ошибка тестирования очереди' });
@@ -573,10 +641,14 @@ const QueueSettings = () => {
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)'
                     }}>{testResult.token?.slice(0, 8)}...</code></div>
+                    <div><strong>Врач:</strong> {testResult.selected_doctor_name || '—'}</div>
                     <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
+                    <div><strong>Врач ID:</strong> {testResult.selected_doctor_id || testResult.doctor_id}</div>
                     <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
+                    <div><strong>Выбранный кабинет:</strong> {testResult.selected_doctor_cabinet || '—'}</div>
                     <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
                     <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
+                    <div><strong>Кандидатов:</strong> {testResult.matched_doctors_count ?? 0}</div>
                     <div><strong>QR URL:</strong> <code style={{
                       backgroundColor: 'var(--mac-success-bg)',
                       padding: '2px 4px',
@@ -625,12 +697,12 @@ const QueueSettings = () => {
                 }}>
                     <Hash style={{ width: '16px', height: '16px' }} />
                     Стартовый номер
-                  </label>
+                </label>
                   <MacOSInput
                   type="number"
                   min="1"
                   max="100"
-                  value={settings.start_numbers[specialty.key]}
+                  value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
                   style={{ width: '100%' }} />
                 
@@ -656,12 +728,12 @@ const QueueSettings = () => {
                 }}>
                     <Users style={{ width: '16px', height: '16px' }} />
                     Лимит в день
-                  </label>
+                </label>
                   <MacOSInput
                   type="number"
                   min="1"
                   max="100"
-                  value={settings.max_per_day[specialty.key]}
+                  value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
                   onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
                   style={{ width: '100%' }} />
                 
@@ -696,7 +768,7 @@ const QueueSettings = () => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                     border: '1px solid var(--mac-border)'
                   }}>
-                      {settings.start_numbers[specialty.key]} - {settings.start_numbers[specialty.key] + settings.max_per_day[specialty.key] - 1}
+                      {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
                     </div>
                   </div>
                 </div>

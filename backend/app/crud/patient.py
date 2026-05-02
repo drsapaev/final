@@ -160,7 +160,7 @@ def create_patient_from_user(db: Session, user: User) -> Patient:
         "last_name": normalized_last_name,
         "middle_name": name_parts.get("middle_name"),
         "phone": user.phone,
-        # email НЕ передаем - это поле не существует в модели Patient
+        "email": user.email,
         "created_at": datetime.utcnow(),
     }
 

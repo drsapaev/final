@@ -1,28 +1,33 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
+const wsProxyTarget =
+  process.env.VITE_WS_PROXY_TARGET ||
+  apiProxyTarget.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     strictPort: false,
     hmr: false,
     watch: {
       usePolling: true,
       interval: 1000
     },
-    allowedHosts: ['localhost', '127.0.0.1'],
+    allowedHosts: true,
     proxy: {
-      // HTTP API -> http://localhost:8000
+      // HTTP API -> target backend (overridable for isolated restore rehearsal)
       "/api": {
-        target: "http://localhost:8000",
+        target: apiProxyTarget,
         changeOrigin: true,
         secure: false,
       },
-      // WebSocket -> ws://localhost:8000
+      // WebSocket -> target backend (overridable for isolated restore rehearsal)
       "/ws": {
-        target: "ws://localhost:8000",
+        target: wsProxyTarget,
         ws: true,
         changeOrigin: true,
         secure: false,
@@ -30,112 +35,6 @@ export default defineConfig({
     },
   },
   build: {
-    // PWA оптимизации
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // Vendor chunks - более детальное разделение
-          if (id.includes('node_modules')) {
-            // React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            
-            // Material-UI отдельно (очень большой)
-            if (id.includes('@mui')) {
-              return 'mui';
-            }
-            
-            // Иконки отдельно
-            if (id.includes('lucide-react') || id.includes('@mui/icons-material')) {
-              return 'icons';
-            }
-            
-            // HTTP клиенты
-            if (id.includes('axios') || id.includes('fetch') || id.includes('http')) {
-              return 'http';
-            }
-            
-            // Утилиты и библиотеки
-            if (id.includes('lodash') || id.includes('moment') || id.includes('date-fns')) {
-              return 'utils';
-            }
-            
-            // Остальные vendor библиотеки
-            return 'vendor';
-          }
-          
-          // App chunks по функциональности - более детальное разделение
-          if (id.includes('/pages/')) {
-            if (id.includes('Admin') || id.includes('Settings') || id.includes('Audit')) {
-              return 'admin-pages';
-            }
-            if (id.includes('Doctor') || id.includes('Cardiologist') || id.includes('Dermatologist') || id.includes('Dentist')) {
-              return 'doctor-pages';
-            }
-            if (id.includes('Patient') || id.includes('Mobile')) {
-              return 'patient-pages';
-            }
-            if (id.includes('Payment') || id.includes('Cashier')) {
-              return 'payment-pages';
-            }
-            if (id.includes('Queue') || id.includes('Display')) {
-              return 'queue-pages';
-            }
-            return 'other-pages';
-          }
-          
-          if (id.includes('/components/')) {
-            // macOS UI компоненты отдельно
-            if (id.includes('/ui/macos/')) {
-              return 'macos-ui';
-            }
-            
-            // Медицинские компоненты
-            if (id.includes('medical') || id.includes('laboratory')) {
-              return 'medical-components';
-            }
-            
-            // Админ компоненты
-            if (id.includes('admin') || id.includes('auth')) {
-              return 'admin-components';
-            }
-            
-            // PWA компоненты
-            if (id.includes('pwa') || id.includes('mobile')) {
-              return 'pwa-components';
-            }
-            
-            // AI компоненты
-            if (id.includes('ai')) {
-              return 'ai-components';
-            }
-            
-            // Таблицы отдельно (могут быть большими)
-            if (id.includes('table') || id.includes('Table')) {
-              return 'table-components';
-            }
-            
-            // Формы отдельно
-            if (id.includes('form') || id.includes('Form') || id.includes('input') || id.includes('Input')) {
-              return 'form-components';
-            }
-            
-            return 'common-components';
-          }
-          
-          // Хуки и утилиты отдельно
-          if (id.includes('/hooks/') || id.includes('/utils/') || id.includes('/contexts/')) {
-            return 'utils';
-          }
-          
-          // Стили отдельно
-          if (id.includes('.css') || id.includes('.scss')) {
-            return 'styles';
-          }
-        }
-      }
-    },
     // Увеличиваем лимит для больших файлов (vendor чанк может быть большим)
     chunkSizeWarningLimit: 1500,
     // Минификация

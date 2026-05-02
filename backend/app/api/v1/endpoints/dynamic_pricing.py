@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -43,7 +43,7 @@ class PricingRuleCreate(BaseModel):
     min_amount: Optional[float] = Field(None, ge=0)
     priority: int = Field(0, ge=0)
     max_uses: Optional[int] = Field(None, ge=1)
-    service_ids: List[int] = Field(..., min_items=1)
+    service_ids: List[int] = Field(..., min_length=1)
 
 
 class PricingRuleUpdate(BaseModel):
@@ -70,7 +70,7 @@ class PricingRuleUpdate(BaseModel):
 class ServicePackageCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    service_ids: List[int] = Field(..., min_items=2)
+    service_ids: List[int] = Field(..., min_length=2)
     package_price: float = Field(..., gt=0)
     valid_from: Optional[datetime] = None
     valid_to: Optional[datetime] = None
@@ -90,7 +90,7 @@ class ServicePackageUpdate(BaseModel):
 
 
 class PriceCalculationRequest(BaseModel):
-    services: List[Dict[str, Any]] = Field(..., min_items=1)
+    services: List[Dict[str, Any]] = Field(..., min_length=1)
     patient_id: Optional[int] = None
     appointment_time: Optional[datetime] = None
 
@@ -123,8 +123,7 @@ class PricingRuleResponse(BaseModel):
     current_uses: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServicePackageResponse(BaseModel):
@@ -143,8 +142,7 @@ class ServicePackageResponse(BaseModel):
     per_patient_limit: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 def _model_to_dict(model: BaseModel) -> dict[str, Any]:

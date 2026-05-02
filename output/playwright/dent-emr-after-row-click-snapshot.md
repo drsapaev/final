@@ -1,0 +1,102 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - button "Управление клиникой" [ref=e8] [cursor=pointer]:
+        - generic [ref=e9]:
+          - img [ref=e10]
+          - text: Управление клиникой
+      - generic [ref=e15]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e16]
+        - generic: ⌘K
+      - generic [ref=e18]:
+        - button "RU" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]:
+            - img [ref=e22]
+            - text: RU
+        - generic "Онлайн" [ref=e26]:
+          - img [ref=e27]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e30] [cursor=pointer]:
+          - img [ref=e31]
+        - button "Выбрать тему" [ref=e35] [cursor=pointer]:
+          - img [ref=e38]
+        - button "Dentist User" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - text: Dentist User
+        - button "Выйти" [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]:
+            - img [ref=e51]
+            - text: Выйти
+    - generic [ref=e54]:
+      - complementary [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: Медицинская система
+          - button "Collapse sidebar" [ref=e59] [cursor=pointer]:
+            - img [ref=e61]
+        - navigation [ref=e64]:
+          - button "Dashboard" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Dashboard
+          - button "Patients" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e74]: Patients
+          - button "Appointments" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: Appointments
+          - button "Examinations" [ref=e80] [cursor=pointer]:
+            - img [ref=e81]
+            - generic [ref=e84]: Examinations
+          - button "Diagnoses" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e89]: Diagnoses
+          - button "Visit Protocols" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+            - generic [ref=e96]: Visit Protocols
+          - button "Photo Archive" [ref=e97] [cursor=pointer]:
+            - img [ref=e98]
+            - generic [ref=e101]: Photo Archive
+          - button "Templates" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e106]: Templates
+          - button "Reports" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+            - generic [ref=e111]: Reports
+          - button "Dental Chart" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+            - generic [ref=e116]: Dental Chart
+          - button "Treatment Plans" [ref=e117] [cursor=pointer]:
+            - img [ref=e118]
+            - generic [ref=e121]: Treatment Plans
+          - button "Prosthetics" [ref=e122] [cursor=pointer]:
+            - img [ref=e123]
+            - generic [ref=e126]: Prosthetics
+          - button "AI Assistant" [ref=e127] [cursor=pointer]:
+            - img [ref=e128]
+            - generic [ref=e131]: AI Assistant
+      - main [ref=e132]:
+        - generic [ref=e133]:
+          - generic [ref=e135]:
+            - heading "Объективные осмотры" [level=3] [ref=e262]
+            - paragraph [ref=e263]: Выберите пациента для проведения или просмотра объективного осмотра
+            - button "D DENT 01 Пациент 1774146335 Провести осмотр" [ref=e265] [cursor=pointer]:
+              - generic [ref=e266]:
+                - generic [ref=e268]: D
+                - generic [ref=e269]:
+                  - paragraph [ref=e270]: DENT 01 Пациент 1774146335
+                  - paragraph [ref=e271]: Провести осмотр
+          - button "💬 AI" [ref=e245] [cursor=pointer]:
+            - generic [ref=e246]: 💬
+            - generic [ref=e247]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e248]:
+    - generic [ref=e249]:
+      - img [ref=e250]
+      - generic [ref=e253]:
+        - strong [ref=e254]: Включить уведомления?
+        - generic [ref=e255]: Получайте уведомления о новых сообщениях
+    - generic [ref=e256]:
+      - button "Включить" [ref=e257] [cursor=pointer]
+      - button "Закрыть" [ref=e258] [cursor=pointer]:
+        - img [ref=e259]

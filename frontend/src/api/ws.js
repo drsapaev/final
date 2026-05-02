@@ -1,19 +1,11 @@
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import { buildWsUrl } from './runtime';
 
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
   const v = (import.meta?.env?.VITE_ENABLE_WS ?? '0').toString().trim();
   return v === '1' || v.toLowerCase() === 'true';
-}
-
-function buildWsBase() {
-  const raw = (import.meta?.env?.VITE_WS_BASE ?? '/ws').toString().trim();
-  if (/^wss?:\/\//i.test(raw)) return raw.replace(/\/+$/, '');
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = location.host;
-  const suffix = raw.startsWith('/') ? raw : `/${raw}`;
-  return `${proto}//${host}${suffix}`.replace(/\/+$/, '');
 }
 
 /**
@@ -25,8 +17,8 @@ export function openQueueWS(department, dateStr, onMessage) {
   let ws = null;
 
   try {
-    const base = buildWsBase();
-    const url = `${base}/queue?department=${encodeURIComponent(department)}&date_str=${encodeURIComponent(dateStr)}`;
+    const query = `department=${encodeURIComponent(department)}&date_str=${encodeURIComponent(dateStr)}`;
+    const url = buildWsUrl(`/ws/queue?${query}`);
     ws = new WebSocket(url);
     ws.onmessage = (ev) => {
       try {
@@ -66,10 +58,9 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
 
   function connect() {
     try {
-      const base = buildWsBase();
       const token = tokenManager.getAccessToken();
       const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-      const url = `${base}/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`;
+      const url = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`);
       
       logger.log(`🔌 Подключаемся к WebSocket: ${url}`);
       
@@ -143,4 +134,3 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
     }
   };
 }
-

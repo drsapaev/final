@@ -43,7 +43,7 @@ conn.close()
 ### Шаг 2: Проверить ответ API
 ```bash
 # В терминале:
-curl -s "http://localhost:8000/api/v1/registrar/queues/today" -H "Authorization: Bearer YOUR_TOKEN" | jq '.queues[].entries | length'
+curl -s "http://localhost:18000/api/v1/registrar/queues/today" -H "Authorization: Bearer YOUR_TOKEN" | jq '.queues[].entries | length'
 ```
 
 ### Шаг 3: Проверить логи фронтенда

@@ -30,6 +30,7 @@ import {
 import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, IconButton } from '@mui/material'; // Legacy for Actions menu
 import UserModal from './UserModal';
 import { useRoles } from '../../hooks/useRoles';
+import { getProfile } from '../../stores/auth';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -42,6 +43,9 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState(null);
+  const [deleteDialogMode, setDeleteDialogMode] = useState('confirm');
+  const [deleteDialogMessage, setDeleteDialogMessage] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
 
   // Load roles from API (Phase 4: DB-driven roles)
@@ -71,6 +75,27 @@ const UserManagement = () => {
 
   useEffect(() => {
     loadUsers();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentProfile = async () => {
+      try {
+        const profile = await getProfile();
+        if (isMounted) {
+          setCurrentProfile(profile || null);
+        }
+      } catch (profileError) {
+        logger.warn('Не удалось загрузить текущий профиль пользователя для guardrail удаления', profileError);
+      }
+    };
+
+    loadCurrentProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadUsers = async () => {
@@ -111,6 +136,18 @@ const UserManagement = () => {
   };
 
   const handleDeleteUser = async () => {
+    if (!selectedUser) {
+      return;
+    }
+
+    if (currentProfile?.id && Number(selectedUser.id) === Number(currentProfile.id)) {
+      setDeleteDialogMode('blocked-self');
+      setDeleteDialogMessage(
+        'Нельзя удалить текущую учётную запись, под которой вы сейчас вошли. Войдите под другим администратором и удалите или деактивируйте этот аккаунт оттуда.'
+      );
+      return;
+    }
+
     try {
       await api.delete(`/users/users/${selectedUser.id}`);
       setSuccess('Пользователь успешно удален');
@@ -121,34 +158,59 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления пользователя';
 
-      // Check if it's an IntegrityError (related data exists)
       if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
-        // Offer to deactivate instead
-        const shouldDeactivate = window.confirm(
-          `${errorMessage}\n\nХотите деактивировать пользователя вместо удаления?`
-        );
-
-        if (shouldDeactivate) {
-          try {
-            await api.put(`/users/users/${selectedUser.id}`, { is_active: false });
-            setSuccess('Пользователь деактивирован');
-            setError('');
-            loadUsers();
-            setShowDeleteDialog(false);
-            setSelectedUser(null);
-            return;
-          } catch (deactivateErr) {
-            setError('Ошибка деактивации пользователя: ' + (deactivateErr.response?.data?.detail || deactivateErr.message));
-          }
-        } else {
-          setShowDeleteDialog(false);
-          setSelectedUser(null);
-        }
+        setDeleteDialogMode('deactivate');
+        setDeleteDialogMessage(errorMessage);
+        logger.error('Ошибка удаления пользователя:', err);
+        return;
       } else {
         setError(errorMessage);
       }
       logger.error('Ошибка удаления пользователя:', err);
     }
+  };
+
+  const handleDeactivateInstead = async () => {
+    if (!selectedUser) {
+      return;
+    }
+
+    if (currentProfile?.id && Number(selectedUser.id) === Number(currentProfile.id)) {
+      setDeleteDialogMode('blocked-self');
+      setDeleteDialogMessage(
+        'Нельзя деактивировать текущую учётную запись из активной сессии. Войдите под другим администратором и выполните это действие оттуда.'
+      );
+      return;
+    }
+
+    try {
+      await api.put(`/users/users/${selectedUser.id}`, { is_active: false });
+      setSuccess('Пользователь деактивирован');
+      setError('');
+      loadUsers();
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
+      setDeleteDialogMode('confirm');
+      setDeleteDialogMessage('');
+    } catch (deactivateErr) {
+      const deactivateMessage = deactivateErr.response?.data?.detail || deactivateErr.message || 'Ошибка деактивации пользователя';
+      setError(`Ошибка деактивации пользователя: ${deactivateMessage}`);
+      logger.error('Ошибка деактивации пользователя:', deactivateErr);
+    }
+  };
+
+  const openDeleteDialog = (user) => {
+    setSelectedUser(user);
+    setDeleteDialogMode('confirm');
+    setDeleteDialogMessage('');
+    setShowDeleteDialog(true);
+  };
+
+  const closeDeleteDialog = () => {
+    setShowDeleteDialog(false);
+    setDeleteDialogMode('confirm');
+    setDeleteDialogMessage('');
+    setSelectedUser(null);
   };
 
   const handleToggleUserStatus = async (userId, isActive) => {
@@ -265,9 +327,10 @@ const UserManagement = () => {
     key: 'actions',
     title: '',
     render: (_, user) =>
-    <div onClickCapture={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
           <IconButton
         onClick={(e) => {
+          e.stopPropagation();
           setAnchorEl(e.currentTarget);
           setSelectedUser(user);
         }}
@@ -405,7 +468,7 @@ const UserManagement = () => {
         </MenuItem>
         <Divider />
         <MenuItem onClick={() => {
-          setShowDeleteDialog(true);
+          openDeleteDialog(selectedUser);
           setAnchorEl(null);
         }}>
           <ListItemIcon><Trash2 size={16} color="#ef4444" /></ListItemIcon>
@@ -425,24 +488,56 @@ const UserManagement = () => {
       {/* Delete Confirmation Dialog (Using MacOSModal) */}
       <MacOSModal
         isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        title="Подтверждение удаления"
+        onClose={closeDeleteDialog}
+        title={
+          deleteDialogMode === 'deactivate'
+            ? 'Удаление недоступно'
+            : deleteDialogMode === 'blocked-self'
+              ? 'Действие недоступно'
+              : 'Подтверждение удаления'
+        }
         size="sm">
         
         <div style={{ padding: '0 0 24px 0' }}>
-          <Typography>
-            Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
-            <br />
-            Это действие нельзя отменить.
-          </Typography>
+          {deleteDialogMode === 'confirm' ? (
+            <Typography>
+              Вы уверены, что хотите удалить пользователя <b>{selectedUser?.username}</b>?
+              <br />
+              Это действие нельзя отменить.
+            </Typography>
+          ) : (
+            <Typography>
+              <b>{selectedUser?.username}</b>
+              <br />
+              <br />
+              {deleteDialogMessage}
+            </Typography>
+          )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <MacOSButton variant="secondary" onClick={() => setShowDeleteDialog(false)}>
-            Отмена
-          </MacOSButton>
-          <MacOSButton variant="danger" onClick={handleDeleteUser}>
-            Удалить
-          </MacOSButton>
+          {deleteDialogMode === 'confirm' ? (
+            <>
+              <MacOSButton variant="secondary" onClick={closeDeleteDialog}>
+                Отмена
+              </MacOSButton>
+              <MacOSButton variant="danger" onClick={handleDeleteUser}>
+                Удалить
+              </MacOSButton>
+            </>
+          ) : deleteDialogMode === 'deactivate' ? (
+            <>
+              <MacOSButton variant="secondary" onClick={closeDeleteDialog}>
+                Отмена
+              </MacOSButton>
+              <MacOSButton variant="primary" onClick={handleDeactivateInstead}>
+                Деактивировать
+              </MacOSButton>
+            </>
+          ) : (
+            <MacOSButton variant="primary" onClick={closeDeleteDialog}>
+              Понятно
+            </MacOSButton>
+          )}
         </div>
       </MacOSModal>
 

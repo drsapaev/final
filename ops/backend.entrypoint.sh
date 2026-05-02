@@ -9,9 +9,15 @@ set -euo pipefail
 : "${RELOAD:=0}"
 : "${DATABASE_URL:=sqlite:////data/app.db}"
 : "${ENSURE_ADMIN:=1}"
+: "${RUN_ALEMBIC_ON_START:=0}"
 
 mkdir -p /data
 export DATABASE_URL
+
+if [[ "${RUN_ALEMBIC_ON_START}" == "1" ]]; then
+  echo "[entrypoint] Running alembic upgrade head..."
+  alembic upgrade head
+fi
 
 echo "[entrypoint] Creating database tables..."
 python -c "

@@ -1,0 +1,35 @@
+{
+  "targets": {
+    "lighthouse_performance": 95,
+    "lighthouse_accessibility": 100,
+    "lighthouse_seo": 95,
+    "lighthouse_best_practices": 95,
+    "lcp_seconds": 2.5,
+    "cls": 0.1,
+    "inp_ms": 200,
+    "broken_links": 0,
+    "console_errors": 0,
+    "critical_axe_violations": 0
+  },
+  "results": {
+    "lighthouse_performance": null,
+    "lighthouse_accessibility": null,
+    "lighthouse_seo": null,
+    "lighthouse_best_practices": null,
+    "lcp_seconds": null,
+    "cls": null,
+    "inp_ms": null,
+    "broken_links": null,
+    "console_errors": null,
+    "critical_axe_violations": null
+  },
+  "audits": {},
+  "metric_checks": {},
+  "summary": {
+    "status": "pending",
+    "ready_for_preview": false,
+    "blocking_failures": [],
+    "pending_gates": [],
+    "passed_gates": []
+  }
+}

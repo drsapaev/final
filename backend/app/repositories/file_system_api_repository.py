@@ -30,7 +30,9 @@ class FileSystemApiRepository:
         file_type: str | None,
         patient_id: int | None,
         appointment_id: int | None,
+        visit_id: int | None,
         emr_id: int | None,
+        emr_record_id: int | None,
         folder_id: int | None,
     ) -> int:
         query = self.db.query(file_model)
@@ -44,8 +46,12 @@ class FileSystemApiRepository:
             query = query.filter(file_model.patient_id == patient_id)
         if appointment_id:
             query = query.filter(file_model.appointment_id == appointment_id)
+        if visit_id:
+            query = query.filter(file_model.visit_id == visit_id)
         if emr_id:
             query = query.filter(file_model.emr_id == emr_id)
+        if emr_record_id:
+            query = query.filter(file_model.emr_record_id == emr_record_id)
         if folder_id:
             query = query.filter(file_model.folder_id == folder_id)
 

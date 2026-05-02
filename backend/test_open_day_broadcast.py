@@ -14,7 +14,7 @@ def get_auth_token():
             {"username": "admin", "password": "admin123"}
         ).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/login",
+            "http://127.0.0.1:18000/api/v1/login",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
@@ -46,7 +46,7 @@ def test_open_day_broadcast():
     print("📅 Открываю день для ENT...")
     try:
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
+            "http://127.0.0.1:18000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
             headers=headers,
             method="POST",
         )

@@ -4,7 +4,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def get_auth_token():
     """Получить токен авторизации"""
@@ -210,8 +210,8 @@ def main():
         print("  ✅ Анализ жалоб работает")
         print("  ✅ Подсказки МКБ-10 работают")
         print("  ✅ Авторизация работает корректно")
-        print("\n🌐 API документация: http://localhost:8000/docs")
-        print("🔧 MCP endpoints: http://localhost:8000/api/v1/mcp/*")
+        print("\n🌐 API документация: http://localhost:18000/docs")
+        print("🔧 MCP endpoints: http://localhost:18000/api/v1/mcp/*")
     else:
         print(f"⚠️ {total_count - success_count} тестов завершились с ошибками")
     

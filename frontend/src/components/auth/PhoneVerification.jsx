@@ -21,6 +21,7 @@ import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const PhoneVerification = ({ 
   phone, 
   purpose = 'verification', 
@@ -354,6 +355,18 @@ const PhoneVerification = ({
       </CardContent>
     </Card>
   );
+};
+
+
+PhoneVerification.propTypes = {
+  ...(PhoneVerification.propTypes || {}),
+  customMessage: PropTypes.any,
+  onCancel: PropTypes.any,
+  onVerified: PropTypes.any,
+  phone: PropTypes.any,
+  purpose: PropTypes.any,
+  showPhoneInput: PropTypes.any,
+  title: PropTypes.any,
 };
 
 export default PhoneVerification;

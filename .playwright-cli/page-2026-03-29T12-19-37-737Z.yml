@@ -1,0 +1,36 @@
+- generic [ref=e5]:
+  - heading "🔐 Вход в систему Система управления клиникой" [level=3] [ref=e7]:
+    - generic [ref=e8]: 🔐 Вход в систему
+    - generic [ref=e9]: Система управления клиникой
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Тип входа
+        - button "Имя пользователя" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: Имя пользователя
+          - img [ref=e18]
+      - generic [ref=e20]:
+        - generic [ref=e21]: Имя пользователя *
+        - textbox "Введите имя пользователя" [ref=e23]: admin@example.com
+      - generic [ref=e24]:
+        - generic [ref=e25]: Пароль *
+        - generic [ref=e26]:
+          - textbox "Введите пароль" [ref=e28]: admin123
+          - button "Показать" [ref=e29] [cursor=pointer]:
+            - generic [ref=e30]: Показать
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33] [cursor=pointer]:
+            - checkbox "Запомнить меня"
+            - img
+          - text: Запомнить меня
+        - button "Забыли пароль?" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: Забыли пароль?
+      - generic [ref=e44]: Failed to fetch
+      - button "ВОЙТИ →" [ref=e37] [cursor=pointer]:
+        - generic [ref=e38]: ВОЙТИ →
+    - generic [ref=e39]:
+      - button "Регистрация" [ref=e40] [cursor=pointer]:
+        - generic [ref=e41]: Регистрация
+      - button "Гость" [ref=e42] [cursor=pointer]:
+        - generic [ref=e43]: Гость

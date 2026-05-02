@@ -8,7 +8,7 @@ import requests
 import json
 
 # API configuration
-API_BASE = "http://localhost:8000"
+API_BASE = "http://localhost:18000"
 AUTH_TOKEN = "your_token_here"  # We'll get this from login
 
 # First, login as registrar

@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { buildWsUrl } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
 
 /**
@@ -96,7 +97,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
  * @returns {WebSocket} WebSocket соединение
  */
 export function createQueueWebSocket(department, date, options = {}) {
-  const baseUrl = 'ws://localhost:8000/api/v1/ws-auth/ws/queue/optional-auth';
+  const baseUrl = buildWsUrl('/api/v1/ws-auth/ws/queue/optional-auth');
   const params = { department, date };
 
   return createAuthenticatedWebSocket(baseUrl, params, options);
@@ -109,7 +110,7 @@ export function createQueueWebSocket(department, date, options = {}) {
  * @returns {WebSocket} WebSocket соединение
  */
 export function createDisplayBoardWebSocket(boardId, options = {}) {
-  const baseUrl = `ws://localhost:8000/api/v1/display/ws/board/${encodeURIComponent(boardId)}`;
+  const baseUrl = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}`);
   const params = {};
 
   return createAuthenticatedWebSocket(baseUrl, params, options);

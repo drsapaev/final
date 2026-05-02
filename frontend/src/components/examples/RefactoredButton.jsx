@@ -15,7 +15,7 @@
  * 6. Transitions use duration + easing from theme
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Loader } from 'lucide-react';
 import { unifiedTheme } from '@/theme/unifiedTheme';
@@ -38,7 +38,6 @@ const RefactoredButton = ({
   type = 'button',
   ...props
 }) => {
-  const [rippleEffect, setRippleEffect] = useState([]);
   const buttonRef = useRef(null);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -219,6 +218,7 @@ const RefactoredButton = ({
   return (
     <button
       ref={buttonRef}
+      className={className}
       type={type}
       style={buttonStyles}
       onClick={handleClick}

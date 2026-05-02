@@ -1,0 +1,39 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: Выберите специалистов и продолжайте регистрацию.
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - heading "Навбатга қўшилиш" [level=1] [ref=e7]
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - img [ref=e10]
+            - text: Клиника
+          - generic [ref=e13]:
+            - img [ref=e14]
+            - text: Все специалисты
+          - generic [ref=e17]:
+            - img [ref=e18]
+            - generic [ref=e20]: "Қабул куни: 2026 M04 12"
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Мутахассисларни танланг" [level=3] [ref=e23]
+          - paragraph [ref=e24]: Бир нечта мутахассисни бир вақтда танлаш мумкин
+        - generic [ref=e25]:
+          - generic [ref=e26] [cursor=pointer]:
+            - checkbox "❤️ Cardiologist User • Кардиология" [ref=e27]
+            - generic [ref=e28]: ❤️
+            - generic [ref=e29]: Cardiologist User • Кардиология
+          - generic [ref=e30] [cursor=pointer]:
+            - checkbox "✨ Dermatologist User • Дерматология" [ref=e31]
+            - generic [ref=e32]: ✨
+            - generic [ref=e33]: Dermatologist User • Дерматология
+          - generic [ref=e34] [cursor=pointer]:
+            - checkbox "🦷 Dentist User • Стоматология • Каб. 103" [ref=e35]
+            - generic [ref=e36]: 🦷
+            - generic [ref=e37]: Dentist User • Стоматология • Каб. 103
+          - generic [ref=e38] [cursor=pointer]:
+            - checkbox "🦷 Temp Dentistry User • Стоматология • Каб. 104" [ref=e39]
+            - generic [ref=e40]: 🦷
+            - generic [ref=e41]: Temp Dentistry User • Стоматология • Каб. 104
+        - button "Давом этиш (0)" [disabled] [ref=e42]
+  - region "Notifications Alt+T"

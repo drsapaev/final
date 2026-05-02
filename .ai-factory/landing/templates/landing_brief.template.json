@@ -1,0 +1,29 @@
+{
+  "project_name": "",
+  "problem": "",
+  "promise": "",
+  "primary_audience": "",
+  "secondary_audiences": [],
+  "primary_cta": "",
+  "secondary_cta": "",
+  "proof_points": [],
+  "sections": [
+    {
+      "id": "hero",
+      "goal": "",
+      "must_include": []
+    },
+    {
+      "id": "proof",
+      "goal": "",
+      "must_include": []
+    },
+    {
+      "id": "cta",
+      "goal": "",
+      "must_include": []
+    }
+  ],
+  "assumptions": [],
+  "blocked_questions": []
+}

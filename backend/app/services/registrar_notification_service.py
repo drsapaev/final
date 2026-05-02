@@ -7,7 +7,7 @@ import logging
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -20,6 +20,8 @@ from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.doctor_info_service import get_doctor_info_service
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
+from app.services.notifications import notification_sender_service
+from app.services.service_mapping import get_service_code
 from app.services.telegram.bot import TelegramBotService
 
 logger = logging.getLogger(__name__)
@@ -34,20 +36,63 @@ class RegistrarNotificationService:
         self.email_sms_service = EmailSMSEnhancedService()
         self.doctor_info_service = get_doctor_info_service(db)
 
+    async def _record_registrar_canonical_event(
+        self,
+        *,
+        event_type: str,
+        title: str,
+        message: str,
+        metadata: dict[str, Any],
+        roles: list[str] | None = None,
+        deep_link: str | None = None,
+    ) -> bool:
+        created = await notification_sender_service.send_registrar_event_notification(
+            db=self.db,
+            event_type=event_type,
+            title=title,
+            message=message,
+            metadata=metadata,
+            roles=roles,
+            deep_link=deep_link or "/registrar",
+        )
+        if not created:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] registrar canonical event failed",
+                extra={"event_type": event_type, "metadata": metadata},
+            )
+        return created
+
+    @staticmethod
+    def _resolve_system_alert_event_type(alert_type: str) -> str:
+        normalized = str(alert_type or "").strip().lower()
+        if normalized in {"security_alert", "security", "auth", "auth_failure"}:
+            return "security_alert"
+        if normalized in {"payment_issue", "billing", "billing_alert", "payment"}:
+            return "billing_alert"
+        return "registrar_system_alert"
+
     # ===================== ПОЛУЧЕНИЕ РЕГИСТРАТОРОВ =====================
 
     def get_active_registrars(self) -> list[User]:
         """Получает список активных регистраторов"""
         return (
             self.db.query(User)
-            .filter(and_(User.role == "Registrar", User.is_active == True))
+            .filter(
+                and_(
+                    func.lower(User.role).in_(["registrar", "receptionist"]),
+                    User.is_active == True,
+                )
+            )
             .all()
         )
 
     def get_registrars_by_department(self, department: str = None) -> list[User]:
         """Получает регистраторов по отделению"""
         query = self.db.query(User).filter(
-            and_(User.role == "Registrar", User.is_active == True)
+            and_(
+                func.lower(User.role).in_(["registrar", "receptionist"]),
+                User.is_active == True,
+            )
         )
 
         # Если указано отделение, фильтруем по нему
@@ -99,7 +144,9 @@ class RegistrarNotificationService:
             if services:
                 services_list = []
                 for service in services:
-                    services_list.append(f"• {service.name} ({service.code})")
+                    services_list.append(
+                        f"• {service.name} ({service.service_code or get_service_code(service.id, self.db)})"
+                    )
                     total_amount += float(service.price) if service.price else 0
                 services_text = "\n".join(services_list)
             elif isinstance(appointment, Visit):
@@ -140,6 +187,21 @@ class RegistrarNotificationService:
 ⏰ Создано: {datetime.now().strftime('%d.%m.%Y %H:%M')}
             """.strip()
 
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type="new_appointment",
+                title="Новая запись в клинике",
+                message=f"Создана новая запись для пациента {patient.full_name}.",
+                metadata={
+                    "appointment_id": appointment.id,
+                    "appointment_kind": appointment_type.lower(),
+                    "patient_id": patient.id,
+                    "doctor_id": getattr(appointment, "doctor_id", None),
+                    "priority": priority,
+                },
+                roles=["registrar"],
+                deep_link="/registrar",
+            )
+
             # Отправляем уведомления
             results = []
             for registrar in registrars:
@@ -151,6 +213,7 @@ class RegistrarNotificationService:
             return {
                 "success": True,
                 "message": f"Уведомления отправлены {len(registrars)} регистраторам",
+                "canonical_created": canonical_created,
                 "results": results,
             }
 
@@ -207,7 +270,7 @@ class RegistrarNotificationService:
 👨‍⚕️ Врач: {doctor_name}
 🏥 Отделение: {department_name}
 👤 Пациент: {patient_info}
-🔧 Услуга: {service.name} ({service.code})
+🔧 Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.db)})
 💰 Цена: {price_override.original_price} → {price_override.new_price} сум
 📝 Причина: {price_override.reason}
 {f"📋 Детали: {price_override.details}" if price_override.details else ""}
@@ -217,6 +280,23 @@ class RegistrarNotificationService:
 
 Для одобрения/отклонения перейдите в панель регистратора.
             """.strip()
+
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type="price_change",
+                title="Изменение цены врачом",
+                message=f"Цена услуги {service.name} изменена и ожидает подтверждения.",
+                metadata={
+                    "price_override_id": price_override.id,
+                    "doctor_id": doctor.id,
+                    "service_id": service.id,
+                    "visit_id": visit.id if visit else None,
+                    "patient_id": patient.id if patient else None,
+                    "original_price": float(price_override.original_price),
+                    "new_price": float(price_override.new_price),
+                },
+                roles=["registrar"],
+                deep_link="/registrar",
+            )
 
             # Отправляем уведомления
             results = []
@@ -234,6 +314,7 @@ class RegistrarNotificationService:
             return {
                 "success": True,
                 "message": f"Уведомления об изменении цены отправлены {len(registrars)} регистраторам",
+                "canonical_created": canonical_created,
                 "results": results,
             }
 
@@ -315,6 +396,22 @@ class RegistrarNotificationService:
 {f"ℹ️ Дополнительно: {additional_info}" if additional_info else ""}
             """.strip()
 
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type="queue_status_changed",
+                title="Изменение статуса очереди",
+                message=f"Статус очереди изменён: {status_change}.",
+                metadata={
+                    "queue_entry_id": queue_entry.id,
+                    "queue_id": queue_entry.queue_id,
+                    "patient_id": queue_entry.patient_id,
+                    "queue_number": queue_entry.queue_number,
+                    "status_change": status_change,
+                    "additional_info": additional_info,
+                },
+                roles=["registrar"],
+                deep_link="/registrar",
+            )
+
             # Отправляем уведомления
             results = []
             for registrar in registrars:
@@ -326,6 +423,7 @@ class RegistrarNotificationService:
             return {
                 "success": True,
                 "message": f"Уведомления о статусе очереди отправлены {len(registrars)} регистраторам",
+                "canonical_created": canonical_created,
                 "results": results,
             }
 
@@ -375,6 +473,20 @@ class RegistrarNotificationService:
 Требуется внимание регистратуры.
             """.strip()
 
+            canonical_event_type = self._resolve_system_alert_event_type(alert_type)
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type=canonical_event_type,
+                title=f"Системное уведомление: {alert_type}",
+                message=message,
+                metadata={
+                    "alert_type": alert_type,
+                    "priority": priority,
+                    "department": department,
+                },
+                roles=["registrar", "admin"],
+                deep_link="/registrar",
+            )
+
             # Отправляем уведомления
             results = []
             for registrar in registrars:
@@ -386,6 +498,7 @@ class RegistrarNotificationService:
             return {
                 "success": True,
                 "message": f"Системные уведомления отправлены {len(registrars)} регистраторам",
+                "canonical_created": canonical_created,
                 "results": results,
             }
 
@@ -437,6 +550,19 @@ class RegistrarNotificationService:
 Хорошего рабочего дня! 🌟
             """.strip()
 
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type="system_alert",
+                title="Ежедневная сводка регистратора",
+                message=f"Сводка за {target_date.strftime('%d.%m.%Y')} готова.",
+                metadata={
+                    "summary_kind": "daily",
+                    "target_date": target_date.isoformat(),
+                    "stats": stats,
+                },
+                roles=["registrar"],
+                deep_link="/registrar",
+            )
+
             # Отправляем сводку
             results = []
             for registrar in registrars:
@@ -448,6 +574,7 @@ class RegistrarNotificationService:
             return {
                 "success": True,
                 "message": f"Ежедневная сводка отправлена {len(registrars)} регистраторам",
+                "canonical_created": canonical_created,
                 "results": results,
             }
 
@@ -522,6 +649,22 @@ class RegistrarNotificationService:
 📎 ID записи: {appointment.id}
             """.strip()
 
+            canonical_created = await self._record_registrar_canonical_event(
+                event_type="system_alert",
+                title="Назначены новые услуги",
+                message=f"Для записи #{appointment.id} назначены новые услуги.",
+                metadata={
+                    "subtype": "services_assigned",
+                    "appointment_id": appointment.id,
+                    "patient_id": appointment.patient_id,
+                    "doctor_id": doctor.id,
+                    "services_count": len(services),
+                    "total_price": float(total_price),
+                },
+                roles=["registrar"],
+                deep_link="/registrar",
+            )
+
             results = []
             for registrar in registrars:
                 try:
@@ -559,6 +702,7 @@ class RegistrarNotificationService:
                 "success": True,
                 "message": f"Уведомление отправлено {success_count} из {len(registrars)} регистраторов",
                 "results": results,
+                "canonical_created": canonical_created,
                 "appointment_id": appointment.id,
                 "patient_name": patient_name,
                 "doctor_name": (

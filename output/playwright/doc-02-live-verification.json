@@ -1,0 +1,28 @@
+{
+  "queue_stats": {
+    "total": 1,
+    "waiting": 0,
+    "called": 1,
+    "served": 0,
+    "online_entries": 0,
+    "desk_entries": 1
+  },
+  "matched_entry": {
+    "id": 6,
+    "number": 1,
+    "patient_name": "DOC-02 Админ 1774161713",
+    "phone": "+998905672271",
+    "source": "desk",
+    "status": "called",
+    "created_at": "2026-03-22T09:41:53.065876+03:00",
+    "called_at": "2026-03-22T06:42:47.511225+03:00",
+    "patient": {
+      "id": 448,
+      "first_name": "Пациент",
+      "last_name": "Админ",
+      "middle_name": "Поток",
+      "phone": "+998905672271",
+      "birth_date": "1990-01-15"
+    }
+  }
+}

@@ -39,12 +39,15 @@ from .clinic import (
     ServiceCategory,
     SystemInfo,
 )
+from .cardio_blood_test import CardioBloodTest
 from .department import (
     Department,
     DepartmentQueueSettings,
     DepartmentRegistrationSettings,
     DepartmentService,
 )
+from .derma_examination import DermaExamination
+from .derma_procedure import DermaProcedure
 from .doctor_phrase_history import DoctorPhraseHistory
 from .doctor_price_override import DoctorPriceOverride
 from .doctor_templates import (
@@ -55,8 +58,15 @@ from .doctor_templates import (
 )
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
-from .emr_v2 import SYSTEM_USER_ID, EMRAuditLog, EMRRecord, EMRRevision
+from .emr_v2 import (
+    SYSTEM_USER_ID,
+    EMRAuditLog,
+    EMRMigrationLedger,
+    EMRRecord,
+    EMRRevision,
+)
 from .emr_version import EMRVersion
+from .finance import FinanceTransaction
 from .family_relation import FamilyRelation, RelationType
 from .file_system import (
     File,
@@ -73,9 +83,24 @@ from .file_system import (
 from .global_search_audit import GlobalSearchAudit
 
 # КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
-from .lab import LabOrder, LabResult
+from .lab import (
+    LabCatalogAnalyte,
+    LabCatalogReferenceRange,
+    LabCatalogUnit,
+    LabOrder,
+    LabReportFieldDef,
+    LabReportInstance,
+    LabReportSection,
+    LabReportTemplate,
+    LabReportTemplateVersion,
+    LabReportValue,
+    LabResult,
+    LabTemplateServiceBinding,
+)
 from .message import Message
 from .notification import (
+    NotificationDelivery,
+    NotificationEvent,
     NotificationHistory,
     NotificationTemplate,
 )
@@ -117,8 +142,8 @@ from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 # from .doctor_price_override import DoctorPriceOverride
 # from .webhook import Webhook, WebhookCall, WebhookEvent
 # from .ai_config import AIProvider, AIProviderSettings
-# from .display_config import DisplayBoard, DisplayBanner, DisplayTheme
-# from .print_config import PrintTemplate, PrintJob
+from .display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme
+from .print_config import PrinterConfig, PrintJob, PrintTemplate
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate
 # from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -127,6 +152,7 @@ from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
 # QueueTicket заменен на новые модели в queue.py
 from .schedule import ScheduleTemplate
 from .service import Service, ServiceCatalog
+from .service_audit import ServiceAuditLog
 from .setting import Setting
 from .telegram_config import (
     TelegramConfig,
@@ -163,10 +189,15 @@ __all__ = [
     "VisitService",
     "Service",
     "ServiceCatalog",
+    "ServiceAuditLog",
     "Payment",
     "PaymentWebhook",
     "PaymentProvider",
     "PaymentTransaction",
+    "FinanceTransaction",
+    "PrinterConfig",
+    "PrintTemplate",
+    "PrintJob",
     "Appointment",
     # "QueueTicket", # заменен на DailyQueue, QueueEntry, QueueToken
     "ScheduleTemplate",
@@ -178,6 +209,7 @@ __all__ = [
     "EMRRecord",
     "EMRRevision",
     "EMRAuditLog",
+    "EMRMigrationLedger",
     "SYSTEM_USER_ID",
     "TwoFactorAuth",
     "TwoFactorBackupCode",
@@ -201,9 +233,21 @@ __all__ = [
     "Permission",
     "UserGroup",
     "UserPermissionOverride",
+    "LabCatalogUnit",
+    "LabCatalogAnalyte",
+    "LabCatalogReferenceRange",
     "LabOrder",
+    "LabReportTemplate",
+    "LabTemplateServiceBinding",
+    "LabReportTemplateVersion",
+    "LabReportSection",
+    "LabReportFieldDef",
+    "LabReportInstance",
+    "LabReportValue",
     "LabResult",
     "AuditLog",
+    "NotificationEvent",
+    "NotificationDelivery",
     "NotificationTemplate",
     "NotificationHistory",
     "Message",
@@ -214,6 +258,9 @@ __all__ = [
     "Doctor",
     "Schedule",
     "ServiceCategory",
+    "CardioBloodTest",
+    "DermaExamination",
+    "DermaProcedure",
     "Branch",
     "BranchStatus",
     "Equipment",

@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getApiOrigin } from '../api/runtime';
 
 /**
  * Утилиты для тестирования мастера регистрации
@@ -8,7 +9,7 @@ import tokenManager from '../utils/tokenManager';
 
 class WizardTester {
   constructor() {
-    this.API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+    this.API_BASE = getApiOrigin();
     this.token = tokenManager.getAccessToken();
   }
 

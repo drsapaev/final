@@ -9,7 +9,7 @@ import json
 def test_api_endpoints():
     """Тестируем все API эндпоинты, которые использует фронтенд"""
 
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:18000"
     token = None
 
     # 1. Получаем токен

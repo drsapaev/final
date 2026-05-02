@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
+import '../../styles/animations.css';
+import PropTypes from 'prop-types';
 
 const FileUpload = ({
   onFilesSelected,
@@ -53,7 +55,8 @@ const FileUpload = ({
     setConverting(true);
 
     if (rejectedFiles && rejectedFiles.length > 0) {
-      if (rejectedFiles[0].size > maxSize) {
+      const rejectedFile = rejectedFiles[0].file || rejectedFiles[0];
+      if (rejectedFile.size > maxSize) {
         setError(`File size too large (max ${maxSize / 1024 / 1024}MB)`);
       } else {
         setError('File type not supported or invalid');
@@ -123,7 +126,7 @@ const FileUpload = ({
     }
   }, [maxSize, onFilesSelected, clearOnSelect]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop: handleDrop,
     maxSize,
     accept,
@@ -153,24 +156,36 @@ const FileUpload = ({
 
   const containerStyle = {
     padding: '24px',
-    border: `2px dashed ${isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-border, #E5E5E5)'}`,
+    border: `2px dashed ${
+      isDragActive || isFocused
+        ? 'var(--mac-accent-blue, #007AFF)'
+        : 'var(--mac-border, #E5E5E5)'
+    }`,
     borderRadius: '8px',
     backgroundColor: isDragActive ? 'var(--mac-bg-secondary, #F5F5F7)' : 'var(--mac-bg-primary, #FFFFFF)',
     cursor: disabled ? 'default' : 'pointer',
     textAlign: 'center',
     transition: 'all 0.2s ease',
     opacity: disabled ? 0.6 : 1,
+    outline: 'none',
     ...style
   };
 
   return (
     <div className={className}>
-            <div {...getRootProps()} style={containerStyle}>
-                <input {...getInputProps()} />
+            <div {...getRootProps()} style={containerStyle} aria-label="File upload dropzone">
+                <input
+                  {...getInputProps()}
+                  aria-describedby={error ? 'file-upload-error' : undefined}
+                />
 
                 {converting ?
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <Loader className="animate-spin text-blue-500" size={32} />
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+        >
+                        <Loader className="animate-spin" size={32} style={{ color: 'var(--mac-accent-blue, #007AFF)' }} />
                         <p style={{ color: 'var(--mac-text-secondary, #8E8E93)', margin: 0 }}>
                             Processing files...
                         </p>
@@ -183,7 +198,7 @@ const FileUpload = ({
               color: isDragActive ? 'var(--mac-accent-blue, #007AFF)' : 'var(--mac-text-tertiary, #C7C7CC)',
               marginBottom: '12px'
             }} />
-          
+
                         <p style={{ margin: '0 0 4px', color: 'var(--mac-text-primary, #1D1D1F)', fontWeight: 500 }}>
                             {isDragActive ? 'Drop files here' : 'Click or drag files to upload'}
                         </p>
@@ -195,7 +210,10 @@ const FileUpload = ({
             </div>
 
             {error &&
-      <div style={{
+      <div
+        id="file-upload-error"
+        role="alert"
+        style={{
         marginTop: '12px',
         padding: '12px',
         backgroundColor: '#FFF2F2',
@@ -281,8 +299,9 @@ const FileUpload = ({
               cursor: 'pointer',
               padding: 0
             }}
-            title="Remove">
-            
+            title="Remove"
+            aria-label={`Remove ${preview.originalName}`}>
+
                                 <X size={12} />
                             </button>
 
@@ -303,6 +322,20 @@ const FileUpload = ({
       }
         </div>);
 
+};
+
+
+FileUpload.propTypes = {
+  ...(FileUpload.propTypes || {}),
+  accept: PropTypes.any,
+  className: PropTypes.any,
+  clearOnSelect: PropTypes.any,
+  disabled: PropTypes.any,
+  maxSize: PropTypes.any,
+  multiple: PropTypes.any,
+  onFilesSelected: PropTypes.any,
+  showPreviews: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default FileUpload;

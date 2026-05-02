@@ -14,6 +14,7 @@ import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const [step, setStep] = useState('method'); // method, phone-verify, email-verify, reset-password
   const [method, setMethod] = useState('phone'); // phone, email
@@ -543,6 +544,14 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       {step === 'success' && renderSuccess()}
     </div>);
 
+};
+
+
+ForgotPassword.propTypes = {
+  ...(ForgotPassword.propTypes || {}),
+  language: PropTypes.any,
+  onBack: PropTypes.any,
+  onSuccess: PropTypes.any,
 };
 
 export default ForgotPassword;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, useFade, useScale } from '../ui/native';
+import PropTypes from 'prop-types';
 
 const KPICard = ({ 
   title, 
@@ -110,6 +111,20 @@ const KPICard = ({
       </div>
     </Card>
   );
+};
+
+
+KPICard.propTypes = {
+  ...(KPICard.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  icon: PropTypes.any,
+  loading: PropTypes.any,
+  title: PropTypes.any,
+  toLocaleString: PropTypes.any,
+  trend: PropTypes.any,
+  trendType: PropTypes.any,
+  value: PropTypes.any,
 };
 
 export default KPICard;

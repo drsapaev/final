@@ -505,19 +505,23 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
             return finalizeItems(items);
         }
 
-        // ⭐ Приоритет 5: queue_numbers (fallback на specialty/service_name)
+        // ⭐ Приоритет 5: queue_numbers только по явным полям очереди
         initialData.queue_numbers.forEach(q => {
-            const serviceName = q.service_name || q.specialty || 'Консультация';
-            const serviceCode = toServiceCode(serviceName) || toServiceCode(q.specialty);
+            const serviceName = q.service_name || null;
+            const serviceCode = serviceName ? toServiceCode(serviceName) : null;
             const foundService = servicesData.find(s =>
                 s.service_code === serviceCode ||
                 s.code === serviceCode ||
                 s.id === q.service_id
             );
 
+            if (!foundService && !q.service_id && !serviceCode) {
+                return;
+            }
+
             items.push(createCartItem({
                 id: q.service_id || foundService?.id || null,
-                name: foundService?.name || q.service_name || serviceName,
+                name: foundService?.name || serviceName || 'Услуга',
                 code: serviceCode,
                 price: foundService?.price || q.service_price || 0,
                 quantity: q.quantity || 1,

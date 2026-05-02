@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   Key,
   Smartphone,
@@ -23,12 +24,30 @@ import {
 import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
+import api from '../../api/client';
+
+const buildStats = (items = []) => ({
+  total_activations: items.length,
+  active_activations: items.filter((item) => item.status === 'active').length,
+  trial_activations: items.filter((item) => item.status === 'trial').length,
+  expired_activations: items.filter((item) => item.status === 'expired').length
+});
+
+const parseMeta = (meta) => {
+  if (!meta) return {};
+  if (typeof meta === 'object') return meta;
+  try {
+    return JSON.parse(meta);
+  } catch {
+    return {};
+  }
+};
+
 const ActivationSystem = () => {
   const [loading, setLoading] = useState(true);
   const [activations, setActivations] = useState([]);
-  const [, setDevices] = useState([]);
   const [stats, setStats] = useState({});
+  const [serverStatus, setServerStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -36,47 +55,26 @@ const ActivationSystem = () => {
 
   // Статусы активации
   const statusLabels = {
+    issued: { label: 'Создана', color: 'info' },
     active: { label: 'Активна', color: 'success' },
     expired: { label: 'Истекла', color: 'warning' },
     revoked: { label: 'Отозвана', color: 'error' },
     trial: { label: 'Пробная', color: 'info' }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Загружаем активации, устройства и статистику
-      const [activationsRes, devicesRes, statsRes] = await Promise.all([
-      fetch('/api/v1/admin/activation/keys', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/activation/devices', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      }),
-      fetch('/api/v1/admin/activation/stats', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-      })]
-      );
+      const [activationsRes, statusRes] = await Promise.all([
+        api.get('/activation/list', { params: { limit: 100 } }),
+        api.get('/activation/status')
+      ]);
 
-      if (activationsRes.ok) {
-        const activationsData = await activationsRes.json();
-        setActivations(activationsData);
-      }
-
-      if (devicesRes.ok) {
-        const devicesData = await devicesRes.json();
-        setDevices(devicesData);
-      }
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
+      const activationsData = activationsRes.data?.items || [];
+      setActivations(activationsData);
+      setStats(buildStats(activationsData));
+      setServerStatus(statusRes.data || null);
 
     } catch (error) {
       logger.error('Ошибка загрузки данных активации:', error);
@@ -84,55 +82,67 @@ const ActivationSystem = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const generateActivationKey = async (keyData) => {
     try {
-      const response = await fetch('/api/v1/admin/activation/keys', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(keyData)
-      });
+      const payload = {
+        days: Number(keyData.duration_days) || 365,
+        status: keyData.key_type === 'trial' ? 'trial' : 'active',
+        meta: JSON.stringify({
+          key_type: keyData.key_type,
+          duration_days: keyData.duration_days,
+          max_devices: keyData.max_devices,
+          description: keyData.description,
+          features: keyData.features
+        })
+      };
 
-      if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: 'Ключ активации создан' });
-        setShowCreateForm(false);
-        await loadData();
-        return result;
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      const response = await api.post('/activation/issue', payload);
+      const result = response.data || {};
+      setMessage({ type: 'success', text: 'Ключ активации создан' });
+      setShowCreateForm(false);
+      await loadData();
+      return result;
     } catch (error) {
       logger.error('Ошибка создания ключа:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
 
-  const revokeActivation = async (activationId) => {
+  const revokeActivation = async (activationKey) => {
     if (!confirm('Отозвать активацию? Устройство будет заблокировано.')) return;
 
     try {
-      const response = await fetch(`/api/v1/admin/activation/keys/${activationId}/revoke`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Активация отозвана' });
-        await loadData();
-      } else {
-        throw new Error('Ошибка отзыва активации');
-      }
+      await api.post('/activation/revoke', { key: activationKey });
+      setMessage({ type: 'success', text: 'Активация отозвана' });
+      await loadData();
     } catch (error) {
       logger.error('Ошибка отзыва:', error);
       setMessage({ type: 'error', text: 'Ошибка отзыва активации' });
+    }
+  };
+
+  const extendActivation = async (activationKey) => {
+    const rawDays = window.prompt('На сколько дней продлить ключ?', '30');
+    if (!rawDays) return;
+    const days = Number.parseInt(rawDays, 10);
+    if (!Number.isFinite(days) || days <= 0) {
+      setMessage({ type: 'error', text: 'Введите корректное число дней' });
+      return;
+    }
+
+    try {
+      await api.post('/activation/extend', { key: activationKey, days });
+      setMessage({ type: 'success', text: 'Активация продлена' });
+      await loadData();
+    } catch (error) {
+      logger.error('Ошибка продления:', error);
+      setMessage({ type: 'error', text: 'Ошибка продления активации' });
     }
   };
 
@@ -199,6 +209,28 @@ const ActivationSystem = () => {
           </Button>
         </div>
       </div>
+
+      {serverStatus &&
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '12px 16px',
+        borderRadius: 'var(--mac-radius-md)',
+        backgroundColor: serverStatus.ok ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
+        color: serverStatus.ok ? 'var(--mac-success)' : 'var(--mac-warning)',
+        border: `1px solid ${serverStatus.ok ? 'var(--mac-success-border)' : 'var(--mac-warning-border)'}`
+      }}>
+          <Badge variant={serverStatus.ok ? 'success' : 'warning'}>
+            {serverStatus.ok ? 'Сервер активирован' : 'Сервер не активирован'}
+          </Badge>
+          <span style={{ fontSize: 'var(--mac-font-size-sm)' }}>
+            {serverStatus.ok ?
+            `Ключ ${serverStatus.key || 'не указан'}` :
+            (serverStatus.reason || 'Статус активации требует проверки')}
+          </span>
+        </div>
+      }
 
       {/* Сообщения */}
       {message.text &&
@@ -333,6 +365,7 @@ const ActivationSystem = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               options={[
               { value: 'all', label: 'Все статусы' },
+              { value: 'issued', label: 'Созданные' },
               { value: 'active', label: 'Активные' },
               { value: 'trial', label: 'Пробные' },
               { value: 'expired', label: 'Истекшие' },
@@ -362,12 +395,12 @@ const ActivationSystem = () => {
                     fontFamily: 'monospace',
                     color: 'var(--mac-text-primary)'
                   }}>
-                        {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
+                        {(activation || {}).key?.slice(0, 8)}...{(activation || {}).key?.slice(-4)}
                       </div>
                       <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => copyToClipboard(activation.key)}
+                    onClick={() => copyToClipboard((activation || {}).key)}
                     style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: '4px' }}>
                     
                         <Copy style={{ width: '12px', height: '12px', marginRight: '4px' }} />
@@ -389,10 +422,10 @@ const ActivationSystem = () => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)'
                   }}>
-                        {activation.machine_hash?.slice(0, 12)}...
+                        {(activation || {}).machine_hash ? `${(activation || {}).machine_hash.slice(0, 12)}...` : 'Не привязано'}
                       </div>
                       <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
-                        ID: {activation.id}
+                        {parseMeta((activation || {}).meta).description || parseMeta((activation || {}).meta).key_type || 'Без описания'}
                       </div>
                     </div>
                   </div>
@@ -402,7 +435,8 @@ const ActivationSystem = () => {
               key: 'status',
               title: 'Статус',
               render: (activation) => {
-                const status = statusLabels[activation.status] || { label: activation.status, color: 'secondary' };
+                const row = activation || {};
+                const status = statusLabels[row.status] || { label: row.status, color: 'secondary' };
                 return <Badge variant={status.color}>{status.label}</Badge>;
               }
             },
@@ -410,18 +444,19 @@ const ActivationSystem = () => {
               key: 'expiry',
               title: 'Срок действия',
               render: (activation) => {
-                const isExpired = new Date(activation.expiry_date) < new Date();
+                const row = activation || {};
+                const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
                 return (
                   <div>
                       <div style={{
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-primary)'
                     }}>
-                        {new Date(activation.expiry_date).toLocaleDateString('ru-RU')}
+                        {row.expiry_date ? new Date(row.expiry_date).toLocaleDateString('ru-RU') : '—'}
                       </div>
                       {isExpired &&
                     <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
-                          Истек {Math.floor((new Date() - new Date(activation.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
+                          Истек {Math.floor((new Date() - new Date(row.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
                         </div>
                     }
                     </div>);
@@ -436,7 +471,7 @@ const ActivationSystem = () => {
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-primary)'
               }}>
-                    {new Date(activation.created_at).toLocaleDateString('ru-RU')}
+                    {(activation || {}).created_at ? new Date((activation || {}).created_at).toLocaleDateString('ru-RU') : '—'}
                   </div>
 
             },
@@ -448,16 +483,16 @@ const ActivationSystem = () => {
                     <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {/* Продлить лицензию */}}
-                  disabled={activation.status === 'revoked'}>
+                  onClick={() => extendActivation((activation || {}).key)}
+                  disabled={(activation || {}).status === 'revoked'}>
                   
                       <Calendar style={{ width: '14px', height: '14px' }} />
                     </Button>
                     <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => revokeActivation(activation.id)}
-                  disabled={activation.status === 'revoked'}>
+                  onClick={() => revokeActivation((activation || {}).key)}
+                  disabled={(activation || {}).status === 'revoked'}>
                   
                       <Shield style={{ width: '14px', height: '14px' }} />
                     </Button>
@@ -729,6 +764,11 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
       </form>
     </Card>);
 
+};
+
+ActivationKeyForm.propTypes = {
+  onSave: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired
 };
 
 export default ActivationSystem;

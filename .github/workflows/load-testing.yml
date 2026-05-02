@@ -16,10 +16,28 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # Весь job не блокирует workflow
     if: ${{ github.event_name == 'workflow_dispatch' }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
     
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.11.10'
         
@@ -46,7 +64,7 @@ jobs:
     - name: 🗄️ Проверка базы данных
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
+        export DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
@@ -62,49 +80,31 @@ jobs:
           exit 1
         fi
         
-        echo "🗄️ Проверяем существующую базу clinic.db..."
-        if [ -f "clinic.db" ]; then
-            echo "✅ База данных clinic.db найдена"
-            ls -la clinic.db
-        else
-            echo "⚠️ База данных clinic.db не найдена, создаем..."
-            python -c "
-            import sys
-            import os
-            import traceback
-            sys.path.insert(0, '.')
-            
-            print('🔧 Начинаем создание базы данных...')
-            
+        echo "⏳ Ожидаем готовность Postgres..."
+        python - <<'PY'
+        import os
+        import time
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(os.environ["DATABASE_URL"])
+        for i in range(30):
             try:
-                from app.db.base import Base
-                from app.db.session import engine
-                print('✅ Импорт базовых компонентов БД успешен')
-                
-                # Импортируем модели для создания таблиц
-                try:
-                    import app.models
-                    print('✅ Импорт всех моделей успешен')
-                except ImportError as e:
-                    print(f'⚠️ Ошибка импорта моделей: {e}')
-                    from app.models.user import User
-                    print('✅ Импорт базовой модели User успешен')
-                
-                Base.metadata.create_all(bind=engine)
-                print('✅ База данных создана')
-                
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                print("✅ Postgres ready")
+                break
             except Exception as e:
-                print(f'❌ Ошибка создания базы: {e}')
-                print('📋 Детали ошибки:')
-                traceback.print_exc()
-                sys.exit(1)
-            "
-        fi
+                if i == 29:
+                    raise
+                print(f"Attempt {i + 1}/30: {e}")
+                time.sleep(2)
+        PY
+        alembic upgrade head
         
     - name: 🚀 Запуск сервера
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
+        export DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
@@ -163,14 +163,14 @@ jobs:
         }
         
         # Проверяем порт
-        echo "🔍 Проверяем порт 8000:"
-        if netstat -tuln 2>/dev/null | grep -q ":8000 "; then
-            echo "⚠️ Порт 8000 занят, освобождаем..."
-            pkill -f "uvicorn.*8000" 2>/dev/null || true
+        echo "🔍 Проверяем порт 18000:"
+        if netstat -tuln 2>/dev/null | grep -q ":18000 "; then
+            echo "⚠️ Порт 18000 занят, освобождаем..."
+            pkill -f "uvicorn.*18000" 2>/dev/null || true
             sleep 2
         fi
         
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level debug > server.log 2>&1 &
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 --log-level debug > server.log 2>&1 &
         server_pid=$!
         echo $server_pid > server.pid
         echo "📊 PID сервера: $server_pid"
@@ -188,7 +188,7 @@ jobs:
                 exit 1
             fi
             
-            if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            if curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
                 echo "✅ Сервер запущен успешно"
                 break
             fi
@@ -199,7 +199,7 @@ jobs:
                 echo "📊 Проверяем процессы:"
                 ps aux | grep uvicorn || echo "Процессы uvicorn не найдены"
                 echo "🔍 Проверяем порты:"
-                netstat -tuln | grep ":8000" || echo "Порт 8000 не слушается"
+                netstat -tuln | grep ":18000" || echo "Порт 18000 не слушается"
                 kill $server_pid 2>/dev/null || true
                 exit 1
             fi
@@ -210,7 +210,7 @@ jobs:
       continue-on-error: true
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
+        export DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
@@ -218,10 +218,10 @@ jobs:
         
         # Проверяем, что сервер запущен, если нет - пропускаем тест
         echo "🔍 Проверяем состояние сервера..."
-        if ! curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+        if ! curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
             echo "⚠️ Сервер не отвечает на health check!"
             echo "📋 Диагностика сервера:"
-            curl -v "http://127.0.0.1:8000/api/v1/health" || echo "Health check недоступен"
+            curl -v "http://127.0.0.1:18000/api/v1/health" || echo "Health check недоступен"
             echo "📊 Проверяем процессы:"
             ps aux | grep uvicorn || echo "Процессы uvicorn не найдены"
             echo "📄 Логи сервера:"
@@ -241,7 +241,7 @@ jobs:
         echo '' >> load_test_api.py
         echo 'async def test_endpoint(client, endpoint):' >> load_test_api.py
         echo '    try:' >> load_test_api.py
-        echo '        response = await client.get(f"http://127.0.0.1:8000{endpoint}")' >> load_test_api.py
+        echo '        response = await client.get(f"http://127.0.0.1:18000{endpoint}")' >> load_test_api.py
         echo '        return response.status_code, float(response.elapsed.total_seconds()) if hasattr(response, "elapsed") else 0.1' >> load_test_api.py
         echo '    except Exception as e:' >> load_test_api.py
         echo '        print(f"❌ Ошибка запроса к {endpoint}: {e}")' >> load_test_api.py
@@ -319,7 +319,7 @@ jobs:
         ) || (
             echo "⚠️ Load testing завершился с предупреждениями"
             echo "📋 Диагностика:"
-            curl -s "http://127.0.0.1:8000/api/v1/health" && echo "✅ API доступен" || echo "❌ API недоступен"
+            curl -s "http://127.0.0.1:18000/api/v1/health" && echo "✅ API доступен" || echo "❌ API недоступен"
             echo "💡 Это не критично - load testing носит информационный характер"
         )
         
@@ -370,7 +370,7 @@ jobs:
         
     - name: 📤 Загрузка отчёта
       continue-on-error: true
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: performance-report
         path: performance-report.md
@@ -406,12 +406,12 @@ jobs:
         fi
         
         # Cleanup - убиваем все возможные uvicorn процессы на этом порту
-        echo "🧹 Очищаем все процессы uvicorn на порту 8000..."
-        pkill -f "uvicorn.*8000" 2>/dev/null || echo "⚠️ Процессы uvicorn на порту 8000 не найдены"
+        echo "🧹 Очищаем все процессы uvicorn на порту 18000..."
+        pkill -f "uvicorn.*18000" 2>/dev/null || echo "⚠️ Процессы uvicorn на порту 18000 не найдены"
         
         # Проверяем, что порт свободен
-        if netstat -tuln 2>/dev/null | grep -q ":8000 "; then
-          echo "⚠️ Порт 8000 все еще занят"
+        if netstat -tuln 2>/dev/null | grep -q ":18000 "; then
+          echo "⚠️ Порт 18000 все еще занят"
         else
-          echo "✅ Порт 8000 свободен"
+          echo "✅ Порт 18000 свободен"
         fi

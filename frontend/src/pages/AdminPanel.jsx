@@ -1,6 +1,7 @@
 // AdminPanel.jsx - macOS UI/UX Compliant - Updated: 2025-01-26
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getAdminNavSections, isInternalDemoEnabled } from '../routing/routeSelectors.js';
 import {
 
 
@@ -35,7 +36,6 @@ import {
   Brain,
   Globe,
   FileText,
-  Server,
   Printer,
   Stethoscope,
   Package,
@@ -61,6 +61,7 @@ import {
   Download,
 
   Key,
+  Lock,
   CheckCircle,
   Activity,
   Eye,
@@ -101,6 +102,7 @@ import useFinance from '../hooks/useFinance';
 import useReports from '../hooks/useReports';
 import useSettings from '../hooks/useSettings';
 import useSecurity from '../hooks/useSecurity';
+import notify from '../services/notify';
 
 import DoctorModal from '../components/admin/DoctorModal';
 import PatientModal from '../components/admin/PatientModal';
@@ -108,6 +110,7 @@ import AppointmentModal from '../components/admin/AppointmentModal';
 import FinanceModal from '../components/admin/FinanceModal';
 
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
+import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
 
 
 import ServiceCatalog from '../components/admin/ServiceCatalog';
@@ -116,6 +119,7 @@ import ServiceCatalog from '../components/admin/ServiceCatalog';
 
 
 import ActivationSystem from '../components/admin/ActivationSystem';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 
 
@@ -157,6 +161,8 @@ import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
+import QueueCabinetManagement from '../components/admin/QueueCabinetManagement';
+import { getApiOrigin } from '../api/runtime';
 
 
 
@@ -167,6 +173,64 @@ import { MobileNavigation } from '../components/admin/MobileOptimization';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
+
+const getAppointmentPatientDisplayName = (appointment) => {
+  const rawName =
+    appointment?.patientName ||
+    appointment?.patient_name ||
+    appointment?.patient?.full_name ||
+    appointment?.patient?.fio ||
+    appointment?.patient?.name ||
+    appointment?.patient?.first_name ||
+    appointment?.patient?.last_name ||
+    'Пациент';
+
+  const normalized = String(rawName).trim();
+  return normalized || 'Пациент';
+};
+
+const getAppointmentDoctorDisplayName = (appointment) => {
+  const rawName =
+    appointment?.doctorName ||
+    appointment?.doctor_name ||
+    appointment?.doctor?.full_name ||
+    appointment?.doctor?.name ||
+    appointment?.doctor?.user?.full_name ||
+    appointment?.doctor?.user?.username ||
+    'Врач';
+
+  const normalized = String(rawName).trim();
+  return normalized || 'Врач';
+};
+
+const getAppointmentDoctorSpecialization = (appointment) => {
+  const rawValue =
+    appointment?.doctorSpecialization ||
+    appointment?.doctor_specialization ||
+    appointment?.specialization ||
+    appointment?.doctor?.specialization ||
+    appointment?.doctor?.specialty ||
+    '';
+
+  return String(rawValue).trim();
+};
+
+const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
+const adminSurfaceStrong = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 78%) 0%, color-mix(in srgb, var(--mac-card-bg), white 70%) 100%)';
+const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';
+const adminBorder = '1px solid color-mix(in srgb, var(--mac-card-border), white 12%)';
+const adminTextSecondary = 'color-mix(in srgb, var(--mac-text-secondary), black 42%)';
+const adminTableHeaderSurface = 'var(--mac-table-header-bg)';
+const adminTableHeaderText = 'var(--mac-table-header-text)';
+const adminTableRowHover = 'var(--mac-table-row-hover-bg)';
+const adminSectionShellStyle = {
+  background: 'var(--mac-gradient-sidebar)',
+  border: '1px solid var(--mac-main-shell-border)',
+  borderRadius: '24px',
+  boxShadow: 'none',
+  backdropFilter: 'var(--mac-blur-light)',
+  WebkitBackdropFilter: 'var(--mac-blur-light)'
+};
 
 const AdminPanel = () => {
   const location = useLocation();
@@ -253,6 +317,8 @@ const AdminPanel = () => {
   // Хук для управления врачами
   const {
     doctors,
+    allDoctors,
+    availableUsers,
     loading: doctorsLoading,
     error: doctorsError,
     searchTerm: doctorsSearchTerm,
@@ -265,7 +331,8 @@ const AdminPanel = () => {
     setFilterStatus: setDoctorsFilterStatus,
     createDoctor,
     updateDoctor,
-    deleteDoctor
+    deleteDoctor,
+    refreshAvailableUsers
   } = useDoctors();
 
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном врачей
@@ -303,7 +370,7 @@ const AdminPanel = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
         const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -349,7 +416,7 @@ const AdminPanel = () => {
     getStatusStats,
     getTodayAppointments,
     getTomorrowAppointments
-  } = useAppointments();
+  } = useAppointments(allDoctors);
 
   // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном записей
   const appointmentModal = useModal();
@@ -469,13 +536,13 @@ const AdminPanel = () => {
     if (file) {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
-        alert('Выберите файл изображения');
+        notify.warning('Выберите файл изображения');
         return;
       }
 
       // Проверяем размер (макс 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Размер файла не должен превышать 5MB');
+        notify.warning('Размер файла не должен превышать 5MB');
         return;
       }
 
@@ -620,7 +687,7 @@ const AdminPanel = () => {
         await resetSettings();
       } catch (error) {
         logger.error('Ошибка сброса настроек:', error);
-        alert('Ошибка при сбросе настроек');
+        notify.error('Ошибка при сбросе настроек');
       }
     }
   });void (
@@ -630,7 +697,7 @@ const AdminPanel = () => {
       await exportSettings();
     } catch (error) {
       logger.error('Ошибка экспорта настроек:', error);
-      alert('Ошибка при экспорте настроек');
+      notify.error('Ошибка при экспорте настроек');
     }
   });void (
 
@@ -639,7 +706,7 @@ const AdminPanel = () => {
       await importSettings(file);
     } catch (error) {
       logger.error('Ошибка импорта настроек:', error);
-      alert('Ошибка при импорте настроек');
+      notify.error('Ошибка при импорте настроек');
     }
   });
 
@@ -696,7 +763,7 @@ const AdminPanel = () => {
       await exportSecurityLogs(format);
     } catch (error) {
       logger.error('Ошибка экспорта логов:', error);
-      alert('Ошибка при экспорте логов безопасности');
+      notify.error('Ошибка при экспорте логов безопасности');
     }
   });
 
@@ -742,7 +809,7 @@ const AdminPanel = () => {
         await deleteUser(user.id);
       } catch (error) {
         logger.error('Ошибка удаления пользователя:', error);
-        alert('Ошибка при удалении пользователя');
+        notify.error('Ошибка при удалении пользователя');
       }
     }
   });void (
@@ -794,10 +861,12 @@ const AdminPanel = () => {
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для врачей с универсальным хуком
   const handleCreateDoctor = () => {
+    void refreshAvailableUsers();
     doctorModal.openModal(null);
   };
 
   const handleEditDoctor = (doctor) => {
+    void refreshAvailableUsers(doctor?.id);
     doctorModal.openModal(doctor);
   };
 
@@ -806,11 +875,11 @@ const AdminPanel = () => {
     if (window.confirm(`Вы уверены, что хотите деактивировать врача "${doctorName}"?\n\nВрач будет отмечен как неактивный, но останется в базе данных.`)) {
       try {
         await deleteDoctor(doctor.id);
-        alert(`Врач "${doctorName}" успешно деактивирован`);
+        notify.success(`Врач "${doctorName}" успешно деактивирован`);
       } catch (error) {
         logger.error('Ошибка деактивации врача:', error);
         const errorMessage = error.message || 'Неизвестная ошибка';
-        alert(`Ошибка при деактивации врача: ${errorMessage}`);
+        notify.error(`Ошибка при деактивации врача: ${errorMessage}`);
       }
     }
   };
@@ -885,7 +954,7 @@ const AdminPanel = () => {
         await deletePatient(patient.id);
       } catch (error) {
         logger.error('Ошибка удаления пациента:', error);
-        alert('Ошибка при удалении пациента');
+        notify.error('Ошибка при удалении пациента');
       }
     }
   };
@@ -941,12 +1010,15 @@ const AdminPanel = () => {
   };
 
   const handleDeleteAppointment = async (appointment) => {
-    if (window.confirm(`Вы уверены, что хотите удалить запись "${appointment.patientName} - ${appointment.doctorName}"?`)) {
+    const patientName = getAppointmentPatientDisplayName(appointment);
+    const doctorName = getAppointmentDoctorDisplayName(appointment);
+
+    if (window.confirm(`Вы уверены, что хотите удалить запись "${patientName} - ${doctorName}"?`)) {
       try {
         await deleteAppointment(appointment.id);
       } catch (error) {
         logger.error('Ошибка удаления записи:', error);
-        alert('Ошибка при удалении записи');
+        notify.error('Ошибка при удалении записи');
       }
     }
   };
@@ -1029,7 +1101,7 @@ const AdminPanel = () => {
         await deleteTransaction(transaction.id);
       } catch (error) {
         logger.error('Ошибка удаления транзакции:', error);
-        alert('Ошибка при удалении транзакции');
+        notify.error('Ошибка при удалении транзакции');
       }
     }
   };
@@ -1093,46 +1165,39 @@ const AdminPanel = () => {
     return methodMap[method] || method;
   };
 
-  // Новая структура навигации
-  const navigationSections = [
-  {
-    title: 'Обзор',
-    items: [
-    { to: '/admin', label: 'Дашборд', icon: BarChart3 },
-    { to: '/admin/analytics', label: 'Аналитика', icon: TrendingUp },
-    { to: '/admin/webhooks', label: 'Webhook\'и', icon: Globe },
-    { to: '/admin/reports', label: 'Отчеты', icon: FileText },
-    { to: '/admin/system', label: 'Система', icon: Server },
-    { to: '/admin/cloud-printing', label: 'Облачная печать', icon: Printer },
-    { to: '/admin/medical-equipment', label: 'Медицинское оборудование', icon: Stethoscope },
-    { to: '/admin/graphql-explorer', label: 'GraphQL API', icon: Database }]
+  const iconMap = {
+    'chart.bar': BarChart3,
+    globe: Globe,
+    'file-text': FileText,
+    gear: Settings,
+    printer: Printer,
+    stethoscope: Stethoscope,
+    database: Database,
+    users: Users,
+    'user-plus': UserPlus,
+    list: Package,
+    building: Building2,
+    calendar: Calendar,
+    'exclamationmark.triangle': AlertTriangle,
+    brain: Brain,
+    bell: Bell,
+    phone: Phone,
+    key: Key,
+    'dollarsign.circle': DollarSign,
+    lock: Lock,
+    'doc.text': FileText,
+    paperplane: Bot,
+  };
 
-  },
-  {
-    title: 'Управление',
-    items: [
-    { to: '/admin/users', label: 'Пользователи', icon: Users },
-    { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
-    { to: '/admin/services', label: 'Услуги', icon: Package },
-    { to: '/admin/departments', label: 'Отделения', icon: FolderTree },
-    { to: '/admin/patients', label: 'Пациенты', icon: Users },
-    { to: '/admin/appointments', label: 'Записи', icon: Calendar },
-    { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle }]
-
-  },
-  {
-    title: 'Система',
-    items: [
-    { to: '/admin/clinic-management', label: 'Управление клиникой', icon: Building2 },
-    { to: '/admin/ai-imaging', label: 'AI Инструменты', icon: Brain },
-    { to: '/admin/telegram-bot', label: 'Telegram', icon: Bot },
-    { to: '/admin/fcm-notifications', label: 'Уведомления', icon: Bell },
-    { to: '/admin/phone-verification', label: 'Верификация телефонов', icon: Phone },
-    { to: '/admin/activation', label: 'Система активации', icon: Key },
-    { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
-    { to: '/admin/settings', label: 'Настройки', icon: Settings }]
-
-  }];
+  const navigationSections = getAdminNavSections({ role: 'Admin' }, {
+    internalDemoEnabled: isInternalDemoEnabled(),
+  }).map((section) => ({
+    ...section,
+    items: section.items.map((item) => ({
+      ...item,
+      icon: iconMap[item.icon] || Activity,
+    })),
+  }));
 
 
   // Получаем все табы для совместимости
@@ -1163,6 +1228,7 @@ const AdminPanel = () => {
   const renderDashboard = () =>
   <ErrorBoundary>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <AdminRouteSwitcher current="dashboard" />
         {/* Красивые KPI карточки */}
         {statsLoading ?
       <div style={{
@@ -1246,7 +1312,7 @@ const AdminPanel = () => {
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
         gap: '24px'
       }}>
-          <MacOSCard style={{ padding: '24px' }}>
+          <MacOSCard style={{ ...adminSectionShellStyle, padding: '24px' }}>
             <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{
               fontSize: 'var(--mac-font-size-lg)',
@@ -1266,7 +1332,7 @@ const AdminPanel = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--mac-bg-secondary)'
+            background: adminSurface
           }}>
                 <MacOSLoadingSkeleton type="text" count={3} />
               </div> :
@@ -1277,7 +1343,7 @@ const AdminPanel = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--mac-bg-secondary)'
+            background: adminSurface
           }}>
                 <MacOSEmptyState
               icon={AlertTriangle}
@@ -1290,7 +1356,8 @@ const AdminPanel = () => {
             height: '256px',
             borderRadius: 'var(--mac-radius-md)',
             padding: '16px',
-            background: 'var(--mac-bg-secondary)',
+            background: adminSurface,
+            border: adminBorder,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between'
@@ -1317,7 +1384,7 @@ const AdminPanel = () => {
                         <div style={{
                       width: '100%',
                       height: `${height}px`,
-                      background: 'linear-gradient(to top, var(--mac-primary), var(--mac-primary-light))',
+                      background: 'linear-gradient(to top, #2563eb, #60a5fa)',
                       borderRadius: '4px 4px 0 0',
                       minHeight: '4px',
                       transition: 'height 0.3s ease'
@@ -1338,7 +1405,7 @@ const AdminPanel = () => {
               justifyContent: 'space-around',
               marginTop: '8px',
               fontSize: '12px',
-              color: 'var(--mac-text-secondary)'
+              color: adminTextSecondary
             }}>
                   <span>Записи: {activityChartData.data.reduce((sum, d) => sum + (d.appointments || 0), 0)}</span>
                   <span>Платежи: {activityChartData.data.reduce((sum, d) => sum + (d.payments || 0), 0)}</span>
@@ -1352,23 +1419,23 @@ const AdminPanel = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--mac-bg-secondary)'
+            background: adminSurface
           }}>
                 <div style={{ textAlign: 'center' }}>
                   <Activity style={{
                 width: '48px',
                 height: '48px',
                 margin: '0 auto 16px auto',
-                color: 'var(--mac-text-tertiary)'
+                color: adminTextSecondary
               }} />
-                  <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
+                  <p style={{ color: adminTextSecondary }}>Нет данных за выбранный период</p>
                 </div>
               </div>
           }
           </MacOSCard>
 
           <MacOSCard
-          style={{ padding: 0 }}>
+          style={{ ...adminSectionShellStyle, padding: 0 }}>
 
             <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{
@@ -1407,7 +1474,8 @@ const AdminPanel = () => {
               gap: '12px',
               padding: '12px',
               borderRadius: 'var(--mac-radius-md)',
-              background: 'var(--mac-bg-secondary)'
+              background: adminInsetSurface,
+              border: adminBorder
             }}>
                     {getStatusIcon(activity.status)}
                     <div style={{ flex: '1' }}>
@@ -1432,7 +1500,7 @@ const AdminPanel = () => {
 
         {/* Системные уведомления */}
         <MacOSCard
-        style={{ padding: 0, marginTop: '24px' }}>
+        style={{ ...adminSectionShellStyle, padding: 0, marginTop: '24px' }}>
 
           <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{
@@ -1467,8 +1535,9 @@ const AdminPanel = () => {
             alignItems: 'center',
             gap: '12px',
             padding: '12px',
-            border: '1px solid var(--mac-border)',
-            borderRadius: 'var(--mac-radius-md)'
+            border: adminBorder,
+            borderRadius: 'var(--mac-radius-md)',
+            background: adminInsetSurface
           }}>
                   <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
                   <div style={{ flex: '1' }}>
@@ -2474,6 +2543,7 @@ const AdminPanel = () => {
         return <UnifiedReports />;
       case 'clinic-management':
         return <ClinicManagement />;
+      case 'clinic-settings':
       case 'queue-settings':
       case 'queue-limits':
         return <UnifiedSettings />;
@@ -2494,13 +2564,20 @@ const AdminPanel = () => {
       case 'phone-verification':
         return <PhoneVerificationManager />;
       case 'webhooks':
-        return <WebhookManager />;
+        return (
+          <div style={{ display: 'grid', gap: '24px' }}>
+            <AdminRouteSwitcher current="dashboard" />
+            <WebhookManager />
+          </div>
+        );
       case 'system':
         return <SystemManagement />;
       case 'cloud-printing':
         return <CloudPrintingManager />;
       case 'medical-equipment':
         return <MedicalEquipmentManager />;
+      case 'queue-cabinet-management':
+        return <QueueCabinetManagement />;
       case 'graphql-explorer':
         return <GraphQLExplorer />;
       case 'services':{
@@ -2587,7 +2664,7 @@ const AdminPanel = () => {
         return <UnifiedSettings />;
       default:
         return (
-          <MacOSCard style={{ padding: '48px' }}>
+          <MacOSCard style={{ ...adminSectionShellStyle, padding: '48px' }}>
             <div style={{ textAlign: 'center' }}>
               <h2 style={{
                 fontSize: '24px',
@@ -2598,7 +2675,6 @@ const AdminPanel = () => {
               }}>
                 {tabs.find((tab) => tab.id === current)?.label || 'Неизвестный раздел'}
               </h2>
-              <p style={{ color: 'var(--mac-text-secondary)' }}>Этот раздел находится в разработке</p>
             </div>
           </MacOSCard>);
 
@@ -2610,7 +2686,11 @@ const AdminPanel = () => {
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <MacOSCard
       variant="default"
-      style={{ padding: '24px' }}>
+      shadow="none"
+      style={{
+      ...adminSectionShellStyle,
+      padding: '24px'
+    }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <h2 style={{
@@ -2663,7 +2743,7 @@ const AdminPanel = () => {
             padding: '8px 12px',
             borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
+            background: adminInsetSurface,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-sm)',
             outline: 'none'
@@ -2682,7 +2762,7 @@ const AdminPanel = () => {
             padding: '8px 12px',
             borderRadius: 'var(--mac-radius-sm)',
             border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
+            background: adminInsetSurface,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-sm)',
             outline: 'none'
@@ -2722,59 +2802,59 @@ const AdminPanel = () => {
           } /> :
 
 
-        <table style={{ width: '100%' }} role="table" aria-label="Таблица врачей">
+        <table style={{ width: '100%' }} aria-label="Таблица врачей">
               <thead>
                 <tr style={{
-              backgroundColor: 'var(--mac-bg-tertiary)',
+              backgroundColor: adminTableHeaderSurface,
               borderBottom: '1px solid var(--mac-border)'
             }}>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Врач</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Специализация</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Отделение</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Опыт</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Статус</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Пациенты</th>
                   <th scope="col" style={{
                 textAlign: 'left',
                 padding: '12px 16px',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-medium)',
+                color: adminTableHeaderText,
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 fontSize: 'var(--mac-font-size-sm)'
               }}>Действия</th>
                 </tr>
@@ -2785,7 +2865,7 @@ const AdminPanel = () => {
               borderBottom: '1px solid var(--mac-border)',
               transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = adminTableRowHover}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
 
                     <td style={{ padding: '12px 16px' }}>
@@ -2828,6 +2908,20 @@ const AdminPanel = () => {
                       margin: '2px 0 0 0'
                     }}>{doctor.user.phone}</p>
                     }
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                            <MacOSBadge
+                              variant={doctor.user?.is_active === false ? 'warning' : 'success'}
+                              style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                            >
+                              {doctor.user?.is_active === false ? 'Аккаунт неактивен' : 'Аккаунт активен'}
+                            </MacOSBadge>
+                            <MacOSBadge
+                              variant={doctor.cabinet ? 'info' : 'warning'}
+                              style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                            >
+                              {doctor.cabinet ? `Кабинет ${doctor.cabinet}` : 'Кабинет не задан'}
+                            </MacOSBadge>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -2865,6 +2959,7 @@ const AdminPanel = () => {
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button
+                    type="button"
                     onClick={() => handleEditDoctor(doctor)}
                     style={{
                       padding: '4px',
@@ -2877,11 +2972,13 @@ const AdminPanel = () => {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    aria-label="Редактировать врача"
                     title="Редактировать">
 
                           <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
                         <button
+                    type="button"
                     onClick={() => handleDeleteDoctor(doctor)}
                     style={{
                       padding: '4px',
@@ -2894,6 +2991,7 @@ const AdminPanel = () => {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    aria-label="Деактивировать врача"
                     title="Деактивировать">
 
                           <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -2914,6 +3012,7 @@ const AdminPanel = () => {
       onClose={handleCloseDoctorModal}
       doctor={doctorModal.selectedItem}
       onSave={handleSaveDoctor}
+      availableUsers={availableUsers}
       loading={doctorModal.loading} />
 
     </div>;
@@ -2923,7 +3022,7 @@ const AdminPanel = () => {
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <MacOSCard
       variant="default"
-      style={{ padding: '24px' }}>
+      style={{ ...adminSectionShellStyle, padding: '24px' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <h2 style={{
@@ -2956,7 +3055,7 @@ const AdminPanel = () => {
               paddingBottom: '8px',
               borderRadius: 'var(--mac-radius-sm)',
               border: '1px solid var(--mac-border)',
-              background: 'var(--mac-bg-primary)',
+              background: adminInsetSurface,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-sm)',
               outline: 'none',
@@ -2972,14 +3071,14 @@ const AdminPanel = () => {
           { value: 'male', label: 'Мужской' },
           { value: 'female', label: 'Женский' }]
           }
-          style={{
-            padding: '8px 12px',
-            borderRadius: 'var(--mac-radius-sm)',
-            border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            outline: 'none'
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: adminInsetSurface,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
           }} />
 
           <MacOSSelect
@@ -2993,14 +3092,14 @@ const AdminPanel = () => {
           { value: '51-65', label: '51-65 лет' },
           { value: '65+', label: '65+ лет' }]
           }
-          style={{
-            padding: '8px 12px',
-            borderRadius: 'var(--mac-radius-sm)',
-            border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            outline: 'none'
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: adminInsetSurface,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
           }} />
 
           <MacOSSelect
@@ -3017,14 +3116,14 @@ const AdminPanel = () => {
           { value: 'O+', label: 'O+' },
           { value: 'O-', label: 'O-' }]
           }
-          style={{
-            padding: '8px 12px',
-            borderRadius: 'var(--mac-radius-sm)',
-            border: '1px solid var(--mac-border)',
-            background: 'var(--mac-bg-primary)',
-            color: 'var(--mac-text-primary)',
-            fontSize: 'var(--mac-font-size-sm)',
-            outline: 'none'
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: adminInsetSurface,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
           }} />
 
         </div>
@@ -3172,6 +3271,7 @@ const AdminPanel = () => {
             actions:
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <MacOSButton
+                type="button"
                 variant="outline"
                 onClick={() => handleEditPatient(patient)}
                 style={{
@@ -3183,11 +3283,13 @@ const AdminPanel = () => {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
+                aria-label="Редактировать пациента"
                 title="Редактировать">
 
                       <Edit style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     <MacOSButton
+                type="button"
                 variant="outline"
                 onClick={() => handleDeletePatient(patient)}
                 style={{
@@ -3201,6 +3303,7 @@ const AdminPanel = () => {
                   color: 'var(--mac-error)',
                   borderColor: 'var(--mac-error)'
                 }}
+                aria-label="Удалить пациента"
                 title="Удалить">
 
                       <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -3326,7 +3429,7 @@ const AdminPanel = () => {
 
         <MacOSCard
           variant="default"
-          style={{ padding: '24px' }}>
+          style={{ ...adminSectionShellStyle, padding: '24px' }}>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <h2 style={{
@@ -3394,7 +3497,7 @@ const AdminPanel = () => {
               { value: '', label: 'Все врачи' },
               ...doctors.map((doctor) => ({
                 value: doctor.id,
-                label: doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`
+                label: `${doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • каб. ${doctor.cabinet}` : ''}`
               }))]
               }
               style={{ minWidth: '140px' }} />
@@ -3437,13 +3540,18 @@ const AdminPanel = () => {
               columns={[
               { key: 'patient', title: 'Пациент', width: '25%' },
               { key: 'doctor', title: 'Врач', width: '20%' },
-              { key: 'datetime', title: 'Дата и время', width: '20%' },
-              { key: 'status', title: 'Статус', width: '15%' },
-              { key: 'reason', title: 'Причина', width: '15%' },
+              { key: 'cabinet', title: 'Кабинет', width: '12%' },
+              { key: 'datetime', title: 'Дата и время', width: '18%' },
+              { key: 'status', title: 'Статус', width: '12%' },
+              { key: 'integrity', title: 'Связность', width: '12%' },
+              { key: 'reason', title: 'Причина', width: '16%' },
               { key: 'actions', title: 'Действия', width: '5%' }]
               }
               data={appointments.map((appointment) => ({
                 id: appointment.id,
+                _patientName: getAppointmentPatientDisplayName(appointment),
+                _doctorName: getAppointmentDoctorDisplayName(appointment),
+                _doctorSpecialization: getAppointmentDoctorSpecialization(appointment),
                 patient:
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{
@@ -3460,15 +3568,15 @@ const AdminPanel = () => {
                       fontSize: 'var(--mac-font-size-sm)',
                       fontWeight: 'var(--mac-font-weight-medium)'
                     }}>
-                          {appointment.patientName.split(' ').map((n) => n[0]).join('').toUpperCase()}
+                          {getAppointmentPatientDisplayName(appointment).split(/\s+/).filter(Boolean).map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'П'}
                         </span>
                       </div>
                       <div>
-                        <p style={{
+                    <p style={{
                       fontWeight: 'var(--mac-font-weight-medium)',
                       color: 'var(--mac-text-primary)',
                       margin: 0
-                    }}>{appointment.patientName}</p>
+                    }}>{getAppointmentPatientDisplayName(appointment)}</p>
                         {appointment.phone &&
                     <p style={{
                       fontSize: 'var(--mac-font-size-sm)',
@@ -3485,12 +3593,57 @@ const AdminPanel = () => {
                     fontWeight: 'var(--mac-font-weight-medium)',
                     color: 'var(--mac-text-primary)',
                     margin: 0
-                  }}>{appointment.doctorName}</p>
+                  }}>{getAppointmentDoctorDisplayName(appointment)}</p>
                       <p style={{
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
                     margin: '4px 0 0 0'
-                  }}>{appointment.doctorSpecialization}</p>
+                  }}>{getAppointmentDoctorSpecialization(appointment) || '—'}</p>
+                      <div style={{ marginTop: '4px' }}>
+                        <MacOSBadge
+                          variant={
+                            appointment.doctor?.active === false || appointment.doctor?.user_active === false
+                              ? 'warning'
+                              : 'success'
+                          }
+                          style={{ fontSize: 'var(--mac-font-size-xs)' }}
+                        >
+                          {appointment.doctor?.active === false
+                            ? 'Врач неактивен'
+                            : appointment.doctor?.user_active === false
+                              ? 'Аккаунт врача неактивен'
+                              : 'Связь активна'}
+                        </MacOSBadge>
+                      </div>
+                    </div>,
+
+                cabinet:
+                <div>
+                      <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    margin: 0
+                  }}>
+                        {appointment.effectiveCabinet || '—'}
+                      </p>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-secondary)',
+                    margin: '4px 0 0 0'
+                  }}>
+                        {appointment.queueCabinet ? `Очередь: ${appointment.queueCabinet}` : appointment.doctorCabinet ? `Врач: ${appointment.doctorCabinet}` : 'Нет связанного кабинета'}
+                      </p>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
+                    margin: '2px 0 0 0'
+                  }}>
+                        Источник: {appointment.queueCabinet
+                          ? 'очередь'
+                          : appointment.doctorCabinet
+                            ? 'карточка врача'
+                            : 'нет данных'}
+                      </p>
                     </div>,
 
                 datetime:
@@ -3516,6 +3669,24 @@ const AdminPanel = () => {
                       {getAppointmentStatusLabel(appointment.status)}
                     </MacOSBadge>,
 
+                integrity:
+                appointment.hasIntegrityWarnings ?
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <MacOSBadge variant="warning">
+                        Требует проверки
+                      </MacOSBadge>
+                      <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                        {appointment.integrityWarnings.join(', ')}
+                      </p>
+                    </div> :
+                <MacOSBadge variant="success">
+                      Связано
+                    </MacOSBadge>,
+
                 reason:
                 <p style={{
                   fontSize: 'var(--mac-font-size-sm)',
@@ -3531,6 +3702,7 @@ const AdminPanel = () => {
                 actions:
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MacOSButton
+                    type="button"
                     variant="outline"
                     onClick={() => handleEditAppointment(appointment)}
                     style={{
@@ -3542,11 +3714,13 @@ const AdminPanel = () => {
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
+                    aria-label="Редактировать запись"
                     title="Редактировать">
 
                         <Edit style={{ width: '16px', height: '16px' }} />
                       </MacOSButton>
                       <MacOSButton
+                    type="button"
                     variant="outline"
                     onClick={() => handleDeleteAppointment(appointment)}
                     style={{
@@ -3560,6 +3734,7 @@ const AdminPanel = () => {
                       color: 'var(--mac-error)',
                       borderColor: 'var(--mac-error)'
                     }}
+                    aria-label="Удалить запись"
                     title="Удалить">
 
                         <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -3700,7 +3875,7 @@ const AdminPanel = () => {
 
         <MacOSCard
           variant="default"
-          style={{ padding: 0 }}>
+          style={{ ...adminSectionShellStyle, padding: 0 }}>
 
           <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <h2 style={{
@@ -3733,7 +3908,7 @@ const AdminPanel = () => {
                   paddingBottom: '8px',
                   borderRadius: 'var(--mac-radius-sm)',
                   border: '1px solid var(--mac-border)',
-                  background: 'var(--mac-bg-primary)',
+                  background: adminInsetSurface,
                   color: 'var(--mac-text-primary)',
                   fontSize: 'var(--mac-font-size-sm)',
                   outline: 'none',
@@ -3753,7 +3928,7 @@ const AdminPanel = () => {
                 padding: '8px 12px',
                 borderRadius: 'var(--mac-radius-sm)',
                 border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
+                background: adminInsetSurface,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-sm)',
                 outline: 'none'
@@ -3777,7 +3952,7 @@ const AdminPanel = () => {
                 padding: '8px 12px',
                 borderRadius: 'var(--mac-radius-sm)',
                 border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
+                background: adminInsetSurface,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-sm)',
                 outline: 'none'
@@ -3797,7 +3972,7 @@ const AdminPanel = () => {
                 padding: '8px 12px',
                 borderRadius: 'var(--mac-radius-sm)',
                 border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
+                background: adminInsetSurface,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-sm)',
                 outline: 'none'
@@ -3817,7 +3992,7 @@ const AdminPanel = () => {
                 padding: '8px 12px',
                 borderRadius: 'var(--mac-radius-sm)',
                 border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
+                background: adminInsetSurface,
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-sm)',
                 outline: 'none'
@@ -3857,16 +4032,16 @@ const AdminPanel = () => {
               } /> :
 
 
-            <table style={{ width: '100%' }} role="table" aria-label="Таблица транзакций">
+            <table style={{ width: '100%' }} aria-label="Таблица транзакций">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Тип</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Категория</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Сумма</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Описание</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Дата</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Статус</th>
-                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Действия</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Тип</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Категория</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Сумма</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Описание</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Дата</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Статус</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-table-header-text)' }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3922,19 +4097,23 @@ const AdminPanel = () => {
                       <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                           <button
+                        type="button"
                         onClick={() => handleEditTransaction(transaction)}
                         style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-text-secondary)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        aria-label="Редактировать транзакцию"
                         title="Редактировать">
 
                             <Edit style={{ width: '16px', height: '16px' }} />
                           </button>
                           <button
+                        type="button"
                         onClick={() => handleDeleteTransaction(transaction)}
                         style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-danger)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        aria-label="Удалить транзакцию"
                         title="Удалить">
 
                             <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -4503,7 +4682,7 @@ const AdminPanel = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: 'var(--mac-bg-primary)',
+        background: 'linear-gradient(180deg, color-mix(in srgb, var(--mac-main-shell-bg), white 10%) 0%, color-mix(in srgb, var(--mac-main-shell-bg), white 4%) 100%)',
         padding: '24px'
       }}>
         <div style={{
@@ -4537,15 +4716,12 @@ const AdminPanel = () => {
   }
 
   const pageStyle = {
-    background: 'var(--mac-bg-sidebar)',
-    borderRight: '1px solid var(--mac-separator)',
-    borderLeft: '1px solid var(--mac-separator)',
-    borderTop: '1px solid var(--mac-separator)',
-    borderBottom: '1px solid var(--mac-separator)',
-    borderRadius: 'var(--mac-radius-lg)',
-    boxShadow: 'var(--mac-shadow-md)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 0,
+    boxShadow: 'none',
+    backdropFilter: 'none',
+    WebkitBackdropFilter: 'none',
     padding: 0,
     margin: 0,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
@@ -4578,7 +4754,7 @@ const AdminPanel = () => {
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
           <div style={{
-            padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' ? '0' : '12px'
+            padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' || current === 'queue-cabinet-management' ? '0' : '12px'
           }}>
             {renderContent()}
           </div>
@@ -4589,6 +4765,7 @@ const AdminPanel = () => {
           isOpen={showHotkeysModal}
           onClose={() => setShowHotkeysModal(false)} />
 
+        <RoleNotificationCenter role="admin" />
       </div>
     </div>);
 

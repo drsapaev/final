@@ -14,6 +14,7 @@ import {
   EyeOff } from
 'lucide-react';
 import { tokenManager } from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент для SMS/Email двухфакторной аутентификации
@@ -310,6 +311,16 @@ const SMSEmail2FA = ({
       </Card>
     </div>);
 
+};
+
+
+SMSEmail2FA.propTypes = {
+  ...(SMSEmail2FA.propTypes || {}),
+  emailAddress: PropTypes.any,
+  method: PropTypes.any,
+  onCancel: PropTypes.any,
+  onSuccess: PropTypes.any,
+  phoneNumber: PropTypes.any,
 };
 
 export default SMSEmail2FA;

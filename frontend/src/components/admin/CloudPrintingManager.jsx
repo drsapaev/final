@@ -24,17 +24,78 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const PROVIDER_LABELS = {
+  mock: 'Mock (Тестовый)',
+  microsoft: 'Microsoft Universal Print',
+  google: 'Google Cloud Print',
+  local: 'Local Print Gateway'
+};
+
+const getProviderLabel = (provider) => PROVIDER_LABELS[provider] || provider;
+
+const getStatusText = (status) => {
+  switch (status) {
+    case 'online': return 'В сети';
+    case 'busy': return 'Занят';
+    case 'offline': return 'Не в сети';
+    case 'error': return 'Ошибка';
+    default: return status;
+  }
+};
+
+const getProviderOptions = (providers = []) =>
+  providers.map((provider) => ({
+    value: provider,
+    label: getProviderLabel(provider)
+  }));
+
+const getPrinterOptions = (printers = [], providerName = '') =>
+  printers
+    .filter((printer) => printer.provider === providerName)
+    .map((printer) => ({
+      value: printer.id,
+      label: `${printer.name} (${getStatusText(printer.status)})`
+    }));
+
+const normalizeLocalPrinter = (printer) => ({
+  id: printer.name || String(printer.id),
+  name: printer.display_name || printer.name || 'Локальный принтер',
+  description:
+    [
+      printer.printer_type ? `${printer.printer_type}` : null,
+      printer.connection_type ? `подключение: ${printer.connection_type}` : null
+    ]
+      .filter(Boolean)
+      .join(' • ') || 'Локальный системный принтер',
+  status: printer.status || 'offline',
+  location: printer.device_path || printer.location || 'Локальный компьютер',
+  capabilities: {
+    printer_type: printer.printer_type || 'unknown',
+    device_path: printer.device_path || null,
+    paper_width: printer.paper_width || null,
+    paper_height: printer.paper_height || null,
+    encoding: printer.encoding || 'utf-8'
+  },
+  provider: 'local',
+  printer_type: printer.printer_type || 'unknown',
+  connection_type: printer.connection_type || 'local',
+  is_default: Boolean(printer.is_default),
+  source: 'system'
+});
+
 const CloudPrintingManager = () => {
   const [activeTab, setActiveTab] = useState('printers');
   const [printers, setPrinters] = useState([]);
+  const [localPrinters, setLocalPrinters] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPrinter, setSelectedPrinter] = useState(null);void
-  useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(null);
   const [statistics, setStatistics] = useState(null);
 
   // Состояние для печати документа
   const [printForm, setPrintForm] = useState({
-    provider_name: 'mock',
+    provider_name: '',
     printer_id: '',
     title: '',
     content: '',
@@ -46,7 +107,7 @@ const CloudPrintingManager = () => {
 
   // Состояние для медицинского документа
   const [medicalForm, setMedicalForm] = useState({
-    provider_name: 'mock',
+    provider_name: '',
     printer_id: '',
     document_type: 'prescription',
     patient_data: {
@@ -70,33 +131,51 @@ const CloudPrintingManager = () => {
     loadStatistics();
   }, []);
 
+  useEffect(() => {
+    if (providers.length === 0) {
+      return;
+    }
+
+    setPrintForm((prev) => (
+      providers.includes(prev.provider_name)
+        ? prev
+        : { ...prev, provider_name: providers[0] }
+    ));
+
+    setMedicalForm((prev) => (
+      providers.includes(prev.provider_name)
+        ? prev
+        : { ...prev, provider_name: providers[0] }
+    ));
+  }, [providers]);
+
   const loadPrinters = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/cloud-printing/printers');
-      setPrinters(response.data?.printers || []);
+      const [cloudResponse, localResponse] = await Promise.all([
+        api.get('/cloud-printing/printers'),
+        api.get('/print/printers')
+      ]);
+      const printersData = cloudResponse.data?.printers || [];
+      const providersData = cloudResponse.data?.providers || [];
+      const localPrintersData = (localResponse.data?.printers || []).map(
+        normalizeLocalPrinter
+      );
+
+      setPrinters(printersData);
+      setLocalPrinters(localPrintersData);
+      setProviders(
+        providersData.length > 0
+          ? providersData
+          : Array.from(new Set(printersData.map((printer) => printer.provider).filter(Boolean)))
+      );
     } catch (error) {
       logger.error('Ошибка загрузки принтеров:', error);
-      // Fallback данные для демонстрации
-      setPrinters([
-      {
-        id: 'mock-printer-1',
-        name: 'Тестовый принтер',
-        description: 'Mock принтер для тестирования',
-        provider: 'mock',
-        status: 'online',
-        location: 'Кабинет 101'
-      },
-      {
-        id: 'mock-printer-2',
-        name: 'Принтер документов',
-        description: 'Основной принтер для документов',
-        provider: 'mock',
-        status: 'busy',
-        location: 'Регистратура'
-      }]
-      );
-      toast.error('Ошибка загрузки принтеров, показаны тестовые данные');
+      setPrinters([]);
+      setLocalPrinters([]);
+      setProviders([]);
+      setSelectedPrinter(null);
+      toast.error('Не удалось загрузить облачные принтеры');
     } finally {
       setLoading(false);
     }
@@ -108,20 +187,17 @@ const CloudPrintingManager = () => {
       setStatistics(response.data?.statistics);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
-      // Fallback данные для демонстрации
-      setStatistics({
-        total_printers: 2,
-        online_printers: 1,
-        offline_printers: 0,
-        providers_count: 1
-      });
+      setStatistics(null);
     }
   };
 
   const testPrinter = async (providerName, printerId) => {
     try {
-      const response = await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
-      if (response.data?.success) {
+      const response = providerName === 'local'
+        ? await api.post(`/print/printers/${encodeURIComponent(printerId)}/test`)
+        : await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
+
+      if (response.data?.success || response.data?.status === 'printed' || response.data?.message) {
         toast.success('Тестовая печать отправлена');
       } else {
         toast.error(response.data?.message || 'Ошибка тестовой печати');
@@ -185,15 +261,71 @@ const CloudPrintingManager = () => {
     }
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'online':return 'В сети';
-      case 'busy':return 'Занят';
-      case 'offline':return 'Не в сети';
-      case 'error':return 'Ошибка';
-      default:return status;
-    }
-  };
+  const renderPrinterGrid = (list, emptyTitle) =>
+    <>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: '16px'
+      }}>
+        {list.map((printer) =>
+          <MacOSCard key={`${printer.provider}-${printer.id}`} style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+              <div>
+                <h4 style={{
+                  margin: '0 0 4px 0',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-text-primary)'
+                }}>{printer.name}</h4>
+                <p style={{
+                  margin: 0,
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>{printer.description}</p>
+              </div>
+              <MacOSBadge variant={getStatusBadgeVariant(printer.status)}>
+                {getStatusText(printer.status)}
+              </MacOSBadge>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)' }}>
+              <div><strong>Провайдер:</strong> {printer.provider}</div>
+              <div><strong>Местоположение:</strong> {printer.location || 'Не указано'}</div>
+              <div><strong>ID:</strong> {printer.id}</div>
+              {printer.provider === 'local' &&
+              <div><strong>Тип:</strong> {printer.printer_type || 'unknown'}</div>
+              }
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+              <MacOSButton
+                size="sm"
+                onClick={() => testPrinter(printer.provider, printer.id)}
+                disabled={printer.status !== 'online'}>
+
+                <TestTube size={16} style={{ marginRight: '4px' }} />
+                Тест
+              </MacOSButton>
+              <MacOSButton
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedPrinter(printer)}>
+
+                <Eye size={16} style={{ marginRight: '4px' }} />
+                Подробнее
+              </MacOSButton>
+            </div>
+          </MacOSCard>
+        )}
+      </div>
+
+      {list.length === 0 && !loading &&
+      <MacOSEmptyState
+        icon={Printer}
+        title={emptyTitle}
+        description="Добавьте принтеры или проверьте подключение к облачным сервисам" />
+      }
+    </>;
 
   const renderPrintersTab = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -210,7 +342,7 @@ const CloudPrintingManager = () => {
         </MacOSButton>
       </div>
 
-      {statistics &&
+        {statistics &&
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -261,69 +393,41 @@ const CloudPrintingManager = () => {
           color: 'var(--mac-text-secondary)'
         }}>Провайдеров</div>
           </MacOSCard>
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{
+          fontSize: 'var(--mac-font-size-2xl)',
+          fontWeight: 'var(--mac-font-weight-bold)',
+          color: 'var(--mac-accent)'
+        }}>{localPrinters.length}</div>
+            <div style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)'
+        }}>Локальных ОС-принтеров</div>
+          </MacOSCard>
         </div>
     }
 
-      <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-      gap: '16px'
-    }}>
-        {printers.map((printer) =>
-      <MacOSCard key={`${printer.provider}-${printer.id}`} style={{ padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-              <div>
-                <h4 style={{
-              margin: '0 0 4px 0',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)'
-            }}>{printer.name}</h4>
-                <p style={{
-              margin: 0,
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-secondary)'
-            }}>{printer.description}</p>
-              </div>
-              <MacOSBadge variant={getStatusBadgeVariant(printer.status)}>
-                {getStatusText(printer.status)}
-              </MacOSBadge>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)' }}>
-              <div><strong>Провайдер:</strong> {printer.provider}</div>
-              <div><strong>Местоположение:</strong> {printer.location || 'Не указано'}</div>
-              <div><strong>ID:</strong> {printer.id}</div>
-            </div>
+      <div style={{ display: 'grid', gap: '24px' }}>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          <h4 style={{
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>Облачные принтеры</h4>
+          {renderPrinterGrid(printers, 'Принтеры не найдены')}
+        </div>
 
-            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-              <MacOSButton
-            size="sm"
-            onClick={() => testPrinter(printer.provider, printer.id)}
-            disabled={printer.status !== 'online'}>
-            
-                <TestTube size={16} style={{ marginRight: '4px' }} />
-                Тест
-              </MacOSButton>
-              <MacOSButton
-            size="sm"
-            variant="outline"
-            onClick={() => setSelectedPrinter(printer)}>
-            
-                <Eye size={16} style={{ marginRight: '4px' }} />
-                Подробнее
-              </MacOSButton>
-            </div>
-          </MacOSCard>
-      )}
+        <div style={{ display: 'grid', gap: '12px' }}>
+          <h4 style={{
+            margin: 0,
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>Локальные ОС-принтеры</h4>
+          {renderPrinterGrid(localPrinters, 'Локальные принтеры не найдены')}
+        </div>
       </div>
-
-      {printers.length === 0 && !loading &&
-    <MacOSEmptyState
-      icon={Printer}
-      title="Принтеры не найдены"
-      description="Добавьте принтеры или проверьте подключение к облачным сервисам" />
-
-    }
     </div>;
 
 
@@ -360,11 +464,15 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="provider"
               value={printForm.provider_name}
-              onChange={(e) => setPrintForm({ ...printForm, provider_name: e.target.value })}
+              onChange={(e) => setPrintForm({
+                ...printForm,
+                provider_name: e.target.value,
+                printer_id: ''
+              })}
               options={[
-              { value: 'mock', label: 'Mock (Тестовый)' },
-              { value: 'microsoft', label: 'Microsoft Universal Print' }]
-              } />
+                { value: '', label: 'Выберите провайдера' },
+                ...getProviderOptions(providers)
+              ]} />
             
             </div>
 
@@ -382,12 +490,7 @@ const CloudPrintingManager = () => {
               onChange={(e) => setPrintForm({ ...printForm, printer_id: e.target.value })}
               options={[
               { value: '', label: 'Выберите принтер' },
-              ...printers.
-              filter((p) => p.provider === printForm.provider_name).
-              map((printer) => ({
-                value: printer.id,
-                label: `${printer.name} (${getStatusText(printer.status)})`
-              }))]
+              ...getPrinterOptions(printers, printForm.provider_name)]
               } />
             
             </div>
@@ -540,11 +643,15 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="med-provider"
               value={medicalForm.provider_name}
-              onChange={(e) => setMedicalForm({ ...medicalForm, provider_name: e.target.value })}>
-              
-                <option value="mock">Mock (Тестовый)</option>
-                <option value="microsoft">Microsoft Universal Print</option>
-              </MacOSSelect>
+              onChange={(e) => setMedicalForm({
+                ...medicalForm,
+                provider_name: e.target.value,
+                printer_id: ''
+              })}
+              options={[
+                { value: '', label: 'Выберите провайдера' },
+                ...getProviderOptions(providers)
+              ]} />
             </div>
 
             <div>
@@ -558,17 +665,11 @@ const CloudPrintingManager = () => {
               <MacOSSelect
               id="med-printer"
               value={medicalForm.printer_id}
-              onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}>
-              
-                <option value="">Выберите принтер</option>
-                {printers.
-              filter((p) => p.provider === medicalForm.provider_name).
-              map((printer) =>
-              <option key={printer.id} value={printer.id}>
-                      {printer.name} ({getStatusText(printer.status)})
-                    </option>
-              )}
-              </MacOSSelect>
+              onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}
+              options={[
+                { value: '', label: 'Выберите принтер' },
+                ...getPrinterOptions(printers, medicalForm.provider_name)
+              ]} />
             </div>
 
             <div>

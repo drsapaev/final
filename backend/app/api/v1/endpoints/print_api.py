@@ -4,12 +4,15 @@ API endpoints для печати документов
 """
 
 from datetime import datetime
+import asyncio
+import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+from app.crud import print_config as crud_print
 from app.models.user import User
 from app.schemas.print_config import (
     PrintCertificateRequest,
@@ -27,6 +30,7 @@ from app.schemas.print_config import (
 from app.services.print_service import get_print_service, PrintService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ===================== ПЕЧАТЬ ДОКУМЕНТОВ =====================
 
@@ -223,22 +227,47 @@ def get_printers(
     Получить список доступных принтеров
     """
     try:
-        # Временная заглушка - возвращаем список принтеров по умолчанию
-        default_printers = [
-            {
-                "id": 1,
-                "name": "default_printer",
-                "display_name": "Принтер по умолчанию",
-                "printer_type": "thermal",
-                "connection_type": "usb",
-                "is_default": True,
-                "status": "online",
-            }
-        ]
+        # Сначала синхронизируем локальные системные принтеры, чтобы UI видел
+        # реальные установленные устройства, а не только seed/mock записи.
+        synced_printers = asyncio.run(print_service.sync_system_printers())
+        printers = crud_print.get_printer_configs(db, active_only=True)
+        local_printer_types = {
+            printer.printer_type
+            for printer in printers
+            if printer.connection_type != "mock"
+        }
+        if local_printer_types:
+            printers = [
+                printer
+                for printer in printers
+                if printer.connection_type != "mock"
+                or printer.printer_type not in local_printer_types
+            ]
+        printer_items = []
 
-        return {"printers": default_printers, "total": len(default_printers)}
+        for printer in printers:
+            status_data = print_service.get_printer_status(printer.name)
+            printer_items.append(
+                {
+                    "id": printer.id,
+                    "name": printer.name,
+                    "display_name": printer.display_name,
+                    "printer_type": printer.printer_type,
+                    "connection_type": printer.connection_type,
+                    "is_default": printer.is_default,
+                    "status": status_data.get("status", "unknown"),
+                }
+            )
+
+        logger.info(
+            "[FIX] Loaded %s printers from database (%s synced local printers)",
+            len(printer_items),
+            len(synced_printers),
+        )
+        return {"printers": printer_items, "total": len(printer_items)}
 
     except Exception as e:
+        logger.error("[FIX] Failed to load printers from database: %s", e)
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения списка принтеров: {str(e)}"
         )

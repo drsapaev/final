@@ -34,9 +34,14 @@ import './EnhancedAppointmentsTable.css';
 import { QueueActionButtons } from '../queue/QueueManagementCard';
 
 import logger from '../../utils/logger';
+import {
+  parseRegistrarTimestamp,
+  REGISTRAR_TIME_ZONE,
+} from '../../utils/dateUtils';
 
 // ⭐ SSOT: Centralized service code resolver
 import { LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName } from '../../utils/serviceCodeResolver';
+import PropTypes from 'prop-types';
 
 const SESSION_COLORS = [
   '#3B82F6', // blue
@@ -117,41 +122,10 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // ✅ FIX 17: Helper для безопасного парсинга даты
-  // КРИТИЧНО: Backend хранит ЛОКАЛЬНОЕ время, но добавляет 'Z' (UTC) суффикс при сериализации
-  // Это вызывает двойное преобразование timezone (+5 часов)
-  // Решение: убираем 'Z' чтобы время парсилось как локальное
+  // Контракт: backend должен отдавать ISO 8601 с корректным timezone.
+  // Для legacy-naive строк считаем, что это время клиники Asia/Tashkent.
   const safeParseDate = useCallback((dateStr) => {
-    if (!dateStr) return null;
-    try {
-      let parseStr = dateStr;
-
-      // ⭐ FIX: Handle timezone conversion for display
-      // Database stores times as UTC (naive) but we want to display in local time (Tashkent +5)
-
-      if (typeof parseStr === 'string') {
-        // If ends with 'Z', it's explicitly UTC
-        if (parseStr.endsWith('Z')) {
-          parseStr = parseStr.slice(0, -1);
-        }
-
-        // If has timezone offset (e.g., +05:00), parse normally
-        if (parseStr.includes('+') || parseStr.includes('-')) {
-          return new Date(parseStr);
-        }
-
-        // If no timezone info - assume it's UTC from database
-        // Add +05:00 offset for Tashkent timezone
-        // This ensures correct display regardless of browser timezone
-        const utcDate = new Date(parseStr + 'Z'); // Parse as UTC
-        // Convert to Tashkent (UTC+5) by adding 5 hours
-        const tashkentOffset = 5 * 60 * 60 * 1000; // 5 hours in ms
-        return new Date(utcDate.getTime() + tashkentOffset);
-      }
-
-      return new Date(parseStr);
-    } catch {
-      return null;
-    }
+    return parseRegistrarTimestamp(dateStr);
   }, []);
 
   const getSessionColor = useCallback((sessionId) => {
@@ -271,11 +245,17 @@ const EnhancedAppointmentsTable = ({
       paid: 'Платный',
       repeat: 'Повторный',
       free: 'Льготный',
-      allfree: 'AllFree',
+      allfree: 'All Free',
+      mixed: 'Смешанный',
       // Виды оплаты
       cash: 'Наличные',
       card: 'Карта',
       online: 'Онлайн',
+      paymentFree: 'Бесплатно',
+      approvalPending: 'Ожидает одобрения',
+      pendingPayment: 'Ожидает оплаты',
+      unknownPayment: 'Не указан',
+      mixedPayment: 'Смешано',
       // Статусы
       scheduled: 'Запланирован',
       confirmed: 'Подтвержден',
@@ -339,6 +319,13 @@ const EnhancedAppointmentsTable = ({
   }, [filteredData, currentPage, pageSize]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
+
+  const getDisplayAmount = useCallback((row) => {
+    if (row?.has_shared_invoice) {
+      return Number(row?.cost || 0);
+    }
+    return Number(row?.cost || row?.invoice_amount || row?.payment_amount || 0);
+  }, []);
 
   // Обработчик сортировки
   const handleSort = useCallback((key) => {
@@ -776,7 +763,8 @@ const EnhancedAppointmentsTable = ({
       paid: 'var(--mac-accent-blue)',
       repeat: 'var(--mac-success)',
       free: 'var(--mac-warning)',
-      allfree: '#ff6b35' // ✅ Добавлено для AllFree (оранжевый цвет)
+      allfree: '#ff6b35',
+      mixed: 'var(--mac-text-secondary)'
     };
 
     const typeText = t[visitType] || visitType;
@@ -784,11 +772,16 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
     const isAllFree = visitType === 'allfree';
+    const isMixed = visitType === 'mixed';
     const backgroundColor = isAllFree ?
     'rgba(255, 107, 53, 0.08)' :
+    isMixed ?
+    'rgba(142, 142, 147, 0.10)' :
     withOpacity(color, 0.08);
     const borderColor = isAllFree ?
     'rgba(255, 107, 53, 0.2)' :
+    isMixed ?
+    'rgba(142, 142, 147, 0.25)' :
     withOpacity(color, 0.2);
 
     return (
@@ -812,14 +805,22 @@ const EnhancedAppointmentsTable = ({
       cash: '💵',
       card: '💳',
       online: '🌐',
-      free: '🆓' // ✅ Добавлено для all_free
+      free: '🆓',
+      approval_pending: '📝',
+      pending_payment: '⌛',
+      unknown_payment: '💰',
+      mixed_payment: '🔀'
     };
 
     const paymentColors = {
       cash: 'var(--mac-success)',
       card: 'var(--mac-accent-blue)',
-      online: 'var(--mac-accent-blue)', // Используем accent вместо хардкоженного цвета
-      free: 'var(--mac-warning)' // ✅ Добавлено для all_free
+      online: 'var(--mac-accent-blue)',
+      free: 'var(--mac-warning)',
+      approval_pending: 'var(--mac-warning)',
+      pending_payment: 'var(--mac-warning)',
+      unknown_payment: 'var(--mac-text-secondary)',
+      mixed_payment: 'var(--mac-text-secondary)'
     };
 
     const statusColors = {
@@ -828,7 +829,14 @@ const EnhancedAppointmentsTable = ({
       failed: 'var(--mac-error)'
     };
 
-    const typeText = paymentType === 'free' ? t.free || 'Бесплатно' : t[paymentType] || paymentType;
+    const paymentLabels = {
+      free: t.paymentFree || 'Бесплатно',
+      approval_pending: t.approvalPending || 'Ожидает одобрения',
+      pending_payment: t.pendingPayment || 'Ожидает оплаты',
+      unknown_payment: t.unknownPayment || 'Не указан',
+      mixed_payment: t.mixedPayment || 'Смешано'
+    };
+    const typeText = paymentLabels[paymentType] || t[paymentType] || paymentType;
     const icon = paymentIcons[paymentType] || '💰';
     const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';void (
     statusColors[paymentStatus] || 'var(--mac-text-secondary)');
@@ -948,17 +956,37 @@ const EnhancedAppointmentsTable = ({
       return baseData.concat([
       (() => {
         const discountMode = row.discount_mode;
+        if (discountMode === 'mixed') return t.mixed;
         if (discountMode === 'benefit') return t.free;
         if (discountMode === 'repeat') return t.repeat;
-        if (discountMode === 'all_free') return t.free;
+        if (discountMode === 'all_free') return t.allfree;
         return t.paid;
       })(),
       formatServicesForCsv(row.services),
-      t[row.payment_type] || row.payment_type || '',
+      (() => {
+        if (row.payment_type === 'mixed_payment') return t.mixedPayment;
+        if (row.payment_type === 'approval_pending') return t.approvalPending;
+        if (row.payment_type === 'free') return t.paymentFree;
+        if (row.cost_display === 'free') return t.paymentFree;
+        const discountMode = row.discount_mode;
+        const paymentStatus = (row.payment_status || '').toLowerCase();
+        const amount = getDisplayAmount(row);
+        const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
+        const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
+        const isZeroCostDiscount = ['repeat', 'benefit'].includes(discountMode) && amount <= 0 && paymentStatus !== 'paid';
+
+        if (isPendingAllFree) return t.approvalPending;
+        if (isApprovedAllFree || isZeroCostDiscount) return t.paymentFree;
+        if (row.payment_type) return t[row.payment_type] || row.payment_type;
+        return paymentStatus === 'paid' ? t.unknownPayment : t.pendingPayment;
+      })(),
       row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : row.appointment_date || '',
       row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : row.appointment_time || '',
       t[row.status] || row.status || '',
-      row.total_amount || row.cost || row.payment_amount || '']
+      (() => {
+        if (row.cost_display === 'free') return t.paymentFree;
+        return row.total_amount || row.cost || row.payment_amount || '';
+      })()]
       ).join(',');
     })].
     join('\n');
@@ -968,7 +996,7 @@ const EnhancedAppointmentsTable = ({
     link.href = URL.createObjectURL(blob);
     link.download = `appointments_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-  }, [filteredData, t, formatPhoneNumber, isDoctorView]);
+  }, [filteredData, t, formatPhoneNumber, getDisplayAmount, isDoctorView]);
 
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
 
@@ -1745,6 +1773,7 @@ const EnhancedAppointmentsTable = ({
                       {renderVisitType((() => {
                       // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
                       const discountMode = row.discount_mode;
+                      if (discountMode === 'mixed') return 'mixed';
                       const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
 
                       if (discountMode === 'benefit') return 'free';
@@ -1792,16 +1821,30 @@ const EnhancedAppointmentsTable = ({
                     minWidth: '100px'
                   }}>
                       {renderPaymentType(
-                      // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
                       (() => {
-                        const discountMode = row.discount_mode;void
-                        row.approval_status;
-                        // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
-                        // (так как пользователь уже выбрал all_free при редактировании)
-                        if (discountMode === 'all_free') {
+                        if (row.payment_type === 'mixed_payment') {
+                          return 'mixed_payment';
+                        }
+                        if (row.payment_type === 'approval_pending') {
+                          return 'approval_pending';
+                        }
+                        if (row.payment_type === 'free') {
                           return 'free';
                         }
-                        return row.payment_type || 'cash';
+                        const discountMode = row.discount_mode;
+                        const paymentStatus = (row.payment_status || '').toLowerCase();
+                        const amount = getDisplayAmount(row);
+                        const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
+                        const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
+                        const isZeroCostDiscount = ['repeat', 'benefit'].includes(discountMode) && amount <= 0 && paymentStatus !== 'paid';
+
+                        if (isPendingAllFree) {
+                          return 'approval_pending';
+                        }
+                        if (isApprovedAllFree || isZeroCostDiscount) {
+                          return 'free';
+                        }
+                        return row.payment_type || (paymentStatus === 'paid' ? 'unknown_payment' : 'pending_payment');
                       })(),
                       row.payment_status
                     )}
@@ -1828,7 +1871,9 @@ const EnhancedAppointmentsTable = ({
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
-                                  {displayDate.toLocaleDateString('ru-RU')}
+                                  {displayDate.toLocaleDateString('ru-RU', {
+                                  timeZone: REGISTRAR_TIME_ZONE
+                                })}
                                 </div>
                                 <div style={{
                                 display: 'flex',
@@ -1843,7 +1888,8 @@ const EnhancedAppointmentsTable = ({
                                   {displayDate.toLocaleTimeString('ru-RU', {
                                   hour: '2-digit',
                                   minute: '2-digit',
-                                  second: '2-digit'
+                                  second: '2-digit',
+                                  timeZone: REGISTRAR_TIME_ZONE
                                 })}
                                 </div>
                               </div>);
@@ -1899,18 +1945,11 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'right',
                     color: (() => {
-                      // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
+                      if (row.cost_display === 'free') return 'var(--mac-warning)';
                       const discountMode = row.discount_mode;
-                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-                      if (isAllFreeApproved) return 'var(--mac-warning)';
-
-                      // ⭐ Используем ту же логику что и в отображении
-                      let amount = 0;
-                      if (row.has_shared_invoice) {
-                        amount = row.cost || 0;
-                      } else {
-                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
-                      }
+                      const amount = getDisplayAmount(row);
+                      const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(discountMode) && amount <= 0;
+                      if (isZeroCostRegistration) return 'var(--mac-warning)';
 
                       return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
                     })(),
@@ -1919,27 +1958,15 @@ const EnhancedAppointmentsTable = ({
                     minWidth: '90px'
                   }}>
                       {(() => {
-                      // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
-                      // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
-                      // 2. invoice_amount (только если НЕ shared invoice)
-                      const discountMode = row.discount_mode;
-
-                      // Показываем "Бесплатно" если discount_mode = 'all_free'
-                      if (discountMode === 'all_free') {
+                      if (row.cost_display === 'free') {
                         return 'Бесплатно';
                       }
-
-                      // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
-                      let amount = 0;
-                      if (row.has_shared_invoice) {
-                        // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
-                        amount = row.cost || 0;
-                      } else {
-                        // Для обычных случаев: приоритет cost, fallback invoice_amount
-                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                      const discountMode = row.discount_mode;
+                      const amount = getDisplayAmount(row);
+                      const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(discountMode) && amount <= 0;
+                      if (isZeroCostRegistration) {
+                        return 'Бесплатно';
                       }
-
-                      // Если есть сумма - показываем, иначе "—"
                       return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
                     })()}
                     </td>
@@ -1994,6 +2021,10 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onActionClick?.('payment', row, e);
                         }}
                         style={{
@@ -2017,6 +2048,10 @@ const EnhancedAppointmentsTable = ({
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('call', row, e);
@@ -2044,6 +2079,10 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onActionClick?.('print', row, e);
                         }}
                         style={{
@@ -2068,6 +2107,10 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           onActionClick?.('complete', row, e);
                         }}
                         style={{
@@ -2087,21 +2130,20 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
-                        {isDoctorView &&
-                      <QueueActionButtons
-                        entry={{
-                          id: row.queue_entry_id || row.id,
-                          queue_entry_id: row.queue_entry_id,
-                          status: row.status
-                        }}
-                        onStatusChange={(action, entry, result) => {
-                          logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
-                          // Передаём событие наружу для обновления списка
-                          onActionClick?.(`queue_${action}`, row, null);
-                        }}
-                        compact={true} />
+                          {isDoctorView && row.queue_entry_id &&
+                        <QueueActionButtons
+                          entry={{
+                            queue_entry_id: row.queue_entry_id,
+                            status: row.status
+                          }}
+                          onStatusChange={(action, entry, result) => {
+                            logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
+                            // Передаём событие наружу для обновления списка
+                            onActionClick?.(`queue_${action}`, row, null);
+                          }}
+                          compact={true} />
 
-                      }
+                        }
 
                         {/* Просмотр */}
                         <button
@@ -2110,17 +2152,11 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
                         }}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('view', row, e);
-                          }
+                          onActionClick?.('view', row, e);
                         }}
                         style={{
                           padding: '4px',
@@ -2145,17 +2181,11 @@ const EnhancedAppointmentsTable = ({
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
                         }}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          // Дублируем обработчик для надежности
-                          if (onActionClick) {
-                            onActionClick('edit', row, e);
-                          }
+                          onActionClick?.('edit', row, e);
                         }}
                         style={{
                           padding: '4px',
@@ -2176,9 +2206,13 @@ const EnhancedAppointmentsTable = ({
                         {/* Просмотр EMR (только для завершённых записей) */}
                         {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
                       row.status === 'in_visit' && row.payment_status === 'paid') &&
-                      <button
+                        <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('view_emr', row, e);
@@ -2199,9 +2233,13 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* Еще */}
-                        <button
+                      <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('more', row, e);
@@ -2225,6 +2263,10 @@ const EnhancedAppointmentsTable = ({
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('schedule_next', row, e);
@@ -2347,6 +2389,23 @@ const EnhancedAppointmentsTable = ({
 
     </div>);
 
+};
+
+
+EnhancedAppointmentsTable.propTypes = {
+  ...(EnhancedAppointmentsTable.propTypes || {}),
+  data: PropTypes.any,
+  language: PropTypes.any,
+  loading: PropTypes.any,
+  onActionClick: PropTypes.any,
+  onRowClick: PropTypes.any,
+  onRowSelect: PropTypes.any,
+  outerBorder: PropTypes.any,
+  selectedRows: PropTypes.any,
+  services: PropTypes.any,
+  showCheckboxes: PropTypes.any,
+  theme: PropTypes.any,
+  view: PropTypes.any,
 };
 
 export default EnhancedAppointmentsTable;

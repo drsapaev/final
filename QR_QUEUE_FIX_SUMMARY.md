@@ -55,7 +55,7 @@ daily_queue = self.db.query(DailyQueue).filter(
 1. #1548B5AL, GB> backend 70?CI5=:
    ```bash
    cd backend
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
    ```
 
 2. B:@>9B5 =0 B5;5D>=5 ;N1CN 87 AAK;>::

@@ -56,6 +56,7 @@ class EMRDataSchema(ORMModel):
     vitals: VitalsData = Field(default_factory=VitalsData)
     plan: PlanData = Field(default_factory=PlanData)
     recommendations: str = Field(default="", max_length=5000)
+    specialty: str = Field(default="general", max_length=32)
     specialty_data: dict[str, Any] = Field(
         default_factory=dict, description="Specialty-specific fields"
     )

@@ -10,7 +10,7 @@
 Frontend console was showing 404 errors:
 ```
 GET http://localhost:5173/api/v1/departments?active_only=true 404 (Not Found)
-GET http://localhost:8000/api/v1/departments/active 404 (Not Found)
+GET http://localhost:18000/api/v1/departments/active 404 (Not Found)
 ```
 
 **Affected Components**:
@@ -85,13 +85,13 @@ $ python -c "from app.api.v1.api import api_router; print(f'API router has {len(
 ```
 
 ### ✅ Backend Server Running
-- Server: http://0.0.0.0:8000
+- Server: http://0.0.0.0:18000
 - Process ID: 9348
 - Status: LISTENING
 
 ### ✅ Endpoint Accessible
 ```bash
-$ curl http://localhost:8000/api/v1/departments
+$ curl http://localhost:18000/api/v1/departments
 > {"detail":"Not authenticated"}  # Correct - authentication required
 ```
 
@@ -260,7 +260,7 @@ The registrar panel and modern tabs components can now successfully load departm
 ---
 
 **Report Generated**: 2025-11-26
-**Backend Status**: Running on port 8000
+**Backend Status**: Running on port 18000
 **Frontend Status**: Ready to consume departments API
 **Recommendation**: **DEPLOY WITH CONFIDENCE**
 

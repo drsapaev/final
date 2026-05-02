@@ -85,7 +85,7 @@ PROMETHEUS_PORT=9090
 - [ ] Install monitoring: `pip install -r requirements-monitoring.txt`
 - [ ] Configure monitoring (Sentry, Prometheus)
 - [ ] Run load tests: `python load_test.py`
-- [ ] Verify health: `curl http://localhost:8000/api/v1/health`
+- [ ] Verify health: `curl http://localhost:18000/api/v1/health`
 - [ ] Start production server
 
 ## 📖 Documentation

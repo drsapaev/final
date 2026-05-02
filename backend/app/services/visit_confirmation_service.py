@@ -354,32 +354,33 @@ class VisitConfirmationService:
         print_tickets: list[dict[str, Any]] = []
 
         for queue_tag in unique_queue_tags:
-            specialist_user_id: int | None = None
+            specialist_doctor_id: int | None = None
             if visit.doctor_id:
                 visit_doctor = self.repository.get_doctor(visit.doctor_id)
                 if visit_doctor:
-                    specialist_user_id = visit_doctor.user_id
-                else:
-                    # Legacy/test compatibility: some flows persisted user_id in visit.doctor_id.
-                    specialist_user_id = visit.doctor_id
+                    specialist_doctor_id = visit_doctor.id
 
-            if queue_tag == "ecg" and not specialist_user_id:
+            if queue_tag == "ecg" and not specialist_doctor_id:
                 ecg_resource = self.repository.get_active_user_by_username("ecg_resource")
                 if ecg_resource:
-                    specialist_user_id = ecg_resource.id
+                    ecg_doctor = self.repository.get_doctor_by_user_id(ecg_resource.id)
+                    if ecg_doctor:
+                        specialist_doctor_id = ecg_doctor.id
+                    else:
+                        continue
                 else:
                     continue
-            elif queue_tag == "lab" and not specialist_user_id:
+            elif queue_tag == "lab" and not specialist_doctor_id:
                 lab_resource = self.repository.get_active_user_by_username("lab_resource")
                 if not lab_resource:
                     continue
                 lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
                 if lab_doctor:
-                    specialist_user_id = lab_doctor.user_id
+                    specialist_doctor_id = lab_doctor.id
                     logger.info(
-                        "For queue_tag=%s using lab resource user id=%s",
+                        "For queue_tag=%s using lab resource doctor id=%s",
                         queue_tag,
-                        specialist_user_id,
+                        specialist_doctor_id,
                     )
                 else:
                     logger.warning(
@@ -388,12 +389,12 @@ class VisitConfirmationService:
                     )
                     continue
 
-            if not specialist_user_id:
+            if not specialist_doctor_id:
                 continue
 
             daily_queue = self.repository.get_or_create_daily_queue(
                 day=today,
-                specialist_id=specialist_user_id,
+                specialist_id=specialist_doctor_id,
                 queue_tag=queue_tag,
             )
 
@@ -445,6 +446,10 @@ class VisitConfirmationService:
                     ),
                     "doctor_name": (
                         doctor.user.full_name if doctor and doctor.user else "Без врача"
+                    ),
+                    "doctor_cabinet": (
+                        daily_queue.cabinet_number
+                        or (doctor.cabinet if doctor else None)
                     ),
                     "department": visit.department,
                     "visit_date": visit.visit_date.isoformat(),

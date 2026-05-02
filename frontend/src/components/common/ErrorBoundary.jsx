@@ -4,6 +4,7 @@ import React from 'react';
 import { Button } from '../ui/native';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
  */
@@ -53,6 +54,14 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+
+ErrorBoundary.propTypes = {
+  ...(ErrorBoundary.propTypes || {}),
+  children: PropTypes.any,
+  onError: PropTypes.any,
+  theme: PropTypes.any,
+};
 
 /**
  * Fallback UI компонент
@@ -152,6 +161,20 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     </div>);
 
 }
+
+
+ErrorFallback.propTypes = {
+  ...(ErrorFallback.propTypes || {}),
+  componentStack: PropTypes.any,
+  error: PropTypes.any,
+  errorInfo: PropTypes.any,
+  getColor: PropTypes.any,
+  getFontSize: PropTypes.any,
+  getSpacing: PropTypes.any,
+  onRetry: PropTypes.any,
+  theme: PropTypes.any,
+  toString: PropTypes.any,
+};
 
 /**
  * HOC для обертывания компонентов в Error Boundary

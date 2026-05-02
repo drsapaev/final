@@ -1,0 +1,401 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e324]:
+          - img [ref=e325]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e327]
+        - button "Admin User" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Admin User
+        - button "Выйти" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - text: Выйти
+    - generic [ref=e55]:
+      - complementary [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: Медицинская система
+          - button "Collapse sidebar" [ref=e60] [cursor=pointer]:
+            - img [ref=e62]
+        - navigation [ref=e65]:
+          - button "Dashboard" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Dashboard
+          - button "Analytics" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e75]: Analytics
+          - button "Wait Time Analytics" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Wait Time Analytics
+          - button "AI Analytics" [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: AI Analytics
+          - button "Webhooks" [ref=e86] [cursor=pointer]:
+            - img [ref=e87]
+            - generic [ref=e90]: Webhooks
+          - button "Reports" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e95]: Reports
+          - button "System" [ref=e96] [cursor=pointer]:
+            - img [ref=e97]
+            - generic [ref=e100]: System
+          - button "Cloud Printing" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Cloud Printing
+          - button "Medical Equipment" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Dynamic Pricing
+          - button "Billing" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Billing
+          - button "Discount Benefits" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e128]: Discount Benefits
+          - button "GraphQL API" [ref=e129] [cursor=pointer]:
+            - img [ref=e130]
+            - generic [ref=e133]: GraphQL API
+          - button "Users" [ref=e134] [cursor=pointer]:
+            - img [ref=e135]
+            - generic [ref=e138]: Users
+          - button "Doctors" [ref=e139] [cursor=pointer]:
+            - img [ref=e140]
+            - generic [ref=e143]: Doctors
+          - button "Services" [ref=e144] [cursor=pointer]:
+            - img [ref=e145]
+            - generic [ref=e148]: Services
+          - button "Patients" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+            - generic [ref=e153]: Patients
+          - button "Appointments" [ref=e154] [cursor=pointer]:
+            - img [ref=e155]
+            - generic [ref=e158]: Appointments
+          - button "All Free" [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+            - generic [ref=e163]: All Free
+          - button "Benefit Settings" [ref=e164] [cursor=pointer]:
+            - img [ref=e165]
+            - generic [ref=e168]: Benefit Settings
+          - button "Wizard Settings" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+            - generic [ref=e175]: Wizard Settings
+          - button "Payment Providers" [ref=e176] [cursor=pointer]:
+            - img [ref=e177]
+            - generic [ref=e180]: Payment Providers
+          - button "Clinic Management" [ref=e181] [cursor=pointer]:
+            - img [ref=e182]
+            - generic [ref=e185]: Clinic Management
+          - button "Clinic Settings" [ref=e186] [cursor=pointer]:
+            - img [ref=e187]
+            - generic [ref=e190]: Clinic Settings
+          - button "Queue Settings" [ref=e191] [cursor=pointer]:
+            - img [ref=e192]
+            - generic [ref=e195]: Queue Settings
+          - button "Queue Limits" [ref=e196] [cursor=pointer]:
+            - img [ref=e197]
+            - generic [ref=e200]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e201] [cursor=pointer]:
+            - img [ref=e202]
+            - generic [ref=e205]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e206] [cursor=pointer]:
+            - img [ref=e207]
+            - generic [ref=e210]: AI Imaging
+          - button "Treatment Recommendations" [ref=e211] [cursor=pointer]:
+            - img [ref=e212]
+            - generic [ref=e215]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e216] [cursor=pointer]:
+            - img [ref=e217]
+            - generic [ref=e220]: Drug Interactions
+          - button "Risk Assessment" [ref=e221] [cursor=pointer]:
+            - img [ref=e222]
+            - generic [ref=e225]: Risk Assessment
+          - button "Voice to Text" [ref=e226] [cursor=pointer]:
+            - img [ref=e227]
+            - generic [ref=e230]: Voice to Text
+          - button "Smart Scheduling" [ref=e231] [cursor=pointer]:
+            - img [ref=e232]
+            - generic [ref=e235]: Smart Scheduling
+          - button "Quality Control" [ref=e236] [cursor=pointer]:
+            - img [ref=e237]
+            - generic [ref=e240]: Quality Control
+          - button "Analytics Insights" [ref=e241] [cursor=pointer]:
+            - img [ref=e242]
+            - generic [ref=e245]: Analytics Insights
+          - button "Telegram Bot" [ref=e246] [cursor=pointer]:
+            - img [ref=e247]
+            - generic [ref=e250]: Telegram Bot
+          - button "FCM Notifications" [ref=e251] [cursor=pointer]:
+            - img [ref=e252]
+            - generic [ref=e255]: FCM Notifications
+          - button "Phone Verification" [ref=e256] [cursor=pointer]:
+            - img [ref=e257]
+            - generic [ref=e260]: Phone Verification
+          - button "User Data Transfer" [ref=e261] [cursor=pointer]:
+            - img [ref=e262]
+            - generic [ref=e265]: User Data Transfer
+          - button "Group Permissions" [ref=e266] [cursor=pointer]:
+            - img [ref=e267]
+            - generic [ref=e270]: Group Permissions
+          - button "User Export" [ref=e271] [cursor=pointer]:
+            - img [ref=e272]
+            - generic [ref=e275]: User Export
+          - button "Registrar Notifications" [ref=e276] [cursor=pointer]:
+            - img [ref=e277]
+            - generic [ref=e282]: Registrar Notifications
+          - button "AI Settings" [active] [ref=e283] [cursor=pointer]:
+            - img [ref=e284]
+            - generic [ref=e287]: AI Settings
+          - button "Telegram Settings" [ref=e288] [cursor=pointer]:
+            - img [ref=e289]
+            - generic [ref=e292]: Telegram Settings
+          - button "Display Settings" [ref=e293] [cursor=pointer]:
+            - img [ref=e294]
+            - generic [ref=e299]: Display Settings
+          - button "Activation" [ref=e300] [cursor=pointer]:
+            - img [ref=e301]
+            - generic [ref=e304]: Activation
+          - button "Finance" [ref=e305] [cursor=pointer]:
+            - img [ref=e306]
+            - generic [ref=e311]: Finance
+          - button "Security" [ref=e312] [cursor=pointer]:
+            - img [ref=e313]
+            - generic [ref=e316]: Security
+          - button "Settings" [ref=e317] [cursor=pointer]:
+            - img [ref=e318]
+            - generic [ref=e321]: Settings
+      - main [ref=e322]:
+        - generic [ref=e637]:
+          - generic [ref=e638]:
+            - generic [ref=e639]:
+              - heading "Настройки AI" [level=2] [ref=e640]
+              - paragraph [ref=e641]: Управление AI провайдерами и шаблонами
+            - generic [ref=e642]:
+              - button "Обновить" [ref=e643] [cursor=pointer]:
+                - generic [ref=e644]:
+                  - img [ref=e645]
+                  - text: Обновить
+              - button "Добавить провайдера" [ref=e650] [cursor=pointer]:
+                - generic [ref=e651]:
+                  - img [ref=e652]
+                  - text: Добавить провайдера
+          - generic [ref=e653]:
+            - generic [ref=e654]:
+              - generic [ref=e655]: "0"
+              - generic [ref=e656]: Всего запросов
+            - generic [ref=e657]:
+              - generic [ref=e658]: "0"
+              - generic [ref=e659]: Успешных
+            - generic [ref=e660]:
+              - generic [ref=e661]: 0%
+              - generic [ref=e662]: Кэш
+            - generic [ref=e663]:
+              - generic [ref=e664]: "0"
+              - generic [ref=e665]: Токенов
+          - generic [ref=e666]:
+            - generic [ref=e667]:
+              - generic [ref=e668]:
+                - generic [ref=e671]:
+                  - heading "DeepSeek Chat" [level=3] [ref=e672]
+                  - paragraph [ref=e673]: Экономичная альтернатива для текстовых задач
+                - generic [ref=e674]:
+                  - generic [ref=e675]: По умолчанию
+                  - generic [ref=e676]: Активен
+              - generic [ref=e677]:
+                - generic [ref=e678]:
+                  - generic [ref=e679]: "Модель:"
+                  - generic [ref=e680]: deepseek-chat
+                - generic [ref=e681]:
+                  - generic [ref=e682]: "Температура:"
+                  - generic [ref=e683]: "0.3"
+                - generic [ref=e684]:
+                  - generic [ref=e685]: "Макс. токенов:"
+                  - generic [ref=e686]: "2000"
+                - generic [ref=e687]:
+                  - generic [ref=e688]: "API ключ:"
+                  - generic [ref=e689]:
+                    - generic [ref=e690]: "***скрыт***"
+                    - button [ref=e691] [cursor=pointer]:
+                      - img [ref=e693]
+                - generic [ref=e696]:
+                  - generic [ref=e697]: "Возможности:"
+                  - generic [ref=e698]:
+                    - generic [ref=e699]: chat
+                    - generic [ref=e700]: diagnosis
+                    - generic [ref=e701]: icd10
+              - generic [ref=e702]:
+                - button "Настроить" [ref=e703] [cursor=pointer]:
+                  - generic [ref=e704]:
+                    - img [ref=e705]
+                    - text: Настроить
+                - button [disabled]:
+                  - generic:
+                    - img
+            - generic [ref=e708]:
+              - generic [ref=e709]:
+                - generic [ref=e712]:
+                  - heading "Google Gemini" [level=3] [ref=e713]
+                  - paragraph [ref=e714]: Gemini Pro для текста и мультимодальных задач
+                - generic [ref=e716]: Активен
+              - generic [ref=e717]:
+                - generic [ref=e718]:
+                  - generic [ref=e719]: "Модель:"
+                  - generic [ref=e720]: gemini-pro
+                - generic [ref=e721]:
+                  - generic [ref=e722]: "Температура:"
+                  - generic [ref=e723]: "0.3"
+                - generic [ref=e724]:
+                  - generic [ref=e725]: "Макс. токенов:"
+                  - generic [ref=e726]: "2000"
+                - generic [ref=e727]:
+                  - generic [ref=e728]: "API ключ:"
+                  - generic [ref=e729]:
+                    - generic [ref=e730]: "***скрыт***"
+                    - button [ref=e731] [cursor=pointer]:
+                      - img [ref=e733]
+                - generic [ref=e736]:
+                  - generic [ref=e737]: "Возможности:"
+                  - generic [ref=e738]:
+                    - generic [ref=e739]: chat
+                    - generic [ref=e740]: diagnosis
+                    - generic [ref=e741]: vision
+              - generic [ref=e742]:
+                - button "Настроить" [ref=e743] [cursor=pointer]:
+                  - generic [ref=e744]:
+                    - img [ref=e745]
+                    - text: Настроить
+                - button [disabled]:
+                  - generic:
+                    - img
+            - generic [ref=e748]:
+              - generic [ref=e749]:
+                - generic [ref=e752]:
+                  - heading "OpenAI GPT" [level=3] [ref=e753]
+                  - paragraph [ref=e754]: GPT-4, GPT-3.5 для текста и изображений
+                - generic [ref=e756]: Активен
+              - generic [ref=e757]:
+                - generic [ref=e758]:
+                  - generic [ref=e759]: "Модель:"
+                  - generic [ref=e760]: gpt-4o-mini
+                - generic [ref=e761]:
+                  - generic [ref=e762]: "Температура:"
+                  - generic [ref=e763]: "0.3"
+                - generic [ref=e764]:
+                  - generic [ref=e765]: "Макс. токенов:"
+                  - generic [ref=e766]: "2000"
+                - generic [ref=e767]:
+                  - generic [ref=e768]: "API ключ:"
+                  - generic [ref=e769]:
+                    - generic [ref=e770]: "***скрыт***"
+                    - button [ref=e771] [cursor=pointer]:
+                      - img [ref=e773]
+                - generic [ref=e776]:
+                  - generic [ref=e777]: "Возможности:"
+                  - generic [ref=e778]:
+                    - generic [ref=e779]: chat
+                    - generic [ref=e780]: diagnosis
+              - generic [ref=e781]:
+                - button "Настроить" [ref=e782] [cursor=pointer]:
+                  - generic [ref=e783]:
+                    - img [ref=e784]
+                    - text: Настроить
+                - button [disabled]:
+                  - generic:
+                    - img
+            - generic [ref=e787]:
+              - generic [ref=e788]:
+                - generic [ref=e791]:
+                  - heading "Mock Provider (Fallback)" [level=3] [ref=e792]
+                  - paragraph
+                - generic [ref=e794]: Активен
+              - generic [ref=e795]:
+                - generic [ref=e796]:
+                  - generic [ref=e797]: "Модель:"
+                  - generic [ref=e798]: mock-v1
+                - generic [ref=e799]:
+                  - generic [ref=e800]: "Температура:"
+                  - generic [ref=e801]: "0.5"
+                - generic [ref=e802]:
+                  - generic [ref=e803]: "Макс. токенов:"
+                  - generic [ref=e804]: "1000"
+                - generic [ref=e805]:
+                  - generic [ref=e806]: "API ключ:"
+                  - generic [ref=e807]:
+                    - generic [ref=e808]: "***скрыт***"
+                    - button [ref=e809] [cursor=pointer]:
+                      - img [ref=e811]
+                - generic [ref=e814]:
+                  - generic [ref=e815]: "Возможности:"
+                  - generic [ref=e817]: chat
+              - generic [ref=e818]:
+                - button "Настроить" [ref=e819] [cursor=pointer]:
+                  - generic [ref=e820]:
+                    - img [ref=e821]
+                    - text: Настроить
+                - button [disabled]:
+                  - generic:
+                    - img
+            - generic [ref=e824]:
+              - img [ref=e825]
+              - heading "Добавить AI провайдера" [level=3] [ref=e833]
+              - paragraph [ref=e834]: Настройте новый AI провайдер для использования в системе
+              - button "Добавить" [ref=e835] [cursor=pointer]:
+                - generic [ref=e836]:
+                  - img [ref=e837]
+                  - text: Добавить
+          - generic [ref=e838]:
+            - heading "Системные настройки AI" [level=3] [ref=e839]:
+              - img [ref=e840]
+              - text: Системные настройки AI
+            - generic [ref=e843]:
+              - generic [ref=e844]:
+                - generic [ref=e846]:
+                  - checkbox [checked] [ref=e848]:
+                    - img [ref=e850] [cursor=pointer]
+                  - generic [ref=e852]: AI система включена
+                - generic [ref=e854]:
+                  - checkbox [checked] [ref=e856]:
+                    - img [ref=e858] [cursor=pointer]
+                  - generic [ref=e860]: Кэширование включено
+                - generic [ref=e862]:
+                  - checkbox [checked] [ref=e864]:
+                    - img [ref=e866] [cursor=pointer]
+                  - generic [ref=e868]: Требовать согласие для файлов
+                - generic [ref=e870]:
+                  - checkbox [checked] [ref=e872]:
+                    - img [ref=e874] [cursor=pointer]
+                  - generic [ref=e876]: Анонимизировать данные
+              - button "Сохранить настройки" [ref=e878] [cursor=pointer]:
+                - generic [ref=e879]:
+                  - img [ref=e880]
+                  - text: Сохранить настройки
+  - region "Notifications Alt+T"
+  - generic [ref=e623]:
+    - generic [ref=e624]:
+      - img [ref=e625]
+      - generic [ref=e628]:
+        - strong [ref=e629]: Включить уведомления?
+        - generic [ref=e630]: Получайте уведомления о новых сообщениях
+    - generic [ref=e631]:
+      - button "Включить" [ref=e632] [cursor=pointer]
+      - button "Закрыть" [ref=e633] [cursor=pointer]:
+        - img [ref=e634]

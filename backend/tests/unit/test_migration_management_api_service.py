@@ -71,6 +71,45 @@ class TestMigrationManagementApiService:
         assert stats["source_distribution"] == [{"source": "online", "count": 12}]
         assert stats["queue_tag_distribution"][0]["queue_tag"] == "cardio"
 
+    def test_migrate_legacy_emr_data_delegates_to_cutover_service(self):
+        class FakeEMRCutoverService:
+            def __init__(self, db):
+                self.db = db
+
+            def migrate_legacy_emrs(self, *, limit, dry_run):
+                return {"success": True, "limit": limit, "dry_run": dry_run}
+
+        service = MigrationManagementApiService(
+            db=object(),
+            repository=SimpleNamespace(),
+            migration_service_factory=lambda db: SimpleNamespace(),
+            emr_cutover_service_factory=FakeEMRCutoverService,
+        )
+
+        result = service.migrate_legacy_emr_data(limit=25, dry_run=True)
+
+        assert result == {"success": True, "limit": 25, "dry_run": True}
+
+    def test_verify_emr_cutover_delegates_to_cutover_service(self):
+        class FakeEMRCutoverService:
+            def __init__(self, db):
+                self.db = db
+
+            def verify_cutover(self):
+                return {"passed": True, "checks": {}, "generated_at": "2026-03-19T00:00:00"}
+
+        service = MigrationManagementApiService(
+            db=object(),
+            repository=SimpleNamespace(),
+            migration_service_factory=lambda db: SimpleNamespace(),
+            emr_cutover_service_factory=FakeEMRCutoverService,
+        )
+
+        result = service.verify_emr_cutover()
+
+        assert result["passed"] is True
+        assert result["checks"] == {}
+
     def test_check_migration_health_marks_failed_checks(self):
         def get_count(table):
             if table == "queue_entries":

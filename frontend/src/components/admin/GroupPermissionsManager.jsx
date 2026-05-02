@@ -31,17 +31,20 @@ const GroupPermissionsManager = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);void
-  useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   // Данные
-  const [users] = useState([]);
+  const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [userPermissions, setUserPermissions] = useState(null);
   const [groupSummary, setGroupSummary] = useState(null);
-  const [cacheStats, setCacheStats] = useState(null);
+  const [cacheStats, setCacheStats] = useState({
+    cache_ttl: 0,
+    cache_size: 0,
+    cached_users: []
+  });
 
   // Загрузка данных
   useEffect(() => {
@@ -51,13 +54,15 @@ const GroupPermissionsManager = () => {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [groupsRes, rolesRes, permissionsRes, cacheRes] = await Promise.all([
+      const [usersRes, groupsRes, rolesRes, permissionsRes, cacheRes] = await Promise.all([
+      api.get('/users/users', { params: { per_page: 100 } }),
       api.get('/admin/permissions/groups'),
       api.get('/admin/permissions/roles'),
       api.get('/admin/permissions/permissions'),
       api.get('/admin/permissions/cache/stats')]
       );
 
+      setUsers(usersRes.data.users || usersRes.data || []);
       setGroups(groupsRes.data);
       setRoles(rolesRes.data);
       setPermissions(permissionsRes.data);
@@ -212,16 +217,13 @@ const GroupPermissionsManager = () => {
   const filteredGroups = groups.filter((group) =>
   group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
   group.display_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );void
+  );
 
-  roles.filter((role) =>
-  role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  role.display_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );void
-
-  permissions.filter((permission) =>
-  permission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  permission.codename.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users.filter((user) =>
+  user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  user.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Стили
@@ -271,7 +273,7 @@ const GroupPermissionsManager = () => {
       
         
         <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-          {users.map((user) =>
+          {filteredUsers.map((user) =>
         <div
           key={user.id}
           role="button"
@@ -319,6 +321,17 @@ const GroupPermissionsManager = () => {
               </div>
             </div>
         )}
+
+          {filteredUsers.length === 0 &&
+        <div style={{
+          padding: '16px',
+          textAlign: 'center',
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
+              Пользователи не найдены
+            </div>
+        }
         </div>
       </Card>
 

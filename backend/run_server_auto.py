@@ -11,7 +11,10 @@ import os
 from pathlib import Path
 
 
-def check_server_health(port=8000, max_attempts=30, delay=1):
+DEFAULT_BACKEND_PORT = 18000
+
+
+def check_server_health(port=DEFAULT_BACKEND_PORT, max_attempts=30, delay=1):
     """Проверяет, что сервер запустился и отвечает на запросы"""
     base_url = f"http://localhost:{port}"
 
@@ -38,11 +41,14 @@ def run_server():
     # Импортируем приложение
     from app.main import app
 
+    host = os.environ.get("BACKEND_HOST", "0.0.0.0")
+    port = int(os.environ.get("BACKEND_PORT", str(DEFAULT_BACKEND_PORT)))
+
     # Запускаем сервер
     uvicorn.run(
         app,
-        host="0.0.0.0",
-        port=8000,
+        host=host,
+        port=port,
         reload=False,
         log_level="info",
         access_log=False,  # Отключаем подробные логи для чистоты вывода
@@ -59,17 +65,19 @@ def main():
     os.environ.setdefault("WS_DEV_ALLOW", "1")
     os.environ.setdefault("CORS_DISABLE", "0")
     os.environ.setdefault("REQUIRE_LICENSE", "0")
+    os.environ.setdefault("BACKEND_HOST", "0.0.0.0")
+    os.environ.setdefault("BACKEND_PORT", str(DEFAULT_BACKEND_PORT))
 
     # Запускаем сервер в отдельном потоке
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
     # Ждем запуска сервера
-    if check_server_health():
+    if check_server_health(port=int(os.environ["BACKEND_PORT"])):
         print("=" * 50)
         print("✅ СИСТЕМА ГОТОВА К РАБОТЕ!")
-        print("🌐 Сервер доступен по адресу: http://localhost:8000")
-        print("📊 API документация: http://localhost:8000/docs")
+        print(f"🌐 Сервер доступен по адресу: http://localhost:{os.environ['BACKEND_PORT']}")
+        print(f"📊 API документация: http://localhost:{os.environ['BACKEND_PORT']}/docs")
         print("=" * 50)
         print("💡 Сервер работает в фоновом режиме")
         print("🔄 Для остановки нажмите Ctrl+C")

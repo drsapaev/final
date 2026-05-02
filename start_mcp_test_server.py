@@ -42,7 +42,7 @@ def start_test_server():
         with socketserver.TCPServer(("", PORT), CustomHTTPRequestHandler) as httpd:
             print(f"🚀 MCP Test Server запущен на http://localhost:{PORT}")
             print(f"📄 HTML тестер доступен по адресу: http://localhost:{PORT}/mcp_test.html")
-            print(f"🔧 Backend API: http://localhost:8000")
+            print(f"🔧 Backend API: http://localhost:18000")
             print(f"🌐 Frontend: http://localhost:5173")
             print("\n" + "="*60)
             print("📋 ИНСТРУКЦИИ ДЛЯ ТЕСТИРОВАНИЯ:")

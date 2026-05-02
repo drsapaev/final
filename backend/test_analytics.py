@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 
 def get_auth_token():

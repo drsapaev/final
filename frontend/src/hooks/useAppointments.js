@@ -1,6 +1,51 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
-const useAppointments = () => {
+import { api } from '../api/client';
+
+const normalizeAppointment = (appointment) => ({
+  ...appointment,
+  patientId: appointment.patientId ?? appointment.patient_id ?? null,
+  doctorId: appointment.doctorId ?? appointment.doctor_id ?? null,
+  patientName: appointment.patientName ?? appointment.patient_name ?? 'Пациент',
+  doctorName: appointment.doctorName ?? appointment.doctor_name ?? 'Врач',
+  doctorSpecialization:
+    appointment.doctorSpecialization ??
+    appointment.doctor_specialization ??
+    appointment.specialization ??
+    '',
+  appointmentDate: appointment.appointmentDate ?? appointment.appointment_date ?? '',
+  appointmentTime: appointment.appointmentTime ?? appointment.appointment_time ?? '',
+  reason: appointment.reason ?? appointment.notes ?? '',
+  notes: appointment.notes ?? '',
+  createdAt: appointment.createdAt ?? appointment.created_at ?? null,
+  updatedAt: appointment.updatedAt ?? appointment.updated_at ?? null,
+  effectiveCabinet: appointment.effectiveCabinet ?? appointment.effective_cabinet ?? null,
+  queueCabinet: appointment.queueCabinet ?? appointment.queue_cabinet ?? null,
+  doctorCabinet: appointment.doctorCabinet ?? appointment.doctor_cabinet ?? null,
+  integrityWarnings:
+    appointment.integrityWarnings ?? appointment.integrity_warnings ?? [],
+  hasIntegrityWarnings:
+    appointment.hasIntegrityWarnings ?? appointment.has_integrity_warnings ?? false,
+});
+
+const buildAppointmentPayload = (appointmentData, doctors = []) => {
+  const selectedDoctor = doctors.find(
+    (doctor) => doctor.id === Number(appointmentData.doctorId)
+  );
+
+  return {
+    patient_id: Number(appointmentData.patientId),
+    doctor_id: Number(appointmentData.doctorId),
+    department: selectedDoctor?.specialty || null,
+    appointment_date: appointmentData.appointmentDate,
+    appointment_time: appointmentData.appointmentTime,
+    notes: appointmentData.reason?.trim() || appointmentData.notes?.trim() || '',
+    status: appointmentData.status || 'pending',
+    services: [],
+  };
+};
+
+const useAppointments = (doctors = []) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -9,220 +54,112 @@ const useAppointments = () => {
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
 
-  // Моковые данные для демонстрации
-  const mockAppointments = useMemo(() => [
-    {
-      id: 1,
-      patientId: 1,
-      doctorId: 1,
-      patientName: 'Иванова Анна Сергеевна',
-      doctorName: 'Иванов Иван Иванович',
-      doctorSpecialization: 'Кардиолог',
-      appointmentDate: '2024-02-01',
-      appointmentTime: '10:00',
-      duration: 30,
-      status: 'confirmed',
-      reason: 'Боли в области сердца, одышка при физической нагрузке',
-      notes: 'Пациентка жалуется на периодические боли в груди',
-      phone: '+998 90 123 45 67',
-      email: 'anna.ivanova@email.com',
-      createdAt: '2024-01-25',
-      updatedAt: '2024-01-25'
-    },
-    {
-      id: 2,
-      patientId: 2,
-      doctorId: 2,
-      patientName: 'Петров Дмитрий Александрович',
-      doctorName: 'Петрова Мария Сергеевна',
-      doctorSpecialization: 'Дерматолог',
-      appointmentDate: '2024-02-01',
-      appointmentTime: '14:30',
-      duration: 45,
-      status: 'paid',
-      reason: 'Кожная сыпь на руках и ногах',
-      notes: 'Сыпь появилась неделю назад, сопровождается зудом',
-      phone: '+998 91 234 56 78',
-      email: 'dmitry.petrov@email.com',
-      createdAt: '2024-01-26',
-      updatedAt: '2024-01-27'
-    },
-    {
-      id: 3,
-      patientId: 3,
-      doctorId: 3,
-      patientName: 'Сидорова Мария Ивановна',
-      doctorName: 'Сидоров Сергей Петрович',
-      doctorSpecialization: 'Стоматолог',
-      appointmentDate: '2024-02-02',
-      appointmentTime: '09:00',
-      duration: 60,
-      status: 'in_visit',
-      reason: 'Плановый осмотр и чистка зубов',
-      notes: 'Регулярный профилактический визит',
-      phone: '+998 92 345 67 89',
-      email: 'maria.sidorova@email.com',
-      createdAt: '2024-01-28',
-      updatedAt: '2024-02-02'
-    },
-    {
-      id: 4,
-      patientId: 4,
-      doctorId: 1,
-      patientName: 'Козлов Алексей Владимирович',
-      doctorName: 'Иванов Иван Иванович',
-      doctorSpecialization: 'Кардиолог',
-      appointmentDate: '2024-02-02',
-      appointmentTime: '11:15',
-      duration: 30,
-      status: 'completed',
-      reason: 'Контрольный осмотр после операции',
-      notes: 'Состояние стабильное, рекомендовано продолжать лечение',
-      phone: '+998 93 456 78 90',
-      email: 'alexey.kozlov@email.com',
-      createdAt: '2024-01-29',
-      updatedAt: '2024-02-02'
-    },
-    {
-      id: 5,
-      patientId: 5,
-      doctorId: 4,
-      patientName: 'Новикова Елена Дмитриевна',
-      doctorName: 'Козлова Анна Владимировна',
-      doctorSpecialization: 'Терапевт',
-      appointmentDate: '2024-02-03',
-      appointmentTime: '15:00',
-      duration: 45,
-      status: 'pending',
-      reason: 'Беременность 24 недели - плановый осмотр',
-      notes: 'Требуется особое внимание к состоянию плода',
-      phone: '+998 94 567 89 01',
-      email: 'elena.novikova@email.com',
-      createdAt: '2024-01-30',
-      updatedAt: '2024-01-30'
-    },
-    {
-      id: 6,
-      patientId: 2,
-      doctorId: 5,
-      patientName: 'Петров Дмитрий Александрович',
-      doctorName: 'Новиков Дмитрий Александрович',
-      doctorSpecialization: 'Хирург',
-      appointmentDate: '2024-01-30',
-      appointmentTime: '16:00',
-      duration: 90,
-      status: 'cancelled',
-      reason: 'Консультация по поводу операции',
-      notes: 'Пациент отменил запись по личным обстоятельствам',
-      phone: '+998 91 234 56 78',
-      email: 'dmitry.petrov@email.com',
-      createdAt: '2024-01-28',
-      updatedAt: '2024-01-30'
-    }
-  ], []);
-
-  // Загрузка записей
   const loadAppointments = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
-    try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setAppointments(mockAppointments);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [mockAppointments]);
 
-  // Создание записи
-  const createAppointment = useCallback(async (appointmentData) => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newAppointment = {
-        id: Date.now(),
-        ...appointmentData,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      setAppointments(prev => [newAppointment, ...prev]);
-      return newAppointment;
+      const response = await api.get('/admin/appointments');
+      const items = Array.isArray(response.data) ? response.data : [];
+      setAppointments(items.map(normalizeAppointment));
     } catch (err) {
       setError(err);
-      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Обновление записи
-  const updateAppointment = useCallback(async (id, appointmentData) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setAppointments(prev => prev.map(appointment => 
-        appointment.id === id 
-          ? { ...appointment, ...appointmentData, updatedAt: new Date().toISOString().split('T')[0] }
-          : appointment
-      ));
-      
-      return { id, ...appointmentData };
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const createAppointment = useCallback(
+    async (appointmentData) => {
+      setLoading(true);
+      setError(null);
 
-  // Удаление записи
-  const deleteAppointment = useCallback(async (id) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setAppointments(prev => prev.filter(appointment => appointment.id !== id));
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        const response = await api.post(
+          '/appointments',
+          buildAppointmentPayload(appointmentData, doctors)
+        );
+        await loadAppointments();
+        return normalizeAppointment(response.data || {});
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [doctors, loadAppointments]
+  );
 
-  // Фильтрация записей
-  const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = !searchTerm || 
-      appointment.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.phone?.includes(searchTerm) ||
-      appointment.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = !filterStatus || appointment.status === filterStatus;
-    const matchesDate = !filterDate || appointment.appointmentDate === filterDate;
-    const matchesDoctor = !filterDoctor || appointment.doctorId === parseInt(filterDoctor);
-    
-    return matchesSearch && matchesStatus && matchesDate && matchesDoctor;
-  });
+  const updateAppointment = useCallback(
+    async (id, appointmentData) => {
+      setLoading(true);
+      setError(null);
 
-  // Получение статистики по статусам
-  const getStatusStats = () => {
+      try {
+        const response = await api.put(
+          `/appointments/${id}`,
+          buildAppointmentPayload(appointmentData, doctors)
+        );
+        await loadAppointments();
+        return normalizeAppointment(response.data || {});
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [doctors, loadAppointments]
+  );
+
+  const deleteAppointment = useCallback(
+    async (id) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        await api.delete(`/appointments/${id}`);
+        await loadAppointments();
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadAppointments]
+  );
+
+  const filteredAppointments = useMemo(
+    () =>
+      appointments.filter((appointment) => {
+        const haystack = [
+          appointment.patientName,
+          appointment.doctorName,
+          appointment.reason,
+          appointment.phone,
+          appointment.effectiveCabinet,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        const matchesSearch =
+          !searchTerm || haystack.includes(searchTerm.toLowerCase());
+        const matchesStatus =
+          !filterStatus || appointment.status === filterStatus;
+        const matchesDate =
+          !filterDate || appointment.appointmentDate === filterDate;
+        const matchesDoctor =
+          !filterDoctor || appointment.doctorId === Number(filterDoctor);
+
+        return matchesSearch && matchesStatus && matchesDate && matchesDoctor;
+      }),
+    [appointments, filterDate, filterDoctor, filterStatus, searchTerm]
+  );
+
+  const getStatusStats = useCallback(() => {
     const stats = {
       pending: 0,
       confirmed: 0,
@@ -230,33 +167,32 @@ const useAppointments = () => {
       in_visit: 0,
       completed: 0,
       cancelled: 0,
-      no_show: 0
+      no_show: 0,
     };
-    
-    appointments.forEach(appointment => {
+
+    appointments.forEach((appointment) => {
       stats[appointment.status] = (stats[appointment.status] || 0) + 1;
     });
-    
+
     return stats;
-  };
+  }, [appointments]);
 
-  // Получение записей на сегодня
-  const getTodayAppointments = () => {
+  const getTodayAppointments = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
-    return appointments.filter(appointment => appointment.appointmentDate === today);
-  };
+    return appointments.filter((appointment) => appointment.appointmentDate === today);
+  }, [appointments]);
 
-  // Получение записей на завтра
-  const getTomorrowAppointments = () => {
+  const getTomorrowAppointments = useCallback(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    return appointments.filter(appointment => appointment.appointmentDate === tomorrowStr);
-  };
+    return appointments.filter(
+      (appointment) => appointment.appointmentDate === tomorrowStr
+    );
+  }, [appointments]);
 
-  // Загрузка при монтировании
   useEffect(() => {
-    loadAppointments();
+    void loadAppointments();
   }, [loadAppointments]);
 
   return {
@@ -278,7 +214,7 @@ const useAppointments = () => {
     refresh: loadAppointments,
     getStatusStats,
     getTodayAppointments,
-    getTomorrowAppointments
+    getTomorrowAppointments,
   };
 };
 

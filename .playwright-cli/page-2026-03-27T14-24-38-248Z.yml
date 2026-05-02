@@ -1,0 +1,364 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "admin" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]:
+            - img [ref=e41]
+            - text: admin
+        - button "Выйти" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - text: Выйти
+    - generic [ref=e49]:
+      - complementary [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]: Медицинская система
+          - button "Collapse sidebar" [ref=e54] [cursor=pointer]:
+            - img [ref=e56]
+        - navigation [ref=e59]:
+          - button "Dashboard" [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e64]: Dashboard
+          - button "Analytics" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Analytics
+          - button "Wait Time Analytics" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e74]: Wait Time Analytics
+          - button "AI Analytics" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: AI Analytics
+          - button "Webhooks" [ref=e80] [cursor=pointer]:
+            - img [ref=e81]
+            - generic [ref=e84]: Webhooks
+          - button "Reports" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e89]: Reports
+          - button "System" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+            - generic [ref=e94]: System
+          - button "Cloud Printing" [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e99]: Cloud Printing
+          - button "Medical Equipment" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Dynamic Pricing
+          - button "Billing" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e114]: Billing
+          - button "Discount Benefits" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e122]: Discount Benefits
+          - button "GraphQL API" [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e127]: GraphQL API
+          - button "Users" [ref=e128] [cursor=pointer]:
+            - img [ref=e129]
+            - generic [ref=e132]: Users
+          - button "Doctors" [ref=e133] [cursor=pointer]:
+            - img [ref=e134]
+            - generic [ref=e137]: Doctors
+          - button "Services" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e142]: Services
+          - button "Patients" [ref=e143] [cursor=pointer]:
+            - img [ref=e144]
+            - generic [ref=e147]: Patients
+          - button "Appointments" [ref=e148] [cursor=pointer]:
+            - img [ref=e149]
+            - generic [ref=e152]: Appointments
+          - button "All Free" [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+            - generic [ref=e157]: All Free
+          - button "Benefit Settings" [ref=e158] [cursor=pointer]:
+            - img [ref=e159]
+            - generic [ref=e162]: Benefit Settings
+          - button "Wizard Settings" [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e169]: Wizard Settings
+          - button "Payment Providers" [ref=e170] [cursor=pointer]:
+            - img [ref=e171]
+            - generic [ref=e174]: Payment Providers
+          - button "Clinic Management" [ref=e175] [cursor=pointer]:
+            - img [ref=e176]
+            - generic [ref=e179]: Clinic Management
+          - button "Clinic Settings" [ref=e180] [cursor=pointer]:
+            - img [ref=e181]
+            - generic [ref=e184]: Clinic Settings
+          - button "Queue Settings" [ref=e185] [cursor=pointer]:
+            - img [ref=e186]
+            - generic [ref=e189]: Queue Settings
+          - button "Queue Limits" [ref=e190] [cursor=pointer]:
+            - img [ref=e191]
+            - generic [ref=e194]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e195] [cursor=pointer]:
+            - img [ref=e196]
+            - generic [ref=e199]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e200] [cursor=pointer]:
+            - img [ref=e201]
+            - generic [ref=e204]: AI Imaging
+          - button "Treatment Recommendations" [ref=e205] [cursor=pointer]:
+            - img [ref=e206]
+            - generic [ref=e209]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e210] [cursor=pointer]:
+            - img [ref=e211]
+            - generic [ref=e214]: Drug Interactions
+          - button "Risk Assessment" [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e219]: Risk Assessment
+          - button "Voice to Text" [ref=e220] [cursor=pointer]:
+            - img [ref=e221]
+            - generic [ref=e224]: Voice to Text
+          - button "Smart Scheduling" [ref=e225] [cursor=pointer]:
+            - img [ref=e226]
+            - generic [ref=e229]: Smart Scheduling
+          - button "Quality Control" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+            - generic [ref=e234]: Quality Control
+          - button "Analytics Insights" [ref=e235] [cursor=pointer]:
+            - img [ref=e236]
+            - generic [ref=e239]: Analytics Insights
+          - button "Telegram Bot" [ref=e240] [cursor=pointer]:
+            - img [ref=e241]
+            - generic [ref=e244]: Telegram Bot
+          - button "FCM Notifications" [ref=e245] [cursor=pointer]:
+            - img [ref=e246]
+            - generic [ref=e249]: FCM Notifications
+          - button "Phone Verification" [ref=e250] [cursor=pointer]:
+            - img [ref=e251]
+            - generic [ref=e254]: Phone Verification
+          - button "User Data Transfer" [ref=e255] [cursor=pointer]:
+            - img [ref=e256]
+            - generic [ref=e259]: User Data Transfer
+          - button "Group Permissions" [ref=e260] [cursor=pointer]:
+            - img [ref=e261]
+            - generic [ref=e264]: Group Permissions
+          - button "User Export" [ref=e265] [cursor=pointer]:
+            - img [ref=e266]
+            - generic [ref=e269]: User Export
+          - button "Registrar Notifications" [ref=e270] [cursor=pointer]:
+            - img [ref=e271]
+            - generic [ref=e276]: Registrar Notifications
+          - button "AI Settings" [ref=e277] [cursor=pointer]:
+            - img [ref=e278]
+            - generic [ref=e281]: AI Settings
+          - button "Telegram Settings" [ref=e282] [cursor=pointer]:
+            - img [ref=e283]
+            - generic [ref=e286]: Telegram Settings
+          - button "Display Settings" [ref=e287] [cursor=pointer]:
+            - img [ref=e288]
+            - generic [ref=e293]: Display Settings
+          - button "Activation" [ref=e294] [cursor=pointer]:
+            - img [ref=e295]
+            - generic [ref=e298]: Activation
+          - button "Finance" [ref=e299] [cursor=pointer]:
+            - img [ref=e300]
+            - generic [ref=e305]: Finance
+          - button "Security" [ref=e306] [cursor=pointer]:
+            - img [ref=e307]
+            - generic [ref=e310]: Security
+          - button "Settings" [ref=e311] [cursor=pointer]:
+            - img [ref=e312]
+            - generic [ref=e315]: Settings
+      - main [ref=e316]:
+        - generic [ref=e321]:
+          - generic [ref=e322]:
+            - button "Finance Overview" [ref=e323] [cursor=pointer]
+            - button "Billing" [ref=e324] [cursor=pointer]
+            - button "Dynamic Pricing" [ref=e325] [cursor=pointer]
+            - button "Discount Benefits" [ref=e326] [cursor=pointer]
+          - generic [ref=e328]:
+            - generic [ref=e329]:
+              - img [ref=e330]
+              - generic [ref=e334]:
+                - heading "Динамическое ценообразование" [level=2] [ref=e335]
+                - paragraph [ref=e336]: Управление правилами ценообразования, пакетами услуг и динамическими ценами
+            - generic [ref=e337]:
+              - button "Правила" [ref=e338] [cursor=pointer]:
+                - img [ref=e339]
+                - text: Правила
+              - button "Пакеты" [ref=e342] [cursor=pointer]:
+                - img [ref=e343]
+                - text: Пакеты
+              - button "Аналитика" [ref=e347] [cursor=pointer]:
+                - img [ref=e348]
+                - text: Аналитика
+            - generic [ref=e350]:
+              - generic [ref=e351]:
+                - generic [ref=e352]:
+                  - heading "Правила ценообразования" [level=3] [ref=e353]
+                  - paragraph [ref=e354]: Управление автоматическими скидками и правилами
+                - generic [ref=e355]:
+                  - button "Обновить цены" [ref=e356] [cursor=pointer]:
+                    - generic [ref=e357]:
+                      - img [ref=e358]
+                      - text: Обновить цены
+                  - button "Создать правило" [ref=e361] [cursor=pointer]:
+                    - generic [ref=e362]:
+                      - img [ref=e363]
+                      - text: Создать правило
+              - generic [ref=e365]:
+                - heading "Правила не найдены" [level=3] [ref=e366]
+                - paragraph [ref=e367]: В системе пока нет созданных правил ценообразования
+                - button "Создать первое правило" [active] [ref=e369] [cursor=pointer]:
+                  - generic [ref=e370]:
+                    - img [ref=e371]
+                    - text: Создать первое правило
+              - generic [ref=e386]:
+                - generic [ref=e387]:
+                  - heading "Создать правило ценообразования" [level=4] [ref=e388]
+                  - button [ref=e389] [cursor=pointer]:
+                    - img [ref=e391]
+                - generic [ref=e394]:
+                  - generic [ref=e395]:
+                    - generic [ref=e396]: Название
+                    - textbox "Название правила" [ref=e398]
+                  - generic [ref=e399]:
+                    - generic [ref=e400]: Тип правила
+                    - combobox [ref=e401] [cursor=pointer]:
+                      - option "По времени" [selected]
+                      - option "По объему"
+                      - option "Сезонное"
+                      - option "Лояльность"
+                      - option "Пакетное"
+                      - option "Динамическое"
+                  - generic [ref=e402]:
+                    - generic [ref=e403]: Тип скидки
+                    - combobox [ref=e404] [cursor=pointer]:
+                      - option "Процентная" [selected]
+                      - option "Фиксированная сумма"
+                      - option "Купи X получи Y"
+                      - option "Ступенчатая"
+                  - generic [ref=e405]:
+                    - generic [ref=e406]: Размер скидки
+                    - spinbutton [ref=e408]: "0"
+                  - generic [ref=e409]:
+                    - generic [ref=e410]: Время начала
+                    - textbox [ref=e412]
+                  - generic [ref=e413]:
+                    - generic [ref=e414]: Время окончания
+                    - textbox [ref=e416]
+                  - generic [ref=e417]:
+                    - generic [ref=e418]: Минимальное количество
+                    - spinbutton [ref=e420]: "1"
+                  - generic [ref=e421]:
+                    - generic [ref=e422]: Приоритет
+                    - spinbutton [ref=e424]: "0"
+                  - generic [ref=e425]:
+                    - generic [ref=e426]: Описание
+                    - textbox "Описание правила" [ref=e427]
+                  - generic [ref=e428]:
+                    - generic [ref=e429]: Услуги
+                    - listbox [ref=e430] [cursor=pointer]:
+                      - option "ADM-06 Live Lab 409003 - 17000 ₽" [ref=e431]
+                      - option "HBsAg Экспресс тест - 15000 ₽" [ref=e432]
+                      - option "HCV Экспресс тест - 15000 ₽" [ref=e433]
+                      - option "HIV Экспресс тест - 15000 ₽" [ref=e434]
+                      - option "Malassezia furfur - 10000 ₽" [ref=e435]
+                      - option "QA Lab Service 288308 - 17000 ₽" [ref=e436]
+                      - option "QA Mismatch Smoke - 12000 ₽" [ref=e437]
+                      - option "RW Экспресс тест - 15000 ₽" [ref=e438]
+                      - option "АлАТ (аланинаминотрансфераза) - 12000 ₽" [ref=e439]
+                      - option "Альфа-амилаза - 10000 ₽" [ref=e440]
+                      - option "Антистрептолизин-О (ASlO) - 12000 ₽" [ref=e441]
+                      - option "АсАТ (аспартотаминотрансфераза) - 12000 ₽" [ref=e442]
+                      - option "АТ-ТПО (аутоантитело к тиреопероксидазе) - 22000 ₽" [ref=e443]
+                      - option "Безоперационная блефаропластика - 120000 ₽" [ref=e444]
+                      - option "Билирубин (общ, прям, непрям) - 15000 ₽" [ref=e445]
+                      - option "Биоптрон - светотерапия - 20000 ₽" [ref=e446]
+                      - option "Бруцеллез (Rose Bengal) - 12000 ₽" [ref=e447]
+                      - option "Витамин Д - 25000 ₽" [ref=e448]
+                      - option "Время свертываемости крови - 10000 ₽" [ref=e449]
+                      - option "Гемоглобин - 8000 ₽" [ref=e450]
+                      - option "Гликированный гемоглобин (НЬА1C) - 18000 ₽" [ref=e451]
+                      - option "Глюкоза - 8000 ₽" [ref=e452]
+                      - option "Глюкоза экспресс тест - 5000 ₽" [ref=e453]
+                      - option "Дарсонваль - 15000 ₽" [ref=e454]
+                      - option "Демодекоз - 8000 ₽" [ref=e455]
+                      - option "Диодная маска лица - 18000 ₽" [ref=e456]
+                      - option "Желчные пигменты на моче - 8000 ₽" [ref=e457]
+                      - option "Иммуноглобулин Е - 18000 ₽" [ref=e458]
+                      - option "Кал на я/г - 10000 ₽" [ref=e459]
+                      - option "Калий - 8000 ₽" [ref=e460]
+                      - option "Кальций - 8000 ₽" [ref=e461]
+                      - option "Карбоновый пилинг - 45000 ₽" [ref=e462]
+                      - option "Консультация дерматолога-косметолога - 50000 ₽" [ref=e463]
+                      - option "Консультация кардиолога - 50000 ₽" [ref=e464]
+                      - option "Консультация стоматолога - 40000 ₽" [ref=e465]
+                      - option "Креатинин - 9000 ₽" [ref=e466]
+                      - option "Криодеструкция бородавок - 25000 ₽" [ref=e467]
+                      - option "Криодеструкция папиллом - 25000 ₽" [ref=e468]
+                      - option "Лазерное удаление татуаж и татуировок - 50000 ₽" [ref=e469]
+                      - option "Мазок на степень чистоты - 8000 ₽" [ref=e470]
+                      - option "Мезотерапия - 60000 ₽" [ref=e471]
+                      - option "Мезотерапия келлоидных рубцов - 40000 ₽" [ref=e472]
+                      - option "Мочевина - 9000 ₽" [ref=e473]
+                      - option "Натрий - 8000 ₽" [ref=e474]
+                      - option "Невропатолог - 100000 ₽" [ref=e475]
+                      - option "Нити грибки - 8000 ₽" [ref=e476]
+                      - option "Общий анализ крови - 15000 ₽" [ref=e477]
+                      - option "Общий анализ мочи - 10000 ₽" [ref=e478]
+                      - option "Общий белок - 12000 ₽" [ref=e479]
+                      - option "Плазмолифтинг волос - 70000 ₽" [ref=e480]
+                      - option "Плазмолифтинг лица - 80000 ₽" [ref=e481]
+                      - option "Ревматоидный фактор (RF) - 12000 ₽" [ref=e482]
+                      - option "Рентгенография зуба - 15000 ₽" [ref=e483]
+                      - option "С-реактивный белок (CRP) - 12000 ₽" [ref=e484]
+                      - option "СМАД - 100000 ₽" [ref=e485]
+                      - option "Спермограмма - 30000 ₽" [ref=e486]
+                      - option "Т3 (трийодтиронин) - 18000 ₽" [ref=e487]
+                      - option "Т4 (тироксин) - 18000 ₽" [ref=e488]
+                      - option "Тестовая услуга - -100 ₽" [ref=e489]
+                      - option "Тестостерон - 20000 ₽" [ref=e490]
+                      - option "Тестостерон - 20000 ₽" [ref=e491]
+                      - option "ТТГ (тиреотропный гормон) - 20000 ₽" [ref=e492]
+                      - option "Удаление жировик - 30000 ₽" [ref=e493]
+                      - option "УЗИ - 120000 ₽" [ref=e494]
+                      - option "УФО терапия - 12000 ₽" [ref=e495]
+                      - option "Холестерин - 10000 ₽" [ref=e496]
+                      - option "Чистка лица - 40000 ₽" [ref=e497]
+                      - option "Щелочная фосфатаза - 10000 ₽" [ref=e498]
+                      - option "ЭКГ - 25000 ₽" [ref=e499]
+                      - option "Эксимер лазер - 25000 ₽" [ref=e500]
+                      - option "ЭхоКГ - 150000 ₽" [ref=e501]
+                - generic [ref=e502]:
+                  - button "Отмена" [ref=e503] [cursor=pointer]:
+                    - generic [ref=e504]: Отмена
+                  - button "Создать" [ref=e505] [cursor=pointer]:
+                    - generic [ref=e506]:
+                      - img [ref=e507]
+                      - text: Создать
+  - region "Notifications Alt+T"
+  - generic [ref=e372]:
+    - generic [ref=e373]:
+      - img [ref=e374]
+      - generic [ref=e377]:
+        - strong [ref=e378]: Включить уведомления?
+        - generic [ref=e379]: Получайте уведомления о новых сообщениях
+    - generic [ref=e380]:
+      - button "Включить" [ref=e381] [cursor=pointer]
+      - button "Закрыть" [ref=e382] [cursor=pointer]:
+        - img [ref=e383]

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 /**
  * Современный компонент для ввода телефона с маской
  * Заменяет react-input-mask для избежания findDOMNode warnings
@@ -157,6 +158,16 @@ const PhoneInput = ({
       {...props}
     />
   );
+};
+
+
+PhoneInput.propTypes = {
+  ...(PhoneInput.propTypes || {}),
+  className: PropTypes.any,
+  onChange: PropTypes.any,
+  placeholder: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
 };
 
 export default PhoneInput;

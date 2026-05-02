@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import ServiceAuditHistory from './ServiceAuditHistory';
+import ServiceChangesPreview from './ServiceChangesPreview';
+import ServiceBatchEdit from './ServiceBatchEdit';
 import {
   Package,
   Plus,
@@ -12,16 +15,15 @@ import {
   Save,
   X,
   RefreshCw,
-
-
   AlertCircle,
-
   Heart,
   Scissors,
   Stethoscope,
   TestTube,
-  Users } from
-'lucide-react';
+  Users,
+  History,
+  CheckSquare
+} from 'lucide-react';
 import {
   MacOSCard,
   MacOSButton,
@@ -43,6 +45,59 @@ import {
 
 '../../utils/serviceCodeUtils';
 
+const SERVICE_GROUP_PREFIXES = {
+  cardiology: ['K'],
+  ecg: ['K'],
+  dermatology: ['D'],
+  dental: ['S'],
+  laboratory: ['L'],
+  procedures: ['C', 'P', 'O']
+};
+
+const SERVICE_GROUP_LABELS = {
+  cardiology: 'Кардиология',
+  ecg: 'ЭКГ',
+  dermatology: 'Дерматология',
+  dental: 'Стоматология',
+  laboratory: 'Лаборатория',
+  procedures: 'Процедуры'
+};
+
+const SERVICE_GROUP_ALIASES = {
+  cardio: 'cardiology',
+  cardiology: 'cardiology',
+  derma: 'dermatology',
+  dermatology: 'dermatology',
+  dental: 'dental',
+  dentistry: 'dental',
+  stomatology: 'dental',
+  lab: 'laboratory',
+  laboratory: 'laboratory',
+  ecg: 'ecg',
+  echokg: 'ecg',
+  procedure: 'procedures',
+  procedures: 'procedures',
+  physio: 'procedures',
+  physiotherapy: 'procedures',
+  cosmetology: 'procedures'
+};
+
+const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
+  for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
+    if (!rawValue) continue;
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (!normalized) continue;
+    if (SERVICE_GROUP_PREFIXES[normalized]) return normalized;
+    if (SERVICE_GROUP_ALIASES[normalized]) {
+      return SERVICE_GROUP_ALIASES[normalized];
+    }
+  }
+
+  return null;
+};
+
+const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey] || [];
+
 const ServiceCatalog = () => {
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
@@ -57,6 +112,9 @@ const ServiceCatalog = () => {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [editingService, setEditingService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(null); // { serviceId, serviceName }
+  const [showBatchEdit, setShowBatchEdit] = useState(false);
+  const [selectedServiceIds, setSelectedServiceIds] = useState(new Set());
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Иконки специальностей
@@ -147,10 +205,35 @@ const ServiceCatalog = () => {
     try {
       logger.log('🔄 Отправляем данные услуги:', serviceData);
 
+      let savedService;
       if (editingService) {
-        await api.put(`/services/${editingService.id}`, serviceData);
+        // ✅ ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ: Обновляем UI сразу
+        const optimisticService = { ...editingService, ...serviceData };
+        setServices(prevServices =>
+          prevServices.map(s => s.id === editingService.id ? optimisticService : s)
+        );
+
+        try {
+          const response = await api.put(`/services/${editingService.id}`, serviceData);
+          savedService = response.data;
+
+          // Обновляем с реальными данными от сервера
+          setServices(prevServices =>
+            prevServices.map(s => s.id === savedService.id ? savedService : s)
+          );
+        } catch (error) {
+          // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
+          setServices(prevServices =>
+            prevServices.map(s => s.id === editingService.id ? editingService : s)
+          );
+          throw error;
+        }
       } else {
-        await api.post('/services', serviceData);
+        const response = await api.post('/services', serviceData);
+        savedService = response.data;
+
+        // ✅ ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ: Добавляем в список сразу
+        setServices(prevServices => [savedService, ...prevServices]);
       }
 
       setMessage({
@@ -159,7 +242,6 @@ const ServiceCatalog = () => {
       });
       setEditingService(null);
       setShowAddForm(false);
-      await loadData();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
 
@@ -195,11 +277,30 @@ const ServiceCatalog = () => {
   const handleDeleteService = async (serviceId) => {
     if (!confirm('Удалить услугу?')) return;
 
+    // Сохраняем старое состояние для отката
+    const oldServices = [...services];
+    const serviceToDelete = services.find(s => s.id === serviceId);
+
     try {
-      await api.delete(`/services/${serviceId}`);
-      setMessage({ type: 'success', text: 'Услуга удалена' });
-      await loadData();
+      // ✅ ОПТИМИСТИЧНОЕ УДАЛЕНИЕ: Деактивируем в UI сразу
+      setServices(prevServices =>
+        prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
+      );
+
+      const response = await api.delete(`/services/${serviceId}`);
+
+      // Обновляем с реальными данными от сервера
+      if (response.data.active === false) {
+        setServices(prevServices =>
+          prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
+        );
+      }
+
+      setMessage({ type: 'success', text: response.data.message || 'Услуга удалена' });
     } catch (error) {
+      // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
+      setServices(oldServices);
+
       logger.error('Ошибка удаления:', error);
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Ошибка удаления услуги' });
     }
@@ -218,6 +319,30 @@ const ServiceCatalog = () => {
   const getSpecialtyIcon = (specialty) => {
     const IconComponent = specialtyIcons[specialty] || Package;
     return IconComponent;
+  };
+
+  const toggleServiceSelection = (serviceId) => {
+    const newSelected = new Set(selectedServiceIds);
+    if (newSelected.has(serviceId)) {
+      newSelected.delete(serviceId);
+    } else {
+      newSelected.add(serviceId);
+    }
+    setSelectedServiceIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedServiceIds.size === filteredServices.length) {
+      setSelectedServiceIds(new Set());
+    } else {
+      setSelectedServiceIds(new Set(filteredServices.map(s => s.id)));
+    }
+  };
+
+  const handleBatchEditComplete = () => {
+    setShowBatchEdit(false);
+    setSelectedServiceIds(new Set());
+    loadData();
   };
 
   if (loading) {
@@ -257,6 +382,16 @@ const ServiceCatalog = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
+          {selectedServiceIds.size > 0 && (
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowBatchEdit(true)}
+              style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--mac-accent)' }}
+            >
+              <CheckSquare size={16} style={{ marginRight: '8px' }} />
+              Редактировать ({selectedServiceIds.size})
+            </MacOSButton>
+          )}
           <MacOSButton variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} style={{ marginRight: '8px' }} />
             Обновить
@@ -482,21 +617,45 @@ const ServiceCatalog = () => {
 
         <MacOSTable
           columns={[
-          { key: 'service', title: 'Услуга', width: '25%' },
-          { key: 'category', title: 'Категория', width: '15%' },
-          { key: 'price', title: 'Цена', width: '15%' },
-          { key: 'duration', title: 'Длительность', width: '12%' },
-          { key: 'doctor', title: 'Врач', width: '15%' },
+          {
+            key: 'select',
+            title: (
+              <input
+                type="checkbox"
+                checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
+                onChange={toggleSelectAll}
+                style={{ cursor: 'pointer' }}
+              />
+            ),
+            width: '40px'
+          },
+          { key: 'service', title: 'Услуга', width: '23%' },
+          { key: 'category', title: 'Категория', width: '14%' },
+          { key: 'price', title: 'Цена', width: '13%' },
+          { key: 'duration', title: 'Длительность', width: '10%' },
+          { key: 'doctor', title: 'Врач', width: '12%' },
           { key: 'status', title: 'Статус', width: '10%' },
-          { key: 'actions', title: 'Действия', width: '8%' }]
+          { key: 'actions', title: 'Действия', width: '12%' }]
           }
           data={filteredServices.map((service) => {
-            const specialty = getCategorySpecialty(service.category_id);
-            const SpecialtyIcon = getSpecialtyIcon(specialty);
-            const doctor = doctors.find((d) => d.id === service.doctor_id);
+              const specialty = getCategorySpecialty(service.category_id);
+              const SpecialtyIcon = getSpecialtyIcon(specialty);
+              const doctor = doctors.find((d) => d.id === service.doctor_id);
+              const canonicalCode = service.service_code || service.code;
+              const hasLegacyCodeMismatch =
+                service.code &&
+                service.service_code &&
+                service.code !== service.service_code;
 
             return {
               id: service.id,
+              select:
+              <input
+                type="checkbox"
+                checked={selectedServiceIds.has(service.id)}
+                onChange={() => toggleServiceSelection(service.id)}
+                style={{ cursor: 'pointer' }}
+              />,
               service:
               <div style={{ display: 'flex', alignItems: 'center' }}>
                   <SpecialtyIcon
@@ -515,13 +674,22 @@ const ServiceCatalog = () => {
                   }}>
                       {service.name}
                     </div>
-                    {service.code &&
+                    {canonicalCode &&
                   <div style={{
                     fontSize: '14px',
                     color: 'var(--mac-text-secondary)',
                     margin: '2px 0 0 0'
                   }}>
-                        Код: {service.code}
+                        Код: {canonicalCode}
+                      </div>
+                    }
+                    {hasLegacyCodeMismatch &&
+                  <div style={{
+                    fontSize: '12px',
+                    color: 'var(--mac-warning)',
+                    margin: '2px 0 0 0'
+                  }}>
+                        Legacy code: {service.code}
                       </div>
                   }
                   </div>
@@ -567,6 +735,23 @@ const ServiceCatalog = () => {
 
               actions:
               <div style={{ display: 'flex', gap: '8px' }}>
+                  <MacOSButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
+                  style={{
+                    padding: '6px',
+                    minWidth: 'auto',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title="История изменений">
+
+                    <History size={14} />
+                  </MacOSButton>
                   <MacOSButton
                   size="sm"
                   variant="outline"
@@ -637,6 +822,7 @@ const ServiceCatalog = () => {
         doctors={doctors}
         departments={departments}
         queueProfiles={queueProfiles}
+        setMessage={setMessage}
         onSave={handleSaveService}
         onCancel={() => {
           setShowAddForm(false);
@@ -644,14 +830,89 @@ const ServiceCatalog = () => {
         }} />
 
       }
+
+      {/* История изменений */}
+      {showHistory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowHistory(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                zIndex: 1001,
+                backgroundColor: 'var(--mac-bg-primary)'
+              }}
+            >
+              <X size={16} />
+            </MacOSButton>
+            <ServiceAuditHistory
+              serviceId={showHistory.serviceId}
+              serviceName={showHistory.serviceName}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Batch редактирование */}
+      {showBatchEdit && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '700px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <ServiceBatchEdit
+              selectedServices={services.filter(s => selectedServiceIds.has(s.id))}
+              categories={categories}
+              onComplete={handleBatchEditComplete}
+              onCancel={() => setShowBatchEdit(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>);
 
 };
 
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave, onCancel }) => {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
+  const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
     name: service?.name || '',
     code: service?.code || service?.service_code || '', // Unified: use code as primary
@@ -708,7 +969,31 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
     return () => clearTimeout(timeoutId);
   }, [formData.code, service?.id]);
 
-  // Auto-extract category_code from code
+  const selectedFormCategory = categories.find(
+    (category) => category.id === parseInt(formData.category_id, 10)
+  );
+  const selectedServiceGroup = resolveServiceGroup({
+    queueTag: formData.queue_tag,
+    departmentKey: formData.department_key,
+    categorySpecialty: selectedFormCategory?.specialty
+  });
+  const allowedPrefixes = getAllowedPrefixesForGroup(selectedServiceGroup);
+  const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : '';
+  const codePrefix = normalizedCode ? normalizedCode.charAt(0).toUpperCase() : '';
+  const codePrefixMismatch =
+    Boolean(
+      normalizedCode &&
+      isValidServiceCode(normalizedCode) &&
+      allowedPrefixes.length &&
+      codePrefix &&
+      !allowedPrefixes.includes(codePrefix)
+    );
+  const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
+  const selectedGroupLabel = selectedServiceGroup
+    ? SERVICE_GROUP_LABELS[selectedServiceGroup] || selectedServiceGroup
+    : '';
+
+  // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
   const derivedCategoryCode = formData.code ? formData.code.charAt(0).toUpperCase() : '';
 
   const handleSubmit = (e) => {
@@ -719,16 +1004,42 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
       return;
     }
 
+    if (codePrefixMismatch) {
+      const errorText = selectedGroupLabel
+        ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}". Допустимые префиксы: ${expectedPrefixLabel}`
+        : `Код ${normalizedCode} не подходит для выбранной категории услуги. Допустимые префиксы: ${expectedPrefixLabel}`;
+      logger.warn('[FIX:ADM-06] Blocking mismatched service code before save:', {
+        normalizedCode,
+        selectedServiceGroup,
+        allowedPrefixes,
+        category_id: formData.category_id,
+        queue_tag: formData.queue_tag,
+        department_key: formData.department_key
+      });
+      setMessage({ type: 'error', text: errorText });
+      return;
+    }
+
+    // ✅ PREVIEW: Show changes preview for editing (not for new services)
+    if (service) {
+      setShowPreview(true);
+    } else {
+      // For new services, save directly
+      handleConfirmSave();
+    }
+  };
+
+  const handleConfirmSave = () => {
     // Подготавливаем данные для API
-    const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : null;
+    const canonicalCode = normalizedCode || null;
     const apiData = {
       ...formData,
       price: formData.price ? parseFloat(formData.price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
       duration_minutes: parseInt(formData.duration_minutes) || 30,
-      code: normalizedCode,
-      service_code: normalizedCode, // Sync for backwards compatibility
+      code: canonicalCode,
+      service_code: canonicalCode, // Sync for backwards compatibility
       category_code: derivedCategoryCode || null // Auto-derived from code
     };
 
@@ -740,6 +1051,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
     });
 
     logger.log('📝 Подготовленные данные для API:', apiData);
+    setShowPreview(false);
     onSave(apiData);
   };
 
@@ -882,7 +1194,20 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
             }
               {derivedCategoryCode &&
             <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
-                  Категория кода: {derivedCategoryCode}
+                  Префикс кода: {derivedCategoryCode}
+                </div>
+            }
+              {selectedGroupLabel && !codePrefixMismatch &&
+            <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
+                  Ожидаемый префикс для {selectedGroupLabel}: {expectedPrefixLabel}
+                </div>
+            }
+              {codePrefixMismatch &&
+            <div style={{ fontSize: '12px', color: 'var(--mac-warning)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={14} />
+                  {selectedGroupLabel
+                    ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}".`
+                    : `Код ${normalizedCode} не подходит для выбранной группы.`}
                 </div>
             }
             </div>
@@ -1121,6 +1446,37 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], onSave,
           </div>
         </div>
       </form>
+
+      {/* ✅ PREVIEW: Changes preview modal */}
+      {showPreview && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <ServiceChangesPreview
+              oldService={service}
+              newService={formData}
+              onConfirm={handleConfirmSave}
+              onCancel={() => setShowPreview(false)}
+            />
+          </div>
+        </div>
+      )}
     </MacOSCard>);
 
 };
@@ -1130,6 +1486,7 @@ ServiceForm.propTypes = {
   categories: PropTypes.array,
   doctors: PropTypes.array,
   queueProfiles: PropTypes.array,
+  setMessage: PropTypes.func,
   onSave: PropTypes.func,
   onCancel: PropTypes.func
 };

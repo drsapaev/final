@@ -80,11 +80,11 @@
 ### Проверка API endpoints
 ```bash
 # Проверка здоровья системы
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # Ответ: {"ok":true,"db":"ok"}
 
 # Проверка провайдеров
-curl http://localhost:8000/api/v1/payments/providers  
+curl http://localhost:18000/api/v1/payments/providers  
 # Ответ: 3 активных провайдера с полной конфигурацией
 ```
 
@@ -250,7 +250,7 @@ DATABASE_URL=postgresql://user:pass@localhost/medilab
 ```bash
 # Backend
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 18000
 
 # Frontend  
 cd frontend

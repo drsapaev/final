@@ -1,0 +1,410 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Управление клиникой" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Управление клиникой
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "admin" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]:
+            - img [ref=e81]
+            - text: admin
+        - button "Выйти" [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]:
+            - img [ref=e86]
+            - text: Выйти
+    - generic [ref=e89]:
+      - complementary [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]: Медицинская система
+          - button "Collapse sidebar" [ref=e94] [cursor=pointer]:
+            - img [ref=e96]
+        - navigation [ref=e99]:
+          - button "Dashboard" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: Dashboard
+          - button "Analytics" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Analytics
+          - button "Wait Time Analytics" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e114]: Wait Time Analytics
+          - button "AI Analytics" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e119]: AI Analytics
+          - button "Webhooks" [ref=e120] [cursor=pointer]:
+            - img [ref=e121]
+            - generic [ref=e124]: Webhooks
+          - button "Reports" [ref=e125] [cursor=pointer]:
+            - img [ref=e126]
+            - generic [ref=e129]: Reports
+          - button "System" [ref=e130] [cursor=pointer]:
+            - img [ref=e131]
+            - generic [ref=e134]: System
+          - button "Cloud Printing" [ref=e135] [cursor=pointer]:
+            - img [ref=e136]
+            - generic [ref=e139]: Cloud Printing
+          - button "Medical Equipment" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+            - generic [ref=e144]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e145] [cursor=pointer]:
+            - img [ref=e146]
+            - generic [ref=e149]: Dynamic Pricing
+          - button "Billing" [ref=e150] [cursor=pointer]:
+            - img [ref=e151]
+            - generic [ref=e154]: Billing
+          - button "Discount Benefits" [ref=e155] [cursor=pointer]:
+            - img [ref=e156]
+            - generic [ref=e162]: Discount Benefits
+          - button "GraphQL API" [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e167]: GraphQL API
+          - button "Users" [ref=e168] [cursor=pointer]:
+            - img [ref=e169]
+            - generic [ref=e172]: Users
+          - button "Doctors" [ref=e173] [cursor=pointer]:
+            - img [ref=e174]
+            - generic [ref=e177]: Doctors
+          - button "Services" [ref=e178] [cursor=pointer]:
+            - img [ref=e179]
+            - generic [ref=e182]: Services
+          - button "Patients" [ref=e183] [cursor=pointer]:
+            - img [ref=e184]
+            - generic [ref=e187]: Patients
+          - button "Appointments" [active] [ref=e188] [cursor=pointer]:
+            - img [ref=e189]
+            - generic [ref=e192]: Appointments
+          - button "All Free" [ref=e193] [cursor=pointer]:
+            - img [ref=e194]
+            - generic [ref=e197]: All Free
+          - button "Benefit Settings" [ref=e198] [cursor=pointer]:
+            - img [ref=e199]
+            - generic [ref=e202]: Benefit Settings
+          - button "Wizard Settings" [ref=e203] [cursor=pointer]:
+            - img [ref=e204]
+            - generic [ref=e209]: Wizard Settings
+          - button "Payment Providers" [ref=e210] [cursor=pointer]:
+            - img [ref=e211]
+            - generic [ref=e214]: Payment Providers
+          - button "Clinic Management" [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e219]: Clinic Management
+          - button "Clinic Settings" [ref=e220] [cursor=pointer]:
+            - img [ref=e221]
+            - generic [ref=e224]: Clinic Settings
+          - button "Queue Settings" [ref=e225] [cursor=pointer]:
+            - img [ref=e226]
+            - generic [ref=e229]: Queue Settings
+          - button "Queue Limits" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+            - generic [ref=e234]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e235] [cursor=pointer]:
+            - img [ref=e236]
+            - generic [ref=e239]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e240] [cursor=pointer]:
+            - img [ref=e241]
+            - generic [ref=e244]: AI Imaging
+          - button "Treatment Recommendations" [ref=e245] [cursor=pointer]:
+            - img [ref=e246]
+            - generic [ref=e249]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e250] [cursor=pointer]:
+            - img [ref=e251]
+            - generic [ref=e254]: Drug Interactions
+          - button "Risk Assessment" [ref=e255] [cursor=pointer]:
+            - img [ref=e256]
+            - generic [ref=e259]: Risk Assessment
+          - button "Voice to Text" [ref=e260] [cursor=pointer]:
+            - img [ref=e261]
+            - generic [ref=e264]: Voice to Text
+          - button "Smart Scheduling" [ref=e265] [cursor=pointer]:
+            - img [ref=e266]
+            - generic [ref=e269]: Smart Scheduling
+          - button "Quality Control" [ref=e270] [cursor=pointer]:
+            - img [ref=e271]
+            - generic [ref=e274]: Quality Control
+          - button "Analytics Insights" [ref=e275] [cursor=pointer]:
+            - img [ref=e276]
+            - generic [ref=e279]: Analytics Insights
+          - button "Telegram Bot" [ref=e280] [cursor=pointer]:
+            - img [ref=e281]
+            - generic [ref=e284]: Telegram Bot
+          - button "FCM Notifications" [ref=e285] [cursor=pointer]:
+            - img [ref=e286]
+            - generic [ref=e289]: FCM Notifications
+          - button "Phone Verification" [ref=e290] [cursor=pointer]:
+            - img [ref=e291]
+            - generic [ref=e294]: Phone Verification
+          - button "User Data Transfer" [ref=e295] [cursor=pointer]:
+            - img [ref=e296]
+            - generic [ref=e299]: User Data Transfer
+          - button "Group Permissions" [ref=e300] [cursor=pointer]:
+            - img [ref=e301]
+            - generic [ref=e304]: Group Permissions
+          - button "User Export" [ref=e305] [cursor=pointer]:
+            - img [ref=e306]
+            - generic [ref=e309]: User Export
+          - button "Registrar Notifications" [ref=e310] [cursor=pointer]:
+            - img [ref=e311]
+            - generic [ref=e316]: Registrar Notifications
+          - button "AI Settings" [ref=e317] [cursor=pointer]:
+            - img [ref=e318]
+            - generic [ref=e321]: AI Settings
+          - button "Telegram Settings" [ref=e322] [cursor=pointer]:
+            - img [ref=e323]
+            - generic [ref=e326]: Telegram Settings
+          - button "Display Settings" [ref=e327] [cursor=pointer]:
+            - img [ref=e328]
+            - generic [ref=e333]: Display Settings
+          - button "Activation" [ref=e334] [cursor=pointer]:
+            - img [ref=e335]
+            - generic [ref=e338]: Activation
+          - button "Finance" [ref=e339] [cursor=pointer]:
+            - img [ref=e340]
+            - generic [ref=e345]: Finance
+          - button "Security" [ref=e346] [cursor=pointer]:
+            - img [ref=e347]
+            - generic [ref=e350]: Security
+          - button "Settings" [ref=e351] [cursor=pointer]:
+            - img [ref=e352]
+            - generic [ref=e355]: Settings
+      - main [ref=e356]:
+        - generic [ref=e530]:
+          - generic [ref=e531]:
+            - generic [ref=e533]:
+              - generic [ref=e534]:
+                - paragraph [ref=e535]: Всего записей
+                - paragraph [ref=e536]: "6"
+              - img [ref=e537]
+            - generic [ref=e540]:
+              - generic [ref=e541]:
+                - paragraph [ref=e542]: На сегодня
+                - paragraph [ref=e543]: "0"
+              - img [ref=e544]
+            - generic [ref=e548]:
+              - generic [ref=e549]:
+                - paragraph [ref=e550]: На завтра
+                - paragraph [ref=e551]: "0"
+              - img [ref=e552]
+            - generic [ref=e555]:
+              - generic [ref=e556]:
+                - paragraph [ref=e557]: Ожидают
+                - paragraph [ref=e558]: "1"
+              - img [ref=e559]
+          - generic [ref=e562]:
+            - generic [ref=e563]:
+              - heading "Управление записями" [level=2] [ref=e564]
+              - button "Создать запись" [ref=e565] [cursor=pointer]:
+                - generic [ref=e566]:
+                  - img [ref=e567]
+                  - text: Создать запись
+            - generic [ref=e568]:
+              - generic [ref=e569]:
+                - img [ref=e570]
+                - textbox "Поиск записей..." [ref=e574]
+              - combobox [ref=e575] [cursor=pointer]:
+                - option "Все статусы" [selected]
+                - option "Ожидает"
+                - option "Подтверждена"
+                - option "Оплачена"
+                - option "На приеме"
+                - option "Завершена"
+                - option "Отменена"
+                - option "Не явился"
+              - textbox [ref=e577]
+              - combobox [ref=e578] [cursor=pointer]:
+                - option "Все врачи" [selected]
+                - option "Concurrency af98bd7c"
+                - option "Concurrency 6621778a"
+                - option "Concurrency c576c96a"
+                - option "Concurrency 9d05424f"
+                - option "ЭКГ Ресурс"
+                - option "qa_cardio_866085"
+                - option "Doctor User"
+                - option "Dentist User"
+            - table [ref=e581]:
+              - rowgroup [ref=e582]:
+                - row "Пациент Врач Дата и время Статус Причина Действия" [ref=e583]:
+                  - columnheader "Пациент" [ref=e584] [cursor=pointer]
+                  - columnheader "Врач" [ref=e585] [cursor=pointer]
+                  - columnheader "Дата и время" [ref=e586] [cursor=pointer]
+                  - columnheader "Статус" [ref=e587] [cursor=pointer]
+                  - columnheader "Причина" [ref=e588] [cursor=pointer]
+                  - columnheader "Действия" [ref=e589] [cursor=pointer]
+              - rowgroup [ref=e590]:
+                - row "ИАС Иванова Анна Сергеевна +998 90 123 45 67 Иванов Иван Иванович Кардиолог 01.02.2024 10:00 (30 мин) Подтверждена Боли в области сердца, одышка при физической нагру..." [ref=e591] [cursor=pointer]:
+                  - cell "ИАС Иванова Анна Сергеевна +998 90 123 45 67" [ref=e592]:
+                    - generic [ref=e593]:
+                      - generic [ref=e595]: ИАС
+                      - generic [ref=e596]:
+                        - paragraph [ref=e597]: Иванова Анна Сергеевна
+                        - paragraph [ref=e598]: +998 90 123 45 67
+                  - cell "Иванов Иван Иванович Кардиолог" [ref=e599]:
+                    - generic [ref=e600]:
+                      - paragraph [ref=e601]: Иванов Иван Иванович
+                      - paragraph [ref=e602]: Кардиолог
+                  - cell "01.02.2024 10:00 (30 мин)" [ref=e603]:
+                    - generic [ref=e604]:
+                      - paragraph [ref=e605]: 01.02.2024
+                      - paragraph [ref=e606]: 10:00 (30 мин)
+                  - cell "Подтверждена" [ref=e607]:
+                    - generic [ref=e608]: Подтверждена
+                  - cell "Боли в области сердца, одышка при физической нагру..." [ref=e609]:
+                    - paragraph [ref=e610]: Боли в области сердца, одышка при физической нагру...
+                  - cell [ref=e611]:
+                    - generic [ref=e612]:
+                      - button "Редактировать" [ref=e613]:
+                        - img [ref=e615]
+                      - button "Удалить" [ref=e618]:
+                        - img [ref=e620]
+                - row "ПДА Петров Дмитрий Александрович +998 91 234 56 78 Петрова Мария Сергеевна Дерматолог 01.02.2024 14:30 (45 мин) Оплачена Кожная сыпь на руках и ногах" [ref=e623] [cursor=pointer]:
+                  - cell "ПДА Петров Дмитрий Александрович +998 91 234 56 78" [ref=e624]:
+                    - generic [ref=e625]:
+                      - generic [ref=e627]: ПДА
+                      - generic [ref=e628]:
+                        - paragraph [ref=e629]: Петров Дмитрий Александрович
+                        - paragraph [ref=e630]: +998 91 234 56 78
+                  - cell "Петрова Мария Сергеевна Дерматолог" [ref=e631]:
+                    - generic [ref=e632]:
+                      - paragraph [ref=e633]: Петрова Мария Сергеевна
+                      - paragraph [ref=e634]: Дерматолог
+                  - cell "01.02.2024 14:30 (45 мин)" [ref=e635]:
+                    - generic [ref=e636]:
+                      - paragraph [ref=e637]: 01.02.2024
+                      - paragraph [ref=e638]: 14:30 (45 мин)
+                  - cell "Оплачена" [ref=e639]:
+                    - generic [ref=e640]: Оплачена
+                  - cell "Кожная сыпь на руках и ногах" [ref=e641]:
+                    - paragraph [ref=e642]: Кожная сыпь на руках и ногах
+                  - cell [ref=e643]:
+                    - generic [ref=e644]:
+                      - button "Редактировать" [ref=e645]:
+                        - img [ref=e647]
+                      - button "Удалить" [ref=e650]:
+                        - img [ref=e652]
+                - row "СМИ Сидорова Мария Ивановна +998 92 345 67 89 Сидоров Сергей Петрович Стоматолог 02.02.2024 09:00 (60 мин) На приеме Плановый осмотр и чистка зубов" [ref=e655] [cursor=pointer]:
+                  - cell "СМИ Сидорова Мария Ивановна +998 92 345 67 89" [ref=e656]:
+                    - generic [ref=e657]:
+                      - generic [ref=e659]: СМИ
+                      - generic [ref=e660]:
+                        - paragraph [ref=e661]: Сидорова Мария Ивановна
+                        - paragraph [ref=e662]: +998 92 345 67 89
+                  - cell "Сидоров Сергей Петрович Стоматолог" [ref=e663]:
+                    - generic [ref=e664]:
+                      - paragraph [ref=e665]: Сидоров Сергей Петрович
+                      - paragraph [ref=e666]: Стоматолог
+                  - cell "02.02.2024 09:00 (60 мин)" [ref=e667]:
+                    - generic [ref=e668]:
+                      - paragraph [ref=e669]: 02.02.2024
+                      - paragraph [ref=e670]: 09:00 (60 мин)
+                  - cell "На приеме" [ref=e671]:
+                    - generic [ref=e672]: На приеме
+                  - cell "Плановый осмотр и чистка зубов" [ref=e673]:
+                    - paragraph [ref=e674]: Плановый осмотр и чистка зубов
+                  - cell [ref=e675]:
+                    - generic [ref=e676]:
+                      - button "Редактировать" [ref=e677]:
+                        - img [ref=e679]
+                      - button "Удалить" [ref=e682]:
+                        - img [ref=e684]
+                - row "КАВ Козлов Алексей Владимирович +998 93 456 78 90 Иванов Иван Иванович Кардиолог 02.02.2024 11:15 (30 мин) Завершена Контрольный осмотр после операции" [ref=e687] [cursor=pointer]:
+                  - cell "КАВ Козлов Алексей Владимирович +998 93 456 78 90" [ref=e688]:
+                    - generic [ref=e689]:
+                      - generic [ref=e691]: КАВ
+                      - generic [ref=e692]:
+                        - paragraph [ref=e693]: Козлов Алексей Владимирович
+                        - paragraph [ref=e694]: +998 93 456 78 90
+                  - cell "Иванов Иван Иванович Кардиолог" [ref=e695]:
+                    - generic [ref=e696]:
+                      - paragraph [ref=e697]: Иванов Иван Иванович
+                      - paragraph [ref=e698]: Кардиолог
+                  - cell "02.02.2024 11:15 (30 мин)" [ref=e699]:
+                    - generic [ref=e700]:
+                      - paragraph [ref=e701]: 02.02.2024
+                      - paragraph [ref=e702]: 11:15 (30 мин)
+                  - cell "Завершена" [ref=e703]:
+                    - generic [ref=e704]: Завершена
+                  - cell "Контрольный осмотр после операции" [ref=e705]:
+                    - paragraph [ref=e706]: Контрольный осмотр после операции
+                  - cell [ref=e707]:
+                    - generic [ref=e708]:
+                      - button "Редактировать" [ref=e709]:
+                        - img [ref=e711]
+                      - button "Удалить" [ref=e714]:
+                        - img [ref=e716]
+                - row "НЕД Новикова Елена Дмитриевна +998 94 567 89 01 Козлова Анна Владимировна Терапевт 03.02.2024 15:00 (45 мин) Ожидает оплаты Беременность 24 недели - плановый осмотр" [ref=e719] [cursor=pointer]:
+                  - cell "НЕД Новикова Елена Дмитриевна +998 94 567 89 01" [ref=e720]:
+                    - generic [ref=e721]:
+                      - generic [ref=e723]: НЕД
+                      - generic [ref=e724]:
+                        - paragraph [ref=e725]: Новикова Елена Дмитриевна
+                        - paragraph [ref=e726]: +998 94 567 89 01
+                  - cell "Козлова Анна Владимировна Терапевт" [ref=e727]:
+                    - generic [ref=e728]:
+                      - paragraph [ref=e729]: Козлова Анна Владимировна
+                      - paragraph [ref=e730]: Терапевт
+                  - cell "03.02.2024 15:00 (45 мин)" [ref=e731]:
+                    - generic [ref=e732]:
+                      - paragraph [ref=e733]: 03.02.2024
+                      - paragraph [ref=e734]: 15:00 (45 мин)
+                  - cell "Ожидает оплаты" [ref=e735]:
+                    - generic [ref=e736]: Ожидает оплаты
+                  - cell "Беременность 24 недели - плановый осмотр" [ref=e737]:
+                    - paragraph [ref=e738]: Беременность 24 недели - плановый осмотр
+                  - cell [ref=e739]:
+                    - generic [ref=e740]:
+                      - button "Редактировать" [ref=e741]:
+                        - img [ref=e743]
+                      - button "Удалить" [ref=e746]:
+                        - img [ref=e748]
+                - row "ПДА Петров Дмитрий Александрович +998 91 234 56 78 Новиков Дмитрий Александрович Хирург 30.01.2024 16:00 (90 мин) Отменена Консультация по поводу операции" [ref=e751] [cursor=pointer]:
+                  - cell "ПДА Петров Дмитрий Александрович +998 91 234 56 78" [ref=e752]:
+                    - generic [ref=e753]:
+                      - generic [ref=e755]: ПДА
+                      - generic [ref=e756]:
+                        - paragraph [ref=e757]: Петров Дмитрий Александрович
+                        - paragraph [ref=e758]: +998 91 234 56 78
+                  - cell "Новиков Дмитрий Александрович Хирург" [ref=e759]:
+                    - generic [ref=e760]:
+                      - paragraph [ref=e761]: Новиков Дмитрий Александрович
+                      - paragraph [ref=e762]: Хирург
+                  - cell "30.01.2024 16:00 (90 мин)" [ref=e763]:
+                    - generic [ref=e764]:
+                      - paragraph [ref=e765]: 30.01.2024
+                      - paragraph [ref=e766]: 16:00 (90 мин)
+                  - cell "Отменена" [ref=e767]:
+                    - generic [ref=e768]: Отменена
+                  - cell "Консультация по поводу операции" [ref=e769]:
+                    - paragraph [ref=e770]: Консультация по поводу операции
+                  - cell [ref=e771]:
+                    - generic [ref=e772]:
+                      - button "Редактировать" [ref=e773]:
+                        - img [ref=e775]
+                      - button "Удалить" [ref=e778]:
+                        - img [ref=e780]
+  - region "Notifications Alt+T"
+  - generic [ref=e783]:
+    - generic [ref=e784]:
+      - img [ref=e785]
+      - generic [ref=e788]:
+        - strong [ref=e789]: Включить уведомления?
+        - generic [ref=e790]: Получайте уведомления о новых сообщениях
+    - generic [ref=e791]:
+      - button "Включить" [ref=e792] [cursor=pointer]
+      - button "Закрыть" [ref=e793] [cursor=pointer]:
+        - img [ref=e794]

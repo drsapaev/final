@@ -20,11 +20,80 @@ from app.crud.user_management import (
 from app.models.notification import NotificationHistory
 from app.models.user import User
 from app.schemas.notification import NotificationHistoryCreate
+from app.services.notification_platform_service import get_notification_platform_service
 from app.services.fcm_service import get_fcm_service
 from app.services.notification_websocket import get_notification_ws_manager
 from app.services.telegram.bot import telegram_bot
 
 logger = logging.getLogger(__name__)
+
+
+NOTIFICATION_EVENT_TYPE_ALIASES = {
+    "queue_changed": "queue_update",
+    "diagnostics_return": "diagnostics_return_needed",
+    "queue_status": "queue_status_changed",
+    "payment_update": "payment_notification",
+    "payment_success": "payment_notification",
+    "result_ready": "lab_results",
+    "lab_result_ready": "lab_results",
+    "appointment_rescheduled": "schedule_change",
+    "appointment_cancelled": "schedule_change",
+    "all_free_pending": "all_free_requested",
+    "all_free_declined": "all_free_rejected",
+    "allfree_requested": "all_free_requested",
+    "allfree_approved": "all_free_approved",
+    "allfree_rejected": "all_free_rejected",
+    "notification_message_received": "message_received",
+    "lab_critical": "lab_critical_result",
+    "lab_new_assignment": "lab_new_study",
+    "lab_result_sent": "lab_result_sent_confirmation",
+    "registrar_alert": "registrar_system_alert",
+    "security_warning": "security_alert",
+    "billing_warning": "billing_alert",
+    "patient_create": "patient_registered",
+}
+
+LAB_NOTIFICATION_EVENT_TYPES = {
+    "lab_results",
+    "lab_critical_result",
+    "lab_new_study",
+    "lab_critical_finding",
+    "lab_result_sent_confirmation",
+    "diagnostics_return_needed",
+}
+
+REGISTRAR_NOTIFICATION_EVENT_TYPES = {
+    "new_appointment",
+    "price_change",
+    "queue_status_changed",
+    "system_alert",
+    "registrar_system_alert",
+    "security_alert",
+    "billing_alert",
+    "all_free_requested",
+    "all_free_approved",
+    "all_free_rejected",
+    "patient_registered",
+}
+
+QUEUE_NOTIFICATION_EVENT_TYPES = {
+    "queue_call",
+    "queue_position",
+    "queue_reminder",
+    "diagnostics_return_needed",
+    "queue_update",
+}
+
+
+def _normalize_notification_event_type(
+    event_type: str | None,
+    *,
+    fallback: str = "",
+) -> str:
+    normalized = str(event_type or "").strip().lower()
+    if not normalized:
+        return fallback
+    return NOTIFICATION_EVENT_TYPE_ALIASES.get(normalized, normalized)
 
 
 class NotificationSenderService:
@@ -47,6 +116,372 @@ class NotificationSenderService:
 
         # Интеграция с FCM
         self.fcm_service = get_fcm_service()
+
+    def _platform_service(self, db: Session):
+        return get_notification_platform_service(db)
+
+    @staticmethod
+    def _extract_prefixed_user_id(actor_ref: str | None, prefix: str) -> int | None:
+        normalized = str(actor_ref or "").strip().lower()
+        expected_prefix = prefix.lower()
+        if not normalized.startswith(expected_prefix):
+            return None
+
+        raw_value = normalized[len(expected_prefix):].strip()
+        if not raw_value.isdigit():
+            return None
+
+        return int(raw_value)
+
+    @staticmethod
+    def _payload_snapshot(
+        title: str,
+        message: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "title": title,
+            "message": message,
+            "metadata": metadata or {},
+        }
+
+    async def send_canonical_notification_to_user(
+        self,
+        *,
+        db: Session,
+        recipient: User,
+        event_type: str,
+        title: str,
+        message: str,
+        source_module: str,
+        metadata: dict[str, Any] | None = None,
+        deep_link: str | None = None,
+        severity: str = "info",
+        priority: str = "normal",
+        actor_id: int | None = None,
+        actor_role: str | None = None,
+        entity_type: str | None = None,
+        entity_id: str | int | None = None,
+    ) -> bool:
+        """Record one canonical inbox delivery for a specific recipient."""
+        try:
+            normalized_event_type = _normalize_notification_event_type(
+                event_type,
+                fallback="notification",
+            )
+            if not recipient or not recipient.is_active:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] canonical notification skipped: inactive/missing recipient",
+                    extra={"event_type": normalized_event_type},
+                )
+                return False
+
+            platform_service = self._platform_service(db)
+            await platform_service.record_delivery_for_user(
+                user=recipient,
+                event_type=normalized_event_type,
+                title=title,
+                message=message,
+                source_module=source_module,
+                recipient_type="user",
+                severity=severity,
+                priority=priority,
+                actor_id=actor_id,
+                actor_role=actor_role,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                payload_snapshot=self._payload_snapshot(title, message, metadata),
+                deep_link=deep_link,
+            )
+            logger.info(
+                "[FIX:NOTIFICATIONS] canonical delivery created",
+                extra={
+                    "event_type": normalized_event_type,
+                    "recipient_id": recipient.id,
+                    "source_module": source_module,
+                },
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] canonical delivery failed",
+                extra={
+                    "event_type": event_type,
+                    "recipient_id": getattr(recipient, "id", None),
+                    "source_module": source_module,
+                    "error": str(exc),
+                },
+            )
+            return False
+
+    async def send_canonical_notification_to_roles(
+        self,
+        *,
+        db: Session,
+        roles: list[str],
+        event_type: str,
+        title: str,
+        message: str,
+        source_module: str,
+        metadata: dict[str, Any] | None = None,
+        deep_link: str | None = None,
+        severity: str = "info",
+        priority: str = "normal",
+        actor_id: int | None = None,
+        actor_role: str | None = None,
+        entity_type: str | None = None,
+        entity_id: str | int | None = None,
+        ) -> bool:
+        """Record one canonical inbox delivery fan-out for role recipients."""
+        try:
+            normalized_event_type = _normalize_notification_event_type(
+                event_type,
+                fallback="notification",
+            )
+            platform_service = self._platform_service(db)
+            recipients: dict[int, User] = {}
+            for role in roles:
+                for user in platform_service.resolve_users_for_role(role):
+                    recipients[user.id] = user
+
+            if not recipients:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] canonical role delivery skipped: no recipients",
+                    extra={
+                        "event_type": normalized_event_type,
+                        "roles": roles,
+                        "source_module": source_module,
+                    },
+                )
+                return False
+
+            await platform_service.record_delivery_for_users(
+                users=list(recipients.values()),
+                event_type=normalized_event_type,
+                title=title,
+                message=message,
+                source_module=source_module,
+                recipient_type="user",
+                severity=severity,
+                priority=priority,
+                actor_id=actor_id,
+                actor_role=actor_role,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                payload_snapshot=self._payload_snapshot(title, message, metadata),
+                deep_link=deep_link,
+            )
+            logger.info(
+                "[FIX:NOTIFICATIONS] canonical role deliveries created",
+                extra={
+                    "event_type": normalized_event_type,
+                    "source_module": source_module,
+                    "roles": roles,
+                    "recipient_count": len(recipients),
+                },
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] canonical role deliveries failed",
+                extra={
+                    "event_type": event_type,
+                    "roles": roles,
+                    "source_module": source_module,
+                    "error": str(exc),
+                },
+            )
+            return False
+
+    async def send_lab_event_notification(
+        self,
+        *,
+        db: Session,
+        recipient: User,
+        event_type: str,
+        metadata: dict[str, Any] | None = None,
+        title: str | None = None,
+        message: str | None = None,
+        actor_user: User | None = None,
+    ) -> bool:
+        """Typed producer helper for canonical lab family events."""
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in LAB_NOTIFICATION_EVENT_TYPES:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] unsupported lab event type",
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
+            )
+            return False
+
+        default_titles = {
+            "lab_results": "Результаты анализов готовы",
+            "lab_critical_result": "Критический результат анализа",
+            "lab_new_study": "Назначено новое исследование",
+            "lab_critical_finding": "Критическая находка в исследовании",
+            "lab_result_sent_confirmation": "Результат исследования отправлен",
+            "diagnostics_return_needed": "Требуется повторная диагностика",
+        }
+        fallback_title = default_titles[normalized_type]
+        body = message or fallback_title
+
+        return await self.send_canonical_notification_to_user(
+            db=db,
+            recipient=recipient,
+            event_type=normalized_type,
+            title=title or fallback_title,
+            message=body,
+            source_module="lab",
+            metadata=metadata,
+            deep_link="/lab/results",
+            severity="critical" if normalized_type == "lab_critical_result" else "info",
+            priority="urgent" if normalized_type == "lab_critical_result" else "high",
+            actor_id=getattr(actor_user, "id", None),
+            actor_role=getattr(actor_user, "role", None),
+            entity_type="lab_result",
+            entity_id=(metadata or {}).get("result_id") or (metadata or {}).get("order_id"),
+        )
+
+    async def send_registrar_event_notification(
+        self,
+        *,
+        db: Session,
+        event_type: str,
+        metadata: dict[str, Any] | None = None,
+        title: str,
+        message: str,
+        roles: list[str] | None = None,
+        deep_link: str | None = None,
+        actor_user: User | None = None,
+    ) -> bool:
+        """Typed producer helper for registrar/admin canonical events."""
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in REGISTRAR_NOTIFICATION_EVENT_TYPES:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] unsupported registrar event type",
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
+            )
+            return False
+
+        resolved_roles = roles or ["registrar"]
+        if normalized_type in {
+            "registrar_system_alert",
+            "security_alert",
+            "billing_alert",
+            "all_free_requested",
+            "patient_registered",
+        } and "admin" not in resolved_roles:
+            resolved_roles = [*resolved_roles, "admin"]
+
+        return await self.send_canonical_notification_to_roles(
+            db=db,
+            roles=resolved_roles,
+            event_type=normalized_type,
+            title=title,
+            message=message,
+            source_module="registrar",
+            metadata=metadata,
+            deep_link=deep_link or "/registrar",
+            severity="critical"
+            if normalized_type in {"security_alert", "billing_alert"}
+            else "info",
+            priority="urgent"
+            if normalized_type in {"security_alert", "billing_alert"}
+            else "high",
+            actor_id=getattr(actor_user, "id", None),
+            actor_role=getattr(actor_user, "role", None),
+            entity_type="visit",
+            entity_id=(metadata or {}).get("visit_id"),
+        )
+
+    async def send_queue_position_event_notification(
+        self,
+        *,
+        db: Session,
+        recipient: User,
+        event_type: str,
+        title: str,
+        message: str,
+        metadata: dict[str, Any] | None = None,
+        actor_user: User | None = None,
+    ) -> bool:
+        """Typed producer helper for queue position family events."""
+        normalized_type = _normalize_notification_event_type(event_type)
+        if normalized_type not in QUEUE_NOTIFICATION_EVENT_TYPES:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] unsupported queue family event type",
+                extra={
+                    "event_type": event_type,
+                    "normalized_event_type": normalized_type,
+                },
+            )
+            return False
+
+        return await self.send_canonical_notification_to_user(
+            db=db,
+            recipient=recipient,
+            event_type=normalized_type,
+            title=title,
+            message=message,
+            source_module="queue",
+            metadata=metadata,
+            deep_link="/queue",
+            severity="info",
+            priority="high",
+            actor_id=getattr(actor_user, "id", None),
+            actor_role=getattr(actor_user, "role", None),
+            entity_type="queue",
+            entity_id=(metadata or {}).get("queue_id"),
+        )
+
+    async def send_patient_registered_notification(
+        self,
+        *,
+        db: Session,
+        patient: Any,
+        registration_source: str = "internal",
+        actor_user: User | None = None,
+    ) -> bool:
+        """Typed producer helper for patient creation canonical event."""
+        patient_id = getattr(patient, "id", None)
+        if not patient_id:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] patient_registered skipped: missing patient id",
+            )
+            return False
+
+        patient_name = (
+            getattr(patient, "full_name", None)
+            or f"{getattr(patient, 'first_name', '')} {getattr(patient, 'last_name', '')}".strip()
+            or f"Пациент #{patient_id}"
+        )
+        title = "Новый пациент зарегистрирован"
+        message = f"{patient_name} зарегистрирован в системе."
+
+        return await self.send_canonical_notification_to_roles(
+            db=db,
+            roles=["admin", "registrar"],
+            event_type="patient_registered",
+            title=title,
+            message=message,
+            source_module="patients",
+            metadata={
+                "patient_id": patient_id,
+                "registration_source": registration_source,
+            },
+            deep_link="/registrar/patients",
+            severity="info",
+            priority="high",
+            actor_id=getattr(actor_user, "id", None),
+            actor_role=getattr(actor_user, "role", None),
+            entity_type="patient",
+            entity_id=patient_id,
+        )
 
     async def send_email(
         self, to_email: str, subject: str, body: str, html_body: str | None = None
@@ -151,45 +586,63 @@ class NotificationSenderService:
     ) -> bool:
         """Отправка Push-уведомления (Mobile + WebSocket)"""
         try:
-            # --- WebSocket Integration ---
-            # Attempt to send to connected WebSocket client (In-App Notification)
-            # We try this regardless of DB/User presence if we have user_id,
-            # but user_id is integer so we can try.
-            try:
-                ws_manager = get_notification_ws_manager()
-                ws_payload = {
-                    "type": "notification",
-                    "title": title,
-                    "message": message,
-                    "data": data,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-                await ws_manager.send_json(ws_payload, user_id)
-            except Exception as ws_e:
-                logger.warning(f"Failed to send WebSocket notification to user {user_id}: {ws_e}")
-            # -----------------------------
+            notification_type = _normalize_notification_event_type(
+                data.get("type") if data else None,
+                fallback="notification",
+            )
+            platform_payload = {
+                "type": notification_type,
+                "title": title,
+                "message": message,
+                "data": data or {},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
-            # Если передан db, пытаемся отправить Mobile Push и сохранить историю
             if db:
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
+                    logger.warning(
+                        "Push target user not found",
+                        extra={"user_id": user_id, "notification_type": notification_type},
+                    )
                     return False
 
-                # Сохраняем в историю
+                platform_service = self._platform_service(db)
+                await platform_service.record_delivery_for_user(
+                    user=user,
+                    event_type=notification_type,
+                    title=title,
+                    message=message,
+                    source_module="notifications",
+                    recipient_type="patient" if (user.role or "").lower() == "patient" else "user",
+                    payload_snapshot={
+                        "title": title,
+                        "message": message,
+                        "metadata": data or {},
+                    },
+                    transport_type=notification_type,
+                )
+
+                # Legacy audit trail remains for external/mobile channels.
                 try:
                     notification_data = {
-                        "recipient_type": "patient", # Предполагаем пациента
+                        "recipient_type": "patient",
                         "recipient_id": user_id,
                         "recipient_contact": "mobile_app",
-                        "notification_type": data.get("type", "push") if data else "push",
+                        "notification_type": notification_type,
                         "channel": "mobile",
                         "subject": title,
                         "content": message,
                         "status": "sent",
                     }
-                    crud_notification_history.create(db, obj_in=NotificationHistoryCreate(**notification_data))
+                    crud_notification_history.create(
+                        db, obj_in=NotificationHistoryCreate(**notification_data)
+                    )
                 except Exception as hist_e:
-                    logger.error(f"Failed to save notification history: {hist_e}")
+                    logger.error(
+                        "Failed to save notification history",
+                        extra={"user_id": user_id, "error": str(hist_e)},
+                    )
 
                 # Отправляем FCM только если есть токен
                 if user.device_token:
@@ -198,6 +651,15 @@ class NotificationSenderService:
                         title=title,
                         body=message,
                         data=data or {},
+                    )
+            else:
+                try:
+                    ws_manager = get_notification_ws_manager()
+                    await ws_manager.send_json(platform_payload, user_id)
+                except Exception as ws_e:
+                    logger.warning(
+                        "Failed to send WebSocket notification without DB",
+                        extra={"user_id": user_id, "error": str(ws_e)},
                     )
 
             return True
@@ -212,6 +674,8 @@ class NotificationSenderService:
         appointment_date: datetime,
         doctor_name: str,
         department: str,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка напоминания о записи"""
         subject = "Напоминание о записи к врачу"
@@ -244,6 +708,24 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Запись к {doctor_name} {appointment_date.strftime('%d.%m.%Y в %H:%M')}",
+                    data={
+                        "type": "appointment_reminder",
+                        "appointment_date": appointment_date.isoformat(),
+                        "doctor_name": doctor_name,
+                        "department": department,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -262,6 +744,8 @@ class NotificationSenderService:
         doctor_name: str,
         department: str,
         queue_number: int | None = None,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка подтверждения визита"""
         subject = "Подтверждение визита к врачу"
@@ -305,6 +789,25 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Ваш визит к {doctor_name} подтверждён на {visit_date.strftime('%d.%m.%Y в %H:%M')}",
+                    data={
+                        "type": "visit_confirmation",
+                        "visit_date": visit_date.isoformat(),
+                        "doctor_name": doctor_name,
+                        "department": department,
+                        "queue_number": queue_number,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -332,11 +835,26 @@ class NotificationSenderService:
             doctor_name = appointment.doctor.name if appointment.doctor else "Врач"
             specialty = appointment.doctor.specialty if appointment.doctor else ""
             visit_date_str = appointment.appointment_date.strftime('%d.%m.%Y в %H:%M')
+            appointment_datetime = appointment.appointment_date
+            if appointment.appointment_time:
+                try:
+                    appointment_datetime = datetime.combine(
+                        appointment.appointment_date,
+                        datetime.strptime(appointment.appointment_time, "%H:%M").time(),
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Failed to parse appointment time for notification",
+                        extra={
+                            "appointment_id": appointment_id,
+                            "appointment_time": appointment.appointment_time,
+                        },
+                    )
 
             # --- Push Notification Logic ---
             if appointment.patient and appointment.patient.user_id:
                 user = db.query(User).filter(User.id == appointment.patient.user_id).first()
-                if user and user.device_token:
+                if user:
                     title = "Запись подтверждена"
                     message = f"Ваша запись к врачу {doctor_name} на {visit_date_str} подтверждена"
 
@@ -364,9 +882,11 @@ class NotificationSenderService:
             return await self.send_visit_confirmation(
                 patient_email=patient_email,
                 patient_phone=patient_phone,
-                visit_date=appointment.appointment_date,
+                visit_date=appointment_datetime,
                 doctor_name=doctor_name,
-                department=specialty, # Using specialty as department for notification text
+                department=appointment.department or specialty,
+                db=db,
+                patient_id=appointment.patient_id,
             )
 
         except Exception as e:
@@ -381,6 +901,8 @@ class NotificationSenderService:
         currency: str,
         visit_date: datetime,
         doctor_name: str,
+        db: Session | None = None,
+        patient_id: int | None = None,
     ) -> dict[str, bool]:
         """Отправка уведомления об оплате"""
         subject = "Подтверждение оплаты"
@@ -413,6 +935,25 @@ class NotificationSenderService:
         # Отправляем уведомления
         results = {}
 
+        if db and patient_id:
+            from app.models.patient import Patient
+
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            if patient and patient.user_id:
+                await self.send_push(
+                    user_id=patient.user_id,
+                    title=subject,
+                    message=f"Оплата {amount} {currency} за визит к {doctor_name} подтверждена",
+                    data={
+                        "type": "payment_notification",
+                        "amount": amount,
+                        "currency": currency,
+                        "visit_date": visit_date.isoformat(),
+                        "doctor_name": doctor_name,
+                    },
+                    db=db,
+                )
+
         if patient_email:
             results["email"] = await self.send_email(patient_email, subject, email_body)
 
@@ -432,28 +973,51 @@ class NotificationSenderService:
         db: Session | None = None,
     ) -> bool:
         """Отправка обновления очереди (Telegram + Push)"""
-        message = f"""
-        📊 <b>Обновление очереди</b>
+        message = (
+            f"📊 Обновление очереди\n\n"
+            f"Отделение: {department}\n"
+            f"Текущий номер: {current_number}\n"
+            f"Примерное время ожидания: {estimated_wait}\n"
+            f"Обновлено: {datetime.now().strftime('%H:%M:%S')}"
+        )
 
-        🏥 Отделение: {department}
-        🎫 Текущий номер: {current_number}
-        ⏱️ Примерное время ожидания: {estimated_wait}
+        if db:
+            platform_service = self._platform_service(db)
+            if patient_id:
+                from app.models.patient import Patient
 
-        Обновлено: {datetime.now().strftime('%H:%M:%S')}
-        """
-
-        # Основная рассылка (в канал/чат отделения, если есть - пока только return telegram logic)
-        # TODO: Если это обновление для КОНКРЕТНОГО пациента (mobile view), отправляем ему лично.
-
-        if patient_id and db:
-             # Отправка конкретному пациенту
-
-             # Push logic if patient has user linked
-             # Assuming patient_id is ID from Patient model
-             # We need User object.
-             # This method signature originally was for GENERAL update.
-             # MobileNotificationService had send_queue_update(patient_id, queue_position, specialty)
-             pass
+                patient = db.query(Patient).filter(Patient.id == patient_id).first()
+                if patient and patient.user_id:
+                    await self.send_push(
+                        user_id=patient.user_id,
+                        title="Обновление очереди",
+                        message=f"Ваша очередь обновлена: #{current_number}",
+                        data={
+                            "type": "queue_update",
+                            "department": department,
+                            "current_number": current_number,
+                            "estimated_wait": estimated_wait,
+                        },
+                        db=db,
+                    )
+            else:
+                targets = platform_service.resolve_users_for_department(department)
+                await platform_service.record_delivery_for_users(
+                    users=targets,
+                    event_type="queue_update",
+                    title="Обновление очереди",
+                    message=message,
+                    source_module="queue",
+                    recipient_type="user",
+                    severity="info",
+                    priority="normal",
+                    payload_snapshot={
+                        "department": department,
+                        "current_number": current_number,
+                        "estimated_wait": estimated_wait,
+                    },
+                    transport_type="queue_update",
+                )
 
         return await self.send_telegram(message)
 
@@ -482,10 +1046,10 @@ class NotificationSenderService:
              message = f"Ваша позиция в очереди к {specialty}: #{queue_position}"
 
              # Push
-             if user.device_token:
-                 await self.send_push(
-                     user_id=user.id,
-                     title=title,
+             if user:
+                  await self.send_push(
+                      user_id=user.id,
+                      title=title,
                      message=message,
                      data={
                          "type": "queue_update",
@@ -508,7 +1072,13 @@ class NotificationSenderService:
             return False
 
     async def send_system_alert(
-        self, alert_type: str, message: str, details: dict[str, Any] | None = None
+        self,
+        alert_type: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+        db: Session | None = None,
+        actor_id: int | None = None,
+        actor_role: str | None = None,
     ) -> bool:
         """Отправка системного оповещения"""
         alert_message = f"""
@@ -525,7 +1095,288 @@ class NotificationSenderService:
 
         alert_message += f"\nВремя: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
 
+        if db:
+            platform_service = self._platform_service(db)
+            admins = platform_service.resolve_users_for_role("admin")
+            await platform_service.record_delivery_for_users(
+                users=admins,
+                event_type="system_alert",
+                title=f"Системное оповещение: {alert_type}",
+                message=message,
+                source_module="system",
+                recipient_type="user",
+                severity="critical" if alert_type.lower() in {"critical", "security"} else "warning",
+                priority="urgent" if alert_type.lower() in {"critical", "security"} else "high",
+                actor_id=actor_id,
+                actor_role=actor_role,
+                payload_snapshot={
+                    "alert_type": alert_type,
+                    "message": message,
+                    "details": details or {},
+                },
+                transport_type="system_alert",
+            )
+
         return await self.send_telegram(alert_message)
+
+    async def send_all_free_request_notification(
+        self,
+        *,
+        db: Session,
+        visit: Any,
+        actor_user: User,
+    ) -> bool:
+        """Create the canonical inbox signal for a pending All Free request."""
+        try:
+            platform_service = self._platform_service(db)
+            admin_users = platform_service.resolve_users_for_role("admin")
+            if not admin_users:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] all_free_requested skipped: no admin recipients",
+                    extra={"visit_id": getattr(visit, "id", None)},
+                )
+                return False
+
+            title = "Новая заявка All Free"
+            body = f"Визит #{visit.id} ожидает одобрения All Free."
+            payload_snapshot = {
+                "title": title,
+                "message": body,
+                "metadata": {
+                    "visit_id": visit.id,
+                    "patient_id": visit.patient_id,
+                    "doctor_id": visit.doctor_id,
+                    "discount_mode": visit.discount_mode,
+                    "approval_status": visit.approval_status,
+                    "request_source": getattr(visit, "source", "desk"),
+                    "requested_by": actor_user.id,
+                },
+            }
+
+            await platform_service.record_delivery_for_users(
+                users=admin_users,
+                event_type="all_free_requested",
+                title=title,
+                message=body,
+                source_module="registrar",
+                recipient_type="user",
+                severity="warning",
+                priority="high",
+                actor_id=actor_user.id,
+                actor_role=actor_user.role,
+                entity_type="visit",
+                entity_id=str(visit.id),
+                payload_snapshot=payload_snapshot,
+                deep_link="/admin/all-free-requests",
+            )
+            logger.info(
+                "[FIX:NOTIFICATIONS] created all_free_requested delivery",
+                extra={
+                    "visit_id": visit.id,
+                    "recipient_count": len(admin_users),
+                    "actor_id": actor_user.id,
+                },
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] failed to create all_free_requested delivery",
+                extra={
+                    "visit_id": getattr(visit, "id", None),
+                    "actor_id": getattr(actor_user, "id", None),
+                    "error": str(exc),
+                },
+            )
+            return False
+
+    async def send_all_free_decision_notification(
+        self,
+        *,
+        db: Session,
+        visit: Any,
+        actor_user: User,
+        rejection_reason: str | None = None,
+    ) -> bool:
+        """Create canonical inbox signals for All Free approve/reject decisions."""
+        try:
+            from app.models.patient import Patient
+
+            platform_service = self._platform_service(db)
+            recipients: dict[int, User] = {}
+
+            registrar_user_id = self._extract_prefixed_user_id(
+                getattr(visit, "confirmed_by", None),
+                "registrar_",
+            )
+            if registrar_user_id:
+                registrar_user = (
+                    db.query(User)
+                    .filter(User.id == registrar_user_id, User.is_active.is_(True))
+                    .first()
+                )
+                if registrar_user:
+                    recipients[registrar_user.id] = registrar_user
+
+            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+            if patient and patient.user_id:
+                patient_user = (
+                    db.query(User)
+                    .filter(User.id == patient.user_id, User.is_active.is_(True))
+                    .first()
+                )
+                if patient_user:
+                    recipients[patient_user.id] = patient_user
+
+            if not recipients:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] all_free decision skipped: no linked recipients",
+                    extra={"visit_id": getattr(visit, "id", None)},
+                )
+                return False
+
+            approved = str(getattr(visit, "approval_status", "")).lower() == "approved"
+            event_type = "all_free_approved" if approved else "all_free_rejected"
+            title = "Заявка All Free одобрена" if approved else "Заявка All Free отклонена"
+            body = (
+                f"Заявка All Free для визита #{visit.id} одобрена."
+                if approved
+                else f"Заявка All Free для визита #{visit.id} отклонена."
+            )
+            payload_snapshot = {
+                "title": title,
+                "message": body,
+                "metadata": {
+                    "visit_id": visit.id,
+                    "patient_id": visit.patient_id,
+                    "doctor_id": visit.doctor_id,
+                    "approval_status": visit.approval_status,
+                    "approver_id": actor_user.id,
+                    "approver_role": actor_user.role,
+                    "rejection_reason": rejection_reason,
+                },
+            }
+
+            await platform_service.record_delivery_for_users(
+                users=list(recipients.values()),
+                event_type=event_type,
+                title=title,
+                message=body,
+                source_module="registrar",
+                recipient_type="user",
+                severity="info" if approved else "warning",
+                priority="high",
+                actor_id=actor_user.id,
+                actor_role=actor_user.role,
+                entity_type="visit",
+                entity_id=str(visit.id),
+                payload_snapshot=payload_snapshot,
+                deep_link="/registrar",
+            )
+            logger.info(
+                "[FIX:NOTIFICATIONS] created %s delivery",
+                event_type,
+                extra={
+                    "visit_id": visit.id,
+                    "recipient_count": len(recipients),
+                    "actor_id": actor_user.id,
+                },
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] failed to create all_free decision delivery",
+                extra={
+                    "visit_id": getattr(visit, "id", None),
+                    "actor_id": getattr(actor_user, "id", None),
+                    "approval_status": getattr(visit, "approval_status", None),
+                    "error": str(exc),
+                },
+            )
+            return False
+
+    async def send_message_received_notification(
+        self,
+        *,
+        db: Session,
+        recipient: User,
+        sender: User,
+        message_id: int,
+        conversation_id: str,
+        message_type: str,
+        preview: str | None = None,
+        patient_id: int | None = None,
+    ) -> bool:
+        """Create a canonical inbox signal for a newly received chat message."""
+        try:
+            platform_service = self._platform_service(db)
+            sender_name = sender.full_name or sender.username or sender.email or f"User {sender.id}"
+            normalized_message_type = str(message_type or "text").strip().lower()
+
+            if normalized_message_type == "voice":
+                body = f"{sender_name} отправил(а) голосовое сообщение."
+            elif normalized_message_type in {"file", "document"}:
+                body = f"{sender_name} отправил(а) файл."
+            elif normalized_message_type == "image":
+                body = f"{sender_name} отправил(а) изображение."
+            else:
+                preview_text = (preview or "").strip()
+                body = (
+                    f"{sender_name}: {preview_text}"
+                    if preview_text
+                    else f"Новое сообщение от {sender_name}"
+                )
+
+            title = "Новое сообщение"
+            payload_snapshot = {
+                "title": title,
+                "message": body,
+                "metadata": {
+                    "message_id": message_id,
+                    "conversation_id": conversation_id,
+                    "sender_id": sender.id,
+                    "sender_name": sender_name,
+                    "message_type": normalized_message_type,
+                    "patient_id": patient_id,
+                },
+            }
+
+            await platform_service.record_delivery_for_user(
+                user=recipient,
+                event_type="message_received",
+                title=title,
+                message=body,
+                source_module="messages",
+                recipient_type="user",
+                severity="info",
+                priority="normal",
+                actor_id=sender.id,
+                actor_role=sender.role,
+                entity_type="message",
+                entity_id=str(message_id),
+                payload_snapshot=payload_snapshot,
+                deep_link=f"/messages?user={sender.id}",
+            )
+            logger.info(
+                "[FIX:NOTIFICATIONS] created message_received delivery",
+                extra={
+                    "message_id": message_id,
+                    "conversation_id": conversation_id,
+                    "sender_id": sender.id,
+                    "recipient_id": recipient.id,
+                },
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] failed to create message_received delivery",
+                extra={
+                    "message_id": message_id,
+                    "sender_id": getattr(sender, "id", None),
+                    "recipient_id": getattr(recipient, "id", None),
+                    "error": str(exc),
+                },
+            )
+            return False
 
     def render_template(self, template_text: str, data: dict[str, Any]) -> str:
         """Рендеринг шаблона с данными"""
@@ -550,13 +1401,28 @@ class NotificationSenderService:
     ) -> NotificationHistory:
         """Отправка уведомления с использованием шаблона"""
 
-        # Получаем шаблон
-        template = crud_notification_template.get_by_type_and_channel(
-            db, type=notification_type, channel=channel
+        raw_notification_type = str(notification_type or "").strip().lower()
+        canonical_notification_type = _normalize_notification_event_type(
+            raw_notification_type,
+            fallback="notification",
         )
+        template_lookup_types = [canonical_notification_type]
+        if raw_notification_type and raw_notification_type != canonical_notification_type:
+            template_lookup_types.append(raw_notification_type)
+
+        # Получаем шаблон
+        template = None
+        for template_type in template_lookup_types:
+            template = crud_notification_template.get_by_type_and_channel(
+                db, type=template_type, channel=channel
+            )
+            if template:
+                break
 
         if not template:
-            logger.warning(f"Шаблон не найден: {notification_type}/{channel}")
+            logger.warning(
+                f"Шаблон не найден: {canonical_notification_type}/{channel}"
+            )
             # Используем базовый шаблон
             subject = template_data.get("subject", "Уведомление")
             content = template_data.get("message", "Сообщение")
@@ -573,17 +1439,47 @@ class NotificationSenderService:
             recipient_type=recipient_type,
             recipient_id=recipient_id,
             recipient_contact=recipient_contact,
-            notification_type=notification_type,
+            notification_type=canonical_notification_type,
             channel=channel,
             template_id=template.id if template else None,
             subject=subject,
             content=content,
             related_entity_type=related_entity_type,
             related_entity_id=related_entity_id,
-            metadata=template_data,
+            notification_metadata=template_data,
         )
 
         history = crud_notification_history.create(db, obj_in=history_data)
+
+        if db and recipient_id is not None:
+            platform_service = self._platform_service(db)
+            recipient_user = None
+            if recipient_type == "patient":
+                from app.models.patient import Patient
+
+                patient = db.query(Patient).filter(Patient.id == recipient_id).first()
+                if patient and patient.user_id:
+                    recipient_user = db.query(User).filter(User.id == patient.user_id).first()
+            else:
+                recipient_user = db.query(User).filter(User.id == recipient_id).first()
+
+            if recipient_user:
+                await platform_service.record_delivery_for_user(
+                    user=recipient_user,
+                    event_type=canonical_notification_type,
+                    title=subject or "Уведомление",
+                    message=content,
+                    source_module="notifications",
+                    recipient_type=recipient_type,
+                    severity="info",
+                    priority="normal",
+                    entity_type=related_entity_type,
+                    entity_id=related_entity_id,
+                    payload_snapshot={
+                        "template_data": template_data,
+                    },
+                    transport_type=channel,
+                )
 
         # Отправляем уведомление
         success = False
@@ -764,6 +1660,11 @@ class NotificationSenderService:
             logger.warning(f"Пациент не найден: {patient_id}")
             return []
 
+        canonical_notification_type = _normalize_notification_event_type(
+            notification_type,
+            fallback="payment_notification",
+        )
+
         # Данные для шаблона
         template_data = {
             "patient_name": patient.full_name
@@ -792,7 +1693,7 @@ class NotificationSenderService:
             if contact:
                 history = await self.send_templated_notification(
                     db=db,
-                    notification_type=notification_type,
+                    notification_type=canonical_notification_type,
                     channel=channel,
                     recipient_contact=contact,
                     template_data=template_data,
@@ -802,9 +1703,6 @@ class NotificationSenderService:
                     related_entity_id=payment_id,
                 )
                 results.append(history)
-
-        return results
-
 
         return results
 
@@ -835,7 +1733,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,
@@ -884,7 +1782,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,
@@ -933,7 +1831,7 @@ class NotificationSenderService:
                 results["telegram"] = await self.send_telegram_message(user.telegram_id, tele_msg)
 
             # Push
-            if user.device_token:
+            if user:
                 results["push"] = await self.send_push(
                     user_id=user.id,
                     title=subject,

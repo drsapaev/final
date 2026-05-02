@@ -1,0 +1,56 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e12]:
+        - generic [ref=e14]:
+          - generic: 🔍
+          - textbox "Поиск пациентов, визитов..." [ref=e15]
+          - generic: ⌘K
+        - generic [ref=e16]:
+          - button "Кассир" [ref=e17] [cursor=pointer]:
+            - generic [ref=e18]:
+              - img [ref=e19]
+              - text: Кассир
+          - button "Главная" [ref=e22] [cursor=pointer]:
+            - generic [ref=e23]:
+              - img [ref=e24]
+              - text: Главная
+          - button "Онлайн‑записи" [ref=e27] [cursor=pointer]:
+            - generic [ref=e28]:
+              - img [ref=e29]
+              - text: Онлайн‑записи
+          - button "Новая запись" [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]:
+              - img [ref=e34]
+              - text: Новая запись
+      - generic [ref=e38]:
+        - button "RU" [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]:
+            - img [ref=e42]
+            - text: RU
+        - generic "Онлайн" [ref=e46]:
+          - img [ref=e47]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+        - button "Выбрать тему" [ref=e55] [cursor=pointer]:
+          - img [ref=e58]
+        - button "Registrar User" [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]:
+            - img [ref=e64]
+            - text: Registrar User
+        - button "Выйти" [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]:
+            - img [ref=e69]
+            - text: Выйти
+    - main [ref=e73]:
+      - main "Панель регистратора" [ref=e74]:
+        - link "Перейти к основному содержимому" [ref=e75] [cursor=pointer]:
+          - /url: "#main-content"
+        - generic [ref=e79]: Загрузка отделений...
+        - tabpanel [ref=e81]
+  - region "Notifications Alt+T"

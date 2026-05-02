@@ -777,7 +777,7 @@ async def get_pending_payments(
                             # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
                             service_code = (
                                 get_service_code(service.id, db)
-                                or service.code
+                                or service.service_code
                                 or service_item
                             )
                             services_codes.append(service_code)
@@ -807,7 +807,7 @@ async def get_pending_payments(
                                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
                                 service_code = (
                                     get_service_code(service.id, db)
-                                    or service.code
+                                    or service.service_code
                                     or service_item['code']
                                 )
                                 services_codes.append(service_code)
@@ -986,7 +986,7 @@ async def get_pending_payments(
                             # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
                             service_code = (
                                 get_service_code(vs.service_id, db)
-                                or service.code
+                                or service.service_code
                                 or f"S{vs.service_id}"
                             )
 

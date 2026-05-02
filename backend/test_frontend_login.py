@@ -38,17 +38,17 @@ def test_backend():
     try:
         with httpx.Client() as client:
             # Проверяем корневой эндпоинт
-            response = client.get("http://localhost:8000/", timeout=5)
+            response = client.get("http://localhost:18000/", timeout=5)
             print(f"✅ Бэкенд доступен: {response.status_code}")
 
             # Проверяем API
-            response = client.get("http://localhost:8000/api/v1/", timeout=5)
+            response = client.get("http://localhost:18000/api/v1/", timeout=5)
             print(f"✅ API доступен: {response.status_code}")
 
     except httpx.ConnectError:
-        print("❌ Бэкенд недоступен на localhost:8000")
+        print("❌ Бэкенд недоступен на localhost:18000")
         print(
-            "   Убедитесь, что запущен: uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+            "   Убедитесь, что запущен: uvicorn main:app --reload --host 0.0.0.0 --port 18000"
         )
     except Exception as e:
         print(f"❌ Ошибка при тестировании бэкенда: {e}")
@@ -68,7 +68,7 @@ def test_login():
             }
 
             response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=data, timeout=5
+                "http://localhost:18000/api/v1/auth/login", data=data, timeout=5
             )
 
             if response.status_code == 200:
@@ -80,7 +80,7 @@ def test_login():
                     # Тестируем получение профиля
                     headers = {"Authorization": f"Bearer {token_data['access_token']}"}
                     profile_response = client.get(
-                        "http://localhost:8000/api/v1/auth/me",
+                        "http://localhost:18000/api/v1/auth/me",
                         headers=headers,
                         timeout=5,
                     )
@@ -94,7 +94,7 @@ def test_login():
 
                     # Тестируем доступ к админ-панели
                     admin_response = client.get(
-                        "http://localhost:8000/api/v1/admin/providers",
+                        "http://localhost:18000/api/v1/admin/providers",
                         headers=headers,
                         timeout=5,
                     )

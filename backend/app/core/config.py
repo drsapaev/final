@@ -13,11 +13,10 @@ from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSou
 
 logger = logging.getLogger(__name__)
 
-# Calculate absolute path to clinic.db (relative to backend directory)
+# Resolve the backend root so config can load backend/.env consistently.
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
 _DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
-_DEFAULT_DB_PATH = _BACKEND_DIR / "clinic.db"
-_DEFAULT_DATABASE_URL = f"sqlite:///{_DEFAULT_DB_PATH.as_posix()}"
+_DEFAULT_DATABASE_URL = "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
 
 
 class _CompatibleCorsEnvSettingsSource(EnvSettingsSource):
@@ -66,6 +65,10 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://localhost:18080",
+            "http://127.0.0.1:18080",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
         ],
@@ -311,24 +314,9 @@ class Settings(BaseSettings):
     PRINTER_USB_VID: int | None = None
     PRINTER_USB_PID: int | None = None
 
-    # --- EMR v2 Feature Flags ---
-    EMR_V2_ENABLED: bool = Field(
+    EMR_LEGACY_WRITE_FREEZE: bool = Field(
         default=False,
-        description="Global toggle for EMR v2. If False, v1 is used for everyone."
-    )
-    EMR_V2_ROLLOUT_PERCENTAGE: int = Field(
-        default=0,
-        ge=0,
-        le=100,
-        description="Percentage of users who see EMR v2 (0-100). Only applies if EMR_V2_ENABLED=True."
-    )
-    EMR_V2_ALLOWED_USER_IDS: str = Field(
-        default="",
-        description="Comma-separated list of user IDs with early access to EMR v2 (e.g., '1,5,12')"
-    )
-    EMR_V2_SHADOW_MODE: bool = Field(
-        default=False,
-        description="If True, v2 renders hidden alongside v1 for data comparison (dev mode)"
+        description="Reject legacy appointment-based EMR writes during hard-cutover maintenance windows.",
     )
 
     @field_validator(

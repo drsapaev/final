@@ -14,6 +14,7 @@ import {
 
 'lucide-react';
 import { Card as MacOSCard } from '../ui/macos';
+import PropTypes from 'prop-types';
 
 
 
@@ -731,6 +732,13 @@ const AnalyticsDashboard = ({
       </div>
     </div>);
 
+};
+
+
+AnalyticsDashboard.propTypes = {
+  ...(AnalyticsDashboard.propTypes || {}),
+  data: PropTypes.any,
+  loading: PropTypes.any,
 };
 
 export default AnalyticsDashboard;

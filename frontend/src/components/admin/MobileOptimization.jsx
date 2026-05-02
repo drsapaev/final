@@ -10,6 +10,23 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  const getItemSectionKey = (item) => {
+    if (item?.id === 'admin-dashboard' || item?.to === '/admin') {
+      return 'dashboard';
+    }
+
+    if (item?.route?.id) {
+      return item.route.id;
+    }
+
+    if (item?.id) {
+      return item.id;
+    }
+
+    const pathParts = String(item?.to || '').split('/').filter(Boolean);
+    return pathParts[pathParts.length - 1] || '';
+  };
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -92,7 +109,11 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
                   </h3>
                   <div className="space-y-1">
                     {section.items.map((item, itemIndex) => {
-                  const isActive = currentSection === item.to.split('/')[2];
+                  const itemSectionKey = getItemSectionKey(item);
+                  const isActive = currentSection === itemSectionKey ||
+                    currentSection === item.id ||
+                    currentSection === item.to.split('/').filter(Boolean).pop() ||
+                    (item.to === '/admin' && currentSection === 'dashboard');
                   const IconComponent = item.icon;
 
                   return (

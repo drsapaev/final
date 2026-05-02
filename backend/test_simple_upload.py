@@ -12,7 +12,7 @@ def test_simple_upload():
     # Получаем токен
     try:
         auth_response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            "http://localhost:18000/api/v1/auth/login",
             data={"username": "admin", "password": "admin123"},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
@@ -40,7 +40,7 @@ def test_simple_upload():
     try:
         print("📤 Отправляем запрос...")
         upload_response = requests.post(
-            "http://localhost:8000/api/v1/files/upload",
+            "http://localhost:18000/api/v1/files/upload",
             headers=headers,
             files=files,
             timeout=10

@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
+import { formatNetworkErrorMessage } from '../utils/networkErrorMessages';
 
 // Дефолтные настройки
 const DEFAULT_CONFIG = {
@@ -165,8 +166,17 @@ export const useDoctorPhrases = ({
       }
     } catch (err) {
       if (err.name !== 'AbortError' && err.name !== 'CanceledError') {
-        logger.warn('Failed to fetch phrase suggestions:', err);
-        setError(err.message);
+        const errorMessage = formatNetworkErrorMessage({
+          responseDetail: err?.response?.data?.detail,
+          responseMessage: err?.response?.data?.message,
+          rawMessage: err?.message,
+          fallbackMessage: 'Не удалось получить подсказки из истории врача',
+        });
+        logger.warn('[DoctorPhrases] Не удалось получить подсказки из истории врача', {
+          error: errorMessage,
+          rawMessage: err?.message,
+        });
+        setError(errorMessage);
         setSuggestions([]);
       }
     } finally {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 const SegmentedControl = React.forwardRef(({ 
   options = [],
@@ -155,6 +156,20 @@ const SegmentedControl = React.forwardRef(({
     </div>
   );
 });
+
+
+SegmentedControl.propTypes = {
+  ...(SegmentedControl.propTypes || {}),
+  className: PropTypes.any,
+  defaultValue: PropTypes.any,
+  disabled: PropTypes.any,
+  onChange: PropTypes.any,
+  options: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 SegmentedControl.displayName = 'SegmentedControl';
 

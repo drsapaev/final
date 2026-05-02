@@ -24,13 +24,13 @@ else {
     Write-Host "ℹ️ Процессы Python не найдены" -ForegroundColor Gray
 }
 
-# Метод 2: Проверка порта 8000 через netstat
+# Метод 2: Проверка порта 18000 через netstat
 Write-Host ""
-Write-Host "Проверка порта 8000..." -ForegroundColor Yellow
-$netstat = netstat -ano | Select-String ":8000.*LISTENING"
+Write-Host "Проверка порта 18000..." -ForegroundColor Yellow
+$netstat = netstat -ano | Select-String ":18000.*LISTENING"
 
 if ($netstat) {
-    Write-Host "⚠️ Порт 8000 все еще занят, принудительная очистка..." -ForegroundColor Yellow
+    Write-Host "⚠️ Порт 18000 все еще занят, принудительная очистка..." -ForegroundColor Yellow
     $netstat | ForEach-Object {
         $line = $_.Line
         $processId = ($line -split '\s+')[-1]
@@ -43,7 +43,7 @@ if ($netstat) {
     Start-Sleep -Seconds 3
     
     # Повторная проверка и очистка
-    $netstat2 = netstat -ano | Select-String ":8000.*LISTENING"
+    $netstat2 = netstat -ano | Select-String ":18000.*LISTENING"
     if ($netstat2) {
         Write-Host "Повторная попытка очистки порта..." -ForegroundColor Yellow
         $netstat2 | ForEach-Object {
@@ -56,17 +56,17 @@ if ($netstat) {
 }
 
 # Финальная проверка
-$finalCheck = netstat -ano | Select-String ":8000.*LISTENING"
+$finalCheck = netstat -ano | Select-String ":18000.*LISTENING"
 if (-not $finalCheck) {
     Write-Host ""
     Write-Host "=" * 60
-    Write-Host "✅ Порт 8000 свободен и готов к использованию!" -ForegroundColor Green
+    Write-Host "✅ Порт 18000 свободен и готов к использованию!" -ForegroundColor Green
     Write-Host "=" * 60
 }
 else {
     Write-Host ""
     Write-Host "=" * 60
-    Write-Host "⚠️ ВНИМАНИЕ: Порт 8000 все еще занят!" -ForegroundColor Red
+    Write-Host "⚠️ ВНИМАНИЕ: Порт 18000 все еще занят!" -ForegroundColor Red
     Write-Host "Попробуйте закрыть процессы вручную через Диспетчер задач" -ForegroundColor Yellow
     Write-Host "=" * 60
 }

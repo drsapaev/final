@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
+import PropTypes from 'prop-types';
 
 const ModernFilters = ({
   searchParams,
@@ -286,6 +287,18 @@ const ModernFilters = ({
       }
     </div>);
 
+};
+
+
+ModernFilters.propTypes = {
+  ...(ModernFilters.propTypes || {}),
+  appointmentsCount: PropTypes.any,
+  autoRefresh: PropTypes.any,
+  className: PropTypes.any,
+  get: PropTypes.any,
+  onAutoRefreshChange: PropTypes.any,
+  onParamsChange: PropTypes.any,
+  searchParams: PropTypes.any,
 };
 
 export default ModernFilters;

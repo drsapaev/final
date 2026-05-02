@@ -227,7 +227,7 @@
 ### **Backend:**
 ```bash
 cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 ```
 
 ### **Frontend:**
@@ -239,9 +239,9 @@ npm start
 ```
 
 ### **Доступ:**
-- Backend API: http://localhost:8000
+- Backend API: http://localhost:18000
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:18000/docs
 
 ---
 

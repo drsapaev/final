@@ -82,7 +82,9 @@ class PricingRule(Base):
     # Связи
     creator: Mapped[User | None] = relationship("User", foreign_keys=[created_by])
     rule_services: Mapped[list[PricingRuleService]] = relationship(
-        "PricingRuleService", back_populates="rule"
+        "PricingRuleService",
+        back_populates="rule",
+        cascade="all, delete-orphan",
     )
     rule_packages: Mapped[list[ServicePackage]] = relationship(
         "ServicePackage", back_populates="pricing_rule"

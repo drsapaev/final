@@ -4,9 +4,11 @@
 
 **Дата тестирования:** _________  
 **Тестировщик:** _________  
-**Версия:** 2.0.0  
-**Backend:** http://localhost:8000  
-**Frontend:** http://localhost:3000  
+**Версия:** 2.1.0  
+**Backend:** http://localhost:18000  
+**Frontend:** http://localhost:5173  
+
+**Live smoke note:** backend `18000` is up; authoritative AI/MCP smoke gate is `GET /api/v1/mcp/health` (returned `overall=healthy` on `2026-03-29`). `GET /api/v1/mcp/status` is informational and may still report `healthy=false` until the cached health state refreshes. Evidence: `output/playwright/ai-mcp-health-smoke-2026-03-29.json`. Browser proof on the same stack loaded `/admin/ai-settings` and `/admin/ai-analytics` under `admin@example.com / admin123` with clean console/network evidence: `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, `output/playwright/ai-mcp-ai-analytics-console.log`
 
 ---
 
@@ -14,17 +16,17 @@
 
 ### Backend
 
-- [ ] Backend сервер запущен
-- [ ] MCP серверы активны
+- [x] Backend сервер запущен
+- [x] MCP серверы активны
 - [ ] DeepSeek API ключ настроен в `.env`
-- [ ] Проверка здоровья системы: `GET /api/v1/mcp/health`
-- [ ] Проверка метрик: `GET /api/v1/mcp/metrics`
+- [x] Проверка здоровья системы: `GET /api/v1/mcp/health`
+- [x] Проверка метрик: `GET /api/v1/mcp/metrics`
 
 ### Frontend
 
-- [ ] Frontend сервер запущен
-- [ ] Авторизация работает
-- [ ] Нет ошибок в консоли браузера
+- [x] Frontend сервер запущен
+- [x] Авторизация работает
+- [x] Нет ошибок в консоли браузера
 
 ### Тестовые данные
 
@@ -438,14 +440,14 @@
 
 ```bash
 # 1. Запуск серверов
-cd backend && uvicorn app.main:app --reload
-cd frontend && npm start
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port 18000 --reload
+cd frontend && npm run dev
 
 # 2. Проверка MCP здоровья
-curl http://localhost:8000/api/v1/mcp/health
+curl http://localhost:18000/api/v1/mcp/health
 
 # 3. Открыть браузер
-http://localhost:3000
+http://localhost:5173
 
 # 4. Логин как doctor
 username: doctor
@@ -470,6 +472,6 @@ password: Test1234
 
 ---
 
-**Version:** 2.0.0  
-**Last Updated:** 2025-10-12
+**Version:** 2.1.0  
+**Last Updated:** 2026-03-29
 

@@ -21,7 +21,7 @@ def test_json_login():
         print(f"Sending JSON login request with data: {data}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/json-login",
+            "http://localhost:18000/api/v1/auth/json-login",
             json=data,
             headers=headers
         )

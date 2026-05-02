@@ -1,0 +1,98 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Управление клиникой" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Управление клиникой
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Doctor User" [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - text: Doctor User
+        - button "Выйти" [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]:
+            - img [ref=e90]
+            - text: Выйти
+    - main [ref=e94]:
+      - generic [ref=e95]:
+        - main [ref=e96]:
+          - generic [ref=e97]:
+            - button "Панель" [ref=e98] [cursor=pointer]:
+              - img [ref=e99]
+              - generic [ref=e101]: Панель
+            - button "Пациенты" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+              - generic [ref=e106]: Пациенты
+            - button "Записи" [ref=e107] [cursor=pointer]:
+              - img [ref=e108]
+              - generic [ref=e110]: Записи
+            - button "Очередь" [ref=e111] [cursor=pointer]:
+              - img [ref=e112]
+              - generic [ref=e117]: Очередь
+            - button "AI Помощник" [ref=e118] [cursor=pointer]:
+              - img [ref=e119]
+              - generic [ref=e127]: AI Помощник
+            - button "Отчеты" [ref=e128] [cursor=pointer]:
+              - img [ref=e129]
+              - generic [ref=e132]: Отчеты
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e138] [cursor=pointer]:
+                - img [ref=e140]
+                - generic [ref=e143]:
+                  - generic [ref=e144]: "0"
+                  - generic [ref=e145]: Активных пациентов
+              - generic [ref=e148] [cursor=pointer]:
+                - img [ref=e150]
+                - generic [ref=e152]:
+                  - generic [ref=e153]: "0"
+                  - generic [ref=e154]: Записей на сегодня
+              - generic [ref=e157] [cursor=pointer]:
+                - img [ref=e159]
+                - generic [ref=e162]:
+                  - generic [ref=e163]: "0"
+                  - generic [ref=e164]: В процессе
+              - generic [ref=e167] [cursor=pointer]:
+                - img [ref=e169]
+                - generic [ref=e172]:
+                  - generic [ref=e173]: "0"
+                  - generic [ref=e174]: Завершено сегодня
+            - generic [ref=e176]:
+              - heading "Быстрые действия" [level=2] [ref=e178]
+              - generic [ref=e180]:
+                - button "Новый пациент" [ref=e181] [cursor=pointer]:
+                  - generic [ref=e182]:
+                    - img [ref=e183]
+                    - text: Новый пациент
+                - button "Записать на прием" [ref=e184] [cursor=pointer]:
+                  - generic [ref=e185]:
+                    - img [ref=e186]
+                    - text: Записать на прием
+                - button "Создать отчет" [ref=e188] [cursor=pointer]:
+                  - generic [ref=e189]:
+                    - img [ref=e190]
+                    - text: Создать отчет
+                - button "Экспорт данных" [ref=e193] [cursor=pointer]:
+                  - generic [ref=e194]:
+                    - img [ref=e195]
+                    - text: Экспорт данных
+        - button "💬 AI" [ref=e198] [cursor=pointer]:
+          - generic [ref=e199]: 💬
+          - generic [ref=e200]: AI
+  - region "Notifications Alt+T"

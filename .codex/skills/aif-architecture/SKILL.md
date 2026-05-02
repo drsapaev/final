@@ -1,6 +1,6 @@
 ---
 name: aif-architecture
-description: Generate architecture guidelines for the project. Analyzes tech stack from DESCRIPTION.md, recommends an architecture pattern, and creates .ai-factory/ARCHITECTURE.md. Use when setting up project architecture, asking "which architecture", or after $2 setup.
+description: Generate architecture guidelines for the project. Analyzes tech stack from DESCRIPTION.md, recommends an architecture pattern, and creates .ai-factory/ARCHITECTURE.md. Use when setting up project architecture, asking "which architecture", or after /aif setup.
 argument-hint: "[clean|ddd|microservices|monolith|layers]"
 allowed-tools: Read Write Glob Grep Bash(mkdir *) AskUserQuestion Questions
 disable-model-invocation: false
@@ -24,7 +24,7 @@ Generate `.ai-factory/ARCHITECTURE.md` with architecture decisions tailored to t
 ```
 ⚠️  No project description found.
 
-Run $2 first to set up project context, or describe your project manually:
+Run /aif first to set up project context, or describe your project manually:
 - What are you building?
 - Tech stack (language, framework, database)?
 - Team size?
@@ -33,11 +33,31 @@ Run $2 first to set up project context, or describe your project manually:
 
 Allow standalone usage — if user provides manual input, use that instead.
 
+**Read `.ai-factory/skill-context/aif-architecture/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the
+  ARCHITECTURE.md template. The template in this SKILL.md is a **base structure**. If a skill-context
+  rule says "architecture doc MUST include X" or "MUST cover section Y" — you MUST augment the
+  template accordingly. Generating ARCHITECTURE.md that violates skill-context rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
 ### Step 1: Analyze & Recommend
 
 Based on project context, evaluate against the decision matrix and recommend an architecture:
 
-**If `$ARGUMENTS` specifies an architecture** (e.g., `$2 clean`):
+**If `$ARGUMENTS` specifies an architecture** (e.g., `/aif-architecture clean`):
 - Use that architecture directly, skip to Step 2
 
 **If no specific architecture requested:**
@@ -162,8 +182,14 @@ Key rules:
 - [rule 2]
 - [rule 3]
 
-All workflow skills ($2, $2) will now follow these architecture guidelines.
+All workflow skills (/aif-plan, /aif-implement) will now follow these architecture guidelines.
 ```
+
+## Artifact Ownership
+
+- Primary ownership: `.ai-factory/ARCHITECTURE.md`.
+- Allowed companion updates: architecture pointer in `.ai-factory/DESCRIPTION.md`, architecture row in `AGENTS.md` context table.
+- Read-only context: roadmap, rules, research, and plan artifacts unless user explicitly requests otherwise.
 
 ---
 

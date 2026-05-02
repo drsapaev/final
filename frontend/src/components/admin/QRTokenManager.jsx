@@ -56,7 +56,7 @@ const QRTokenManager = () => {
         const doctorsData = await doctorsRes.json();
         const docs = Array.isArray(doctorsData) ? doctorsData : doctorsData.doctors || [];
         setSpecialists(docs.map((d) => ({
-          id: d.id || d.user_id,
+          id: d.id,
           name: d.user?.full_name || d.full_name || `Врач #${d.id}`,
           department: d.specialty
         })));

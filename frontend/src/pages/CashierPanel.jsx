@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Search, CheckCircle, DollarSign, User, RefreshCw } from 'lucide-react';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
 import { Card, Badge, Button } from '../components/ui/macos';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
@@ -13,8 +13,12 @@ import Input from '../components/ui/macos/Input';
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
+import { getApiOrigin } from '../api/runtime';
+import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getErrorMessage } from '../utils/errorHandler';
+import notify from '../services/notify';
 import {
   Dialog,
   DialogTitle,
@@ -63,6 +67,138 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
+const PAYMENT_METHOD_LABELS = {
+  cash: 'Наличные',
+  card: 'Карта',
+  payme: 'PayMe',
+  click: 'Click'
+};
+
+const resolvePaymentId = (paymentRowOrId) => {
+  if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
+    return paymentRowOrId;
+  }
+
+  return (
+    paymentRowOrId?.id ||
+    paymentRowOrId?.payment_id ||
+    paymentRowOrId?.grouped_payments?.[0] ||
+    null
+  );
+};
+
+const resolvePaymentMethodCode = (method) => {
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+
+  if (!normalizedMethod) return 'cash';
+  if (normalizedMethod === 'наличные') return 'cash';
+  if (normalizedMethod === 'карта') return 'card';
+
+  return normalizedMethod;
+};
+
+const resolvePaymentMethodLabel = (method) => {
+  const methodCode = resolvePaymentMethodCode(method);
+  return PAYMENT_METHOD_LABELS[methodCode] || String(method || 'Наличные');
+};
+
+const extractReceiptDateTime = (paymentRow) => {
+  const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
+  const parsedDate = sourceTimestamp ? new Date(sourceTimestamp) : null;
+  const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
+
+  return {
+    date: paymentRow?.date || (hasValidDate ? parsedDate.toLocaleDateString('ru-RU') : ''),
+    time: paymentRow?.time || (
+      hasValidDate
+        ? parsedDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        : ''
+    )
+  };
+};
+
+const buildReceiptServices = (paymentRow, totalAmount) => {
+  const currency = String(paymentRow?.currency || 'UZS');
+  const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
+
+  if (namedServices.length > 0) {
+    return namedServices
+      .filter(Boolean)
+      .map((serviceName) => ({
+      name: serviceName,
+      quantity: 1,
+      price: totalAmount,
+      total: totalAmount,
+      currency
+      }));
+  }
+
+  if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
+    return paymentRow.services.flatMap((serviceItem) => {
+      if (typeof serviceItem === 'object' && serviceItem !== null) {
+        const displayName = serviceItem.name || serviceItem.code || null;
+        if (!displayName) {
+          return [];
+        }
+        const quantity = Number(serviceItem.quantity || 1);
+        const price = Number(serviceItem.price || totalAmount);
+        return {
+          name: displayName,
+          quantity,
+          price,
+          total: Number(serviceItem.total || price * quantity),
+          currency: serviceItem.currency || currency
+        };
+      }
+
+      if (!serviceItem) {
+        return [];
+      }
+
+      return {
+        name: String(serviceItem),
+        quantity: 1,
+        price: totalAmount,
+        total: totalAmount,
+        currency
+      };
+    });
+  }
+
+  return [];
+};
+
+const buildReceiptPrintPayload = (paymentRow) => {
+  const paymentId = resolvePaymentId(paymentRow);
+  const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
+  const services = buildReceiptServices(paymentRow, totalAmount);
+  const { date, time } = extractReceiptDateTime(paymentRow);
+  const methodCode = resolvePaymentMethodCode(paymentRow?.method);
+
+  return {
+    payment: {
+      number: paymentRow?.receipt_no || `PAY-${paymentId}`,
+      date,
+      time,
+      services,
+      subtotal: totalAmount,
+      discount: 0,
+      total: totalAmount,
+      method: methodCode,
+      method_name: resolvePaymentMethodLabel(paymentRow?.method),
+      status: paymentRow?.status || 'paid',
+      paid_amount: totalAmount,
+      change: 0
+    },
+    patient: {
+      full_name: paymentRow?.patient || paymentRow?.patient_name || 'Пациент',
+      phone: paymentRow?.patient_phone || null
+    },
+    services,
+    clinic: null
+  };
+};
+
 const CashierPanel = () => {void
   useBreakpoint();
   const location = useLocation();
@@ -92,7 +228,7 @@ const CashierPanel = () => {void
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+          const API_BASE = getApiOrigin();
           const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -304,6 +440,12 @@ const CashierPanel = () => {void
     setPendingPage(1);
   }, [dateMode, selectedDate, dateFrom, dateTo, debouncedQuery]);
 
+  const triggerDataReload = useCallback(() => {
+    setCurrentPage(1);
+    setPendingPage(1);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 
@@ -333,11 +475,12 @@ const CashierPanel = () => {void
     // Let's just update local lists simply for immediate feedback if possible, but with server-side pagination it's tricky.
     // Correct approach: Call loadData. Since loadData is inside useEffect, we can't call it directly.
     // Triggering a reload of data:
-    setCurrentPage(1); // resetting page is a simple way to reload
+    triggerDataReload();
   };
 
   const handlePaymentError = (error) => {
-    setPaymentError(error);
+    const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+    setPaymentError(message);
     logger.error('Ошибка платежа:', error);
   };
 
@@ -413,7 +556,7 @@ const CashierPanel = () => {void
         });
 
         if (!result.success) {
-          throw new Error(`Ошибка оплаты визита #${p.visitId}: ${result.error}`);
+          throw new Error(`Не удалось оплатить визит #${p.visitId}: ${result.error}`);
         }
       }
 
@@ -427,15 +570,16 @@ const CashierPanel = () => {void
         });
       }
 
-      alert(`✅ Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
+      notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
       paymentModal.closeModal();
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
     } catch (error) {
       logger.error('Ошибка обработки платежа:', error);
-      setPaymentError(error.message || 'Ошибка обработки платежа. Попробуйте позже.');
-      alert(`❌ Ошибка обработки платежа: ${error.message || 'Попробуйте позже'}`);
+      const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+      setPaymentError(message);
+      notify.error(message);
     }
   };
 
@@ -450,7 +594,7 @@ const CashierPanel = () => {void
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
-      alert(`❌ Ошибка подтверждения платежа: ${err.message}`);
+      notify.error(getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -468,13 +612,13 @@ const CashierPanel = () => {void
       if (result.success) {
         setCancelDialogOpen(false);
         setConfirmingPaymentId(null);
-        alert('Платёж отменён');
-        setCurrentPage(1); // Reload data
+        notify.info('Платёж отменён');
+        triggerDataReload();
       } else {
-        alert('Ошибка: ' + result.error);
+        notify.error(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert('Ошибка отмены: ' + error.message);
+      notify.error(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -486,16 +630,19 @@ const CashierPanel = () => {void
       date_to: date_to || undefined
     });
 
-    if (!result.success) {
-      alert('Ошибка экспорта: ' + (result.error || 'Неизвестная ошибка'));
-    }
+      if (!result.success) {
+        notify.error(
+          getErrorMessage(
+            result.error,
+            'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
+          )
+        );
+      }
   };
 
   // ✅ УЛУЧШЕНИЕ: Кнопка обновления данных
   const handleRefresh = () => {
-    setCurrentPage(1);
-    setPendingPage(1);
-    setRefreshKey((prev) => prev + 1); // Force reload
+    triggerDataReload();
   };
 
   // ✅ v2.0: Состояние для возврата
@@ -517,7 +664,7 @@ const CashierPanel = () => {void
   // ✅ v2.0: Обработчик возврата
   const handleRefund = async () => {
     if (!refundAmount || !refundReason || refundReason.length < 3) {
-      alert('Укажите сумму возврата и причину (минимум 3 символа)');
+      notify.warning('Укажите сумму возврата и причину (минимум 3 символа)');
       return;
     }
     try {
@@ -527,22 +674,51 @@ const CashierPanel = () => {void
       });
       if (result.success) {
         setRefundDialogOpen(false);
-        alert(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
-        setCurrentPage(1); // Reload
+        setRefundPaymentId(null);
+        setRefundReason('');
+        setRefundAmount('');
+        notify.success(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
+        triggerDataReload();
       } else {
-        alert('Ошибка возврата: ' + result.error);
+        notify.error(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
       }
     } catch (error) {
-      alert('Ошибка: ' + error.message);
+      notify.error(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
     }
   };
 
   // ✅ v2.0: Обработчик печати чека
-  const handlePrintReceipt = async (paymentId) => {
+  const handlePrintReceipt = async (paymentRowOrId) => {
+    const paymentId = resolvePaymentId(paymentRowOrId);
+
+    if (!paymentId) {
+      notify.error('Не удалось определить платеж для печати чека.');
+      return;
+    }
+
+    if (paymentRowOrId && typeof paymentRowOrId === 'object') {
+      try {
+        const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
+        if (opened) {
+          notify.success('Открыт диалог печати этого компьютера.');
+          return;
+        }
+
+        logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+          paymentId
+        });
+      } catch (error) {
+        logger.error('[Cashier] Unexpected browser receipt print error:', error);
+      }
+    }
+
     const result = await paymentsHook.getReceipt(paymentId);
     if (!result.success) {
-      alert('Ошибка получения чека: ' + result.error);
+      notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+      return;
     }
+
+    notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
   };
 
   // ✅ v2.0: Состояние для почасовой статистики
@@ -556,7 +732,7 @@ const CashierPanel = () => {void
       setHourlyStats(result.data);
       setShowHourlyChart(true);
     } else {
-      alert('Ошибка загрузки статистики: ' + result.error);
+      notify.error(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
     }
   };
 
@@ -673,21 +849,36 @@ const CashierPanel = () => {void
         // Создаём новую группу
         grouped[groupKey] = {
           ...payment,
-          services: [], // Services info might need to be fetched or assumed from note/structure
-          services_names: [],
+          services: Array.isArray(payment.services) ? [...payment.services] : [],
+          services_names: Array.isArray(payment.services_names) ? [...payment.services_names] : [],
           grouped_payments: [payment.id],
-          total_amount: payment.amount,
+          total_amount: Number(payment.amount || 0),
           date: dateKey, // Display helpers
           time: timeKey,
-          patient: payment.patient_name
+          patient: payment.patient_name,
+          service: payment.service || null
         };
       } else {
         grouped[groupKey].grouped_payments.push(payment.id);
         grouped[groupKey].total_amount += Number(payment.amount);
+        if (payment.service && !grouped[groupKey].service) {
+          grouped[groupKey].service = payment.service;
+        }
+        if (Array.isArray(payment.services)) {
+          grouped[groupKey].services.push(...payment.services);
+        }
+        if (Array.isArray(payment.services_names)) {
+          grouped[groupKey].services_names.push(...payment.services_names);
+        }
       }
     });
 
-    return Object.values(grouped);
+    return Object.values(grouped).map((group) => ({
+      ...group,
+      services: Array.from(new Set(group.services.filter(Boolean))),
+      services_names: Array.from(new Set(group.services_names.filter(Boolean))),
+      service: group.service || group.services_names[0] || group.services[0] || null
+    }));
   };
 
   // Group payments for display (already filtered by server)
@@ -946,11 +1137,6 @@ const CashierPanel = () => {void
                 id: 'refunds',
                 label: 'Возвраты',
                 icon: RefreshCw
-              },
-              {
-                id: 'deposits',
-                label: 'Депозиты',
-                icon: User
               }]
               }
               activeTab={activeTab}
@@ -1141,7 +1327,7 @@ const CashierPanel = () => {void
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {/* TODO: Render services info properly if available in history item */}
-                                {row.service || 'Услуга'}
+                                 {row.service || '—'}
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {row.method}
@@ -1189,7 +1375,7 @@ const CashierPanel = () => {void
                                 <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handlePrintReceipt(row.id)}
+                          onClick={() => handlePrintReceipt(row)}
                           title="Печать чека">
 
                                   🧾 Чек
@@ -1255,14 +1441,6 @@ const CashierPanel = () => {void
               </div>
             }
 
-            {/* Вкладка Депозиты */}
-            {activeTab === 'deposits' &&
-            <div style={{ marginTop: '24px', padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                <User size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                <h3>Управление депозитами</h3>
-                <p>Раздел находится в разработке</p>
-              </div>
-            }
           </Card>
 
           {/* ✅ УЛУЧШЕНИЕ: Диалог подтверждения отмены платежа */}

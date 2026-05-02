@@ -28,6 +28,7 @@ from app.models.visit import Visit
 from app.repositories.admin_departments_api_repository import (
     AdminDepartmentsApiRepository,
 )
+from app.services.service_mapping import get_service_code
 from app.schemas.department import (
     DepartmentQueueSettingsUpdate,
     DepartmentRegistrationSettingsUpdate,
@@ -698,7 +699,9 @@ def get_department_services(
                 "service": {
                     "id": ds.service.id,
                     "name": ds.service.name,
-                    "code": ds.service.code,
+                    "code": ds.service.service_code or get_service_code(
+                        ds.service.id, db
+                    ),
                     "base_price": float(ds.service.price) if ds.service.price else None,
                 },
                 "is_default": ds.is_default,

@@ -1,0 +1,145 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Управление клиникой" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Управление клиникой
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Doctor User" [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - text: Doctor User
+        - button "Выйти" [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]:
+            - img [ref=e90]
+            - text: Выйти
+    - main [ref=e94]:
+      - generic [ref=e95]:
+        - main [ref=e96]:
+          - generic [ref=e97]:
+            - button "Панель" [ref=e98] [cursor=pointer]:
+              - img [ref=e99]
+              - generic [ref=e101]: Панель
+            - button "Пациенты" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+              - generic [ref=e106]: Пациенты
+            - button "Записи" [ref=e107] [cursor=pointer]:
+              - img [ref=e108]
+              - generic [ref=e110]: Записи
+            - button "Очередь" [ref=e111] [cursor=pointer]:
+              - img [ref=e112]
+              - generic [ref=e117]: Очередь
+            - button "AI Помощник" [ref=e118] [cursor=pointer]:
+              - img [ref=e119]
+              - generic [ref=e127]: AI Помощник
+            - button "Отчеты" [ref=e128] [cursor=pointer]:
+              - img [ref=e129]
+              - generic [ref=e132]: Отчеты
+          - generic [ref=e216]:
+            - generic [ref=e218]:
+              - heading "Записи на прием" [level=2] [ref=e219]
+              - generic [ref=e220]:
+                - generic [ref=e221]:
+                  - img [ref=e222]
+                  - textbox "Поиск записей..." [ref=e225]
+                - combobox [ref=e226]:
+                  - option "Все статусы" [selected]
+                  - option "Запланированы"
+                  - option "В процессе"
+                  - option "Завершены"
+                  - option "Отменены"
+                - button "Назначить следующий визит" [ref=e227] [cursor=pointer]:
+                  - generic [ref=e228]:
+                    - img [ref=e229]
+                    - text: Назначить следующий визит
+            - table [ref=e231]:
+              - rowgroup [ref=e232]:
+                - row "Время Пациент Тип Статус Примечания Действия" [ref=e233]:
+                  - columnheader "Время" [ref=e234]
+                  - columnheader "Пациент" [ref=e235]
+                  - columnheader "Тип" [ref=e236]
+                  - columnheader "Статус" [ref=e237]
+                  - columnheader "Примечания" [ref=e238]
+                  - columnheader "Действия" [ref=e239]
+              - rowgroup [ref=e240]:
+                - row "09:00 Ахмедов Алишер Консультация Запланирован Плановый осмотр" [ref=e241] [cursor=pointer]:
+                  - cell "09:00" [ref=e242]:
+                    - generic [ref=e243]:
+                      - img [ref=e244]
+                      - text: 09:00
+                  - cell "Ахмедов Алишер" [ref=e247]
+                  - cell "Консультация" [ref=e248]
+                  - cell "Запланирован" [ref=e249]:
+                    - generic [ref=e250]: Запланирован
+                  - cell "Плановый осмотр" [ref=e251]
+                  - cell [ref=e252]:
+                    - button [ref=e253]:
+                      - img [ref=e254]
+                    - button [ref=e257]:
+                      - img [ref=e258]
+                    - button [ref=e261]:
+                      - img [ref=e262]
+                - row "10:30 Каримова Зухра Повторный прием В процессе Контроль сахара" [ref=e266] [cursor=pointer]:
+                  - cell "10:30" [ref=e267]:
+                    - generic [ref=e268]:
+                      - img [ref=e269]
+                      - text: 10:30
+                  - cell "Каримова Зухра" [ref=e272]
+                  - cell "Повторный прием" [ref=e273]
+                  - cell "В процессе" [ref=e274]:
+                    - generic [ref=e275]: В процессе
+                  - cell "Контроль сахара" [ref=e276]
+                  - cell [ref=e277]:
+                    - button [ref=e278]:
+                      - img [ref=e279]
+                    - button [ref=e282]:
+                      - img [ref=e283]
+                    - button [ref=e286]:
+                      - img [ref=e287]
+                - row "14:00 Тошматов Бахтиёр Экстренный Завершен Обострение астмы" [ref=e291] [cursor=pointer]:
+                  - cell "14:00" [ref=e292]:
+                    - generic [ref=e293]:
+                      - img [ref=e294]
+                      - text: 14:00
+                  - cell "Тошматов Бахтиёр" [ref=e297]
+                  - cell "Экстренный" [ref=e298]
+                  - cell "Завершен" [ref=e299]:
+                    - generic [ref=e300]: Завершен
+                  - cell "Обострение астмы" [ref=e301]
+                  - cell [ref=e302]:
+                    - button [ref=e303]:
+                      - img [ref=e304]
+                    - button [ref=e307]:
+                      - img [ref=e308]
+                    - button [ref=e311]:
+                      - img [ref=e312]
+        - button "💬 AI" [ref=e198] [cursor=pointer]:
+          - generic [ref=e199]: 💬
+          - generic [ref=e200]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e201]:
+    - generic [ref=e202]:
+      - img [ref=e203]
+      - generic [ref=e206]:
+        - strong [ref=e207]: Включить уведомления?
+        - generic [ref=e208]: Получайте уведомления о новых сообщениях
+    - generic [ref=e209]:
+      - button "Включить" [ref=e210] [cursor=pointer]
+      - button "Закрыть" [ref=e211] [cursor=pointer]:
+        - img [ref=e212]

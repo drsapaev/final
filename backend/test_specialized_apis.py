@@ -15,7 +15,7 @@ def test_specialized_apis():
     print("⏳ Ждем запуска сервера...")
     for i in range(30):
         try:
-            response = httpx.get("http://localhost:8000/_routes", timeout=1)
+            response = httpx.get("http://localhost:18000/_routes", timeout=1)
             if response.status_code == 200:
                 print("✅ Сервер запущен!")
                 break
@@ -35,7 +35,7 @@ def test_specialized_apis():
                 "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login", data=login_data
+                "http://localhost:18000/api/v1/auth/login", data=login_data
             )
 
             if login_response.status_code != 200:
@@ -66,7 +66,7 @@ def test_specialized_apis():
             for method, endpoint in endpoints:
                 try:
                     response = client.request(
-                        method, f"http://localhost:8000{endpoint}", headers=headers
+                        method, f"http://localhost:18000{endpoint}", headers=headers
                     )
                     print(
                         f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
@@ -85,7 +85,7 @@ def test_specialized_apis():
             for method, endpoint in endpoints:
                 try:
                     response = client.request(
-                        method, f"http://localhost:8000{endpoint}", headers=headers
+                        method, f"http://localhost:18000{endpoint}", headers=headers
                     )
                     print(
                         f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
@@ -105,7 +105,7 @@ def test_specialized_apis():
             for method, endpoint in endpoints:
                 try:
                     response = client.request(
-                        method, f"http://localhost:8000{endpoint}", headers=headers
+                        method, f"http://localhost:18000{endpoint}", headers=headers
                     )
                     print(
                         f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
@@ -126,7 +126,7 @@ def test_specialized_apis():
             for method, endpoint in endpoints:
                 try:
                     response = client.request(
-                        method, f"http://localhost:8000{endpoint}", headers=headers
+                        method, f"http://localhost:18000{endpoint}", headers=headers
                     )
                     print(
                         f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
@@ -139,7 +139,7 @@ def test_specialized_apis():
             try:
                 # Проверяем, что OPTIONS запросы работают
                 cors_response = client.options(
-                    "http://localhost:8000/api/v1/patients",
+                    "http://localhost:18000/api/v1/patients",
                     headers={
                         "Origin": "http://localhost:5173",
                         "Access-Control-Request-Method": "GET",

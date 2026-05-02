@@ -21,10 +21,11 @@ const Table = React.forwardRef(({
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
     fontSize: '14px',
     lineHeight: '1.4',
-    backgroundColor: 'var(--mac-bg-primary)',
+    backgroundColor: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-main-shell-bg, var(--mac-bg-secondary)) 20%)',
     borderRadius: '8px',
     overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    boxShadow: 'none',
     ...style
   };
 
@@ -50,7 +51,7 @@ const TableHead = React.forwardRef(({
   ...props
 }, ref) => {
   const headStyles = {
-    backgroundColor: 'var(--mac-bg-secondary)',
+    backgroundColor: 'var(--mac-table-header-bg)',
     borderBottom: '1px solid var(--mac-separator)',
     ...style
   };
@@ -111,7 +112,7 @@ const TableRow = React.forwardRef(({
 
   const handleMouseEnter = (e) => {
     if (hover && !selected) {
-      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+      e.target.style.backgroundColor = 'var(--mac-table-row-hover-bg)';
     }
   };
 
@@ -186,8 +187,8 @@ const TableHeaderCell = React.forwardRef(({
     textAlign: align,
     fontWeight: '600',
     fontSize: '13px',
-    color: 'var(--mac-text-primary)',
-    backgroundColor: 'var(--mac-bg-secondary)',
+    color: 'var(--mac-table-header-text)',
+    backgroundColor: 'var(--mac-table-header-bg)',
     borderBottom: '1px solid var(--mac-separator)',
     verticalAlign: 'middle',
     cursor: sortable ? 'pointer' : 'default',
@@ -212,7 +213,7 @@ const TableHeaderCell = React.forwardRef(({
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         {children}
         {sortable &&
-        <span style={{ fontSize: '12px', opacity: 0.6 }}>
+        <span style={{ fontSize: '12px', opacity: 0.72 }}>
             {sortDirection === 'asc' ? '↑' : sortDirection === 'desc' ? '↓' : '↕'}
           </span>
         }

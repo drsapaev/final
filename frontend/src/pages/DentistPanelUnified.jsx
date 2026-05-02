@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button, Badge, Card } from '../components/ui/macos';
 import auth from '../stores/auth.js';
+import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
 import ToothModal from '../components/dental/ToothModal';
@@ -41,8 +42,77 @@ import {
 'lucide-react';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import '../styles/animations.css';
+import { getApiBaseUrl } from '../api/runtime';
+import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
+import { printPanelTicket } from '../services/panelPrint';
+import notify from '../services/notify';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+import {
+  DENTIST_DOCUMENTS_STORAGE_KEY,
+  parseDentistDocuments,
+  upsertDentistVisitProtocol,
+} from '../utils/dentistryDocuments';
+import {
+  buildDentistVisitProtocolCard,
+  buildDentistVisitProtocolSaveRequest,
+  mapDentistVisitProtocolFromEmr,
+  mergeDentistVisitProtocolCards,
+} from '../utils/dentistVisitProtocolBridge';
+import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+
+const API_V1_BASE = getApiBaseUrl();
+
+let dentistAppointmentsCache = null;
+let dentistAppointmentsLoadPromise = null;
+let dentistServicesCache = null;
+let dentistServicesLoadPromise = null;
+const dentistVisitProtocolsCache = new Map();
+const dentistVisitProtocolsLoadPromises = new Map();
+const dentistFallbackLoggedKeys = new Set();
+
+function normalizeNumericId(value) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildPatientsFromAppointments(appointments) {
+  const patientsById = new Map();
+
+  appointments.forEach((appointment) => {
+    const patientId = appointment.patient_id || appointment.id;
+    if (!patientId || patientsById.has(patientId)) {
+      return;
+    }
+
+    const patientName =
+      appointment.patient_fio || appointment.patient_name || appointment.name || 'Пациент';
+
+    patientsById.set(patientId, {
+      id: patientId,
+      patient_id: patientId,
+      appointment_id: appointment.appointment_id || appointment.id || null,
+      visit_id: normalizeNumericId(appointment.visit_id),
+      name: patientName,
+      patient_name: patientName,
+      patient_fio: patientName,
+      phone: appointment.patient_phone || appointment.phone || '',
+      specialty: appointment.specialty || 'dentistry',
+      source: appointment.source || 'appointments',
+    });
+  });
+
+  return Array.from(patientsById.values());
+}
+
+function loadStoredDentistDocuments() {
+  if (typeof window === 'undefined') {
+    return parseDentistDocuments(null);
+  }
+
+  return parseDentistDocuments(window.localStorage.getItem(DENTIST_DOCUMENTS_STORAGE_KEY));
+}
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -68,17 +138,33 @@ const DentistPanelUnified = () => {
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
-    // Если есть patientId, переходим на вкладку пациента
-    if (params.get('patientId')) {
-      return 'examinations';
+    const explicitTab = params.get('tab');
+    if (explicitTab) {
+      return explicitTab;
     }
-    return params.get('tab') || 'appointments';
+
+    if (params.get('visitId') || params.get('visit_id')) {
+      return 'visits';
+    }
+
+    return 'appointments';
   }, [location.search]);
 
   // Получаем patientId из URL для автоматической загрузки пациента
   const getPatientIdFromUrl = useCallback(() => {
     const params = new URLSearchParams(location.search);
     return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
+  const getVisitIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    const visitIdParam = params.get('visitId') || params.get('visit_id');
+    if (!visitIdParam) {
+      return null;
+    }
+
+    const parsed = parseInt(visitIdParam, 10);
+    return Number.isFinite(parsed) ? parsed : null;
   }, [location.search]);
 
   // Состояние
@@ -95,7 +181,9 @@ const DentistPanelUnified = () => {
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    navigate(`/dentist?tab=${tabId}`, { replace: true });
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tabId);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
   };
 
   const handleCardKeyDown = useCallback((event, action) => {
@@ -109,13 +197,18 @@ const DentistPanelUnified = () => {
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [savedVisitProtocols, setSavedVisitProtocols] = useState(
+    () => loadStoredDentistDocuments().visitProtocols
+  );
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  useState(null);
+  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState(null);
 
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState({});
+  const appointmentsTableDataRef = useRef([]);
+  const appointmentsLoadPromiseRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showDentalChart, setShowDentalChart] = useState(false);
@@ -136,6 +229,139 @@ const DentistPanelUnified = () => {
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        DENTIST_DOCUMENTS_STORAGE_KEY,
+        JSON.stringify({ visitProtocols: savedVisitProtocols })
+      );
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
+    }
+  }, [savedVisitProtocols]);
+
+  useEffect(() => {
+    appointmentsTableDataRef.current = appointmentsTableData;
+  }, [appointmentsTableData]);
+
+  const loadDentistVisitProtocolsForPatient = useCallback(async (patient) => {
+    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
+    if (!patientId) {
+      return [];
+    }
+
+    const cacheKey = String(patientId);
+    const cachedProtocols = dentistVisitProtocolsCache.get(cacheKey);
+    if (cachedProtocols) {
+      return cachedProtocols;
+    }
+
+    const inFlightProtocols = dentistVisitProtocolsLoadPromises.get(cacheKey);
+    if (inFlightProtocols) {
+      return inFlightProtocols;
+    }
+
+    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
+      patientId,
+      patientName: patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент',
+    });
+
+    const loadPromise = (async () => {
+      try {
+        const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
+          params: { limit: 20 },
+          silent: true,
+        });
+
+        const summaries = Array.isArray(response.data) ? response.data : [];
+        const records = await Promise.all(
+          summaries.map(async (summary) => {
+            try {
+              const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
+                silent: true,
+                validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+              });
+
+              if (emrResponse.status === 404) {
+                return null;
+              }
+
+              const protocolRecord = mapDentistVisitProtocolFromEmr(
+                emrResponse.data,
+                patient,
+              );
+
+              if (!protocolRecord) {
+                return null;
+              }
+
+              return protocolRecord;
+            } catch (error) {
+              logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
+                patientId,
+                visitId: summary.visit_id,
+                error: error?.message || error,
+              });
+              return null;
+            }
+          })
+        );
+
+        const filteredRecords = records.filter(Boolean);
+        dentistVisitProtocolsCache.set(cacheKey, filteredRecords);
+        return filteredRecords;
+      } catch (error) {
+        dentistVisitProtocolsCache.delete(cacheKey);
+        throw error;
+      } finally {
+        dentistVisitProtocolsLoadPromises.delete(cacheKey);
+      }
+    })();
+
+    dentistVisitProtocolsLoadPromises.set(cacheKey, loadPromise);
+    return loadPromise;
+  }, []);
+
+  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId, patient = null) => {
+    if (!visitId) {
+      return null;
+    }
+
+    try {
+      const response = await apiClient.get(`/v2/emr/${visitId}`, {
+        silent: true,
+        validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+      });
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient);
+      if (!protocolRecord) {
+        return null;
+      }
+
+      logger.info('[Dentist] Протокол визита загружен из EMR v2', {
+        visitId,
+        emrId: response.data?.id,
+        status: response.data?.status,
+      });
+
+      return protocolRecord;
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
+        visitId,
+        error: error?.message || error,
+      });
+      return null;
+    }
+  }, []);
 
   // Формы данных
   const [examinationForm, setExaminationForm] = useState({
@@ -191,21 +417,46 @@ const DentistPanelUnified = () => {
   // Загрузка данных
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async () => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!token) return;
-      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const servicesData = data.services_by_group || {};
-        setServices(servicesData);
-        logger.info('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+    if (dentistServicesCache) {
+      setServices(dentistServicesCache);
+      return dentistServicesCache;
+    }
+
+    if (dentistServicesLoadPromise) {
+      return dentistServicesLoadPromise;
+    }
+
+    const loadPromise = (async () => {
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) return null;
+        const response = await fetch(`${API_V1_BASE}/registrar/services`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const servicesData = data.services_by_group || {};
+          dentistServicesCache = servicesData;
+          setServices(servicesData);
+          logger.info('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+          return servicesData;
+        }
+
+        return null;
+      } catch (error) {
+        logger.error('[Dentist] Ошибка загрузки услуг:', error);
+        return null;
       }
-    } catch (error) {
-      logger.error('[Dentist] Ошибка загрузки услуг:', error);
+    })();
+
+    dentistServicesLoadPromise = loadPromise;
+
+    try {
+      return await loadPromise;
+    } finally {
+      if (dentistServicesLoadPromise === loadPromise) {
+        dentistServicesLoadPromise = null;
+      }
     }
   }, []);
 
@@ -232,129 +483,195 @@ const DentistPanelUnified = () => {
   }, []);
 
   // Загрузка записей стоматолога
-  const loadDentistryAppointments = useCallback(async () => {
-    setAppointmentsLoading(true);
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        logger.info('Нет токена аутентификации');
-        setAppointmentsLoading(false);
-        return;
-      }
-
-      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+  const loadDentistryAppointments = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh && dentistAppointmentsCache) {
+      appointmentsTableDataRef.current = dentistAppointmentsCache;
+      setAppointmentsTableData(dentistAppointmentsCache);
+      setPatients((prev) => {
+        const derivedPatients = buildPatientsFromAppointments(dentistAppointmentsCache);
+        return derivedPatients.length > 0 ? derivedPatients : prev;
       });
+      return dentistAppointmentsCache;
+    }
 
-      if (response.ok) {
-        const data = await response.json();
+    if (appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise) {
+      return appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise;
+    }
 
-        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        let allAppointments = [];
-        if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach((queue) => {
-            if (queue.entries) {
-              queue.entries.forEach((entry) => {
-                allAppointments.push({
-                  id: entry.id,
-                  visit_id: entry.id, // Добавляем visit_id для сопоставления с БД
-                  patient_id: entry.patient_id,
-                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-                  patient_phone: entry.phone || '',
-                  patient_birth_year: entry.patient_birth_year || '',
-                  address: entry.address || '',
-                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
-                  discount_mode: entry.discount_mode || 'none',
-                  services: entry.services || [],
-                  service_codes: entry.service_codes || [],
-                  payment_type: entry.payment_status || 'Не оплачено',
-                  payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'), // ✅ ИСПРАВЛЕНО: берем из entry
-                  doctor: entry.doctor_name || 'Врач',
-                  specialty: queue.specialty,
-                  created_at: entry.created_at,
-                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-                  appointment_time: entry.visit_time || '09:00',
-                  status: entry.status || 'waiting',
-                  cost: entry.cost || 0
-                });
-              });
-            }
-          });
+    const loadPromise = (async () => {
+      setAppointmentsLoading(true);
+      try {
+        const token = tokenManager.getAccessToken();
+        if (!token) {
+          logger.info('Нет токена аутентификации');
+          return [];
         }
 
-        // Фильтруем только стоматологические записи для отображения
-        const appointmentsData = allAppointments.filter((apt) =>
-        apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
-        );
-
-        // 2. Получаем актуальный payment_status из БД через all-appointments
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-        const today = new Date().toISOString().split('T')[0];
-        try {
-          const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (appointmentsResponse.ok) {
-            const appointmentsDBResponse = await appointmentsResponse.json();
-            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
-            logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
-
-            // Создаем карту id -> payment_status
-            const paymentStatusMap = new Map();
-            appointmentsDBData.forEach((apt) => {
-              if (apt.id) {
-                paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
-              }
-              if (apt.patient_id && apt.appointment_date) {
-                const key = `${apt.patient_id}_${apt.appointment_date}`;
-                paymentStatusMap.set(key, apt.payment_status || 'pending');
-              }
-            });
-
-            // Обновляем payment_status в наших записях
-            allAppointments = allAppointments.map((apt) => {
-              let paymentStatus = paymentStatusMap.get(apt.id);
-              if (!paymentStatus && apt.patient_id && apt.appointment_date) {
-                const key = `${apt.patient_id}_${apt.appointment_date}`;
-                paymentStatus = paymentStatusMap.get(key);
-              }
-              return {
-                ...apt,
-                payment_status: paymentStatus || apt.payment_status || 'pending',
-                payment_type: paymentStatus || apt.payment_type
-              };
-            });
-
-            logger.info('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
+        // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
+        const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
-        } catch (err) {
-          logger.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
-        }
-
-        // Добавляем информацию о всех услугах пациента в каждую запись
-        const enrichedAppointmentsData = appointmentsData.map((apt) => {
-          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
-          return {
-            ...apt,
-            all_patient_services: allPatientServices.services,
-            all_patient_service_codes: allPatientServices.service_codes
-          };
         });
 
+        if (response.ok) {
+          const data = await response.json();
+
+          // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
+          let allAppointments = [];
+          if (data && data.queues && Array.isArray(data.queues)) {
+            data.queues.forEach((queue) => {
+              if (queue.entries) {
+                queue.entries.forEach((entry) => {
+                  allAppointments.push({
+                    id: entry.id,
+                    appointment_id: entry.appointment_id || null,
+                    visit_id: entry.visit_id || null,
+                    patient_id: entry.patient_id,
+                    patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                    patient_phone: entry.phone || '',
+                    patient_birth_year: entry.patient_birth_year || '',
+                    address: entry.address || '',
+                    visit_type:
+                      entry.discount_mode === 'repeat' ? 'Повторный' :
+                      entry.discount_mode === 'benefit' ? 'Льготный' :
+                      entry.discount_mode === 'all_free' ? 'All Free' :
+                      'Платный',
+                    discount_mode: entry.discount_mode || 'none',
+                    services: entry.services || [],
+                    service_codes: entry.service_codes || [],
+                    payment_type: entry.payment_type || null,
+                    payment_status: entry.payment_status || 'pending',
+                    doctor: entry.doctor_name || 'Врач',
+                    specialty: queue.specialty,
+                    created_at: entry.created_at,
+                    appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                    appointment_time: entry.visit_time || '09:00',
+                    status: entry.status || 'waiting',
+                    cost: entry.cost || 0
+                  });
+                });
+              }
+            });
+          }
+
+          // Фильтруем только стоматологические записи для отображения
+          let appointmentsData = allAppointments.filter((apt) =>
+            isDentistrySpecialty(apt.specialty)
+          );
+
+          // 2. Получаем актуальный payment_status из БД через all-appointments
+          const today = new Date().toISOString().split('T')[0];
+          try {
+            const appointmentsResponse = await fetch(`${API_V1_BASE}/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (appointmentsResponse.ok) {
+              const appointmentsDBResponse = await appointmentsResponse.json();
+              const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+              logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
+
+              // Создаем карту id -> payment_status
+              const appointmentMetaMap = new Map();
+              appointmentsDBData.forEach((apt) => {
+                const appointmentMeta = {
+                  payment_status: apt.payment_status || 'pending',
+                  payment_type: apt.payment_type || null,
+                  visit_id: apt.visit_id || null,
+                  appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
+                };
+                if (apt.id) {
+                  appointmentMetaMap.set(apt.id, appointmentMeta);
+                }
+                if (apt.patient_id && apt.appointment_date) {
+                  const key = `${apt.patient_id}_${apt.appointment_date}`;
+                  appointmentMetaMap.set(key, appointmentMeta);
+                }
+              });
+
+              // Обновляем payment_status в наших записях
+              allAppointments = allAppointments.map((apt) => {
+                let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+                if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
+                  const key = `${apt.patient_id}_${apt.appointment_date}`;
+                  appointmentMeta = appointmentMetaMap.get(key);
+                }
+                return {
+                  ...apt,
+                  appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+                  visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+                  payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+                  payment_type: appointmentMeta?.payment_type || apt.payment_type || null
+                };
+              });
+              appointmentsData = appointmentsData.map((apt) => {
+                let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
+                if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
+                  const key = `${apt.patient_id}_${apt.appointment_date}`;
+                  appointmentMeta = appointmentMetaMap.get(key);
+                }
+                return {
+                  ...apt,
+                  appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
+                  visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
+                  payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
+                  payment_type: appointmentMeta?.payment_type || apt.payment_type || null
+                };
+              });
+
+              logger.info('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
+            }
+          } catch (err) {
+            logger.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
+          }
+
+          // Добавляем информацию о всех услугах пациента в каждую запись
+          const enrichedAppointmentsData = appointmentsData.map((apt) => {
+            const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+            return {
+              ...apt,
+              all_patient_services: allPatientServices.services,
+              all_patient_service_codes: allPatientServices.service_codes
+            };
+          });
+
+        dentistAppointmentsCache = enrichedAppointmentsData;
+        appointmentsTableDataRef.current = enrichedAppointmentsData;
         setAppointmentsTableData(enrichedAppointmentsData);
+        setPatients((prev) => {
+          const derivedPatients = buildPatientsFromAppointments(enrichedAppointmentsData);
+            return derivedPatients.length > 0 ? derivedPatients : prev;
+          });
+          return enrichedAppointmentsData;
+        }
+
+        logger.error('Ошибка загрузки очередей:', response.status);
+        return [];
+      } catch (error) {
+        logger.error('Ошибка загрузки записей стоматолога:', error);
+        return [];
+      } finally {
+        setAppointmentsLoading(false);
       }
-    } catch (error) {
-      logger.error('Ошибка загрузки записей стоматолога:', error);
+    })();
+
+    appointmentsLoadPromiseRef.current = loadPromise;
+    dentistAppointmentsLoadPromise = loadPromise;
+
+    try {
+      return await loadPromise;
     } finally {
-      setAppointmentsLoading(false);
+      if (appointmentsLoadPromiseRef.current === loadPromise) {
+        appointmentsLoadPromiseRef.current = null;
+      }
+      if (dentistAppointmentsLoadPromise === loadPromise) {
+        dentistAppointmentsLoadPromise = null;
+      }
     }
   }, [getAllPatientServices]);
 
@@ -368,7 +685,7 @@ const DentistPanelUnified = () => {
     const handleQueueUpdate = (event) => {
       logger.info('[Dentist] Получено событие обновления очереди:', event.detail);
       if (activeTab === 'appointments') {
-        loadDentistryAppointments();
+        loadDentistryAppointments(true);
       }
     };
     window.addEventListener('queueUpdated', handleQueueUpdate);
@@ -378,14 +695,43 @@ const DentistPanelUnified = () => {
     };
   }, [activeTab, loadDentistryAppointments]);
 
+  const ensureCanonicalVisitId = useCallback(async (row) => {
+    const appointmentId = row?.appointment_id || row?.id;
+    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+
+    if (visitId) {
+      setAppointmentsTableData((prev) => prev.map((appointment) =>
+        appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
+      ));
+    }
+
+    return visitId;
+  }, []);
+
+  const resolvePatientId = useCallback((patient) => (
+    patient?.patient?.id || patient?.patient_id || patient?.id || null
+  ), []);
+
+  const resolvePatientName = useCallback((patient) => (
+    patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент'
+  ), []);
+
   // Обработчики для таблицы записей
-  const handleAppointmentRowClick = (row) => {
+  const handleAppointmentRowClick = async (row) => {
     logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
+      const visitId = await ensureCanonicalVisitId(row);
+      if (!visitId) {
+        logger.error('[Dentist] Не удалось определить канонический visit_id', row);
+        return;
+      }
+
       // Создаем объект пациента для переключения на прием
       const patientData = {
         id: row.id,
+        appointment_id: row.appointment_id || row.id,
+        visit_id: visitId,
         patient_name: row.patient_fio,
         phone: row.patient_phone,
         number: row.id,
@@ -402,14 +748,13 @@ const DentistPanelUnified = () => {
 
     switch (action) {
       case 'view':
-        handleAppointmentRowClick(row);
+        await handleAppointmentRowClick(row);
         break;
       case 'call':
         // Вызвать пациента
         try {
-          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
           const token = tokenManager.getAccessToken();
-          const response = await fetch(apiUrl, {
+          const response = await fetch(`${API_V1_BASE}/registrar/queue/${row.id}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -419,7 +764,7 @@ const DentistPanelUnified = () => {
 
           if (response.ok) {
             logger.info('[Dentist] Пациент вызван:', row.patient_fio);
-            await loadDentistryAppointments();
+            await loadDentistryAppointments(true);
           }
         } catch (error) {
           logger.error('[Dentist] Ошибка вызова пациента:', error);
@@ -427,17 +772,33 @@ const DentistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
-        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
-        window.print();
+        try {
+          const printResult = await printPanelTicket(row, {
+            specialtyName: 'Стоматология'
+          });
+          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+        } catch (error) {
+          logger.error('[Dentist] Ошибка печати талона:', error);
+          notify.error(error.message || 'Не удалось отправить талон на печать');
+        }
         break;
       case 'complete':
         // Завершить приём
         try {
+          const visitId = await ensureCanonicalVisitId(row);
+          if (!visitId) {
+            logger.error('[Dentist] Нельзя открыть протокол без канонического visit_id', row);
+            break;
+          }
+
           const patient = {
             id: row.id,
+            appointment_id: row.appointment_id || row.id,
+            visit_id: visitId,
             patient_name: row.patient_fio,
             phone: row.patient_phone,
             number: row.id,
@@ -471,20 +832,35 @@ const DentistPanelUnified = () => {
 
   const loadPatients = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/patients?department=Dental&limit=100', { headers: authHeader() });
-      if (response.ok) {
-        const data = await response.json();
-        setPatients(Array.isArray(data) ? data : []);
+      const derivedPatients = buildPatientsFromAppointments(appointmentsTableDataRef.current);
+      if (derivedPatients.length > 0) {
+        logger.info('[Dentist] Загружаю пациентов из уже загруженных записей', {
+          count: derivedPatients.length,
+        });
+        setPatients(derivedPatients);
+        return;
+      }
+
+      logger.info('[Dentist] Пациенты будут загружены из очереди и записей стоматолога');
+      const refreshedAppointments = await loadDentistryAppointments();
+      const refreshedPatients = buildPatientsFromAppointments(
+        Array.isArray(refreshedAppointments) && refreshedAppointments.length > 0
+          ? refreshedAppointments
+          : appointmentsTableDataRef.current,
+      );
+
+      if (refreshedPatients.length > 0) {
+        setPatients(refreshedPatients);
       }
     } catch (e) {
       logger.error('Ошибка загрузки пациентов:', e);
     }
-  }, [authHeader]);
+  }, [loadDentistryAppointments]);
 
   const loadTreatmentPlans = useCallback(async () => {
     try {
       // TODO: Implement treatment plans endpoint
-      // const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
+      // const res = await fetch(`${API_V1_BASE}/dental/treatments?limit=100`, { headers: authHeader() });
       // if (res.ok) setTreatmentPlans(await res.json());
       setTreatmentPlans([]);
       logger.info('Treatment plans endpoint not implemented yet');
@@ -496,7 +872,7 @@ const DentistPanelUnified = () => {
     }}, []);const loadProsthetics = useCallback(async () => {
     try {
       // TODO: Implement prosthetics endpoint
-      // const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
+      // const res = await fetch(`${API_V1_BASE}/dental/prosthetics?limit=100`, { headers: authHeader() });
       // if (res.ok) setProsthetics(await res.json());
       setProsthetics([]);
       logger.info('Prosthetics endpoint not implemented yet');
@@ -525,43 +901,133 @@ const DentistPanelUnified = () => {
     loadServices();
   }, [loadData, loadServices]);
 
+  useEffect(() => {
+    const selectedPatientIdForProtocols =
+      selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
+
+    if (!selectedPatientIdForProtocols) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const hydrateDentistVisitProtocols = async () => {
+      try {
+        const backendProtocols = await loadDentistVisitProtocolsForPatient(selectedPatient);
+        if (cancelled || backendProtocols.length === 0) {
+          return;
+        }
+
+        setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
+      } catch (error) {
+        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
+          patientId: selectedPatientIdForProtocols,
+          error: error?.message || error,
+        });
+      }
+    };
+
+    hydrateDentistVisitProtocols();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadDentistVisitProtocolsForPatient, selectedPatient]);
+
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
       const patientIdFromUrl = getPatientIdFromUrl();
-      if (!patientIdFromUrl) return;
+      const visitIdFromUrl = getVisitIdFromUrl();
+      if (!patientIdFromUrl && !visitIdFromUrl) return;
 
-      // Если пациент уже загружен с этим ID, пропускаем
-      if (selectedPatient?.patient_id === patientIdFromUrl) return;
+      // Если пациент уже загружен с этим ID/визитом, пропускаем
+      const currentPatientId = selectedPatient?.patient_id || null;
+      const currentVisitId = normalizeNumericId(selectedPatient?.visit_id);
+      if (
+        patientIdFromUrl &&
+        currentPatientId === patientIdFromUrl &&
+        (!visitIdFromUrl || currentVisitId === visitIdFromUrl)
+      ) {
+        return;
+      }
+      if (
+        visitIdFromUrl &&
+        currentVisitId === visitIdFromUrl &&
+        (!patientIdFromUrl || currentPatientId === patientIdFromUrl)
+      ) {
+        return;
+      }
 
       try {
-        const token = tokenManager.getAccessToken();
-        if (!token) return;
+        const findMatchingAppointment = (appointments) => {
+          if (!Array.isArray(appointments)) {
+            return null;
+          }
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+          return appointments.find((appointment) => {
+            if (visitIdFromUrl && normalizeNumericId(appointment.visit_id) === visitIdFromUrl) {
+              return true;
+            }
+            return patientIdFromUrl && appointment.patient_id === patientIdFromUrl;
+          }) || null;
+        };
 
-        // Загружаем данные пациента
-        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        let matchingAppointment = findMatchingAppointment(appointmentsTableData);
+        if (!matchingAppointment) {
+          const refreshedAppointments = await loadDentistryAppointments();
+          matchingAppointment = findMatchingAppointment(refreshedAppointments || []);
+        }
 
-        if (patientResponse.ok) {
-          const patientData = await patientResponse.json();
+        if (matchingAppointment) {
+          const patientName =
+            matchingAppointment.patient_fio ||
+            matchingAppointment.patient_name ||
+            matchingAppointment.name ||
+            'Пациент';
 
-          // Создаем объект пациента для отображения
           const patientObj = {
-            id: patientData.id,
-            patient_id: patientData.id,
-            patient_name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
-            patient_fio: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
-            phone: patientData.phone || '',
-            source: 'search',
+            id: matchingAppointment.appointment_id || matchingAppointment.id || patientIdFromUrl || visitIdFromUrl,
+            patient_id: matchingAppointment.patient_id || patientIdFromUrl || matchingAppointment.id,
+            appointment_id: matchingAppointment.appointment_id || matchingAppointment.id || null,
+            visit_id: visitIdFromUrl || normalizeNumericId(matchingAppointment.visit_id) || null,
+            patient_name: patientName,
+            patient_fio: patientName,
+            phone: matchingAppointment.patient_phone || matchingAppointment.phone || '',
+            source: matchingAppointment.source || 'appointments',
+            specialty: matchingAppointment.specialty || 'dental'
+          };
+
+          setSelectedPatient(patientObj);
+          handleTabChange(patientObj.visit_id ? 'visits' : 'appointments');
+          logger.info('[Dentist] Загружен пациент из URL:', patientObj.patient_name);
+          return;
+        }
+
+        if (visitIdFromUrl || patientIdFromUrl) {
+          const fallbackLabel = patientIdFromUrl
+            ? `Пациент #${patientIdFromUrl}`
+            : `Визит #${visitIdFromUrl}`;
+
+          const patientObj = {
+            id: patientIdFromUrl || visitIdFromUrl,
+            patient_id: patientIdFromUrl || visitIdFromUrl,
+            appointment_id: null,
+            visit_id: visitIdFromUrl || null,
+            patient_name: fallbackLabel,
+            patient_fio: fallbackLabel,
+            phone: '',
+            source: 'url',
             specialty: 'dental'
           };
 
           setSelectedPatient(patientObj);
-          setActiveTab('examinations');
-          logger.info('[Dentist] Загружен пациент из URL:', patientObj.patient_name);
+          handleTabChange(visitIdFromUrl ? 'visits' : 'appointments');
+          const fallbackLogKey = `${patientIdFromUrl || ''}:${visitIdFromUrl || ''}`;
+          if (!dentistFallbackLoggedKeys.has(fallbackLogKey)) {
+            dentistFallbackLoggedKeys.add(fallbackLogKey);
+            logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback:', patientObj.patient_name);
+          }
         }
       } catch (error) {
         logger.error('[Dentist] Не удалось загрузить пациента из URL:', error);
@@ -569,13 +1035,25 @@ const DentistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.search, getPatientIdFromUrl, getVisitIdFromUrl, appointmentsTableData, loadDentistryAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Обработчики
   const handlePatientSelect = (patient) => {
-    setSelectedPatient(patient);
-    // Переключаемся на вкладку визита для работы с EMR
-    handleTabChange('visits');
+    const normalizedPatient = {
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    };
+    setSelectedPatient(normalizedPatient);
+
+    if (normalizedPatient.visit_id) {
+      handleTabChange('visits');
+      return;
+    }
+
+    notify.info('Выберите визит с каноническим visit_id во вкладке "Записи".');
+    handleTabChange('appointments');
   };
 
   // Сохранение EMR
@@ -645,35 +1123,78 @@ const DentistPanelUnified = () => {
 
 
   const handleExamination = (patient) => {
-    setSelectedPatient(patient);
-    setExaminationForm({ ...examinationForm, patient_id: patient.id });
+    const patientId = resolvePatientId(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: patientId,
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
+    setExaminationForm({ ...examinationForm, patient_id: patientId });
     setShowExaminationForm(true);
   };
 
   const handleTreatment = (patient) => {
-    setSelectedPatient(patient);
-    setTreatmentForm({ ...treatmentForm, patient_id: patient.id });
+    const patientId = resolvePatientId(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: patientId,
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
+    setTreatmentForm({ ...treatmentForm, patient_id: patientId });
     setShowTreatmentForm(true);
   };
 
   const handleProsthetic = (patient) => {
-    setSelectedPatient(patient);
-    setProstheticForm({ ...prostheticForm, patient_id: patient.id });
+    const patientId = resolvePatientId(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: patientId,
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
+    setProstheticForm({ ...prostheticForm, patient_id: patientId });
     setShowProstheticForm(true);
   };
 
   const handleDiagnosis = (patient) => {
-    setSelectedPatient(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
     setShowDiagnosisForm(true);
   };
 
-  const handleVisitProtocol = (patient) => {
-    setSelectedPatient(patient);
+  const handleVisitProtocol = async (patient) => {
+    const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
+    if (!visitId) {
+      notify.error('Для протокола визита нужен канонический visit_id. Откройте пациента из вкладки "Записи".');
+      return;
+    }
+
+    const backendProtocol = await loadDentistVisitProtocolByVisitId(visitId, patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient),
+      visit_id: visitId,
+      visitData: backendProtocol?.visitData || patient?.visitData || null,
+      source: backendProtocol?.source || patient?.source || 'appointments',
+    });
     setShowVisitProtocol(true);
   };
 
   const handlePhotoArchive = (patient) => {
-    setSelectedPatient(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
     setShowPhotoArchive(true);
   };
 
@@ -681,18 +1202,180 @@ const DentistPanelUnified = () => {
     setShowProtocolTemplates(true);
   };
 
+  const buildVisitProtocolDraftFromTemplate = useCallback((template) => {
+    if (!template) {
+      return null;
+    }
+
+    const mapPhotoList = (type) => (
+      Array.isArray(template.photos)
+        ? template.photos.filter((photo) => photo?.type === type).map((photo, index) => ({
+          id: `${type}-${index}-${Date.now()}`,
+          url: '',
+          filename: photo.description || `${type} photo ${index + 1}`,
+          size: 0,
+          type,
+          uploadedAt: new Date().toISOString(),
+          description: photo.description || '',
+        }))
+        : []
+    );
+
+    return {
+      chiefComplaint: template.description || template.name || '',
+      historyOfPresentIllness: template.description || '',
+      procedures: Array.isArray(template.steps)
+        ? template.steps.map((step, index) => ({
+          name: typeof step === 'string' ? step : step?.name || `Шаг ${index + 1}`,
+          teeth: '',
+          notes: '',
+          duration: typeof step === 'object' && step !== null ? step.duration || 0 : 0,
+        }))
+        : [],
+      materials: Array.isArray(template.materials)
+        ? template.materials.map((material) => ({
+          name: material?.name || '',
+          quantity: material?.quantity || '',
+          notes: material?.required ? 'Обязательный материал' : '',
+        }))
+        : [],
+      anesthesia: Array.isArray(template.anesthesia)
+        ? template.anesthesia.map((anesthesia) => ({
+          drug: anesthesia?.drug || '',
+          dose: anesthesia?.dose || '',
+          method: anesthesia?.method || '',
+          required: Boolean(anesthesia?.required),
+        }))
+        : [],
+      photos: {
+        before: mapPhotoList('before'),
+        during: mapPhotoList('during'),
+        after: mapPhotoList('after'),
+      },
+      radiographs: [],
+      prescriptions: Array.isArray(template.prescriptions)
+        ? template.prescriptions.map((prescription) => ({
+          medication: prescription?.medication || '',
+          dosage: prescription?.dosage || '',
+          instructions: prescription?.instructions || '',
+          required: Boolean(prescription?.required),
+        }))
+        : [],
+      recommendations: template.aftercare || '',
+      nextVisit: { date: '', time: '', purpose: '' },
+    };
+  }, []);
+
+  const handleProtocolTemplateSelect = useCallback((template) => {
+    const templateName = template?.name || 'Шаблон протокола';
+    const currentPatientName = resolvePatientName(selectedPatient);
+    const draft = {
+      patient_id: selectedPatient?.patient_id || selectedPatient?.id || null,
+      patient_name: currentPatientName || `Шаблон: ${templateName}`,
+      patient_fio: currentPatientName || `Шаблон: ${templateName}`,
+      visit_id: selectedPatient?.visit_id || null,
+      source: 'protocol-template',
+      visitData: buildVisitProtocolDraftFromTemplate(template),
+    };
+
+    logger.info('[Dentist] Использую шаблон протокола', {
+      template: templateName,
+      patient: draft.patient_name,
+    });
+
+    setProtocolTemplateDraft(draft);
+    setShowProtocolTemplates(false);
+    setShowVisitProtocol(true);
+  }, [buildVisitProtocolDraftFromTemplate, resolvePatientName, selectedPatient]);
+
   const handleReports = () => {
     setShowReports(true);
   };
 
+  const persistVisitProtocol = useCallback(async (patient, visitData) => {
+    if (!patient?.visit_id) {
+      return;
+    }
+
+    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
+    const patientName = patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент';
+    const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
+      source: 'local_cache',
+    });
+
+    try {
+      const payload = buildDentistVisitProtocolSaveRequest(patient, visitData, {
+        isDraft: true,
+        rowVersion: 0,
+      });
+      logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
+        visitId: patient.visit_id,
+        patientId,
+      });
+
+      const response = await apiClient.post(`/v2/emr/${patient.visit_id}`, payload);
+      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient) || localRecord;
+
+      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
+      return backendRecord;
+    } catch (error) {
+      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
+        visitId: patient.visit_id,
+        patientName,
+        error: error?.message || error,
+      });
+
+      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
+      return localRecord;
+    }
+  }, []);
+
+  const reopenVisitProtocol = useCallback(async (protocolRecord) => {
+    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id, protocolRecord);
+
+    if (!backendProtocol && !protocolRecord?.visitData) {
+      notify.error('Не удалось открыть протокол визита: данные не найдены.');
+      return;
+    }
+
+    const selectedProtocol = backendProtocol || protocolRecord;
+    setSelectedPatient({
+      id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
+      patient_id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
+      patient_name: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
+      patient_fio: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
+      visit_id: selectedProtocol.visit_id || protocolRecord?.visit_id || null,
+      visitData: selectedProtocol.visitData || protocolRecord?.visitData || null,
+      source: selectedProtocol.source || protocolRecord?.source || 'reports',
+    });
+    setShowVisitProtocol(true);
+  }, [loadDentistVisitProtocolByVisitId]);
+
   const handleDentalChart = (patient) => {
-    setSelectedPatient(patient);
+    setSelectedPatient({
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient)
+    });
     setDentalChartData(patient.dentalChart || null);
     setShowDentalChart(true);
   };
 
-  const handleTreatmentPlanner = (patient) => {
-    setSelectedPatient(patient);
+  const handleTreatmentPlanner = async (patient) => {
+    const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
+    if (!visitId) {
+      notify.error('План лечения требует канонический visit_id. Откройте пациента из вкладки "Записи".');
+      return;
+    }
+
+    setSelectedPatient({
+      ...patient,
+      patient_id: resolvePatientId(patient),
+      patient_name: resolvePatientName(patient),
+      patient_fio: resolvePatientName(patient),
+      visit_id: visitId
+    });
     setShowTreatmentPlanner(true);
   };
 
@@ -700,7 +1383,7 @@ const DentistPanelUnified = () => {
   const handleExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/dental/examinations', {
+      const res = await fetch(`${API_V1_BASE}/dental/examinations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(examinationForm)
@@ -712,7 +1395,7 @@ const DentistPanelUnified = () => {
           periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '',
           gingival_bleeding: '', diagnosis: '', recommendations: ''
         });
-        loadDentistryAppointments();
+        loadDentistryAppointments(true);
       }
     } catch (e) {
       logger.error('Ошибка сохранения осмотра:', e);
@@ -722,7 +1405,7 @@ const DentistPanelUnified = () => {
   const handleTreatmentSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/dental/treatments', {
+      const res = await fetch(`${API_V1_BASE}/dental/treatments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(treatmentForm)
@@ -744,7 +1427,7 @@ const DentistPanelUnified = () => {
   const handleProstheticSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/dental/prosthetics', {
+      const res = await fetch(`${API_V1_BASE}/dental/prosthetics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify(prostheticForm)
@@ -1006,18 +1689,6 @@ const DentistPanelUnified = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)'
         }}>Быстрые действия</h3>
-          <Button
-          variant="text"
-          size="sm"
-          onClick={() => {}}
-          style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-accent-blue)'
-          }}>
-
-            Показать все
-          </Button>
         </div>
         <div style={{
         display: 'grid',
@@ -1125,18 +1796,6 @@ const DentistPanelUnified = () => {
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)'
         }}>Последние записи</h3>
-          <Button
-          variant="text"
-          size="sm"
-          onClick={() => {}}
-          style={{
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-accent-blue)'
-          }}>
-
-            Показать все
-          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {appointmentsTableData.slice(0, 5).map((appointment) =>
@@ -1494,7 +2153,6 @@ const DentistPanelUnified = () => {
         outerBorder={false}
         services={services}
         showCheckboxes={false}
-        onRowSelect={() => {}}
         onRowClick={handleAppointmentRowClick}
         onActionClick={handleAppointmentActionClick} />
 
@@ -1696,7 +2354,7 @@ const DentistPanelUnified = () => {
 
             {/* EMR System */}
             <EMRContainerV2
-              visitId={selectedPatient.id}
+              visitId={selectedPatient.visit_id}
               patientId={selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id}
               specialty="dentistry" />
 
@@ -1956,7 +2614,7 @@ const DentistPanelUnified = () => {
               Стандартный протокол лечения кариеса с анестезией и пломбированием
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -2011,7 +2669,7 @@ const DentistPanelUnified = () => {
               Протокол лечения корневых каналов с инструментальной обработкой
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -2066,7 +2724,7 @@ const DentistPanelUnified = () => {
               Протокол профессиональной гигиены полости рта
             </p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="sm" style={{ flex: 1 }}>
+              <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
@@ -2082,6 +2740,79 @@ const DentistPanelUnified = () => {
   // Рендер отчетов
   const renderReports = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {savedVisitProtocols.length > 0 &&
+      <Card padding="lg">
+          <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
+            <div>
+              <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>Сохранённые протоколы визитов</h3>
+              <p style={{
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
+                Последние протоколы доступны для повторного открытия без ручной пересборки
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '16px'
+        }}>
+            {savedVisitProtocols.map((protocol) =>
+          <div
+            key={protocol.visit_id}
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+                <div>
+                  <div style={{
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '4px'
+              }}>{protocol.patient_name}</div>
+                  <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                    Визит #{protocol.visit_id} • {new Date(protocol.saved_at).toLocaleString('ru-RU')}
+                  </div>
+                </div>
+                <div style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)',
+              minHeight: '36px'
+            }}>
+                  {protocol.visitData?.chiefComplaint || 'Жалоба не указана'}
+                </div>
+                <Button
+                onClick={() => reopenVisitProtocol(protocol)}
+                style={{
+                  alignSelf: 'flex-start'
+                }}>
+                  Открыть протокол
+                </Button>
+              </div>
+          )}
+          </div>
+        </Card>
+      }
+
       <Card padding="lg">
         <div style={{
         display: 'flex',
@@ -2597,7 +3328,7 @@ const DentistPanelUnified = () => {
       case 'queue':
         return (
           <QueueIntegration
-            specialist="Стоматолог"
+            specialistId={user?.doctor_id || user?.specialist_id || ''}
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment) => {
               setSelectedPatient(appointment);
@@ -2669,6 +3400,10 @@ const DentistPanelUnified = () => {
 
   }
 
+  const selectedPatientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
+  const selectedPatientDisplayName =
+    selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || 'Пациент';
+
   return (
     <div className="dentist-panel" style={{
       padding: '0px', // Убираем padding, так как он уже есть в main контейнере
@@ -2701,7 +3436,7 @@ const DentistPanelUnified = () => {
 
       {showExaminationForm && selectedPatient &&
       <ExaminationForm
-        patientId={selectedPatient.id}
+        patientId={selectedPatientId}
         initialData={selectedPatient.examinationData}
         onSave={(examinationData) => {
           logger.info('Сохранение осмотра:', examinationData);
@@ -2713,8 +3448,8 @@ const DentistPanelUnified = () => {
 
       {showDiagnosisForm && selectedPatient &&
       <DiagnosisForm
-        patientId={selectedPatient.id}
-        patientName={selectedPatient.name}
+        patientId={selectedPatientId}
+        patientName={selectedPatientDisplayName}
         initialData={selectedPatient.diagnosisData}
         onSave={(diagnosisData) => {
           logger.info('Сохранение диагнозов:', diagnosisData);
@@ -2724,24 +3459,29 @@ const DentistPanelUnified = () => {
 
       }
 
-      {showVisitProtocol && selectedPatient &&
+      {showVisitProtocol && (selectedPatient || protocolTemplateDraft) &&
       <VisitProtocol
-        patientId={selectedPatient.id}
-        patientName={selectedPatient.name}
-        visitId={Date.now()}
-        initialData={selectedPatient.visitData}
-        onSave={(visitData) => {
+        patientId={(selectedPatient || protocolTemplateDraft)?.patient_id || selectedPatientId}
+        patientName={(selectedPatient || protocolTemplateDraft)?.patient_name || selectedPatientDisplayName}
+        visitId={(selectedPatient || protocolTemplateDraft)?.visit_id || selectedPatient?.visit_id}
+        initialData={(selectedPatient || protocolTemplateDraft)?.visitData || selectedPatient?.visitData}
+        onSave={async (visitData) => {
           logger.info('Сохранение протокола визита:', visitData);
+          await persistVisitProtocol(selectedPatient || protocolTemplateDraft, visitData);
           setShowVisitProtocol(false);
+          setProtocolTemplateDraft(null);
         }}
-        onClose={() => setShowVisitProtocol(false)} />
+        onClose={() => {
+          setShowVisitProtocol(false);
+          setProtocolTemplateDraft(null);
+        }} />
 
       }
 
       {showPhotoArchive && selectedPatient &&
       <PhotoArchive
-        patientId={selectedPatient.id}
-        patientName={selectedPatient.name}
+        patientId={selectedPatientId}
+        patientName={selectedPatientDisplayName}
         initialData={selectedPatient.photoArchive}
         onSave={(archiveData) => {
           logger.info('Сохранение фото архива:', archiveData);
@@ -2753,10 +3493,7 @@ const DentistPanelUnified = () => {
 
       {showProtocolTemplates &&
       <ProtocolTemplates
-        onSelectTemplate={(template) => {
-          logger.info('Выбран шаблон:', template);
-          // Здесь можно открыть протокол визита с выбранным шаблоном
-        }}
+        onSelectTemplate={handleProtocolTemplateSelect}
         onClose={() => setShowProtocolTemplates(false)} />
 
       }
@@ -2809,7 +3546,7 @@ const DentistPanelUnified = () => {
               fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)'
             }}>
-                Схема зубов: {selectedPatient.name}
+                Схема зубов: {selectedPatientDisplayName}
               </h2>
               <button
               onClick={() => setShowDentalChart(false)}
@@ -2835,7 +3572,7 @@ const DentistPanelUnified = () => {
               </button>
             </div>
             <TeethChart
-            patientId={selectedPatient.id}
+            patientId={selectedPatientId}
             initialData={dentalChartData}
             onToothClick={(toothNumber, toothData) => {
               logger.info('Клик по зубу:', toothNumber, toothData);
@@ -2882,7 +3619,7 @@ const DentistPanelUnified = () => {
               fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)'
             }}>
-                План лечения: {selectedPatient.name}
+                План лечения: {selectedPatientDisplayName}
               </h2>
               <button
               onClick={() => setShowTreatmentPlanner(false)}
@@ -2908,8 +3645,8 @@ const DentistPanelUnified = () => {
               </button>
             </div>
             <TreatmentPlanner
-            patientId={selectedPatient.id}
-            visitId={selectedPatient.visitId || 'demo-visit-1'}
+            patientId={selectedPatientId}
+            visitId={selectedPatient.visit_id}
             teethData={dentalChartData || {}}
             onUpdate={(plan) => {
               logger.info('План лечения обновлен:', plan);
@@ -2925,7 +3662,7 @@ const DentistPanelUnified = () => {
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
-                Новый стоматологический осмотр — {selectedPatient.name}
+                Новый стоматологический осмотр — {selectedPatientDisplayName}
               </h2>
             </div>
             <div className="p-6">
@@ -3095,7 +3832,7 @@ const DentistPanelUnified = () => {
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
-                Новый план лечения — {selectedPatient.name}
+                Новый план лечения — {selectedPatientDisplayName}
               </h2>
             </div>
             <div className="p-6">
@@ -3255,7 +3992,7 @@ const DentistPanelUnified = () => {
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
-                Новый протез — {selectedPatient.name}
+                Новый протез — {selectedPatientDisplayName}
               </h2>
             </div>
             <div className="p-6">
@@ -3423,14 +4160,14 @@ const DentistPanelUnified = () => {
           setToothModalOpen(false);
         }}
         patientId={selectedPatient?.id}
-        visitId={selectedPatient?.visitId || 'demo-visit-1'} />
+        visitId={selectedPatient?.visit_id} />
 
       }
 
       {/* DentalPriceManager Modal */}
       {showPriceManager && selectedServiceForPrice &&
       <DentalPriceManager
-        visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+        visitId={selectedPatient?.visit_id}
         serviceId={selectedServiceForPrice.id}
         serviceName={selectedServiceForPrice.name}
         originalPrice={selectedServiceForPrice.price}
@@ -3464,6 +4201,7 @@ const DentistPanelUnified = () => {
         useWebSocket={false}
         position="bottom-right" />
 
+      <RoleNotificationCenter role="dentist" />
     </div>);
 
 };

@@ -146,7 +146,7 @@ python generate_openapi.py > openapi.json
 ### Переменные окружения
 ```yaml
 PYTHON_VERSION: '3.11'
-DATABASE_URL: 'sqlite:///./test_clinic.db'
+DATABASE_URL: 'postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb'
 CORS_DISABLE: '1'
 WS_DEV_ALLOW: '1'
 ```

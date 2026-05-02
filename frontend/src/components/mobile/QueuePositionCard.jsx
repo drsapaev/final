@@ -1,5 +1,6 @@
 import { Card, Badge } from '../ui/macos';
 import { Clock, User } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const QueuePositionCard = ({ queueEntry }) => {
   if (!queueEntry) return null;
@@ -97,6 +98,19 @@ const QueuePositionCard = ({ queueEntry }) => {
       }
         </Card>);
 
+};
+
+
+QueuePositionCard.propTypes = {
+  ...(QueuePositionCard.propTypes || {}),
+  cabinet: PropTypes.any,
+  doctorName: PropTypes.any,
+  estimatedWaitTime: PropTypes.any,
+  number: PropTypes.any,
+  peopleBefore: PropTypes.any,
+  queueEntry: PropTypes.any,
+  specialty: PropTypes.any,
+  status: PropTypes.any,
 };
 
 export default QueuePositionCard;

@@ -4,6 +4,26 @@
  */
 import { api } from '../api/client';
 
+const normalizePrintResponse = (responseData, fallbackErrorMessage) => {
+  if (responseData?.success === false) {
+    return {
+      success: false,
+      error: responseData.error || responseData.message || fallbackErrorMessage,
+      data: responseData
+    };
+  }
+
+  return {
+    success: true,
+    data: responseData
+  };
+};
+
+const normalizePrintError = (error, fallbackMessage) => ({
+  success: false,
+  error: error.response?.data?.detail || fallbackMessage
+});
+
 export const printService = {
   /**
    * Получение списка принтеров
@@ -17,10 +37,7 @@ export const printService = {
         data: response.data.printers || []
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка получения принтеров'
-      };
+      return normalizePrintError(error, 'Ошибка получения принтеров');
     }
   },
 
@@ -30,16 +47,10 @@ export const printService = {
   async printTicket(ticketData) {
     try {
       const response = await api.post('/print/ticket', ticketData);
-      
-      return {
-        success: true,
-        data: response.data
-      };
+
+      return normalizePrintResponse(response.data, 'Ошибка печати талона');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка печати талона'
-      };
+      return normalizePrintError(error, 'Ошибка печати талона');
     }
   },
 
@@ -49,16 +60,10 @@ export const printService = {
   async printPrescription(prescriptionData) {
     try {
       const response = await api.post('/print/prescription', prescriptionData);
-      
-      return {
-        success: true,
-        data: response.data
-      };
+
+      return normalizePrintResponse(response.data, 'Ошибка печати рецепта');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка печати рецепта'
-      };
+      return normalizePrintError(error, 'Ошибка печати рецепта');
     }
   },
 
@@ -68,38 +73,73 @@ export const printService = {
   async printCertificate(certificateData) {
     try {
       const response = await api.post('/print/certificate', certificateData);
-      
-      return {
-        success: true,
-        data: response.data
-      };
+
+      return normalizePrintResponse(response.data, 'Ошибка печати справки');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка печати справки'
-      };
+      return normalizePrintError(error, 'Ошибка печати справки');
     }
   },
 
   /**
-   * Быстрая печать текста
+   * Печать лабораторных результатов
+   */
+  async printLabResults(labResultsData) {
+    try {
+      const response = await api.post('/print/lab-results', labResultsData);
+
+      return normalizePrintResponse(response.data, 'Ошибка печати лабораторных результатов');
+    } catch (error) {
+      return normalizePrintError(error, 'Ошибка печати лабораторных результатов');
+    }
+  },
+
+  /**
+   * Печать чека
+   */
+  async printReceipt(receiptData) {
+    try {
+      const response = await api.post('/print/receipt', receiptData);
+
+      return normalizePrintResponse(response.data, 'Ошибка печати чека');
+    } catch (error) {
+      return normalizePrintError(error, 'Ошибка печати чека');
+    }
+  },
+
+  /**
+   * Быстрая печать
    */
   async quickPrint(text, printerName = 'default') {
+    return {
+      success: false,
+      error:
+        'Generic quickPrint is deprecated. Use printTicket, printReceipt, quickQueueTicket, or quickPaymentReceipt.'
+    };
+  },
+
+  /**
+   * Быстрая печать талона очереди
+   */
+  async quickQueueTicket(ticketData) {
     try {
-      const response = await api.post('/print/quick', {
-        text,
-        printer_name: printerName
-      });
-      
-      return {
-        success: true,
-        data: response.data
-      };
+      const response = await api.post('/print/quick/queue-ticket', ticketData);
+
+      return normalizePrintResponse(response.data, 'Ошибка быстрой печати талона');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка быстрой печати'
-      };
+      return normalizePrintError(error, 'Ошибка быстрой печати талона');
+    }
+  },
+
+  /**
+   * Быстрая печать чека
+   */
+  async quickPaymentReceipt(receiptData) {
+    try {
+      const response = await api.post('/print/quick/payment-receipt', receiptData);
+
+      return normalizePrintResponse(response.data, 'Ошибка быстрой печати чека');
+    } catch (error) {
+      return normalizePrintError(error, 'Ошибка быстрой печати чека');
     }
   },
 
@@ -117,10 +157,7 @@ export const printService = {
         data: response.data
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка получения шаблонов'
-      };
+      return normalizePrintError(error, 'Ошибка получения шаблонов');
     }
   },
 
@@ -130,16 +167,10 @@ export const printService = {
   async checkPrinterStatus(printerName) {
     try {
       const response = await api.get(`/print/printers/${printerName}/status`);
-      
-      return {
-        success: true,
-        data: response.data
-      };
+
+      return normalizePrintResponse(response.data, 'Ошибка проверки принтера');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка проверки принтера'
-      };
+      return normalizePrintError(error, 'Ошибка проверки принтера');
     }
   },
 
@@ -148,19 +179,13 @@ export const printService = {
    */
   async testPrint(printerName) {
     try {
-      const response = await api.post('/print/test', {
-        printer_name: printerName
-      });
-      
-      return {
-        success: true,
-        data: response.data
-      };
+      const response = await api.post(
+        `/print/printers/${encodeURIComponent(printerName)}/test`
+      );
+
+      return normalizePrintResponse(response.data, 'Ошибка тестовой печати');
     } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Ошибка тестовой печати'
-      };
+      return normalizePrintError(error, 'Ошибка тестовой печати');
     }
   }
 };

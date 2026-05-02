@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.visit import Visit
+from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 
@@ -397,7 +398,11 @@ class BatchPatientService:
         # Собираем данные из Visit
         for visit in visits:
             if hasattr(visit, 'service') and visit.service:
-                services.append(visit.service.code if hasattr(visit.service, 'code') else str(visit.service_id))
+                services.append(
+                    visit.service.service_code
+                    or get_service_code(visit.service.id, self.db)
+                    or str(visit.service_id)
+                )
             if hasattr(visit, 'cost') and visit.cost:
                 total_cost += visit.cost
 

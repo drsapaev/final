@@ -17,7 +17,7 @@ class AIProviderBase(BaseModel):
     api_url: str | None = Field(None, max_length=200, description="Базовый URL API")
     model: str | None = Field(None, max_length=100, description="Модель AI")
     temperature: float = Field(0.2, ge=0.0, le=2.0, description="Температура генерации")
-    max_tokens: int = Field(1000, ge=1, le=8000, description="Максимум токенов")
+    max_tokens: int = Field(1000, ge=1, le=18000, description="Максимум токенов")
     active: bool = Field(False, description="Активен ли провайдер")
     is_default: bool = Field(False, description="Провайдер по умолчанию")
     capabilities: list[str] | None = Field(
@@ -36,7 +36,7 @@ class AIProviderUpdate(BaseModel):
     api_url: str | None = Field(None, max_length=200)
     model: str | None = Field(None, max_length=100)
     temperature: float | None = Field(None, ge=0.0, le=2.0)
-    max_tokens: int | None = Field(None, ge=1, le=8000)
+    max_tokens: int | None = Field(None, ge=1, le=18000)
     active: bool | None = None
     is_default: bool | None = None
     capabilities: list[str] | None = None
@@ -85,7 +85,7 @@ class AIPromptTemplateBase(BaseModel):
     )
 
     temperature: float | None = Field(None, ge=0.0, le=2.0)
-    max_tokens: int | None = Field(None, ge=1, le=8000)
+    max_tokens: int | None = Field(None, ge=1, le=18000)
     response_schema: dict[str, Any] | None = Field(
         None, description="JSON Schema ответа"
     )
@@ -108,7 +108,7 @@ class AIPromptTemplateUpdate(BaseModel):
     examples: list[dict[str, Any]] | None = None
 
     temperature: float | None = Field(None, ge=0.0, le=2.0)
-    max_tokens: int | None = Field(None, ge=1, le=8000)
+    max_tokens: int | None = Field(None, ge=1, le=18000)
     response_schema: dict[str, Any] | None = None
     active: bool | None = None
 

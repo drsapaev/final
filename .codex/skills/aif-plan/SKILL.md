@@ -34,6 +34,36 @@ Use this context when:
 - Planning file structure (follow project conventions)
 - **Follow architecture guidelines from `.ai-factory/ARCHITECTURE.md` when planning file structure and task organization**
 
+**Read `.ai-factory/skill-context/aif-plan/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the PLAN.md
+  template and task format. The plan template from TASK-FORMAT.md is a **base structure**. If a
+  skill-context rule says "tasks MUST include X" or "plan MUST have section Y" — you MUST augment
+  the template accordingly. Generating a plan that violates skill-context rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
+**OPTIONAL (recommended):** Read `.ai-factory/ROADMAP.md` if it exists:
+- Use it to link this plan to a specific milestone (when applicable)
+- This reduces ambiguity in `/aif-implement` milestone completion and `/aif-verify` roadmap gates
+
+**OPTIONAL (recommended):** Read `.ai-factory/RESEARCH.md` if it exists:
+- Treat `## Active Summary (input for /aif-plan)` as an additional requirements source
+- Carry over constraints/decisions into tasks and plan settings
+- Prefer the summary over raw notes; use `## Sessions` only when you need deeper rationale
+- If the user omitted the feature description, use `Active Summary -> Topic:` as the default description
+
 ### Step 0.1: Ensure Git Repository
 
 ```bash
@@ -57,6 +87,10 @@ full        → Full mode (first word)
 - Remaining text becomes the description
 - `--list` and `--cleanup` execute immediately and **STOP** (do NOT continue to Step 1+)
 
+**If the description is empty:**
+- If `.ai-factory/RESEARCH.md` exists and its `Active Summary` has a non-empty `Topic:`, default the description to that topic (no extra user input required)
+- Otherwise, ask the user for a short feature description
+
 **If `--list` is present**, jump to [--list Subcommand](#--list-subcommand).
 **If `--cleanup` is present**, jump to [--cleanup Subcommand](#--cleanup-subcommand).
 
@@ -72,6 +106,10 @@ Options:
 1. Full (Recommended) — creates git branch, asks preferences, full plan
 2. Fast — quick plan, no branch, saves to PLAN.md
 ```
+
+If the user did not provide a description and `.ai-factory/RESEARCH.md` exists:
+- Mention that you will default the description to the `Active Summary` topic
+- Only ask for `full` vs `fast` (no description prompt needed)
 
 For concrete parsing examples and expected behavior per command shape, read `references/EXAMPLES.md` (Argument Parsing).
 
@@ -128,19 +166,23 @@ Examples:
 AskUserQuestion: Before we start, a few questions:
 
 1. Should I write tests for this feature?
-   - [ ] Yes, write tests
-   - [ ] No, skip tests
+   a. Yes, write tests
+   b. No, skip tests
 
 2. Logging level for implementation:
-   - [ ] Verbose (recommended) - detailed DEBUG logs for development
-   - [ ] Standard - INFO level, key events only
-   - [ ] Minimal - only WARN/ERROR
+   a. Verbose (recommended) - detailed DEBUG logs for development
+   b. Standard - INFO level, key events only
+   c. Minimal - only WARN/ERROR
 
-3. Update documentation after implementation?
-   - [ ] Yes, update docs ($2)
-   - [ ] No, skip docs
+3. Documentation policy after implementation?
+   a. Yes — mandatory docs checkpoint at completion (recommended)
+   b. No — warn-only (`WARN [docs]`), no mandatory checkpoint
 
-4. Any specific requirements or constraints?
+4. Roadmap milestone linkage (only if `.ai-factory/ROADMAP.md` exists):
+   a. Link this plan to a milestone
+   b. Skip — no linkage (allowed; `/aif-verify --strict` should report WARN, not fail, for missing linkage alone)
+
+5. Any specific requirements or constraints?
 ```
 
 **Default to verbose logging.** AI-generated code benefits greatly from extensive logging because:
@@ -148,7 +190,16 @@ AskUserQuestion: Before we start, a few questions:
 - Users can always remove logs later
 - Missing logs during development wastes debugging time
 
-Store all preferences — they will be used in the plan file and passed to `$2`.
+Store all preferences — they will be used in the plan file and passed to `/aif-implement`.
+
+Docs policy semantics:
+- `Docs: yes` → `/aif-implement` MUST show a mandatory documentation checkpoint and route docs changes through `/aif-docs`
+- `Docs: no` (or unset) → `/aif-implement` emits `WARN [docs]` and continues without a mandatory docs checkpoint
+
+**If `.ai-factory/ROADMAP.md` exists and the user chose milestone linkage:**
+- Read `.ai-factory/ROADMAP.md` and list candidate milestones (prefer unchecked items)
+- Ask the user to pick one milestone (or type a custom one)
+- Store the selected milestone name and a 1-sentence rationale for inclusion in the plan file
 
 ### Step 1.4: Create Branch or Worktree
 
@@ -176,14 +227,31 @@ Copy context files so the worktree has full AI context:
 ```bash
 WORKTREE="../${DIRNAME}-<branch-name-with-hyphens>"
 
+# Ensure AI Factory directories exist before copy operations
+mkdir -p "${WORKTREE}/.ai-factory"
+mkdir -p "${WORKTREE}/.ai-factory/plans"
+mkdir -p "${WORKTREE}/.ai-factory/patches"
+mkdir -p "${WORKTREE}/.ai-factory/evolutions"
+
 # Project context
 cp .ai-factory/DESCRIPTION.md "${WORKTREE}/.ai-factory/DESCRIPTION.md" 2>/dev/null
 cp .ai-factory/ARCHITECTURE.md "${WORKTREE}/.ai-factory/ARCHITECTURE.md" 2>/dev/null
+cp .ai-factory/RESEARCH.md "${WORKTREE}/.ai-factory/RESEARCH.md" 2>/dev/null
 
-# Past lessons / patches
-cp -r .ai-factory/patches/ "${WORKTREE}/.ai-factory/patches/" 2>/dev/null
+# Skill-context (primary learning context)
+cp -r .ai-factory/skill-context/ "${WORKTREE}/.ai-factory/skill-context/" 2>/dev/null
 
-# Claude Code skills + settings
+# Note: do not copy patch-cursor.json into a truncated patch set.
+# The parallel worktree copies only a limited number of patches for fallback context.
+# Copying the evolve cursor without the full patch history can cause /aif-evolve to skip patches
+# or trigger a partial rescan.
+
+# Limited patch fallback: copy only recent patches (latest 10 by filename)
+for patch in $(ls -1 .ai-factory/patches/*.md 2>/dev/null | sort | tail -n 10); do
+  cp "${patch}" "${WORKTREE}/.ai-factory/patches/"
+done
+
+# Agent skills + settings
 cp -r .claude/ "${WORKTREE}/.claude/" 2>/dev/null
 
 # CLAUDE.md only if untracked
@@ -195,7 +263,6 @@ fi
 Create changes directory and switch:
 
 ```bash
-mkdir -p "${WORKTREE}/.ai-factory/plans"
 cd "${WORKTREE}"
 ```
 
@@ -208,8 +275,8 @@ Parallel worktree created!
   Directory: <worktree-path>
 
 To manage worktrees later:
-  $2 --list
-  $2 --cleanup <branch-name>
+  /aif-plan --list
+  /aif-plan --cleanup <branch-name>
 ```
 
 Continue to Step 2.
@@ -238,10 +305,14 @@ Ask a shorter set of questions:
 AskUserQuestion: Before we start:
 
 1. Should I include tests in the plan?
-   - [ ] Yes, include tests
-   - [ ] No, skip tests
+   a. Yes, include tests
+   b. No, skip tests
 
 2. Any specific requirements or constraints?
+
+3. Roadmap milestone linkage (only if `.ai-factory/ROADMAP.md` exists):
+   a. Link this plan to a milestone
+   b. Skip — no linkage (allowed; `/aif-verify --strict` should report WARN, not fail, for missing linkage alone)
 ```
 
 **Plan file:** Always `.ai-factory/PLAN.md` (no branch, no branch-named file).
@@ -330,8 +401,18 @@ mkdir -p .ai-factory/plans  # only when saving to branch-named plan files
 - Title with feature name
 - Branch and creation date
 - `Settings` section (Testing, Logging, Docs)
+- `Roadmap Linkage` section (optional, only if `.ai-factory/ROADMAP.md` exists)
+- `Research Context` section (optional, if `.ai-factory/RESEARCH.md` exists)
 - `Tasks` section grouped by phases
 - `Commit Plan` section when there are 5+ tasks
+
+If `.ai-factory/ROADMAP.md` exists:
+- If the user linked a milestone, write `## Roadmap Linkage` with `Milestone: "..."` and `Rationale: ...`
+- If the user skipped linkage, write `## Roadmap Linkage` with `Milestone: "none"` and `Rationale: "Skipped by user"`
+
+If `.ai-factory/RESEARCH.md` exists:
+- Include `## Research Context` by copying only the `Active Summary` (do not paste full `Sessions`)
+- Keep it compact; it should be readable as a one-screen requirements snapshot
 
 Use the canonical template in `references/TASK-FORMAT.md` (Plan File Template).
 
@@ -343,16 +424,16 @@ Use the canonical template in `references/TASK-FORMAT.md` (Plan File Template).
 
 ### Step 6: Next Steps
 
-**Full mode + parallel (`--parallel`):** Automatically invoke `$2` — the whole point of parallel is autonomous end-to-end execution in an isolated worktree.
+**Full mode + parallel (`--parallel`):** Automatically invoke `/aif-implement` — the whole point of parallel is autonomous end-to-end execution in an isolated worktree.
 
 ```
-$2
+/aif-implement
 
-CONTEXT FROM $2:
+CONTEXT FROM /aif-plan:
 - Plan file: .ai-factory/plans/<branch-name>.md
 - Testing: yes/no
 - Logging: verbose/standard/minimal
-- Docs: yes/no
+- Docs: yes/no  # yes => mandatory docs checkpoint, no => warn-only
 ```
 
 **Full mode normal:** STOP after planning. The user reviews the plan and decides when to implement.
@@ -362,7 +443,7 @@ Plan created with [N] tasks.
 Plan file: .ai-factory/plans/<branch-name>.md
 
 To start implementation, run:
-$2
+/aif-implement
 
 To view tasks:
 /tasks (or use TaskList)
@@ -375,7 +456,7 @@ Plan created with [N] tasks.
 Plan file: .ai-factory/PLAN.md
 
 To start implementation, run:
-$2
+/aif-implement
 
 To view tasks:
 /tasks (or use TaskList)
@@ -383,16 +464,7 @@ To view tasks:
 
 ### Context Cleanup
 
-Context is heavy after planning. All results are saved to the plan file — suggest freeing space:
-
-```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
-```
+Suggest the user to free up context space if needed: `/clear` (full reset) or `/compact` (compress history).
 
 ---
 
@@ -466,12 +538,14 @@ Use canonical examples in `references/TASK-FORMAT.md`:
 6. **Include file paths** — Help implementer know where to work
 7. **Commit checkpoints for large plans** — 5+ tasks need commit plan with checkpoints every 3-5 tasks
 8. **Plan file location** — Fast mode: `.ai-factory/PLAN.md`. Full mode: `.ai-factory/plans/<branch-name>.md`
+9. **Ownership boundary** — This command owns plan files only (`.ai-factory/PLAN.md`, `.ai-factory/plans/<branch>.md`). Use owner commands (`/aif-roadmap`, `/aif-rules`, `/aif-explore`) for their artifacts.
+10. **Roadmap linkage (when available)** — If `.ai-factory/ROADMAP.md` exists, include a `## Roadmap Linkage` section in the plan (or explicitly state it was skipped).
 
 ## Plan File Handling
 
 **Fast mode (`.ai-factory/PLAN.md`)**
 - Temporary plan for quick work
-- `$2` may offer deletion after completion
+- `/aif-implement` may offer deletion after completion
 
 **Full mode (`.ai-factory/plans/<branch>.md`)**
 - Branch-scoped, long-lived plan for feature delivery

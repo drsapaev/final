@@ -8,6 +8,7 @@
  * - Калькуляторы рисков
  */
 
+import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import EMRTextField from '../EMRTextField';
@@ -327,3 +328,13 @@ export function CardiologySection({
 }
 
 export default CardiologySection;
+
+CardiologySection.propTypes = {
+  ecgData: PropTypes.object,
+  echoData: PropTypes.object,
+  labResults: PropTypes.object,
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};

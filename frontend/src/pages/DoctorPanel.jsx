@@ -44,9 +44,10 @@ import {
 import { useModal } from '../hooks/useModal.jsx';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
 import useDoctorQueue from '../hooks/useDoctorQueue.js';
-import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
+import { getApiOrigin } from '../api/runtime';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -80,7 +81,6 @@ const DoctorPanel = () => {
   const [filterStatus, setFilterStatus] = useState('all');
 
   // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
-  const { currentUser } = useAppData();
   const {
     queue: queueEntries,
     stats: queueStats,
@@ -93,23 +93,25 @@ const DoctorPanel = () => {
     sendToDiagnostics,
     markIncomplete,
     completeVisit
-  } = useDoctorQueue(null, currentUser);
+  } = useDoctorQueue('general');
 
   // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
   const callFromDiagnostics = async (entryId) => {
     try {
       const token = tokenManager.getAccessToken();
-      const response = await fetch(`/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
+      const apiBase = getApiOrigin();
+      const response = await fetch(`${apiBase}/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      const result = await response.json().catch(() => null);
       if (response.ok) {
-        logger.log('Push-уведомление отправлено');
+        logger.log('Push-уведомление отправлено', result);
       } else {
-        logger.error('Ошибка отправки уведомления');
+        logger.error('Ошибка отправки уведомления', result);
       }
     } catch (err) {
       logger.error('Ошибка:', err);
@@ -244,6 +246,49 @@ const DoctorPanel = () => {
     loadData();
   }, [loadData]);
 
+  const handleScheduleNextSuccess = useCallback((result, submittedFormData) => {
+    const confirmation = result?.confirmation || {};
+    const normalizedPatientId = submittedFormData?.patient_id ? Number(submittedFormData.patient_id) : null;
+    const selectedPatient = normalizedPatientId
+      ? patients.find((patient) => Number(patient.id) === normalizedPatientId)
+      : null;
+    const visitDate = confirmation.visit_date || submittedFormData?.visit_date || '';
+    const visitTime = confirmation.visit_time || submittedFormData?.visit_time || '09:00';
+
+    const nextAppointment = {
+      id: result?.visit_id || Date.now(),
+      patientId: normalizedPatientId,
+      patientName: confirmation.patient_name || selectedPatient?.name || 'Новый пациент',
+      time: visitTime,
+      type:
+        submittedFormData?.discount_mode === 'repeat'
+          ? 'Повторный прием'
+          : submittedFormData?.discount_mode === 'benefit'
+            ? 'Льготный визит'
+            : 'Следующий визит',
+      status: 'scheduled',
+      notes: result?.message || (visitDate ? `Ожидает подтверждения на ${visitDate}` : 'Ожидает подтверждения'),
+      appointmentDate: visitDate,
+      confirmationToken: confirmation.token || null,
+      confirmationChannel: confirmation.channel || submittedFormData?.confirmation_channel || 'telegram',
+      totalAmount: confirmation.total_amount || null,
+      servicesCount: confirmation.services_count || submittedFormData?.services?.length || 1,
+      source: 'schedule-next'
+    };
+
+    setAppointments((prev) => [
+      nextAppointment,
+      ...prev.filter((appointment) => Number(appointment.id) !== Number(nextAppointment.id))
+    ]);
+
+    logger.info('[DOC-05] Appointments table refreshed after schedule-next', {
+      visitId: nextAppointment.id,
+      patientId: nextAppointment.patientId,
+      patientName: nextAppointment.patientName,
+      status: nextAppointment.status
+    });
+  }, [patients]);
+
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
@@ -254,7 +299,7 @@ const DoctorPanel = () => {
         const token = tokenManager.getAccessToken();
         if (!token) return;
 
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
 
         // Загружаем данные пациента
         const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
@@ -1519,6 +1564,7 @@ const DoctorPanel = () => {
       <ScheduleNextModal
         isOpen={scheduleNextModal.open}
         onClose={() => setScheduleNextModal({ open: false, patient: null })}
+        onSuccess={handleScheduleNextSuccess}
         patient={scheduleNextModal.patient}
         theme={{ isDark, getColor, getSpacing, getFontSize }} />
 
@@ -1531,6 +1577,7 @@ const DoctorPanel = () => {
         useWebSocket={false}
         position="bottom-right" />
 
+      <RoleNotificationCenter role="doctor" />
     </div>);
 
 };

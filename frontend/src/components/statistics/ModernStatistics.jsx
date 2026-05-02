@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Button, Card, Icon } from '../ui/macos';
+import PropTypes from 'prop-types';
 
 const ModernStatistics = ({
   appointments = [],
@@ -343,6 +344,16 @@ const ModernStatistics = ({
       {/* Детальная статистика удалена - для упрощения UI */}
     </div>);
 
+};
+
+
+ModernStatistics.propTypes = {
+  ...(ModernStatistics.propTypes || {}),
+  appointments: PropTypes.any,
+  language: PropTypes.any,
+  onExport: PropTypes.any,
+  onRefresh: PropTypes.any,
+  selectedDate: PropTypes.any,
 };
 
 export default ModernStatistics;

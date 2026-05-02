@@ -7,7 +7,7 @@ import json
 
 def test_auth_endpoints():
     """Тестировать все endpoints аутентификации"""
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:18000"
     
     # Тестовые данные
     test_data = {
@@ -60,7 +60,7 @@ def test_available_endpoints():
     print("\n📋 Проверка доступных endpoints...")
     
     try:
-        response = requests.get("http://localhost:8000/_routes")
+        response = requests.get("http://localhost:18000/_routes")
         if response.status_code == 200:
             routes = response.json()
             auth_routes = [route for route in routes if 'login' in route.get('path', '')]

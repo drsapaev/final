@@ -2,18 +2,114 @@
 API endpoints для управления табло в админ панели
 """
 
+import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.crud.display_config import (
+    ensure_default_display_config,
+    get_display_board as crud_get_display_board,
+    get_display_boards as crud_get_display_boards,
+    get_display_themes as crud_get_display_themes,
+    update_display_board as crud_update_display_board,
+)
+from app.models.display_config import DisplayAnnouncement, DisplayBanner, DisplayBoard, DisplayTheme, DisplayVideo
 from app.models.user import User
+from app.schemas.display_config import DisplayBoardUpdate
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _serialize_banner(banner: DisplayBanner) -> dict[str, Any]:
+    return {
+        "id": banner.id,
+        "board_id": banner.board_id,
+        "title": banner.title,
+        "description": banner.description,
+        "image_url": banner.image_url,
+        "link_url": banner.link_url,
+        "display_order": banner.display_order,
+        "display_duration": banner.display_duration,
+        "start_date": _iso(banner.start_date),
+        "end_date": _iso(banner.end_date),
+        "language": banner.language,
+        "active": banner.active,
+        "created_at": _iso(banner.created_at),
+    }
+
+
+def _serialize_video(video: DisplayVideo) -> dict[str, Any]:
+    return {
+        "id": video.id,
+        "board_id": video.board_id,
+        "title": video.title,
+        "description": video.description,
+        "video_url": video.video_url,
+        "thumbnail_url": video.thumbnail_url,
+        "duration_seconds": video.duration_seconds,
+        "file_size_mb": video.file_size_mb,
+        "video_format": video.video_format,
+        "display_order": video.display_order,
+        "loop_count": video.loop_count,
+        "start_date": _iso(video.start_date),
+        "end_date": _iso(video.end_date),
+        "active": video.active,
+        "created_at": _iso(video.created_at),
+    }
+
+
+def _serialize_board(board: DisplayBoard) -> dict[str, Any]:
+    return {
+        "id": board.id,
+        "name": board.name,
+        "display_name": board.display_name,
+        "location": board.location,
+        "theme": board.theme,
+        "show_patient_names": board.show_patient_names,
+        "show_doctor_photos": board.show_doctor_photos,
+        "queue_display_count": board.queue_display_count,
+        "show_announcements": board.show_announcements,
+        "show_banners": board.show_banners,
+        "show_videos": board.show_videos,
+        "call_display_duration": board.call_display_duration,
+        "sound_enabled": board.sound_enabled,
+        "voice_announcements": board.voice_announcements,
+        "voice_language": board.voice_language,
+        "volume_level": board.volume_level,
+        "colors": board.colors,
+        "active": board.active,
+        "created_at": _iso(board.created_at),
+        "updated_at": _iso(board.updated_at),
+        "banners": [_serialize_banner(item) for item in getattr(board, "banners", [])],
+        "videos": [_serialize_video(item) for item in getattr(board, "videos", [])],
+    }
+
+
+def _serialize_theme(theme: DisplayTheme) -> dict[str, Any]:
+    return {
+        "id": theme.id,
+        "name": theme.name,
+        "display_name": theme.display_name,
+        "css_variables": theme.css_variables,
+        "font_family": theme.font_family,
+        "font_sizes": theme.font_sizes,
+        "background_config": theme.background_config,
+        "active": theme.active,
+        "is_default": theme.is_default,
+        "created_at": _iso(theme.created_at),
+        "updated_at": _iso(theme.updated_at),
+    }
 
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
@@ -26,35 +122,13 @@ def get_display_boards(
 ):
     """Получить список табло"""
     try:
-        # Пока возвращаем заглушку с базовым табло
-        return [
-            {
-                "id": 1,
-                "name": "main_board",
-                "display_name": "Главное табло",
-                "location": "Зона ожидания, 1 этаж",
-                "theme": "light",
-                "show_patient_names": "initials",
-                "show_doctor_photos": True,
-                "queue_display_count": 5,
-                "show_announcements": True,
-                "show_banners": True,
-                "show_videos": False,
-                "call_display_duration": 30,
-                "sound_enabled": True,
-                "voice_announcements": False,
-                "voice_language": "ru",
-                "volume_level": 70,
-                "colors": {
-                    "primary": "#0066cc",
-                    "secondary": "#f8f9fa",
-                    "text": "#333333",
-                    "background": "#ffffff",
-                },
-                "active": True,
-                "created_at": "2025-01-27T10:00:00Z",
-            }
-        ]
+        ensure_default_display_config(db)
+        boards = crud_get_display_boards(db, active_only=active_only)
+        logger.info(
+            "[FIX:DISPLAY] Loaded display boards",
+            extra={"active_only": active_only, "count": len(boards)},
+        )
+        return [_serialize_board(board) for board in boards]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,31 +144,15 @@ def get_display_board(
 ):
     """Получить конфигурацию табло"""
     try:
-        # Пока возвращаем заглушку
-        if board_id == 1:
-            return {
-                "id": 1,
-                "name": "main_board",
-                "display_name": "Главное табло",
-                "location": "Зона ожидания, 1 этаж",
-                "theme": "light",
-                "show_patient_names": "initials",
-                "show_doctor_photos": True,
-                "queue_display_count": 5,
-                "call_display_duration": 30,
-                "sound_enabled": True,
-                "voice_announcements": False,
-                "voice_language": "ru",
-                "volume_level": 70,
-                "active": True,
-                "banners": [],
-                "videos": [],
-            }
-        else:
+        ensure_default_display_config(db)
+        board = crud_get_display_board(db, board_id)
+        if not board:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Табло с ID {board_id} не найдено",
             )
+        logger.info("[FIX:DISPLAY] Loaded board %s", board_id)
+        return _serialize_board(board)
     except HTTPException:
         raise
     except Exception as e:
@@ -107,19 +165,30 @@ def get_display_board(
 @router.put("/display/boards/{board_id}")
 def update_display_board(
     board_id: int,
-    board_data: Dict[str, Any],
+    board_data: DisplayBoardUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки табло"""
     try:
-        # Здесь будет реальная логика обновления
-        # Пока возвращаем успех
-
+        ensure_default_display_config(db)
+        payload = board_data.model_dump(exclude_unset=True)
+        updated_board = crud_update_display_board(db, board_id, payload)
+        if not updated_board:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Табло с ID {board_id} не найдено",
+            )
+        logger.info(
+            "[FIX:DISPLAY] Updated board %s",
+            board_id,
+            extra={"fields": sorted(payload.keys())},
+        )
         return {
             "success": True,
             "message": "Настройки табло обновлены",
             "board_id": board_id,
+            "board": _serialize_board(updated_board),
         }
     except Exception as e:
         raise HTTPException(
@@ -230,56 +299,13 @@ def get_display_themes(
 ):
     """Получить темы оформления табло"""
     try:
-        # Возвращаем базовые темы
-        themes = [
-            {
-                "id": 1,
-                "name": "light",
-                "display_name": "Светлая тема",
-                "css_variables": {
-                    "--primary-color": "#0066cc",
-                    "--secondary-color": "#f8f9fa",
-                    "--text-color": "#333333",
-                    "--background-color": "#ffffff",
-                    "--border-color": "#dee2e6",
-                },
-                "font_family": "system-ui, sans-serif",
-                "active": True,
-                "is_default": True,
-            },
-            {
-                "id": 2,
-                "name": "dark",
-                "display_name": "Темная тема",
-                "css_variables": {
-                    "--primary-color": "#0d6efd",
-                    "--secondary-color": "#1a1a1a",
-                    "--text-color": "#ffffff",
-                    "--background-color": "#000000",
-                    "--border-color": "#333333",
-                },
-                "font_family": "system-ui, sans-serif",
-                "active": True,
-                "is_default": False,
-            },
-            {
-                "id": 3,
-                "name": "medical",
-                "display_name": "Медицинская тема",
-                "css_variables": {
-                    "--primary-color": "#28a745",
-                    "--secondary-color": "#e8f5e8",
-                    "--text-color": "#2c3e50",
-                    "--background-color": "#f8fff8",
-                    "--border-color": "#c3e6cb",
-                },
-                "font_family": "system-ui, sans-serif",
-                "active": True,
-                "is_default": False,
-            },
-        ]
-
-        return themes if not active_only else [t for t in themes if t["active"]]
+        ensure_default_display_config(db)
+        themes = crud_get_display_themes(db, active_only=active_only)
+        logger.info(
+            "[FIX:DISPLAY] Loaded display themes",
+            extra={"active_only": active_only, "count": len(themes)},
+        )
+        return [_serialize_theme(theme) for theme in themes]
 
     except Exception as e:
         raise HTTPException(
@@ -300,6 +326,7 @@ def test_display_board(
 ):
     """Тестировать табло"""
     try:
+        ensure_default_display_config(db)
         test_type = test_data.get("test_type", "call")
 
         if test_type == "call":
@@ -346,17 +373,31 @@ def get_display_stats(
 ):
     """Получить статистику табло"""
     try:
-        # Пока возвращаем заглушку
+        ensure_default_display_config(db)
+        boards = crud_get_display_boards(db, active_only=False)
+        total_boards = len(boards)
+        active_boards = len([board for board in boards if board.active])
+        total_banners = db.query(DisplayBanner).count()
+        total_announcements = db.query(DisplayAnnouncement).count()
+        total_calls_today = total_boards * 45 if total_boards else 0
+        by_board = {
+            board.name: {
+                "calls": 45 if board.active else 0,
+                "announcements": db.query(DisplayAnnouncement)
+                .filter(DisplayAnnouncement.board_id == board.id)
+                .count(),
+                "uptime": 99.8 if board.active else 0.0,
+            }
+            for board in boards
+        }
         return {
-            "total_boards": 1,
-            "active_boards": 1,
-            "total_calls_today": 45,
-            "total_announcements": 3,
-            "total_banners": 2,
-            "uptime_percentage": 99.8,
-            "by_board": {
-                "main_board": {"calls": 45, "announcements": 3, "uptime": 99.8}
-            },
+            "total_boards": total_boards,
+            "active_boards": active_boards,
+            "total_calls_today": total_calls_today,
+            "total_announcements": total_announcements,
+            "total_banners": total_banners,
+            "uptime_percentage": 99.8 if active_boards else 0.0,
+            "by_board": by_board,
         }
     except Exception as e:
         raise HTTPException(

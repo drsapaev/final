@@ -13,7 +13,7 @@ def test_with_details():
     # Тест 1: Health check
     print("\n1️⃣ Тестируем health endpoint:")
     try:
-        response = requests.get("http://localhost:8000/api/v1/health")
+        response = requests.get("http://localhost:18000/api/v1/health")
         print(f"   Status: {response.status_code}")
         print(f"   Response: {response.json()}")
     except Exception as e:
@@ -23,7 +23,7 @@ def test_with_details():
     # Тест 2: Проверка endpoint существования
     print("\n2️⃣ Проверяем существование queue endpoints:")
     try:
-        response = requests.get("http://localhost:8000/api/v1/queue/today?specialist_id=1")
+        response = requests.get("http://localhost:18000/api/v1/queue/today?specialist_id=1")
         print(f"   /queue/today Status: {response.status_code}")
         if response.status_code != 401:  # Ожидаем 401 (нужна авторизация)
             print(f"   Response: {response.text[:200]}")
@@ -43,7 +43,7 @@ def test_with_details():
         print(f"   Отправляем данные: {json.dumps(test_data, ensure_ascii=False)}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/queue/join",
+            "http://localhost:18000/api/v1/queue/join",
             json=test_data,
             headers={"Content-Type": "application/json"},
             timeout=10
@@ -83,7 +83,7 @@ def test_with_details():
     
     try:
         response = requests.post(
-            "http://localhost:8000/api/v1/queue/join",
+            "http://localhost:18000/api/v1/queue/join",
             json=minimal_data,
             timeout=5
         )

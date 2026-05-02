@@ -2,12 +2,14 @@
 API endpoints для управления клиникой
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_admin
+from app.api.deps import get_db
+from app.core.security import require_roles
 from app.models.user import User
 from app.schemas.clinic import (
     BackupCreate,
@@ -44,6 +46,12 @@ from app.services.clinic_management_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+# SSOT: token-based role guard via get_current_user, без request.state middleware path.
+require_admin = require_roles("Admin")
+logger.info(
+    "[FIX:clinic-management-auth] Clinic management uses token-based Admin guard"
+)
 
 # ===================== ФИЛИАЛЫ =====================
 

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import { getApiOrigin } from '../api/runtime';
+import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
-const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 const usePatients = () => {
   const [patients, setPatients] = useState([]);
@@ -84,6 +86,10 @@ const usePatients = () => {
 
       // Преобразуем данные из формата компонента в формат API
       // Backend принимает полное ФИО или отдельные поля - используем отдельные поля
+      const documentFields = buildPatientDocumentFields(
+        patientData.passport ?? patientData.doc_number
+      );
+
       const apiData = {
         last_name: patientData.lastName || patientData.last_name,
         first_name: patientData.firstName || patientData.first_name,
@@ -92,8 +98,8 @@ const usePatients = () => {
         sex: patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null,
         phone: patientData.phone || null,
         email: patientData.email || null,
-        doc_number: patientData.passport || patientData.doc_number || null,
-        address: patientData.address || null
+        address: patientData.address || null,
+        ...documentFields
       };
 
       const response = await fetch(`${API_BASE}/api/v1/patients/`, {
@@ -159,7 +165,12 @@ const usePatients = () => {
       if (patientData.gender !== undefined) apiData.sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
       if (patientData.phone !== undefined) apiData.phone = patientData.phone;
       if (patientData.email !== undefined) apiData.email = patientData.email;
-      if (patientData.passport !== undefined) apiData.doc_number = patientData.passport;
+      if (patientData.passport !== undefined || patientData.doc_number !== undefined) {
+        Object.assign(
+          apiData,
+          buildPatientDocumentFields(patientData.passport ?? patientData.doc_number)
+        );
+      }
       if (patientData.address !== undefined) apiData.address = patientData.address;
 
       const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {

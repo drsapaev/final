@@ -1,0 +1,54 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:5173",
+      "localStorage": [
+        {
+          "name": "colorScheme",
+          "value": "glass"
+        },
+        {
+          "name": "theme",
+          "value": "dark"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":23,\"username\":\"cashier@example.com\",\"email\":\"cashier@example.com\",\"full_name\":\"Cashier User\",\"role\":\"Cashier\",\"is_active\":true,\"is_superuser\":false}"
+        },
+        {
+          "name": "ui_theme",
+          "value": "dark"
+        },
+        {
+          "name": "ui.accent",
+          "value": "blue"
+        },
+        {
+          "name": "auth_token",
+          "value": "<redacted>"
+        },
+        {
+          "name": "customColorScheme",
+          "value": "true"
+        },
+        {
+          "name": "app_language",
+          "value": "ru"
+        },
+        {
+          "name": "activeColorSchemeId",
+          "value": "glass"
+        },
+        {
+          "name": "language",
+          "value": "ru"
+        },
+        {
+          "name": "auth_profile",
+          "value": "{\"id\":23,\"username\":\"cashier@example.com\",\"email\":\"cashier@example.com\",\"full_name\":\"Cashier User\",\"role\":\"Cashier\",\"is_active\":true,\"is_superuser\":false}"
+        }
+      ]
+    }
+  ]
+}

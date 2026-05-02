@@ -72,3 +72,19 @@
 - [x] Regression budgets automated per profile (RPS drop/P95 growth guardrails in `ops/load/endpoint_profiles.json`).
 - [x] Unified CI load gate executes full profile matrix and blocks on budget breach.
 - [x] Aggregated artifacts produced: `k6-summary.json`, `load-regression-report.md`, `load-regression-report.json`, plus per-profile reports.
+
+## P6 Local-First Acceptance (Current Active Phase)
+- [x] Local host-based staging remains the primary operating contour (`backend :18000`, `frontend :18080`, dedicated staging Postgres `:55432`).
+- [x] Manual smoke pack is green for roles: admin, registrar, cardiology, dermatology, dentistry, lab, cashier.
+- [x] Remaining queue-domain gap is explicitly closed: legacy queue is archived and documented as non-canonical.
+- [x] Secrets/config hygiene pass is complete before any VPS move (no accidental local/staging credentials or machine-specific drift in committed runtime docs).
+
+## STOP/GO Phase Local → VPS
+- [x] GO only if the local acceptance pack is green.
+- [x] GO only if the queue-domain migration/archival decision is closed and documented.
+
+## P7 VPS Promotion (Deferred But Mandatory Next Milestone)
+- [ ] Linux VPS staging exists with reachable URL, host PostgreSQL, `systemd` backend, Nginx frontend, and TLS.
+- [ ] `ops/vps/*` rollout kit is executed successfully on VPS staging.
+- [ ] `run_emr_cutover.py` is green on VPS staging with `passed == true`.
+- [ ] Production rollout is blocked until VPS staging has passed smoke validation and a short soak window.

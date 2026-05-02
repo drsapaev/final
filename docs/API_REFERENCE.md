@@ -1,6 +1,6 @@
 # 📚 API Reference - Clinic Management System
 
-> **Base URL**: `http://localhost:8000/api/v1`  
+> **Base URL**: `http://localhost:18000/api/v1`  
 > **Version**: 2.1.0  
 > **Total Routes**: 981 endpoints  
 > **Authentication**: Bearer Token (JWT)  

@@ -103,9 +103,15 @@ class Prescription(Base):
     appointment_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True
     )  # ✅ SECURITY: SET NULL to preserve prescriptions
+    visit_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # Canonical clinical anchor after EMR v2 cutover
     emr_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("emr.id", ondelete="SET NULL"), nullable=True, index=True
     )  # ✅ SECURITY: SET NULL to preserve prescriptions
+    emr_record_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("emr_records.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # Canonical EMR v2 reference
 
     # Препараты (JSON массив)
     medications: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const MacOSBadge = ({
   children,
   variant = 'default',
@@ -104,6 +105,17 @@ const MacOSBadge = ({
       {children}
     </span>
   );
+};
+
+
+MacOSBadge.propTypes = {
+  ...(MacOSBadge.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  outline: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default MacOSBadge;

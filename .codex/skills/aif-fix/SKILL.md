@@ -19,7 +19,8 @@ Fix a specific bug or problem in the codebase. Supports two modes: immediate fix
 **If the file EXISTS:**
 - Read `.ai-factory/FIX_PLAN.md`
 - Inform the user: "Found existing fix plan. Executing fix based on the plan."
-- **Skip Steps 0.1 through 1** — go directly to **Step 2: Investigate the Codebase**, using the plan as your guide
+- Skip **Step 1** (problem intake/mode choice), but still run **Step 0.1** to load context
+- Then continue to **Step 2: Investigate the Codebase**, using the plan as your guide
 - Follow each step of the plan sequentially
 - After the fix is fully applied and verified, **delete** `.ai-factory/FIX_PLAN.md`:
   ```bash
@@ -28,7 +29,7 @@ Fix a specific bug or problem in the codebase. Supports two modes: immediate fix
 - Continue to Step 4 (Verify), Step 5 (Test suggestion), Step 6 (Patch)
 
 **If the file DOES NOT exist AND `$ARGUMENTS` is empty:**
-- Tell the user: "No fix plan found and no problem description provided. Please either provide a bug description (`$2 <description>`) or create a fix plan first."
+- Tell the user: "No fix plan found and no problem description provided. Please either provide a bug description (`/aif-fix <description>`) or create a fix plan first."
 - **STOP.**
 
 **If the file DOES NOT exist AND `$ARGUMENTS` is provided:**
@@ -41,12 +42,35 @@ Fix a specific bug or problem in the codebase. Supports two modes: immediate fix
 - Project architecture
 - Coding conventions
 
-**Read all patches from `.ai-factory/patches/`** if the directory exists:
-- Use `Glob` to find all `*.md` files in `.ai-factory/patches/`
-- Read each patch file to learn from past fixes
-- Pay attention to recurring patterns, root causes, and solutions
-- If the current problem resembles a past patch — apply the same approach or avoid the same mistakes
-- This is your accumulated experience. Use it.
+**Read `.ai-factory/skill-context/aif-fix/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the FIX_PLAN.md
+  template and patch files. The FIX_PLAN.md template in Step 1.1 is a **base structure**. If a
+  skill-context rule says "steps MUST include X" or "plan MUST have section Y" — you MUST augment
+  the template accordingly. Generating a FIX_PLAN.md or patch that violates skill-context rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
+**Patch fallback (limited, only when skill-context is missing):**
+
+- If `.ai-factory/skill-context/aif-fix/SKILL.md` does not exist and `.ai-factory/patches/` exists:
+  - Use `Glob` to find `*.md` files in `.ai-factory/patches/`
+  - Sort patch filenames ascending (lexical), then select the last **10** (or fewer if less exist)
+  - Read those selected patch files only
+  - Prioritize recurring **Root Cause** and **Prevention** patterns
+- If skill-context exists, do **not** read all patches by default.
+  - Optionally inspect a small, targeted subset of recent patches when tags/files clearly match the current bug.
 
 ### Step 1: Understand the Problem & Choose Mode
 
@@ -73,11 +97,9 @@ Options:
 1. **Fix now** — Investigate and apply the fix immediately
 2. **Plan first** — Create a fix plan for review, then fix later
 
-**If user chooses "Plan first":**
-- Proceed to **Step 1.1: Create Fix Plan**
-
-**If user chooses "Fix now":**
-- Skip Step 1.1, proceed directly to **Step 2: Investigate the Codebase**
+**Based on choice:**
+- "Plan first" → Proceed to **Step 1.1: Create Fix Plan**
+- "Fix now" → Skip Step 1.1, proceed directly to **Step 2: Investigate the Codebase**
 
 ### Step 1.1: Create Fix Plan
 
@@ -139,7 +161,7 @@ Plan saved to `.ai-factory/FIX_PLAN.md`.
 
 Review the plan and when you're ready to execute, run:
 
-$2
+/aif-fix
 ```
 
 **STOP here. Do NOT apply the fix.**
@@ -249,10 +271,23 @@ describe('functionName', () => {
 });
 \`\`\`
 
-Would you like me to create this test?
-- [ ] Yes, create the test
-- [ ] No, skip for now
+AskUserQuestion: Would you like me to create this test?
+
+Options:
+1. Yes, create the test
+2. No, skip for now
 ```
+
+**Handling the user's response:**
+
+- **If "Yes, create the test":**
+  1. Create the test file in the appropriate test directory (follow project conventions)
+  2. Include the suggested test case and any additional edge cases related to the fix
+  3. Run the test to verify it passes
+  4. Then proceed to **Step 6: Create Self-Improvement Patch**
+
+- **If "No, skip for now":**
+  - Proceed directly to **Step 6: Create Self-Improvement Patch**
 
 ## Logging Requirements
 
@@ -282,7 +317,7 @@ function fixedFunction(input) {
 
 ### Example 1: Null Reference Error
 
-**User:** `$2 TypeError: Cannot read property 'name' of undefined in UserProfile`
+**User:** `/aif-fix TypeError: Cannot read property 'name' of undefined in UserProfile`
 
 **Actions:**
 1. Search for UserProfile component/function
@@ -292,7 +327,7 @@ function fixedFunction(input) {
 
 ### Example 2: API Returns Wrong Data
 
-**User:** `$2 /api/orders returns empty array for authenticated users`
+**User:** `/aif-fix /api/orders returns empty array for authenticated users`
 
 **Actions:**
 1. Find orders API endpoint
@@ -303,7 +338,7 @@ function fixedFunction(input) {
 
 ### Example 3: Form Validation Not Working
 
-**User:** `$2 email validation accepts invalid emails`
+**User:** `/aif-fix email validation accepts invalid emails`
 
 **Actions:**
 1. Find email validation logic
@@ -324,8 +359,12 @@ function fixedFunction(input) {
 8. **Minimal changes** - Don't refactor unrelated code
 9. **One fix at a time** - Don't scope creep
 10. **Clean up** - Delete FIX_PLAN.md after successful fix execution
+11. **Ownership boundary** - `/aif-fix` owns `.ai-factory/FIX_PLAN.md` and `.ai-factory/patches/*.md`; treat `.ai-factory/DESCRIPTION.md`, roadmap/rules/architecture context artifacts as read-only unless the user explicitly requests otherwise
+12. **Logging scope** - Keep `[FIX]` logging requirements for fixes; context-gate outputs in this command should use `WARN`/`ERROR` and must not change global logging policy in other skills
 
 ## After Fixing
+
+**Use this output template in Step 5** (before the AskUserQuestion about tests):
 
 ```
 ## Fix Applied ✅
@@ -338,13 +377,6 @@ function fixedFunction(input) {
 - path/to/file.ts (line X)
 
 **Logging added:** Yes, prefix `[FIX]`
-**Test suggested:** Yes
-
-Please test the fix and share logs if any issues.
-
-To add the suggested test:
-- [ ] Yes, create test
-- [ ] No, skip
 ```
 
 ### Step 6: Create Self-Improvement Patch
@@ -444,16 +476,7 @@ default avatar URL. Also added a null check in the Avatar sub-component.
 
 ### Context Cleanup
 
-Context is heavy after investigation, fix, and patch generation. All results are saved — suggest freeing space:
-
-```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
-```
+Suggest the user to free up context space if needed: `/clear` (full reset) or `/compact` (compress history).
 
 ---
 

@@ -86,17 +86,20 @@ export const paymentService = {
   /**
    * Скачивание квитанции
    */
-  async downloadReceipt(paymentId) {
+    async downloadReceipt(paymentId) {
     try {
       const response = await api.get(`/payments/${paymentId}/receipt/download`, {
         responseType: 'blob'
       });
       
       // Создаем ссылку для скачивания
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `receipt_${paymentId}.txt`);
+      link.setAttribute('download', `receipt_${paymentId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();

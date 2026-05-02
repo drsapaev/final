@@ -36,8 +36,8 @@ class GroupPermissionsApiService:
             raise GroupPermissionsApiDomainError(404, "Пользователь не найден")
 
         permissions = self.permission_service.get_user_permissions(self.db, user_id, use_cache)
-        roles = [role.name for role in user.roles if role.is_active]
-        groups = [group.name for group in user.groups if group.is_active]
+        roles = self.repository.get_user_role_names(user_id)
+        groups = self.repository.get_user_group_names(user_id)
 
         return {
             "user_id": user_id,
@@ -68,8 +68,8 @@ class GroupPermissionsApiService:
                 "description": group.description,
                 "group_type": group.group_type,
                 "is_active": group.is_active,
-                "users_count": len([u for u in group.users if u.is_active]),
-                "roles_count": len([r for r in group.roles if r.is_active]),
+                "users_count": self.repository.count_group_users(group.id),
+                "roles_count": self.repository.count_group_roles(group.id),
             }
             for group in groups
         ]

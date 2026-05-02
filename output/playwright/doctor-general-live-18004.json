@@ -1,0 +1,20 @@
+{
+  "status_code": 200,
+  "json": {
+    "queue_exists": false,
+    "doctor": {
+      "id": 21,
+      "name": "Doctor User",
+      "specialty": "general",
+      "cabinet": null
+    },
+    "date": "2026-03-21",
+    "entries": [],
+    "stats": {
+      "total": 0,
+      "waiting": 0,
+      "called": 0,
+      "served": 0
+    }
+  }
+}

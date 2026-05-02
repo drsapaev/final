@@ -1,7 +1,126 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
+import { api } from '../api/client';
+import logger from '../utils/logger';
+
+const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
+
+const normalizeTransaction = (transaction = {}) => ({
+  id: transaction.id,
+  type: transaction.type || 'income',
+  category: transaction.category || '',
+  amount: Number(transaction.amount ?? 0),
+  description: transaction.description || '',
+  patientId: transaction.patient_id ?? transaction.patientId ?? null,
+  doctorId: transaction.doctor_id ?? transaction.doctorId ?? null,
+  patientName: transaction.patient_name ?? transaction.patientName ?? null,
+  doctorName: transaction.doctor_name ?? transaction.doctorName ?? null,
+  paymentMethod: transaction.payment_method || transaction.paymentMethod || 'cash',
+  status: transaction.status || 'completed',
+  transactionDate: transaction.transaction_date || transaction.transactionDate || '',
+  notes: transaction.notes || '',
+  reference: transaction.reference || '',
+  createdAt: transaction.created_at || transaction.createdAt || null,
+  updatedAt: transaction.updated_at || transaction.updatedAt || null
+});
+
+const sortTransactions = (transactions = []) => {
+  return [...transactions].sort((left, right) => {
+    const leftTime = new Date(left.transactionDate || 0).getTime() || 0;
+    const rightTime = new Date(right.transactionDate || 0).getTime() || 0;
+
+    if (rightTime !== leftTime) {
+      return rightTime - leftTime;
+    }
+
+    return Number(right.id || 0) - Number(left.id || 0);
+  });
+};
+
+const normalizeDeletedIds = (deletedIds = []) => {
+  return [...new Set(deletedIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)))];
+};
+
+const readFinanceCache = () => {
+  try {
+    const raw = localStorage.getItem(FINANCE_CACHE_KEY);
+    if (!raw) {
+      return { transactions: [], deletedIds: [] };
+    }
+
+    const parsed = JSON.parse(raw);
+    const cachedTransactions = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.transactions)
+        ? parsed.transactions
+        : [];
+    const deletedIds = Array.isArray(parsed?.deletedIds) ? parsed.deletedIds : [];
+
+    return {
+      transactions: sortTransactions(cachedTransactions.map(normalizeTransaction)),
+      deletedIds: normalizeDeletedIds(deletedIds)
+    };
+  } catch (error) {
+    logger.warn('[FIX:FINANCE] Не удалось прочитать локальный кэш финансов:', error);
+    return { transactions: [], deletedIds: [] };
+  }
+};
+
+const writeFinanceCache = (transactions, deletedIds = []) => {
+  try {
+    localStorage.setItem(
+      FINANCE_CACHE_KEY,
+      JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        transactions: sortTransactions(transactions.map(normalizeTransaction)),
+        deletedIds: normalizeDeletedIds(deletedIds)
+      })
+    );
+  } catch (error) {
+    logger.warn('[FIX:FINANCE] Не удалось сохранить локальный кэш финансов:', error);
+  }
+};
+
+const mergeTransactions = (serverTransactions = [], cacheState = { transactions: [], deletedIds: [] }) => {
+  const deletedIds = new Set(normalizeDeletedIds(cacheState.deletedIds));
+  const merged = new Map();
+
+  serverTransactions.forEach((transaction) => {
+    const normalized = normalizeTransaction(transaction);
+    if (normalized.id == null || deletedIds.has(Number(normalized.id))) {
+      return;
+    }
+    merged.set(Number(normalized.id), normalized);
+  });
+
+  (cacheState.transactions || []).forEach((transaction) => {
+    const normalized = normalizeTransaction(transaction);
+    if (normalized.id == null || deletedIds.has(Number(normalized.id))) {
+      return;
+    }
+    merged.set(Number(normalized.id), normalized);
+  });
+
+  return sortTransactions(Array.from(merged.values()));
+};
+
+const toApiPayload = (transactionData) => ({
+  type: transactionData.type,
+  category: transactionData.category,
+  amount: Number(transactionData.amount),
+  description: transactionData.description,
+  patient_id: transactionData.patientId ? Number(transactionData.patientId) : null,
+  doctor_id: transactionData.doctorId ? Number(transactionData.doctorId) : null,
+  payment_method: transactionData.paymentMethod,
+  status: transactionData.status,
+  transaction_date: transactionData.transactionDate,
+  notes: transactionData.notes ? transactionData.notes : null,
+  reference: transactionData.reference ? transactionData.reference : null
+});
 
 const useFinance = () => {
-  const [transactions, setTransactions] = useState([]);
+  const initialCache = readFinanceCache();
+  const [transactions, setTransactions] = useState(initialCache.transactions);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -10,270 +129,196 @@ const useFinance = () => {
   const [filterDateRange, setFilterDateRange] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
-  // Моковые данные для демонстрации
-  const mockTransactions = useMemo(() => [
-    {
-      id: 1,
-      type: 'income',
-      category: 'Консультация врача',
-      amount: 150000,
-      description: 'Консультация кардиолога - Иванов И.И.',
-      patientId: 1,
-      doctorId: 1,
-      patientName: 'Иванова Анна Сергеевна',
-      doctorName: 'Иванов Иван Иванович',
-      paymentMethod: 'card',
-      status: 'completed',
-      transactionDate: '2024-02-01',
-      notes: 'Плановый осмотр',
-      reference: '****1234',
-      createdAt: '2024-02-01T10:00:00Z'
-    },
-    {
-      id: 2,
-      type: 'income',
-      category: 'Диагностика',
-      amount: 250000,
-      description: 'ЭКГ и УЗИ сердца',
-      patientId: 2,
-      doctorId: 1,
-      patientName: 'Петров Дмитрий Александрович',
-      doctorName: 'Иванов Иван Иванович',
-      paymentMethod: 'cash',
-      status: 'completed',
-      transactionDate: '2024-02-01',
-      notes: 'Полный комплекс диагностики',
-      reference: null,
-      createdAt: '2024-02-01T14:30:00Z'
-    },
-    {
-      id: 3,
-      type: 'expense',
-      category: 'Зарплата персонала',
-      amount: 5000000,
-      description: 'Зарплата врачей за январь',
-      patientId: null,
-      doctorId: null,
-      patientName: null,
-      doctorName: null,
-      paymentMethod: 'transfer',
-      status: 'completed',
-      transactionDate: '2024-02-01',
-      notes: 'Ежемесячная выплата зарплаты',
-      reference: 'TRF-2024-001',
-      createdAt: '2024-02-01T09:00:00Z'
-    },
-    {
-      id: 4,
-      type: 'income',
-      category: 'Лечение',
-      amount: 300000,
-      description: 'Лечение дерматологических проблем',
-      patientId: 3,
-      doctorId: 2,
-      patientName: 'Сидорова Мария Ивановна',
-      doctorName: 'Петрова Мария Сергеевна',
-      paymentMethod: 'mobile',
-      status: 'completed',
-      transactionDate: '2024-02-02',
-      notes: 'Курс лечения 2 недели',
-      reference: 'MOB-789456',
-      createdAt: '2024-02-02T11:15:00Z'
-    },
-    {
-      id: 5,
-      type: 'expense',
-      category: 'Медикаменты',
-      amount: 750000,
-      description: 'Закупка лекарств для клиники',
-      patientId: null,
-      doctorId: null,
-      patientName: null,
-      doctorName: null,
-      paymentMethod: 'card',
-      status: 'completed',
-      transactionDate: '2024-02-02',
-      notes: 'Закупка у поставщика "ФармаМед"',
-      reference: '****5678',
-      createdAt: '2024-02-02T16:45:00Z'
-    },
-    {
-      id: 6,
-      type: 'income',
-      category: 'Анализы',
-      amount: 120000,
-      description: 'Лабораторные анализы крови',
-      patientId: 4,
-      doctorId: 4,
-      patientName: 'Козлов Алексей Владимирович',
-      doctorName: 'Козлова Анна Владимировна',
-      paymentMethod: 'cash',
-      status: 'pending',
-      transactionDate: '2024-02-03',
-      notes: 'Общий анализ крови + биохимия',
-      reference: null,
-      createdAt: '2024-02-03T08:30:00Z'
-    },
-    {
-      id: 7,
-      type: 'expense',
-      category: 'Коммунальные услуги',
-      amount: 450000,
-      description: 'Оплата электроэнергии и воды',
-      patientId: null,
-      doctorId: null,
-      patientName: null,
-      doctorName: null,
-      paymentMethod: 'transfer',
-      status: 'completed',
-      transactionDate: '2024-02-03',
-      notes: 'За январь 2024',
-      reference: 'UTIL-2024-001',
-      createdAt: '2024-02-03T10:00:00Z'
-    },
-    {
-      id: 8,
-      type: 'income',
-      category: 'Процедуры',
-      amount: 180000,
-      description: 'Физиотерапевтические процедуры',
-      patientId: 5,
-      doctorId: 4,
-      patientName: 'Новикова Елена Дмитриевна',
-      doctorName: 'Козлова Анна Владимировна',
-      paymentMethod: 'card',
-      status: 'completed',
-      transactionDate: '2024-02-03',
-      notes: 'Курс из 10 процедур',
-      reference: '****9012',
-      createdAt: '2024-02-03T15:20:00Z'
-    }
-  ], []);
+  const transactionsRef = useRef(initialCache.transactions);
+  const deletedIdsRef = useRef(new Set(initialCache.deletedIds));
 
-  // Загрузка транзакций
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
+  const persistTransactions = useCallback((nextTransactions, nextDeletedIds = deletedIdsRef.current) => {
+    const normalizedTransactions = sortTransactions(nextTransactions.map(normalizeTransaction));
+    const normalizedDeletedIds = normalizeDeletedIds(Array.isArray(nextDeletedIds) ? nextDeletedIds : Array.from(nextDeletedIds || []));
+
+    transactionsRef.current = normalizedTransactions;
+    deletedIdsRef.current = new Set(normalizedDeletedIds);
+    setTransactions(normalizedTransactions);
+    writeFinanceCache(normalizedTransactions, normalizedDeletedIds);
+
+    return normalizedTransactions;
+  }, []);
+
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setTransactions(mockTransactions);
+      const response = await api.get('/admin/finance/transactions', {
+        params: {
+          skip: 0,
+          limit: 1000
+        }
+      });
+
+      const rawTransactions = Array.isArray(response.data) ? response.data : [];
+      const mergedTransactions = mergeTransactions(rawTransactions, {
+        transactions: transactionsRef.current,
+        deletedIds: Array.from(deletedIdsRef.current)
+      });
+
+      persistTransactions(mergedTransactions, Array.from(deletedIdsRef.current));
+      return mergedTransactions;
     } catch (err) {
+      logger.error('Ошибка загрузки финансовых транзакций:', err);
       setError(err);
+
+      if (transactionsRef.current.length > 0) {
+        logger.warn('[FIX:FINANCE] Используем локальный кэш финансовых транзакций после ошибки загрузки');
+        return transactionsRef.current;
+      }
+
+      const cachedState = readFinanceCache();
+      if (cachedState.transactions.length > 0) {
+        logger.info('[FIX:FINANCE] Восстановили финансовые транзакции из локального кэша');
+        persistTransactions(cachedState.transactions, cachedState.deletedIds);
+        return cachedState.transactions;
+      }
+
+      return [];
     } finally {
       setLoading(false);
     }
-  }, [mockTransactions]);
+  }, [persistTransactions]);
 
-  // Создание транзакции
   const createTransaction = useCallback(async (transactionData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newTransaction = {
-        id: Date.now(),
-        ...transactionData,
-        createdAt: new Date().toISOString()
-      };
-      
-      setTransactions(prev => [newTransaction, ...prev]);
-      return newTransaction;
+      const response = await api.post('/admin/finance/transactions', toApiPayload(transactionData));
+      const createdTransaction = normalizeTransaction(response.data);
+      const nextDeletedIds = Array.from(deletedIdsRef.current).filter(
+        (deletedId) => Number(deletedId) !== Number(createdTransaction.id)
+      );
+      const nextTransactions = mergeTransactions(
+        [...transactionsRef.current, createdTransaction],
+        {
+          transactions: [],
+          deletedIds: nextDeletedIds
+        }
+      );
+
+      persistTransactions(nextTransactions, nextDeletedIds);
+      await loadTransactions();
+      return createdTransaction;
     } catch (err) {
+      logger.error('Ошибка создания финансовой транзакции:', err);
       setError(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTransactions, persistTransactions]);
 
-  // Обновление транзакции
   const updateTransaction = useCallback(async (id, transactionData) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setTransactions(prev => prev.map(transaction => 
-        transaction.id === id 
-          ? { ...transaction, ...transactionData }
-          : transaction
-      ));
-      
-      return { id, ...transactionData };
+      const response = await api.put(`/admin/finance/transactions/${id}`, toApiPayload(transactionData));
+      const updatedTransaction = normalizeTransaction(response.data);
+      const nextDeletedIds = Array.from(deletedIdsRef.current).filter(
+        (deletedId) => Number(deletedId) !== Number(updatedTransaction.id)
+      );
+      const nextTransactions = mergeTransactions(
+        [
+          ...transactionsRef.current.filter((transaction) => Number(transaction.id) !== Number(id)),
+          updatedTransaction
+        ],
+        {
+          transactions: [],
+          deletedIds: nextDeletedIds
+        }
+      );
+
+      persistTransactions(nextTransactions, nextDeletedIds);
+      await loadTransactions();
+      return updatedTransaction;
     } catch (err) {
+      logger.error('Ошибка обновления финансовой транзакции:', err);
       setError(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTransactions, persistTransactions]);
 
-  // Удаление транзакции
   const deleteTransaction = useCallback(async (id) => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setTransactions(prev => prev.filter(transaction => transaction.id !== id));
+      await api.delete(`/admin/finance/transactions/${id}`);
+      const nextDeletedIds = normalizeDeletedIds([
+        ...Array.from(deletedIdsRef.current),
+        Number(id)
+      ]);
+      const nextTransactions = transactionsRef.current.filter((transaction) => Number(transaction.id) !== Number(id));
+
+      persistTransactions(nextTransactions, nextDeletedIds);
+      await loadTransactions();
     } catch (err) {
+      logger.error('Ошибка удаления финансовой транзакции:', err);
       setError(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTransactions, persistTransactions]);
 
-  // Фильтрация транзакций
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = !searchTerm || 
-      transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.doctorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.reference?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = !filterType || transaction.type === filterType;
-    const matchesCategory = !filterCategory || transaction.category === filterCategory;
-    const matchesStatus = !filterStatus || transaction.status === filterStatus;
-    
-    const matchesDateRange = !filterDateRange || (() => {
-      const transactionDate = new Date(transaction.transactionDate);
-      const today = new Date();
-      
-      switch (filterDateRange) {
-        case 'today':
-          return transactionDate.toDateString() === today.toDateString();
-        case 'week': {
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          return transactionDate >= weekAgo;
-        }
-        case 'month': {
-          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-          return transactionDate >= monthAgo;
-        }
-        case 'year': {
-          const yearAgo = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-          return transactionDate >= yearAgo;
-        }
-        default:
-          return true;
-      }
-    })();
-    
-    return matchesSearch && matchesType && matchesCategory && matchesStatus && matchesDateRange;
-  });
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((transaction) => {
+      const search = searchTerm.toLowerCase();
+      const matchesSearch =
+        !searchTerm ||
+        transaction.description.toLowerCase().includes(search) ||
+        transaction.category.toLowerCase().includes(search) ||
+        transaction.patientName?.toLowerCase().includes(search) ||
+        transaction.doctorName?.toLowerCase().includes(search) ||
+        transaction.reference?.toLowerCase().includes(search);
 
-  // Получение финансовой статистики
+      const matchesType = !filterType || transaction.type === filterType;
+      const matchesCategory = !filterCategory || transaction.category === filterCategory;
+      const matchesStatus = !filterStatus || transaction.status === filterStatus;
+
+      const matchesDateRange = !filterDateRange || (() => {
+        const transactionDate = new Date(transaction.transactionDate);
+        const today = new Date();
+
+        switch (filterDateRange) {
+          case 'today':
+            return transactionDate.toDateString() === today.toDateString();
+          case 'week': {
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return transactionDate >= weekAgo;
+          }
+          case 'month': {
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            return transactionDate >= monthAgo;
+          }
+          case 'year': {
+            const yearAgo = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
+            return transactionDate >= yearAgo;
+          }
+          default:
+            return true;
+        }
+      })();
+
+      return matchesSearch && matchesType && matchesCategory && matchesStatus && matchesDateRange;
+    });
+  }, [filterCategory, filterDateRange, filterStatus, filterType, searchTerm, transactions]);
+
   const getFinancialStats = () => {
     const stats = {
       totalIncome: 0,
@@ -283,27 +328,26 @@ const useFinance = () => {
       incomeCount: 0,
       expenseCount: 0
     };
-    
-    transactions.forEach(transaction => {
+
+    transactions.forEach((transaction) => {
       if (transaction.type === 'income') {
         stats.totalIncome += transaction.amount;
-        stats.incomeCount++;
+        stats.incomeCount += 1;
       } else {
         stats.totalExpense += transaction.amount;
-        stats.expenseCount++;
+        stats.expenseCount += 1;
       }
     });
-    
+
     stats.netProfit = stats.totalIncome - stats.totalExpense;
-    
+
     return stats;
   };
 
-  // Получение статистики по категориям
   const getCategoryStats = () => {
     const categoryStats = {};
-    
-    transactions.forEach(transaction => {
+
+    transactions.forEach((transaction) => {
       if (!categoryStats[transaction.category]) {
         categoryStats[transaction.category] = {
           income: 0,
@@ -311,31 +355,30 @@ const useFinance = () => {
           count: 0
         };
       }
-      
+
       if (transaction.type === 'income') {
         categoryStats[transaction.category].income += transaction.amount;
       } else {
         categoryStats[transaction.category].expense += transaction.amount;
       }
-      
-      categoryStats[transaction.category].count++;
+
+      categoryStats[transaction.category].count += 1;
     });
-    
+
     return categoryStats;
   };
 
-  // Получение статистики по дням
   const getDailyStats = (days = 7) => {
     const dailyStats = {};
     const today = new Date();
-    
-    for (let i = 0; i < days; i++) {
+
+    for (let i = 0; i < days; i += 1) {
       const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
       const dateStr = date.toISOString().split('T')[0];
       dailyStats[dateStr] = { income: 0, expense: 0, count: 0 };
     }
-    
-    transactions.forEach(transaction => {
+
+    transactions.forEach((transaction) => {
       const transactionDate = transaction.transactionDate;
       if (dailyStats[transactionDate]) {
         if (transaction.type === 'income') {
@@ -343,14 +386,13 @@ const useFinance = () => {
         } else {
           dailyStats[transactionDate].expense += transaction.amount;
         }
-        dailyStats[transactionDate].count++;
+        dailyStats[transactionDate].count += 1;
       }
     });
-    
+
     return dailyStats;
   };
 
-  // Загрузка при монтировании
   useEffect(() => {
     loadTransactions();
   }, [loadTransactions]);

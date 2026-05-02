@@ -8,6 +8,7 @@ import MacOSCheckbox from '../ui/macos/MacOSCheckbox';
 import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 /**
  * UserModal - macOS-styled modal for creating/editing users
@@ -155,6 +156,12 @@ const UserModal = ({
     </div>
   );
 
+
+  ErrorMessage.propTypes = {
+    ...(ErrorMessage.propTypes || {}),
+    message: PropTypes.any,
+  };
+
   // Form field wrapper with icon
   const FormField = ({ label, required, icon: Icon, error, children }) => (
     <div style={{ marginBottom: '16px' }}>
@@ -186,6 +193,16 @@ const UserModal = ({
       {error && <ErrorMessage message={error} />}
     </div>
   );
+
+
+  FormField.propTypes = {
+    ...(FormField.propTypes || {}),
+    children: PropTypes.any,
+    error: PropTypes.any,
+    icon: PropTypes.any,
+    label: PropTypes.any,
+    required: PropTypes.any,
+  };
 
   return (
     <MacOSModal
@@ -356,6 +373,16 @@ const UserModal = ({
       `}</style>
     </MacOSModal>
   );
+};
+
+
+UserModal.propTypes = {
+  ...(UserModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  loading: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  user: PropTypes.any,
 };
 
 export default UserModal;

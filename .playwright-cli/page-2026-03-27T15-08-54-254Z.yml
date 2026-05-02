@@ -1,0 +1,329 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "admin" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]:
+            - img [ref=e41]
+            - text: admin
+        - button "Выйти" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - text: Выйти
+    - generic [ref=e49]:
+      - complementary [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]: Медицинская система
+          - button "Collapse sidebar" [ref=e54] [cursor=pointer]:
+            - img [ref=e56]
+        - navigation [ref=e59]:
+          - button "Dashboard" [ref=e60] [cursor=pointer]:
+            - img [ref=e61]
+            - generic [ref=e64]: Dashboard
+          - button "Analytics" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Analytics
+          - button "Wait Time Analytics" [ref=e70] [cursor=pointer]:
+            - img [ref=e71]
+            - generic [ref=e74]: Wait Time Analytics
+          - button "AI Analytics" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e79]: AI Analytics
+          - button "Webhooks" [ref=e80] [cursor=pointer]:
+            - img [ref=e81]
+            - generic [ref=e84]: Webhooks
+          - button "Reports" [ref=e85] [cursor=pointer]:
+            - img [ref=e86]
+            - generic [ref=e89]: Reports
+          - button "System" [ref=e90] [cursor=pointer]:
+            - img [ref=e91]
+            - generic [ref=e94]: System
+          - button "Cloud Printing" [ref=e95] [cursor=pointer]:
+            - img [ref=e96]
+            - generic [ref=e99]: Cloud Printing
+          - button "Medical Equipment" [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+            - generic [ref=e104]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e109]: Dynamic Pricing
+          - button "Billing" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e114]: Billing
+          - button "Discount Benefits" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e122]: Discount Benefits
+          - button "GraphQL API" [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e127]: GraphQL API
+          - button "Users" [ref=e128] [cursor=pointer]:
+            - img [ref=e129]
+            - generic [ref=e132]: Users
+          - button "Doctors" [ref=e133] [cursor=pointer]:
+            - img [ref=e134]
+            - generic [ref=e137]: Doctors
+          - button "Services" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e142]: Services
+          - button "Patients" [ref=e143] [cursor=pointer]:
+            - img [ref=e144]
+            - generic [ref=e147]: Patients
+          - button "Appointments" [ref=e148] [cursor=pointer]:
+            - img [ref=e149]
+            - generic [ref=e152]: Appointments
+          - button "All Free" [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+            - generic [ref=e157]: All Free
+          - button "Benefit Settings" [ref=e158] [cursor=pointer]:
+            - img [ref=e159]
+            - generic [ref=e162]: Benefit Settings
+          - button "Wizard Settings" [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e169]: Wizard Settings
+          - button "Payment Providers" [ref=e170] [cursor=pointer]:
+            - img [ref=e171]
+            - generic [ref=e174]: Payment Providers
+          - button "Clinic Management" [ref=e175] [cursor=pointer]:
+            - img [ref=e176]
+            - generic [ref=e179]: Clinic Management
+          - button "Clinic Settings" [ref=e180] [cursor=pointer]:
+            - img [ref=e181]
+            - generic [ref=e184]: Clinic Settings
+          - button "Queue Settings" [ref=e185] [cursor=pointer]:
+            - img [ref=e186]
+            - generic [ref=e189]: Queue Settings
+          - button "Queue Limits" [ref=e190] [cursor=pointer]:
+            - img [ref=e191]
+            - generic [ref=e194]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e195] [cursor=pointer]:
+            - img [ref=e196]
+            - generic [ref=e199]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e200] [cursor=pointer]:
+            - img [ref=e201]
+            - generic [ref=e204]: AI Imaging
+          - button "Treatment Recommendations" [ref=e205] [cursor=pointer]:
+            - img [ref=e206]
+            - generic [ref=e209]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e210] [cursor=pointer]:
+            - img [ref=e211]
+            - generic [ref=e214]: Drug Interactions
+          - button "Risk Assessment" [ref=e215] [cursor=pointer]:
+            - img [ref=e216]
+            - generic [ref=e219]: Risk Assessment
+          - button "Voice to Text" [ref=e220] [cursor=pointer]:
+            - img [ref=e221]
+            - generic [ref=e224]: Voice to Text
+          - button "Smart Scheduling" [ref=e225] [cursor=pointer]:
+            - img [ref=e226]
+            - generic [ref=e229]: Smart Scheduling
+          - button "Quality Control" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+            - generic [ref=e234]: Quality Control
+          - button "Analytics Insights" [ref=e235] [cursor=pointer]:
+            - img [ref=e236]
+            - generic [ref=e239]: Analytics Insights
+          - button "Telegram Bot" [ref=e240] [cursor=pointer]:
+            - img [ref=e241]
+            - generic [ref=e244]: Telegram Bot
+          - button "FCM Notifications" [ref=e245] [cursor=pointer]:
+            - img [ref=e246]
+            - generic [ref=e249]: FCM Notifications
+          - button "Phone Verification" [ref=e250] [cursor=pointer]:
+            - img [ref=e251]
+            - generic [ref=e254]: Phone Verification
+          - button "User Data Transfer" [ref=e255] [cursor=pointer]:
+            - img [ref=e256]
+            - generic [ref=e259]: User Data Transfer
+          - button "Group Permissions" [ref=e260] [cursor=pointer]:
+            - img [ref=e261]
+            - generic [ref=e264]: Group Permissions
+          - button "User Export" [ref=e265] [cursor=pointer]:
+            - img [ref=e266]
+            - generic [ref=e269]: User Export
+          - button "Registrar Notifications" [ref=e270] [cursor=pointer]:
+            - img [ref=e271]
+            - generic [ref=e276]: Registrar Notifications
+          - button "AI Settings" [ref=e277] [cursor=pointer]:
+            - img [ref=e278]
+            - generic [ref=e281]: AI Settings
+          - button "Telegram Settings" [ref=e282] [cursor=pointer]:
+            - img [ref=e283]
+            - generic [ref=e286]: Telegram Settings
+          - button "Display Settings" [ref=e287] [cursor=pointer]:
+            - img [ref=e288]
+            - generic [ref=e293]: Display Settings
+          - button "Activation" [ref=e294] [cursor=pointer]:
+            - img [ref=e295]
+            - generic [ref=e298]: Activation
+          - button "Finance" [ref=e299] [cursor=pointer]:
+            - img [ref=e300]
+            - generic [ref=e305]: Finance
+          - button "Security" [ref=e306] [cursor=pointer]:
+            - img [ref=e307]
+            - generic [ref=e310]: Security
+          - button "Settings" [ref=e311] [cursor=pointer]:
+            - img [ref=e312]
+            - generic [ref=e315]: Settings
+      - main [ref=e316]:
+        - generic [ref=e334]:
+          - generic [ref=e335]:
+            - generic [ref=e336]:
+              - heading "Настройки льгот" [level=2] [ref=e337]:
+                - img [ref=e338]
+                - text: Настройки льгот
+              - paragraph [ref=e341]: Управление параметрами льгот и повторных визитов
+            - generic [ref=e342]:
+              - generic [ref=e343]: "Обновлено: 27.03.2026 в 15:07:03"
+              - button "Обновить" [ref=e344] [cursor=pointer]:
+                - generic [ref=e345]:
+                  - img [ref=e346]
+                  - text: Обновить
+          - generic [ref=e351]:
+            - generic [ref=e352]:
+              - generic [ref=e353]:
+                - img [ref=e355]
+                - generic [ref=e357]:
+                  - generic [ref=e358]:
+                    - heading "Повторные визиты" [level=3] [ref=e359]
+                    - generic [ref=e360]: Неактивны
+                  - paragraph [ref=e361]: Настройки для повторных консультаций
+              - generic [ref=e362]:
+                - generic [ref=e363]:
+                  - generic [ref=e364]: Окно повторного визита (дней)
+                  - generic [ref=e365]:
+                    - generic [ref=e366]:
+                      - img [ref=e367]
+                      - spinbutton [ref=e371]: "21"
+                    - generic [ref=e372]: дней
+                  - paragraph [ref=e373]: Период, в течение которого консультация считается повторной
+                - generic [ref=e374]:
+                  - generic [ref=e375]: Скидка на повторный визит (%)
+                  - generic [ref=e376]:
+                    - generic [ref=e377]:
+                      - img [ref=e378]
+                      - spinbutton [ref=e383]: "0"
+                    - generic [ref=e384]: "%"
+                  - paragraph [ref=e385]: 0% = бесплатно, 50% = половина цены, 100% = полная цена
+                - generic [ref=e387]:
+                  - img [ref=e388]
+                  - generic [ref=e390]:
+                    - paragraph [ref=e391]: "Как работают повторные визиты:"
+                    - list [ref=e392]:
+                      - listitem [ref=e393]: • Проверяется наличие консультации у того же врача
+                      - listitem [ref=e394]: • В течение указанного периода (дней)
+                      - listitem [ref=e395]: • Применяется указанная скидка
+            - generic [ref=e396]:
+              - generic [ref=e397]:
+                - img [ref=e399]
+                - generic [ref=e401]:
+                  - generic [ref=e402]:
+                    - heading "Льготные визиты" [level=3] [ref=e403]
+                    - generic [ref=e404]: Бесплатно
+                  - paragraph [ref=e405]: Настройки для льготных категорий пациентов
+              - generic [ref=e406]:
+                - generic [ref=e408]:
+                  - checkbox [checked] [ref=e410]:
+                    - img [ref=e412] [cursor=pointer]
+                  - generic [ref=e414]:
+                    - generic [ref=e415]: Льготные консультации бесплатны
+                    - paragraph [ref=e416]: Консультации специалистов для льготных категорий
+                - generic [ref=e418]:
+                  - checkbox [ref=e420]
+                  - generic [ref=e422]:
+                    - generic [ref=e423]: Автоодобрение заявок "All Free"
+                    - paragraph [ref=e424]: Автоматически одобрять все заявки на бесплатные услуги
+                - generic [ref=e426]:
+                  - img [ref=e427]
+                  - generic [ref=e429]:
+                    - paragraph [ref=e430]: "Типы льгот:"
+                    - list [ref=e431]:
+                      - listitem [ref=e432]:
+                        - text: •
+                        - strong [ref=e433]: Льготный
+                        - text: "- обычно только консультации"
+                      - listitem [ref=e434]:
+                        - text: •
+                        - strong [ref=e435]: All Free
+                        - text: "- любые услуги (требует одобрения)"
+          - button "Сохранить настройки" [disabled] [ref=e438]:
+            - generic [ref=e439]:
+              - img [ref=e440]
+              - text: Сохранить настройки
+          - generic [ref=e444]:
+            - generic [ref=e445]:
+              - generic [ref=e446]:
+                - heading "Окно повторных визитов" [level=3] [ref=e447]
+                - img [ref=e448]
+              - generic [ref=e450]: 21 дней
+              - generic [ref=e451]:
+                - img [ref=e452]
+                - generic [ref=e453]: Скидка неактивна
+            - generic [ref=e454]:
+              - generic [ref=e455]:
+                - heading "Скидка на повторные визиты" [level=3] [ref=e456]
+                - img [ref=e457]
+              - generic [ref=e461]: 0%
+              - generic [ref=e462]:
+                - img [ref=e463]
+                - generic [ref=e464]: Не применяется
+            - generic [ref=e465]:
+              - generic [ref=e466]:
+                - heading "Льготные консультации" [level=3] [ref=e467]
+                - img [ref=e468]
+              - generic [ref=e470]: Бесплатно
+              - generic [ref=e471]:
+                - img [ref=e472]
+                - generic [ref=e473]: Активны
+            - generic [ref=e474]:
+              - generic [ref=e475]:
+                - heading "Автоодобрение All Free" [level=3] [ref=e476]
+                - img [ref=e477]
+              - generic [ref=e480]: Выключено
+              - generic [ref=e481]:
+                - img [ref=e482]
+                - generic [ref=e483]: Вручную
+          - generic [ref=e484]:
+            - heading "Текущие настройки:" [level=4] [ref=e485]
+            - generic [ref=e486]:
+              - generic [ref=e487]:
+                - img [ref=e488]
+                - generic [ref=e490]: "Окно: 21 дней"
+              - generic [ref=e491]:
+                - img [ref=e492]
+                - generic [ref=e494]: "Скидка: 0%"
+              - generic [ref=e495]:
+                - img [ref=e496]
+                - generic [ref=e499]: "Льготы: Бесплатно"
+              - generic [ref=e500]:
+                - img [ref=e501]
+                - generic [ref=e503]: "All Free: Ручное одобрение"
+  - region "Notifications Alt+T"
+  - generic [ref=e504]:
+    - generic [ref=e505]:
+      - img [ref=e506]
+      - generic [ref=e509]:
+        - strong [ref=e510]: Включить уведомления?
+        - generic [ref=e511]: Получайте уведомления о новых сообщениях
+    - generic [ref=e512]:
+      - button "Включить" [ref=e513] [cursor=pointer]
+      - button "Закрыть" [ref=e514] [cursor=pointer]:
+        - img [ref=e515]

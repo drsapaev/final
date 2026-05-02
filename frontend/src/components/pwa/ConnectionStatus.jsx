@@ -12,6 +12,7 @@ import WifiOffIcon from '@mui/icons-material/WifiOff';
 import SyncIcon from '@mui/icons-material/Sync';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import { usePWA } from '../../hooks/usePWA';
+import PropTypes from 'prop-types';
 
 const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   const { isOnline, isServiceWorkerReady } = usePWA();
@@ -188,6 +189,13 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
       )}
     </>
   );
+};
+
+
+ConnectionStatus.propTypes = {
+  ...(ConnectionStatus.propTypes || {}),
+  position: PropTypes.any,
+  showOfflineAlert: PropTypes.any,
 };
 
 export default ConnectionStatus;

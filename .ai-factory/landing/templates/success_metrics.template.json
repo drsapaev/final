@@ -1,0 +1,24 @@
+{
+  "quality_targets": {
+    "lighthouse_performance": 95,
+    "lighthouse_accessibility": 100,
+    "lighthouse_seo": 95,
+    "lighthouse_best_practices": 95,
+    "lcp_seconds": 2.5,
+    "cls": 0.1,
+    "inp_ms": 200,
+    "broken_links": 0,
+    "console_errors": 0,
+    "critical_axe_violations": 0
+  },
+  "business_targets": {
+    "primary_conversion": "",
+    "secondary_conversion": "",
+    "max_form_fields": 3
+  },
+  "release_blockers": [
+    "unresolved critical audit issues",
+    "critical axe violations",
+    "missing measured scorecard evidence"
+  ]
+}

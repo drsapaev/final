@@ -6,8 +6,8 @@ GraphQL API предоставляет гибкий и эффективный с
 
 ## Доступ к API
 
-- **Endpoint**: `http://localhost:8000/api/graphql`
-- **GraphiQL интерфейс**: `http://localhost:8000/api/graphql` (в браузере)
+- **Endpoint**: `http://localhost:18000/api/graphql`
+- **GraphiQL интерфейс**: `http://localhost:18000/api/graphql` (в браузере)
 - **Метод**: POST
 - **Content-Type**: application/json
 

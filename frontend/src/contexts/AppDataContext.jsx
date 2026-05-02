@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react';
+import PropTypes from 'prop-types';
 /**
  * Контекст для управления глобальным состоянием приложения
  * Оптимизирует передачу данных между компонентами
@@ -366,6 +367,12 @@ export const AppDataProvider = ({ children }) => {
       {children}
     </AppDataContext.Provider>
   );
+};
+
+
+AppDataProvider.propTypes = {
+  ...(AppDataProvider.propTypes || {}),
+  children: PropTypes.any,
 };
 
 // Хук для использования контекста

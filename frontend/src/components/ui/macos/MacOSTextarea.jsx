@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
 const MacOSTextarea = React.forwardRef(({
   className,
@@ -122,6 +123,22 @@ const MacOSTextarea = React.forwardRef(({
     />
   );
 });
+
+
+MacOSTextarea.propTypes = {
+  ...(MacOSTextarea.propTypes || {}),
+  autoResize: PropTypes.any,
+  className: PropTypes.any,
+  defaultValue: PropTypes.any,
+  disabled: PropTypes.any,
+  error: PropTypes.any,
+  maxRows: PropTypes.any,
+  minRows: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  value: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 MacOSTextarea.displayName = 'MacOSTextarea';
 

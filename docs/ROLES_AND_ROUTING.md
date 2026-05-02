@@ -1,181 +1,153 @@
-# Система ролей и маршрутизации
+# Roles And Routing
 
-## ⚠️ ОБНОВЛЕНО: Система аутентификации модернизирована!
+This document reflects the frontend routing contract under `frontend/src/routing/`.
+The code-first source of truth is:
 
-**ВАЖНО**: Система была обновлена с новым блокирующим 2FA флоу и унифицированными моделями ролей.
-**Основная форма входа**: `LoginFormStyled.jsx` (заменила `Login.jsx`)
-**Полная документация**: `docs/AUTHENTICATION_SYSTEM_FINAL_GUIDE.md`
+- `frontend/src/routing/routeRegistry.js`
+- `frontend/src/routing/routeSelectors.js`
+- `frontend/src/routing/routeGuards.jsx`
+- `frontend/src/routing/routeDocsSnapshot.js`
 
-## 🎯 Критические пользователи и их роли
+## Route Groups
 
-| Пользователь | Пароль | Роль | Маршрут | Описание |
-|-------------|--------|------|---------|----------|
-| admin | admin123 | Admin | /admin | Администратор системы |
-| registrar | registrar123 | Registrar | /registrar-panel | Регистратура |
-| lab | lab123 | Lab | /lab-panel | Лаборатория |
-| doctor | doctor123 | Doctor | /doctor-panel | Врач общей практики |
-| cashier | cashier123 | Cashier | /cashier-panel | Касса |
-| cardio | cardio123 | cardio | /cardiologist | Кардиолог |
-| derma | derma123 | derma | /dermatologist | Дерматолог-косметолог |
-| dentist | dentist123 | dentist | /dentist | Стоматолог |
+### Public
+- `/`
+- `/login`
+- `/health`
+- `/queue/join`
+- `/queue/join/:token`
+- `/queue-board`
+- `/display-board`
+- `/display-board/:role`
+- `/payment/success`
+- `/payment/cancel`
+- `/unauthorized`
+- `/forbidden`
+- `/not-found`
 
-## 🔐 Система ролей и разрешений (НОВОЕ)
+### Onboarding
+- `/setup`
 
-### Базовые роли в системе управления пользователями:
-- **Admin** - Полный доступ ко всем функциям
-- **Doctor** - Доступ к пациентам, записям, EMR, аналитике
-- **Nurse** - Доступ к записям и расписанию
-- **Receptionist** - Доступ к записям, платежам, расписанию
-- **Patient** - Доступ к своему профилю и записям
+### Clinical
+Canonical role homes:
+- `Admin` -> `/admin`
+- `Registrar` -> `/registrar`
+- `Doctor` -> `/doctor`
+- `Cashier` -> `/cashier`
+- `Lab` -> `/lab`
+- `cardio` -> `/doctor/cardiology`
+- `derma` -> `/doctor/dermatology`
+- `dentist` -> `/doctor/dentistry`
+- `Patient` -> `/patient`
 
-### Разрешения по категориям:
-- **users:** - Управление пользователями
-- **profile:** - Управление профилями
-- **patients:** - Управление пациентами
-- **appointments:** - Управление записями
-- **emr:** - Медицинские карты
-- **payments:** - Платежи
-- **analytics:** - Аналитика и отчеты
-- **settings:** - Настройки системы
-- **audit:** - Аудит действий
-- **export:** - Экспорт данных
+Shared clinical workspaces:
+- `/clinical/scheduler`
+- `/clinical/appointments`
+- `/clinical/search`
+- `/clinical/profile`
+- `/clinical/security`
+- `/clinical/security/two-factor`
+- `/clinical/visits/:id`
+- `/clinical/pickup/:patientId`
 
-## 🛡️ Защищенные маршруты
+### Admin
+Canonical admin IA now lives under `/admin/*`.
 
-### Frontend маршруты (App.jsx)
-```javascript
-// КРИТИЧЕСКИ ВАЖНО: Не изменять роли без обновления тестов!
-<Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
-<Route path="doctor-panel"    element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-<Route path="cashier-panel"   element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
-<Route path="lab-panel"       element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
+Primary admin routes:
+- `/admin`
+- `/admin/analytics`
+- `/admin/users`
+- `/admin/settings`
+- `/admin/security`
+- `/admin/audit`
+- `/admin/notifications`
+- `/admin/integrations/telegram`
+- `/admin/activation`
+- `/admin/file-management`
+- `/admin/advanced-users`
+- `/admin/user-select`
 
-<Route path="cardiologist"    element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
-<Route path="dermatologist"   element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
-<Route path="dentist"         element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
-```
+Additional admin subsections remain under `/admin/*` and are tracked in the route registry.
 
-### Backend API endpoints
-```python
-# КРИТИЧЕСКИ ВАЖНО: Синхронизировать с frontend ролями!
-user: User = Depends(deps.require_roles("Admin", "Doctor", "cardio"))  # Cardio API
-user: User = Depends(deps.require_roles("Admin", "Doctor", "derma"))   # Derma API  
-user: User = Depends(deps.require_roles("Admin", "Doctor", "dentist")) # Dental API
-```
+### Internal Demo
+Internal demo surfaces are no longer part of production IA.
 
-### Новые API endpoints управления пользователями:
-```python
-# Система управления пользователями (НОВОЕ)
-from app.api.deps import require_admin, require_staff
+Canonical internal-demo routes:
+- `/internal-demo/medilab`
+- `/internal-demo/macos`
+- `/internal-demo/integration`
+- `/internal-demo/payment-test`
+- `/internal-demo/css-test`
+- `/internal-demo/buttons`
 
-# Управление пользователями - только для администраторов
-user: User = Depends(require_admin)  # /users/* (создание, удаление, массовые действия)
+Policy:
+- never visible in production navigation
+- never used for role-home routing
+- treated as internal-only surfaces
+- available only when internal demo routing is enabled
 
-# Просмотр и редактирование - для персонала
-user: User = Depends(require_staff)  # /users (список), /users/{id} (просмотр)
+## Compatibility Redirects
 
-# Профили и настройки - для владельца или администратора
-user: User = Depends(require_staff)  # /users/{id}/profile, /users/{id}/preferences
-```
+Legacy URLs still work, but they redirect to canonical destinations.
 
-## 🔄 Функции перенаправления
+Examples:
+- `/registrar-panel` -> `/registrar`
+- `/doctor-panel` -> `/doctor`
+- `/cashier-panel` -> `/cashier`
+- `/lab-panel` -> `/lab`
+- `/cardiologist` -> `/doctor/cardiology`
+- `/dermatologist` -> `/doctor/dermatology`
+- `/dentist` -> `/doctor/dentistry`
+- `/scheduler` -> `/clinical/scheduler`
+- `/appointments` -> `/clinical/appointments`
+- `/search` -> `/clinical/search`
+- `/profile` -> `/clinical/profile`
+- `/security` -> `/clinical/security`
+- `/visits/:id` -> `/clinical/visits/:id`
+- `/pickup/:patientId` -> `/clinical/pickup/:patientId`
+- `/settings` -> `/admin/settings`
+- `/analytics` -> `/admin/analytics`
+- `/audit` -> `/admin/audit`
+- `/notifications` -> `/admin/notifications`
+- `/telegram-integration` -> `/admin/integrations/telegram`
+- `/advanced-users` -> `/admin/advanced-users`
+- `/file-management` -> `/admin/file-management`
+- `/user-select` -> `/admin/user-select`
+- `/payment/test` -> `/internal-demo/payment-test`
+- `/css-test` -> `/internal-demo/css-test`
+- `/buttons` -> `/internal-demo/buttons`
+- `/medilab-demo` -> `/internal-demo/medilab`
+- `/macos-demo` -> `/internal-demo/macos`
+- `/integration-demo` -> `/internal-demo/integration`
+- `/old-login` -> `/login`
 
-### Login.jsx - pickRouteForRoleCached()
-```javascript
-// КРИТИЧЕСКИ ВАЖНО: Синхронизировать с маршрутами!
-if (role === 'admin')     return '/admin';
-if (role === 'registrar') return '/registrar-panel';
-if (role === 'lab')       return '/lab-panel';
-if (role === 'doctor')    return '/doctor-panel';
-if (role === 'cashier')   return '/cashier-panel';
-if (role === 'cardio')    return '/cardiologist';
-if (role === 'derma')     return '/dermatologist';
-if (role === 'dentist')   return '/dentist';
-```
+## Setup Gating
 
-### UserSelect.jsx - routeForRole()
-```javascript
-// КРИТИЧЕСКИ ВАЖНО: Синхронизировать с Login.jsx!
-if (r === 'admin')     return '/admin';
-if (r === 'registrar') return '/registrar-panel';
-if (r === 'lab')       return '/lab-panel';
-if (r === 'doctor')    return '/doctor-panel';
-if (r === 'cashier')   return '/cashier-panel';
-if (r === 'cardio')    return '/cardiologist';
-if (r === 'derma')     return '/dermatologist';
-if (r === 'dentist')   return '/dentist';
-```
+Setup precedence is enforced by routing guards, not by page-local logic:
 
-## ⚠️ Правила изменений
+1. Public and callback routes remain reachable before initialization.
+2. When the app is not initialized, `clinical` and `admin` routes redirect to `/setup`.
+3. When the app is initialized, `/setup` redirects to `/login`.
+4. `/login` and `/setup` must not loop.
 
-### ❌ НЕ ДЕЛАТЬ:
-1. **Не изменять роли** без обновления всех связанных файлов
-2. **Не удалять пользователей** cardio, derma, dentist
-3. **Не изменять маршруты** без обновления функций перенаправления
-4. **Не изменять пароли** без обновления документации
+## Auth And Role Policy
 
-### ✅ ОБЯЗАТЕЛЬНО ДЕЛАТЬ:
-1. **Запускать тесты** после каждого изменения: `python test_role_routing.py`
-2. **Обновлять документацию** при добавлении новых ролей
-3. **Синхронизировать** frontend и backend роли
-4. **Тестировать логин** для всех ролей после изменений
+- `public`: no auth required
+- `authenticated`: any signed-in user
+- `role-scoped`: signed-in user plus explicit allowed roles from the route registry
 
-## 🧪 Автоматическое тестирование
+Role normalization:
+- `Receptionist` is treated as `registrar`
+- `Nurse` is treated as `doctor`
 
-### Запуск тестов:
-```bash
-cd backend
-python test_role_routing.py
-```
+## Error Routes
 
-### Что тестируется:
-- ✅ Логин всех критических пользователей
-- ✅ Корректность ролей в профилях
-- ✅ Доступность специализированных API
-- ✅ Соответствие ролей ожидаемым значениям
+Canonical system routes:
+- `/unauthorized`
+- `/forbidden`
+- `/not-found`
 
-## 🚨 Критические файлы для синхронизации
+## Notes
 
-При изменении системы ролей ОБЯЗАТЕЛЬНО обновить:
-
-1. **Frontend:**
-   - `frontend/src/App.jsx` - маршруты RequireAuth
-   - `frontend/src/pages/Login.jsx` - pickRouteForRoleCached()
-   - `frontend/src/pages/UserSelect.jsx` - routeForRole()
-
-2. **Backend:**
-   - `backend/app/api/v1/endpoints/cardio.py` - require_roles
-   - `backend/app/api/v1/endpoints/derma.py` - require_roles  
-   - `backend/app/api/v1/endpoints/dental.py` - require_roles
-   - `backend/app/api/v1/endpoints/user_management.py` - НОВОЕ: управление пользователями
-   - `backend/app/middleware/user_permissions.py` - НОВОЕ: проверка прав
-   - `backend/app/services/user_management_service.py` - НОВОЕ: сервис управления
-
-3. **База данных:**
-   - Таблица `users` - роли пользователей
-   - Таблица `user_roles` - НОВОЕ: роли системы
-   - Таблица `user_permissions` - НОВОЕ: разрешения
-   - Таблица `role_permissions` - НОВОЕ: связи ролей и разрешений
-   - Таблица `user_groups` - НОВОЕ: группы пользователей
-   - Таблица `user_profiles` - НОВОЕ: профили пользователей
-   - Таблица `user_preferences` - НОВОЕ: настройки пользователей
-   - Таблица `user_notification_settings` - НОВОЕ: настройки уведомлений
-   - Таблица `user_audit_logs` - НОВОЕ: аудит действий
-   - Пароли пользователей
-
-4. **Тесты:**
-   - `backend/test_role_routing.py` - список пользователей и ролей
-   - `backend/test_user_management_system.py` - НОВОЕ: тесты системы управления
-   - `backend/create_user_management_tables.py` - НОВОЕ: создание таблиц
-
-## 📋 Чек-лист перед коммитом
-
-- [ ] Запущены тесты: `python test_role_routing.py`
-- [ ] Запущены тесты системы управления: `python test_user_management_system.py`
-- [ ] Все тесты прошли успешно
-- [ ] Обновлена документация
-- [ ] Синхронизированы frontend и backend роли
-- [ ] Проверен логин для всех ролей
-- [ ] Обновлены пароли в документации (если изменены)
-- [ ] Проверена работа новых API endpoints управления пользователями
-- [ ] Проверена система разрешений и middleware
+- This document is intentionally a contract summary, not a hand-maintained second route table.
+- If route ownership, IA grouping, shell behavior, or compatibility rules change, update the routing registry first and then refresh this summary.

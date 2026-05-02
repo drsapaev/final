@@ -8,11 +8,29 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_roles
+from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
+from app.models.user import User
 from app.services.telegram_bot import get_telegram_bot_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _validate_webhook_secret(request: Request, db: Session) -> None:
+    config = crud_telegram.get_telegram_config(db)
+    expected_secret = getattr(config, "webhook_secret", None)
+    if not expected_secret:
+        return
+
+    received_secret = request.headers.get("x-telegram-bot-api-secret-token")
+    if received_secret != expected_secret:
+        logger.warning("Telegram webhook rejected due to invalid secret token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid Telegram webhook secret",
+        )
 
 
 @router.post("/webhook")
@@ -26,6 +44,8 @@ async def telegram_webhook(
         # Логируем входящее обновление
         logger.info(f"Получено обновление от Telegram: {update}")
 
+        _validate_webhook_secret(request, db)
+
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
 
@@ -38,6 +58,8 @@ async def telegram_webhook(
 
         return {"status": "ok"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка обработки webhook: {e}")
         raise HTTPException(
@@ -55,6 +77,8 @@ async def verify_webhook(request: Request, db: Session = Depends(get_db)):
         # Telegram может отправлять GET запросы для проверки webhook
         return {"status": "webhook_verified"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка проверки webhook: {e}")
         raise HTTPException(
@@ -70,6 +94,7 @@ async def send_message_to_user(
     parse_mode: str = "HTML",
     reply_markup: Dict[str, Any] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Отправка сообщения пользователю через бота
@@ -92,6 +117,8 @@ async def send_message_to_user(
                 detail="Ошибка отправки сообщения",
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка отправки сообщения: {e}")
         raise HTTPException(
@@ -101,7 +128,10 @@ async def send_message_to_user(
 
 
 @router.get("/bot-info", operation_id="telegram_webhook_get_bot_info")
-async def get_bot_info(db: Session = Depends(get_db)):
+async def get_bot_info(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
     """
     Получить информацию о боте
     """
@@ -132,6 +162,8 @@ async def get_bot_info(db: Session = Depends(get_db)):
 
         return {"active": False, "message": "Ошибка получения информации о боте"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка получения информации о боте: {e}")
         return {"active": False, "message": f"Ошибка: {str(e)}"}

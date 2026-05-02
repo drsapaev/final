@@ -314,33 +314,45 @@ export function FormField({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
+  const inputId = props.id || `field-${name}`;
+  const errorId = `error-${name}`;
 
   return (
     <div style={containerStyle}>
       {label &&
-      <label style={labelStyle}>
+      <label htmlFor={inputId} style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
       }
       
       <input
+        id={inputId}
         type={type}
         name={name}
         value={value}
         placeholder={placeholder}
         onChange={handleChange}
         onBlur={handleBlur}
+        aria-invalid={!!(error && touched)}
+        aria-describedby={error && touched ? errorId : undefined}
+        aria-required={required}
         style={inputStyle}
         {...props} />
       
       
       {error && touched &&
-      <div style={errorStyle}>{error}</div>
+      <div id={errorId} role="alert" style={errorStyle}>{error}</div>
       }
     </div>);
 
 }
+
+
+FormField.propTypes = {
+  ...(FormField.propTypes || {}),
+  id: PropTypes.any,
+};
 
 /**
  * Компонент текстовой области
@@ -430,33 +442,45 @@ export function FormTextArea({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
+  const inputId = props.id || `field-${name}`;
+  const errorId = `error-${name}`;
 
   return (
     <div style={containerStyle}>
       {label &&
-      <label style={labelStyle}>
+      <label htmlFor={inputId} style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
       }
       
       <textarea
+        id={inputId}
         name={name}
         value={value}
         placeholder={placeholder}
         onChange={handleChange}
         onBlur={handleBlur}
         rows={rows}
+        aria-invalid={!!(error && touched)}
+        aria-describedby={error && touched ? errorId : undefined}
+        aria-required={required}
         style={textareaStyle}
         {...props} />
       
       
       {error && touched &&
-      <div style={errorStyle}>{error}</div>
+      <div id={errorId} role="alert" style={errorStyle}>{error}</div>
       }
     </div>);
 
 }
+
+
+FormTextArea.propTypes = {
+  ...(FormTextArea.propTypes || {}),
+  id: PropTypes.any,
+};
 
 /**
  * Компонент селекта
@@ -534,21 +558,27 @@ export function FormSelect({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
+  const inputId = props.id || `field-${name}`;
+  const errorId = `error-${name}`;
 
   return (
     <div style={containerStyle}>
       {label &&
-      <label style={labelStyle}>
+      <label htmlFor={inputId} style={labelStyle}>
           {label}
           {required && <span style={requiredStyle}> *</span>}
         </label>
       }
       
       <select
+        id={inputId}
         name={name}
         value={value}
         onChange={handleChange}
         onBlur={handleBlur}
+        aria-invalid={!!(error && touched)}
+        aria-describedby={error && touched ? errorId : undefined}
+        aria-required={required}
         style={selectStyle}
         {...props}>
         
@@ -561,11 +591,17 @@ export function FormSelect({
       </select>
       
       {error && touched &&
-      <div style={errorStyle}>{error}</div>
+      <div id={errorId} role="alert" style={errorStyle}>{error}</div>
       }
     </div>);
 
 }
+
+
+FormSelect.propTypes = {
+  ...(FormSelect.propTypes || {}),
+  id: PropTypes.any,
+};
 
 /**
  * Компонент кнопки отправки

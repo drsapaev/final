@@ -11,7 +11,6 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 
 
 class QueueBatchRepository:
@@ -31,14 +30,10 @@ class QueueBatchRepository:
         )
 
     def resolve_specialist_user_id(self, specialist_id: int) -> tuple[int | None, bool]:
-        """Returns (user_id, converted_from_doctor_id)."""
+        """Returns (doctor_id, converted_from_legacy_user_id)."""
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        if doctor and doctor.user_id:
-            return doctor.user_id, True
-
-        user = self.db.query(User).filter(User.id == specialist_id).first()
-        if user:
-            return user.id, False
+        if doctor:
+            return doctor.id, False
 
         return None, False
 
@@ -74,4 +69,3 @@ class QueueBatchRepository:
 
     def rollback(self) -> None:
         self.db.rollback()
-

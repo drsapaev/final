@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Intake"
+  short_description: "Normalize a landing brief"
+  default_prompt: "Use $landing-intake to turn a raw request into a structured landing brief."

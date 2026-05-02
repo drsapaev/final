@@ -13,7 +13,7 @@ if not token:
     print("Токен не указан. Пытаемся войти как admin...")
     # Попробуем залогиниться
     login_response = requests.post(
-        "http://localhost:8000/api/v1/authentication/login",
+        "http://localhost:18000/api/v1/authentication/login",
         json={"username": "registrar", "password": "registrar123"}
     )
 
@@ -28,7 +28,7 @@ if not token:
 
 # Запрашиваем очереди
 today = date.today().strftime('%Y-%m-%d')
-url = f"http://localhost:8000/api/v1/registrar/queues/today?target_date={today}"
+url = f"http://localhost:18000/api/v1/registrar/queues/today?target_date={today}"
 
 print(f"\n📡 Запрос: GET {url}")
 response = requests.get(

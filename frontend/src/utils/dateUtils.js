@@ -3,6 +3,38 @@
  * Provides consistent date formatting across the app
  */
 
+export const REGISTRAR_TIME_ZONE = 'Asia/Tashkent';
+
+/**
+ * Parses registrar timestamps using the clinic timezone contract.
+ * Legacy naive timestamps are treated as Asia/Tashkent local time.
+ *
+ * @param {string|Date} value - Timestamp to parse
+ * @returns {Date|null} Parsed Date or null when invalid
+ */
+export const parseRegistrarTimestamp = (value) => {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    let parsed;
+    if (/Z$|[+-]\d{2}:\d{2}$/.test(raw)) {
+        parsed = new Date(raw);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        parsed = new Date(`${raw}T00:00:00+05:00`);
+    } else {
+        const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+        parsed = new Date(`${normalized}+05:00`);
+    }
+
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 /**
  * Converts a Date object to YYYY-MM-DD format string
  * @param {Date} date - The date to format (defaults to current date)

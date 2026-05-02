@@ -5,7 +5,7 @@ API endpoints для платежной системы
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -314,13 +314,12 @@ def download_receipt(
     """Скачивание квитанции"""
     service = PaymentReadService(db)
     try:
-        from fastapi.responses import PlainTextResponse
-
-        receipt_content = service.build_receipt_content(payment_id=payment_id)
-        return PlainTextResponse(
-            content=receipt_content,
+        pdf_bytes = service.build_receipt_pdf(payment_id=payment_id)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=receipt_{payment_id}.txt"
+                "Content-Disposition": f'attachment; filename="receipt_{payment_id}.pdf"'
             },
         )
 

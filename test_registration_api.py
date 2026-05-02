@@ -32,7 +32,7 @@ try:
     print("📤 Отправляем тестовый запрос на создание записи...")
 
     response = requests.post(
-        'http://localhost:8000/api/v1/registrar/cart',
+        'http://localhost:18000/api/v1/registrar/cart',
         headers={
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'

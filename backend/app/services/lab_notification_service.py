@@ -6,12 +6,14 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
 from app.models.lab import LabOrder, LabResult
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.visit import Visit
 from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
@@ -51,18 +53,9 @@ class LabNotificationService:
             Статистика отправленных уведомлений
         """
         try:
-            # Находим готовые результаты без уведомления
-            ready_orders = (
-                self.db.query(LabOrder)
-                .filter(
-                    LabOrder.status == "completed",
-                    or_(
-                        LabOrder.notification_sent == False,
-                        LabOrder.notification_sent.is_(None),
-                    ),
-                )
-                .all()
-            )
+            # Находим готовые результаты. Дедупликация здесь не хранится в модели,
+            # поэтому этот сервис отвечает только за canonical delivery.
+            ready_orders = self.db.query(LabOrder).filter(LabOrder.status == "completed").all()
 
             notifications_sent = 0
             errors = []
@@ -70,8 +63,6 @@ class LabNotificationService:
             for order in ready_orders:
                 try:
                     await self._notify_patient_results_ready(order)
-                    order.notification_sent = True
-                    order.notification_sent_at = datetime.utcnow()
                     notifications_sent += 1
                 except Exception as e:
                     errors.append({"order_id": order.id, "error": str(e)})
@@ -116,11 +107,48 @@ class LabNotificationService:
         """.strip()
 
         # Отправляем через доступные каналы
-        if user and hasattr(user, 'telegram_id') and user.telegram_id:
-            await notification_sender_service.send_telegram_message(
-                user_id=user.telegram_id,
-                message=message,
+        if user:
+            canonical_created = await notification_sender_service.send_lab_event_notification(
+                db=self.db,
+                recipient=user,
+                event_type="lab_results",
+                title="Результаты анализов готовы",
+                message=f"Результаты лабораторных исследований по заказу #{order.id} готовы.",
+                metadata={
+                    "order_id": order.id,
+                    "patient_id": order.patient_id,
+                    "result_id": None,
+                },
             )
+            if not canonical_created:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] lab_results canonical delivery failed",
+                    extra={"order_id": order.id, "patient_user_id": user.id},
+                )
+            else:
+                confirmation_created = await notification_sender_service.send_lab_event_notification(
+                    db=self.db,
+                    recipient=user,
+                    event_type="lab_result_sent_confirmation",
+                    title="Результат исследования отправлен",
+                    message=f"Результаты по заказу #{order.id} отправлены в личный кабинет.",
+                    metadata={
+                        "order_id": order.id,
+                        "patient_id": order.patient_id,
+                        "result_id": None,
+                    },
+                )
+                if not confirmation_created:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] lab_result_sent_confirmation canonical delivery failed",
+                        extra={"order_id": order.id, "patient_user_id": user.id},
+                    )
+
+            if hasattr(user, 'telegram_id') and user.telegram_id:
+                await notification_sender_service.send_telegram_message(
+                    user_id=user.telegram_id,
+                    message=message,
+                )
 
         # SMS если есть телефон
         if patient.phone:
@@ -140,17 +168,7 @@ class LabNotificationService:
             # Находим результаты за последние 24 часа
             yesterday = datetime.utcnow() - timedelta(hours=24)
 
-            recent_results = (
-                self.db.query(LabResult)
-                .filter(
-                    LabResult.created_at >= yesterday,
-                    or_(
-                        LabResult.critical_notified == False,
-                        LabResult.critical_notified.is_(None),
-                    ),
-                )
-                .all()
-            )
+            recent_results = self.db.query(LabResult).filter(LabResult.created_at >= yesterday).all()
 
             critical_found = []
 
@@ -163,9 +181,11 @@ class LabNotificationService:
                         try:
                             value = float(result.value)
                             if value < thresholds["low"] or value > thresholds["high"]:
+                                order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
+                                patient_id = order.patient_id if order else None
                                 critical_found.append({
                                     "result_id": result.id,
-                                    "patient_id": result.patient_id,
+                                    "patient_id": patient_id,
                                     "test_name": result.test_name,
                                     "value": value,
                                     "unit": thresholds["unit"],
@@ -175,9 +195,6 @@ class LabNotificationService:
 
                                 # Уведомляем врача
                                 await self._notify_doctor_critical_value(result, value, thresholds)
-
-                                result.critical_notified = True
-                                result.critical_notified_at = datetime.utcnow()
                         except (ValueError, TypeError):
                             pass
 
@@ -200,12 +217,21 @@ class LabNotificationService:
         thresholds: dict,
     ):
         """Уведомляет врача о критическом значении"""
-        # Получаем назначившего врача
         order = self.db.query(LabOrder).filter(LabOrder.id == result.order_id).first()
-        if not order or not order.doctor_id:
+        if not order:
             return
 
-        patient = self.db.query(Patient).filter(Patient.id == result.patient_id).first()
+        visit = None
+        if order.visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == order.visit_id).first()
+        if not visit or not visit.doctor_id:
+            return
+
+        doctor = self.db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+        if not doctor or not doctor.user_id:
+            return
+
+        patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
 
         alert_type = "⬇️ КРИТИЧЕСКИ НИЗКОЕ" if value < thresholds["low"] else "⬆️ КРИТИЧЕСКИ ВЫСОКОЕ"
 
@@ -218,18 +244,75 @@ class LabNotificationService:
 📈 Значение: {value} {thresholds.get('unit', '')}
 📉 Норма: {thresholds['low']} - {thresholds['high']}
 
-👤 Пациент: {patient.short_name() if patient else f'ID {result.patient_id}'}
+👤 Пациент: {patient.short_name() if patient else f'ID {order.patient_id}'}
 
 Требуется срочное внимание!
         """.strip()
 
         # Отправляем врачу
-        doctor_user = self.db.query(User).filter(User.id == order.doctor_id).first()
-        if doctor_user and hasattr(doctor_user, 'telegram_id') and doctor_user.telegram_id:
-            await notification_sender_service.send_telegram_message(
-                user_id=doctor_user.telegram_id,
-                message=message,
+        doctor_user = self.db.query(User).filter(User.id == doctor.user_id).first()
+        if doctor_user:
+            canonical_created = await notification_sender_service.send_lab_event_notification(
+                db=self.db,
+                recipient=doctor_user,
+                event_type="lab_critical_result",
+                title="Критический результат анализа",
+                message=f"{result.test_name}: {value} {thresholds.get('unit', '')} у пациента #{order.patient_id}.",
+                metadata={
+                    "result_id": result.id,
+                    "order_id": result.order_id,
+                    "patient_id": order.patient_id,
+                    "test_name": result.test_name,
+                    "value": value,
+                    "unit": thresholds.get("unit", ""),
+                    "critical_low": thresholds["low"],
+                    "critical_high": thresholds["high"],
+                    "is_critical": True,
+                },
             )
+            if not canonical_created:
+                logger.error(
+                    "[FIX:NOTIFICATIONS] lab_critical_result canonical delivery failed",
+                    extra={
+                        "result_id": result.id,
+                        "doctor_user_id": doctor_user.id,
+                    "order_id": result.order_id,
+                },
+            )
+            else:
+                finding_created = await notification_sender_service.send_lab_event_notification(
+                    db=self.db,
+                    recipient=doctor_user,
+                    event_type="lab_critical_finding",
+                    title="Критическая находка в исследовании",
+                    message=f"В анализе {result.test_name} у пациента #{order.patient_id} обнаружена критическая находка.",
+                    metadata={
+                        "result_id": result.id,
+                        "order_id": result.order_id,
+                        "patient_id": order.patient_id,
+                        "test_name": result.test_name,
+                        "value": value,
+                        "unit": thresholds.get("unit", ""),
+                        "critical_low": thresholds["low"],
+                        "critical_high": thresholds["high"],
+                        "is_critical": True,
+                    },
+                )
+                if not finding_created:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] lab_critical_finding canonical delivery failed",
+                        extra={
+                            "result_id": result.id,
+                            "doctor_user_id": doctor_user.id,
+                            "order_id": result.order_id,
+                        },
+                    )
+
+            if hasattr(doctor_user, 'telegram_id') and doctor_user.telegram_id:
+                await notification_sender_service.send_telegram_message(
+                    user_id=doctor_user.telegram_id,
+                    message=message,
+                )
 
         logger.warning(f"Critical value alert sent for result {result.id}")
 
@@ -285,12 +368,31 @@ class LabNotificationService:
                     # Отправляем напоминание
                     if patient.user_id:
                         user = self.db.query(User).filter(User.id == patient.user_id).first()
-                        if user and hasattr(user, 'telegram_id') and user.telegram_id:
-                            await notification_sender_service.send_telegram_message(
-                                user_id=user.telegram_id,
-                                message=message,
+                        if user:
+                            canonical_created = await notification_sender_service.send_queue_position_event_notification(
+                                db=self.db,
+                                recipient=user,
+                                event_type="diagnostics_return_needed",
+                                title="Напоминание о повторном анализе",
+                                message=f"Через {days_until} дней запланирован повторный анализ.",
+                                metadata={
+                                    "order_id": order.id,
+                                    "patient_id": order.patient_id,
+                                    "follow_up_date": order.follow_up_date.isoformat(),
+                                    "days_until": days_until,
+                                },
                             )
-                            reminders_sent += 1
+
+                            telegram_sent = False
+                            if hasattr(user, 'telegram_id') and user.telegram_id:
+                                tg_response = await notification_sender_service.send_telegram_message(
+                                    user_id=user.telegram_id,
+                                    message=message,
+                                )
+                                telegram_sent = bool(tg_response.get("success"))
+
+                            if canonical_created or telegram_sent:
+                                reminders_sent += 1
 
                     order.follow_up_reminded = True
                     order.follow_up_reminded_at = datetime.utcnow()

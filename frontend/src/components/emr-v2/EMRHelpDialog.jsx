@@ -1,6 +1,9 @@
 /**
  * EMRHelpDialog - Справка и безопасность
- */const EMRHelpDialog = ({ isOpen, onClose }) => {
+ */
+import PropTypes from 'prop-types';
+
+const EMRHelpDialog = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     const handleActivationKeyDown = (event, action) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -69,6 +72,11 @@
             </div>
         </div>
     );
+};
+
+EMRHelpDialog.propTypes = {
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
 };
 
 export default EMRHelpDialog;

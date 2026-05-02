@@ -168,9 +168,7 @@ def open_queue(
     Из detail.md стр. 253: Кнопка «Открыть приём сейчас» → проставляется opened_at → онлайн набор закрыт
     """
     try:
-        result = crud_queue.open_daily_queue(
-            db=db, day=day, specialist_id=specialist_id, user_id=current_user.id
-        )
+        result = crud_queue.open_daily_queue(db=db, day=day, specialist_id=specialist_id)
 
         return QueueOpenResponse(**result)
 

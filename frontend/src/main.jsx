@@ -2,9 +2,17 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
+import './styles/theme.css';
+import './styles/dark-theme-visibility-fix.css';
+import './styles/global-fixes.css';
+import './theme/macos-tokens.css';
+import './styles/macos.css';
+import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
 
 // Инициализация API interceptors
 import { setupInterceptors, initializeAuth } from './api/interceptors';
+
+bootstrapStoredColorScheme();
 
 // Настраиваем interceptors
 setupInterceptors();

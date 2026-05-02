@@ -7,7 +7,7 @@ import requests
 import json
 from datetime import datetime
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 
 def test_time_restrictions():
     """Тестирует временные ограничения QR системы"""

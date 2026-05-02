@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../ui/macos';
+import notify from '../../services/notify';
 
 /**
  * Cash Payment Modal Component
@@ -32,7 +33,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!paymentData.amount || paymentData.amount <= 0) {
-            alert('Введите корректную сумму');
+            notify.warning('Введите корректную сумму');
             return;
         }
         onProcessPayment(appointment, paymentData);

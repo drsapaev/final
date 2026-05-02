@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getVisit, rescheduleVisit } from '../api';
 import RescheduleDialog from '../components/RescheduleDialog';
 
+import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 /**
  * VisitDetails page
@@ -33,7 +34,7 @@ function VisitDetails() {
     }).
     catch((err) => {
       logger.error('getVisit error:', err);
-      setError(err && err.data && (err.data.detail || err.data.message) || err.message || 'Ошибка загрузки приёма');
+      setError(getErrorMessage(err, 'Не удалось загрузить приём. Проверьте соединение и попробуйте снова.'));
     }).
     finally(() => {
       if (mounted) setLoading(false);
@@ -61,7 +62,7 @@ function VisitDetails() {
       setVisit((prev) => ({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
     } catch (err) {
       logger.error('rescheduleTomorrow error:', err);
-      setError(err && err.data && (err.data.detail || err.data.message) || err.message || 'Ошибка переноса');
+      setError(getErrorMessage(err, 'Не удалось перенести приём. Проверьте соединение и попробуйте снова.'));
     } finally {
       setLoading(false);
     }

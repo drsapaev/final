@@ -4,8 +4,13 @@
 """
 
 import asyncio
+import json
+import platform
+import re
 import os
+import logging
 import socket
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +22,43 @@ from sqlalchemy.orm import Session
 from app.crud import print_config as crud_print
 from app.models.print_config import PrinterConfig, PrintJob, PrintTemplate
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
+LEGACY_COMMENT_BLOCK_RE = re.compile(r"{% comment %}.*?{% endcomment %}", re.S)
+THERMAL_PRINTER_KEYWORDS = (
+    "thermal",
+    "therm",
+    "ticket",
+    "receipt",
+    "pos",
+    "escpos",
+    "receipt printer",
+    "ticket printer",
+    "xprinter",
+    "epson",
+    "star",
+    "bixolon",
+    "pos58",
+    "80mm",
+    "58mm",
+)
+LAB_PRINTER_KEYWORDS = (
+    "laser",
+    "laserjet",
+    "office",
+    "canon",
+    "brother",
+    "xerox",
+    "hp",
+    "mfp",
+    "a4",
+    "pdf",
+)
+PRESCRIPTION_PRINTER_KEYWORDS = (
+    "prescription",
+    "rx",
+    "a5",
+)
 
 
 class PrintService:
@@ -71,6 +113,13 @@ class PrintService:
         Основной метод печати документа
         """
         try:
+            logger.info(
+                "[FIX] print_document start document_type=%s printer_name=%s",
+                document_type,
+                printer_name,
+            )
+            if document_type == "lab_results":
+                document_data = self._normalize_lab_results_data(document_data, user)
             # Находим принтер
             printer = self._get_printer(printer_name, document_type)
             if not printer:
@@ -108,6 +157,12 @@ class PrintService:
 
                 # Обновляем статус задания
                 self._update_print_job(print_job.id, "completed")
+                logger.info(
+                    "[FIX] print_document completed document_type=%s printer=%s job_id=%s",
+                    document_type,
+                    printer.name,
+                    print_job.id,
+                )
 
                 return {
                     "success": True,
@@ -120,9 +175,21 @@ class PrintService:
             except Exception as e:
                 # Обновляем статус задания с ошибкой
                 self._update_print_job(print_job.id, "failed", str(e))
+                logger.error(
+                    "[FIX] print_document failed document_type=%s printer=%s error=%s",
+                    document_type,
+                    printer.name,
+                    e,
+                )
                 raise
 
         except Exception as e:
+            logger.error(
+                "[FIX] print_document error document_type=%s printer_name=%s error=%s",
+                document_type,
+                printer_name,
+                e,
+            )
             return {
                 "success": False,
                 "error": str(e),
@@ -134,10 +201,54 @@ class PrintService:
     ) -> PrinterConfig | None:
         """Найти принтер по имени или типу документа"""
         if printer_name:
-            return crud_print.get_printer_by_name(self.db, printer_name)
-        else:
-            # Находим принтер по умолчанию для типа документа
-            return crud_print.get_default_printer_for_type(self.db, document_type)
+            printer = crud_print.get_printer_by_name(self.db, printer_name)
+            if printer:
+                logger.info(
+                    "[FIX] Using requested printer name=%s type=%s connection=%s",
+                    printer.name,
+                    printer.printer_type,
+                    printer.connection_type,
+                )
+                return printer
+
+            synced_printer = self._sync_discovered_printer_by_name(printer_name)
+            if synced_printer:
+                logger.info(
+                    "[FIX] Synced discovered printer name=%s type=%s connection=%s",
+                    synced_printer.name,
+                    synced_printer.printer_type,
+                    synced_printer.connection_type,
+                )
+                return synced_printer
+
+            logger.warning(
+                "[FIX] Requested printer name=%s not found, falling back to document_type=%s",
+                printer_name,
+                document_type,
+            )
+
+        printer = crud_print.get_default_printer_for_type(self.db, document_type)
+        if printer:
+            logger.info(
+                "[FIX] Using default printer name=%s type=%s connection=%s for document_type=%s",
+                printer.name,
+                printer.printer_type,
+                printer.connection_type,
+                document_type,
+            )
+        return printer
+
+    def _sync_discovered_printer_by_name(
+        self, printer_name: str
+    ) -> PrinterConfig | None:
+        """Синхронизировать один принтер из системного списка и вернуть его."""
+        discovered = self._discover_system_printers_sync()
+        for printer_data in discovered:
+            if printer_data["name"] != printer_name and printer_data["display_name"] != printer_name:
+                continue
+            return self._upsert_discovered_printer(printer_data)
+
+        return None
 
     def _get_template(
         self, template_id: int | None, document_type: str, printer_id: int
@@ -153,10 +264,66 @@ class PrintService:
     def _render_template(self, template: PrintTemplate, data: dict[str, Any]) -> str:
         """Рендерить шаблон с данными"""
         try:
-            jinja_template = self.jinja_env.from_string(template.template_content)
+            template_source = LEGACY_COMMENT_BLOCK_RE.sub("", template.template_content)
+            jinja_template = self.jinja_env.from_string(template_source)
             return jinja_template.render(**data)
         except Exception as e:
             raise Exception(f"Ошибка рендеринга шаблона: {str(e)}")
+
+    def _normalize_lab_results_data(
+        self, lab_data: dict[str, Any], user: User | None = None
+    ) -> dict[str, Any]:
+        """Нормализовать данные для печати лабораторного отчета."""
+        from app.core.config import settings
+
+        normalized = lab_data.copy()
+        clinic_data = normalized.get("clinic") or {}
+        patient_data = normalized.get("patient") or {}
+
+        referring_doctor = normalized.get("referring_doctor")
+        if not isinstance(referring_doctor, dict):
+            referring_doctor = {}
+
+        lab_doctor = normalized.get("lab_doctor")
+        if not isinstance(lab_doctor, dict):
+            lab_doctor = {}
+
+        lab_head = normalized.get("lab_head")
+        if not isinstance(lab_head, dict):
+            lab_head = {}
+
+        normalized["clinic"] = {
+            "name": clinic_data.get("name") or settings.APP_NAME,
+            "license_number": clinic_data.get("license_number") or "",
+            "address": clinic_data.get("address") or "",
+            "phone": clinic_data.get("phone") or "",
+            "email": clinic_data.get("email") or "",
+        }
+        normalized["referring_doctor"] = {
+            "full_name": referring_doctor.get("full_name")
+            or patient_data.get("referring_doctor_name")
+            or normalized.get("referring_doctor_name")
+            or "Не указано",
+            "specialty_name": referring_doctor.get("specialty_name")
+            or normalized.get("referring_specialty")
+            or "",
+        }
+        normalized["lab_doctor"] = {
+            "full_name": lab_doctor.get("full_name")
+            or (user.full_name if user else None)
+            or normalized.get("lab_doctor_name")
+            or "Лаборант",
+            "specialty_name": lab_doctor.get("specialty_name") or "Лаборант",
+            "license_number": lab_doctor.get("license_number") or "",
+        }
+        normalized["lab_head"] = {
+            "full_name": lab_head.get("full_name")
+            or normalized.get("lab_head_name")
+            or "Заведующий лабораторией",
+            "specialty_name": lab_head.get("specialty_name") or "",
+        }
+
+        return normalized
 
     def _create_print_job(
         self,
@@ -202,6 +369,22 @@ class PrintService:
         Печать на ESC/POS принтере (термопринтер)
         """
         try:
+            if printer.connection_type == "mock":
+                encoded_content = content.encode(printer.encoding or "utf-8")
+                logger.info(
+                    "[FIX] Mock ESC/POS print for printer=%s bytes_sent=%s",
+                    printer.name,
+                    len(encoded_content),
+                )
+                return {
+                    "method": "mock",
+                    "printer": printer.display_name,
+                    "bytes_sent": len(encoded_content),
+                }
+
+            if printer.connection_type == "local":
+                return await self._print_local_escpos(printer, content)
+
             if printer.connection_type == "network":
                 return await self._print_network_escpos(printer, content)
             elif printer.connection_type == "usb":
@@ -215,6 +398,55 @@ class PrintService:
 
         except Exception as e:
             raise Exception(f"Ошибка ESC/POS печати: {str(e)}")
+
+    async def _print_local_escpos(
+        self, printer: PrinterConfig, content: str
+    ) -> dict[str, Any]:
+        """Печать ESC/POS содержимого на локальный системный принтер."""
+        try:
+            import tempfile
+
+            safe_device = printer.device_path or printer.display_name or printer.name
+            if not safe_device:
+                raise Exception("Не указан локальный принтер")
+
+            encoded_content = content.encode(printer.encoding or "utf-8")
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding=printer.encoding or "utf-8",
+                suffix=".txt",
+                delete=False,
+            ) as temp_file:
+                temp_file.write(content)
+                temp_file_path = temp_file.name
+
+            try:
+                if platform.system() == "Windows":
+                    cmd = ["print", f"/D:{safe_device}", temp_file_path]
+                else:
+                    cmd = ["lp", "-d", safe_device, temp_file_path]
+
+                process = await asyncio.create_subprocess_exec(
+                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await process.communicate()
+
+                if process.returncode == 0:
+                    return {
+                        "method": "local",
+                        "device_path": safe_device,
+                        "bytes_sent": len(encoded_content),
+                    }
+
+                raise Exception(f"Ошибка локальной печати: {stderr.decode()}")
+            finally:
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            raise Exception(f"Ошибка локальной ESC/POS печати: {str(e)}")
 
     async def _print_network_escpos(
         self, printer: PrinterConfig, content: str
@@ -317,22 +549,50 @@ class PrintService:
         Печать PDF документов (A4/A5)
         """
         try:
+            if printer.connection_type == "mock":
+                logger.info(
+                    "[FIX] Mock PDF print for printer=%s paper_size=%s content_chars=%s",
+                    printer.name,
+                    paper_size,
+                    len(content),
+                )
+                return {
+                    "method": "mock",
+                    "paper_size": paper_size,
+                    "printer": printer.display_name,
+                    "status": "queued",
+                    "file_size": len(content.encode("utf-8")),
+                }
+
             import tempfile
 
-            from app.services.pdf_service import get_pdf_service
+            from app.services.pdf_service import _load_weasyprint_components
 
-            pdf_service = get_pdf_service()
-
-            # Если контент это HTML шаблон, генерируем PDF
+            # Если контент это HTML шаблон, генерируем PDF напрямую из строки.
             if content.strip().startswith(
                 '<!DOCTYPE html'
             ) or content.strip().startswith('<html'):
-                # Генерируем PDF из HTML
-                pdf_bytes = pdf_service.generate_pdf_from_html(
-                    template_name="temp_template.html",  # Временный шаблон
-                    data={},
-                    paper_size=paper_size,
+                weasy_css, weasy_html = _load_weasyprint_components()
+                css_content = (
+                    """
+                        @page {
+                            size: A5;
+                            margin: 15mm;
+                        }
+                        body { font-family: 'Times New Roman', serif; }
+                    """
+                    if paper_size == "A5"
+                    else """
+                        @page {
+                            size: A4;
+                            margin: 20mm;
+                        }
+                        body { font-family: 'Times New Roman', serif; }
+                    """
                 )
+                html_doc = weasy_html(string=content, base_url=str(self.templates_dir))
+                css_doc = weasy_css(string=css_content)
+                pdf_bytes = html_doc.write_pdf(stylesheets=[css_doc])
             else:
                 # Контент уже готовый, используем как есть
                 pdf_bytes = content.encode('utf-8')
@@ -502,6 +762,14 @@ class PrintService:
         if not printer.active:
             return {"status": "disabled", "message": "Принтер отключен"}
 
+        if printer.connection_type == "mock":
+            return {"status": "online", "message": "Mock printer available"}
+
+        if printer.connection_type == "local":
+            if printer.device_path:
+                return {"status": "online", "message": "Локальный принтер доступен"}
+            return {"status": "offline", "message": "Не указан локальный принтер"}
+
         # Проверяем доступность принтера
         try:
             if printer.connection_type == "network":
@@ -523,6 +791,233 @@ class PrintService:
 
         except Exception as e:
             return {"status": "error", "message": f"Ошибка проверки: {str(e)}"}
+
+    async def discover_system_printers(self) -> list[dict[str, Any]]:
+        """Получить список локально установленных принтеров ОС."""
+        try:
+            system_name = platform.system()
+            if system_name == "Windows":
+                return await asyncio.to_thread(self._discover_windows_printers_sync)
+            if system_name in {"Linux", "Darwin"}:
+                return await asyncio.to_thread(self._discover_unix_printers_sync)
+            return []
+        except Exception as e:
+            logger.warning("[FIX] System printer discovery failed: %s", e)
+            return []
+
+    async def sync_system_printers(self) -> list[PrinterConfig]:
+        """Синхронизировать локальные системные принтеры в БД."""
+        discovered = await self.discover_system_printers()
+        synced: list[PrinterConfig] = []
+
+        for printer_data in discovered:
+            try:
+                synced.append(self._upsert_discovered_printer(printer_data))
+            except Exception as e:
+                logger.warning(
+                    "[FIX] Failed to sync discovered printer %s: %s",
+                    printer_data.get("name"),
+                    e,
+                )
+
+        if synced:
+            logger.info("[FIX] Synced %s system printers", len(synced))
+
+        return synced
+
+    def _discover_windows_printers_sync(self) -> list[dict[str, Any]]:
+        """Обнаружить локальные принтеры в Windows через PowerShell."""
+        command = [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            (
+                "Get-Printer | "
+                "Select-Object Name,DriverName,PortName,Shared,Default,PrinterStatus,Comment,Location,WorkOffline | "
+                "ConvertTo-Json -Depth 4"
+            ),
+        ]
+
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        raw_output = completed.stdout.strip()
+        if not raw_output:
+            return []
+
+        payload = json.loads(raw_output)
+        items = payload if isinstance(payload, list) else [payload]
+
+        discovered: list[dict[str, Any]] = []
+        for item in items:
+            normalized = self._normalize_discovered_printer(item, system_name="Windows")
+            if normalized:
+                discovered.append(normalized)
+
+        return discovered
+
+    def _discover_unix_printers_sync(self) -> list[dict[str, Any]]:
+        """Обнаружить локальные принтеры в Unix-подобных системах."""
+        command = ["lpstat", "-p"]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+        except FileNotFoundError:
+            return []
+
+        discovered: list[dict[str, Any]] = []
+        for line in completed.stdout.splitlines():
+            line = line.strip()
+            if not line.startswith("printer "):
+                continue
+
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+
+            name = parts[1]
+            discovered.append(
+                self._normalize_discovered_printer(
+                    {
+                        "Name": name,
+                        "DriverName": name,
+                        "PortName": name,
+                        "Shared": False,
+                        "Default": False,
+                        "PrinterStatus": 0,
+                        "Comment": "",
+                        "Location": "",
+                        "WorkOffline": False,
+                    },
+                    system_name="Unix",
+                )
+            )
+
+        return [item for item in discovered if item]
+
+    def _normalize_discovered_printer(
+        self, raw: dict[str, Any], *, system_name: str
+    ) -> dict[str, Any] | None:
+        """Свести системные данные принтера к нашему внутреннему формату."""
+        name = str(
+            raw.get("Name")
+            or raw.get("name")
+            or raw.get("PrinterName")
+            or raw.get("displayName")
+            or ""
+        ).strip()
+        if not name:
+            return None
+
+        driver_name = str(raw.get("DriverName") or raw.get("driverName") or name).strip()
+        port_name = str(raw.get("PortName") or raw.get("portName") or name).strip()
+        comment = str(raw.get("Comment") or raw.get("comment") or "").strip()
+        location = str(raw.get("Location") or raw.get("location") or "").strip()
+        display_name = comment or location or name
+        printer_type = self._infer_printer_type(name, driver_name)
+        paper_width, paper_height = self._infer_paper_size(printer_type)
+        is_default = bool(raw.get("Default") or raw.get("default") or raw.get("isDefault"))
+        status = self._infer_printer_status(raw)
+
+        return {
+            "name": name,
+            "display_name": display_name,
+            "printer_type": printer_type,
+            "connection_type": "local",
+            "device_path": name if system_name == "Windows" else port_name,
+            "paper_width": paper_width,
+            "paper_height": paper_height,
+            "margins": None,
+            "encoding": "utf-8",
+            "active": True,
+            "is_default": is_default,
+            "status": status,
+            "driver_name": driver_name,
+            "location": location,
+        }
+
+    def _infer_printer_type(self, name: str, driver_name: str) -> str:
+        haystack = f"{name} {driver_name}".lower()
+
+        if any(keyword in haystack for keyword in THERMAL_PRINTER_KEYWORDS):
+            return "ESC/POS"
+
+        if any(keyword in haystack for keyword in PRESCRIPTION_PRINTER_KEYWORDS):
+            return "A5"
+
+        if any(keyword in haystack for keyword in LAB_PRINTER_KEYWORDS):
+            return "A4"
+
+        return "A4"
+
+    def _infer_paper_size(self, printer_type: str) -> tuple[int | None, int | None]:
+        if printer_type == "ESC/POS":
+            return 58, None
+        if printer_type == "A5":
+            return 148, 210
+        return 210, 297
+
+    def _infer_printer_status(self, raw: dict[str, Any]) -> str:
+        if raw.get("WorkOffline") or raw.get("workOffline"):
+            return "offline"
+
+        status_value = raw.get("PrinterStatus") or raw.get("printerStatus")
+        if isinstance(status_value, str):
+            lowered = status_value.lower()
+            if lowered in {"offline", "error", "disabled"}:
+                return "offline"
+            return "online"
+
+        if status_value in {1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}:
+            return "offline"
+
+        return "online"
+
+    def _upsert_discovered_printer(
+        self, printer_data: dict[str, Any]
+    ) -> PrinterConfig:
+        """Создать или обновить конфигурацию принтера из системного инвентаря."""
+        printer = crud_print.get_printer_by_name(self.db, printer_data["name"])
+        if not printer:
+            printer = PrinterConfig(
+                name=printer_data["name"],
+                display_name=printer_data["display_name"],
+                printer_type=printer_data["printer_type"],
+                connection_type=printer_data["connection_type"],
+                device_path=printer_data["device_path"],
+                paper_width=printer_data["paper_width"],
+                paper_height=printer_data["paper_height"],
+                margins=printer_data["margins"],
+                encoding=printer_data["encoding"],
+                active=printer_data["active"],
+                is_default=printer_data["is_default"],
+            )
+            self.db.add(printer)
+        else:
+            printer.display_name = printer_data["display_name"]
+            printer.printer_type = printer_data["printer_type"]
+            printer.connection_type = printer_data["connection_type"]
+            printer.device_path = printer_data["device_path"]
+            printer.paper_width = printer_data["paper_width"]
+            printer.paper_height = printer_data["paper_height"]
+            printer.margins = printer_data["margins"]
+            printer.encoding = printer_data["encoding"]
+            printer.active = True
+            printer.is_default = printer_data["is_default"] or printer.is_default
+
+        self.db.commit()
+        self.db.refresh(printer)
+        return printer
 
     async def generate_receipt(
         self,
@@ -547,6 +1042,7 @@ class PrintService:
         """
         from app.models.payment import Payment
         from app.models.visit import Visit
+        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные платежа
@@ -579,6 +1075,42 @@ class PrintService:
         else:
             receipt_data = {}
 
+        clinic_data = receipt_data.get("clinic") or {}
+        receipt_data.setdefault(
+            "clinic_name",
+            receipt_data.get("clinic_name")
+            or clinic_data.get("name")
+            or settings.APP_NAME,
+        )
+        receipt_data.setdefault(
+            "clinic_phone",
+            receipt_data.get("clinic_phone")
+            or clinic_data.get("phone")
+            or "",
+        )
+        receipt_data.setdefault(
+            "clinic_address",
+            receipt_data.get("clinic_address")
+            or clinic_data.get("address")
+            or "",
+        )
+        receipt_data.setdefault(
+            "clinic_website",
+            receipt_data.get("clinic_website")
+            or clinic_data.get("website")
+            or "",
+        )
+        receipt_data.setdefault(
+            "cashier",
+            receipt_data.get("cashier")
+            or {"full_name": user.full_name if user else "Система"},
+        )
+        receipt_data.setdefault(
+            "doctor",
+            receipt_data.get("doctor")
+            or {"full_name": user.full_name if user else "Врач", "specialty_name": "", "cabinet": ""},
+        )
+
         # Дополняем данными из БД
         if payment:
             receipt_data.update(
@@ -589,8 +1121,11 @@ class PrintService:
                     "method": payment.method or "cash",
                     "status": payment.status,
                     "receipt_no": payment.receipt_no or f"RCP-{payment.id}",
-                    "paid_at": payment.paid_at
-                    or queue_service.get_local_timestamp(self.db),
+                    "paid_at": (
+                        payment.paid_at.isoformat()
+                        if payment.paid_at
+                        else queue_service.get_local_timestamp(self.db).isoformat()
+                    ),
                     "note": payment.note,
                 }
             )
@@ -605,8 +1140,18 @@ class PrintService:
                 }
             )
 
+        payment_block = receipt_data.setdefault("payment", {})
+        if isinstance(payment_block, dict):
+            payment_block["services"] = payment_block.get("services") or receipt_data.get("services", [])
+            payment_block["method_name"] = payment_block.get("method_name") or "cash"
+            payment_block["total"] = payment_block.get("total", receipt_data.get("amount", 0))
+            payment_block["subtotal"] = payment_block.get("subtotal", payment_block.get("total", 0))
+            payment_block["discount"] = payment_block.get("discount", 0)
+            payment_block["paid_amount"] = payment_block.get("paid_amount", payment_block.get("total", 0))
+            payment_block["change"] = payment_block.get("change", 0)
+
         # Добавляем метаданные
-        now = queue_service.get_local_timestamp(self.db)
+        now = queue_service.get_local_timestamp(self.db).isoformat()
         receipt_data.update(
             {
                 "date": now,
@@ -646,6 +1191,7 @@ class PrintService:
         """
         from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
+        from app.core.config import settings
         from app.services.queue_service import queue_service
 
         # Получаем данные из очереди
@@ -674,6 +1220,10 @@ class PrintService:
         else:
             ticket_data_final = {}
 
+        ticket_data_final.setdefault("clinic_name", settings.APP_NAME)
+        ticket_data_final.setdefault("clinic_phone", "")
+        ticket_data_final.setdefault("clinic_address", "")
+
         # Дополняем данными из БД
         if queue_entry:
             ticket_data_final.update(
@@ -700,7 +1250,7 @@ class PrintService:
             )
 
         # Добавляем метаданные
-        now = queue_service.get_local_timestamp(self.db)
+        now = queue_service.get_local_timestamp(self.db).isoformat()
         ticket_data_final.update(
             {
                 "date": now,
@@ -745,11 +1295,11 @@ class PrintService:
         return {
             "id": template.id,
             "name": template.name,
-            "document_type": template.document_type,
+            "document_type": template.template_type,
             "printer_id": template.printer_id,
             "template_content": template.template_content,
             "language": template.language or language,
-            "is_active": template.is_active,
+            "is_active": template.active,
             "created_at": (
                 template.created_at.isoformat() if template.created_at else None
             ),

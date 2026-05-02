@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.models.role_permission import Role, UserGroup
 from app.services.group_permissions_api_service import (
     GroupPermissionsApiDomainError,
     GroupPermissionsApiService,
@@ -14,7 +15,13 @@ from app.services.group_permissions_api_service import (
 @pytest.mark.unit
 class TestGroupPermissionsApiService:
     def test_get_user_permissions_payload_raises_for_missing_user(self):
-        repository = SimpleNamespace(get_user=lambda user_id: None)
+        repository = SimpleNamespace(
+            get_user=lambda user_id: None,
+            get_user_role_names=lambda user_id: [],
+            get_user_group_names=lambda user_id: [],
+            count_group_users=lambda group_id: 0,
+            count_group_roles=lambda group_id: 0,
+        )
         permission_service = SimpleNamespace()
         service = GroupPermissionsApiService(
             db=None,
@@ -31,15 +38,41 @@ class TestGroupPermissionsApiService:
     def test_get_user_permissions_payload_returns_roles_and_groups(self):
         user = SimpleNamespace(
             username="admin",
-            roles=[SimpleNamespace(name="Admin", is_active=True)],
-            groups=[SimpleNamespace(name="main", is_active=True)],
         )
-        repository = SimpleNamespace(get_user=lambda user_id: user)
+
+        class FakeQuery:
+            def __init__(self, items):
+                self._items = items
+
+            def join(self, *args, **kwargs):
+                return self
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def all(self):
+                return list(self._items)
+
+        class FakeDb:
+            def query(self, model):
+                if model is Role:
+                    return FakeQuery([SimpleNamespace(name="Admin", is_active=True)])
+                if model is UserGroup:
+                    return FakeQuery([SimpleNamespace(name="main", is_active=True)])
+                raise AssertionError(f"Unexpected model: {model!r}")
+
+        repository = SimpleNamespace(
+            get_user=lambda user_id: user,
+            get_user_role_names=lambda user_id: ["Admin"],
+            get_user_group_names=lambda user_id: ["main"],
+            count_group_users=lambda group_id: 0,
+            count_group_roles=lambda group_id: 0,
+        )
         permission_service = SimpleNamespace(
             get_user_permissions=lambda db, user_id, use_cache: {"a.read", "a.write"}
         )
         service = GroupPermissionsApiService(
-            db=object(),
+            db=FakeDb(),
             repository=repository,
             permission_service=permission_service,
         )
@@ -65,6 +98,10 @@ class TestGroupPermissionsApiService:
             get_active_override=lambda user_id, permission_id: None,
             create_override=lambda **kwargs: created_override,
             rollback=lambda: None,
+            get_user_role_names=lambda user_id: [],
+            get_user_group_names=lambda user_id: [],
+            count_group_users=lambda group_id: 0,
+            count_group_roles=lambda group_id: 0,
         )
         permission_service = SimpleNamespace(
             _clear_user_cache=lambda user_id: cache_calls.append(user_id),
@@ -100,6 +137,10 @@ class TestGroupPermissionsApiService:
             get_active_override=lambda user_id, permission_id: SimpleNamespace(id=1),
             create_override=lambda **kwargs: None,
             rollback=lambda: None,
+            get_user_role_names=lambda user_id: [],
+            get_user_group_names=lambda user_id: [],
+            count_group_users=lambda group_id: 0,
+            count_group_roles=lambda group_id: 0,
         )
         service = GroupPermissionsApiService(
             db=None,

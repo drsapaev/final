@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 export const LandingHero = ({ onGetStarted }) => {
   return (
     <section className="landing-hero">
@@ -28,4 +29,10 @@ export const LandingHero = ({ onGetStarted }) => {
       </div>
     </section>
   );
+};
+
+
+LandingHero.propTypes = {
+  ...(LandingHero.propTypes || {}),
+  onGetStarted: PropTypes.any,
 };

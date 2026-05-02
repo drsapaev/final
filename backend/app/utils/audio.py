@@ -98,7 +98,7 @@ async def get_audio_duration(content: bytes, format_name: str) -> int:
         logger.warning("pydub not installed, cannot get audio duration")
         # Если pydub не установлен - возвращаем примерную длительность
         # Для webm/opus: ~64kbps = ~8KB/s
-        estimated_duration = len(content) // 8000
+        estimated_duration = len(content) // 18000
         return min(estimated_duration, MAX_AUDIO_DURATION)
 
     except Exception as e:

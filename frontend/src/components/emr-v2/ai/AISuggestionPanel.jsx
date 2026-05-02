@@ -2,7 +2,9 @@
  * AISuggestionPanel - Sidebar panel for AI suggestions
  * 
  * Shows all suggestions grouped by field
- */import AISuggestionCard from './AISuggestionCard';
+ */
+import PropTypes from 'prop-types';
+import AISuggestionCard from './AISuggestionCard';
 import './AISuggestionPanel.css';
 
 /**
@@ -145,3 +147,22 @@ export function AISuggestionPanel({
 }
 
 export default AISuggestionPanel;
+
+AISuggestionPanel.propTypes = {
+    suggestions: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        targetField: PropTypes.string,
+        content: PropTypes.string,
+        explanation: PropTypes.string,
+        source: PropTypes.string,
+        confidence: PropTypes.number,
+    })),
+    onApply: PropTypes.func,
+    onDismiss: PropTypes.func,
+    onRefresh: PropTypes.func,
+    isLoading: PropTypes.bool,
+    error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+    disabled: PropTypes.bool,
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
+};

@@ -5,6 +5,10 @@
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
+import {
+  DEFAULT_USER_FACING_NETWORK_ERROR,
+  formatApiErrorMessage,
+} from './networkErrorMessages';
 /**
  * Типы ошибок
  */
@@ -61,10 +65,14 @@ export function getErrorType(error) {
 /**
  * Извлекает сообщение об ошибке из ответа сервера
  */
-export function getErrorMessage(error) {
-  // Сетевая ошибка
-  if (!error.response) {
-    return 'Ошибка подключения к серверу. Проверьте интернет-соединение.';
+export function getErrorMessage(error, fallbackMessage = DEFAULT_USER_FACING_NETWORK_ERROR) {
+  const formatted = formatApiErrorMessage(error, fallbackMessage);
+  if (formatted) {
+    return formatted;
+  }
+
+  if (!error?.response) {
+    return fallbackMessage;
   }
 
   const { status, data } = error.response;
@@ -176,7 +184,7 @@ export function handleError(error, options = {}) {
         toast.error('Ошибка сервера. Попробуйте позже.', { duration: 4000 });
         break;
       case ERROR_TYPES.NETWORK:
-        toast.error('Проблемы с подключением', { duration: 3000 });
+        toast.error(errorMessage, { duration: 3000 });
         break;
       default:
         toast.error(errorMessage, { duration: 4000 });

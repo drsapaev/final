@@ -474,9 +474,9 @@ c:\final\backend\
     └── 20260105_0002_doctor_phrases.py  # Migration
 
 c:\final\frontend\src\
-├── components\emr\
-│   ├── EMRSmartField.jsx                # v4.0 - Doctor History integration
-│   └── EMRSmartField.css
+├── components\emr-v2\sections\
+│   ├── EMRSmartFieldV2.jsx              # v4.0 - Doctor History integration
+│   └── EMRSmartFieldV2.css
 └── hooks\
     └── useDoctorPhrases.js              # Hook with readiness check
 ```

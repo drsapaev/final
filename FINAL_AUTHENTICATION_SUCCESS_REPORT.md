@@ -50,8 +50,8 @@
 
 4. **`frontend/src/pages/PaymentTest.jsx`**
    ```javascript
-   // ❌ Было: 'http://localhost:8000/api/v1/authentication/login'
-   // ✅ Стало: 'http://localhost:8000/api/v1/auth/login'
+   // ❌ Было: 'http://localhost:18000/api/v1/authentication/login'
+   // ✅ Стало: 'http://localhost:18000/api/v1/auth/login'
    ```
 
 5. **`frontend/src/components/auth/LoginFormStyled.jsx`**
@@ -89,7 +89,7 @@
 
 ### ✅ Исправлены серверы:
 
-- **Backend:** Запущен из `C:\final\backend` на порту `8000` ✅
+- **Backend:** Запущен из `C:\final\backend` на порту `18000` ✅
 - **Frontend:** Запущен на порту `5174` (5173 был занят) ✅
 
 ---
@@ -98,7 +98,7 @@
 
 ### Backend API:
 ```bash
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # ✅ Ответ: {"ok":true,"db":"ok"}
 ```
 
@@ -137,7 +137,7 @@ python create_missing_users.py
 - ❌ **Отсутствие пользователей** → ✅ **Исправлено**
 
 ### 🚀 СИСТЕМА ПОЛНОСТЬЮ ФУНКЦИОНАЛЬНА:
-- ✅ **Backend сервер работает** на `localhost:8000`
+- ✅ **Backend сервер работает** на `localhost:18000`
 - ✅ **Frontend сервер работает** на `localhost:5174`
 - ✅ **Все API endpoints корректны**
 - ✅ **Все пользователи созданы**

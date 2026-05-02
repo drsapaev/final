@@ -1,16 +1,31 @@
+import logging
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import desc
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.models.derma_examination import DermaExamination
+from app.models.derma_procedure import DermaProcedure
+from app.models.patient import Patient
 from app.models.user import User
+from app.models.visit import Visit
+from app.schemas.derma import (
+    DermaExaminationCreate,
+    DermaExaminationOut,
+    DermaProcedureCreate,
+    DermaProcedureOut,
+)
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
 
 router = APIRouter(prefix="/derma", tags=["derma"])
+logger = logging.getLogger(__name__)
+DERMA_ROLES = ("Admin", "Doctor", "derma", "dermatology")
 
 
 class PriceOverrideRequest(BaseModel):
@@ -33,75 +48,237 @@ class PriceOverrideResponse(BaseModel):
     created_at: datetime
 
 
-@router.get("/examinations", summary="Осмотры кожи")
+def _validate_derma_context(
+    db: Session,
+    *,
+    patient_id: int,
+    visit_id: int | None,
+) -> None:
+    patient = db.get(Patient, patient_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+
+    if visit_id is None:
+        return
+
+    visit = db.get(Visit, visit_id)
+    if visit is None:
+        raise HTTPException(status_code=404, detail="Визит не найден")
+    if visit.patient_id != patient_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Визит не принадлежит выбранному пациенту",
+        )
+
+
+@router.get(
+    "/examinations",
+    summary="Осмотры кожи",
+    response_model=list[DermaExaminationOut],
+)
 async def get_skin_examinations(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+) -> list[DermaExaminationOut]:
     """
     Получить список осмотров кожи
     """
     try:
-        # Пока возвращаем пустой список - можно расширить при наличии модели
-        return []
-    except Exception as e:
+        query = db.query(DermaExamination)
+        if patient_id is not None:
+            query = query.filter(DermaExamination.patient_id == patient_id)
+
+        examinations = (
+            query.order_by(
+                desc(DermaExamination.examination_date),
+                desc(DermaExamination.created_at),
+                desc(DermaExamination.id),
+            )
+            .limit(limit)
+            .all()
+        )
+        logger.info(
+            "[derma.examinations] listed examinations user_id=%s patient_id=%s count=%s",
+            getattr(user, "id", None),
+            patient_id,
+            len(examinations),
+        )
+        return examinations
+    except SQLAlchemyError as e:
+        logger.exception(
+            "[derma.examinations] failed to list examinations user_id=%s patient_id=%s",
+            getattr(user, "id", None),
+            patient_id,
+        )
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения осмотров: {str(e)}"
         )
 
 
-@router.post("/examinations", summary="Создать осмотр кожи")
+@router.post(
+    "/examinations",
+    summary="Создать осмотр кожи",
+    response_model=DermaExaminationOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_skin_examination(
-    examination_data: Dict[str, Any],
+    examination_data: DermaExaminationCreate,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
-) -> Dict[str, Any]:
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
+) -> DermaExaminationOut:
     """
     Создать новый осмотр кожи
     """
     try:
-        # Пока возвращаем заглушку - можно расширить при наличии модели
-        return {"message": "Осмотр кожи создан", "id": 1}
-    except Exception as e:
+        _validate_derma_context(
+            db,
+            patient_id=examination_data.patient_id,
+            visit_id=examination_data.visit_id,
+        )
+
+        examination = DermaExamination(
+            patient_id=examination_data.patient_id,
+            visit_id=examination_data.visit_id,
+            doctor_id=getattr(user, "id", None),
+            examination_date=examination_data.examination_date,
+            skin_type=examination_data.skin_type,
+            skin_condition=examination_data.skin_condition,
+            lesions=examination_data.lesions,
+            distribution=examination_data.distribution,
+            symptoms=examination_data.symptoms,
+            diagnosis=examination_data.diagnosis,
+            treatment_plan=examination_data.treatment_plan,
+        )
+        db.add(examination)
+        db.commit()
+        db.refresh(examination)
+        logger.info(
+            "[derma.examinations] created examination_id=%s patient_id=%s visit_id=%s user_id=%s",
+            examination.id,
+            examination.patient_id,
+            examination.visit_id,
+            getattr(user, "id", None),
+        )
+        return examination
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(
+            "[derma.examinations] failed to create examination user_id=%s patient_id=%s visit_id=%s",
+            getattr(user, "id", None),
+            examination_data.patient_id,
+            examination_data.visit_id,
+        )
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания осмотра: {str(e)}"
         )
 
 
-@router.get("/procedures", summary="Косметические процедуры")
+@router.get(
+    "/procedures",
+    summary="Косметические процедуры",
+    response_model=list[DermaProcedureOut],
+)
 async def get_cosmetic_procedures(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
-) -> List[Dict[str, Any]]:
+) -> list[DermaProcedureOut]:
     """
     Получить список косметических процедур
     """
     try:
-        # Пока возвращаем пустой список - можно расширить при наличии модели
-        return []
-    except Exception as e:
+        query = db.query(DermaProcedure)
+        if patient_id is not None:
+            query = query.filter(DermaProcedure.patient_id == patient_id)
+
+        procedures = (
+            query.order_by(
+                desc(DermaProcedure.procedure_date),
+                desc(DermaProcedure.created_at),
+                desc(DermaProcedure.id),
+            )
+            .limit(limit)
+            .all()
+        )
+        logger.info(
+            "[derma.procedures] listed procedures user_id=%s patient_id=%s count=%s",
+            getattr(user, "id", None),
+            patient_id,
+            len(procedures),
+        )
+        return procedures
+    except SQLAlchemyError as e:
+        logger.exception(
+            "[derma.procedures] failed to list procedures user_id=%s patient_id=%s",
+            getattr(user, "id", None),
+            patient_id,
+        )
         raise HTTPException(
             status_code=500, detail=f"Ошибка получения процедур: {str(e)}"
         )
 
 
-@router.post("/procedures", summary="Создать косметическую процедуру")
+@router.post(
+    "/procedures",
+    summary="Создать косметическую процедуру",
+    response_model=DermaProcedureOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_cosmetic_procedure(
-    procedure_data: Dict[str, Any],
+    procedure_data: DermaProcedureCreate,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
-) -> Dict[str, Any]:
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
+) -> DermaProcedureOut:
     """
     Создать новую косметическую процедуру
     """
     try:
-        # Пока возвращаем заглушку - можно расширить при наличии модели
-        return {"message": "Косметическая процедура создана", "id": 1}
-    except Exception as e:
+        _validate_derma_context(
+            db,
+            patient_id=procedure_data.patient_id,
+            visit_id=procedure_data.visit_id,
+        )
+
+        procedure = DermaProcedure(
+            patient_id=procedure_data.patient_id,
+            visit_id=procedure_data.visit_id,
+            doctor_id=getattr(user, "id", None),
+            procedure_date=procedure_data.procedure_date,
+            procedure_type=procedure_data.procedure_type,
+            area_treated=procedure_data.area_treated,
+            products_used=procedure_data.products_used,
+            results=procedure_data.results,
+            follow_up=procedure_data.follow_up,
+            total_cost=procedure_data.total_cost,
+        )
+        db.add(procedure)
+        db.commit()
+        db.refresh(procedure)
+        logger.info(
+            "[derma.procedures] created procedure_id=%s patient_id=%s visit_id=%s user_id=%s",
+            procedure.id,
+            procedure.patient_id,
+            procedure.visit_id,
+            getattr(user, "id", None),
+        )
+        return procedure
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(
+            "[derma.procedures] failed to create procedure user_id=%s patient_id=%s visit_id=%s",
+            getattr(user, "id", None),
+            procedure_data.patient_id,
+            procedure_data.visit_id,
+        )
         raise HTTPException(
             status_code=500, detail=f"Ошибка создания процедуры: {str(e)}"
         )
@@ -115,7 +292,7 @@ async def create_cosmetic_procedure(
 async def create_price_override(
     override_data: PriceOverrideRequest,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
 ) -> PriceOverrideResponse:
     """
     Дерматолог изменяет цену процедуры с указанием причины
@@ -152,7 +329,7 @@ async def create_price_override(
 @router.get("/price-overrides", summary="Получить изменения цен")
 async def get_price_overrides(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     visit_id: Optional[int] = Query(None, description="ID визита"),
     status: Optional[str] = Query(
         None, description="Статус (pending, approved, rejected)"
@@ -198,7 +375,7 @@ async def get_price_overrides(
 @router.get("/photo-gallery", summary="Фотогалерея")
 async def get_photo_gallery(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     patient_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """

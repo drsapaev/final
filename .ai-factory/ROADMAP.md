@@ -18,6 +18,9 @@
 - [x] **SLO and Capacity Engineering** — automate regression budgets for latency/error rate and scale test profiles per critical endpoint group. (k6 profile matrix + aggregated regression gate implemented on 2026-02-22)
 - [x] **Interoperability and Multi-Clinic Scale** — standardize adapter contracts for external systems and prepare tenant/branch isolation strategy. (Completed; CI evidence: run `22298766412`)
 - [x] **Frontend↔Backend Parity Gate** — automated parity matrix, RBAC alignment checks, UX scorecard, and blocking CI gate with parity artifacts. (Implemented on 2026-02-24)
+- [x] **EMR v2 Hard-Cutover + Local Staging Rehearsal** — canonical `visit_id`-based EMR v2 only, SQLite→Postgres sync, local host-based staging contour, and successful green cutover rehearsal. (Completed on 2026-03-19)
+- [x] **Local Product Stabilization and Acceptance** — use the local staging contour as the primary operating environment, run role-by-role smoke validation, and close remaining queue/data migration decisions before any remote promotion. (Completed on 2026-03-19)
+- [ ] **VPS Staging Promotion Path (Mandatory Next Milestone)** — promote the working local contour to a Linux VPS with host Postgres, `systemd` backend, Nginx frontend, TLS, and rerun EMR cutover/acceptance there before production.
 
 ## Completed
 
@@ -37,3 +40,4 @@
 | SLO and Capacity Engineering | 2026-02-22 |
 | Interoperability and Multi-Clinic Scale | 2026-02-23 |
 | Frontend↔Backend Parity Gate | 2026-02-24 |
+| EMR v2 Hard-Cutover + Local Staging Rehearsal | 2026-03-19 |

@@ -11,10 +11,10 @@
 ## 🚀 **РАБОТАЮЩИЕ СЕРВИСЫ**
 
 ### 1. **Backend API** ✅
-- **URL**: http://localhost:8000
+- **URL**: http://localhost:18000
 - **Статус**: ✅ РАБОТАЕТ
 - **Health Check**: `{"ok": true, "db": "ok"}`
-- **API Documentation**: http://localhost:8000/docs
+- **API Documentation**: http://localhost:18000/docs
 
 ### 2. **Frontend Application** ✅
 - **URL**: http://localhost:5173
@@ -42,12 +42,12 @@
 ```bash
 # Логин работает
 curl -X POST -d "username=admin&password=admin123&grant_type=password" \
-  http://localhost:8000/api/v1/auth/login
+  http://localhost:18000/api/v1/auth/login
 # Возвращает: {"access_token":"...", "token_type":"bearer"}
 
 # Получение профиля работает
 curl -H "Authorization: Bearer <TOKEN>" \
-  http://localhost:8000/api/v1/auth/me
+  http://localhost:18000/api/v1/auth/me
 # Возвращает: {"id":14,"username":"admin","role":"Admin",...}
 ```
 
@@ -102,7 +102,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 ### **1. Запуск Backend**
 ```bash
 cd C:\final\backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 ```
 
 ### **2. Запуск Frontend**
@@ -113,8 +113,8 @@ npm run dev
 
 ### **3. Доступ к системе**
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Backend API**: http://localhost:18000
+- **API Docs**: http://localhost:18000/docs
 
 ### **4. Вход в систему**
 - **Логин**: admin

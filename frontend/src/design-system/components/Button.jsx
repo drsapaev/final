@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { createButtonStyles } from './utils';
 import { SIZES, VARIANTS } from './types';
+import PropTypes from 'prop-types';
 
 const Button = forwardRef(({
   children,
@@ -70,6 +71,22 @@ const Button = forwardRef(({
     </button>
   );
 });
+
+
+Button.propTypes = {
+  ...(Button.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  fullWidth: PropTypes.any,
+  loading: PropTypes.any,
+  onClick: PropTypes.any,
+  onMouseEnter: PropTypes.any,
+  onMouseLeave: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Button.displayName = 'Button';
 

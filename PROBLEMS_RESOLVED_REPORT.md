@@ -34,7 +34,7 @@
 ## 📊 **ТЕКУЩИЙ СТАТУС СИСТЕМЫ**
 
 ### **Backend API** ✅ РАБОТАЕТ
-- **URL**: http://localhost:8000
+- **URL**: http://localhost:18000
 - **Health Check**: `{"ok": true, "db": "ok"}`
 - **Статус**: ✅ Полностью функционален
 - **API Endpoints**: 1000+ endpoints доступны
@@ -58,7 +58,7 @@
 ```bash
 # Логин работает
 curl -X POST -d "username=admin&password=admin123&grant_type=password" \
-  http://localhost:8000/api/v1/auth/login
+  http://localhost:18000/api/v1/auth/login
 
 # Возвращает JWT токен
 {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
@@ -86,7 +86,7 @@ curl -X POST -d "username=admin&password=admin123&grant_type=password" \
 ### **1. Backend**
 ```bash
 cd C:\final\backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 18000
 ```
 
 ### **2. Frontend**
@@ -97,8 +97,8 @@ npm run dev
 
 ### **3. Доступ**
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Backend API**: http://localhost:18000
+- **API Docs**: http://localhost:18000/docs
 
 ### **4. Вход**
 - **Логин**: admin

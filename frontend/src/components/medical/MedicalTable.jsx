@@ -1,6 +1,7 @@
 import React from 'react';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * Унифицированная медицинская таблица в стиле MediLab
@@ -271,6 +272,20 @@ const MedicalTable = ({
       )}
     </div>
   );
+};
+
+
+MedicalTable.propTypes = {
+  ...(MedicalTable.propTypes || {}),
+  className: PropTypes.any,
+  columns: PropTypes.any,
+  data: PropTypes.any,
+  onDelete: PropTypes.any,
+  onEdit: PropTypes.any,
+  onView: PropTypes.any,
+  pageSize: PropTypes.any,
+  pagination: PropTypes.any,
+  sortable: PropTypes.any,
 };
 
 export default MedicalTable;

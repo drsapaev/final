@@ -29,6 +29,26 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+
+const sanitizePayload = (form) =>
+  Object.fromEntries(
+    Object.entries(form).filter(([, value]) => {
+      if (value === '' || value === null || typeof value === 'undefined') {
+        return false;
+      }
+
+      if (Array.isArray(value) && value.length === 0) {
+        return false;
+      }
+
+      if (typeof value === 'number' && Number.isNaN(value)) {
+        return false;
+      }
+
+      return true;
+    })
+  );
+
 const DiscountBenefitsManager = () => {
   const [activeTab, setActiveTab] = useState('discounts');
   const [discounts, setDiscounts] = useState([]);
@@ -144,7 +164,7 @@ const DiscountBenefitsManager = () => {
   // Создание скидки
   const createDiscount = async () => {
     try {
-      await api.post('/discount-benefits/discounts', discountForm);
+      await api.post('/discount-benefits/discounts', sanitizePayload(discountForm));
       toast.success('Скидка создана успешно');
       setShowCreateForm(false);
       setDiscountForm({
@@ -173,7 +193,7 @@ const DiscountBenefitsManager = () => {
   // Создание льготы
   const createBenefit = async () => {
     try {
-      await api.post('/discount-benefits/benefits', benefitForm);
+      await api.post('/discount-benefits/benefits', sanitizePayload(benefitForm));
       toast.success('Льгота создана успешно');
       setShowCreateForm(false);
       setBenefitForm({
@@ -201,7 +221,7 @@ const DiscountBenefitsManager = () => {
   // Создание программы лояльности
   const createLoyaltyProgram = async () => {
     try {
-      await api.post('/discount-benefits/loyalty-programs', loyaltyForm);
+      await api.post('/discount-benefits/loyalty-programs', sanitizePayload(loyaltyForm));
       toast.success('Программа лояльности создана успешно');
       setShowCreateForm(false);
       setLoyaltyForm({

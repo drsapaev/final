@@ -23,6 +23,26 @@ Create and maintain a high-level project roadmap with major milestones.
 - Chosen architecture pattern and folder structure
 - Module boundaries and communication patterns
 
+**Read `.ai-factory/skill-context/aif-roadmap/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including the ROADMAP.md
+  template. The template in this SKILL.md is a **base structure**. If a skill-context rule says
+  "roadmap MUST include X" or "milestones MUST have Y" — you MUST augment the template accordingly.
+  Generating a roadmap that violates skill-context rules is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
 ### Step 1: Determine Mode
 
 If argument is `check` → Mode 3: Check Progress (requires ROADMAP.md)
@@ -52,7 +72,9 @@ Options:
 3. Both — I'll describe, you'll add what's missing
 ```
 
-If user chooses to describe → ask follow-up:
+**Based on choice:**
+- "Analyze codebase and suggest milestones" → proceed to Step 1.2
+- "Let me describe the vision" or "Both" → collect user description (if "Both", also add codebase analysis in Step 1.2), then ask follow-up:
 
 ```
 AskUserQuestion: Any priorities or deadlines?
@@ -93,7 +115,7 @@ Create `.ai-factory/ROADMAP.md` with this format:
 ```
 
 **Rules for milestones:**
-- Each milestone is a **high-level goal**, not a granular task (that's `$2`)
+- Each milestone is a **high-level goal**, not a granular task (that's `/aif-plan`)
 - 5-15 milestones is the sweet spot — fewer means too vague, more means too granular
 - Order by logical sequence (dependencies first)
 - Mark already-completed milestones as `[x]` and add them to the Completed table
@@ -186,17 +208,17 @@ Completed: X/N
 Next up: **Milestone Name**
 
 To start working on the next milestone:
-$2 <milestone description>  → creates branch + plan
-$2                     → executes the plan
+/aif-plan <milestone description>  → creates branch + plan
+/aif-implement                     → executes the plan
 ```
 
 ---
 
-### Mode 3: Check Progress (`$2 check`)
+### Mode 3: Check Progress (`/aif-roadmap check`)
 
 Automated scan — analyze the codebase and mark completed milestones without interactive questions.
 
-**Requires** `.ai-factory/ROADMAP.md` to exist. If it doesn't — tell the user to run `$2` first.
+**Requires** `.ai-factory/ROADMAP.md` to exist. If it doesn't — tell the user to run `/aif-roadmap` first.
 
 **3.1: Read roadmap and project context**
 
@@ -270,4 +292,5 @@ Next up: **Milestone Name**
 2. **ROADMAP.md is the source of truth** — always read before modifying
 3. **Never remove milestones silently** — always confirm with user before removing
 4. **Completed table tracks history** — every checked milestone gets a date entry
-5. **NO implementation** — this skill only plans, use `$2` to start a feature and `$2` to execute
+5. **NO implementation** — this skill only plans, use `/aif-plan` to start a feature and `/aif-implement` to execute
+6. **Ownership boundary** — this command owns roadmap structure/content; `/aif-implement` may only mark milestones completed when implementation evidence is clear

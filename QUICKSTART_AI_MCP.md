@@ -7,28 +7,28 @@
 ```bash
 # Backend
 cd C:\final\backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python run_server.py
 
 # Frontend (в новом терминале)
-cd C:\final\frontend
-npm start
+cd C:\final
+npm run dev
 ```
 
 ### 2. Проверка MCP
 
 ```bash
 # Открыть в браузере
-http://localhost:8000/docs
+http://localhost:18000/docs
 
 # Или curl
-curl http://localhost:8000/api/v1/mcp/health
+curl http://localhost:18000/api/v1/mcp/health
 ```
 
 ✅ Должно вернуть: `{"status": "healthy", "servers": [...]}`
 
 ### 3. Тестирование в UI
 
-1. **Открыть:** http://localhost:3000
+1. **Открыть:** http://localhost:5173
 2. **Логин:** `doctor` / `Test1234`
 3. **Создать запись** → **Оплатить** → **Открыть EMR**
 4. **Ввести жалобу:** "Головная боль в течение 2 дней"

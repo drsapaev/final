@@ -1,0 +1,163 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Clinic Management" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Clinic Management
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Lab User" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img [ref=e82]
+            - text: Lab User
+        - button "Выйти" [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]:
+            - img [ref=e87]
+            - text: Выйти
+    - generic [ref=e90]:
+      - complementary [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: Medical System
+          - button "Collapse sidebar" [ref=e95] [cursor=pointer]:
+            - img [ref=e97]
+        - navigation [ref=e100]:
+          - button "Tests" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Tests
+          - button "Results" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Results
+          - button "Patients" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Patients
+          - button "Appointments" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Appointments
+          - button "Reports" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e127]: Reports
+      - main [ref=e128]:
+        - generic [ref=e129]:
+          - generic [ref=e130]:
+            - heading "Enterprise Laboratory Panel Очередь 5 Шаблоны 20 Бланки 2" [level=3] [ref=e625]:
+              - generic [ref=e133]:
+                - img [ref=e134]
+                - text: Enterprise Laboratory Panel
+              - generic [ref=e137]:
+                - button "Очередь 5" [ref=e138] [cursor=pointer]:
+                  - generic [ref=e139]:
+                    - img [ref=e140]
+                    - text: Очередь
+                    - generic [ref=e143]: "5"
+                - button "Шаблоны 20" [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145]:
+                    - img [ref=e146]
+                    - text: Шаблоны
+                    - generic [ref=e149]: "20"
+                - button "Бланки 2" [ref=e626] [cursor=pointer]:
+                  - generic [ref=e151]:
+                    - img [ref=e152]
+                    - text: Бланки
+                    - generic [ref=e157]: "2"
+            - generic [ref=e628]: Новый лабораторный бланк создан.
+          - generic [ref=e574]:
+            - generic [ref=e575]:
+              - heading "Редактор лабораторного бланка" [level=3] [ref=e577]:
+                - img [ref=e578]
+                - text: Редактор лабораторного бланка
+              - generic [ref=e584]:
+                - generic [ref=e585]:
+                  - generic [ref=e629]:
+                    - generic [ref=e630]:
+                      - generic [ref=e631]: Каримова Гликия Севда
+                      - generic [ref=e632]: DRAFT
+                      - generic [ref=e633]: HbA1c
+                    - generic [ref=e634]: "Визит: 724 | Бланк #13"
+                  - generic [ref=e635]:
+                    - button "Save Draft" [ref=e636] [cursor=pointer]:
+                      - generic [ref=e637]:
+                        - img [ref=e638]
+                        - text: Save Draft
+                    - button "Mark Ready" [ref=e641] [cursor=pointer]:
+                      - generic [ref=e642]:
+                        - img [ref=e643]
+                        - text: Mark Ready
+                    - button "Finalize" [ref=e646] [cursor=pointer]:
+                      - generic [ref=e647]:
+                        - img [ref=e648]
+                        - text: Finalize
+                - generic [ref=e587]:
+                  - generic [ref=e651]:
+                    - generic [ref=e652]: lab_technician_label
+                    - textbox "lab_technician_label" [ref=e653]: Врач лаборант
+                  - generic [ref=e654]:
+                    - generic [ref=e655]: lab_technician_name
+                    - textbox "lab_technician_name" [ref=e656]
+                  - generic [ref=e657]:
+                    - generic [ref=e658]: approver_label
+                    - textbox "approver_label" [ref=e659]: Подпись
+                  - generic [ref=e660]:
+                    - generic [ref=e661]: approver_name
+                    - textbox "approver_name" [ref=e662]
+                - generic [ref=e664]:
+                  - generic [ref=e665]: Тахлил номи
+                  - generic [ref=e667]:
+                    - generic [ref=e668]:
+                      - strong [ref=e669]: Гликированный гемоглобин (HbA1c)
+                      - generic [ref=e671]: "Норма: 4.8 - 5.6 %"
+                    - textbox [ref=e672]
+                    - generic [ref=e673]: "%"
+                    - generic [ref=e674]: ok
+            - generic [ref=e602]:
+              - heading "Доступные бланки пациента" [level=3] [ref=e604]:
+                - img [ref=e605]
+                - text: Доступные бланки пациента
+              - generic [ref=e608]:
+                - generic [ref=e609]:
+                  - button "Все" [ref=e610] [cursor=pointer]:
+                    - generic [ref=e611]: Все
+                  - button "Без флагов" [ref=e612] [cursor=pointer]:
+                    - generic [ref=e613]: Без флагов
+                  - button "С флагами" [ref=e614] [cursor=pointer]:
+                    - generic [ref=e615]: С флагами
+                  - button "Критические" [ref=e616] [cursor=pointer]:
+                    - generic [ref=e617]: Критические
+                - button "HbA1c 20.03.2026, 18:50:00 DRAFT clean" [ref=e675] [cursor=pointer]:
+                  - generic [ref=e676]:
+                    - generic [ref=e677]: HbA1c
+                    - generic [ref=e678]: 20.03.2026, 18:50:00
+                  - generic [ref=e679]:
+                    - generic [ref=e680]: DRAFT
+                    - generic [ref=e681]: clean
+                - button "HbA1c 20.03.2026, 18:15:26 FINALIZED clean" [ref=e618] [cursor=pointer]:
+                  - generic [ref=e619]:
+                    - generic [ref=e620]: HbA1c
+                    - generic [ref=e621]: 20.03.2026, 18:15:26
+                  - generic [ref=e622]:
+                    - generic [ref=e623]: FINALIZED
+                    - generic [ref=e624]: clean
+  - generic [ref=e334]:
+    - generic [ref=e335]:
+      - img [ref=e336]
+      - generic [ref=e339]:
+        - strong [ref=e340]: Включить уведомления?
+        - generic [ref=e341]: Получайте уведомления о новых сообщениях
+    - generic [ref=e342]:
+      - button "Включить" [ref=e343] [cursor=pointer]
+      - button "Закрыть" [ref=e344] [cursor=pointer]:
+        - img [ref=e345]

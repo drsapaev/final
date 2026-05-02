@@ -34,12 +34,41 @@ from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
 
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
 
 class BillingService:
     """Сервис для управления счетами и автоматическим выставлением"""
 
     def __init__(self, db: Session):
         self.db = db
+
+    def _get_local_timestamp_naive(
+        self, db: Session | None = None, timezone: str | None = None
+    ) -> datetime:
+        """Получить локальный timestamp без tzinfo для DateTime-колонок БД."""
+        local_timestamp = queue_service.get_local_timestamp(
+            db or self.db, timezone=timezone
+        )
+        if local_timestamp.tzinfo is None:
+            return local_timestamp
+        return local_timestamp.replace(tzinfo=None)
+
+    @staticmethod
+    def _normalize_datetime(value: datetime | None) -> datetime | None:
+        """Снять tzinfo с datetime, если он есть, чтобы сравнения были однородными."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value
+        return value.replace(tzinfo=None)
 
     # === Создание счетов ===
 
@@ -70,6 +99,7 @@ class BillingService:
             else 0
         )
         total_amount = subtotal + tax_amount
+        now = self._get_local_timestamp_naive()
 
         # Создаем счет
         invoice = Invoice(
@@ -83,9 +113,8 @@ class BillingService:
             tax_amount=tax_amount,
             total_amount=total_amount,
             balance=total_amount,
-            issue_date=queue_service.get_local_timestamp(self.db),
-            due_date=queue_service.get_local_timestamp(self.db)
-            + timedelta(days=due_days),
+            issue_date=now,
+            due_date=now + timedelta(days=due_days),
             auto_send=auto_send,
             is_auto_generated=True,
             created_by=created_by,
@@ -288,9 +317,7 @@ class BillingService:
 
         # Устанавливаем paid_at если статус "paid"
         if status == PaymentStatus.PAID.value:
-            from app.services.queue_service import queue_service
-
-            payment.paid_at = queue_service.get_local_timestamp(self.db)
+            payment.paid_at = self._get_local_timestamp_naive()
 
         self.db.add(payment)
 
@@ -526,7 +553,6 @@ class BillingService:
         1. Статус визита (paid, in_visit, in_progress, completed, done)
         2. payment_processed_at (явный признак оплаты)
         3. Записи в таблице payments (статус 'paid' или наличие paid_at)
-        4. discount_mode='paid' в сочетании с другими признаками
 
         Args:
             visit: Объект Visit для проверки
@@ -568,36 +594,21 @@ class BillingService:
                 if payment_status == 'paid' or payment_row.paid_at:
                     is_paid = True
 
-        # Приоритет 4: Проверяем discount_mode ТОЛЬКО если есть другие признаки оплаты
-        if not is_paid:
-            discount_mode_value = getattr(visit, 'discount_mode', None)
-            v_status = (getattr(visit, 'status', None) or '').lower()
-
-            if discount_mode_value == 'paid' and v_status in paid_statuses:
-                is_paid = True
-            elif discount_mode_value == 'paid' and getattr(
-                visit, 'payment_processed_at', None
-            ):
-                is_paid = True
-
         return is_paid
 
     def get_discount_mode_for_visit(self, visit: Visit) -> str:
         """
-        Получить discount_mode для визита (SSOT).
+        Получить registration discount_mode для визита (SSOT).
 
         Args:
             visit: Объект Visit
 
         Returns:
-            discount_mode: none|repeat|benefit|all_free|paid
+            discount_mode: none|repeat|benefit|all_free
         """
-        # Если визит оплачен, возвращаем 'paid'
-        if self.is_visit_paid(visit):
-            return 'paid'
-
-        # Иначе возвращаем discount_mode из визита
-        return getattr(visit, 'discount_mode', 'none') or 'none'
+        return _normalize_registration_discount_mode(
+            getattr(visit, 'discount_mode', None)
+        )
 
     def calculate_total(
         self,
@@ -820,9 +831,7 @@ class BillingService:
 
         # Устанавливаем paid_at если статус "paid"
         if new_status_lower == "paid" and not payment.paid_at:
-            from app.services.queue_service import queue_service
-
-            payment.paid_at = queue_service.get_local_timestamp(self.db)
+            payment.paid_at = self._get_local_timestamp_naive()
 
         # Обновляем метаданные если переданы
         if meta:
@@ -845,32 +854,31 @@ class BillingService:
         force_update: bool = False,
     ) -> bool:
         """
-        Обновить discount_mode визита на основе фактического статуса оплаты (SSOT).
+        Нормализовать registration discount_mode визита (SSOT).
 
-        Если визит оплачен (по любым признакам), но discount_mode не установлен как 'paid',
-        обновляет discount_mode в базе данных.
+        Больше не использует и не сохраняет `paid` как discount_mode.
 
         Args:
             visit: Объект Visit для обновления
-            force_update: Принудительно обновить даже если discount_mode уже 'paid'
+            force_update: Принудительно обновить даже если режим уже нормализован
 
         Returns:
             True если было выполнено обновление, False если нет
         """
-        is_paid = self.is_visit_paid(visit)
+        current_mode = getattr(visit, 'discount_mode', None)
+        normalized_mode = _normalize_registration_discount_mode(current_mode)
 
-        if is_paid:
-            if visit.discount_mode != 'paid' or force_update:
-                visit.discount_mode = 'paid'
-                try:
-                    self.db.commit()
-                    self.db.refresh(visit)
-                    return True
-                except Exception as e:
-                    self.db.rollback()
-                    raise ValueError(
-                        f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}"
-                    )
+        if force_update and normalized_mode != current_mode:
+            visit.discount_mode = normalized_mode
+            try:
+                self.db.commit()
+                self.db.refresh(visit)
+                return True
+            except Exception as e:
+                self.db.rollback()
+                raise ValueError(
+                    f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}"
+                )
 
         return False
 
@@ -939,7 +947,7 @@ class BillingService:
 
         if invoice.balance <= 0:
             invoice.status = InvoiceStatus.PAID
-            invoice.paid_date = queue_service.get_local_timestamp(self.db)
+            invoice.paid_date = self._get_local_timestamp_naive()
         elif invoice.paid_amount > 0:
             invoice.status = InvoiceStatus.PARTIALLY_PAID
 
@@ -1014,6 +1022,10 @@ class BillingService:
             return
 
         settings = self.get_billing_settings()
+        due_date = self._normalize_datetime(invoice.due_date)
+        if not due_date:
+            return
+        now = self._get_local_timestamp_naive()
 
         # Напоминания до срока оплаты
         if settings.reminder_days_before:
@@ -1021,8 +1033,8 @@ class BillingService:
                 int(d.strip()) for d in settings.reminder_days_before.split(',')
             ]
             for days in days_before:
-                reminder_date = invoice.due_date - timedelta(days=days)
-                if reminder_date > queue_service.get_local_timestamp(self.db):
+                reminder_date = due_date - timedelta(days=days)
+                if reminder_date > now:
                     self._create_reminder(
                         invoice_id=invoice_id,
                         reminder_type='email',
@@ -1038,7 +1050,7 @@ class BillingService:
                 int(d.strip()) for d in settings.reminder_days_after.split(',')
             ]
             for days in days_after:
-                reminder_date = invoice.due_date + timedelta(days=days)
+                reminder_date = due_date + timedelta(days=days)
                 self._create_reminder(
                     invoice_id=invoice_id,
                     reminder_type='email',
@@ -1051,7 +1063,7 @@ class BillingService:
     def send_due_reminders(self) -> int:
         """Отправить напоминания, которые пора отправлять"""
 
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
 
         # Получаем напоминания к отправке
         reminders = (
@@ -1092,7 +1104,7 @@ class BillingService:
     def create_recurring_invoices(self) -> int:
         """Создать периодические счета"""
 
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
 
         # Получаем счета для создания периодических
         recurring_invoices = (
@@ -1152,8 +1164,13 @@ class BillingService:
                     self.db.add(new_item)
 
                 # Обновляем дату следующего счета
+                next_invoice_date = self._normalize_datetime(
+                    parent_invoice.next_invoice_date
+                )
+                if not next_invoice_date:
+                    next_invoice_date = now
                 parent_invoice.next_invoice_date = self._calculate_next_recurrence_date(
-                    parent_invoice.next_invoice_date,
+                    next_invoice_date,
                     parent_invoice.recurrence_type,
                     parent_invoice.recurrence_interval,
                 )
@@ -1190,7 +1207,7 @@ class BillingService:
 
     def _generate_invoice_number(self, settings: BillingSettings) -> str:
         """Сгенерировать номер счета"""
-        year = queue_service.get_local_timestamp(self.db).year
+        year = self._get_local_timestamp_naive().year
         number = settings.next_invoice_number
 
         return settings.invoice_number_format.format(
@@ -1199,7 +1216,7 @@ class BillingService:
 
     def _generate_payment_number(self) -> str:
         """Сгенерировать номер платежа"""
-        now = queue_service.get_local_timestamp(self.db)
+        now = self._get_local_timestamp_naive()
         return f"PAY-{now.year}-{now.month:02d}-{now.day:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
 
     def _get_applicable_billing_rules(
@@ -1355,14 +1372,14 @@ class BillingService:
 
 def get_discount_mode_for_visit(db: Session, visit: Visit) -> str:
     """
-    Получить discount_mode для визита (SSOT helper function).
+    Получить registration discount_mode для визита (SSOT helper function).
 
     Args:
         db: Database session
         visit: Объект Visit
 
     Returns:
-        discount_mode: none|repeat|benefit|all_free|paid
+        discount_mode: none|repeat|benefit|all_free
     """
     billing_service = BillingService(db)
     return billing_service.get_discount_mode_for_visit(visit)
@@ -1383,15 +1400,17 @@ def is_appointment_paid(db: Session, appointment) -> bool:
     if getattr(appointment, 'payment_processed_at', None):
         return True
 
-    # Проверяем visit_type
+    # [FIX:BILLING_PAYMENT_STATUS] visit_type='paid' means a paid service type, not completed payment.
     visit_type = getattr(appointment, 'visit_type', None) or ''
     if visit_type.lower() == 'paid':
-        return True
+        logger.debug(
+            "[FIX:BILLING_PAYMENT_STATUS] Ignoring appointment.visit_type='paid' as payment proof: appointment_id=%s",
+            getattr(appointment, 'id', None),
+        )
 
-    # Проверяем статус
-    status = getattr(appointment, 'status', None) or ''
-    paid_statuses = ['paid', 'completed', 'done']
-    if status.lower() in paid_statuses:
+    # Проверяем явный payment_status, если он есть в будущих/адаптерных моделях.
+    explicit_payment_status = getattr(appointment, 'payment_status', None) or ''
+    if str(explicit_payment_status).lower() == 'paid':
         return True
 
     # Проверяем наличие платежей
@@ -1425,8 +1444,12 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
     """
     is_paid = is_appointment_paid(db, appointment)
 
-    if is_paid and getattr(appointment, 'visit_type', None) != 'paid':
-        appointment.visit_type = 'paid'
+    if is_paid and not getattr(appointment, 'payment_processed_at', None):
+        appointment.payment_processed_at = datetime.utcnow()
+        logger.info(
+            "[FIX:BILLING_PAYMENT_STATUS] Appointment payment marker updated without changing visit_type: appointment_id=%s",
+            getattr(appointment, 'id', None),
+        )
         try:
             db.commit()
             db.refresh(appointment)
@@ -1434,7 +1457,7 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
         except Exception as e:
             db.rollback()
             raise ValueError(
-                f"Не удалось сохранить visit_type для Appointment {appointment.id}: {e}"
+                f"Не удалось сохранить payment_processed_at для Appointment {appointment.id}: {e}"
             )
 
     return False
@@ -1442,28 +1465,26 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
 
 def get_discount_mode_for_appointment(db: Session, appointment) -> str:
     """
-    Получить discount_mode для appointment (SSOT helper function).
+    Получить registration discount_mode для appointment (SSOT helper function).
 
     Args:
         db: Database session
         appointment: Объект Appointment
 
     Returns:
-        discount_mode: none|repeat|benefit|all_free|paid
+        discount_mode: none|repeat|benefit|all_free
     """
-    # Если appointment оплачен, возвращаем 'paid'
-    if is_appointment_paid(db, appointment):
-        return 'paid'
-
-    # Иначе маппим visit_type в discount_mode
-    visit_type = getattr(appointment, 'visit_type', None) or 'paid'
+    # Маппим visit_type в registration discount_mode без payment marker.
+    visit_type = getattr(appointment, 'visit_type', None) or 'none'
     visit_type_lower = visit_type.lower()
 
     if visit_type_lower == 'paid':
         return 'none'
     elif visit_type_lower == 'repeat':
         return 'repeat'
+    elif visit_type_lower == 'benefit':
+        return 'benefit'
     elif visit_type_lower == 'free':
         return 'all_free'
     else:
-        return 'none'
+        return _normalize_registration_discount_mode(visit_type_lower)

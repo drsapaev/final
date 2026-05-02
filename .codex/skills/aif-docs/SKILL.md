@@ -3,7 +3,7 @@ name: aif-docs
 description: Generate and maintain project documentation. Creates a lean README as a landing page with detailed docs/ directory split by topic. Use when user says "create docs", "write documentation", "update docs", "generate readme", or "document project".
 argument-hint: "[--web]"
 allowed-tools: Read Write Edit Glob Grep Bash(mkdir, npx, python) AskUserQuestion Questions WebFetch WebSearch
-disable-model-invocation: true
+disable-model-invocation: false
 metadata:
   author: AI Factory
   version: "1.0"
@@ -38,6 +38,27 @@ Generate, maintain, and improve project documentation following a landing-page R
 - Look for existing docs, comments, API endpoints, CLI commands
 - Check for existing README.md and docs/ directory
 
+**Read `.ai-factory/skill-context/aif-docs/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
+
+**How to apply skill-context rules:**
+- Treat them as **project-level overrides** for this skill's general instructions
+- When a skill-context rule conflicts with a general rule written in this SKILL.md,
+  **the skill-context rule wins** (more specific context takes priority — same principle as nested CLAUDE.md files)
+- When there is no conflict, apply both: general rules from SKILL.md + project rules from skill-context
+- Do NOT ignore skill-context rules even if they seem to contradict this skill's defaults —
+  they exist because the project's experience proved the default insufficient
+- **CRITICAL:** skill-context rules apply to ALL outputs of this skill — including README.md,
+  documentation pages, and their templates. The templates in this SKILL.md are **base structures**.
+  If a skill-context rule says "docs MUST include X" or "README MUST have section Y" — you MUST
+  augment the templates accordingly. Generating documentation that violates skill-context rules
+  is a bug.
+
+**Enforcement:** After generating any output artifact, verify it against all skill-context rules.
+If any rule is violated — fix the output before presenting it to the user.
+
 **Scan for scattered markdown files in project root:**
 
 Use `Glob` to find all `*.md` files in the project root (exclude `node_modules/`, `.ai-factory/`, agent dirs):
@@ -70,15 +91,18 @@ State C: README.md + docs/ exist     → Depends on flags (see below)
 ```
 Documentation already exists (README.md + docs/).
 
-What would you like to do?
-- [ ] Generate HTML only — build site from current docs as-is
-- [ ] Audit & improve first — check for issues, then generate HTML
-- [ ] Audit only — check for issues without generating HTML
+AskUserQuestion: What would you like to do?
+
+Options:
+1. Generate HTML only — build site from current docs as-is
+2. Audit & improve first — check for issues, then generate HTML
+3. Audit only — check for issues without generating HTML
 ```
 
-- **"Generate HTML only"** → skip Step 1.1, Step 2, Step 4 — go directly to Step 3 (HTML generation), then done
-- **"Audit & improve first"** → run Step 1.1 → Step 2 (State C) → Step 3 → Step 4 → Step 4.1
-- **"Audit only"** → run Step 1.1 → Step 2 (State C) → Step 4 → Step 4.1 (skip Step 3)
+**Based on choice:**
+- Generate HTML only → skip Step 1.1, Step 2, Step 4 — go directly to Step 3 (HTML generation), then done
+- Audit & improve first → run Step 1.1 → Step 2 (State C) → Step 3 → Step 4 → Step 4.1
+- Audit only → run Step 1.1 → Step 2 (State C) → Step 4 → Step 4.1 (skip Step 3)
 
 **State C without `--web` flag** → run Step 2 (State C) as usual.
 
@@ -121,11 +145,18 @@ Suggested actions:
   → Move DEPLOYMENT.md → docs/deployment.md
   → Merge SETUP.md into docs/getting-started.md
 
-Would you like to:
-- [ ] Apply all suggestions
-- [ ] Let me pick which ones
-- [ ] Skip — keep files where they are
+AskUserQuestion: Would you like to apply the consolidation?
+
+Options:
+1. Apply all suggestions
+2. Let me pick which ones
+3. Skip — keep files where they are
 ```
+
+**Based on choice:**
+- Apply all suggestions → move/merge all listed files, continue to Step 2
+- Let me pick which ones → present each file individually for approval, apply selected
+- Skip → leave files where they are, continue to Step 2
 
 **When moving/merging:**
 1. Create the target file in `docs/` with prev/next navigation header (following Documentation table order) and "See Also" footer
@@ -170,11 +201,18 @@ I've analyzed your project and suggest these documentation pages:
 3. api.md — API endpoints reference
 4. configuration.md — Environment variables and config
 
-Would you like to:
-- [ ] Generate all of these
-- [ ] Let me pick which ones
-- [ ] Add more topics
+AskUserQuestion: Would you like to generate these documentation pages?
+
+Options:
+1. Generate all of these
+2. Let me pick which ones
+3. Add more topics
 ```
+
+**Based on choice:**
+- Generate all → proceed to generate README.md and all listed docs/ files
+- Let me pick → present each topic for individual approval, generate only approved
+- Add more topics → ask what additional topics to include, confirm final list, then generate
 
 #### 2.2: Generate README.md
 
@@ -437,11 +475,18 @@ The following root files have been incorporated into docs/:
   DEPLOYMENT.md → now in docs/deployment.md
   SETUP.md → merged into docs/getting-started.md
 
-These originals are no longer needed. Delete them?
-- [ ] Yes, delete all originals
-- [ ] Let me pick which ones to delete
-- [ ] No, keep them (I'll clean up later)
+AskUserQuestion: These originals are no longer needed. Delete them?
+
+Options:
+1. Yes, delete all originals
+2. Let me pick which ones to delete
+3. No, keep them (I'll clean up later)
 ```
+
+**Based on choice:**
+- Yes, delete all → delete all listed originals (see "When deleting" below)
+- Let me pick → present each file individually, delete only approved
+- No, keep them → leave originals in place, continue to Step 5
 
 **When deleting:**
 1. Verify one more time that the target docs/ file contains all content from the original
@@ -477,16 +522,7 @@ Read `AGENTS.md` and find the `## Documentation` section. Update it to reflect t
 
 ### Context Cleanup
 
-Context is heavy after codebase scanning and documentation generation. All docs are saved — suggest freeing space:
-
-```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
-```
+Suggest the user to free up context space if needed: `/clear` (full reset) or `/compact` (compress history).
 
 ## Important Rules
 
@@ -496,3 +532,4 @@ Options:
 4. **Use the project's language** — if project README is in Russian, write docs in Russian
 5. **Preserve existing badges/logos** — don't remove them during restructuring
 6. **Add to .gitignore** if generating HTML: add `docs-html/` to .gitignore
+7. **Ownership boundary** — this command owns documentation artifacts (`README.md`, `docs/*`, and the Documentation section in `AGENTS.md`), not `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md`, or `.ai-factory/RESEARCH.md`

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,65 @@ from app.services.notification_service import NotificationService
 from app.services.service_mapping import get_service_code
 
 router = APIRouter()
+
+
+DOCTOR_QUEUE_SPECIALTY_VARIANTS: dict[str, list[str]] = {
+    "cardiology": ["cardiology", "cardio", "Cardiologist", "Cardio"],
+    "cardio": ["cardiology", "cardio", "Cardiologist", "Cardio"],
+    "derma": ["derma", "dermatology", "Dermatologist"],
+    "dermatology": ["derma", "dermatology", "Dermatologist"],
+    "dentist": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
+    "dentistry": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
+    "stomatology": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
+    "lab": ["lab", "laboratory", "Laboratory"],
+    "laboratory": ["lab", "laboratory", "Laboratory"],
+    "general": ["general", "therapy", "therapist", "general_practice"],
+}
+
+DOCTOR_QUEUE_ALLOWED_TAGS: dict[str, list[str]] = {
+    "cardiology": ["cardio", "cardiology", "cardiology_common"],
+    "cardio": ["cardio", "cardiology", "cardiology_common"],
+    "derma": ["derma", "dermatology"],
+    "dermatology": ["derma", "dermatology"],
+    "dentist": ["dentist", "dental", "dentistry", "stomatology"],
+    "dentistry": ["dentist", "dental", "dentistry", "stomatology"],
+    "stomatology": ["dentist", "dental", "dentistry", "stomatology"],
+    "lab": ["lab", "laboratory"],
+    "laboratory": ["lab", "laboratory"],
+    "general": ["general"],
+}
+
+
+def _normalize_queue_specialty(value: str) -> str:
+    return (value or "general").strip().lower()
+
+
+def _resolve_queue_specialty_variants(specialty: str) -> list[str]:
+    normalized = _normalize_queue_specialty(specialty)
+    return DOCTOR_QUEUE_SPECIALTY_VARIANTS.get(normalized, [normalized])
+
+
+def _resolve_queue_allowed_tags(specialty: str) -> list[str]:
+    normalized = _normalize_queue_specialty(specialty)
+    return DOCTOR_QUEUE_ALLOWED_TAGS.get(normalized, [normalized])
+
+
+def _serialize_queue_doctor(doctor: Optional[Doctor], current_user: User, specialty: str):
+    normalized = _normalize_queue_specialty(specialty)
+    if doctor:
+        return {
+            "id": doctor.id,
+            "name": doctor.user.full_name if doctor.user else f"Врач #{doctor.id}",
+            "specialty": doctor.specialty,
+            "cabinet": doctor.cabinet,
+        }
+
+    return {
+        "id": current_user.id,
+        "name": current_user.full_name or current_user.username or "Врач",
+        "specialty": normalized,
+        "cabinet": None,
+    }
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -94,6 +153,7 @@ def get_doctor_queue_today(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -105,33 +165,31 @@ def get_doctor_queue_today(
     Из passport.md стр. 1419: GET /api/doctor/cardiology/queue/today
     """
     try:
-        # Нормализуем название специальности для поиска
-        specialty_mapping = {
-            'cardiology': ['cardiology', 'cardio', 'Cardiologist', 'Cardio'],
-            'cardio': ['cardiology', 'cardio', 'Cardiologist', 'Cardio'],
-            'derma': ['derma', 'dermatology', 'Dermatologist'],
-            'dentist': ['dentist', 'dental', 'dentistry', 'Dentist'],
-            'lab': ['lab', 'laboratory', 'Laboratory'],
-        }
+        normalized_specialty = _normalize_queue_specialty(specialty)
+        specialty_variants = _resolve_queue_specialty_variants(normalized_specialty)
+        allowed_queue_tags = _resolve_queue_allowed_tags(normalized_specialty)
 
-        # Получаем возможные варианты специальности
-        specialty_variants = specialty_mapping.get(specialty.lower(), [specialty])
-
-        # Получаем врача по специальности и пользователю
-        doctor = (
-            db.query(Doctor)
-            .filter(
-                and_(
-                    Doctor.specialty.in_(specialty_variants),
-                    Doctor.user_id == current_user.id,
-                    Doctor.active == True,
-                )
+        doctor = None
+        if normalized_specialty == "general":
+            doctor = (
+                db.query(Doctor)
+                .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
+                .first()
             )
-            .first()
-        )
+        else:
+            doctor = (
+                db.query(Doctor)
+                .filter(
+                    and_(
+                        Doctor.specialty.in_(specialty_variants),
+                        Doctor.user_id == current_user.id,
+                        Doctor.active == True,
+                    )
+                )
+                .first()
+            )
 
-        if not doctor:
-            # Если врач не найден по user_id, ищем по специальности (для админа и других ролей)
+        if not doctor and normalized_specialty != "general":
             doctor = (
                 db.query(Doctor)
                 .filter(
@@ -142,51 +200,71 @@ def get_doctor_queue_today(
                 .first()
             )
 
-            if not doctor:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Врач специальности '{specialty}' не найден. Проверенные варианты: {specialty_variants}",
-                )
+        if not doctor and normalized_specialty != "general":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Врач специальности '{specialty}' не найден. Проверенные варианты: {specialty_variants}",
+            )
 
         today = date.today()
 
-        # ⭐ ВАЖНО: DailyQueue.specialist_id - это user_id, а не doctor_id
-        # Получаем дневную очередь по user_id
-        doctor_user_id = doctor.user_id if doctor.user_id else None
-        daily_queue = None
-        if doctor_user_id:
-            daily_queue = (
+        candidate_specialist_ids = (
+            {doctor.id}
+            if doctor
+            else ({current_user.id} if normalized_specialty == "general" else set())
+        )
+
+        daily_queue_query = db.query(DailyQueue).filter(
+            and_(
+                DailyQueue.day == today,
+                DailyQueue.specialist_id.in_(sorted(candidate_specialist_ids)),
+            )
+        )
+
+        if allowed_queue_tags:
+            queue_tag_filters = [DailyQueue.queue_tag.in_(allowed_queue_tags)]
+            if normalized_specialty == "general":
+                queue_tag_filters.append(DailyQueue.queue_tag.is_(None))
+            daily_queue_query = daily_queue_query.filter(or_(*queue_tag_filters))
+
+        daily_queues = daily_queue_query.order_by(DailyQueue.id.asc()).all()
+
+        if not daily_queues:
+            legacy_queue = (
                 db.query(DailyQueue)
                 .filter(
                     and_(
                         DailyQueue.day == today,
-                        DailyQueue.specialist_id == doctor_user_id,
+                        DailyQueue.specialist_id.in_(sorted(candidate_specialist_ids)),
                     )
                 )
+                .order_by(DailyQueue.id.asc())
                 .first()
             )
+            if legacy_queue and (
+                normalized_specialty == "general"
+                or legacy_queue.queue_tag in allowed_queue_tags
+                or legacy_queue.queue_tag is None
+            ):
+                daily_queues = [legacy_queue]
 
-        if not daily_queue:
+        if not daily_queues:
             return {
                 "queue_exists": False,
-                "doctor": {
-                    "id": doctor.id,
-                    "name": (
-                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                    ),
-                    "specialty": doctor.specialty,
-                    "cabinet": doctor.cabinet,
-                },
+                "doctor": _serialize_queue_doctor(
+                    doctor, current_user, normalized_specialty
+                ),
                 "date": today.isoformat(),
                 "entries": [],
-                "stats": {"total": 0, "waiting": 0, "in_progress": 0, "completed": 0},
+                "stats": {"total": 0, "waiting": 0, "called": 0, "served": 0},
             }
 
         # Получаем записи очереди
+        queue_ids = [queue.id for queue in daily_queues]
         entries = (
             db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-            .order_by(OnlineQueueEntry.number)
+            .filter(OnlineQueueEntry.queue_id.in_(queue_ids))
+            .order_by(OnlineQueueEntry.queue_id.asc(), OnlineQueueEntry.number.asc())
             .all()
         )
 
@@ -241,16 +319,14 @@ def get_doctor_queue_today(
 
         return {
             "queue_exists": True,
-            "queue_id": daily_queue.id,
+            "queue_id": queue_ids[0],
+            "queue_ids": queue_ids,
             "opened_at": (
-                daily_queue.opened_at.isoformat() if daily_queue.opened_at else None
+                daily_queues[0].opened_at.isoformat()
+                if daily_queues[0].opened_at
+                else None
             ),
-            "doctor": {
-                "id": doctor.id,
-                "name": doctor.user.full_name if doctor.user else f"Врач #{doctor.id}",
-                "specialty": doctor.specialty,
-                "cabinet": doctor.cabinet,
-            },
+            "doctor": _serialize_queue_doctor(doctor, current_user, normalized_specialty),
             "date": today.isoformat(),
             "entries": queue_entries,
             "stats": stats,
@@ -281,6 +357,7 @@ def call_patient(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -393,6 +470,7 @@ def start_patient_visit(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -413,6 +491,24 @@ def start_patient_visit(
                 detail="Запись в очереди не найдена",
             )
 
+        daily_queue = queue_entry.queue
+        doctor = daily_queue.specialist if daily_queue else None
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Врач не найден для этой очереди",
+            )
+
+        if (
+            current_user.role != "Admin"
+            and doctor.user_id
+            and doctor.user_id != current_user.id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет прав для работы с этой очередью",
+            )
+
         # Обновляем статус
         queue_entry.status = "in_progress"
 
@@ -420,7 +516,7 @@ def start_patient_visit(
         visit = crud_visit.find_or_create_today_visit(
             db=db,
             patient_id=queue_entry.patient_id,
-            doctor_id=current_user.id,
+            doctor_id=doctor.id,
             department=(
                 queue_entry.queue.department
                 if hasattr(queue_entry, 'queue')
@@ -464,6 +560,7 @@ def complete_patient_visit(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -476,64 +573,38 @@ def complete_patient_visit(
     """
     try:
         from app.models.appointment import Appointment
+        from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
 
-        # Сначала ищем в Visit
-        visit = db.query(Visit).filter(Visit.id == entry_id).first()
+        # Канонический путь этого endpoint работает по queue_entries.id.
+        # Лишь если такой записи в очереди нет, допускаем legacy fallback на Visit/Appointment.
+        queue_entry = (
+            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        )
+
+        visit = None
+        if not queue_entry:
+            visit = db.query(Visit).filter(Visit.id == entry_id).first()
         if visit:
             # Обновляем статус визита
             visit.status = "completed"
 
-            # ✅ ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
-            # Проверяем через Payment или по существующему discount_mode
+            # ✅ ИСПРАВЛЕНО: payment state должен приходить из Payment/discount_mode,
+            # а не из факта завершения приема.
             from app.models.payment import Payment
 
-            if not visit.discount_mode or visit.discount_mode == "none":
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == visit.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # ✅ ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при завершении приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "complete_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment and (
+                payment.status
+                and payment.status.lower() == 'paid'
+                or payment.paid_at
+            ):
+                visit.discount_mode = "paid"
 
             db.commit()
             db.refresh(visit)
@@ -552,46 +623,30 @@ def complete_patient_visit(
             }
 
         # Если не найден в Visit, ищем в Appointment
-        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
+        appointment = None
+        if not queue_entry:
+            appointment = (
+                db.query(Appointment).filter(Appointment.id == entry_id).first()
+            )
         if appointment:
             # Обновляем статус appointment
             appointment.status = "completed"
 
-            # ✅ Сохраняем информацию об оплате: если appointment был оплачен, сохраняем visit_type='paid'
-            # Appointment не имеет discount_mode, используем visit_type
-            if not appointment.visit_type or appointment.visit_type not in (
-                "paid",
-                "repeat",
-                "benefit",
-                "all_free",
-            ):
-                from app.models.payment import Payment
+            # ✅ Сохраняем payment state только из реального Payment.
+            from app.models.payment import Payment
 
-                payment = (
-                    db.query(Payment)
-                    .filter(Payment.visit_id == appointment.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    appointment.visit_type = "paid"
-                elif (
-                    hasattr(appointment, 'payment_amount')
-                    and appointment.payment_amount
-                    and appointment.payment_amount > 0
-                ):
-                    appointment.visit_type = "paid"
-                elif appointment.status in (
-                    "paid",
-                    "in_visit",
-                    "in_progress",
-                    "completed",
-                ):
-                    appointment.visit_type = "paid"
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == appointment.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment and (
+                payment.status
+                and payment.status.lower() == 'paid'
+                or payment.paid_at
+            ):
+                appointment.discount_mode = "paid"
 
             db.commit()
             db.refresh(appointment)
@@ -603,12 +658,7 @@ def complete_patient_visit(
                 "status": "completed",
             }
 
-        # Если не найден ни в Visit, ни в Appointment — пробуем завершить по записи очереди
-        from app.models.online_queue import OnlineQueueEntry
-
-        queue_entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
-        )
+        # Если найден queue entry, завершаем канонический queue flow
         if queue_entry:
             # Проверяем права врача на эту очередь
             daily_queue = queue_entry.queue
@@ -634,7 +684,7 @@ def complete_patient_visit(
                 visit = crud_visit.find_or_create_today_visit(
                     db=db,
                     patient_id=queue_entry.patient_id,
-                    doctor_id=current_user.id,
+                    doctor_id=doctor.id if doctor else None,
                     department=(
                         daily_queue.department
                         if daily_queue and hasattr(daily_queue, 'department')
@@ -668,38 +718,8 @@ def complete_patient_visit(
                         visit.payment_processed_at = (
                             payment.paid_at or datetime.utcnow()
                         )
-                elif not visit.discount_mode or visit.discount_mode == "none":
-                    # ✅ ИСПРАВЛЕНО: Если нет информации об оплате, но был вызван в кабинет - считаем что оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при завершении приема из очереди (visit {visit.id})",
-                        )
-                        logger.info(
-                            "complete_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
+                elif payment:
+                    # Если платеж уже существует, отражаем его в discount_mode.
                     visit.discount_mode = "paid"
                     if (
                         hasattr(visit, 'payment_processed_at')
@@ -707,8 +727,6 @@ def complete_patient_visit(
                     ):
                         visit.payment_processed_at = (
                             payment.paid_at or datetime.utcnow()
-                            if payment
-                            else datetime.utcnow()
                         )
 
                 # ✅ Также обновляем соответствующий Appointment, если он существует
@@ -738,12 +756,6 @@ def complete_patient_visit(
                         or appointment.discount_mode == "none"
                     ):
                         if visit.discount_mode == "paid":
-                            appointment.discount_mode = "paid"
-                        elif (
-                            hasattr(appointment, 'payment_amount')
-                            and appointment.payment_amount
-                            and appointment.payment_amount > 0
-                        ):
                             appointment.discount_mode = "paid"
 
                 if visit_data:
@@ -801,6 +813,7 @@ def get_doctor_services(
             "Receptionist",
             "cardio",
             "cardiology",
+            "Cardiologist",
             "derma",
             "dentist",
             "Lab",
@@ -830,7 +843,7 @@ def get_doctor_services(
                 {
                     "id": service.id,
                     "name": service.name,
-                    "code": service.code,
+                    "code": service.service_code or get_service_code(service.id, db),
                     "price": float(service.price) if service.price else 0,
                     "currency": service.currency or "UZS",
                     "duration_minutes": service.duration_minutes or 30,
@@ -1051,8 +1064,7 @@ def get_doctor_stats(
             db.query(DailyQueue)
             .filter(
                 and_(
-                    DailyQueue.specialist_id
-                    == doctor.user_id,  # ⭐ user_id, а не doctor.id
+                    DailyQueue.specialist_id == doctor.id,
                     DailyQueue.day >= start_date,
                 )
             )
@@ -1243,7 +1255,7 @@ async def schedule_next_visit(
                 service_id=service.id,
                 name=service.name,
                 # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                code=get_service_code(service.id, db) or service.code,
+                code=service.service_code or get_service_code(service.id, db),
                 qty=service_req.quantity,
                 price=service_price,
                 currency="UZS",
@@ -1429,7 +1441,7 @@ def get_visit_details(
                 "id": vs.id,
                 "service_id": vs.service_id,
                 "service_name": service.name if service else f"Услуга #{vs.service_id}",
-                "service_code": service.code if service else None,
+                "service_code": (service.service_code or get_service_code(service.id, db)) if service else None,
                 "quantity": vs.quantity,
                 "price": vs.price,
                 "custom_price": vs.custom_price,

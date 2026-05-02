@@ -270,10 +270,6 @@ const ModernQueueManager = ({
       queueProfiles.map((p) => p.specialty?.toLowerCase())
     );
 
-    // Группируем врачей по специальности, чтобы избежать дубликатов в списке выбора очереди
-    // (если очередь привязана к специальности, а не к конкретному врачу)
-    const seenSpecialties = new Set();
-
     // Маппинг специальностей на русские названия (можно расширить)
     const specialtyNames = {
       'cardiology': 'Кардиолог',
@@ -312,33 +308,25 @@ const ModernQueueManager = ({
     };
 
     return doctors.
-    filter((d) => d.specialty) // Только врачи со специальностью
+    filter((d) => d.id !== undefined && d.id !== null) // Только врачи с canonical id
     .filter((d) => {
       // ⭐ SSOT Filter: Показываем только тех врачей, чья специальность есть в queueProfiles
       if (allowedSpecialties.size === 0) return true; // Если профили не загружены - показываем всех
       const normalizedSpec = normalizeSpecialty(d.specialty);
       return allowedSpecialties.has(normalizedSpec);
     }).
-    reduce((acc, d) => {
+    map((d) => {
       const normalizedSpec = normalizeSpecialty(d.specialty);
-
-      // Если специальность уже была, пропускаем (для группировки очередей)
-      // Если нужно показывать всех врачей, уберите эту проверку
-      if (seenSpecialties.has(normalizedSpec)) {
-        return acc;
-      }
-      seenSpecialties.add(normalizedSpec);
 
       const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
       const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
 
-      acc.push({
+      return {
         id: d.id,
-        label: `${specialtyLabel}${cabinetInfo}`,
+        label: `${d.full_name || d.user?.full_name || d.name || `Врач #${d.id}`}${specialtyLabel ? ` • ${specialtyLabel}` : ''}${cabinetInfo}`,
         specialty: normalizedSpec
-      });
-      return acc;
-    }, []).
+      };
+    }).
     sort((a, b) => a.label.localeCompare(b.label));
   }, [doctors, queueProfiles]);
 
@@ -549,7 +537,12 @@ const ModernQueueManager = ({
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
         title={qrData?.is_clinic_wide ? 'Общий QR код клиники' : 'QR код для записи'}
-        maxWidth="32rem">
+        maxWidth="32rem"
+        maxHeight="calc(100dvh - 2rem)"
+        dialogClassName="mqm-qr-dialog"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}>
 
         <div className="mqm-qr-modal-content">
           {/* Badge для типа QR */}

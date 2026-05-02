@@ -21,6 +21,7 @@ import {
     Scissors,
     FolderTree
 } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 // Маппинг иконок (должен совпадать с ModernTabs.jsx)
 export const iconMap = {
@@ -206,6 +207,14 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
             </div>
         </div>
     );
+};
+
+
+IconSelector.propTypes = {
+  ...(IconSelector.propTypes || {}),
+  label: PropTypes.any,
+  onChange: PropTypes.any,
+  value: PropTypes.any,
 };
 
 export default IconSelector;

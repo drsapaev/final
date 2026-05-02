@@ -53,7 +53,7 @@ import {
   MenuItem,
   FormControlLabel } from
 '@mui/material';
-import tokenManager from '../utils/tokenManager';
+import { api } from '../api/client.js';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
@@ -76,56 +76,42 @@ const TelegramManager = () => {
   const loadTelegramData = async () => {
     try {
       setLoading(true);
-      const token = tokenManager.getAccessToken();
-
       const [statusRes, templatesRes] = await Promise.all([
-      fetch('/api/v1/telegram/bot-status', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }),
-      fetch('/api/v1/telegram/templates', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })]
-      );
+        api.get('/telegram/bot-status'),
+        api.get('/admin/telegram/templates')
+      ]);
 
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        setBotStatus(statusData);
-      }
+      const statusData = statusRes?.data || {};
+      const templatesData = templatesRes?.data || {};
 
-      if (templatesRes.ok) {
-        const templatesData = await templatesRes.json();
-        setTemplates(templatesData.templates || templatesData || []);
-      }
-    } catch {
-      setError('Ошибка загрузки данных Telegram');
+      setBotStatus({
+        bot_active: Boolean(statusData.active || statusData.configured),
+        webhook_configured: Boolean(statusData.webhook_configured || statusData.webhook_set),
+        subscribers_count: Number(statusData?.stats?.active_users ?? statusData?.stats?.total_users ?? 0),
+        configured: Boolean(statusData.configured),
+        raw: statusData
+      });
+
+      const normalizedTemplates = Array.isArray(templatesData) ?
+      templatesData :
+      Object.entries(templatesData).map(([key, value]) => ({
+        id: key,
+        name: value?.subject || key,
+        message_type: key,
+        content: value?.message_text || '',
+        is_active: true
+      }));
+
+      setTemplates(normalizedTemplates);
+    } catch (e) {
+      setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных Telegram');
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreateTemplate = async () => {
-    try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('/api/v1/telegram/templates', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(templateForm)
-      });
-
-      if (response.ok) {
-        setSuccess('Шаблон успешно создан');
-        loadTelegramData();
-        setShowTemplateDialog(false);
-        resetForm();
-      } else {
-        setError('Ошибка создания шаблона');
-      }
-    } catch {
-      setError('Ошибка создания шаблона');
-    }
+    setError('В этой сборке доступен просмотр Telegram шаблонов. Создание шаблонов через UI пока не опубликовано в backend contract.');
   };
 
   const resetForm = () => {
@@ -139,7 +125,7 @@ const TelegramManager = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: '400px' }}>
         <CircularProgress />
       </Box>);
 
@@ -153,9 +139,8 @@ const TelegramManager = () => {
         </Typography>
         <Button
           variant="outlined"
-          startIcon={<RefreshCw />}
           onClick={loadTelegramData}>
-          
+          <RefreshCw size={16} />
           Обновить
         </Button>
       </Box>
@@ -233,30 +218,27 @@ const TelegramManager = () => {
               <Typography variant="h6" gutterBottom>
                 Быстрые действия
               </Typography>
-              <Box display="flex" flexDirection="column" gap={2}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Button
                   fullWidth
                   variant="contained"
-                  startIcon={<Settings />}
-                  sx={{ py: 1.5 }}>
-                  
+                  style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <Settings size={16} />
                   Настроить бота
                 </Button>
                 <Button
                   fullWidth
                   variant="outlined"
-                  startIcon={<Send />}
-                  sx={{ py: 1.5 }}>
-                  
+                  style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <Send size={16} />
                   Отправить сообщение
                 </Button>
                 <Button
                   fullWidth
                   variant="outlined"
-                  startIcon={<Plus />}
                   onClick={() => setShowTemplateDialog(true)}
-                  sx={{ py: 1.5 }}>
-                  
+                  style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <Plus size={16} />
                   Новый шаблон
                 </Button>
               </Box>

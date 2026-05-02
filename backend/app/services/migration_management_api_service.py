@@ -8,6 +8,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.repositories.migration_management_repository import MigrationManagementRepository
+from app.services.emr_cutover_service import EMRCutoverService
 from app.services.migration_service import MigrationService
 
 
@@ -19,13 +20,18 @@ class MigrationManagementApiService:
         db: Session,
         repository: MigrationManagementRepository | None = None,
         migration_service_factory: Callable[[Session], MigrationService] | None = None,
+        emr_cutover_service_factory: Callable[[Session], EMRCutoverService] | None = None,
     ):
         self.db = db
         self.repository = repository or MigrationManagementRepository(db)
         self._migration_service_factory = migration_service_factory or MigrationService
+        self._emr_cutover_service_factory = emr_cutover_service_factory or EMRCutoverService
 
     def _migration_service(self) -> MigrationService:
         return self._migration_service_factory(self.db)
+
+    def _emr_cutover_service(self) -> EMRCutoverService:
+        return self._emr_cutover_service_factory(self.db)
 
     @staticmethod
     def parse_date(value: str | None):
@@ -48,6 +54,20 @@ class MigrationManagementApiService:
 
     def cleanup_old_data(self, days_to_keep: int) -> dict:
         return self._migration_service().cleanup_old_data(days_to_keep)
+
+    def migrate_legacy_emr_data(
+        self,
+        *,
+        limit: int | None = None,
+        dry_run: bool = False,
+    ) -> dict:
+        return self._emr_cutover_service().migrate_legacy_emrs(
+            limit=limit,
+            dry_run=dry_run,
+        )
+
+    def verify_emr_cutover(self) -> dict:
+        return self._emr_cutover_service().verify_cutover()
 
     def get_migration_stats(self) -> dict:
         queue_stats = self.repository.get_queue_stats()

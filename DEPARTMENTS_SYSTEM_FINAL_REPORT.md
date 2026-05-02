@@ -210,7 +210,7 @@ Traceback (most recent call last):
 
 2. **Воспроизвести через curl** с полными данными:
    ```bash
-   curl -X POST http://localhost:8000/api/v1/registrar/cart \
+   curl -X POST http://localhost:18000/api/v1/registrar/cart \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
@@ -230,7 +230,7 @@ Traceback (most recent call last):
    ```bash
    # В отдельном терминале
    cd backend
-   python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000 --log-level debug
    ```
 
 4. **Добавить отладочный print в начало create_cart_appointments**:

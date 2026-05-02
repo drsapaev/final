@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Copy"
+  short_description: "Write landing copy and CTAs"
+  default_prompt: "Use $landing-copy to draft or refine landing page copy, section messaging, and CTAs."

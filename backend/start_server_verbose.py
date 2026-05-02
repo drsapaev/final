@@ -34,19 +34,22 @@ os.environ["PYTHONPATH"] = current_dir
 sys.path.insert(0, current_dir)
 
 if __name__ == "__main__":
+    PORT = int(os.environ.get("BACKEND_PORT", "18000"))
+
     print("=" * 80)
     print("🚀 ЗАПУСК СЕРВЕРА С ПОЛНЫМ ЛОГИРОВАНИЕМ")
     print("=" * 80)
     print(f"📁 Рабочая директория: {os.getcwd()}")
     print(f"🗄️ База данных: {os.environ['DATABASE_URL']}")
     print(f"🐍 Python path: {os.environ['PYTHONPATH']}")
+    print(f"🌐 Порт: {PORT}")
     print("=" * 80)
     
     # Конфигурация uvicorn с МАКСИМАЛЬНЫМ логированием
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=PORT,
         reload=False,  # Отключаем reload для стабильности
         log_level="info",
         access_log=True,  # ВКЛЮЧАЕМ логи доступа

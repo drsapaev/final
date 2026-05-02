@@ -2,10 +2,11 @@
  * MCP (Model Context Protocol) API Client
  */
 import axios from 'axios';
+import { getApiBaseUrl } from './runtime';
 import { getAuthToken } from '../services/auth';
 
 import logger from '../utils/logger';
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = getApiBaseUrl();
 
 // Создаем axios instance для MCP
 const mcpClient = axios.create({

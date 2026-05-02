@@ -1,6 +1,10 @@
 # 🔔 Notification System Architecture
 
-> **Version**: 2.0  
+> **Deprecated / Historical Reference**
+> This document describes an older sender-service / multi-channel architecture and does not match the current notification platform on `main`.
+> Current source of truth: `.ai-factory/plans/feat-unified-notifications-strong.md`, `backend/app/api/v1/endpoints/notifications.py`, `backend/app/services/notification_platform_service.py`, `frontend/src/contexts/NotificationCenterContext.jsx`, and `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+
+> **Version**: 2.0
 > **Last Updated**: February 2026
 
 ## 🌟 Overview

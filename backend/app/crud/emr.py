@@ -44,9 +44,25 @@ class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUp
             .first()
         )
 
+    def get_by_visit(
+        self, db: Session, *, visit_id: int
+    ) -> Prescription | None:
+        """Получить рецепт по каноническому visit ID"""
+        return db.query(Prescription).filter(Prescription.visit_id == visit_id).first()
+
     def get_by_emr(self, db: Session, *, emr_id: int) -> Prescription | None:
         """Получить рецепт по ID EMR"""
         return db.query(Prescription).filter(Prescription.emr_id == emr_id).first()
+
+    def get_by_emr_record(
+        self, db: Session, *, emr_record_id: int
+    ) -> Prescription | None:
+        """Получить рецепт по каноническому EMR v2"""
+        return (
+            db.query(Prescription)
+            .filter(Prescription.emr_record_id == emr_record_id)
+            .first()
+        )
 
     def save_prescription(
         self, db: Session, *, prescription_id: int

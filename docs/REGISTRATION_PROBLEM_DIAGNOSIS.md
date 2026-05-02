@@ -81,7 +81,7 @@ SELECT COUNT(*) FROM visits WHERE visit_date = '2025-10-01';
 ### Шаг 3: Тестировать API эндпоинт
 ```bash
 # Тестовый запрос:
-curl -X POST "http://localhost:8000/api/v1/registrar/cart" \
+curl -X POST "http://localhost:18000/api/v1/registrar/cart" \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"patient_id": 1, "visits": [...]}'
@@ -90,7 +90,7 @@ curl -X POST "http://localhost:8000/api/v1/registrar/cart" \
 ### Шаг 4: Проверить ответ API
 ```bash
 # Проверить текущее состояние:
-curl "http://localhost:8000/api/v1/registrar/queues/today" \
+curl "http://localhost:18000/api/v1/registrar/queues/today" \
   -H "Authorization: Bearer TOKEN"
 ```
 
@@ -173,7 +173,7 @@ const minimalData = {
 ### Тест 2: Проверка API
 ```bash
 # Прямой запрос к API
-curl -X POST "http://localhost:8000/api/v1/registrar/cart" \
+curl -X POST "http://localhost:18000/api/v1/registrar/cart" \
   -H "Authorization: Bearer TOKEN" \
   -d '{"patient_id": 1, "visits": [...]}'
 ```

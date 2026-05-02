@@ -1,0 +1,98 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "Doctor User" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: Doctor User
+        - button "Выйти" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]:
+            - img [ref=e50]
+            - text: Выйти
+    - main [ref=e54]:
+      - generic [ref=e55]:
+        - main [ref=e56]:
+          - generic [ref=e57]:
+            - button "Панель" [ref=e58] [cursor=pointer]:
+              - img [ref=e59]
+              - generic [ref=e61]: Панель
+            - button "Пациенты" [ref=e62] [cursor=pointer]:
+              - img [ref=e63]
+              - generic [ref=e66]: Пациенты
+            - button "Записи" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+              - generic [ref=e70]: Записи
+            - button "Очередь" [ref=e71] [cursor=pointer]:
+              - img [ref=e72]
+              - generic [ref=e77]: Очередь
+            - button "AI Помощник" [ref=e78] [cursor=pointer]:
+              - img [ref=e79]
+              - generic [ref=e87]: AI Помощник
+            - button "Отчеты" [ref=e88] [cursor=pointer]:
+              - img [ref=e89]
+              - generic [ref=e92]: Отчеты
+          - generic [ref=e94]:
+            - generic [ref=e95]:
+              - generic [ref=e98] [cursor=pointer]:
+                - img [ref=e100]
+                - generic [ref=e103]:
+                  - generic [ref=e104]: "0"
+                  - generic [ref=e105]: Активных пациентов
+              - generic [ref=e108] [cursor=pointer]:
+                - img [ref=e110]
+                - generic [ref=e112]:
+                  - generic [ref=e113]: "0"
+                  - generic [ref=e114]: Записей на сегодня
+              - generic [ref=e117] [cursor=pointer]:
+                - img [ref=e119]
+                - generic [ref=e122]:
+                  - generic [ref=e123]: "0"
+                  - generic [ref=e124]: В процессе
+              - generic [ref=e127] [cursor=pointer]:
+                - img [ref=e129]
+                - generic [ref=e132]:
+                  - generic [ref=e133]: "0"
+                  - generic [ref=e134]: Завершено сегодня
+            - generic [ref=e136]:
+              - heading "Быстрые действия" [level=2] [ref=e138]
+              - generic [ref=e140]:
+                - button "Новый пациент" [ref=e141] [cursor=pointer]:
+                  - generic [ref=e142]:
+                    - img [ref=e143]
+                    - text: Новый пациент
+                - button "Записать на прием" [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145]:
+                    - img [ref=e146]
+                    - text: Записать на прием
+                - button "Создать отчет" [ref=e148] [cursor=pointer]:
+                  - generic [ref=e149]:
+                    - img [ref=e150]
+                    - text: Создать отчет
+                - button "Экспорт данных" [ref=e153] [cursor=pointer]:
+                  - generic [ref=e154]:
+                    - img [ref=e155]
+                    - text: Экспорт данных
+        - button "💬 AI" [ref=e158] [cursor=pointer]:
+          - generic [ref=e159]: 💬
+          - generic [ref=e160]: AI
+  - region "Notifications Alt+T"

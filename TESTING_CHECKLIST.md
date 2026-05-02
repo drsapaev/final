@@ -70,7 +70,7 @@ python check_testing_readiness.py
 ### Запуск backend (если не запущен)
 ```bash
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 ```
 
 ### Запуск frontend (если не запущен)

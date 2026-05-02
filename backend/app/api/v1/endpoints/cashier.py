@@ -9,7 +9,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Generic, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
 
@@ -17,10 +18,20 @@ from app.api import deps
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.patient import Patient
+from app.models.user import User
+from app.services.payment_read_service import PaymentReadService
+from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _preserve_cashier_visit_status(raw_status: str | None) -> str:
+    """Payment belongs to Payment/discount_mode; legacy visit.status='paid' becomes operational waiting."""
+    if not raw_status or raw_status == "paid":
+        return "waiting"
+    return raw_status
 
 
 # ===================== МОДЕЛИ ДЛЯ КАССИРА =====================
@@ -43,8 +54,7 @@ class PendingPaymentItem(BaseModel):
     queue_number: Optional[str] = None
     department: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentHistoryItem(BaseModel):
@@ -61,8 +71,7 @@ class PaymentHistoryItem(BaseModel):
     note: Optional[str] = None
     cashier_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 T = TypeVar("T")
@@ -97,8 +106,7 @@ class PaymentResponse(BaseModel):
     paid_at: Optional[datetime] = None
     note: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CancelPaymentRequest(BaseModel):
@@ -146,6 +154,113 @@ def get_patient_name(patient: Optional[Patient], patient_id: int) -> str:
     return f"Пациент #{patient_id}"
 
 
+def _decimal_to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _emit_payment_notification(
+    *,
+    db: Session,
+    payment: Payment,
+    current_user: Any,
+    change_type: str,
+    patient_id: Optional[int] = None,
+    visit: Optional[Visit] = None,
+    reason: Optional[str] = None,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit canonical payment_notification for patient inbox without breaking cashier flow."""
+    try:
+        resolved_visit = visit
+        if resolved_visit is None and payment.visit_id:
+            resolved_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+
+        resolved_patient_id = patient_id or (resolved_visit.patient_id if resolved_visit else None)
+        if not resolved_patient_id:
+            return
+
+        patient = db.query(Patient).filter(Patient.id == resolved_patient_id).first()
+        if not patient or not patient.user_id:
+            return
+
+        recipient = (
+            db.query(User)
+            .filter(User.id == patient.user_id, User.is_active.is_(True))
+            .first()
+        )
+        if not recipient:
+            return
+
+        amount_value = _decimal_to_float(getattr(payment, "amount", None))
+        metadata: Dict[str, Any] = {
+            "payment_id": payment.id,
+            "visit_id": payment.visit_id,
+            "patient_id": resolved_patient_id,
+            "payment_status": payment.status,
+            "payment_method": getattr(payment, "method", None),
+            "change_type": change_type,
+        }
+        if amount_value is not None:
+            metadata["amount"] = amount_value
+        if reason:
+            metadata["reason"] = reason
+        if extra_metadata:
+            metadata.update(extra_metadata)
+
+        title_map = {
+            "paid": "Оплата подтверждена",
+            "paid_manual": "Оплата подтверждена",
+            "cancelled": "Платеж отменен",
+            "partial_refund": "Частичный возврат выполнен",
+            "full_refund": "Возврат выполнен",
+            "failed": "Платеж не выполнен",
+        }
+        message_map = {
+            "paid": "Ваш платеж успешно проведен.",
+            "paid_manual": "Ваш платеж подтвержден кассиром.",
+            "cancelled": "Платеж был отменен.",
+            "partial_refund": "Выполнен частичный возврат по вашему платежу.",
+            "full_refund": "Средства по вашему платежу полностью возвращены.",
+            "failed": "Не удалось завершить платеж.",
+        }
+        title = title_map.get(change_type, "Обновление статуса платежа")
+        message = message_map.get(change_type, "Статус платежа обновлен.")
+        if amount_value is not None:
+            message = f"{message} Сумма: {amount_value:,.2f} UZS."
+
+        await notification_sender_service.send_canonical_notification_to_user(
+            db=db,
+            recipient=recipient,
+            event_type="payment_notification",
+            title=title,
+            message=message,
+            source_module="cashier",
+            metadata=metadata,
+            deep_link="/patient",
+            severity="warning" if change_type in {"cancelled", "failed", "full_refund"} else "info",
+            priority="high" if change_type in {"cancelled", "failed", "full_refund"} else "normal",
+            actor_id=getattr(current_user, "id", None),
+            actor_role=getattr(current_user, "role", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+        )
+    except Exception as notify_error:
+        logger.warning(
+            "[FIX:NOTIFICATIONS] failed to emit payment_notification",
+            extra={
+                "payment_id": getattr(payment, "id", None),
+                "visit_id": getattr(payment, "visit_id", None),
+                "change_type": change_type,
+                "error": str(notify_error),
+            },
+        )
+
+
 # ===================== API ENDPOINTS =====================
 
 @router.get("/pending-payments")
@@ -179,12 +294,7 @@ async def get_pending_payments(
         query = db.query(Visit).options(
             joinedload(Visit.services)
         ).filter(
-            ~Visit.status.in_(excluded_statuses),
-            # Также исключаем визиты с discount_mode='paid' (SSOT признак оплаты)
-            or_(
-                Visit.discount_mode.is_(None),
-                Visit.discount_mode != "paid"
-            )
+            ~Visit.status.in_(excluded_statuses)
         )
         
         # Фильтр по датам
@@ -712,6 +822,7 @@ async def create_payment(
     try:
         # Определяем patient_id
         patient_id = payment_data.patient_id
+        visit = None
         
         if payment_data.visit_id:
             # ✅ FIX: Use lazy load to ensure consistency with get_pending_payments
@@ -776,6 +887,15 @@ async def create_payment(
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
+
+        await _emit_payment_notification(
+            db=db,
+            payment=new_payment,
+            current_user=current_user,
+            change_type="paid",
+            patient_id=patient_id,
+            visit=visit,
+        )
         
         # 🔔 WebSocket: Broadcast payment_created event
         try:
@@ -883,15 +1003,25 @@ async def cancel_payment(
         if hasattr(payment, 'note') and cancel_data.reason:
             payment.note = f"Отменён: {cancel_data.reason}"
 
-        # Возвращаем статус визита в 'pending', чтобы он появился в списке
+        # Возвращаем только operational статус визита; registration type не трогаем.
+        visit = None
         if payment.visit_id:
             visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
             if visit and visit.status == 'paid':
-                 visit.status = 'pending'
-                 visit.discount_mode = 'none'
-                 db.add(visit)
+                visit.status = _preserve_cashier_visit_status(visit.status)
+                db.add(visit)
         
         db.commit()
+
+        await _emit_payment_notification(
+            db=db,
+            payment=payment,
+            current_user=current_user,
+            change_type="cancelled",
+            patient_id=visit.patient_id if visit else None,
+            visit=visit,
+            reason=cancel_data.reason,
+        )
         
         return {
             "success": True,
@@ -949,16 +1079,28 @@ async def mark_visit_as_paid(
             )
             db.add(new_payment)
         
-        # Обновляем статус визита и discount_mode (SSOT)
-        visit.status = "paid"  # Используем "paid" вместо "closed" для правильной фильтрации
-        visit.discount_mode = "paid"  # SSOT признак оплаты
-        
+        # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита
+        # и не должна менять registration type.
+        visit.status = _preserve_cashier_visit_status(visit.status)
+
         db.commit()
-        
+
+        if total_amount > 0:
+            await _emit_payment_notification(
+                db=db,
+                payment=new_payment,
+                current_user=current_user,
+                change_type="paid",
+                patient_id=visit.patient_id,
+                visit=visit,
+            )
+
         return {
             "success": True,
             "message": "Визит отмечен как оплаченный",
             "visit_id": visit_id,
+            "status": visit.status,
+            "payment_status": "paid",
             "amount": float(total_amount)
         }
         
@@ -999,15 +1141,24 @@ async def confirm_payment(
         from datetime import datetime
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.utcnow().timestamp())}"
     
-    # Обновляем статус визита
+    # Обновляем только operational статус визита; registration type не меняем.
+    visit = None
     if payment.visit_id:
          visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
          if visit:
-             visit.status = 'paid'
-             visit.discount_mode = 'paid'
-             db.add(visit)
+              visit.status = _preserve_cashier_visit_status(visit.status)
+              db.add(visit)
     
     db.commit()
+    await _emit_payment_notification(
+        db=db,
+        payment=payment,
+        current_user=current_user,
+        change_type="paid_manual",
+        patient_id=visit.patient_id if visit else None,
+        visit=visit,
+        extra_metadata={"confirmation_mode": "manual"},
+    )
     return {"success": True, "status": "paid"}
 
 
@@ -1057,19 +1208,34 @@ async def refund_payment(
         if new_refunded_amount >= payment.amount:
             payment.status = "refunded"
             
-            # Возвращаем статус визита в 'pending' при полном возврате
+            # Возвращаем только operational статус при полном возврате.
             if payment.visit_id:
                 visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
                 if visit and visit.status == 'paid':
-                     visit.status = 'pending'
-                     visit.discount_mode = 'none'
-                     db.add(visit)
+                    visit.status = _preserve_cashier_visit_status(visit.status)
+                    db.add(visit)
         else:
             # Частичный возврат — оставляем "paid" но с пометкой
             pass
         
         db.commit()
         db.refresh(payment)
+
+        refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
+        refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
+        await _emit_payment_notification(
+            db=db,
+            payment=payment,
+            current_user=current_user,
+            change_type=refund_change_type,
+            patient_id=refund_visit.patient_id if refund_visit else None,
+            visit=refund_visit,
+            reason=refund_data.reason,
+            extra_metadata={
+                "refund_amount": _decimal_to_float(refund_data.amount),
+                "remaining_amount": _decimal_to_float(payment.amount - new_refunded_amount),
+            },
+        )
         
         return RefundResponse(
             id=payment.id,
@@ -1101,73 +1267,17 @@ async def get_payment_receipt(
     db: Session = Depends(deps.get_db),
     current_user = Depends(deps.require_roles("Admin", "Cashier")),
 ):
-    """
-    Генерация PDF-чека для платежа.
-    """
-    from fastapi.responses import StreamingResponse
-    import io
-    
+    """Генерация PDF-чека для платежа."""
     try:
-        payment = db.query(Payment).filter(Payment.id == payment_id).first()
-        
-        if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Платеж не найден"
-            )
-        
-        # Получаем данные визита и пациента
-        visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
-        patient = None
-        patient_name = "Неизвестно"
-        
-        if visit:
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-            if patient:
-                patient_name = get_patient_name(patient, patient.id)
-        
-        # Генерируем простой текстовый чек (можно заменить на reportlab для PDF)
-        receipt_content = f"""
-================================
-        КВИТАНЦИЯ ОБ ОПЛАТЕ
-================================
-
-Номер чека: {payment.receipt_no or f"PAY-{payment.id:06d}"}
-Дата: {payment.paid_at.strftime('%d.%m.%Y %H:%M') if payment.paid_at else payment.created_at.strftime('%d.%m.%Y %H:%M')}
-
---------------------------------
-Пациент: {patient_name}
-Визит ID: {payment.visit_id or 'N/A'}
-
---------------------------------
-ПЛАТЕЖНАЯ ИНФОРМАЦИЯ:
-
-Сумма: {payment.amount:,.0f} {payment.currency or 'UZS'}
-Способ оплаты: {'Наличные' if payment.method == 'cash' else 'Карта' if payment.method == 'card' else payment.method}
-Статус: {'Оплачено' if payment.status in ['paid', 'completed'] else 'Возвращено' if payment.status == 'refunded' else payment.status}
-
-{f'Возврат: {payment.refunded_amount:,.0f} UZS' if payment.refunded_amount else ''}
-{f'Причина возврата: {payment.refund_reason}' if payment.refund_reason else ''}
-
---------------------------------
-{payment.note or ''}
-
-================================
-   Спасибо за визит!
-================================
-        """
-        
-        # Возвращаем как текст (для полноценного PDF нужен reportlab)
-        buffer = io.BytesIO(receipt_content.encode('utf-8'))
-        
-        return StreamingResponse(
-            buffer,
-            media_type="text/plain; charset=utf-8",
+        service = PaymentReadService(db)
+        pdf_bytes = service.build_receipt_pdf(payment_id=payment_id)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
             headers={
-                "Content-Disposition": f"attachment; filename=receipt_{payment_id}.txt"
-            }
+                "Content-Disposition": f'attachment; filename="receipt_{payment_id}.pdf"'
+            },
         )
-        
     except HTTPException:
         raise
     except Exception as e:

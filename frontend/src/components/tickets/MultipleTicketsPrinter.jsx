@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
+import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
+import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
   const [printedTickets, setPrintedTickets] = useState(new Set());
@@ -8,86 +11,46 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
   const [countdown, setCountdown] = useState(0);
 
   // Функция печати одного талона
-  const printSingleTicket = (ticket) => {
+  const printSingleTicket = async (ticket) => {
     setCurrentPrinting(ticket.queue_id);
 
-    // Формируем содержимое талона
-    const printContent = `
-      ═══════════════════════════════════
-           ТАЛОН НА ПРИЁМ
-      ═══════════════════════════════════
-      
-      Пациент: ${ticket.patient_name || 'Не указан'}
-      
-      Очередь: ${ticket.queue_name}
-      Номер: ${ticket.queue_number}
-      
-      ${ticket.doctor_name !== 'Без врача' ? `Врач: ${ticket.doctor_name}` : ''}
-      
-      Дата: ${new Date(ticket.visit_date).toLocaleDateString('ru-RU')}
-      Время: ${ticket.visit_time || 'Не указано'}
-      
-      ═══════════════════════════════════
-      Сохраните талон до приёма
-      ═══════════════════════════════════
-    `;
-
-    // Создаем новое окно для печати
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Талон ${ticket.queue_name} №${ticket.queue_number}</title>
-          <style>
-            body {
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              line-height: 1.4;
-              margin: 20px;
-              white-space: pre-line;
-            }
-            @media print {
-              body { margin: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-
-    // Автоматическая печать через небольшую задержку
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-
-      // Отмечаем талон как напечатанный
-      setPrintedTickets((prev) => new Set([...prev, ticket.queue_id]));
-      setCurrentPrinting(null);
-
-      // Проверяем, все ли талоны напечатаны
-      if (printedTickets.size + 1 >= tickets.length) {
-        setTimeout(() => {
-          onAllPrinted && onAllPrinted();
-        }, 1000);
+    try {
+      const result = await printPanelTicketInBrowserAsync(buildPanelTicketPayload(ticket));
+      if (!result?.opened) {
+        logger.warn('Browser popup blocked for ticket print', ticket);
+      } else if (!result?.success) {
+        logger.warn('Browser ticket preview failed', ticket);
       }
-    }, 500);
+      return Boolean(result?.opened && result?.success);
+    } catch (error) {
+      logger.error('Browser ticket print failed', error);
+      return false;
+    } finally {
+      setCurrentPrinting(null);
+    }
   };
 
   // Печать всех талонов с интервалом
-  const printAllTickets = () => {
-    let delay = 0;
-    tickets.forEach((ticket) => {
+  const printAllTickets = async () => {
+    let allSucceeded = true;
+
+    for (const ticket of tickets) {
       if (!printedTickets.has(ticket.queue_id)) {
-        setTimeout(() => {
-          printSingleTicket(ticket);
-        }, delay);
-        delay += 2000; // 2 секунды между печатью каждого талона
+        // Небольшая пауза между печатью талонов, чтобы не перегружать принтер
+        // и сохранить предсказуемый порядок печати.
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        const success = await printSingleTicket(ticket);
+        if (success) {
+          setPrintedTickets((prev) => new Set([...prev, ticket.queue_id]));
+        } else {
+          allSucceeded = false;
+        }
       }
-    });
+    }
+
+    if (allSucceeded) {
+      onAllPrinted && onAllPrinted();
+    }
   };
 
   // Обратный отсчет для кнопки "Печать всех"
@@ -195,6 +158,18 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
       </div>
     </div>);
 
+};
+
+
+MultipleTicketsPrinter.propTypes = {
+  ...(MultipleTicketsPrinter.propTypes || {}),
+  forEach: PropTypes.any,
+  length: PropTypes.any,
+  map: PropTypes.any,
+  onAllPrinted: PropTypes.any,
+  onClose: PropTypes.any,
+  some: PropTypes.any,
+  tickets: PropTypes.any,
 };
 
 export default MultipleTicketsPrinter;

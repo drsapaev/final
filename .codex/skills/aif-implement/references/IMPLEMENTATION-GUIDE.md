@@ -38,6 +38,56 @@ What would you like to do?
 
 Tasks are persisted in the conversation/project state.
 
+## List Available Plans (`--list`)
+
+When the user runs:
+
+```
+/aif-implement --list
+```
+
+Use read-only discovery and stop without executing any tasks.
+
+### Discovery steps
+
+```
+git branch --show-current
+```
+
+Then derive:
+- `branchPlan = .ai-factory/plans/<branch-with-slashes-replaced-by-hyphens>.md`
+- `fastPlan = .ai-factory/PLAN.md`
+- `fixPlan = .ai-factory/FIX_PLAN.md`
+
+Check which files exist and print:
+
+```
+## Available Plans
+Current branch: <branch>
+- [x| ] <branchPlan>   (current-branch plan)
+- [x| ] <fastPlan>     (fast plan)
+- [x| ] <fixPlan>      (fix plan)
+
+Use:
+- /aif-implement @<path>  to execute a specific plan
+- /aif-implement          to use automatic priority
+```
+
+If no plans exist, print:
+
+```
+No plan files found. Create one with:
+- /aif-plan full <description>
+- /aif-plan fast <description>
+- /aif-fix <bug description>
+```
+
+### Constraints
+
+- Do not execute implementation tasks
+- Do not modify files
+- Do not call `TaskUpdate`
+
 ### Recovery after a break or after /clear
 
 If the user is resuming later and you don't have prior conversational context, rebuild context from git + the plan file before continuing:
@@ -50,7 +100,7 @@ git diff --stat
 ```
 
 Then:
-- Re-open the active plan file and confirm it matches the current branch.
+- Re-open the active plan file (`@plan-file` override if provided; otherwise branch plan first, then `PLAN.md`, then `FIX_PLAN.md` redirect to `/aif-fix`).
 - Use `TaskList` to find `in_progress` first, otherwise the next pending task.
 - If `TaskList` and plan checkboxes disagree, reconcile (verify code, then update `TaskUpdate` + plan checkbox).
 
@@ -58,7 +108,7 @@ Then:
 ```
 User: /aif-implement
 
-Claude: Resuming implementation...
+Agent: Resuming implementation...
 
 Found 3 completed tasks, 5 pending.
 Continuing from Task #4: Implement JWT generation

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
   const [loading, setLoading] = useState(false);
@@ -312,6 +313,15 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       </div>
     </div>);
 
+};
+
+
+TwoFactorVerify.propTypes = {
+  ...(TwoFactorVerify.propTypes || {}),
+  method: PropTypes.any,
+  onCancel: PropTypes.any,
+  onSuccess: PropTypes.any,
+  pendingToken: PropTypes.any,
 };
 
 export default TwoFactorVerify;

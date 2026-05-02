@@ -28,7 +28,7 @@ DON'T:
 ## 📁 Files You Can Safely Modify
 
 ### ✅ SAFE (UI/Performance):
-- `frontend/src/components/emr/EMRSmartField.css` - Styling
+- `frontend/src/components/emr-v2/sections/EMRSmartFieldV2.css` - Styling
 - Database indexes (add, not remove)
 - Telemetry dashboard queries
 - Error handling logic
@@ -82,12 +82,12 @@ Before committing ANY change, test:
 ```bash
 # 1. Isolation test
 curl -H "Authorization: Bearer doctor_A_token" \
-  http://localhost:8000/api/v1/emr/phrase-suggest \
+  http://localhost:18000/api/v1/emr/phrase-suggest \
   -d '{"doctorId": B, ...}'
 # Expected: 403 Forbidden or empty results
 
 # 2. Readiness test
-curl http://localhost:8000/api/v1/emr/readiness/123
+curl http://localhost:18000/api/v1/emr/readiness/123
 # Expected: ready=false if < 10 EMRs
 
 # 3. SQL injection test

@@ -13,7 +13,7 @@ import urllib.request
 from datetime import datetime
 
 # Конфигурация для GitHub Actions
-BASE_URL = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8000")
+BASE_URL = os.getenv("TEST_BASE_URL", "http://127.0.0.1:18000")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 RETRY_DELAY = int(os.getenv("RETRY_DELAY", "5"))
 

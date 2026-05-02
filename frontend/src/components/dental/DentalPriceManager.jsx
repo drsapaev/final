@@ -13,8 +13,10 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import { getApiBaseUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
-const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+import PropTypes from 'prop-types';
+const API_BASE = getApiBaseUrl();
 
 /**
  * Компонент для указания цены стоматологом после лечения
@@ -330,6 +332,18 @@ const DentalPriceManager = ({
       </div>
     </div>);
 
+};
+
+
+DentalPriceManager.propTypes = {
+  ...(DentalPriceManager.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onPriceSet: PropTypes.any,
+  originalPrice: PropTypes.any,
+  serviceId: PropTypes.any,
+  serviceName: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default DentalPriceManager;

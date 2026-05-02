@@ -7,7 +7,7 @@ import sys
 import time
 
 
-def test_connection(port=8000, timeout=5):
+def test_connection(port=18000, timeout=5):
     """Проверяет подключение к серверу"""
     try:
         response = requests.get(

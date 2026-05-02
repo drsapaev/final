@@ -7,8 +7,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
-from sqlalchemy import func
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -29,7 +29,7 @@ from app.schemas.department import (
     DepartmentRegistrationSettingsUpdate,
     DepartmentServiceCreate,
 )
-from app.services.service_mapping import normalize_service_code
+from app.services.service_mapping import get_service_code, normalize_service_code
 
 router = APIRouter()
 
@@ -92,8 +92,7 @@ class DepartmentResponse(BaseModel):
     active: bool
     description: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DepartmentResponseWithSettings(DepartmentResponse):
@@ -691,7 +690,9 @@ def get_department_services(
                 "service": {
                     "id": ds.service.id,
                     "name": ds.service.name,
-                    "code": ds.service.code,
+                    "code": ds.service.service_code or get_service_code(
+                        ds.service.id, db
+                    ),
                     "base_price": float(ds.service.price) if ds.service.price else None,
                 },
                 "is_default": ds.is_default,
@@ -1005,7 +1006,12 @@ def initialize_department(
             # Проверяем, что услуга не существует
             existing_service = (
                 db.query(Service)
-                .filter(Service.code == payload.get("service_code"))
+                .filter(
+                    or_(
+                        Service.code == payload.get("service_code"),
+                        Service.service_code == payload.get("service_code"),
+                    )
+                )
                 .first()
             )
 

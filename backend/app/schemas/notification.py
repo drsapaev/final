@@ -73,6 +73,80 @@ class NotificationHistory(NotificationHistoryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class NotificationInboxItem(BaseModel):
+    id: str = Field(..., description="Delivery ID used by the frontend")
+    delivery_id: str = Field(..., description="Canonical delivery UUID")
+    event_id: str = Field(..., description="Canonical event UUID")
+    sequence_id: int = Field(..., description="Monotonic inbox cursor")
+    notification_type: str = Field(..., description="Canonical notification type")
+    event_type: str = Field(..., description="Canonical event type")
+    title: str = Field(..., description="Notification title")
+    message: str = Field(..., description="Notification body")
+    severity: str = Field(..., description="Severity: info, warning, critical, error")
+    priority: str = Field(..., description="Priority: low, normal, high, urgent")
+    recipient_type: str = Field(..., description="Recipient scope type")
+    recipient_id: int = Field(..., description="Recipient user ID")
+    role: str | None = Field(None, description="Derived panel role")
+    department_key: str | None = Field(None, description="Derived department key")
+    channel: str = Field(..., description="Delivery channel")
+    status: str = Field(..., description="Legacy-compatible delivery status")
+    delivery_status: str = Field(..., description="Canonical delivery status")
+    is_read: bool = Field(False, description="Read flag")
+    is_seen: bool = Field(False, description="Seen flag")
+    is_archived: bool = Field(False, description="Archived flag")
+    correlation_id: str | None = Field(None, description="Correlation ID")
+    dedup_key: str = Field(..., description="Deduplication key")
+    deep_link: str | None = Field(None, description="Deep link")
+    payload_snapshot: dict[str, Any] | None = Field(None, description="Snapshot")
+    created_at: datetime
+    dispatched_at: datetime | None = None
+    first_delivered_at: datetime | None = None
+    seen_at: datetime | None = None
+    read_at: datetime | None = None
+    archived_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationInboxResponse(BaseModel):
+    items: list[NotificationInboxItem]
+    total: int
+    unread_count: int
+    next_cursor: str | None = None
+    has_more: bool = False
+    cursor: str | None = None
+    role: str | None = None
+    status: str = "all"
+
+
+class NotificationUnreadCountResponse(BaseModel):
+    total: int
+    by_role: dict[str, int]
+    by_channel: dict[str, int]
+    by_severity: dict[str, int]
+
+
+class NotificationMutationResponse(BaseModel):
+    success: bool = True
+    id: str
+    delivery_status: str
+    unread_count: int
+    message: str | None = None
+
+
+class NotificationStatsItem(BaseModel):
+    id: str
+    notification_type: str
+    status: str
+    message: str
+    created_at: datetime
+    role: str | None = None
+    channel: str | None = None
+    severity: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Настройки уведомлений пользователя
 class NotificationSettingsBase(BaseModel):
     user_id: int = Field(..., description="ID пользователя")
@@ -155,4 +229,4 @@ class NotificationStatsResponse(BaseModel):
     pending: int
     by_channel: dict[str, int]
     by_type: dict[str, int]
-    recent_activity: list[NotificationHistory]
+    recent_activity: list[NotificationStatsItem]

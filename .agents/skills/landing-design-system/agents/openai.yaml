@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Design System"
+  short_description: "Define tokens and visual rules"
+  default_prompt: "Use $landing-design-system to produce tokens and component rules for a landing page."

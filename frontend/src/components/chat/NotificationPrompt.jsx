@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { pushNotifications } from '../../services/pushNotifications';
+import notify from '../../services/notify';
 import logger from '../../utils/logger';
 
 /**
@@ -13,8 +14,12 @@ export function NotificationPrompt() {
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
+    const canUseSessionStorage = typeof sessionStorage !== 'undefined';
+
     // Check if already dismissed this session
-    const dismissed = sessionStorage.getItem('notification-prompt-dismissed');
+    const dismissed = canUseSessionStorage
+      ? sessionStorage.getItem('notification-prompt-dismissed')
+      : null;
     if (dismissed) {
       setIsDismissed(true);
       return;
@@ -22,9 +27,10 @@ export function NotificationPrompt() {
 
     // Check current permission status
     if (pushNotifications.isSupported) {
-      if (Notification.permission === 'granted') {
+      const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+      if (permission === 'granted') {
         setIsEnabled(true);
-      } else if (Notification.permission === 'default') {
+      } else if (permission === 'default') {
         // Show prompt after 5 seconds
         const timer = setTimeout(() => setIsVisible(true), 5000);
         return () => clearTimeout(timer);
@@ -39,8 +45,9 @@ export function NotificationPrompt() {
     setIsLoading(true);
 
     // Safety timeout to reset loading state if browser hangs
+    let settled = false;
     const safetyTimer = setTimeout(() => {
-      if (isLoading) {
+      if (!settled) {
         logger.log('[NotificationPrompt] Request timed out or user ignored');
         setIsLoading(false);
         // Optionally close if we think they ignored it
@@ -49,6 +56,7 @@ export function NotificationPrompt() {
 
     try {
       const granted = await pushNotifications.requestPermission();
+      settled = true;
       clearTimeout(safetyTimer);
       logger.log('[NotificationPrompt] Permission result:', granted);
 
@@ -56,17 +64,20 @@ export function NotificationPrompt() {
         setIsEnabled(true);
         setIsVisible(false);
         // Show test notification
-        new Notification('Уведомления включены!', {
-          body: 'Теперь вы будете получать уведомления о новых сообщениях',
-          icon: '/favicon.ico'
-        });
+        if (typeof Notification !== 'undefined') {
+          new Notification('Уведомления включены!', {
+            body: 'Теперь вы будете получать уведомления о новых сообщениях',
+            icon: '/favicon.ico'
+          });
+        }
       } else {
         // Permission denied or dismissed
         logger.log('[NotificationPrompt] Permission denied or dismissed');
 
         // If the user explicitly denied it (check current permission state)
-        if (Notification.permission === 'denied') {
-          alert('Уведомления заблокированы. Пожалуйста, разрешите их в настройках браузера. \n(Нажмите на замок в адресной строке -> Разрешения -> Уведомления)');
+        const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+        if (permission === 'denied') {
+          notify.warning('Уведомления заблокированы. Разрешите их в настройках браузера.');
         } else {
           // Just dismissed, or default
           logger.log('[NotificationPrompt] User dismissed the prompt');
@@ -75,10 +86,12 @@ export function NotificationPrompt() {
         setIsVisible(false);
       }
     } catch (error) {
+      settled = true;
       clearTimeout(safetyTimer);
       logger.error('[NotificationPrompt] Error:', error);
-      alert('Не удалось включить уведомления. Проверьте настройки браузера.');
+      notify.error('Не удалось включить уведомления. Проверьте настройки браузера.');
     } finally {
+      settled = true;
       setIsLoading(false);
     }
   };
@@ -86,7 +99,9 @@ export function NotificationPrompt() {
   const handleDismiss = () => {
     setIsVisible(false);
     setIsDismissed(true);
-    sessionStorage.setItem('notification-prompt-dismissed', 'true');
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('notification-prompt-dismissed', 'true');
+    }
   };
 
   if (!isVisible || isDismissed || isEnabled) {
@@ -213,7 +228,8 @@ export function NotificationPrompt() {
           background: rgba(255, 255, 255, 0.3);
         }
       `}</style>
-    </div>);
+    </div>
+  );
 
 }
 

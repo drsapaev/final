@@ -18,7 +18,7 @@ async def get_auth_token():
             {"username": "admin", "password": "admin"}
         ).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/login",
+            "http://127.0.0.1:18000/api/v1/login",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
@@ -40,7 +40,7 @@ async def test_ws_queue_auth(token):
     print("\n🔌 Тестирую /ws/queue с аутентификацией...")
     try:
         uri = (
-            "ws://127.0.0.1:8000/ws/queue?department=ENT&date=2025-08-28&token=" + token
+            "ws://127.0.0.1:18000/ws/queue?department=ENT&date=2025-08-28&token=" + token
         )
         headers = {"Origin": "http://localhost:5173"}
 
@@ -83,7 +83,7 @@ async def test_broadcast_trigger(token):
     print("📅 Открываю день для ENT...")
     try:
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
+            "http://127.0.0.1:18000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
             headers=headers,
             method="POST",
         )
@@ -105,7 +105,7 @@ async def test_broadcast_trigger(token):
     print("\n🎫 Выдаю следующий талон...")
     try:
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/next-ticket?department=ENT&date=2025-08-28",
+            "http://127.0.0.1:18000/api/v1/next-ticket?department=ENT&date=2025-08-28",
             headers=headers,
             method="POST",
         )

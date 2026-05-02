@@ -1,0 +1,22 @@
+{
+  "startedAt": "2026-03-28T15:55:25.956Z",
+  "healthOk": true,
+  "loginOk": true,
+  "loginPath": "/api/v1/auth/simple-login",
+  "lab07": {
+    "resolved": true,
+    "wrongTemplateAttempted": true,
+    "wrongTemplateStatus": 409,
+    "wrongTemplateDetail": "Template 'HbA1c' is not allowed for services: L23"
+  },
+  "lab08": {
+    "publishedVersionId": 24,
+    "updateAttempted": true,
+    "updateStatus": 409,
+    "updateDetail": "Only draft versions can be updated"
+  },
+  "error": null,
+  "finishedAt": "2026-03-28T15:55:39.895Z",
+  "backendOutTail": "completed\", \"request_id\": \"d993e9c1-d78b-443f-8d30-95d6a4581528\", \"trace_id\": \"b463a65ddede4023827f72dea1d634b7\", \"method\": \"POST\", \"path\": \"/api/v1/lab/report-instances\", \"status_code\": 409, \"duration_ms\": 398.25, \"client_ip\": \"127.0.0.1\"}\r\nINFO:     127.0.0.1:59761 - \"POST /api/v1/lab/report-instances HTTP/1.1\" 409 Conflict\r\nDEBUG: Checking roles for user 22 (lab@example.com)\r\nDEBUG: User Role: 'Lab', Normalized: 'lab'\r\nDEBUG: Required Roles: ('Admin', 'Lab', 'Doctor'), Normalized: ['admin', 'lab', 'doctor']\r\n{\"timestamp\": \"2026-03-28T15:55:38.809541+00:00\", \"level\": \"INFO\", \"logger\": \"app.middleware.observability_middleware\", \"message\": \"request.completed\", \"request_id\": \"01a5fa7a-72e3-4573-a93d-4e619a4fbab5\", \"trace_id\": \"dffa5f2496cd49d38e4d90457f94f5f2\", \"method\": \"GET\", \"path\": \"/api/v1/lab/template-versions/24\", \"status_code\": 200, \"duration_ms\": 10.46, \"client_ip\": \"127.0.0.1\"}\r\nINFO:     127.0.0.1:59759 - \"GET /api/v1/lab/template-versions/24 HTTP/1.1\" 200 OK\r\nDEBUG: Checking roles for user 22 (lab@example.com)\r\nDEBUG: User Role: 'Lab', Normalized: 'lab'\r\nDEBUG: Required Roles: ('Admin', 'Lab'), Normalized: ['admin', 'lab']\r\n{\"timestamp\": \"2026-03-28T15:55:38.816244+00:00\", \"level\": \"INFO\", \"logger\": \"app.services.lab_reporting_service\", \"message\": \"[LAB] update_template_version version_id=24\"}\r\n{\"timestamp\": \"2026-03-28T15:55:38.816244+00:00\", \"level\": \"INFO\", \"logger\": \"app.services.lab_reporting_service\", \"message\": \"[LAB] ensure_default_catalog seeding analytes/units/reference ranges\"}\r\n{\"timestamp\": \"2026-03-28T15:55:38.893555+00:00\", \"level\": \"INFO\", \"logger\": \"app.middleware.observability_middleware\", \"message\": \"request.completed\", \"request_id\": \"05b87207-82b9-4019-a3b7-77c33c91dafd\", \"trace_id\": \"38c5c7399ed349838e1ac1334e1d42e1\", \"method\": \"PUT\", \"path\": \"/api/v1/lab/template-versions/24\", \"status_code\": 409, \"duration_ms\": 81.47, \"client_ip\": \"127.0.0.1\"}\r\nINFO:     127.0.0.1:59761 - \"PUT /api/v1/lab/template-versions/24 HTTP/1.1\" 409 Conflict\r\n",
+  "backendErrTail": "[app.db.session] Using DATABASE_URL = postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb\r\nws.queue: INFO: WS logger initialized with console handler\r\nws.queue: INFO: WSManager: ������ ����� ���������\r\nws.queue: INFO: WSManager: ������ ���������� ��������� 2653646960848\r\nINFO:     Started server process [18236]\r\nINFO:     Waiting for application startup.\r\nINFO:     Application startup complete.\r\nINFO:     Uvicorn running on http://127.0.0.1:18000 (Press CTRL+C to quit)\r\n"
+}

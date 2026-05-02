@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-03-26 — Follow-up backlog triage → ADM-06 browser smoke
+- **docs/ADM-06_BROWSER_SMOKE.md** — added a compact QA checklist extracted from the live service-catalog smoke so QA can verify the guardrail in a few steps instead of running the full panel runbook.
+- **docs/README.md** — updated the Testing & QA index and linked the new smoke checklist alongside the SSOT panel runbook.
+- **docs/PANEL_QA_CHECKLIST.md** — added a direct pointer from the full runbook to the short smoke checklist and refreshed the document timestamp.
+- **.ai-factory/logs/PANEL_QA_IMPLEMENTATION_STATUS.md** — final cycle tracking now reflects `ADM-06-BROWSER-SMOKE` as the last completed case and keeps the follow-up backlog closed.
+- Verified live on the temp admin stack `http://127.0.0.1:4194` -> `http://127.0.0.1:18008`:
+  - invalid `Лабораторные анализы + P77` blocked with the inline warning `Код P77 не подходит для группы "Лаборатория"`
+  - valid `Прочие услуги + O77` saved successfully
+  - new row `QA Mismatch Smoke` appeared in the catalog table with canonical code `O77`
+
 ## 2025-08-17 — Step A: Архитектура, конфиги, ENV, секреты
 - **backend/app/core/config.py** — *kept + extended*: единый центр настроек; добавлены `API_V1_STR`, `DEBUG`, нормализация `CORS_ORIGINS` (CSV), сохранены прежние имена полей (`REQUIRE_LICENSE`, `LICENSE_ALLOW_HEALTH`, `DATABASE_URL`, `AUTH_*` и пр.).
 - **backend/.env.example** — добавлен шаблон переменных окружения.

@@ -8,15 +8,26 @@
  * - Undo/redo support
  */
 
-import { useReducer, useCallback, useEffect, useRef } from 'react';
+import { useReducer, useCallback, useEffect, useRef, useState } from 'react';
 import { emrReducer, initialState, emrActions } from '../reducers/emrReducer';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
+import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
 
 // Generate client session ID for smart conflict resolution
 const generateSessionId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
+
+const emrCache = new Map();
+const isAccessDeniedStatus = (status) => status === 401 || status === 403;
+
+const getAccessDeniedMessage = (error) => (
+    error?.response?.data?.detail ||
+    error?.response?.data?.message ||
+    error?.message ||
+    'Нет доступа к EMR для текущей учётной записи'
+);
 
 /**
  * useEMR Hook
@@ -24,47 +35,141 @@ const generateSessionId = () => {
  * @param {number} visitId - Visit ID to load EMR for
  * @param {Object} options - Configuration options
  * @param {boolean} options.autoLoad - Auto-load on mount (default: true)
+ * @param {string} options.specialty - Canonical specialty for this EMR flow
  * @returns {Object} EMR state and actions
  */
-export function useEMR(visitId, { autoLoad = true } = {}) {
+export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {}) {
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
-    const abortControllerRef = useRef(null);
+    const isMountedRef = useRef(true);
+    const writeAccessDeniedRef = useRef(false);
+    const [writeAccessDenied, setWriteAccessDenied] = useState(false);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        writeAccessDeniedRef.current = false;
+        setWriteAccessDenied(false);
+    }, [visitId, specialty]);
+
+    const cacheKey = `${visitId || ''}:${specialty}`;
+
+    const handleAccessDenied = useCallback((operation, error) => {
+        const status = error?.response?.status;
+        const message = getAccessDeniedMessage(error);
+        logger.warn(`[FIX:EMR${status}] ${operation} blocked by access control`, {
+            visitId,
+            specialty,
+            status,
+            message
+        });
+        writeAccessDeniedRef.current = true;
+        setWriteAccessDenied(true);
+        dispatch(emrActions.saveError(message));
+        return {
+            accessDenied: true,
+            status,
+            message
+        };
+    }, [specialty, visitId]);
 
     // =========================================================================
     // LOAD EMR
     // =========================================================================
-    const loadEMR = useCallback(async () => {
+    const loadEMR = useCallback(async (forceRefresh = false) => {
         if (!visitId) return;
 
-        // Cancel any pending request
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        const cachedEntry = emrCache.get(cacheKey);
+        if (!forceRefresh) {
+            if (cachedEntry?.data) {
+                if (isMountedRef.current) {
+                    dispatch(emrActions.load(cachedEntry.data));
+                }
+                return cachedEntry.data;
+            }
+
+            if (cachedEntry?.promise) {
+                return cachedEntry.promise;
+            }
+        } else if (cachedEntry?.promise) {
+            return cachedEntry.promise;
         }
-        abortControllerRef.current = new AbortController();
+
+        const loadPromise = (async () => {
+            try {
+                const response = await apiClient.get(`/v2/emr/${visitId}`, {
+                    silent: true,
+                    validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+                });
+
+                if (response.status === 404) {
+                    logger.info('[FIX:EMR404] EMR not found, initializing empty draft', {
+                        visitId,
+                        specialty,
+                    });
+                    writeAccessDeniedRef.current = false;
+                    setWriteAccessDenied(false);
+                    const emptyEmr = {
+                        data: buildInitialEMRData(specialty),
+                        version: 1,
+                        row_version: 0,
+                        status: 'draft',
+                    };
+                    emrCache.set(cacheKey, { data: emptyEmr, promise: null });
+                    if (isMountedRef.current) {
+                        dispatch(emrActions.load(emptyEmr));
+                    }
+                    return emptyEmr;
+                }
+
+                const normalizedEmr = {
+                    ...response.data,
+                    data: normalizeEMRData(response.data?.data, specialty),
+                };
+                writeAccessDeniedRef.current = false;
+                setWriteAccessDenied(false);
+                emrCache.set(cacheKey, { data: normalizedEmr, promise: null });
+                if (isMountedRef.current) {
+                    dispatch(emrActions.load(normalizedEmr));
+                }
+                return normalizedEmr;
+            } catch (error) {
+                if (isAccessDeniedStatus(error?.response?.status)) {
+                    emrCache.delete(cacheKey);
+                    return handleAccessDenied('loadEMR', error);
+                }
+
+                logger.error('Failed to load EMR:', error);
+                emrCache.delete(cacheKey);
+                if (isMountedRef.current) {
+                    dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
+                }
+                throw error;
+            }
+        })();
+
+        emrCache.set(cacheKey, {
+            data: cachedEntry?.data || null,
+            promise: loadPromise,
+        });
 
         try {
-            const response = await apiClient.get(`/v2/emr/${visitId}`, {
-                signal: abortControllerRef.current.signal,
-            });
-            dispatch(emrActions.load(response.data));
-            return response.data;
-        } catch (error) {
-            if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-                return; // Aborted, ignore
+            return await loadPromise;
+        } finally {
+            const currentEntry = emrCache.get(cacheKey);
+            if (currentEntry?.promise === loadPromise) {
+                emrCache.set(cacheKey, {
+                    data: currentEntry.data || null,
+                    promise: null,
+                });
             }
-
-            if (error.response?.status === 404) {
-                // No EMR exists yet - start with empty
-                dispatch(emrActions.load(null));
-                return null;
-            }
-
-            logger.error('Failed to load EMR:', error);
-            dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
-            throw error;
         }
-    }, [visitId]);
+    }, [cacheKey, handleAccessDenied, specialty, visitId]);
 
     // =========================================================================
     // SAVE EMR
@@ -72,11 +177,23 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
     const saveEMR = useCallback(async (options = {}) => {
         const { isDraft = true, force = false } = options;
 
+        if (writeAccessDeniedRef.current) {
+            logger.info('[FIX:EMR403] saveEMR skipped because access was already denied', {
+                visitId,
+                specialty,
+            });
+            return {
+                accessDenied: true,
+                status: 403,
+                message: getAccessDeniedMessage()
+            };
+        }
+
         dispatch(emrActions.saveStart());
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 row_version: force ? 0 : state.rowVersion, // 0 = skip lock check
                 client_session_id: clientSessionId.current,
                 is_draft: isDraft,
@@ -86,6 +203,10 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
+            if (isAccessDeniedStatus(error?.response?.status)) {
+                return handleAccessDenied('saveEMR', error);
+            }
+
             // Check for conflict (409)
             if (error.response?.status === 409) {
                 const conflictData = error.response.data?.detail || error.response.data;
@@ -103,17 +224,29 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveError(error.message || 'Ошибка сохранения'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // SIGN EMR
     // =========================================================================
     const signEMR = useCallback(async () => {
+        if (writeAccessDeniedRef.current) {
+            logger.info('[FIX:EMR403] signEMR skipped because access was already denied', {
+                visitId,
+                specialty,
+            });
+            return {
+                accessDenied: true,
+                status: 403,
+                message: getAccessDeniedMessage()
+            };
+        }
+
         dispatch(emrActions.saveStart());
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 row_version: state.rowVersion,
                 client_session_id: clientSessionId.current,
             };
@@ -122,6 +255,10 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
+            if (isAccessDeniedStatus(error?.response?.status)) {
+                return handleAccessDenied('signEMR', error);
+            }
+
             if (error.response?.status === 409) {
                 const conflictData = error.response.data?.detail || error.response.data;
                 dispatch(emrActions.conflictDetected(conflictData));
@@ -131,7 +268,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveError(error.message || 'Ошибка подписания'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // AMEND EMR
@@ -143,11 +280,23 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             return { error };
         }
 
+        if (writeAccessDeniedRef.current) {
+            logger.info('[FIX:EMR403] amendEMR skipped because access was already denied', {
+                visitId,
+                specialty,
+            });
+            return {
+                accessDenied: true,
+                status: 403,
+                message: getAccessDeniedMessage()
+            };
+        }
+
         dispatch(emrActions.saveStart());
 
         try {
             const payload = {
-                data: state.data,
+                data: normalizeEMRData(state.data, specialty),
                 reason: reason.trim(),
                 row_version: state.rowVersion,
             };
@@ -156,16 +305,23 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
+            if (isAccessDeniedStatus(error?.response?.status)) {
+                return handleAccessDenied('amendEMR', error);
+            }
+
             dispatch(emrActions.saveError(error.message || 'Ошибка внесения поправки'));
             throw error;
         }
-    }, [visitId, state.data, state.rowVersion]);
+    }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
 
     // =========================================================================
     // CONFLICT RESOLUTION
     // =========================================================================
     const reloadFromServer = useCallback(async () => {
-        await loadEMR();
+        const result = await loadEMR(true);
+        if (result?.accessDenied) {
+            return result;
+        }
         dispatch(emrActions.conflictResolved());
     }, [loadEMR]);
 
@@ -205,12 +361,6 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
         if (autoLoad && visitId) {
             loadEMR();
         }
-
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
     }, [autoLoad, visitId, loadEMR]);
 
     // =========================================================================
@@ -227,6 +377,7 @@ export function useEMR(visitId, { autoLoad = true } = {}) {
         lastSaved: state.lastSaved,
         conflict: state.conflict,
         error: state.error,
+        accessDenied: writeAccessDenied,
 
         // Computed
         isLoading: state.status === 'loading',

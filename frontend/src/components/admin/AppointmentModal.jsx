@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
 
   MacOSButton,
+  MacOSBadge,
   MacOSInput,
   MacOSSelect,
   MacOSTextarea,
   MacOSModal } from
 '../ui/macos';
+import PropTypes from 'prop-types';
 
 const AppointmentModal = ({
   isOpen,
@@ -33,19 +35,23 @@ const AppointmentModal = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedDoctor = useMemo(
+    () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
+    [doctors, formData.doctorId]
+  );
 
   // Инициализация формы при открытии
   useEffect(() => {
     if (isOpen) {
       if (appointment) {
         setFormData({
-          patientId: appointment.patientId || '',
-          doctorId: appointment.doctorId || '',
+          patientId: appointment.patientId || appointment.patient_id || '',
+          doctorId: appointment.doctorId || appointment.doctor_id || '',
           appointmentDate: appointment.appointmentDate || '',
           appointmentTime: appointment.appointmentTime || '',
           duration: appointment.duration || 30,
           status: appointment.status || 'pending',
-          reason: appointment.reason || '',
+          reason: appointment.reason || appointment.notes || '',
           notes: appointment.notes || '',
           phone: appointment.phone || '',
           email: appointment.email || ''
@@ -148,14 +154,30 @@ const AppointmentModal = ({
     }
   };
 
+  const getPatientDisplayName = (patient) => {
+    if (!patient) return '';
+    return (
+      patient.fullName ||
+      patient.full_name ||
+      [patient.lastName || patient.last_name, patient.firstName || patient.first_name, patient.middleName || patient.middle_name]
+        .filter(Boolean)
+        .join(' ')
+    );
+  };
+
   const getPatientName = (patientId) => {
     const patient = patients.find((p) => p.id === parseInt(patientId));
-    return patient ? `${patient.lastName} ${patient.firstName} ${patient.middleName}` : '';
+    return getPatientDisplayName(patient);
+  };
+
+  const getDoctorDisplayName = (doctor) => {
+    if (!doctor) return '';
+    return doctor.user?.full_name || doctor.user?.username || doctor.name || `Врач #${doctor.id}`;
   };
 
   const getDoctorName = (doctorId) => {
     const doctor = doctors.find((d) => d.id === parseInt(doctorId));
-    return doctor ? `${doctor.name} (${doctor.specialization})` : '';
+    return doctor ? `${getDoctorDisplayName(doctor)} (${doctor.specialty || doctor.specialization || '—'})` : '';
   };
 
   if (!isOpen) return null;
@@ -198,7 +220,7 @@ const AppointmentModal = ({
                 { value: '', label: 'Выберите пациента' },
                 ...patients.map((patient) => ({
                   value: patient.id,
-                  label: `${patient.lastName} ${patient.firstName} ${patient.middleName} - ${patient.phone}`
+                  label: `${getPatientDisplayName(patient)}${patient.phone ? ` - ${patient.phone}` : ''}`
                 }))]
                 }
                 error={errors.patientId}
@@ -237,7 +259,7 @@ const AppointmentModal = ({
                 { value: '', label: 'Выберите врача' },
                 ...doctors.map((doctor) => ({
                   value: doctor.id,
-                  label: `${doctor.name} - ${doctor.specialization}`
+                  label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • кабинет ${doctor.cabinet}` : ''}`
                 }))]
                 }
                 error={errors.doctorId}
@@ -534,6 +556,24 @@ const AppointmentModal = ({
             }}>
                     <strong style={{ color: 'var(--mac-text-primary)' }}>Врач:</strong> {getDoctorName(formData.doctorId)}
                   </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                    <MacOSBadge
+                      variant={
+                        selectedDoctor?.active === false || selectedDoctor?.user?.is_active === false
+                          ? 'warning'
+                          : 'success'
+                      }
+                    >
+                      {selectedDoctor?.active === false
+                        ? 'Врач неактивен'
+                        : selectedDoctor?.user?.is_active === false
+                          ? 'Аккаунт врача неактивен'
+                          : 'Связь активна'}
+                    </MacOSBadge>
+                    <MacOSBadge variant={selectedDoctor?.cabinet ? 'info' : 'warning'}>
+                      {selectedDoctor?.cabinet ? `Кабинет ${selectedDoctor.cabinet}` : 'Кабинет не задан'}
+                    </MacOSBadge>
+                  </div>
                   <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
@@ -599,6 +639,18 @@ const AppointmentModal = ({
           </form>
     </MacOSModal>);
 
+};
+
+
+AppointmentModal.propTypes = {
+  ...(AppointmentModal.propTypes || {}),
+  appointment: PropTypes.any,
+  doctors: PropTypes.any,
+  isOpen: PropTypes.any,
+  loading: PropTypes.any,
+  onClose: PropTypes.any,
+  onSave: PropTypes.any,
+  patients: PropTypes.any,
 };
 
 export default AppointmentModal;

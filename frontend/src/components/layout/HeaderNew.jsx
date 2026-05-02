@@ -9,6 +9,7 @@ import { Button, Icon } from '../ui/macos';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
+import { getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 
 import logger from '../../utils/logger';
 
@@ -96,8 +97,9 @@ export default function HeaderNew() {
   const roleLower = String(role).toLowerCase();
   // Normalize receptionist to registrar for UI consistency
   const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
+  const currentRoute = getEffectiveRouteByPath(location.pathname);
 
-  const isRegistrarPanel = location.pathname === '/registrar-panel';
+  const isRegistrarPanel = currentRoute?.id === 'registrar-home';
 
   // Определяем активную кастомную схему
   const isGlassTheme = colorScheme === 'glass';
@@ -145,8 +147,8 @@ export default function HeaderNew() {
   const navItems = useMemo(() => {
     const items = [];
     if (roleNormalized !== 'admin') {
-      if (roleNormalized === 'registrar') items.push({ to: '/cashier-panel', label: 'Кассир', icon: 'creditcard' });
-      if (roleNormalized === 'cashier') items.push({ to: '/cashier-panel', label: 'Касса', icon: 'creditcard' });
+      if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: 'Кассир', icon: 'creditcard' });
+      if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: 'Касса', icon: 'creditcard' });
     }
     return items;
   }, [roleNormalized]);
@@ -173,7 +175,7 @@ export default function HeaderNew() {
     }}>
 
       <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
-      <span className="hdr-hide-xs">Clinic Management</span>
+      <span className="hdr-hide-xs">Управление клиникой</span>
     </Button>;
 
 
@@ -211,7 +213,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Главная"
-        onClick={() => navigate('/registrar-panel?view=welcome')}
+        onClick={() => navigate('/registrar?tab=welcome')}
         className="hdr-hide-md"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -222,7 +224,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Онлайн‑записи"
-        onClick={() => navigate('/registrar-panel?view=queue')}
+        onClick={() => navigate('/registrar?tab=queue')}
         className="hdr-hide-xs"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -275,7 +277,7 @@ export default function HeaderNew() {
         gap: '4px'
       }}>
 
-        <Icon name="magnifyingglass" size="small" />
+        <Icon name="globe" size="small" />
         {lang.toUpperCase()}
       </Button>
 
@@ -405,7 +407,7 @@ export default function HeaderNew() {
           <Button
         variant="outline"
         size="small"
-        onClick={() => navigate('/profile')}
+        onClick={() => navigate('/clinical/profile')}
         title="Профиль пользователя"
         className="hdr-hide-sm"
         style={{

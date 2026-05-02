@@ -9,11 +9,35 @@
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
 import axios from 'axios';
+import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP === '1';
+const GLOBAL_RATE_LIMIT_COOLDOWN_MS = 60_000;
+let globalRateLimitUntil = 0;
+let globalRateLimitLogAt = 0;
+
+function readPersistedRateLimitUntil() {
+  try {
+    const raw = window.localStorage.getItem('clinic_api_rate_limit_until');
+    const parsed = Number(raw || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function persistRateLimitUntil(until) {
+  try {
+    window.localStorage.setItem('clinic_api_rate_limit_until', String(until || 0));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+globalRateLimitUntil = Math.max(globalRateLimitUntil, readPersistedRateLimitUntil());
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -66,7 +90,7 @@ async function refreshTokenIfNeeded() {
   refreshPromise = (async () => {
     try {
       logger.log('🔄 Token expiring soon, refreshing...');
-      const response = await axios.post(`${API_BASE}/auth/refresh`, {
+      const response = await axios.post(buildApiUrl('/auth/refresh'), {
         refresh_token: refreshToken
       });
 
@@ -150,6 +174,20 @@ async function ensureCSRFToken() {
 
 // Ensure Authorization header is attached for every request from localStorage
 api.interceptors.request.use(async (config) => {
+  const now = Date.now();
+  const requestUrl = String(config.url || '');
+  if (now < globalRateLimitUntil && !requestUrl.includes('/auth/')) {
+    if (now - globalRateLimitLogAt > 10_000) {
+      logger.warn('[API] Global 429 cooldown active', {
+        cooldownUntil: new Date(globalRateLimitUntil).toISOString(),
+        url: requestUrl
+      });
+      globalRateLimitLogAt = now;
+    }
+    persistRateLimitUntil(globalRateLimitUntil);
+    return Promise.reject(createLocalRateLimitError(config));
+  }
+
   // Try to refresh token if expiring soon (except for auth endpoints)
   if (!config.url?.includes('/auth/')) {
     await refreshTokenIfNeeded();
@@ -196,6 +234,15 @@ api.interceptors.response.use(
       // NOTE: Token clearing removed to prevent race condition during login.
       // User will be redirected to login by RoleGuard or route protection instead.
     }
+    if (error.response?.status === 429) {
+      globalRateLimitUntil = Date.now() + GLOBAL_RATE_LIMIT_COOLDOWN_MS;
+      globalRateLimitLogAt = 0;
+      persistRateLimitUntil(globalRateLimitUntil);
+      logger.warn('[API] HTTP 429 received, enabling global cooldown', {
+        url: error.config?.url,
+        cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+      });
+    }
     return Promise.reject(error);
   }
 );
@@ -223,6 +270,23 @@ function getToken() {
 
 function clearToken() {
   setToken(null);
+}
+
+function createLocalRateLimitError(config) {
+  const error = new Error('Client-side cooldown active after HTTP 429');
+  error.name = 'AxiosError';
+  error.config = config;
+  error.isAxiosError = true;
+  error.response = {
+    status: 429,
+    statusText: 'Too Many Requests',
+    data: {
+      detail: 'Превышен лимит запросов. Клиент временно поставил запросы на паузу после 429.',
+      cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
+    },
+    config
+  };
+  return error;
 }
 
 /**
@@ -292,7 +356,11 @@ if (existingToken) {
 export {
   api,
   apiClient,
+  getApiOrigin,
   getApiBase,
+  getApiBaseUrl,
+  buildApiUrl,
+  buildWsUrl,
   apiRequest,
   setToken,
   setAuthToken,

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import './LinkPreview.css';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const LinkPreview = ({ url }) => {
     const [preview, setPreview] = useState(null);
@@ -18,7 +19,10 @@ const LinkPreview = ({ url }) => {
                     }
                 }
             } catch (e) {
-                logger.error('Failed to fetch link preview:', e);
+                logger.error('[LinkPreview] Не удалось получить preview ссылки', {
+                    url,
+                    error: e?.message || String(e),
+                });
             } finally {
                 setLoading(false);
             }
@@ -46,6 +50,12 @@ const LinkPreview = ({ url }) => {
             </div>
         </a>
     );
+};
+
+
+LinkPreview.propTypes = {
+  ...(LinkPreview.propTypes || {}),
+  url: PropTypes.any,
 };
 
 export default LinkPreview;

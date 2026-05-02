@@ -1,0 +1,386 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e324]:
+          - img [ref=e325]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e327]
+        - button "Admin User" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Admin User
+        - button "Выйти" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - text: Выйти
+    - generic [ref=e55]:
+      - complementary [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: Медицинская система
+          - button "Collapse sidebar" [ref=e60] [cursor=pointer]:
+            - img [ref=e62]
+        - navigation [ref=e65]:
+          - button "Dashboard" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Dashboard
+          - button "Analytics" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e75]: Analytics
+          - button "Wait Time Analytics" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Wait Time Analytics
+          - button "AI Analytics" [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: AI Analytics
+          - button "Webhooks" [ref=e86] [cursor=pointer]:
+            - img [ref=e87]
+            - generic [ref=e90]: Webhooks
+          - button "Reports" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e95]: Reports
+          - button "System" [ref=e96] [cursor=pointer]:
+            - img [ref=e97]
+            - generic [ref=e100]: System
+          - button "Cloud Printing" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Cloud Printing
+          - button "Medical Equipment" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Medical Equipment
+          - button "Dynamic Pricing" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Dynamic Pricing
+          - button "Billing" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Billing
+          - button "Discount Benefits" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e128]: Discount Benefits
+          - button "GraphQL API" [ref=e129] [cursor=pointer]:
+            - img [ref=e130]
+            - generic [ref=e133]: GraphQL API
+          - button "Users" [ref=e134] [cursor=pointer]:
+            - img [ref=e135]
+            - generic [ref=e138]: Users
+          - button "Doctors" [ref=e139] [cursor=pointer]:
+            - img [ref=e140]
+            - generic [ref=e143]: Doctors
+          - button "Services" [ref=e144] [cursor=pointer]:
+            - img [ref=e145]
+            - generic [ref=e148]: Services
+          - button "Patients" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+            - generic [ref=e153]: Patients
+          - button "Appointments" [ref=e154] [cursor=pointer]:
+            - img [ref=e155]
+            - generic [ref=e158]: Appointments
+          - button "All Free" [ref=e159] [cursor=pointer]:
+            - img [ref=e160]
+            - generic [ref=e163]: All Free
+          - button "Benefit Settings" [ref=e164] [cursor=pointer]:
+            - img [ref=e165]
+            - generic [ref=e168]: Benefit Settings
+          - button "Wizard Settings" [ref=e169] [cursor=pointer]:
+            - img [ref=e170]
+            - generic [ref=e175]: Wizard Settings
+          - button "Payment Providers" [ref=e176] [cursor=pointer]:
+            - img [ref=e177]
+            - generic [ref=e180]: Payment Providers
+          - button "Clinic Management" [ref=e181] [cursor=pointer]:
+            - img [ref=e182]
+            - generic [ref=e185]: Clinic Management
+          - button "Clinic Settings" [ref=e186] [cursor=pointer]:
+            - img [ref=e187]
+            - generic [ref=e190]: Clinic Settings
+          - button "Queue Settings" [ref=e191] [cursor=pointer]:
+            - img [ref=e192]
+            - generic [ref=e195]: Queue Settings
+          - button "Queue Limits" [ref=e196] [cursor=pointer]:
+            - img [ref=e197]
+            - generic [ref=e200]: Queue Limits
+          - button "Queue Cabinet Management" [ref=e201] [cursor=pointer]:
+            - img [ref=e202]
+            - generic [ref=e205]: Queue Cabinet Management
+          - button "AI Imaging" [ref=e206] [cursor=pointer]:
+            - img [ref=e207]
+            - generic [ref=e210]: AI Imaging
+          - button "Treatment Recommendations" [ref=e211] [cursor=pointer]:
+            - img [ref=e212]
+            - generic [ref=e215]: Treatment Recommendations
+          - button "Drug Interactions" [ref=e216] [cursor=pointer]:
+            - img [ref=e217]
+            - generic [ref=e220]: Drug Interactions
+          - button "Risk Assessment" [ref=e221] [cursor=pointer]:
+            - img [ref=e222]
+            - generic [ref=e225]: Risk Assessment
+          - button "Voice to Text" [ref=e226] [cursor=pointer]:
+            - img [ref=e227]
+            - generic [ref=e230]: Voice to Text
+          - button "Smart Scheduling" [ref=e231] [cursor=pointer]:
+            - img [ref=e232]
+            - generic [ref=e235]: Smart Scheduling
+          - button "Quality Control" [ref=e236] [cursor=pointer]:
+            - img [ref=e237]
+            - generic [ref=e240]: Quality Control
+          - button "Analytics Insights" [ref=e241] [cursor=pointer]:
+            - img [ref=e242]
+            - generic [ref=e245]: Analytics Insights
+          - button "Telegram Bot" [ref=e246] [cursor=pointer]:
+            - img [ref=e247]
+            - generic [ref=e250]: Telegram Bot
+          - button "FCM Notifications" [ref=e251] [cursor=pointer]:
+            - img [ref=e252]
+            - generic [ref=e255]: FCM Notifications
+          - button "Phone Verification" [ref=e256] [cursor=pointer]:
+            - img [ref=e257]
+            - generic [ref=e260]: Phone Verification
+          - button "User Data Transfer" [ref=e261] [cursor=pointer]:
+            - img [ref=e262]
+            - generic [ref=e265]: User Data Transfer
+          - button "Group Permissions" [ref=e266] [cursor=pointer]:
+            - img [ref=e267]
+            - generic [ref=e270]: Group Permissions
+          - button "User Export" [ref=e271] [cursor=pointer]:
+            - img [ref=e272]
+            - generic [ref=e275]: User Export
+          - button "Registrar Notifications" [ref=e276] [cursor=pointer]:
+            - img [ref=e277]
+            - generic [ref=e282]: Registrar Notifications
+          - button "AI Settings" [ref=e283] [cursor=pointer]:
+            - img [ref=e284]
+            - generic [ref=e287]: AI Settings
+          - button "Telegram Settings" [ref=e288] [cursor=pointer]:
+            - img [ref=e289]
+            - generic [ref=e292]: Telegram Settings
+          - button "Display Settings" [ref=e293] [cursor=pointer]:
+            - img [ref=e294]
+            - generic [ref=e299]: Display Settings
+          - button "Activation" [ref=e300] [cursor=pointer]:
+            - img [ref=e301]
+            - generic [ref=e304]: Activation
+          - button "Finance" [ref=e305] [cursor=pointer]:
+            - img [ref=e306]
+            - generic [ref=e311]: Finance
+          - button "Security" [ref=e312] [cursor=pointer]:
+            - img [ref=e313]
+            - generic [ref=e316]: Security
+          - button "Settings" [ref=e317] [cursor=pointer]:
+            - img [ref=e318]
+            - generic [ref=e321]: Settings
+      - main [ref=e322]:
+        - generic [ref=e336]:
+          - generic [ref=e337]:
+            - generic [ref=e338]:
+              - generic [ref=e339]:
+                - img [ref=e340]
+                - generic [ref=e346]:
+                  - heading "Цветовая схема интерфейса" [level=3] [ref=e347]
+                  - paragraph [ref=e348]: Тема управляет фоном, карточками, header и sidebar. Accent отдельно задаёт цвет интерактивных элементов.
+              - generic [ref=e349]:
+                - img [ref=e350]
+                - text: "Accent сейчас:"
+                - strong [ref=e354]: Blue
+            - generic [ref=e355]:
+              - generic [ref=e356]: Что именно меняет настройка
+              - generic [ref=e357]:
+                - generic [ref=e358]: Цветовая схема сохраняется в профиле пользователя и подтягивается после входа.
+                - generic [ref=e359]: Accent color хранится локально в браузере и перекрашивает primary buttons, focus states и status chips.
+            - generic [ref=e360]:
+              - generic [ref=e361]: Быстрый выбор схемы
+              - combobox [ref=e362] [cursor=pointer]:
+                - option "Выберите схему" [disabled]
+                - option "Светлая"
+                - option "Темная"
+                - option "Авто"
+                - option "Яркая многоцветная" [selected]
+                - option "Полупрозрачная стеклянная"
+                - option "Градиентная палитра"
+            - generic [ref=e363]:
+              - button "Светлая Спокойная атмосфера Плотные Высокий" [ref=e364] [cursor=pointer]:
+                - generic [ref=e366]:
+                  - generic [ref=e367]:
+                    - img [ref=e368]
+                    - generic [ref=e374]: Светлая
+                  - generic [ref=e375]: Спокойная атмосфера
+                - generic [ref=e383]:
+                  - generic [ref=e384]: Плотные
+                  - generic [ref=e385]: Высокий
+              - button "Темная Собранная атмосфера Плотные Высокий" [ref=e386] [cursor=pointer]:
+                - generic [ref=e388]:
+                  - generic [ref=e389]:
+                    - img [ref=e390]
+                    - generic [ref=e392]: Темная
+                  - generic [ref=e393]: Собранная атмосфера
+                - generic [ref=e401]:
+                  - generic [ref=e402]: Плотные
+                  - generic [ref=e403]: Высокий
+              - button "Авто Адаптивная атмосфера Системные Зависит от ОС" [ref=e404] [cursor=pointer]:
+                - generic [ref=e406]:
+                  - generic [ref=e407]:
+                    - img [ref=e408]
+                    - generic [ref=e410]: Авто
+                  - generic [ref=e411]: Адаптивная атмосфера
+                - generic [ref=e419]:
+                  - generic [ref=e420]: Системные
+                  - generic [ref=e421]: Зависит от ОС
+              - button "Яркая многоцветная Энергичная атмосфера Активна Матовые Средне-высокий" [pressed] [ref=e422] [cursor=pointer]:
+                - generic [ref=e423]:
+                  - generic [ref=e424]:
+                    - generic [ref=e425]:
+                      - img [ref=e426]
+                      - generic [ref=e430]: Яркая многоцветная
+                    - generic [ref=e431]: Энергичная атмосфера
+                  - generic [ref=e432]: Активна
+                - generic [ref=e440]:
+                  - generic [ref=e441]: Матовые
+                  - generic [ref=e442]: Средне-высокий
+              - button "Полупрозрачная стеклянная Премиальная атмосфера Стекло Средний" [ref=e443] [cursor=pointer]:
+                - generic [ref=e445]:
+                  - generic [ref=e446]:
+                    - img [ref=e447]
+                    - generic [ref=e451]: Полупрозрачная стеклянная
+                  - generic [ref=e452]: Премиальная атмосфера
+                - generic [ref=e460]:
+                  - generic [ref=e461]: Стекло
+                  - generic [ref=e462]: Средний
+              - button "Градиентная палитра Иммерсивная атмосфера Полупрозрачные Средний" [ref=e463] [cursor=pointer]:
+                - generic [ref=e465]:
+                  - generic [ref=e466]:
+                    - img [ref=e467]
+                    - generic [ref=e470]: Градиентная палитра
+                  - generic [ref=e471]: Иммерсивная атмосфера
+                - generic [ref=e479]:
+                  - generic [ref=e480]: Полупрозрачные
+                  - generic [ref=e481]: Средний
+            - generic [ref=e482]:
+              - generic [ref=e485]:
+                - img [ref=e486]
+                - generic [ref=e490]:
+                  - strong [ref=e491]: Яркая многоцветная
+                  - generic [ref=e492]: Тёплая матовая сцена с мягкими закатными оттенками и выраженными поверхностями.
+              - generic [ref=e506]:
+                - generic [ref=e507]:
+                  - generic [ref=e508]: Активная схема
+                  - generic [ref=e509]: Яркая многоцветная
+                - generic [ref=e510]:
+                  - generic [ref=e511]:
+                    - generic [ref=e512]: Характер
+                    - generic [ref=e513]: Энергичная
+                  - generic [ref=e514]:
+                    - generic [ref=e515]: Поверхности
+                    - generic [ref=e516]: Матовые
+                  - generic [ref=e517]:
+                    - generic [ref=e518]: Контраст
+                    - generic [ref=e519]: Средне-высокий
+                  - generic [ref=e520]:
+                    - generic [ref=e521]: Лучше всего для
+                    - generic [ref=e522]: Публичные зоны, демонстрации, живые панели ожидания
+                - generic [ref=e523]: Для полной смены характера интерфейса сначала выберите цветовую схему, затем при необходимости подстройте Accent ниже.
+          - generic [ref=e524]:
+            - generic [ref=e525]: Accent color
+            - generic [ref=e526]:
+              - radiogroup "Accent color" [ref=e527]:
+                - radio "Blue" [checked] [ref=e528] [cursor=pointer]
+                - radio "Purple" [ref=e529] [cursor=pointer]
+                - radio "Pink" [ref=e530] [cursor=pointer]
+                - radio "Red" [ref=e531] [cursor=pointer]
+                - radio "Orange" [ref=e532] [cursor=pointer]
+                - radio "Yellow" [ref=e533] [cursor=pointer]
+                - radio "Green" [ref=e534] [cursor=pointer]
+                - radio "Graphite" [ref=e535] [cursor=pointer]
+              - generic [ref=e536]: Accent color влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
+          - generic [ref=e537]:
+            - generic [ref=e538]: Логика применения
+            - generic [ref=e539]: "Цветовая схема задаёт пространство интерфейса: фон, поверхности, header и sidebar. Accent управляет цветом действий и выделений. Theme preference синхронизируется через профиль пользователя, accent остаётся локальной настройкой рабочего места."
+          - generic [ref=e541]:
+            - generic [ref=e542]:
+              - generic [ref=e543]:
+                - heading "Настройки клиники" [level=2] [ref=e544]:
+                  - img [ref=e545]
+                  - text: Настройки клиники
+                - paragraph [ref=e549]: Основная информация о медицинском учреждении
+              - generic [ref=e550]:
+                - button "Обновить" [ref=e551] [cursor=pointer]:
+                  - generic [ref=e552]:
+                    - img [ref=e553]
+                    - text: Обновить
+                - button "Сохранить" [ref=e558] [cursor=pointer]:
+                  - generic [ref=e559]:
+                    - img [ref=e560]
+                    - text: Сохранить
+            - generic [ref=e564]:
+              - generic [ref=e565]:
+                - heading "Основная информация" [level=3] [ref=e566]:
+                  - img [ref=e567]
+                  - text: Основная информация
+                - generic [ref=e571]:
+                  - generic [ref=e572]:
+                    - generic [ref=e573]: Название клиники
+                    - textbox "Название медицинского учреждения" [ref=e575]: Clinic Management
+                  - generic [ref=e576]:
+                    - generic [ref=e577]:
+                      - img [ref=e578]
+                      - text: Адрес
+                    - textbox "Полный адрес клиники" [ref=e581]
+                  - generic [ref=e582]:
+                    - generic [ref=e583]:
+                      - img [ref=e584]
+                      - text: Телефон
+                    - textbox "+998 (90) 123-45-67" [ref=e587]: "+998551043434"
+                  - generic [ref=e588]:
+                    - generic [ref=e589]:
+                      - img [ref=e590]
+                      - text: Email
+                    - textbox "info@clinic.com" [ref=e594]
+              - generic [ref=e595]:
+                - heading "Системные настройки" [level=3] [ref=e596]:
+                  - img [ref=e597]
+                  - text: Системные настройки
+                - generic [ref=e600]:
+                  - generic [ref=e601]:
+                    - generic [ref=e602]:
+                      - img [ref=e603]
+                      - text: Часовой пояс
+                    - combobox [ref=e606] [cursor=pointer]:
+                      - option "Ташкент (UTC+5)" [selected]
+                      - option "Алматы (UTC+6)"
+                      - option "Москва (UTC+3)"
+                      - option "Дубай (UTC+4)"
+                      - option "UTC (UTC+0)"
+                    - paragraph [ref=e607]: Используется для расписания и онлайн-очереди
+                  - generic [ref=e608]:
+                    - generic [ref=e609]:
+                      - img [ref=e610]
+                      - text: Логотип клиники
+                    - img "Логотип клиники" [ref=e616]
+                    - generic [ref=e618] [cursor=pointer]:
+                      - img [ref=e619]
+                      - text: Выбрать файл
+                    - paragraph [ref=e622]: "Поддерживаются форматы: JPG, PNG, GIF. Максимальный размер: 5MB"
+  - region "Notifications Alt+T"
+  - generic [ref=e623]:
+    - generic [ref=e624]:
+      - img [ref=e625]
+      - generic [ref=e628]:
+        - strong [ref=e629]: Включить уведомления?
+        - generic [ref=e630]: Получайте уведомления о новых сообщениях
+    - generic [ref=e631]:
+      - button "Включить" [ref=e632] [cursor=pointer]
+      - button "Закрыть" [ref=e633] [cursor=pointer]:
+        - img [ref=e634]

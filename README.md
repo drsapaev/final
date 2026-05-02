@@ -79,10 +79,10 @@
    ```bash
    cd backend
    pip install -r requirements.txt
-   # Local Postgres DSN example:
+   # PostgreSQL DSN example:
    # postgresql+psycopg://clinic:<password>@localhost:5432/clinicdb
    alembic upgrade head
-   uvicorn app.main:app --reload
+   python run_server.py
    ```
 
 3. **Frontend**
@@ -114,7 +114,7 @@ CORS_DISABLE=1
 WS_DEV_ALLOW=1
 
 # Frontend
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:18000
 ```
 
 ### База данных
@@ -144,6 +144,7 @@ cd frontend
 npm run test
 npx playwright test
 ```
+В CI фронтенд gate дополнительно включает `frontend/e2e/registrar-time.spec.js` для проверки времени регистрации пациента в `Asia/Tashkent`.
 
 ### CI/CD
 Система включает полный CI/CD пайплайн с:
@@ -175,6 +176,7 @@ Require these GitHub-native checks:
 ## 📚 Документация
 
 - [Документация API](docs/README.md) - подробное описание API
+- [Короткий smoke по ADM-06](docs/ADM-06_BROWSER_SMOKE.md) - компактная ручная проверка guardrail для каталога услуг
 - [Система ролей](docs/ROLES_AND_ROUTING.md) - управление доступом
 - [CI Guardrails](docs/CI_GUARDRAILS.md) - какие проверки реально блокируют merge в `main`
 - [CI/CD](CI-CD-README.md) - настройка и использование

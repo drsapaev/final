@@ -26,6 +26,7 @@ import {
   ZoomIn,
   ZoomOut } from
 'lucide-react';
+import PropTypes from 'prop-types';
 
 // Статусы зубов
 const TOOTH_STATUS = {
@@ -400,6 +401,14 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
       </CardContent>
     </Card>);
 
+};
+
+
+TeethChart.propTypes = {
+  ...(TeethChart.propTypes || {}),
+  initialData: PropTypes.any,
+  onToothClick: PropTypes.any,
+  readOnly: PropTypes.any,
 };
 
 export default TeethChart;

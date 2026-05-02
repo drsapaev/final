@@ -45,7 +45,7 @@ def test_complete_system_corrected():
     for role, password in user_credentials.items():
         try:
             auth_response = requests.post(
-                "http://localhost:8000/api/v1/auth/login",
+                "http://localhost:18000/api/v1/auth/login",
                 data={"username": role, "password": password},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=5
@@ -75,7 +75,7 @@ def test_complete_system_corrected():
         # Тест AI анализа (используем правильный endpoint)
         try:
             ai_response = requests.post(
-                "http://localhost:8000/api/v1/emr/ai-enhanced/analyze-patient",
+                "http://localhost:18000/api/v1/emr/ai-enhanced/analyze-patient",
                 headers=headers,
                 json={"patient_data": {"symptoms": "головная боль, температура"}},
                 timeout=5
@@ -93,7 +93,7 @@ def test_complete_system_corrected():
         # Тест EMR шаблонов
         try:
             templates_response = requests.get(
-                "http://localhost:8000/api/v1/emr/templates",
+                "http://localhost:18000/api/v1/emr/templates",
                 headers=headers,
                 timeout=5
             )
@@ -117,7 +117,7 @@ def test_complete_system_corrected():
         # Тест мобильного здоровья
         try:
             mobile_health_response = requests.get(
-                "http://localhost:8000/api/v1/mobile/health",
+                "http://localhost:18000/api/v1/mobile/health",
                 headers=headers,
                 timeout=5
             )
@@ -134,7 +134,7 @@ def test_complete_system_corrected():
         # Тест мобильной статистики
         try:
             mobile_stats_response = requests.get(
-                "http://localhost:8000/api/v1/mobile/stats",
+                "http://localhost:18000/api/v1/mobile/stats",
                 headers=headers,
                 timeout=5
             )
@@ -158,7 +158,7 @@ def test_complete_system_corrected():
         # Тест быстрой статистики
         try:
             quick_stats_response = requests.get(
-                "http://localhost:8000/api/v1/analytics/quick-stats",
+                "http://localhost:18000/api/v1/analytics/quick-stats",
                 headers=headers,
                 timeout=5
             )
@@ -175,7 +175,7 @@ def test_complete_system_corrected():
         # Тест дашборда
         try:
             dashboard_response = requests.get(
-                "http://localhost:8000/api/v1/analytics/dashboard",
+                "http://localhost:18000/api/v1/analytics/dashboard",
                 headers=headers,
                 timeout=5
             )
@@ -199,7 +199,7 @@ def test_complete_system_corrected():
         # Тест статуса 2FA
         try:
             twofa_status_response = requests.get(
-                "http://localhost:8000/api/v1/2fa/status",
+                "http://localhost:18000/api/v1/2fa/status",
                 headers=headers,
                 timeout=5
             )
@@ -216,7 +216,7 @@ def test_complete_system_corrected():
         # Тест здоровья 2FA
         try:
             twofa_health_response = requests.get(
-                "http://localhost:8000/api/v1/2fa/health",
+                "http://localhost:18000/api/v1/2fa/health",
                 headers=headers,
                 timeout=5
             )
@@ -240,7 +240,7 @@ def test_complete_system_corrected():
         # Тест статуса бота
         try:
             telegram_status_response = requests.get(
-                "http://localhost:8000/api/v1/telegram/bot-status",
+                "http://localhost:18000/api/v1/telegram/bot-status",
                 headers=headers,
                 timeout=5
             )
@@ -264,7 +264,7 @@ def test_complete_system_corrected():
         # Тест Email/SMS статистики
         try:
             email_sms_response = requests.get(
-                "http://localhost:8000/api/v1/email-sms/statistics",
+                "http://localhost:18000/api/v1/email-sms/statistics",
                 headers=headers,
                 timeout=5
             )
@@ -281,7 +281,7 @@ def test_complete_system_corrected():
         # Тест шаблонов
         try:
             templates_response = requests.get(
-                "http://localhost:8000/api/v1/email-sms/templates",
+                "http://localhost:18000/api/v1/email-sms/templates",
                 headers=headers,
                 timeout=5
             )
@@ -305,7 +305,7 @@ def test_complete_system_corrected():
         # Тест файловой статистики
         try:
             files_response = requests.get(
-                "http://localhost:8000/api/v1/files/statistics",
+                "http://localhost:18000/api/v1/files/statistics",
                 headers=headers,
                 timeout=5
             )
@@ -322,7 +322,7 @@ def test_complete_system_corrected():
         # Тест загрузки файлов
         try:
             upload_response = requests.post(
-                "http://localhost:8000/api/v1/files/test-upload",
+                "http://localhost:18000/api/v1/files/test-upload",
                 headers=headers,
                 timeout=5
             )

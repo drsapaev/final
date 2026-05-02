@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronRight, Home } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSBreadcrumb = ({ 
   items = [], 
@@ -148,6 +149,17 @@ const MacOSBreadcrumb = ({
       {items.map(renderItem)}
     </nav>
   );
+};
+
+
+MacOSBreadcrumb.propTypes = {
+  ...(MacOSBreadcrumb.propTypes || {}),
+  className: PropTypes.any,
+  items: PropTypes.any,
+  onItemClick: PropTypes.any,
+  separator: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default MacOSBreadcrumb;

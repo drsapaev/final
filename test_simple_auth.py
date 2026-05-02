@@ -21,7 +21,7 @@ def test_simple_login():
         print(f"Sending simple login request with data: {data}")
         
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/simple-login",
+            "http://localhost:18000/api/v1/auth/simple-login",
             json=data,
             headers=headers
         )

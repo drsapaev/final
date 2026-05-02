@@ -1,7 +1,7 @@
 // Компонент для ролевых ограничений доступа
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
-import { hasRouteAccess as hasRouteAccessByRole } from '../../constants/routes';
+import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors.js';
 
 /**
  * Компонент для проверки ролевого доступа
@@ -34,7 +34,7 @@ export function RoleGuard({
   if (allowedRoles.length > 0) {
     const userRoles = getUserRoles(userProfile);
     const hasRole = allowedRoles.some((role) =>
-    userRoles.includes(role.toLowerCase())
+    userRoles.includes(normalizeRole(role))
     );
 
     if (!hasRole) {
@@ -78,9 +78,9 @@ export function useRoleAccess(profile = null) {
   JSON.parse(localStorage.getItem('auth_profile') || 'null') : null);
 
   const hasRole = (roles) => {
-    if (!userProfile || !Array.isArray(roles)) return false;
+  if (!userProfile || !Array.isArray(roles)) return false;
     const userRoles = getUserRoles(userProfile);
-    return roles.some((role) => userRoles.includes(role.toLowerCase()));
+    return roles.some((role) => userRoles.includes(normalizeRole(role)));
   };
 
   const hasPermission = (permissions) => {
@@ -204,18 +204,7 @@ function AccessDenied({ message, theme }) {
  * Утилиты для работы с ролями
  */
 function getUserRoles(profile) {
-  const roles = [];
-
-  if (profile.role) roles.push(String(profile.role).toLowerCase());
-  if (profile.role_name) roles.push(String(profile.role_name).toLowerCase());
-  if (Array.isArray(profile.roles)) {
-    profile.roles.forEach((r) => roles.push(String(r).toLowerCase()));
-  }
-  if (profile.is_superuser || profile.is_admin || profile.admin) {
-    roles.push('admin');
-  }
-
-  return [...new Set(roles)]; // Убираем дубликаты
+  return getProfileRoles(profile);
 }
 
 function getUserPermissions(profile) {

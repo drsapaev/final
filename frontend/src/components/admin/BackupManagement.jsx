@@ -1,22 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   HardDrive,
   Plus,
   Search,
-
-  Download,
   Trash2,
   Save,
   X,
   RefreshCw,
   Calendar,
   Clock,
-
-
-  Play,
-
-
-
   Edit } from
 'lucide-react';
 import {
@@ -35,6 +27,38 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const emptyBackupStats = {
+  total_backups: 0,
+  completed_backups: 0,
+  failed_backups: 0,
+  total_size: 0
+};
+
+const deriveBackupStats = (backupList) => {
+  const nextBackups = Array.isArray(backupList) ? backupList : [];
+  return {
+    total_backups: nextBackups.length,
+    completed_backups: nextBackups.filter((backup) => backup.status === 'completed').length,
+    failed_backups: nextBackups.filter((backup) => backup.status === 'failed').length,
+    total_size: nextBackups.reduce((sum, backup) => sum + (backup.file_size || 0), 0)
+  };
+};
+
+const defaultBackupForm = {
+  name: '',
+  backup_type: 'full',
+  status: 'pending',
+  file_path: '',
+  file_size: '',
+  retention_days: 30,
+  notes: '',
+  description: '',
+  schedule: 'manual',
+  compression: true,
+  encryption: false
+};
+
 const BackupManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,21 +72,14 @@ const BackupManagement = () => {
   const [stats, setStats] = useState(null);
 
   // Форма резервной копии
-  const [formData, setFormData] = useState({
-    name: '',
-    backup_type: 'full',
-    description: '',
-    schedule: 'manual',
-    retention_days: 30,
-    compression: true,
-    encryption: false
-  });
+  const [formData, setFormData] = useState(defaultBackupForm);
 
   const statusOptions = [
+  { value: 'pending', label: 'Ожидает', color: 'gray' },
+  { value: 'in_progress', label: 'Выполняется', color: 'warning' },
   { value: 'completed', label: 'Завершено', color: 'success' },
-  { value: 'running', label: 'Выполняется', color: 'warning' },
   { value: 'failed', label: 'Ошибка', color: 'error' },
-  { value: 'scheduled', label: 'Запланировано', color: 'gray' }];
+  { value: 'cancelled', label: 'Отменено', color: 'gray' }];
 
 
   const typeOptions = [
@@ -80,62 +97,27 @@ const BackupManagement = () => {
   { value: 'monthly', label: 'Ежемесячно' }];
 
 
-  useEffect(() => {
-    loadBackups();
-    loadStats();
-  }, []);
-
-  const loadBackups = async () => {
+  const loadBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/backups');
-      setBackups(response.data.backups || []);
+      const response = await api.get('/clinic/backups');
+      const nextBackups = Array.isArray(response.data)
+        ? response.data
+        : response.data?.backups || [];
+      setBackups(nextBackups);
+      setStats(deriveBackupStats(nextBackups));
     } catch (error) {
       logger.error('Ошибка загрузки резервных копий:', error);
-      // Fallback данные
-      setBackups([
-      {
-        id: 1,
-        name: 'Полная копия БД',
-        backup_type: 'full',
-        status: 'completed',
-        created_at: '2024-01-15T10:30:00Z',
-        size: 1024000000,
-        description: 'Полная резервная копия базы данных',
-        schedule: 'daily',
-        retention_days: 30
-      },
-      {
-        id: 2,
-        name: 'Инкрементальная копия',
-        backup_type: 'incremental',
-        status: 'completed',
-        created_at: '2024-01-15T18:00:00Z',
-        size: 51200000,
-        description: 'Инкрементальная копия изменений',
-        schedule: 'daily',
-        retention_days: 7
-      }]
-      );
+      setBackups([]);
+      setStats(emptyBackupStats);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadStats = async () => {
-    try {
-      const response = await api.get('/backups/stats');
-      setStats(response.data);
-    } catch (error) {
-      logger.error('Ошибка загрузки статистики:', error);
-      setStats({
-        total_backups: 2,
-        completed_backups: 2,
-        failed_backups: 0,
-        total_size: 1075200000
-      });
-    }
-  };
+  useEffect(() => {
+    loadBackups();
+  }, [loadBackups]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -143,10 +125,10 @@ const BackupManagement = () => {
       setSaving(true);
 
       if (editingBackup) {
-        await api.put(`/backups/${editingBackup.id}`, formData);
+        await api.put(`/clinic/backups/${editingBackup.id}`, formData);
         setMessage({ type: 'success', text: 'Настройки обновлены' });
       } else {
-        await api.post('/backups', formData);
+        await api.post('/clinic/backups', formData);
         setMessage({ type: 'success', text: 'Резервная копия создана' });
       }
 
@@ -154,7 +136,6 @@ const BackupManagement = () => {
       setEditingBackup(null);
       resetForm();
       loadBackups();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка сохранения резервной копии' });
     } finally {
@@ -163,51 +144,36 @@ const BackupManagement = () => {
   };
 
   const handleEdit = (backup) => {
-    setFormData(backup);
+    setFormData({
+      ...defaultBackupForm,
+      ...backup,
+      description: backup.notes || backup.description || ''
+    });
     setEditingBackup(backup);
     setShowAddForm(true);
   };
 
   const handleDelete = async (backupId) => {
     try {
-      await api.delete(`/backups/${backupId}`);
+      await api.delete(`/clinic/backups/${backupId}`);
       setMessage({ type: 'success', text: 'Резервная копия удалена' });
       loadBackups();
-      loadStats();
     } catch {
       setMessage({ type: 'error', text: 'Ошибка удаления резервной копии' });
     }
   };
 
-  const handleDownload = async (backupId) => {
+  const handleCleanupExpired = async () => {
     try {
-      const response = await api.get(`/backups/${backupId}/download`, {
-        responseType: 'blob'
+      const response = await api.post('/clinic/backups/cleanup');
+      const cleanedCount = response.data?.cleaned_count ?? 0;
+      setMessage({
+        type: 'success',
+        text: `Очищено ${cleanedCount} просроченных резервных копий`
       });
-
-      const blob = new Blob([response.data]);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `backup_${backupId}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      setMessage({ type: 'success', text: 'Резервная копия скачана' });
-    } catch {
-      setMessage({ type: 'error', text: 'Ошибка скачивания резервной копии' });
-    }
-  };
-
-  const handleRunBackup = async (backupId) => {
-    try {
-      await api.post(`/backups/${backupId}/run`);
-      setMessage({ type: 'success', text: 'Резервная копия запущена' });
       loadBackups();
-      loadStats();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка запуска резервной копии' });
+      setMessage({ type: 'error', text: 'Ошибка очистки просроченных резервных копий' });
     }
   };
 
@@ -238,13 +204,8 @@ const BackupManagement = () => {
     return typeOption ? typeOption.label : type;
   };
 
-  const getScheduleLabel = (schedule) => {
-    const scheduleOption = scheduleOptions.find((s) => s.value === schedule);
-    return scheduleOption ? scheduleOption.label : schedule;
-  };
-
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes <= 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -413,6 +374,17 @@ const BackupManagement = () => {
               
               <Plus style={{ width: '16px', height: '16px' }} />
               <span>Создать копию</span>
+            </MacOSButton>
+            <MacOSButton
+              onClick={handleCleanupExpired}
+              variant="outline"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              <span>Очистить просроченные</span>
             </MacOSButton>
           </div>
         </div>
@@ -692,7 +664,7 @@ const BackupManagement = () => {
                 color: 'var(--mac-text-secondary)',
                 margin: 0
               }}>
-                    {getTypeLabel(backup.backup_type)} • {getScheduleLabel(backup.schedule)}
+                    {getTypeLabel(backup.backup_type)} • Хранение {backup.retention_days} дней
                   </p>
                 </div>
                 <MacOSBadge
@@ -710,7 +682,7 @@ const BackupManagement = () => {
               color: 'var(--mac-text-secondary)'
             }}>
                   <HardDrive style={{ width: '16px', height: '16px' }} />
-                  <span>{formatFileSize(backup.size)}</span>
+                  <span>{formatFileSize(backup.file_size)}</span>
                 </div>
                 <div style={{
               display: 'flex',
@@ -732,9 +704,20 @@ const BackupManagement = () => {
                   <Clock style={{ width: '16px', height: '16px' }} />
                   <span>Хранение: {backup.retention_days} дней</span>
                 </div>
+                {backup.file_path &&
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
+                    <span style={{ fontFamily: 'monospace' }}>{backup.file_path}</span>
+                  </div>
+            }
               </div>
 
-              {backup.description &&
+              {backup.notes &&
           <div style={{ marginBottom: '16px' }}>
                   <p style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -742,7 +725,7 @@ const BackupManagement = () => {
               margin: 0,
               lineHeight: '1.4'
             }}>
-                    {backup.description}
+                    {backup.notes}
                   </p>
                 </div>
           }
@@ -752,22 +735,6 @@ const BackupManagement = () => {
             justifyContent: 'flex-end',
             gap: '8px'
           }}>
-                {backup.status === 'completed' &&
-            <MacOSButton
-              variant="outline"
-              onClick={() => handleDownload(backup.id)}
-              style={{ padding: '6px 12px' }}>
-              
-                    <Download style={{ width: '16px', height: '16px' }} />
-                  </MacOSButton>
-            }
-                <MacOSButton
-              variant="outline"
-              onClick={() => handleRunBackup(backup.id)}
-              style={{ padding: '6px 12px' }}>
-              
-                  <Play style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
                 <MacOSButton
               variant="outline"
               onClick={() => handleEdit(backup)}

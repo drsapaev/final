@@ -2,12 +2,17 @@
 Pydantic схемы для управления пользователями
 """
 
+import logging
+import os
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from email_validator import EmailNotValidError, validate_email as validate_email_address
+from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class UserStatus(str, Enum):
@@ -45,6 +50,62 @@ class TimeFormat(str, Enum):
 
     HOUR_12 = "12"
     HOUR_24 = "24"
+
+
+_RESERVED_EMAIL_DOMAIN_SUFFIXES = (".local", ".test", ".invalid", ".example")
+_RESERVED_EMAIL_DOMAINS = {
+    "arpa",
+    "example",
+    "example.com",
+    "example.net",
+    "example.org",
+    "invalid",
+    "localhost.localdomain",
+    "onion",
+    "test",
+}
+
+
+def _allow_reserved_email_domains() -> bool:
+    env = os.getenv("ENV", "dev").lower()
+    testing = os.getenv("TESTING", "0").lower() in ("1", "true", "yes")
+    return testing or env not in ("prod", "production")
+
+
+def _is_reserved_email_domain(domain: str) -> bool:
+    domain = domain.strip().lower()
+    return domain in _RESERVED_EMAIL_DOMAINS or any(
+        domain.endswith(suffix) for suffix in _RESERVED_EMAIL_DOMAIN_SUFFIXES
+    )
+
+
+def _normalize_user_management_email(value: str, *, allow_reserved: bool) -> str:
+    normalized = value.strip().lower()
+    if not normalized:
+        raise ValueError("Email обязателен")
+
+    try:
+        validated = validate_email_address(
+            normalized,
+            check_deliverability=False,
+            test_environment=True,
+            globally_deliverable=False,
+        )
+        return validated.email
+    except EmailNotValidError as exc:
+        message = str(exc)
+        domain = normalized.rsplit("@", 1)[-1] if "@" in normalized else ""
+        if (
+            allow_reserved
+            and "special-use or reserved name" in message
+            and _is_reserved_email_domain(domain)
+        ):
+            logger.info(
+                "[FIX:ADM-03] Allowing reserved email domain in admin user flow: %s",
+                normalized,
+            )
+            return normalized
+        raise ValueError("Некорректный email") from exc
 
 
 # Схемы для профиля пользователя
@@ -129,6 +190,7 @@ class UserPreferencesBase(BaseModel):
     sms_notifications: bool | None = False
     push_notifications: bool | None = True
     desktop_notifications: bool | None = True
+    security_settings: dict[str, Any] | None = None
 
 
 class UserPreferencesCreate(UserPreferencesBase):
@@ -451,7 +513,7 @@ class UserCreateRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
@@ -478,6 +540,14 @@ class UserCreateRequest(BaseModel):
             raise ValueError('Пароль должен содержать минимум одну цифру')
         return v
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _normalize_user_management_email(
+            v,
+            allow_reserved=_allow_reserved_email_domains(),
+        )
+
 
 class UserUpdateRequest(BaseModel):
     """Схема обновления пользователя"""
@@ -485,7 +555,7 @@ class UserUpdateRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     username: str | None = Field(None, min_length=3, max_length=50)
-    email: EmailStr | None = None
+    email: str | None = Field(None, min_length=3, max_length=254)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
         None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
@@ -498,6 +568,16 @@ class UserUpdateRequest(BaseModel):
     first_name: str | None = Field(None, min_length=1, max_length=50)
     last_name: str | None = Field(None, min_length=1, max_length=50)
     phone: str | None = Field(None, min_length=10, max_length=20)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _normalize_user_management_email(
+            v,
+            allow_reserved=_allow_reserved_email_domains(),
+        )
 
 
 class UserResponse(BaseModel):

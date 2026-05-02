@@ -42,10 +42,16 @@ class QueueCabinetResponse(BaseModel):
     specialist_name: str
     queue_tag: Optional[str]
     cabinet_number: Optional[str]
+    doctor_cabinet: Optional[str]
+    effective_cabinet: Optional[str]
     cabinet_floor: Optional[int]
     cabinet_building: Optional[str]
     entries_count: int
     active: bool
+    linked_doctor_found: bool
+    doctor_has_cabinet: bool
+    sync_status: str
+    integrity_warnings: List[str]
 
 
 class BulkCabinetUpdateRequest(BaseModel):
@@ -125,7 +131,11 @@ def update_queue_cabinet_info(
     try:
         return service.update_queue_cabinet_info(
             queue_id=queue_id,
-            cabinet_info=cabinet_info.model_dump() if hasattr(cabinet_info, "model_dump") else cabinet_info.dict(),
+            cabinet_info=(
+                cabinet_info.model_dump(exclude_unset=True)
+                if hasattr(cabinet_info, "model_dump")
+                else cabinet_info.dict(exclude_unset=True)
+            ),
             updated_by=current_user.username,
         )
     except QueueCabinetManagementDomainError as exc:
@@ -152,7 +162,11 @@ def bulk_update_cabinet_info(
     """
     service = QueueCabinetManagementApiService(db)
     try:
-        updates = request.model_dump()["updates"] if hasattr(request, "model_dump") else request.dict()["updates"]
+        updates = (
+            request.model_dump(exclude_unset=True)["updates"]
+            if hasattr(request, "model_dump")
+            else request.dict(exclude_unset=True)["updates"]
+        )
         return service.bulk_update_cabinet_info(
             updates=updates,
             updated_by=current_user.username,

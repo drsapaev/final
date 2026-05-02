@@ -33,6 +33,91 @@ System covers patient lifecycle from registration and queue to visit documentati
 - ORM access is encapsulated in `backend/app/repositories`
 - Detailed rules: see `.ai-factory/ARCHITECTURE.md`
 
+## Deployment Model
+
+- Target architecture: **isolated deployment per clinic**
+- Each clinic deployment owns:
+  - its own backend/frontend runtime
+  - its own PostgreSQL database
+  - its own host/domain or clinic-host endpoint
+  - its own clinic branding and admin context
+- Deployment may run as:
+  - VPS-hosted rollout
+  - on-prem / clinic-host install
+- Branches remain inside a single clinic deployment and are not treated as independent deployments.
+- First-run business initialization happens inside the deployed app via `/setup`.
+- `/setup` is an orchestration layer over existing SSOT entities:
+  - `clinic_settings`
+  - `branches`
+  - `users` + related profile/preferences/notification rows
+  - activation records
+
+## Package And Setup Model
+
+- The system should be distributed as one universal application package, not as a custom build per clinic.
+- The universal package includes:
+  - backend code
+  - frontend code
+  - Alembic migrations
+  - backup/update/restore helpers
+  - sample env files
+  - `/setup`
+
+Per-clinic technical configuration is install-time state and must stay outside the package:
+- database connection strings
+- host or domain values
+- public and backend URLs
+- secrets
+- PostgreSQL credentials
+- backup, log, and upload paths
+
+Per-clinic business identity belongs to `/setup`:
+- clinic name
+- first branch
+- first admin identity and credentials
+- optional activation or license key
+
+Global defaults may stay shared until there is a clear product requirement to make them clinic-specific:
+- default timezone
+- queue window defaults
+- backup schedule defaults
+- fallback branch code
+
+## Access Model
+
+- **Host machine**
+  - the clinic server or main machine where backend, PostgreSQL, storage, backup, and update tooling run
+- **Admin user**
+  - the person who manages the system through application roles
+- **Workstation user**
+  - the person who signs in from another machine with their own account
+
+Default workstation access is:
+- browser/LAN access
+- no separate backend install
+- no separate PostgreSQL instance
+
+Any thin launcher is optional convenience only and not a required second install mode.
+
+## Release Artifact Model
+
+- Clinic updates are delivered as an **approved release artifact**.
+- The same artifact format must support:
+  - online delivery from GitHub Releases or another approved release source
+  - offline delivery as a copied package
+- Release approval source of truth is the approved release ref plus the manifest embedded in the artifact.
+
+## Local-Only Policy
+
+- Local-only clinics must be able to complete install, setup, login, and core workflows without mandatory internet services.
+- External integrations remain optional and are configured later when needed.
+- The following remain unavailable until configured explicitly:
+  - Telegram flows
+  - SMS delivery
+  - push via FCM
+  - cloud AI features
+  - internet-facing payment callbacks or webhooks
+
 ## Data & Migration Policy
 
 - **Single source of truth:** PostgreSQL + Alembic
@@ -53,3 +138,11 @@ System covers patient lifecycle from registration and queue to visit documentati
 
 - Strategic milestones and phase gates tracked in `docs/PLAN_CHECKLIST.md`
 - High-level delivery roadmap tracked in `.ai-factory/ROADMAP.md`
+- Current primary runtime is the local host-based staging contour:
+  - backend on `:18000`
+  - frontend on `:5173`
+  - dedicated staging Postgres cluster on `:55432`
+- EMR v2 hard-cutover has already been rehearsed successfully on the local staging contour.
+- Current local-first execution checklist is maintained in `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
+- VPS rollout is one supported isolated-deployment path after local acceptance and is documented in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md`.
+- The same deployment contract is intended to support clinic-host / on-prem installs with the same post-deploy `/setup` flow.

@@ -7,7 +7,7 @@ import json
 
 def test_authentication_detailed():
     """Детальное тестирование аутентификации"""
-    url = "http://localhost:8000/api/v1/authentication/login"
+    url = "http://localhost:18000/api/v1/authentication/login"
     
     # Тестовые данные
     test_data = {
@@ -39,7 +39,7 @@ def test_authentication_detailed():
 
 def test_direct_auth():
     """Прямое тестирование аутентификации через OAuth2"""
-    url = "http://localhost:8000/api/v1/auth/login"
+    url = "http://localhost:18000/api/v1/auth/login"
     
     # Form data для OAuth2
     form_data = {

@@ -7,6 +7,7 @@ import { getTheme, applyCSSVariables, lightTheme } from './themes';
 import { tokens } from './tokens';
 import logger from '../utils/logger';
 import '../theme/macos-tokens.css';
+import PropTypes from 'prop-types';
 
 // Утилиты для работы с токенами дизайна
 const getColor = (colorName, shade = 500) => {
@@ -172,6 +173,13 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
       {children}
     </ThemeContext.Provider>);
 
+};
+
+
+ThemeProvider.propTypes = {
+  ...(ThemeProvider.propTypes || {}),
+  children: PropTypes.any,
+  defaultTheme: PropTypes.any,
 };
 
 // HOC для компонентов, которым нужна тема

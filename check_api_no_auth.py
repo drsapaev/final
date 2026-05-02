@@ -6,7 +6,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:18000/api/v1"
 
 def check_services_without_auth():
     """Проверяем API услуг без аутентификации"""

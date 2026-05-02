@@ -5,28 +5,20 @@ import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
 import GroupPermissionsManager from './GroupPermissionsManager';
-import { useTheme } from '../../contexts/ThemeContext';
 
 // Простой компонент вкладок для админки
 const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
-  const { isDark } = useTheme();
-  const colors = {
-    bg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.98)',
-    border: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-    text: isDark ? '#f8fafc' : '#0f172a',
-    textSecondary: isDark ? '#cbd5e1' : '#64748b',
-    active: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-    activeText: '#3b82f6'
-  };
-
   return (
     <div style={{
       display: 'flex',
       gap: '4px',
       padding: '8px',
-      background: colors.bg,
-      borderRadius: '8px',
-      border: `1px solid ${colors.border}`,
+      background: 'var(--mac-gradient-sidebar)',
+      borderRadius: '18px',
+      border: '1px solid var(--mac-main-shell-border)',
+      boxShadow: 'var(--mac-main-shell-shadow)',
+      backdropFilter: 'var(--mac-blur-light)',
+      WebkitBackdropFilter: 'var(--mac-blur-light)',
       marginBottom: '20px'
     }}>
       {tabs.map((tab) =>
@@ -35,17 +27,18 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
         onClick={() => onTabChange(tab.id)}
         style={{
           padding: '8px 16px',
-          border: 'none',
-          borderRadius: '6px',
-          background: activeTab === tab.id ? colors.active : 'transparent',
-          color: activeTab === tab.id ? colors.activeText : colors.text,
+          borderRadius: '10px',
+          border: activeTab === tab.id ? '1px solid var(--mac-nav-item-active-border)' : '1px solid transparent',
+          background: activeTab === tab.id ? 'var(--mac-nav-item-active)' : 'var(--mac-nav-item-bg)',
+          color: activeTab === tab.id ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
           fontSize: '14px',
           fontWeight: activeTab === tab.id ? '600' : '400',
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          boxShadow: activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none'
         }}>
         
           {tab.label}
@@ -66,8 +59,7 @@ AdminTabs.propTypes = {
 
 const UnifiedUserManagement = () => {
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'users';void
-  useTheme();
+  const section = searchParams.get('section') || 'users';
 
   const getActiveTab = (section) => {
     switch (section) {
@@ -109,7 +101,7 @@ const UnifiedUserManagement = () => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: 'var(--mac-text-primary)' }}>
       <AdminTabs
         tabs={tabs}
         activeTab={activeTab}

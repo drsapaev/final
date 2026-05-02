@@ -143,9 +143,9 @@
 }
 
 [data-color-scheme="gradient"] .mac-card {
-  background-color: rgba(17, 42, 74, 0.18) !important;
-  backdrop-filter: blur(12px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+  background-color: var(--mac-card-bg) !important;
+  backdrop-filter: var(--mac-blur-light) !important;
+  -webkit-backdrop-filter: var(--mac-blur-light) !important;
 }
 
 [data-color-scheme="vibrant"] .mac-card:hover,
@@ -314,7 +314,7 @@
 [data-color-scheme="vibrant"] .app-main,
 [data-color-scheme="glass"] .app-main,
 [data-color-scheme="gradient"] .app-main {
-  background: var(--mac-main-shell-bg);
+  background: var(--mac-gradient-sidebar);
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: var(--mac-main-shell-shadow);
@@ -369,7 +369,7 @@
 }
 
 [data-theme="light"] .app-main {
-  background: var(--mac-main-shell-bg);
+  background: var(--mac-gradient-sidebar);
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: var(--mac-main-shell-shadow);
@@ -434,7 +434,7 @@ body {
 }
 
 .app-main {
-  background: var(--mac-main-shell-bg);
+  background: var(--mac-gradient-sidebar);
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: var(--mac-main-shell-shadow);

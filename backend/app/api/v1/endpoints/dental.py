@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dental", tags=["dental"])
 
+DENTAL_CLINICIAN_ROLES = ("Admin", "Doctor", "dentist")
+
 
 class DentalPriceOverrideRequest(BaseModel):
     visit_id: int
@@ -41,7 +43,7 @@ class DentalPriceOverrideResponse(BaseModel):
 @router.get("/examinations", summary="Стоматологические осмотры")
 async def get_dental_examinations(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -60,7 +62,7 @@ async def get_dental_examinations(
 async def create_dental_examination(
     examination_data: Dict[str, Any],
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> Dict[str, Any]:
     """
     Создать новый стоматологический осмотр
@@ -76,7 +78,7 @@ async def create_dental_examination(
 @router.get("/treatments", summary="Планы лечения")
 async def get_treatment_plans(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -95,7 +97,7 @@ async def get_treatment_plans(
 async def create_treatment_plan(
     treatment_data: Dict[str, Any],
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> Dict[str, Any]:
     """
     Создать новый план лечения
@@ -111,7 +113,7 @@ async def create_treatment_plan(
 @router.get("/prosthetics", summary="Протезирование")
 async def get_prosthetics(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -130,7 +132,7 @@ async def get_prosthetics(
 async def create_prosthetic(
     prosthetic_data: Dict[str, Any],
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> Dict[str, Any]:
     """
     Создать новый протез
@@ -146,7 +148,7 @@ async def create_prosthetic(
 @router.get("/xray", summary="Рентгеновские снимки")
 async def get_xray_images(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     patient_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
@@ -170,7 +172,7 @@ async def get_xray_images(
 async def create_dental_price_override(
     override_data: DentalPriceOverrideRequest,
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
 ) -> DentalPriceOverrideResponse:
     """
     Стоматолог указывает цену после проведенного лечения
@@ -205,7 +207,7 @@ async def create_dental_price_override(
 @router.get("/price-overrides", summary="Получить изменения цен стоматолога")
 async def get_dental_price_overrides(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles(*DENTAL_CLINICIAN_ROLES)),
     visit_id: Optional[int] = Query(None, description="ID визита"),
     status: Optional[str] = Query(
         None, description="Статус (pending, approved, rejected)"

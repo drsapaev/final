@@ -39,6 +39,55 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
+
+
+def _normalize_registration_discount_mode(raw_value: str | None) -> str:
+    """Registrar-facing adapters expose registration type only, not payment markers."""
+    normalized = str(raw_value or "none").strip().lower()
+    if normalized in REGISTRATION_DISCOUNT_MODES:
+        return normalized
+    return "none"
+
+
+def _resolve_payment_truth(
+    db: Session,
+    *,
+    visit_id: int | None = None,
+    legacy_paid_at: datetime | None = None,
+) -> tuple[str, str | None]:
+    """Resolve payment truth from payments, with a narrow processed-at fallback."""
+    if visit_id:
+        try:
+            from app.models.payment import Payment
+
+            payment = (
+                _repo(db).query(Payment)
+                .filter(Payment.visit_id == visit_id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+            if payment:
+                status = (
+                    "paid"
+                    if (
+                        str(getattr(payment, "status", "") or "").lower() == "paid"
+                        or getattr(payment, "paid_at", None)
+                    )
+                    else "pending"
+                )
+                method = getattr(payment, "method", None) or None
+                return status, method
+        except Exception:
+            logger.debug(
+                "registrar_integration_api_service: failed to resolve payment truth for visit %s",
+                visit_id,
+                exc_info=True,
+            )
+
+    return ("paid", None) if legacy_paid_at else ("pending", None)
+
+
 def _repo(db: Session) -> RegistrarIntegrationApiRepository:
     return RegistrarIntegrationApiRepository(db)
 
@@ -598,7 +647,7 @@ def get_registrar_services(
             service_data = {
                 "id": service.id,
                 "name": service.name,
-                "code": service.code,
+                "code": service.service_code or get_service_code(service.id, db),
                 "price": float(service.price) if service.price else 0,
                 "currency": service.currency or "UZS",
                 "duration_minutes": service.duration_minutes or 30,
@@ -1076,7 +1125,7 @@ def open_reception(
     Из detail.md стр. 253: Кнопка «Открыть приём сейчас»
     """
     try:
-        result = crud_queue.open_daily_queue(db, day, specialist_id, current_user.id)
+        result = crud_queue.open_daily_queue(db, day, specialist_id)
 
         return {
             "success": True,
@@ -1125,57 +1174,11 @@ def start_queue_visit(
         if visit:
             # Обновляем статус визита
             visit.status = "in_progress"
-
-            # [OK] ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
-            # Не теряем информацию об оплате при обновлении статуса
-            if not visit.discount_mode or visit.discount_mode == "none":
-                from app.models.payment import Payment
-
-                payment = (
-                    _repo(db).query(Payment)
-                    .filter(Payment.visit_id == visit.id)
-                    .order_by(Payment.created_at.desc())
-                    .first()
-                )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    visit.discount_mode = "paid"
-                elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # [OK] ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
-                    # Создаем платеж через SSOT
-                    from app.services.billing_service import BillingService
-
-                    billing_service = BillingService(db)
-
-                    # Проверяем, не создан ли уже платеж
-                    if not payment:
-                        # Рассчитываем сумму визита через SSOT
-                        total_info = billing_service.calculate_total(
-                            visit_id=visit.id,
-                            discount_mode=visit.discount_mode or "none",
-                        )
-                        payment_amount = float(total_info["total"])
-
-                        # Создаем платеж через SSOT
-                        payment = billing_service.create_payment(
-                            visit_id=visit.id,
-                            amount=payment_amount,
-                            currency=total_info.get("currency", "UZS"),
-                            method="cash",  # Предполагаем наличные для визитов в процессе
-                            status="paid",
-                            note=f"Автоматическое создание платежа при начале приема (visit {visit.id})",
-                        )
-                        logger.info(
-                            "start_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s",
-                            payment.id,
-                            visit.id,
-                            payment_amount,
-                        )
-
-                    visit.discount_mode = "paid"
+            logger.info(
+                "[FIX:PAYMENT_STATUS] start_queue_visit preserves registration type for visit %d; operational status is %s",
+                visit.id,
+                visit.status,
+            )
 
             _repo(db).commit()
             _repo(db).refresh(visit)
@@ -1411,12 +1414,12 @@ def get_today_queues(
                 service_code_val = (
                     get_service_code(
                         {
-                            'code': service.code,
                             'service_code': getattr(service, 'service_code', None),
                             'category_code': getattr(service, 'category_code', None),
+                            'code': getattr(service, 'code', None),
                         }
                     )
-                    or service.code
+                    or service.service_code
                     or 'N/A'
                 )
                 queue_tag_val = service.queue_tag or 'N/A'
@@ -1451,8 +1454,8 @@ def get_today_queues(
                                 service_name,
                                 service_code_val,
                             )
-                    elif service.code:
-                        service_code_upper = str(service.code).upper()
+                    elif service.service_code:
+                        service_code_upper = str(service.service_code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
                             logger.debug(
@@ -1768,18 +1771,20 @@ def get_today_queues(
             if not daily_queue:
                 continue
 
-            # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
-            # Проверяем оба варианта для совместимости с существующими данными
+            # ✅ CANONICAL: DailyQueue.specialist_id должен указывать на Doctor.id.
+            # Старые записи с user_id больше не auto-link'им: вместо этого оставляем
+            # запись видимой и помечаем её как требующую deterministic repair.
             doctor = (
                 _repo(db).query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
             )
-            # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
+            integrity_warnings: list[str] = []
             if not doctor:
-                doctor = (
-                    _repo(db).query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                integrity_warnings.append("linked_doctor_missing")
+                logger.warning(
+                    "get_today_queues: DailyQueue %d specialist_id=%s does not resolve to Doctor.id",
+                    daily_queue.id,
+                    daily_queue.specialist_id,
                 )
-            if not doctor:
-                continue
 
             # [OK] ИСПРАВЛЕНО: Приоритет - queue_tag из DailyQueue, затем doctor.specialty
             # queue_tag - это точное указание очереди, созданное при регистрации
@@ -1808,16 +1813,32 @@ def get_today_queues(
             }
             specialty = specialty_mapping.get(specialty, specialty)
 
+            if doctor and not doctor.user_id:
+                integrity_warnings.append("doctor_without_user")
+            if doctor and doctor.user and not doctor.user.is_active:
+                integrity_warnings.append("doctor_user_inactive")
+            if doctor and not doctor.active:
+                integrity_warnings.append("doctor_inactive")
+            if doctor and not doctor.cabinet:
+                integrity_warnings.append("doctor_cabinet_missing")
+
             if specialty not in queues_by_specialty:
                 queues_by_specialty[specialty] = {
                     "entries": [],
                     "doctor": doctor,
-                    "doctor_id": doctor.id,  # ✅ ИСПРАВЛЕНО: Используем doctor.id вместо user_id
+                    "doctor_id": doctor.id if doctor else daily_queue.specialist_id,
+                    "integrity_warnings": list(dict.fromkeys(integrity_warnings)),
                 }
             else:
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
                 # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
                 # Это важно, когда для одной специальности есть записи от разных врачей
+                bucket = queues_by_specialty[specialty]
+                bucket.setdefault("integrity_warnings", [])
+                for warning in integrity_warnings:
+                    if warning not in bucket["integrity_warnings"]:
+                        bucket["integrity_warnings"].append(warning)
+
                 if doctor and doctor.id:
                     # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
                     # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
@@ -2344,21 +2365,9 @@ def get_today_queues(
                     entry_status = status_mapping.get(visit.status, "waiting")
 
                     # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    from app.services.billing_service import (
-                        BillingService,
-                        get_discount_mode_for_visit,
+                    discount_mode = _normalize_registration_discount_mode(
+                        getattr(visit, "discount_mode", None)
                     )
-
-                    # Определяем статус оплаты через SSOT
-                    billing_service = BillingService(db)
-                    is_paid = billing_service.is_visit_paid(visit)
-
-                    # Обновляем discount_mode в БД если визит оплачен
-                    if is_paid:
-                        billing_service.update_visit_discount_mode(visit)
-
-                    # Получаем discount_mode для ответа API
-                    discount_mode = get_discount_mode_for_visit(db, visit)
 
                     # ✅ ДОБАВЛЕНО: Сохраняем department из модели Visit для использования ниже
                     # Это нужно для новых записей из сценария 5
@@ -2442,21 +2451,9 @@ def get_today_queues(
                     entry_status = status_mapping.get(appointment.status, "waiting")
 
                     # [OK] Используем единый сервис для определения оплаты (Single Source of Truth)
-                    from app.services.billing_service import (
-                        get_discount_mode_for_appointment,
-                        is_appointment_paid,
-                        update_appointment_payment_status,
+                    discount_mode = _normalize_registration_discount_mode(
+                        getattr(appointment, "visit_type", None)
                     )
-
-                    # Определяем статус оплаты через единый сервис
-                    is_paid = is_appointment_paid(db, appointment)
-
-                    # Обновляем visit_type в БД если appointment оплачен
-                    if is_paid:
-                        update_appointment_payment_status(db, appointment)
-
-                    # Получаем discount_mode для ответа API
-                    discount_mode = get_discount_mode_for_appointment(db, appointment)
 
                     source = "desk"  # Appointment обычно создается регистратором
 
@@ -2846,10 +2843,22 @@ def get_today_queues(
                         # Другой datetime-like объект
                         queue_time_str = entry_queue_time.isoformat() + "Z"
 
+                entry_visit_id = (
+                    entry_wrapper.get("visit_id")
+                    or getattr(entry_data, "visit_id", None)
+                    or (record_id if entry_type == "visit" else None)
+                )
+                payment_status, payment_type = _resolve_payment_truth(
+                    db,
+                    visit_id=entry_visit_id,
+                    legacy_paid_at=getattr(entry_data, "payment_processed_at", None),
+                )
+
                 entries.append(
                     {
                         "id": record_id,
                         "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
+                        "visit_id": entry_visit_id,
                         "number": queue_entry_number,  # [OK] ИСПРАВЛЕНО: реальный номер из queue_entries
                         "patient_id": patient_id,
                         "patient_name": patient_name,
@@ -2862,9 +2871,8 @@ def get_today_queues(
                         "service_name": entry_wrapper.get("service_name"),  # ✅ НОВОЕ: Название услуги для отображения
                         "service_id": entry_wrapper.get("service_id"),  # ✅ SSOT: ID услуги из БД
                         "cost": total_cost,
-                        "payment_status": (
-                            "paid" if discount_mode == "paid" else "pending"
-                        ),
+                        "payment_status": payment_status,
+                        "payment_type": payment_type,
                         "source": source,
                         "status": entry_status,
                         "created_at": (
@@ -2876,6 +2884,9 @@ def get_today_queues(
                         "called_at": None,
                         "visit_time": visit_time,
                         "discount_mode": discount_mode,
+                        "approval_status": getattr(
+                            entry_data, "approval_status", None
+                        ),
                         "type": entry_type,  # ✅ ИСПРАВЛЕНО: Добавляем type для frontend (online_queue, visit, appointment)
                         "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment' (для совместимости)
                         "queue_entry_id": entry_wrapper.get("queue_entry_id"),  # ✅ SSOT FIX: ID OnlineQueueEntry для QR-записей
@@ -2889,13 +2900,17 @@ def get_today_queues(
                 "queue_id": queue_number,
                 # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
                 # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
-                # Поэтому в ответе API specialist_id должен быть doctor.id, а не user_id
-                "specialist_id": data["doctor_id"],  # Это уже doctor.id из queues_by_specialty
+                # Если doctor не найден, оставляем raw specialist_id видимым для repair.
+                "specialist_id": data["doctor_id"],
                 "specialist_name": (
-                    doctor.user.full_name if doctor and doctor.user else "Врач"
+                    doctor.user.full_name
+                    if doctor and doctor.user
+                    else f"Специалист #{data['doctor_id']}"
                 ),
                 "specialty": specialty,
                 "cabinet": doctor.cabinet if doctor else "N/A",
+                "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
+                "has_integrity_warnings": bool(data.get("integrity_warnings")),
                 "opened_at": datetime.now().isoformat(),
                 "entries": entries,
                 "stats": {
@@ -2980,13 +2995,13 @@ class BatchServiceItem(BaseModel):
     """Услуга для массового создания очередей"""
 
     specialist_id: int = Field(
-        ..., description="ID специалиста (user_id, не doctor_id)"
+        ..., description="ID специалиста (doctor_id; legacy user_id нормализуется на backend)"
     )
     service_id: int = Field(..., description="ID услуги")
     quantity: int = Field(default=1, ge=1, description="Количество")
 
-    # ⚠️ ВАЖНО: specialist_id должен быть user_id (ForeignKey на users.id), а не doctor_id!
-    # Если передается doctor_id, нужно конвертировать его в user_id на backend
+    # ⚠️ ВАЖНО: specialist_id должен быть canonical doctor_id.
+    # Legacy user_id, если встретится, нормализуется на backend.
 
 
 class BatchQueueEntriesRequest(BaseModel):
@@ -3087,10 +3102,10 @@ def get_doctor_user_id(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
-    Получить user_id по doctor_id
+    Legacy compatibility bridge for doctor -> user lookup.
 
-    Используется для конвертации doctor_id в user_id при создании записей в очереди,
-    так как DailyQueue.specialist_id требует user_id, а не doctor_id.
+    Canonical queue flows use Doctor.id. This helper is retained only for
+    transitional compatibility and should not be used as the source of truth.
 
     Args:
         doctor_id: ID врача из таблицы doctors
@@ -3120,8 +3135,11 @@ def get_doctor_user_id(
 
         return {
             "doctor_id": doctor_id,
+            "canonical_specialist_id": doctor.id,
             "user_id": doctor.user_id,
             "doctor_name": doctor.user.full_name if doctor.user else None,
+            "deprecated": True,
+            "note": "Use doctor_id as the canonical specialist identifier in queue flows.",
         }
 
     except HTTPException:

@@ -128,7 +128,7 @@ INFO:     Application startup complete.
    **Вариант C - Через uvicorn напрямую**:
    ```bash
    cd backend
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info --access-log
+uvicorn app.main:app --host 0.0.0.0 --port 18000 --log-level info --access-log
    ```
 
 ### Проблема: Middleware не логирует запросы
@@ -140,7 +140,7 @@ INFO:     Application startup complete.
 ### Проблема: Видны только startup логи, но не запросы
 
 **Проверьте**:
-1. Действительно ли приходят запросы на сервер? Откройте `http://localhost:8000/` в браузере
+1. Действительно ли приходят запросы на сервер? Откройте `http://localhost:18000/` в браузере
 2. Проверьте, что сервер запущен БЕЗ `reload=True`
 3. Используйте `start_server_verbose.py` для максимального логирования
 
@@ -149,10 +149,10 @@ INFO:     Application startup complete.
 После запуска сервера откройте в браузере или через curl:
 ```bash
 # Проверка health endpoint
-curl http://localhost:8000/
+curl http://localhost:18000/
 
 # Проверка API
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 ```
 
 Вы должны увидеть в консоли:

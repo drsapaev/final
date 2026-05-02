@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 const Checkbox = React.forwardRef(({
   checked: checkedProp,
@@ -125,6 +126,22 @@ const Checkbox = React.forwardRef(({
     </label>
   );
 });
+
+
+Checkbox.propTypes = {
+  ...(Checkbox.propTypes || {}),
+  checked: PropTypes.any,
+  className: PropTypes.any,
+  defaultChecked: PropTypes.any,
+  description: PropTypes.any,
+  disabled: PropTypes.any,
+  id: PropTypes.any,
+  label: PropTypes.any,
+  onChange: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Checkbox.displayName = 'Checkbox';
 

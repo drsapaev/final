@@ -2,7 +2,6 @@
 EMR v2 API Endpoints - Production EMR with versioning
 
 Endpoints:
-- GET  /emr/feature-flags        - Get EMR v2 feature flag config
 - GET  /emr/{visit_id}           - Get current EMR for visit
 - GET  /emr/{visit_id}/history   - Get all revisions
 - GET  /emr/{visit_id}/version/{v} - Get specific version
@@ -22,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.core.config import settings
+from app.core.audit import extract_model_changes, log_critical_change
 from app.models.user import User
 from app.schemas.emr_v2 import (
     EMRAmendRequest,
@@ -53,51 +52,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/emr", tags=["EMR v2"])
 
+EMR_V2_ALLOWED_ROLES = (
+    "Doctor",
+    "Admin",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "Cardio",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+    "Lab",
+    "Laboratory",
+)
 
-# =============================================================================
-# Feature Flags
-# =============================================================================
-
-
-class FeatureFlagsResponse(BaseModel):
-    """EMR v2 feature flags configuration"""
-    enabled: bool
-    rollout_percentage: int
-    allowed_user_ids: List[int]
-    shadow_mode: bool
-
-
-@router.get("/feature-flags", response_model=FeatureFlagsResponse)
-async def get_feature_flags(
-    current_user: User = Depends(deps.get_current_user),
-):
-    """
-    Get EMR v2 feature flags configuration.
-    
-    Returns the current rollout configuration for the frontend
-    to determine which EMR version to display.
-    """
-    # Parse allowed user IDs from comma-separated string
-    allowed_ids = []
-    if settings.EMR_V2_ALLOWED_USER_IDS:
-        try:
-            allowed_ids = [
-                int(uid.strip()) 
-                for uid in settings.EMR_V2_ALLOWED_USER_IDS.split(",")
-                if uid.strip().isdigit()
-            ]
-        except ValueError:
-            pass  # Invalid format, use empty list
-    
-    return FeatureFlagsResponse(
-        enabled=settings.EMR_V2_ENABLED,
-        rollout_percentage=settings.EMR_V2_ROLLOUT_PERCENTAGE,
-        allowed_user_ids=allowed_ids,
-        shadow_mode=settings.EMR_V2_SHADOW_MODE,
-    )
-
-
-def get_client_ip(request: Request) -> Optional[str]:
+def get_client_ip(request: Request) -> str | None:
     """Extract client IP from request"""
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -110,12 +80,67 @@ def get_client_ip(request: Request) -> Optional[str]:
 # =============================================================================
 
 
+class DoctorHistoryEntry(BaseModel):
+    """Single history entry"""
+    content: str
+    diagnosis: Optional[str] = None
+    created_at: str
+
+
+class DoctorHistoryResponse(BaseModel):
+    """Doctor history response"""
+    entries: List[DoctorHistoryEntry]
+    total: int
+    field_name: str
+
+
+@router.get("/doctor-history", response_model=DoctorHistoryResponse)
+async def get_doctor_history(
+    doctor_id: int = Query(..., description="Doctor ID"),
+    field_name: str = Query(..., description="Field name (complaints, diagnosis, etc.)"),
+    specialty: str = Query("general", description="Doctor specialty"),
+    search_text: Optional[str] = Query(None, description="Search text for similarity"),
+    limit: int = Query(10, ge=1, le=50, description="Max entries"),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+):
+    """
+    Get doctor's previous EMR entries for a specific field.
+    
+    Used to provide context to AI for better suggestions.
+    Doctor can only access their own history.
+    """
+    # Security: doctor can only access their own history
+    if current_user.id != doctor_id and not current_user.has_role("Admin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    history_service = EMRDoctorHistoryService(db)
+    try:
+        entries = history_service.get_history_entries(
+            doctor_id=doctor_id,
+            field_name=field_name,
+            specialty=specialty,
+            search_text=search_text,
+            limit=limit,
+        )
+        return DoctorHistoryResponse(
+            entries=[DoctorHistoryEntry(**entry) for entry in entries],
+            total=len(entries),
+            field_name=field_name,
+        )
+    except EMRDoctorHistoryDomainError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.error("[EMR v2] Doctor history error: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch history") from exc
+
+
 @router.get("/{visit_id}", response_model=EMRRecordOut)
 async def get_emr(
     visit_id: int,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get current EMR for visit.
@@ -144,7 +169,7 @@ async def get_emr_history(
     visit_id: int,
     limit: int = Query(50, ge=1, le=200, description="Maximum revisions to return"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get revision history for EMR.
@@ -179,7 +204,7 @@ async def get_emr_version(
     visit_id: int,
     version: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get specific version of EMR.
@@ -203,7 +228,7 @@ async def compare_versions(
     v1: int = Query(..., ge=1, description="First version number"),
     v2: int = Query(..., ge=1, description="Second version number"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Compare two EMR versions.
@@ -224,7 +249,7 @@ async def get_patient_emrs(
     patient_id: int,
     limit: int = Query(100, ge=1, le=500, description="Maximum EMRs to return"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Get all EMRs for a patient.
@@ -246,7 +271,7 @@ async def save_emr(
     payload: EMRSaveRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Save EMR with versioning.
@@ -259,6 +284,11 @@ async def save_emr(
     - If row_version mismatch but same user/session: allows (autosave)
     """
     try:
+        existing_emr = emr_v2_service.get_by_visit(db, visit_id)
+        old_data = None
+        if existing_emr is not None:
+            old_data, _ = extract_model_changes(existing_emr, None)
+
         emr = emr_v2_service.save(
             db,
             visit_id=visit_id,
@@ -268,6 +298,19 @@ async def save_emr(
             client_session_id=payload.client_session_id,
             is_draft=payload.is_draft,
         )
+        _, new_data = extract_model_changes(None, emr)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="CREATE" if existing_emr is None else "UPDATE",
+            table_name="emr",
+            row_id=emr.id,
+            old_data=old_data,
+            new_data=new_data,
+            request=request,
+            description=f"Сохранен EMR ID={emr.id} для визита {visit_id}",
+        )
+        db.commit()
         return emr
     except ConcurrencyError as e:
         raise HTTPException(
@@ -291,7 +334,7 @@ async def sign_emr(
     payload: EMRSignRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Sign and finalize EMR.
@@ -359,7 +402,7 @@ async def amend_emr(
     payload: EMRAmendRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Amend a signed EMR.
@@ -399,7 +442,7 @@ async def restore_emr(
     payload: EMRRestoreRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor", "Admin")),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
 ):
     """
     Restore EMR to a specific version.
@@ -422,60 +465,3 @@ async def restore_emr(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
-# Doctor History (for AI context)
-# =============================================================================
-
-
-class DoctorHistoryEntry(BaseModel):
-    """Single history entry"""
-    content: str
-    diagnosis: Optional[str] = None
-    created_at: str
-
-
-class DoctorHistoryResponse(BaseModel):
-    """Doctor history response"""
-    entries: List[DoctorHistoryEntry]
-    total: int
-    field_name: str
-
-
-@router.get("/doctor-history", response_model=DoctorHistoryResponse)
-async def get_doctor_history(
-    doctor_id: int = Query(..., description="Doctor ID"),
-    field_name: str = Query(..., description="Field name (complaints, diagnosis, etc.)"),
-    specialty: str = Query("general", description="Doctor specialty"),
-    search_text: Optional[str] = Query(None, description="Search text for similarity"),
-    limit: int = Query(10, ge=1, le=50, description="Max entries"),
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Doctor")),
-):
-    """
-    Get doctor's previous EMR entries for a specific field.
-    
-    Used to provide context to AI for better suggestions.
-    Doctor can only access their own history.
-    """
-    # Security: doctor can only access their own history
-    if current_user.id != doctor_id and not current_user.has_role("Admin"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    history_service = EMRDoctorHistoryService(db)
-    try:
-        entries = history_service.get_history_entries(
-            doctor_id=doctor_id,
-            field_name=field_name,
-            search_text=search_text,
-            limit=limit,
-        )
-        return DoctorHistoryResponse(
-            entries=[DoctorHistoryEntry(**entry) for entry in entries],
-            total=len(entries),
-            field_name=field_name,
-        )
-    except EMRDoctorHistoryDomainError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as exc:
-        logger.error("[EMR v2] Doctor history error: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to fetch history") from exc

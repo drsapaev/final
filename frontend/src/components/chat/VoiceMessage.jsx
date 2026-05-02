@@ -6,53 +6,89 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 const VoiceMessage = ({ message, fileUrl }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(message.voice_duration || 0);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [audioSrc, setAudioSrc] = useState(null);
+    const [audioUnavailable, setAudioUnavailable] = useState(false);
 
     const audioRef = useRef(null);
+    const objectUrlRef = useRef(null);
 
-    // Загружаем аудио с авторизацией
-    useEffect(() => {
-        let objectUrl = null;
+    const loadAudio = async () => {
+        if (!fileUrl || audioSrc || isLoading || audioUnavailable) {
+            return audioSrc;
+        }
 
-        const loadAudio = async () => {
-            if (!fileUrl) return;
+        setIsLoading(true);
 
-            try {
-                const token = auth.getState().token;
-                const response = await fetch(fileUrl, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+        try {
+            const token = auth.getState().token;
+            const response = await fetch(fileUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) {
+                if (response.status === 404 || response.status === 400) {
+                    logger.info('[FIX:VOICE] Audio stream unavailable', {
+                        messageId: message?.id,
+                        status: response.status,
+                    });
+                    setAudioUnavailable(true);
+                    return null;
                 }
 
-                const blob = await response.blob();
-                objectUrl = URL.createObjectURL(blob);
-                setAudioSrc(objectUrl);
-            } catch (error) {
-                logger.error('Failed to load audio:', error);
-                setIsLoading(false);
+                throw new Error(`HTTP ${response.status}`);
             }
-        };
 
-        loadAudio();
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
 
-        // Cleanup
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+            }
+
+            objectUrlRef.current = objectUrl;
+            if (audioRef.current) {
+                audioRef.current.src = objectUrl;
+            }
+            setAudioSrc(objectUrl);
+            setAudioUnavailable(false);
+            return objectUrl;
+        } catch (error) {
+            logger.error('Failed to load audio:', error);
+            setAudioUnavailable(true);
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setAudioSrc(null);
+        setAudioUnavailable(false);
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(message.voice_duration || 0);
+
+        if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+        }
+
         return () => {
-            if (objectUrl) {
-                URL.revokeObjectURL(objectUrl);
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
             }
         };
-    }, [fileUrl]);
+    }, [fileUrl, message.voice_duration]);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -66,10 +102,14 @@ const VoiceMessage = ({ message, fileUrl }) => {
         };
         const handleCanPlay = () => setIsLoading(false);
         const handleError = (e) => {
-            logger.error('Audio playback error:', e);
-            logger.error('Audio src:', audio.src);
-            logger.error('Audio error code:', audio.error?.code);
-            logger.error('Audio error message:', audio.error?.message);
+            logger.warn('[FIX:VOICE] Audio playback failed', {
+                messageId: message?.id,
+                src: audio.src,
+                code: audio.error?.code,
+                message: audio.error?.message,
+            });
+            setAudioUnavailable(true);
+            setIsPlaying(false);
             setIsLoading(false);
         };
 
@@ -90,19 +130,25 @@ const VoiceMessage = ({ message, fileUrl }) => {
 
     const togglePlay = async () => {
         const audio = audioRef.current;
-        if (!audio || !audioSrc) return;
+        if (!audio || audioUnavailable) return;
 
         try {
             if (isPlaying) {
                 audio.pause();
                 setIsPlaying(false);
             } else {
+                const src = audioSrc || await loadAudio();
+                if (!src) {
+                    return;
+                }
                 await audio.play();
                 setIsPlaying(true);
             }
         } catch (error) {
-            logger.error('Playback error:', error);
-            alert('Ошибка воспроизведения: ' + error.message);
+            logger.warn('[FIX:VOICE] Playback error', {
+                messageId: message?.id,
+                error: error?.message || String(error),
+            });
             setIsPlaying(false);
         }
     };
@@ -157,19 +203,17 @@ const VoiceMessage = ({ message, fileUrl }) => {
 
     return (
         <div className="voice-message">
-            {audioSrc && (
-                <audio
-                    ref={audioRef}
-                    src={audioSrc}
-                    preload="metadata"
-                />
-            )}
+            <audio
+                ref={audioRef}
+                src={audioSrc || undefined}
+                preload="none"
+            />
 
             <button
                 onClick={togglePlay}
                 className="play-button"
-                disabled={isLoading || !audioSrc}
-                title={isPlaying ? 'Пауза' : 'Воспроизвести'}
+                disabled={isLoading || audioUnavailable || !fileUrl}
+                title={audioUnavailable ? 'Аудио недоступно' : (isPlaying ? 'Пауза' : 'Воспроизвести')}
             >
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
             </button>
@@ -207,6 +251,14 @@ const VoiceMessage = ({ message, fileUrl }) => {
             </div>
         </div>
     );
+};
+
+
+VoiceMessage.propTypes = {
+  ...(VoiceMessage.propTypes || {}),
+  fileUrl: PropTypes.any,
+  message: PropTypes.any,
+  voice_duration: PropTypes.any,
 };
 
 export default VoiceMessage;

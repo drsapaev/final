@@ -1,6 +1,6 @@
-﻿import websocket
+import websocket
 
-URL = "ws://localhost:8000/ws/queue?department=ENT&date=2025-08-18"
+URL = "ws://localhost:18000/ws/queue?department=ENT&date=2025-08-18"
 
 def on_open(ws): print("open")
 def on_message(ws, m): print("msg:", m)

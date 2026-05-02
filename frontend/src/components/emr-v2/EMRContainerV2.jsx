@@ -3,7 +3,7 @@
  * 
  * Phase 4 Result:
  * - Uses modular sections instead of inline JSX
- * - SingleSheetEMR stays working until migration complete
+ * - Legacy single-sheet EMR has been retired
  * - All Phase 1-3 features work (autosave, guards, history, conflict)
  * 
  * Phase 6 Additions:
@@ -28,6 +28,7 @@ import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
 import { useAppData } from '../../contexts/AppDataContext';
 import { mcpAPI } from '../../api/mcpClient';
+import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -57,10 +58,12 @@ import './EMRContainerV2.css';
  * @param {Object} props
  * @param {number} props.visitId - Visit ID
  * @param {number} props.patientId - Patient ID
+ * @param {string} props.specialty - Canonical specialty key
  * @param {string} props.patientName - Patient name (for sticky header)
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete
  */
-export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
+export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }) {
+    const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,
         status,
@@ -71,6 +74,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         isSaving,
         isSigned,
         isAmended,
+        accessDenied,
         version,
         canUndo,
         canRedo,
@@ -83,7 +87,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         redo,
         reloadFromServer,
         forceOverwrite,
-    } = useEMR(visitId);
+    } = useEMR(visitId, { specialty: canonicalSpecialty });
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData();
@@ -98,7 +102,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         saveEMR,
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
-        enabled: !isSigned,
+        enabled: !isSigned && !accessDenied,
     });
 
     // Navigation guard
@@ -407,6 +411,30 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
         enabled: true,
     });
 
+    if (!visitId) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: для EMR v2 требуется `visitId`.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!specialty || !isCanonicalSpecialty(canonicalSpecialty)) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <div className="emr-v2-actions">
+                        Ошибка контракта: передана ненормализованная specialty.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const handleAmend = async () => {
         if (amendReason.trim().length >= 10) {
             await amendEMR(amendReason);
@@ -649,20 +677,25 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
 
                 {/* Actions */}
                 <div className="emr-v2-actions">
+                    {accessDenied && (
+                        <div className="emr-v2-signed-badge" style={{ marginBottom: 8 }}>
+                            ⛔ Нет прав на сохранение этой EMR
+                        </div>
+                    )}
                     {!isSigned ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
-                                onClick={() => saveEMR()}
-                                disabled={isSaving || !isDirty}
-                            >
-                                {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
-                            </button>
+                                onClick={() => saveEMR({ isDraft: false })}
+                            disabled={isSaving || !isDirty || accessDenied}
+                        >
+                            {isSaving ? '💾 Сохранение...' : '💾 Сохранить'}
+                        </button>
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
                                 onClick={handleSign}
-                                disabled={isSaving || isDirty}
-                                title={isDirty ? 'Сначала сохраните' : 'Подписать'}
+                                disabled={isSaving || isDirty || accessDenied}
+                                title={accessDenied ? 'Нет прав на изменение EMR' : (isDirty ? 'Сначала сохраните' : 'Подписать')}
                             >
                                 ✅ Подписать
                             </button>
@@ -775,6 +808,7 @@ export function EMRContainerV2({ visitId, patientId, ICD10Component }) {
 EMRContainerV2.propTypes = {
     visitId: PropTypes.number.isRequired,
     patientId: PropTypes.number,
+    specialty: PropTypes.string.isRequired,
     ICD10Component: PropTypes.elementType,
 };
 

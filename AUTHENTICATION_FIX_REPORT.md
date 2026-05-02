@@ -85,12 +85,12 @@ const response = await api.post('/auth/refresh', {...});
 #### `frontend/src/pages/PaymentTest.jsx`
 ```javascript
 // ❌ Было:
-url: 'http://localhost:8000/api/v1/authentication/login'
-const response = await fetch('http://localhost:8000/api/v1/authentication/login', {...});
+url: 'http://localhost:18000/api/v1/authentication/login'
+const response = await fetch('http://localhost:18000/api/v1/authentication/login', {...});
 
 // ✅ Стало:
-url: 'http://localhost:8000/api/v1/auth/login'
-const response = await fetch('http://localhost:8000/api/v1/auth/login', {...});
+url: 'http://localhost:18000/api/v1/auth/login'
+const response = await fetch('http://localhost:18000/api/v1/auth/login', {...});
 ```
 
 ### 2. Исправление данных пользователей в ROLE_OPTIONS
@@ -182,7 +182,7 @@ users_to_create = [
 ### Проверка backend endpoints:
 ```bash
 # Health check
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 # Ответ: {"ok":true,"db":"ok"}
 
 # Создание пользователей для всех ролей

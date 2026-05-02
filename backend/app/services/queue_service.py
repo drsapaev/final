@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
-from app.models.user import User
 from app.services.queue_session import (
     get_or_create_session_id,
 )
@@ -372,28 +371,17 @@ class QueueBusinessService:
         defaults = defaults or {}
 
         # ✅ SECURITY: Проверяем существование врача перед созданием очереди
-        # ✅ ИСПРАВЛЕНО: Используем правильный импорт Doctor из app.models.clinic
-        # ✅ ИСПРАВЛЕНО: Проверяем как по doctor.id, так и по doctor.user_id (для совместимости)
-        doctor = (
-            db.query(Doctor)
-            .filter(
-                or_(
-                    Doctor.id == specialist_id,
-                    Doctor.user_id == specialist_id,
-                )
-            )
-            .first()
-        )
+        # SSOT: DailyQueue.specialist_id ссылается на Doctor.id
+        doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if not doctor:
             logger.error(
-                f"Cannot create DailyQueue: Doctor with ID or user_id={specialist_id} does not exist"
+                f"Cannot create DailyQueue: Doctor with ID={specialist_id} does not exist"
             )
             raise ValueError(
                 f"Врач с ID {specialist_id} не найден. Невозможно создать очередь."
             )
-
         # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
-        # DailyQueue.specialist_id должен быть doctor.id, а не doctor.user_id
+        # DailyQueue.specialist_id должен быть doctor.id
         actual_specialist_id = doctor.id
 
         # ⭐ SSOT FIX: Сначала ищем очередь по (day, queue_tag), игнорируя specialist_id
@@ -538,7 +526,6 @@ class QueueBusinessService:
 
         doctor: Doctor | None = None
         daily_queue: DailyQueue | None = None
-        queue_user_id = specialist_id
         doctor_id: int | None = None
 
         if not is_clinic_wide:
@@ -550,7 +537,6 @@ class QueueBusinessService:
                 .filter(
                     or_(
                         Doctor.id == specialist_id,
-                        Doctor.user_id == specialist_id,
                     ),
                     Doctor.active.is_(True),
                 )
@@ -561,13 +547,11 @@ class QueueBusinessService:
                     f"Doctor {specialist_id} not found or inactive"
                 )
             doctor_id = doctor.id
-            if doctor.user_id:
-                queue_user_id = doctor.user_id
 
             daily_queue = self.get_or_create_daily_queue(
                 db,
                 day=day,
-                specialist_id=queue_user_id,
+                specialist_id=doctor.id,
                 queue_tag=queue_tag or doctor.specialty,
                 defaults={
                     "start_number": queue_settings.get("start_numbers", {}).get(
@@ -617,10 +601,6 @@ class QueueBusinessService:
         specialist_name = None
         if doctor and doctor.user:
             specialist_name = doctor.user.full_name or doctor.user.username
-        elif queue_user_id:
-            user_obj = db.query(User).filter(User.id == queue_user_id).first()
-            if user_obj:
-                specialist_name = user_obj.full_name or user_obj.username
 
         metadata = {
             "day": day,
@@ -761,32 +741,14 @@ class QueueBusinessService:
                     .first()
                 )
 
-                # Если не нашли - используем queue_tag напрямую из профиля
+                # Если не нашли - это ошибка сопоставления профиля, а не повод
+                # подставлять случайного активного врача.
                 if not doctor:
-                    # Создаём/получаем очередь по queue_tag профиля
-                    # Используем первый доступный доктор как fallback
-                    fallback_doctor = db.query(Doctor).filter(Doctor.active.is_(True)).first()
-                    if not fallback_doctor:
-                        raise QueueValidationError("Нет доступных врачей")
-
-                    queue_user_id = fallback_doctor.user_id or fallback_doctor.id
-                    queue_tag = profile_key  # ⭐ Используем ключ профиля как queue_tag
-                    defaults = {
-                        "start_number": fallback_doctor.start_number_online,
-                        "max_online_entries": fallback_doctor.max_online_per_day,
-                    }
-                    daily_queue = self.get_or_create_daily_queue(
-                        db,
-                        day=day,
-                        specialist_id=queue_user_id,
-                        queue_tag=queue_tag,
-                        defaults=defaults,
+                    raise QueueValidationError(
+                        f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
                     )
-                    specialist_name = queue_profile.title_ru or queue_profile.title
-                    cabinet = None
                 else:
                     # Нашли врача - используем его данные
-                    queue_user_id = doctor.user_id or doctor.id
                     queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
                     defaults = {
                         "start_number": doctor.start_number_online,
@@ -796,7 +758,7 @@ class QueueBusinessService:
                     daily_queue = self.get_or_create_daily_queue(
                         db,
                         day=day,
-                        specialist_id=queue_user_id,
+                        specialist_id=doctor.id,
                         queue_tag=queue_tag,
                         defaults=defaults,
                     )
@@ -812,7 +774,6 @@ class QueueBusinessService:
                         Doctor.active.is_(True),
                         or_(
                             Doctor.id == specialist_id_override,
-                            Doctor.user_id == specialist_id_override,
                         ),
                     )
                     .first()
@@ -820,7 +781,6 @@ class QueueBusinessService:
                 if not doctor:
                     raise QueueValidationError("Специалист недоступен для записи")
 
-                queue_user_id = doctor.user_id or doctor.id
                 queue_tag = doctor.specialty
                 defaults = {
                     "start_number": doctor.start_number_online,
@@ -830,7 +790,7 @@ class QueueBusinessService:
                 daily_queue = self.get_or_create_daily_queue(
                     db,
                     day=day,
-                    specialist_id=queue_user_id,
+                    specialist_id=doctor.id,
                     queue_tag=queue_tag,
                     defaults=defaults,
                 )

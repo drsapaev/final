@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import PropTypes from 'prop-types';
 
 const MacOSModal = ({
   isOpen = false,
@@ -222,6 +223,22 @@ const MacOSModal = ({
       </div>
     </div>
   );
+};
+
+
+MacOSModal.propTypes = {
+  ...(MacOSModal.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  closable: PropTypes.any,
+  closeOnEscape: PropTypes.any,
+  closeOnOverlayClick: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  title: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default MacOSModal;

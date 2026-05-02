@@ -26,6 +26,7 @@ import {
   MacOSTab,
   MacOSCard } from
 '../ui/macos';
+import PropTypes from 'prop-types';
 
 const SecuritySettings = ({
   settings = {},
@@ -196,7 +197,7 @@ const SecuritySettings = ({
 
     setIsSubmitting(true);
     try {
-      await onSave(formData);
+      await onSave(formData, activeTab);
     } catch (error) {
       logger.error('Ошибка сохранения настроек безопасности:', error);
     } finally {
@@ -841,7 +842,7 @@ const SecuritySettings = ({
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-secondary)'
           }}>
-            Настройки безопасности сохраняются автоматически
+            Настройки безопасности сохраняются после нажатия «Сохранить»
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -870,3 +871,9 @@ const SecuritySettings = ({
 };
 
 export default SecuritySettings;
+
+SecuritySettings.propTypes = {
+  settings: PropTypes.object,
+  onSave: PropTypes.func,
+  loading: PropTypes.bool,
+};

@@ -3,7 +3,7 @@
 """
 import requests
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:18000"
 
 # Тест 1: Проверка что бэкенд работает
 try:

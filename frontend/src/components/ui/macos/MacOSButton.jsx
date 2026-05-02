@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 const MacOSButton = ({
   children,
   variant = 'default',
@@ -211,6 +212,7 @@ const MacOSButton = ({
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      aria-busy={loading}
       {...props}
     >
       {loading && (
@@ -236,6 +238,22 @@ const MacOSButton = ({
       </span>
     </button>
   );
+};
+
+
+MacOSButton.propTypes = {
+  ...(MacOSButton.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  endIcon: PropTypes.any,
+  loading: PropTypes.any,
+  onClick: PropTypes.any,
+  size: PropTypes.any,
+  startIcon: PropTypes.any,
+  style: PropTypes.any,
+  type: PropTypes.any,
+  variant: PropTypes.any,
 };
 
 export default MacOSButton;

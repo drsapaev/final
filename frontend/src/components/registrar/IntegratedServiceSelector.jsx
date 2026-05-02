@@ -13,8 +13,10 @@ import {
   AlertCircle } from
 'lucide-react';
 import { Card } from '../ui/native';
+import { getApiOrigin } from '../../api/runtime';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
@@ -126,7 +128,7 @@ const IntegratedServiceSelector = ({
       try {
         const params = new URLSearchParams();
         // Исключаем фильтрацию по specialty, чтобы не терять группы
-        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const API_BASE = getApiOrigin();
         const response = await fetch(`${API_BASE}/api/v1/registrar/services?${params}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -423,6 +425,16 @@ const IntegratedServiceSelector = ({
 
   // Простой режим возвращает компактный контент без лишних вспомогательных блоков
   return content;
+};
+
+
+IntegratedServiceSelector.propTypes = {
+  ...(IntegratedServiceSelector.propTypes || {}),
+  className: PropTypes.any,
+  onNext: PropTypes.any,
+  onServicesChange: PropTypes.any,
+  selectedServices: PropTypes.any,
+  simple: PropTypes.any,
 };
 
 export default IntegratedServiceSelector;

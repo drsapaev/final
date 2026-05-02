@@ -3,6 +3,7 @@ Security Middleware для rate limiting, brute force protection и IP logging
 """
 
 import logging
+import os
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -35,8 +36,18 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "password_reset": {"requests": 3, "window": 3600},  # 3 попытки за час
             "password_change": {"requests": 5, "window": 3600},  # 5 попыток за час
             "session": {"requests": 600, "window": 3600},  # auth/session checks
-            "api": {"requests": 100, "window": 3600},  # 100 запросов за час
         }
+
+        # Общий API bucket должен быть достаточно высоким для длинного локального
+        # браузерного smoke и при этом оставаться ограниченным в production.
+        # Даем dev/local более щедрый лимит, а в prod сохраняем более строгий.
+        env = os.getenv("ENV", "dev").lower()
+        api_requests = int(os.getenv("SECURITY_API_RATE_LIMIT_REQUESTS", "5000"))
+        api_window = int(os.getenv("SECURITY_API_RATE_LIMIT_WINDOW", "3600"))
+        if env in {"dev", "development", "local"} and "SECURITY_API_RATE_LIMIT_REQUESTS" not in os.environ:
+            api_requests = 50000
+
+        self.rate_limits["api"] = {"requests": api_requests, "window": api_window}
 
         # Brute force protection конфигурация
         self.brute_force_config = {
@@ -251,6 +262,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/health",
             "/api/v1/health",
             "/api/v1/status",
+            "/api/v1/setup/status",
+            "/api/v1/setup/initialize",
             "/api/v1/queues/profiles/public",
             "/api/v1/activation/status",
         ]

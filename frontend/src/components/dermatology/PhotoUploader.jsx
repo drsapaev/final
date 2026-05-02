@@ -38,6 +38,7 @@ import heic2any from 'heic2any';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 const PhotoUploader = ({ visitId, onDataUpdate }) => {
   const [photos, setPhotos] = useState({
     before: [],
@@ -644,6 +645,13 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
       </Dialog>
     </Box>);
 
+};
+
+
+PhotoUploader.propTypes = {
+  ...(PhotoUploader.propTypes || {}),
+  onDataUpdate: PropTypes.any,
+  visitId: PropTypes.any,
 };
 
 export default PhotoUploader;

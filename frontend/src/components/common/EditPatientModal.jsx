@@ -1,10 +1,9 @@
 // Stub component for EditPatientModal
 // This component has been replaced by AppointmentWizardV2
-// Keeping this stub to prevent build errors in legacy panel filesimport logger from '../../utils/logger';
-const EditPatientModal = ({ isOpen, onClose }) => {
-    // This is a stub - the actual functionality is now in AppointmentWizardV2
-    logger.warn('EditPatientModal is deprecated. Use AppointmentWizardV2 instead.');
+// Keeping this stub to prevent build errors in legacy panel files
+import PropTypes from 'prop-types';
 
+const EditPatientModal = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     return (
@@ -21,17 +20,24 @@ const EditPatientModal = ({ isOpen, onClose }) => {
             zIndex: 9999
         }}>
             <div style={{
-                background: 'white',
+                background: 'var(--mac-card-bg, white)',
                 padding: '20px',
                 borderRadius: '8px',
-                maxWidth: '400px'
+                maxWidth: '400px',
+                border: '1px solid var(--mac-card-border, #d8dde8)'
             }}>
-                <h3>Edit Patient Modal (Deprecated)</h3>
-                <p>This component has been replaced. Please use AppointmentWizardV2.</p>
+                <h3 style={{ marginTop: 0 }}>Edit Patient Modal</h3>
+                <p>This legacy modal has been replaced by AppointmentWizardV2.</p>
                 <button onClick={onClose}>Close</button>
             </div>
         </div>
     );
+};
+
+EditPatientModal.propTypes = {
+  ...(EditPatientModal.propTypes || {}),
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
 };
 
 export default EditPatientModal;

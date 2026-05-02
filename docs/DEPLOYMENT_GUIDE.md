@@ -318,7 +318,7 @@ EnvironmentFile=/home/clinic/clinic/.env
 ExecStart=/home/clinic/clinic/backend/venv/bin/gunicorn \
     --workers 4 \
     --worker-class uvicorn.workers.UvicornWorker \
-    --bind 127.0.0.1:8000 \
+    --bind 127.0.0.1:18000 \
     --access-logfile /var/log/clinic/access.log \
     --error-logfile /var/log/clinic/error.log \
     --capture-output \
@@ -463,7 +463,7 @@ server {
 
     # Proxy to backend
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:18000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -478,7 +478,7 @@ server {
 
     # WebSocket endpoint
     location /ws {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:18000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -488,7 +488,7 @@ server {
 
     # Health check endpoint (no rate limiting)
     location /health {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:18000;
         access_log off;
     }
 }
@@ -662,7 +662,7 @@ If you are enabling the AI-free Doctor Autocomplete feature:
 2. **Key Steps**:
    - Run migrations: `alembic upgrade head`
    - Run batch indexing: `python migrate_phrases.py`
-   - Verify readiness: `curl http://localhost:8000/api/v1/emr/readiness/{doctor_id}`
+   - Verify readiness: `curl http://localhost:18000/api/v1/emr/readiness/{doctor_id}`
 
 See the [Feature README](./DOCTOR_AUTOCOMPLETE_README.md) for more details.
 
@@ -718,7 +718,7 @@ sudo journalctl -u clinic-backend -n 100
 # - Check .env file permissions and syntax
 # - Verify database connection
 # - Check port availability
-sudo lsof -i :8000
+sudo lsof -i :18000
 ```
 
 #### Database connection errors

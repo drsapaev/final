@@ -21,6 +21,7 @@ import {
 
 'lucide-react';
 import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, MacOSSelect } from '../ui/macos';
+import PropTypes from 'prop-types';
 
 const SecurityMonitor = ({
   data = {},
@@ -337,7 +338,7 @@ const SecurityMonitor = ({
           <MacOSCard key={i} style={{ padding: '16px' }}>
               <div style={{
               animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              backgroundColor: 'var(--mac-bg-secondary)',
+              backgroundColor: 'var(--mac-card-bg)',
               borderRadius: 'var(--mac-radius-sm)',
               height: '16px',
               width: '75%',
@@ -345,7 +346,7 @@ const SecurityMonitor = ({
             }}></div>
               <div style={{
               animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              backgroundColor: 'var(--mac-bg-secondary)',
+              backgroundColor: 'var(--mac-card-bg)',
               borderRadius: 'var(--mac-radius-sm)',
               height: '32px',
               width: '50%'
@@ -553,7 +554,7 @@ const SecurityMonitor = ({
                   padding: '12px',
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
+                  backgroundColor: 'var(--mac-card-bg)'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <SeverityIcon style={{
@@ -620,7 +621,7 @@ const SecurityMonitor = ({
                   padding: '16px',
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
+                  backgroundColor: 'var(--mac-card-bg)'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -735,7 +736,7 @@ const SecurityMonitor = ({
                   padding: '12px',
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
+                  backgroundColor: 'var(--mac-card-bg)'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <StatusIcon style={{
@@ -787,7 +788,7 @@ const SecurityMonitor = ({
                   padding: '16px',
                   borderRadius: 'var(--mac-radius-md)',
                   border: '1px solid var(--mac-border)',
-                  backgroundColor: 'var(--mac-bg-secondary)'
+                  backgroundColor: 'var(--mac-card-bg)'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{
@@ -859,7 +860,7 @@ const SecurityMonitor = ({
               padding: '16px',
               borderRadius: 'var(--mac-radius-md)',
               border: '1px solid var(--mac-border)',
-              backgroundColor: 'var(--mac-bg-secondary)'
+              backgroundColor: 'var(--mac-card-bg)'
             }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <Globe style={{ width: '24px', height: '24px', color: 'var(--mac-danger)' }} />
@@ -891,6 +892,14 @@ const SecurityMonitor = ({
       }
     </div>);
 
+};
+
+
+SecurityMonitor.propTypes = {
+  ...(SecurityMonitor.propTypes || {}),
+  data: PropTypes.any,
+  loading: PropTypes.any,
+  onRefresh: PropTypes.any,
 };
 
 export default SecurityMonitor;

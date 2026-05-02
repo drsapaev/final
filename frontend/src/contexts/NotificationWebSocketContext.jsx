@@ -1,147 +1,326 @@
-
-import { createContext, useContext, useEffect, useRef, useCallback } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { useToast } from '../components/common/Toast';
+import { useLocation } from 'react-router-dom';
+import { buildWsUrl } from '../api/runtime';
+import notify from '../services/notify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import { useNotificationCenter } from './NotificationCenterContext';
+import { clearNotificationQueryCache } from '../api/services';
+import { getEffectiveRouteByPath } from '../routing/routeSelectors';
 
 const NotificationWebSocketContext = createContext(null);
 
+function normalizePayload(payload = {}) {
+  const nested = payload.notification || payload.payload || payload.data || payload;
+  const rawType =
+    nested.type ||
+    nested.event_type ||
+    nested.notification_type ||
+    payload.type ||
+    payload.event_type ||
+    payload.notification_type ||
+    'notification';
+  const normalizedRawType = String(rawType).toLowerCase();
+  const typeAliases = {
+    queue_changed: 'queue_update',
+    diagnostics_return: 'diagnostics_return_needed',
+  };
+  const type = typeAliases[normalizedRawType] || normalizedRawType;
+
+  const title =
+    nested.title ||
+    nested.subject ||
+    (type === 'queue_update' ? 'Обновление очереди' : 'Уведомление');
+  const message = nested.message || nested.content || payload.message || payload.content || '';
+
+  return { type, title, message, raw: payload, nested };
+}
+
 export function NotificationWebSocketProvider({ children }) {
   const ws = useRef(null);
-  const { addToast } = useToast();
+  const handleMessageRef = useRef(() => {});
+  const connectRef = useRef(null);
+  const connectTimerRef = useRef(null);
+  const disconnectRef = useRef(null);
+  const closeOnOpenRef = useRef(null);
+  const closeOnOpenReasonRef = useRef('');
   const reconnectTimeout = useRef(null);
+  const shouldReconnect = useRef(true);
+  const location = useLocation();
+  const { appendNotification, replaceNotifications, updateUnreadSnapshot } = useNotificationCenter();
 
-  const handleMessage = useCallback((data) => {
-    if (data.type === 'notification') {
-      const { title, message } = data;
-      // Use Toast to show notification
-      // meta.type can be 'error', 'success', etc. if needed
-      addToast({
-        title: title,
-        message: message,
-        type: 'info', // Default to info, or map from meta.type
-        duration: 5000
-        // Optional: onClick logic using meta (e.g. navigate to queued item)
-      });
-
-      // If browsers support Notification API and permission granted, we could also show system notification
-      if (document.hidden && Notification.permission === 'granted') {
-        new Notification(title, { body: message });
-      }
-    } else if (data.type === 'queue_update') {
-      // Specific handling for queue updates if needed
-      addToast({
-        title: 'Обновление очереди',
-        message: 'Ваш статус обновлен',
-        type: 'info'
-      });
+  const closeSocketSafely = useCallback((socket, reason) => {
+    if (!socket) {
+      return;
     }
-  }, [addToast]);
+
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.close(1000, reason);
+      } catch (error) {
+        logger.warn('[NotificationWS] failed to close socket', error);
+      }
+      return;
+    }
+
+    if (socket.readyState === WebSocket.CONNECTING) {
+      closeOnOpenRef.current = socket;
+      closeOnOpenReasonRef.current = reason;
+    }
+  }, []);
+
+  const scheduleReconnect = useCallback(() => {
+    if (!shouldReconnect.current) {
+      return;
+    }
+
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+    }
+
+    reconnectTimeout.current = setTimeout(() => {
+      void connectRef.current?.();
+    }, 3000);
+  }, []);
+
+  const applyUnreadSnapshot = useCallback((data) => {
+    if (
+      typeof data?.unread_count === 'number' ||
+      typeof data?.unreadCount === 'number' ||
+      data?.by_role ||
+      data?.by_channel ||
+      data?.by_severity
+    ) {
+      updateUnreadSnapshot(
+        {
+          total: Number(data?.unread_count ?? data?.unreadCount ?? 0),
+          by_role: data?.by_role,
+          by_channel: data?.by_channel,
+          by_severity: data?.by_severity
+        },
+        { replace: false }
+      );
+    }
+  }, [updateUnreadSnapshot]);
+
+  useEffect(() => {
+    handleMessageRef.current = (data) => {
+      const normalized = normalizePayload(data);
+
+      const invalidateNotificationCache = () => {
+        clearNotificationQueryCache();
+      };
+
+      if (normalized.type === 'connection_established') {
+        logger.info('[NotificationWS] handshake confirmed', {
+          userId: data.user_id,
+          role: data.role,
+          unreadCount: data.unread_count
+        });
+        applyUnreadSnapshot(data);
+        return;
+      }
+
+      if (normalized.type === 'notification_sync_response') {
+        invalidateNotificationCache();
+        const items = Array.isArray(data.items) ? data.items : [];
+        replaceNotifications(items, {
+          source: 'ws',
+          unreadSnapshot: {
+            total: Number(data.unread_count ?? data.unreadCount ?? 0),
+            by_role: data.by_role || {},
+            by_channel: data.by_channel || {},
+            by_severity: data.by_severity || {}
+          },
+          lastSyncAt: new Date().toISOString()
+        });
+        return;
+      }
+
+      if (
+        normalized.type === 'notification_seen_ack' ||
+        normalized.type === 'notification_read_ack' ||
+        normalized.type === 'notification_archive_ack' ||
+        normalized.type === 'notification_mark_all_read_ack'
+      ) {
+        invalidateNotificationCache();
+        applyUnreadSnapshot(data);
+        return;
+      }
+
+      if (
+        normalized.type === 'notification' ||
+        normalized.type === 'queue_update' ||
+        normalized.type === 'diagnostics_return_needed' ||
+        normalized.type === 'system_alert'
+      ) {
+        invalidateNotificationCache();
+        const notification = appendNotification(
+          {
+            ...data,
+            ...normalized.nested,
+            type: normalized.type,
+            title: normalized.title,
+            message: normalized.message
+          },
+          'ws'
+        );
+
+        const toastMessage = notification.message
+          ? `${notification.title}: ${notification.message}`
+          : notification.title;
+        const toastType = notification.type.includes('error')
+          ? 'error'
+          : notification.type.includes('warning') || notification.type.includes('alert')
+            ? 'warning'
+            : notification.type.includes('success')
+              ? 'success'
+              : 'info';
+
+        notify[toastType](toastMessage);
+
+        if (
+          typeof Notification !== 'undefined' &&
+          document.hidden &&
+          Notification.permission === 'granted'
+        ) {
+          new Notification(notification.title, { body: notification.message });
+        }
+      }
+    };
+  }, [appendNotification, applyUnreadSnapshot, replaceNotifications]);
 
   const connect = useCallback(() => {
-    let activeSocket = null;
-    const token = tokenManager.getAccessToken();
-    if (!token || !tokenManager.isTokenValid()) {
-      // Retry later if no token (e.g. not logged in)
-      reconnectTimeout.current = setTimeout(connect, 5000);
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
+    }
+
+    if (ws.current && (
+      ws.current.readyState === WebSocket.OPEN ||
+      ws.current.readyState === WebSocket.CONNECTING
+    )) {
       return () => {};
     }
 
-    // Determine WebSocket Protocol (ws/wss) based on current page
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use the backend host or default to same-origin with standard port
-    // Simplification: assume backend on port 8000 or proxy. 
-    // Ideally use environment variable.
-    // Given the rest of the app:
-    const host = window.location.hostname;
-    // Standard backend port in dev is 8000. In prod, likely same port.
-    // If we have API_URL environment variable, we should parse it.
-    // For now, let's try a safe bet or a configurable url.
-    // Assuming backend is at localhost:8000 for dev environments.
+    const token = tokenManager.getAccessToken();
+    if (!token || !tokenManager.isTokenValid()) {
+      scheduleReconnect();
+      return () => {};
+    }
 
-    // Better strategy: Use a known base URL config if available
-    let wsUrl = `${protocol}//${host}:8000/api/v1/notification-websocket/ws/notifications/connect?token=${token}`;
-
-    // BUT wait, in existing code, endpoints are often referenced via imports.
-    // The endpoint I created is in `app/api/v1/endpoints/notification_websocket.py`
-    // And registered as `notification_websocket.router` with tags=["notification-websocket"].
-    // It does NOT have a prefix in `api.py`.
-    // Wait, let's check api.py again.
-
-    /*
-    api_router.include_router(
-        notification_websocket.router, tags=["notification-websocket"]
-    )
-    */
-
-    // And the router implementation:
-    // @router.websocket("/ws/notifications/connect")
-
-    // So the full path is `/api/v1/ws/notifications/connect`.
-
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-    // Convert http(s) to ws(s)
-    const wsBase = apiBase.replace(/^http/, 'ws');
-    wsUrl = `${wsBase}/ws/notifications/connect?token=${token}`;
-
+    const wsUrl = `${buildWsUrl('/api/v1/ws/notifications/connect')}?token=${token}`;
     const socket = new WebSocket(wsUrl);
-    activeSocket = socket;
+    ws.current = socket;
 
     socket.onopen = () => {
-      logger.info('[FIX:WS] Notification WebSocket connected');
+      if (closeOnOpenRef.current === socket) {
+        closeOnOpenRef.current = null;
+        const reason = closeOnOpenReasonRef.current || 'Public route';
+        closeOnOpenReasonRef.current = '';
+        try {
+          socket.close(1000, reason);
+        } catch (error) {
+          logger.warn('[NotificationWS] failed to close socket after connect', error);
+        }
+        return;
+      }
+
+      logger.info('[NotificationWS] connected');
     };
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        handleMessage(data);
-      } catch (e) {
-        logger.error('Error parsing WS message:', e);
+        handleMessageRef.current(data);
+      } catch (error) {
+        logger.error('[NotificationWS] failed to parse message', error);
       }
     };
 
     socket.onclose = (event) => {
-      logger.info('[FIX:WS] Notification WebSocket closed. Reconnecting...', {
-        code: event.code
-      });
-      ws.current = null;
-      reconnectTimeout.current = setTimeout(connect, 3000);
+      if (ws.current === socket) {
+        ws.current = null;
+      }
+      if (closeOnOpenRef.current === socket) {
+        closeOnOpenRef.current = null;
+        closeOnOpenReasonRef.current = '';
+      }
+      logger.info('[NotificationWS] closed', { code: event.code, reason: event.reason });
+      if (shouldReconnect.current) {
+        scheduleReconnect();
+      }
     };
 
     socket.onerror = () => {
-      logger.warn('[FIX:WS] Notification WebSocket handshake failed; waiting for retry');
-      socket.close();
-    };
-
-    ws.current = socket;
-    return () => {
-      if (activeSocket?.readyState === WebSocket.OPEN) {
-        activeSocket.close(1000, 'Unmount');
-      } else if (activeSocket?.readyState === WebSocket.CONNECTING) {
-        activeSocket.onopen = () => activeSocket.close(1000, 'Unmount before open');
-        activeSocket.onclose = null;
-        activeSocket.onerror = null;
-        activeSocket.onmessage = null;
+      logger.warn('[NotificationWS] socket error, reconnecting');
+      try {
+        socket.close();
+      } catch (error) {
+        logger.warn('[NotificationWS] failed to close errored socket', error);
       }
     };
-  }, [handleMessage]);
+
+    return () => {
+      shouldReconnect.current = false;
+      closeSocketSafely(socket, 'Unmount');
+    };
+  }, [closeSocketSafely, scheduleReconnect]);
+
+  connectRef.current = connect;
 
   useEffect(() => {
-    const disconnect = connect();
+    const route = getEffectiveRouteByPath(location.pathname);
+    const isPublicRoute = !route || route.auth === 'public';
+
+    shouldReconnect.current = !isPublicRoute;
+
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
+
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
+    }
+
+    if (isPublicRoute) {
+      if (disconnectRef.current) {
+        disconnectRef.current();
+        disconnectRef.current = null;
+      }
+      const socket = ws.current;
+      closeSocketSafely(socket, 'Public route');
+      return () => {};
+    }
+
+    connectTimerRef.current = setTimeout(() => {
+      disconnectRef.current = connectRef.current?.() || null;
+    }, 0);
+
     return () => {
-      disconnect?.();
+      if (connectTimerRef.current) {
+        clearTimeout(connectTimerRef.current);
+        connectTimerRef.current = null;
+      }
+      if (disconnectRef.current) {
+        disconnectRef.current();
+        disconnectRef.current = null;
+      }
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      closeSocketSafely(ws.current, 'Unmount');
     };
-  }, [connect]);
+  }, [closeSocketSafely, connect, location.pathname]);
 
   return (
     <NotificationWebSocketContext.Provider value={{ ws: ws.current }}>
-            {children}
-        </NotificationWebSocketContext.Provider>);
-
+      {children}
+    </NotificationWebSocketContext.Provider>
+  );
 }
 
 NotificationWebSocketProvider.propTypes = {

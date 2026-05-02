@@ -86,7 +86,7 @@
 
 ```bash
 # База данных
-DATABASE_URL=sqlite:///./clinic.db
+DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
 
 # CORS и WebSocket
 CORS_DISABLE=1
@@ -135,7 +135,7 @@ reportlab
 ```bash
 # Убедитесь, что сервер работает
 cd backend
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 18000
 ```
 
 ### 2️⃣ Проверьте GitHub Actions
@@ -164,7 +164,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ```bash
 cd backend
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 18000
 ```
 
 ### ❌ Ошибки в GitHub Actions

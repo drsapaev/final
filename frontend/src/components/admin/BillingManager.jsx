@@ -35,6 +35,60 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+
+const INVOICE_TYPE_OPTIONS = [
+  { value: 'standard', label: 'Обычный' },
+  { value: 'recurring', label: 'Периодический' },
+  { value: 'advance', label: 'Авансовый' },
+  { value: 'correction', label: 'Корректировочный' }
+];
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'cash', label: 'Наличные' },
+  { value: 'card', label: 'Банковская карта' },
+  { value: 'bank_transfer', label: 'Банковский перевод' },
+  { value: 'online', label: 'Онлайн платеж' },
+  { value: 'insurance', label: 'Страховка' },
+  { value: 'installment', label: 'Рассрочка' }
+];
+
+const INVOICE_TYPE_LABELS = Object.fromEntries(
+  INVOICE_TYPE_OPTIONS.map((option) => [option.value, option.label])
+);
+
+const PAYMENT_METHOD_LABELS = Object.fromEntries(
+  PAYMENT_METHOD_OPTIONS.map((option) => [option.value, option.label])
+);
+
+const toNullableInteger = (value) => {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const buildInvoicePayload = (form) => ({
+  ...form,
+  patient_id: toNullableInteger(form.patient_id),
+  visit_id: toNullableInteger(form.visit_id),
+  appointment_id: toNullableInteger(form.appointment_id),
+  due_days: toNullableInteger(form.due_days) ?? 30,
+  recurrence_interval: toNullableInteger(form.recurrence_interval) ?? 1,
+  items: form.items.map((item) => ({
+    ...item,
+    quantity: toNullableInteger(item.quantity) ?? 1,
+    unit_price: Number(item.unit_price) || 0
+  }))
+});
+
+const buildPaymentPayload = (form) => ({
+  ...form,
+  invoice_id: toNullableInteger(form.invoice_id),
+  amount: Number(form.amount) || 0
+});
+
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState([]);
@@ -51,7 +105,7 @@ const BillingManager = () => {
     patient_id: '',
     visit_id: '',
     appointment_id: '',
-    invoice_type: 'STANDARD',
+    invoice_type: 'standard',
     items: [{ description: '', quantity: 1, unit_price: 0 }],
     description: '',
     notes: '',
@@ -59,7 +113,7 @@ const BillingManager = () => {
     auto_send: false,
     send_reminders: true,
     is_recurring: false,
-    recurrence_type: 'MONTHLY',
+    recurrence_type: 'monthly',
     recurrence_interval: 1
   });
 
@@ -67,7 +121,7 @@ const BillingManager = () => {
   const [paymentForm, setPaymentForm] = useState({
     invoice_id: '',
     amount: 0,
-    payment_method: 'CASH',
+    payment_method: 'cash',
     reference_number: '',
     description: '',
     notes: ''
@@ -103,14 +157,14 @@ const BillingManager = () => {
 
   const handleCreateInvoice = async () => {
     try {
-      await api.post('/billing/invoices', invoiceForm);
+      await api.post('/billing/invoices', buildInvoicePayload(invoiceForm));
       toast.success('Счет создан успешно');
       setShowCreateInvoice(false);
       setInvoiceForm({
         patient_id: '',
         visit_id: '',
         appointment_id: '',
-        invoice_type: 'STANDARD',
+        invoice_type: 'standard',
         items: [{ description: '', quantity: 1, unit_price: 0 }],
         description: '',
         notes: '',
@@ -118,7 +172,7 @@ const BillingManager = () => {
         auto_send: false,
         send_reminders: true,
         is_recurring: false,
-        recurrence_type: 'MONTHLY',
+        recurrence_type: 'monthly',
         recurrence_interval: 1
       });
       loadData();
@@ -130,13 +184,13 @@ const BillingManager = () => {
 
   const handleRecordPayment = async () => {
     try {
-      await api.post('/billing/payments', paymentForm);
+      await api.post('/billing/payments', buildPaymentPayload(paymentForm));
       toast.success('Платеж записан успешно');
       setShowRecordPayment(false);
       setPaymentForm({
         invoice_id: '',
         amount: 0,
-        payment_method: 'CASH',
+        payment_method: 'cash',
         reference_number: '',
         description: '',
         notes: ''
@@ -287,7 +341,9 @@ const BillingManager = () => {
                       Счет № {invoice.invoice_number}
                     </h4>
                     {getStatusBadge(invoice.status)}
-                    <MacOSBadge variant="outline">{invoice.invoice_type}</MacOSBadge>
+                    <MacOSBadge variant="outline">
+                      {INVOICE_TYPE_LABELS[invoice.invoice_type] || invoice.invoice_type}
+                    </MacOSBadge>
                   </div>
 
                   <div style={{
@@ -439,12 +495,7 @@ const BillingManager = () => {
               <MacOSSelect
             value={invoiceForm.invoice_type}
             onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_type: e.target.value })}
-            options={[
-            { value: 'STANDARD', label: 'Обычный' },
-            { value: 'RECURRING', label: 'Периодический' },
-            { value: 'ADVANCE', label: 'Авансовый' },
-            { value: 'CORRECTION', label: 'Корректировочный' }]
-            } />
+            options={INVOICE_TYPE_OPTIONS} />
           
             </div>
 
@@ -692,14 +743,7 @@ const BillingManager = () => {
               <MacOSSelect
             value={paymentForm.payment_method}
             onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
-            options={[
-            { value: 'CASH', label: 'Наличные' },
-            { value: 'CARD', label: 'Банковская карта' },
-            { value: 'BANK_TRANSFER', label: 'Банковский перевод' },
-            { value: 'ONLINE', label: 'Онлайн платеж' },
-            { value: 'INSURANCE', label: 'Страховка' },
-            { value: 'INSTALLMENT', label: 'Рассрочка' }]
-            } />
+            options={PAYMENT_METHOD_OPTIONS} />
           
             </div>
 
@@ -786,7 +830,7 @@ const BillingManager = () => {
                   <div>Счет ID: {payment.invoice_id}</div>
                   <div>Пациент ID: {payment.patient_id}</div>
                   <div>Сумма: {payment.amount.toLocaleString()} сум</div>
-                  <div>Способ: {payment.payment_method}</div>
+                  <div>Способ: {PAYMENT_METHOD_LABELS[payment.payment_method] || payment.payment_method}</div>
                   <div>Дата: {new Date(payment.payment_date).toLocaleDateString()}</div>
                   {payment.reference_number &&
               <div>Ссылка: {payment.reference_number}</div>

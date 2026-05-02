@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { getApiBaseUrl } from '../api/runtime';
 import { tokenManager } from './tokenManager';
 
 // Используем общий базовый URL как в api/client.js
-const API_BASE = import.meta.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({

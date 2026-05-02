@@ -4,7 +4,7 @@ import random
 from datetime import date
 
 # Получаем токен
-token_response = requests.post("http://localhost:8000/api/v1/auth/login", data={
+token_response = requests.post("http://localhost:18000/api/v1/auth/login", data={
     "username": "registrar@example.com",
     "password": "registrar123"
 })
@@ -29,7 +29,7 @@ patient_data = {
     "address": "Тестовый адрес, 123"
 }
 
-patient_response = requests.post("http://localhost:8000/api/v1/patients", json=patient_data, headers=headers)
+patient_response = requests.post("http://localhost:18000/api/v1/patients", json=patient_data, headers=headers)
 print(f"📋 Статус создания пациента: {patient_response.status_code}")
 
 if patient_response.status_code not in [200, 201]:
@@ -41,7 +41,7 @@ patient_id = patient["id"]
 print(f"✅ Пациент создан: ID {patient_id}")
 
 # Проверяем количество записей ДО создания визита
-queues_before = requests.get("http://localhost:8000/api/v1/registrar/queues/today", headers=headers)
+queues_before = requests.get("http://localhost:18000/api/v1/registrar/queues/today", headers=headers)
 total_before = sum(len(q.get("entries", [])) for q in queues_before.json().get("queues", []))
 print(f"📊 Записей в очереди ДО: {total_before}")
 
@@ -64,7 +64,7 @@ cart_data = {
 }
 
 print(f"📤 Отправляем данные визита...")
-cart_response = requests.post("http://localhost:8000/api/v1/registrar/cart", json=cart_data, headers=headers)
+cart_response = requests.post("http://localhost:18000/api/v1/registrar/cart", json=cart_data, headers=headers)
 print(f"📋 Статус создания визита: {cart_response.status_code}")
 
 if cart_response.status_code == 200:
@@ -77,7 +77,7 @@ else:
     print(f"❌ Ошибка создания визита: {cart_response.text}")
 
 # Проверяем количество записей ПОСЛЕ создания визита
-queues_after = requests.get("http://localhost:8000/api/v1/registrar/queues/today", headers=headers)
+queues_after = requests.get("http://localhost:18000/api/v1/registrar/queues/today", headers=headers)
 total_after = sum(len(q.get("entries", [])) for q in queues_after.json().get("queues", []))
 print(f"📊 Записей в очереди ПОСЛЕ: {total_after}")
 

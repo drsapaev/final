@@ -1,0 +1,542 @@
+{
+  "url": "http://localhost:5173/registrar-panel",
+  "title": "Clinic Management System",
+  "bodyText": "Управление клиникой\n🔍\n⌘K\nКассир\nГлавная\nОнлайн‑записи\nНовая запись\nRU\nОнлайн\nRegistrar User\nВыйти\nПерейти к основному содержимому\nВсе отделения\nКардиология\nЭКГ\nДерматология\nСтоматология\nЛаборатория\nПроцедуры\nУЗИ\nНеврология\n📋\nОчередь пуста\n\nСегодня пока нет записей\n\n➕ Создать первую запись",
+  "events": [
+    {
+      "type": "console",
+      "level": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "console",
+      "level": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 Отправляемые данные: {username: [REDACTED], password: [REDACTED], remember_me: false}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 📝 formData: {username: [REDACTED], password: [REDACTED], loginType: username}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/me/preferences {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/me/preferences, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /users/me/preferences {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:THEME] Loaded color scheme from user preferences {colorScheme: vibrant}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:THEME] Loaded color scheme from user preferences {colorScheme: vibrant}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔐 Login redirect: {from: /, computedRoute: /registrar-panel, target: /registrar-panel, profile: Receptionist, timestamp: 2026-03-27T17:59:37.588Z}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /registrar-panel}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /registrar-panel}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/me/preferences {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /users/me/preferences {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/me/preferences, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /users/me/preferences, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] Service Worker registered: {}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /users/me/preferences {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /users/me/preferences {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /registrar-panel}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] Reusing recent auth session validation {ageMs: 78}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] RequireAuth validating session {path: /registrar-panel}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:AUTH] Reusing recent auth session validation {ageMs: 79}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] Service Worker already registered: {}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] [FIX:WS] Notification WebSocket connected"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🚀 Starting initial data load (guarded)..."
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔧 loadIntegratedData called at: 2026-03-27T17:59:38.650Z"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik..."
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🚀 Загружаем данные параллельно..."
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: 2026-03-27, first3: Array(0)}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: 2026-03-27, first3: Array(0)}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /queues/profiles?active_only=true {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /registrar/queues/today {params: Object, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /registrar/services {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /registrar/queue-settings {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /registrar/departments?active_only=true {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔄 API Request: GET /queues/profiles?active_only=true {params: undefined, data: undefined}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /queues/profiles?active_only=true, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /registrar/queues/today, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /registrar/doctors, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /registrar/services, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /registrar/queue-settings, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /registrar/departments?active_only=true, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] 🔍 [api/client.js] Request interceptor: {url: /queues/profiles?active_only=true, hasToken: [REDACTED], tokenPreview: [REDACTED], headers: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Загружены динамические отделения: [Array(6) - showing first 5]"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /queues/profiles?active_only=true {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ SSOT: Loaded 8 queue profiles from API (source: database)"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /registrar/services {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /registrar/queues/today {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 SSOT: Loaded 0 entries (no dedup, no aggregation)"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Загружено 0 записей для специальности: все"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📋 Нет записей на сегодня - это нормальная ситуация в начале дня"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /registrar/doctors {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: 2026-03-27, first3: Array(0)}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /queues/profiles?active_only=true {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ SSOT: Loaded 8 queue profiles from API (source: database)"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /registrar/departments?active_only=true {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "log",
+      "text": "[LOG] ✅ API Response: GET /registrar/queue-settings {status: 200, data: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Ответ врачей: OK"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Ответ услуг: OK"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Ответ настроек очереди: OK"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Ответ отделений: OK {success: true, data: [Array(6) - showing first 5], count: 6}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔄 Обрабатываем ответы API..."
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Статус ответов: {doctors: OK, services: OK, queueSettings: OK, allSuccess: Object}"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Данные врачей получены: 8 врачей"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Врачи обновлены из API"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Отделения обновлены из API: 6"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Данные услуг получены: [Array(6) - showing first 5]"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Услуги обновлены из API"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] ✅ Настройки очереди обновлены из API"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🎯 Загрузка интегрированных данных завершена"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 Для вкладки \"Все отделения\": 0 записей до агрегации"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 🔍 QR-записей в фильтре: 0"
+    },
+    {
+      "type": "console",
+      "level": "info",
+      "text": "[INFO] 📊 После агрегации: 0 пациентов"
+    }
+  ]
+}

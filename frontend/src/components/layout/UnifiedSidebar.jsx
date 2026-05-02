@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -6,6 +6,7 @@ import auth from '../../stores/auth.js';
 import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 
 /**
  * Унифицированный сайдбар в стиле MediLab
@@ -70,87 +71,39 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 
   // Основные навигационные элементы
   const mainNavItems = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    iconName: 'LayoutDashboard',
-    path: '/dashboard',
-    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-  },
-  {
-    id: 'search',
-    label: 'Поиск',
-    iconName: 'Search',
-    path: '/search',
-    roles: ['admin', 'doctor', 'registrar', 'receptionist', 'cashier', 'lab', 'cardio', 'derma', 'dentist']
-  },
-  {
-    id: 'patients',
-    label: 'Patients',
-    iconName: 'Users',
-    path: '/patients',
-    roles: ['admin', 'doctor', 'registrar']
-  },
-  {
-    id: 'appointments',
-    label: 'Appointments',
-    iconName: 'Calendar',
-    path: '/appointments',
-    roles: ['admin', 'doctor', 'registrar']
-  },
-  {
-    id: 'staff-schedule',
-    label: 'Staff Schedule',
-    iconName: 'Clock',
-    path: '/staff-schedule',
-    roles: ['admin', 'registrar']
-  },
-  {
-    id: 'doctors',
-    label: 'Doctors',
-    iconName: 'Stethoscope',
-    path: '/doctors',
-    roles: ['admin', 'registrar']
-  },
-  {
-    id: 'departments',
-    label: 'Departments',
-    iconName: 'Building',
-    path: '/departments',
-    roles: ['admin']
-  },
-  {
-    id: 'stock',
-    label: 'Stock',
-    iconName: 'Package',
-    path: '/stock',
-    roles: ['admin', 'lab', 'cashier']
-  }];
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      iconName: 'LayoutDashboard',
+      path: 'dashboard',
+      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+    },
+    {
+      id: 'patients',
+      label: 'Patients',
+      iconName: 'Users',
+      path: 'patients',
+      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+    },
+    {
+      id: 'appointments',
+      label: 'Appointments',
+      iconName: 'Calendar',
+      path: 'appointments',
+      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+    },
+    {
+      id: 'staff-schedule',
+      label: 'Staff Schedule',
+      iconName: 'Clock',
+      path: 'staff-schedule',
+      roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
+    }
+  ];
 
 
-  // Дополнительные элементы
-  const additionalItems = [
-  {
-    id: 'emr-system',
-    label: 'EMR System',
-    iconName: 'FileText',
-    path: '/advanced-emr',
-    roles: ['admin', 'doctor', 'nurse']
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    iconName: 'Settings',
-    path: '/settings',
-    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-  },
-  {
-    id: 'help',
-    label: 'Help Center',
-    iconName: 'HelpCircle',
-    path: '/help',
-    roles: ['admin', 'doctor', 'registrar', 'cashier', 'lab']
-  }];
+  // Дополнительные элементы: в demo-режиме они не нужны
+  const additionalItems = [];
 
 
   // Фильтруем элементы по роли пользователя
@@ -172,17 +125,19 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 
   // Проверяем активность элемента
   const isActive = (path) => {
-    if (path === '/dashboard' || path === '/') {
-      return location.pathname === '/' || location.pathname === '/dashboard' || location.pathname === '/medilab-demo' || location.pathname === '/medilab-demo/dashboard';
-    }
-
-    // Для демо-страницы проверяем специальные маршруты
     if (location.pathname.startsWith('/medilab-demo')) {
-      const demoPath = path.replace('/', '/medilab-demo');
+      const slug = String(path || '').replace(/^\/+/, '');
+      const demoPath = slug === 'dashboard'
+        ? '/medilab-demo/dashboard'
+        : `/medilab-demo/${slug}`;
+      if (location.pathname === '/medilab-demo' && slug === 'dashboard') {
+        return true;
+      }
       return location.pathname === demoPath;
     }
 
-    return location.pathname.startsWith(path);
+    const normalizedPath = String(path || '').startsWith('/') ? String(path || '') : `/${String(path || '')}`;
+    return location.pathname === normalizedPath || location.pathname.startsWith(normalizedPath);
   };
 
   // Стили для навигационных элементов
@@ -331,53 +286,6 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         {visibleMainItems.map((item) => {
           const active = isActive(item.path);
 
-          // Для демо-страницы используем специальные маршруты
-          const demoPath = location.pathname.startsWith('/medilab-demo') ?
-          item.path.replace('/', '/medilab-demo') :
-          item.path;
-
-          const inlineStyle = isCollapsed ? {
-            width: '40px',
-            height: '40px',
-            minWidth: '40px',
-            minHeight: '40px',
-            maxWidth: '40px',
-            maxHeight: '40px',
-            padding: '0',
-            margin: '0 auto'
-          } : {};
-
-          return (
-            <NavLink
-              key={item.id}
-              to={demoPath}
-              className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
-              style={({ isHovered }) => ({
-                ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {}),
-                ...inlineStyle
-              })}
-              title={isCollapsed ? item.label : ''}>
-
-              <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
-              {!isCollapsed && <span>{item.label}</span>}
-            </NavLink>);
-
-        })}
-
-        {/* Разделитель */}
-        <div
-          style={{
-            height: '1px',
-            backgroundColor: 'var(--mac-separator)',
-            margin: '16px 0'
-          }} />
-
-
-        {/* Дополнительные элементы */}
-        {visibleAdditionalItems.map((item) => {
-          const active = isActive(item.path);
-
           const inlineStyle = isCollapsed ? {
             width: '40px',
             height: '40px',
@@ -406,6 +314,50 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             </NavLink>);
 
         })}
+
+        {visibleAdditionalItems.length > 0 &&
+        <>
+          {/* Разделитель */}
+          <div
+            style={{
+              height: '1px',
+              backgroundColor: 'var(--mac-separator)',
+              margin: '16px 0'
+            }} />
+
+          {/* Дополнительные элементы */}
+          {visibleAdditionalItems.map((item) => {
+            const active = isActive(item.path);
+
+            const inlineStyle = isCollapsed ? {
+              width: '40px',
+              height: '40px',
+              minWidth: '40px',
+              minHeight: '40px',
+              maxWidth: '40px',
+              maxHeight: '40px',
+              padding: '0',
+              margin: '0 auto'
+            } : {};
+
+            return (
+              <NavLink
+                key={item.id}
+                to={item.path}
+                className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
+                style={({ isHovered }) => ({
+                  ...navItemStyle(active),
+                  ...(isHovered && !active ? hoverStyle : {}),
+                  ...inlineStyle
+                })}
+                title={isCollapsed ? item.label : ''}>
+
+                <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
+                {!isCollapsed && <span>{item.label}</span>}
+              </NavLink>);
+
+          })}
+        </>}
       </nav>
 
       {/* Кнопки переключения темы и языка */}
@@ -525,6 +477,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       </div>
     </aside>);
 
+};
+
+
+UnifiedSidebar.propTypes = {
+  ...(UnifiedSidebar.propTypes || {}),
+  isCollapsed: PropTypes.any,
+  onToggle: PropTypes.any,
 };
 
 export default UnifiedSidebar;

@@ -569,18 +569,18 @@ async def get_api_examples(
     examples = {
         "authentication_examples": {
             "login": {
-                "curl": "curl -X POST 'http://localhost:8000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=admin&password=admin123'",
+                "curl": "curl -X POST 'http://localhost:18000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=admin&password=admin123'",
                 "python": """
 import requests
 
 response = requests.post(
-    'http://localhost:8000/api/v1/auth/login',
+    'http://localhost:18000/api/v1/auth/login',
     data={'username': 'admin', 'password': 'admin123'}
 )
 token = response.json()['access_token']
                 """,
                 "javascript": """
-const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+const response = await fetch('http://localhost:18000/api/v1/auth/login', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -594,7 +594,7 @@ const token = data.access_token;
         },
         "patient_examples": {
             "create_patient": {
-                "curl": "curl -X POST 'http://localhost:8000/api/v1/patients/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"full_name\": \"Иван Иванов\", \"phone\": \"+998901234567\", \"birth_date\": \"1990-01-01\", \"gender\": \"male\"}'",
+                "curl": "curl -X POST 'http://localhost:18000/api/v1/patients/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"full_name\": \"Иван Иванов\", \"phone\": \"+998901234567\", \"birth_date\": \"1990-01-01\", \"gender\": \"male\"}'",
                 "python": """
 import requests
 
@@ -606,13 +606,13 @@ data = {
     'gender': 'male'
 }
 response = requests.post(
-    'http://localhost:8000/api/v1/patients/',
+    'http://localhost:18000/api/v1/patients/',
     headers=headers,
     json=data
 )
                 """,
                 "javascript": """
-const response = await fetch('http://localhost:8000/api/v1/patients/', {
+const response = await fetch('http://localhost:18000/api/v1/patients/', {
     method: 'POST',
     headers: {
         'Authorization': `Bearer ${token}`,
@@ -630,7 +630,7 @@ const response = await fetch('http://localhost:8000/api/v1/patients/', {
         },
         "visit_examples": {
             "create_visit": {
-                "curl": "curl -X POST 'http://localhost:8000/api/v1/visits/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"patient_id\": 1, \"service_id\": 1, \"payment_amount\": 100000, \"notes\": \"Консультация\"}'",
+                "curl": "curl -X POST 'http://localhost:18000/api/v1/visits/' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"patient_id\": 1, \"service_id\": 1, \"payment_amount\": 100000, \"notes\": \"Консультация\"}'",
                 "python": """
 import requests
 
@@ -642,13 +642,13 @@ data = {
     'notes': 'Консультация'
 }
 response = requests.post(
-    'http://localhost:8000/api/v1/visits/',
+    'http://localhost:18000/api/v1/visits/',
     headers=headers,
     json=data
 )
                 """,
                 "javascript": """
-const response = await fetch('http://localhost:8000/api/v1/visits/', {
+const response = await fetch('http://localhost:18000/api/v1/visits/', {
     method: 'POST',
     headers: {
         'Authorization': `Bearer ${token}`,

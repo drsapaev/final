@@ -18,7 +18,7 @@ async def get_auth_token():
             {"username": "admin", "password": "admin"}
         ).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:8000/api/v1/login",
+            "http://127.0.0.1:18000/api/v1/login",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
@@ -41,7 +41,7 @@ async def test_ws_with_broadcast(token):
 
     # 1. Сначала подключаемся к WebSocket
     print("🔌 Подключаюсь к WebSocket...")
-    uri = "ws://127.0.0.1:8000/ws/queue?department=ENT&date=2025-08-28&token=" + token
+    uri = "ws://127.0.0.1:18000/ws/queue?department=ENT&date=2025-08-28&token=" + token
     headers = {"Origin": "http://localhost:5173"}
 
     try:
@@ -66,7 +66,7 @@ async def test_ws_with_broadcast(token):
                 print("📅 Открываю день для ENT...")
                 try:
                     req = urllib.request.Request(
-                        "http://127.0.0.1:8000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
+                        "http://127.0.0.1:18000/api/v1/appointments/open?department=ENT&date_str=2025-08-28&start_number=1",
                         headers={"Authorization": f"Bearer {token}"},
                         method="POST",
                     )

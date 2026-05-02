@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -14,13 +14,18 @@ import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { getApiOrigin } from '../api/runtime';
+import notify from '../services/notify';
+import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
-const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = getApiOrigin();
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
+import ModernDialog from '../components/dialogs/ModernDialog';
+import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 
 // Современный мастер
 // ✅ Используется только новый мастер (V2)
@@ -39,9 +44,13 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
+import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
+import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/networkErrorMessages';
+import { getErrorMessage } from '../utils/errorHandler';
+import { aggregatePatientsForAllDepartments as aggregateRegistrarPatients } from '../utils/registrarAggregation';
 
 // ⭐ SSOT: Centralized service code resolver
-import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
+import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
 
 // API client
 import { api } from '../api/client';
@@ -59,6 +68,19 @@ const RegistrarPanel = () => {
   // Основные состояния
   const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentView = useMemo(() => {
+    const explicitView = searchParams.get('view');
+    if (explicitView === 'welcome' || explicitView === 'queue') {
+      return explicitView;
+    }
+
+    const legacyTab = searchParams.get('tab');
+    if (legacyTab === 'welcome' || legacyTab === 'queue') {
+      return legacyTab;
+    }
+
+    return explicitView;
+  }, [searchParams]);
   const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
   const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
   const todayStr = getLocalDateString();
@@ -661,9 +683,43 @@ const RegistrarPanel = () => {
           }
         }, 100);
       }*/}, [appointments]); // Убираем дублирование - filteredAppointments уже определена ниже в коде
-  const [showSlotsModal, setShowSlotsModal] = useState(false);const [showQRModal, setShowQRModal] = useState(false);const autoRefresh = true; // Новые состояния для интеграции с админ панелью
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [selectedDoctor, setSelectedDoctor] = useState(null);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Инициализация selectedDoctor первым доступным врачом
-  useEffect(() => {if (!selectedDoctor && doctors.length > 0) {setSelectedDoctor(doctors[0]);}}, [doctors, selectedDoctor]); // Переводы
+  const [showSlotsModal, setShowSlotsModal] = useState(false);
+  const autoRefresh = true; // Новые состояния для интеграции с админ панелью
+  const resolveRescheduleVisitId = useCallback((appointmentRow) => {
+    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || appointmentRow?.appointment_id || appointmentRow?.appointment_ids?.[0] || appointmentRow?.id || null;
+  }, []);
+  const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
+    if (!appointmentRow) return;
+
+    const idsToRemove = new Set();
+    [appointmentRow.id, appointmentRow.visit_id, appointmentRow.visitId, appointmentRow.appointment_id, appointmentRow.queue_entry_id, visitId].forEach((id) => {
+      if (id !== undefined && id !== null) {
+        idsToRemove.add(String(id));
+      }
+    });
+    [appointmentRow.visit_ids, appointmentRow.appointment_ids, appointmentRow.queue_entry_ids].forEach((ids) => {
+      if (Array.isArray(ids)) {
+        ids.forEach((id) => {
+          if (id !== undefined && id !== null) {
+            idsToRemove.add(String(id));
+          }
+        });
+      }
+    });
+    if (Array.isArray(appointmentRow.aggregated_ids)) {
+      appointmentRow.aggregated_ids.forEach((id) => {
+        if (id !== undefined && id !== null) {
+          idsToRemove.add(String(id));
+        }
+      });
+    }
+
+    setAppointments((prev) => prev.filter((apt) => {
+      const candidateIds = [apt.id, apt.visit_id, apt.visitId, apt.appointment_id, apt.queue_entry_id];
+      return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
+    }));
+  }, []);
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const translations = { ru: { // Основные
       welcome: 'Добро пожаловать', start_work: 'Начать работу', quick_start: 'Быстрый старт', loading: 'Загрузка', error: 'Ошибка', success: 'Успешно', warning: 'Предупреждение', // Вкладки
       tabs_welcome: 'Главная', tabs_appointments: 'Все записи', tabs_cardio: 'Кардиолог', tabs_echokg: 'ЭКГ', tabs_derma: 'Дерматолог', tabs_dental: 'Стоматолог', tabs_lab: 'Лаборатория', tabs_procedures: 'Процедуры', tabs_queue: 'Онлайн-очередь', // Действия
@@ -769,55 +825,11 @@ const RegistrarPanel = () => {
   const loadIntegratedData = useCallback(async () => {
     logger.info('🔧 loadIntegratedData called at:', new Date().toISOString());
     try {
-      // УБИРАЕМ setAppointmentsLoading(true) - это не должно влиять на загрузку записей
-      // setAppointmentsLoading(true);
-
-      // Сначала устанавливаем fallback данные для врачей и услуг
-      // logger.info('Setting fallback doctors and services data');
-      setDoctors([
-      { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
-      { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
-      { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }]
-      );
-
-      setServices({
-        laboratory: [
-        { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-        { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }],
-
-        cardiology: [
-        { id: 13, name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 14, name: 'ЭКГ', price: 20000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 15, name: 'ЭхоКГ', price: 35000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 16, name: 'ЭКГ с консультацией кардиолога', price: 70000, specialty: 'cardiology', group: 'cardiology' },
-        { id: 17, name: 'ЭхоКГ с консультацией кардиолога', price: 85000, specialty: 'cardiology', group: 'cardiology' }],
-
-        dermatology: [
-        { id: 5, name: 'Консультация дерматолога-косметолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
-        { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }],
-
-        stomatology: [
-        { id: 18, name: 'Консультация стоматолога', price: 30000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 19, name: 'Лечение кариеса', price: 80000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 20, name: 'Удаление зуба', price: 50000, specialty: 'stomatology', group: 'stomatology' },
-        { id: 21, name: 'Чистка зубов', price: 40000, specialty: 'stomatology', group: 'stomatology' }],
-
-        cosmetology: [
-        { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
-        { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }],
-
-        procedures: [
-        { id: 22, name: 'Физиотерапия', price: 25000, specialty: 'procedures', group: 'procedures' },
-        { id: 23, name: 'Массаж', price: 30000, specialty: 'procedures', group: 'procedures' },
-        { id: 24, name: 'Ингаляция', price: 15000, specialty: 'procedures', group: 'procedures' }]
-
-      });
+      // Сбрасываем устаревшие значения перед загрузкой truth из API.
+      // Если backend недоступен, лучше показать пустое состояние, чем локальные моки.
+      setDoctors([]);
+      setServices({});
+      setDynamicDepartments([]);
 
       // Загружаем врачей, услуги и настройки очередей из админ панели
       try {
@@ -890,7 +902,7 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных врачей:', error.message);
           }
         } else {
-          logger.warn('❌ API врачей недоступен, используем демо-данные');
+          logger.warn('❌ API врачей недоступен, оставляем пустое состояние');
         }
 
         // Обработка отделений
@@ -916,7 +928,7 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных услуг:', error.message);
           }
         } else {
-          logger.warn('❌ API услуг недоступен, используем демо-данные');
+          logger.warn('❌ API услуг недоступен, оставляем пустое состояние');
         }
 
         if (queueRes && queueRes.data) {
@@ -926,18 +938,18 @@ const RegistrarPanel = () => {
             logger.warn('Ошибка обработки данных настроек очереди:', error.message);
           }
         } else {
-          logger.warn('❌ API настроек очереди недоступен, используем демо-данные');
+          logger.warn('❌ API настроек очереди недоступен, оставляем пустое состояние');
         }
 
         logger.info('🎯 Загрузка интегрированных данных завершена');
       } catch (fetchError) {
-        // Backend недоступен - используем демо-данные (уже установлены выше)
-        logger.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+        // Backend недоступен - оставляем пустое состояние без локальных моков.
+        logger.warn('Backend недоступен для загрузки интегрированных данных, оставляем пустое состояние:', fetchError.message);
       }
 
     } catch (error) {
       logger.error('Ошибка загрузки интегрированных данных:', error);
-      toast.error('Ошибка загрузки данных из админ панели');
+      notify.error('Ошибка загрузки данных из админ панели');
     } finally {
 
 
@@ -965,9 +977,22 @@ const RegistrarPanel = () => {
         }
       } catch (error) {
         // Подавляем ошибки для демо-режима
-        if (error.message !== 'Failed to fetch') {
-          logger.error(`Error fetching patient ${patientId}:`, error);
+        const rawMessage = error?.message || '';
+        if (isNetworkFetchError(rawMessage)) {
+          logger.warn('[Registrar] Не удалось загрузить пациента из URL: backend недоступен', {
+            patientId,
+            rawMessage,
+          });
+          return null;
         }
+
+        logger.error(`Error fetching patient ${patientId}:`, {
+          error: formatNetworkErrorMessage({
+            rawMessage,
+            fallbackMessage: 'Не удалось загрузить пациента из URL',
+          }),
+          rawMessage,
+        });
       }
       return null;
     }, []);
@@ -1030,20 +1055,14 @@ const RegistrarPanel = () => {
 
 
         // Игнорируем ошибки парсинга JSON
-      } // Добавляем недостающие поля для таблицы с значениями по умолчанию
-      // ✅ ИСПРАВЛЕНО: Правильно обрабатываем all_free заявки (только одобренные)
-      const isAllFree = enrichedApt.discount_mode === 'all_free' && enrichedApt.approval_status === 'approved';enrichedApt = {
+      }
+      enrichedApt = {
         ...enrichedApt,
-        // Если поля уже есть в API, используем их, иначе значения по умолчанию
-        // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
-        visit_type: isAllFree ? 'free' : enrichedApt.visit_type || 'paid', // Платный по умолчанию
-        // ✅ Для all_free устанавливаем payment_type как 'free', иначе определяем по провайдеру
-        payment_type: isAllFree ? 'free' : enrichedApt.payment_type || (enrichedApt.payment_provider === 'online' ? 'online' : 'cash'),
-        // ✅ Если пришел payment_status от API — уважаем его; иначе — выводим из discount_mode или payment_processed_at
-        payment_status: isAllFree ? 'paid' : enrichedApt.payment_status || (enrichedApt.discount_mode === 'paid' ? 'paid' : enrichedApt.payment_processed_at ? 'paid' : enrichedApt.payment_amount > 0 ? 'pending' : 'pending'),
-        services: enrichedApt.services || [], // ✅ ИСПРАВЛЕНО: оставляем пустым если нет услуг
-        // ✅ Для all_free устанавливаем cost = 0, иначе используем payment_amount или cost
-        cost: isAllFree ? 0 : enrichedApt.cost || enrichedApt.payment_amount || 0
+        visit_type: enrichedApt.visit_type ?? null,
+        payment_type: enrichedApt.payment_type ?? null,
+        payment_status: enrichedApt.payment_status ?? 'pending',
+        services: enrichedApt.services || [],
+        cost: Number(enrichedApt.cost ?? 0)
       };
 
       return enrichedApt;
@@ -1055,6 +1074,27 @@ const RegistrarPanel = () => {
   const loadAppointments = useCallback(async (options = {}) => {
     // console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false } = options || {};
+    const callSource = String(options?.source || 'unknown');
+    const isAutoRefreshCall = callSource === 'auto_refresh';
+    if (isAutoRefreshCall) {
+      const cooldownUntil = autoRefreshCooldownUntilRef.current;
+      if (Date.now() < cooldownUntil) {
+        if (!autoRefreshCooldownLoggedRef.current) {
+          logger.info('⏳ Автообновление приостановлено после rate limit', {
+            cooldownUntil: new Date(cooldownUntil).toISOString()
+          });
+          autoRefreshCooldownLoggedRef.current = true;
+        }
+        return;
+      }
+
+      if (loadAppointmentsInFlightRef.current) {
+        logger.info('⏭️ Автообновление пропущено: предыдущий запрос еще выполняется');
+        return;
+      }
+    }
+
+    loadAppointmentsInFlightRef.current = true;
     try {
       if (!silent) {
         setAppointmentsLoading(true);
@@ -1143,6 +1183,9 @@ const RegistrarPanel = () => {
             return {
               // SSOT passthrough
               id: entryId,
+              visit_id: fullEntry.visit_id || entry.visit_id || null,
+              appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId,
+              queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
               patient_id: fullEntry.patient_id || entry.patient_id,
               patient_fio: fullEntry.patient_name || entry.patient_name || 'Неизвестный пациент',
               patient_birth_year: fullEntry.patient_birth_year || fullEntry.birth_year || null,
@@ -1259,6 +1302,16 @@ const RegistrarPanel = () => {
         });
       }
     } catch (error) {
+      if (error?.response?.status === 429) {
+        autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
+        autoRefreshCooldownLoggedRef.current = false;
+        logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
+          source: callSource,
+          dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
+        });
+        return;
+      }
+
       // Handle axios errors
       if (error.response?.status === 401) {
         // Токен недействителен
@@ -1289,10 +1342,11 @@ const RegistrarPanel = () => {
             }return demoAppointments;});});
         // Показываем уведомление пользователю только при первой загрузке
         if (appointmentsCount === 0) {
-          toast('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+          notify.info('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
         }
       }
     } finally {
+      loadAppointmentsInFlightRef.current = false;
       if (!silent) setAppointmentsLoading(false);
     }
   }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab, demoAppointments, appointmentsCount]);
@@ -1335,6 +1389,9 @@ const RegistrarPanel = () => {
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
+  const loadAppointmentsInFlightRef = useRef(false);
+  const autoRefreshCooldownUntilRef = useRef(0);
+  const autoRefreshCooldownLoggedRef = useRef(false);
   useEffect(() => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
@@ -1646,8 +1703,12 @@ const RegistrarPanel = () => {
     // Во время мастера записи или модальных окон автообновление отключаем, чтобы не было мерцаний
     if (showWizard || paymentDialog.open || printDialog.open || cancelDialog.open) return;
     if (!autoRefresh) return;
+    if (Date.now() < autoRefreshCooldownUntilRef.current) return;
 
     const id = setInterval(() => {
+      if (Date.now() < autoRefreshCooldownUntilRef.current || loadAppointmentsInFlightRef.current) {
+        return;
+      }
       // Загружаем только записи тихо, без смены индикаторов
       logger.info('⏰ Автообновление: вызов loadAppointments');
       loadAppointments({ silent: true, source: 'auto_refresh' });
@@ -1686,7 +1747,7 @@ const RegistrarPanel = () => {
           _locallyModified: false
         } : apt
         ));
-        toast.success('Пациент вызван успешно!');
+        notify.success('Пациент вызван успешно!');
 
         // Перезагружаем данные для синхронизации с сервером
         await loadAppointments({ source: 'start_visit_success' });
@@ -1697,11 +1758,11 @@ const RegistrarPanel = () => {
       }
     } catch (error) {
       logger.error('RegistrarPanel: Start visit API error:', error);
-      toast.error('Не удалось вызвать пациента: ' + error.message);
+          notify.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
     }
   }, [loadAppointments]);
 
-  const handlePayment = async (appointment) => {
+  const handlePayment = async (appointment, paymentData = null) => {
     try {
       logger.info('🔍 handlePayment вызван с данными:', appointment);
       logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
@@ -1736,15 +1797,12 @@ const RegistrarPanel = () => {
         // ✅ ИСПРАВЛЕНИЕ: Проверяем статус КАЖДОЙ записи перед попыткой оплаты
         const paymentStatus = (record.payment_status || '').toLowerCase();
         const status = (record.status || '').toLowerCase();
-        const discountMode = (record.discount_mode || '').toLowerCase();
-
-        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}, discount_mode=${discountMode}`);
+        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}`);
 
         // Пропускаем записи, которые уже оплачены
         if (paymentStatus === 'paid' ||
         status === 'paid' ||
-        status === 'queued' ||
-        discountMode === 'paid') {
+        status === 'queued') {
           logger.info(`⏭️ Запись ${recordId} уже оплачена, пропускаем`);
           paymentResults.push({ success: true, recordId, skipped: true, reason: 'already_paid' });
           continue;
@@ -1768,7 +1826,11 @@ const RegistrarPanel = () => {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-            }
+            },
+            body: JSON.stringify({
+              amount: paymentData?.amount ?? null,
+              method: paymentData?.method ?? null
+            })
           });
 
           if (response.ok) {
@@ -1852,17 +1914,17 @@ const RegistrarPanel = () => {
           message += `. Ошибок: ${failedCount}`;
         }
 
-        toast.success(message);
+        notify.success(message);
         // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
         setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
         return paymentResults;
       } else {
-        toast.error('Не удалось оплатить записи');
+        notify.error('Не удалось оплатить записи');
         return paymentResults;
       }
     } catch (error) {
       logger.error('RegistrarPanel: Payment error:', error);
-      toast.error('Ошибка при оплате');
+      notify.error('Ошибка при оплате');
     }
   };
 
@@ -1870,12 +1932,12 @@ const RegistrarPanel = () => {
   const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '') => {
     try {
       if (!appointmentId || Number(appointmentId) <= 0) {
-        toast.error('Некорректный идентификатор записи');
+        notify.error('Некорректный идентификатор записи');
         return;
       }
       const token = tokenManager.getAccessToken();
       if (!token) {
-        toast.error('Требуется вход в систему');
+        notify.error('Требуется вход в систему');
         return;
       }
       let url = '';
@@ -1910,7 +1972,7 @@ const RegistrarPanel = () => {
           _cancelReason: reason
         } : apt
         ));
-        toast.success('Запись отменена (локально)');
+        notify.success('Запись отменена (локально)');
         return { id: appointmentId, status: 'cancelled' };
       } else if (status === 'confirmed') {
         // Пока нет API для подтверждения, обновляем локально
@@ -1922,7 +1984,7 @@ const RegistrarPanel = () => {
           _locallyModified: true
         } : apt
         ));
-        toast.success('Запись подтверждена (локально)');
+        notify.success('Запись подтверждена (локально)');
         return { id: appointmentId, status: 'confirmed' };
       } else if (status === 'no_show') {
         // Пока нет API для неявки, обновляем локально
@@ -1935,7 +1997,7 @@ const RegistrarPanel = () => {
           _noShowReason: reason
         } : apt
         ));
-        toast.success('Отмечено как неявка (локально)');
+        notify.success('Отмечено как неявка (локально)');
         return { id: appointmentId, status: 'no_show' };
       } else if (status === 'in_cabinet') {
         if (isFromVisits) {
@@ -1946,7 +2008,7 @@ const RegistrarPanel = () => {
         }
       } else {
         logger.info('Неподдерживаемый статус:', status);
-        toast.error('Изменение данного статуса не поддерживается');
+        notify.error('Изменение данного статуса не поддерживается');
         return;
       }
 
@@ -1978,11 +2040,11 @@ const RegistrarPanel = () => {
       ));
 
       await loadAppointments({ source: 'status_update' });
-      toast.success('Статус обновлен');
+      notify.success('Статус обновлен');
       return updatedAppointment;
     } catch (error) {
       logger.error('RegistrarPanel: Update status error:', error);
-      toast.error('Не удалось обновить статус: ' + error.message);
+      notify.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
       return null;
     }
   }, [loadAppointments]);
@@ -2002,8 +2064,8 @@ const RegistrarPanel = () => {
     const successCount = results.filter((r) => r.status === 'fulfilled').length;
     const failCount = results.length - successCount;
 
-    if (successCount > 0) toast.success(`Обновлено: ${successCount}`);
-    if (failCount > 0) toast.error(`Ошибок: ${failCount}`);
+    if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
+    if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
     setAppointmentsSelected(new Set());
   }, [appointmentsSelected, updateAppointmentStatus]);
 
@@ -2078,13 +2140,12 @@ const RegistrarPanel = () => {
       } else if (e.key === 'Escape') {
         if (showWizard) setShowWizard(false);
         if (showSlotsModal) setShowSlotsModal(false);
-        if (showQRModal) setShowQRModal(false);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, showQRModal, appointments, handleBulkAction, appointmentsSelected]);
+  }, [showWizard, showSlotsModal, appointments, handleBulkAction, appointmentsSelected]);
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
@@ -2136,146 +2197,7 @@ const RegistrarPanel = () => {
   // Groups entries by patient for visual display (1 patient = 1 row)
   // ✅ ALLOWED by SSOT: This is view-model grouping, NOT business logic
   // ⚠️ Do NOT use for: filtering, routing, department decisions
-  const aggregatePatientsForAllDepartments = useCallback((appointments) => {
-    const patientGroups = {};
-
-    appointments.forEach((appointment) => {
-      // Используем patient_fio как уникальный идентификатор пациента
-      const patientKey = appointment.patient_fio;
-
-      if (!patientGroups[patientKey]) {
-        // ✅ ИСПРАВЛЕНО: Проверяем All Free статус для корректного отображения
-        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-
-        patientGroups[patientKey] = {
-          id: appointment.id,
-          patient_id: appointment.patient_id,
-          patient_fio: appointment.patient_fio,
-          patient_birth_year: appointment.patient_birth_year,
-          patient_phone: appointment.patient_phone,
-          address: appointment.address,
-          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
-          visit_type: isAllFree ? 'free' : appointment.visit_type,
-          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем payment_type как 'free'
-          payment_type: isAllFree ? 'free' : appointment.payment_type,
-          payment_status: appointment.payment_status,
-          cost: 0, // Будет суммироваться из всех записей
-          status: appointment.status,
-          date: appointment.date,
-          appointment_date: appointment.appointment_date,
-          created_at: appointment.created_at,
-          // Агрегируем услуги из разных отделений
-          services: [],
-          departments: new Set(),
-          doctors: new Set(),
-          // Используем первую попавшуюся запись для остальных полей
-          department: appointment.department,
-          doctor_specialty: appointment.doctor_specialty,
-          queue_numbers: appointment.queue_numbers || [],
-          confirmation_status: appointment.confirmation_status,
-          confirmed_at: appointment.confirmed_at,
-          confirmed_by: appointment.confirmed_by,
-          record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
-          source: appointment.source, // ✅ FIX: Сохраняем источник (online/desk) для Wizard'а
-          // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
-          discount_mode: appointment.discount_mode,
-          approval_status: appointment.approval_status,
-          // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
-          // Если запись уже агрегирована в loadAppointments, берем её aggregated_ids
-          aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]
-        };
-      } else {
-        // Добавляем ID в массив агрегированных
-        const newIds = appointment.aggregated_ids || [appointment.id];
-        patientGroups[patientKey].aggregated_ids.push(...newIds);
-        // Убираем возможные дубликаты
-        patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
-
-        // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
-        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-        const existingIsAllFree = patientGroups[patientKey].discount_mode === 'all_free' &&
-        patientGroups[patientKey].approval_status === 'approved';
-
-        if (isAllFree && !existingIsAllFree) {
-          // Новая запись All Free, а существующая нет — обновляем
-          patientGroups[patientKey].visit_type = 'free';
-          patientGroups[patientKey].payment_type = 'free';
-          patientGroups[patientKey].discount_mode = appointment.discount_mode;
-          patientGroups[patientKey].approval_status = appointment.approval_status;
-        }
-
-        // ✅ FIX: Агрегируем queue_numbers (добавляем новые очереди к существующему пациенту в таблице "Все")
-        // ⭐ ИСПРАВЛЕНО: Дедупликация по ID записи, а не по specialty
-        // Это позволяет сохранить несколько записей с одинаковой specialty (например, 2 консультации кардиолога)
-        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
-          const existingQueueIds = new Set((patientGroups[patientKey].queue_numbers || []).map((qn) =>
-          qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`
-          ));
-
-          appointment.queue_numbers.forEach((qn) => {
-            const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
-            if (!existingQueueIds.has(queueId)) {
-              patientGroups[patientKey].queue_numbers.push(qn);
-              existingQueueIds.add(queueId);
-            }
-          });
-        }
-
-        // ✅ SSOT: Только source='online' считается QR-записью
-        // confirmation больше не используется — backend теперь всегда возвращает 'online' или 'desk'
-        const isQRSource = (src) => src === 'online';
-        const currentIsQR = isQRSource(appointment.source);
-        const aggregatedIsQR = isQRSource(patientGroups[patientKey].source);
-
-        if (currentIsQR && !aggregatedIsQR) {
-          patientGroups[patientKey].source = appointment.source;
-          patientGroups[patientKey].record_type = appointment.record_type || patientGroups[patientKey].record_type;
-        }
-      }
-
-      // Суммируем стоимость для ВСЕХ записей пациента (включая первую)
-      // ✅ ИСПРАВЛЕНО: Для All Free не суммируем стоимость, оставляем 0
-      const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
-      if (!isAllFree && appointment.cost) {
-        patientGroups[patientKey].cost += appointment.cost;
-      }
-
-      // Добавляем услуги если их еще нет
-      // ⭐ DEBUG: Логируем что приходит в агрегацию
-      // console.log(`🔄 Aggregating ${appointment.patient_fio}: appointment.services=${JSON.stringify(appointment.services)}, current patientGroups[${patientKey}].services=${JSON.stringify(patientGroups[patientKey].services)}`);
-
-      if (appointment.services && Array.isArray(appointment.services)) {
-        appointment.services.forEach((service) => {
-          if (!patientGroups[patientKey].services.includes(service)) {
-            patientGroups[patientKey].services.push(service);
-          }
-        });
-      }
-
-      // ✅ FIX: Агрегируем service_codes для корректной работы Wizard
-      if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-        if (!patientGroups[patientKey].service_codes) patientGroups[patientKey].service_codes = [];
-        appointment.service_codes.forEach((code) => {
-          if (!patientGroups[patientKey].service_codes.includes(code)) {
-            patientGroups[patientKey].service_codes.push(code);
-          }
-        });
-      }
-
-      // Добавляем информацию об отделении
-      if (appointment.department) {
-        patientGroups[patientKey].departments.add(appointment.department);
-      }
-
-      // Добавляем информацию о враче
-      if (appointment.doctor_specialty) {
-        patientGroups[patientKey].doctors.add(appointment.doctor_specialty);
-      }
-    });
-
-    // Преобразуем обратно в массив
-    return Object.values(patientGroups);
-  }, []);
+  const aggregatePatientsForAllDepartments = useCallback((appointments) => aggregateRegistrarPatients(appointments), []);
 
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
@@ -2284,37 +2206,13 @@ const RegistrarPanel = () => {
   // ⭐ ИСПРАВЛЕНО: Для QR-записей с несколькими специалистами используем queue_numbers
   const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
     // ⭐ SSOT: Используем централизованную функцию toServiceCode
-    // Расширяем её для обратной совместимости с fuzzy matching
+    // Используем только канонический резолв из SSOT
     const toServiceCode = (value) => {
       if (!value) return null;
 
       // Сначала пробуем SSOT резолвер
       const ssotResult = ssotToServiceCode(value);
       if (ssotResult) return ssotResult;
-
-      // Fallback для fuzzy matching (legacy support)
-      const normalized = String(value).toLowerCase().trim();
-      for (const [key, code] of Object.entries(SPECIALTY_TO_CODE)) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          return code;
-        }
-      }
-
-      // Ultimate fallback: первая буква + 01
-      // ⚠️ ТОЛЬКО для известных категорий, не для произвольных кириллических букв
-      const firstLetter = normalized.charAt(0).toUpperCase();
-      if (/[A-Z]/i.test(firstLetter)) {
-        // Только латинские буквы для кодов (K, D, S, L, P, C)
-        return `${firstLetter}01`;
-      }
-      // Кириллические буквы: конвертируем известные, игнорируем остальные
-      const ruToEn = { 'К': 'K', 'Д': 'D', 'С': 'S', 'Л': 'L', 'П': 'P' };
-      const mappedLetter = ruToEn[firstLetter];
-      if (mappedLetter) {
-        return `${mappedLetter}01`;
-      }
-      // ⛔ Не генерируем коды из неизвестных кириллических букв (О, Е, А и т.д.)
-      // Это предотвращает генерацию невалидных кодов вроде "О01"
 
       return null;
     };
@@ -2340,14 +2238,6 @@ const RegistrarPanel = () => {
           if (serviceNameCode && !seenCodes.has(serviceNameCode)) {
             allCodes.push(serviceNameCode);
             seenCodes.add(serviceNameCode);
-            return;
-          }
-
-          // Приоритет 2: specialty
-          const specialtyCode = toServiceCode(qn.specialty || qn.queue_tag);
-          if (specialtyCode && !seenCodes.has(specialtyCode)) {
-            allCodes.push(specialtyCode);
-            seenCodes.add(specialtyCode);
           }
         });
 
@@ -2395,34 +2285,8 @@ const RegistrarPanel = () => {
         }
       }
 
-      // Fallback: если в services нет подходящих кодов, генерируем из queue_numbers (для старых записей)
-      const tabToSpecialtyMap = {
-        'cardio': ['cardiology', 'cardio', 'cardiolog'],
-        'echokg': ['echokg', 'ecg', 'echo'],
-        'derma': ['dermatology', 'derma', 'dermatolog'],
-        'dental': ['stomatology', 'dentist', 'dental', 'stom'],
-        'lab': ['laboratory', 'lab'],
-        'procedures': ['procedures', 'procedure', 'cosmetology', 'physio']
-      };
-
-      const possibleSpecialties = tabToSpecialtyMap[departmentKey] || [departmentKey];
-
-      const matchingQueue = appointment.queue_numbers.find((qn) => {
-        const qnSpecialty = (qn.specialty || qn.queue_tag || '').toLowerCase().trim();
-        return possibleSpecialties.some((spec) => qnSpecialty.includes(spec) || spec.includes(qnSpecialty));
-      });
-
-      if (matchingQueue) {
-        const serviceNameCode = toServiceCode(matchingQueue.service_name);
-        if (serviceNameCode) {
-          return [serviceNameCode];
-        }
-
-        const specialtyCode = toServiceCode(matchingQueue.specialty || matchingQueue.queue_tag);
-        if (specialtyCode) {
-          return [specialtyCode];
-        }
-      }
+      // Если services не дали подходящих кодов, не подменяем их specialty-эвристикой.
+      return [];
     }
 
     // ⭐ Для обычных записей без queue_numbers
@@ -2784,6 +2648,9 @@ const RegistrarPanel = () => {
   });
 
   DataSourceIndicator.displayName = 'DataSourceIndicator';
+  DataSourceIndicator.propTypes = {
+    count: PropTypes.number.isRequired,
+  };
 
   // Функция генерации CSV
   const generateCSV = (data) => {
@@ -2835,14 +2702,14 @@ const RegistrarPanel = () => {
         break;
       case 'in_cabinet':
         await updateAppointmentStatus(row.id, 'in_cabinet');
-        toast.success('Пациент отправлен в кабинет');
+        notify.success('Пациент отправлен в кабинет');
         break;
       case 'call':
         await handleStartVisit(row);
         break;
       case 'complete':
         await updateAppointmentStatus(row.id, 'done');
-        toast.success('Приём завершён');
+        notify.success('Приём завершён');
         break;
       case 'payment':
         setPaymentDialog({ open: true, row, paid: false, source: 'context' });
@@ -2878,9 +2745,6 @@ const RegistrarPanel = () => {
 
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
-      <ToastContainer position="bottom-right" />
-
-
       {/* Skip to content link for screen readers */}
       <a
         href="#main-content"
@@ -2906,7 +2770,7 @@ const RegistrarPanel = () => {
       </a>
 
       {/* Современные вкладки */}
-      {(!searchParams.get('view') || searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue') &&
+      {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
       <div style={{
         margin: `0 ${'1rem'}`,
         maxWidth: 'none',
@@ -2929,7 +2793,7 @@ const RegistrarPanel = () => {
       {/* Основной контент без отступа сверху */}
       <div style={{ overflow: 'hidden' }}>
         {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
-        {searchParams.get('view') === 'welcome' &&
+        {currentView === 'welcome' &&
         <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{
             margin: `0 ${'1rem'} ${'2rem'} ${'1rem'}`,
@@ -3077,7 +2941,7 @@ const RegistrarPanel = () => {
                             const csvContent = generateCSV(appointments);
                             const filename = `appointments_${getLocalDateString()}.csv`;
                             downloadCSV(csvContent, filename);
-                            toast.success(`Экспортировано ${appointments.length} записей`);
+                            notify.success(`Экспортировано ${appointments.length} записей`);
                           }}
                           style={{
                             display: 'flex',
@@ -3181,7 +3045,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });toast.success('Данные обновлены');}}
+                          onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success('Данные обновлены');}}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="gear" size="small" />
@@ -3593,7 +3457,7 @@ const RegistrarPanel = () => {
         }
 
         {/* Онлайн-очередь по параметру view=queue */}
-        {searchParams.get('view') === 'queue' &&
+        {currentView === 'queue' &&
         <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
               <CardHeader>
@@ -3626,7 +3490,7 @@ const RegistrarPanel = () => {
               <CardContent>
                 <ModernQueueManager
                 selectedDate={searchParams.get('date') || getLocalDateString()}
-                selectedDoctor={searchParams.get('doctor') || selectedDoctor?.id?.toString() || ''}
+                selectedDoctor={searchParams.get('doctor') || ''}
                 searchQuery={searchParams.get('q') || ''}
                 onQueueUpdate={loadAppointments}
                 onDateChange={(newDate) => {
@@ -3651,7 +3515,7 @@ const RegistrarPanel = () => {
         }
 
         {/* Основная панель с записями */}
-        {(!searchParams.get('view') || searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue') &&
+        {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
         <div
           id="main-content"
           role="tabpanel"
@@ -4036,7 +3900,7 @@ const RegistrarPanel = () => {
 
             if (failCount > 0) {
               logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
-              toast.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
+              notify.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
             } else {
               logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
             }
@@ -4045,9 +3909,9 @@ const RegistrarPanel = () => {
 
             // Если это 404 после всех попыток
             if (error.response?.status === 404) {
-              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных`);
+        notify.error(`Не удалось найти запись ${appointmentId} в базе данных`);
             } else {
-              toast.error('Не удалось обновить статус на сервере: ' + (error.message || 'Unknown error'));
+      notify.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
             }
             // Don't return here, still update locally to remove from view or let the user know
           }
@@ -4074,11 +3938,11 @@ const RegistrarPanel = () => {
         isOpen={paymentDialog.open}
         onClose={() => setPaymentDialog({ open: false, row: null, paid: false, source: null })}
         appointment={paymentDialog.row}
-        onPaymentSuccess={async () => {
+        onPaymentSuccess={async (paymentData) => {
           // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
           const appointment = paymentDialog.row;
           if (appointment) {
-            const updated = await handlePayment(appointment);
+            const updated = await handlePayment(appointment, paymentData);
             if (updated) {
               // Статус уже правильно установлен в handlePayment (status: 'queued')
               logger.info('PaymentDialog: Оплата успешна, статус обновлен:', updated);
@@ -4119,7 +3983,21 @@ const RegistrarPanel = () => {
         documentData={printDialog.data}
         onPrint={async (printerName, docType, docData) => {
           logger.info('Printing:', { printerName, docType, docData });
-          // Здесь можно добавить реальную логику печати
+
+          if (docType !== 'ticket') {
+            throw new Error(`Неподдерживаемый тип документа: ${docType}`);
+          }
+
+          const result = await printPanelTicketInBrowserAsync(docData);
+          if (result?.opened && result?.success) {
+            return;
+          }
+
+          if (!result?.opened) {
+            throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
+          }
+
+          throw result?.error || new Error('Не удалось подготовить талон к печати. Проверьте данные записи и повторите попытку.');
         }} />
 
 
@@ -4160,12 +4038,12 @@ const RegistrarPanel = () => {
             const message = wizardEditMode ?
             'Запись успешно обновлена!' :
             'Запись успешно создана!';
-            toast.success(message);
+            notify.success(message);
           } catch (error) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
-            toast.success('Запись создана! Обновите страницу для отображения изменений.');
+            notify.success('Запись создана! Обновите страницу для отображения изменений.');
           }
         }} />
 
@@ -4175,139 +4053,116 @@ const RegistrarPanel = () => {
       {/* Встроенный мастер удален - используется AppointmentWizard компонент */}
 
       {/* Модальное окно слотов */}
-      {showSlotsModal &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }} role="dialog" aria-modal="true">
-          <div style={{
-          background: cardBg,
-          padding: '24px',
-          borderRadius: '12px',
-          maxWidth: '500px',
-          width: '90%'
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>📅 {t('available_slots')}</h3>
-              <button onClick={() => setShowSlotsModal(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-            </div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              <button style={buttonStyle} onClick={async () => {
+      <ModernDialog
+        isOpen={showSlotsModal}
+        onClose={() => setShowSlotsModal(false)}
+        title={`📅 ${t('available_slots')}`}
+        maxWidth="32rem"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}
+        actions={[
+          {
+            label: '🌅 ' + t('tomorrow'),
+            variant: 'primary',
+            onClick: async () => {
               if (!rescheduleData) return;
+
               try {
                 setShowSlotsModal(false);
-                logger.info(`Перенос визита ${rescheduleData.id} на завтра`);
-                await api.post(`/visits/${rescheduleData.id}/reschedule/tomorrow`);
-                toast.success('Визит успешно перенесен на завтра');
+                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                logger.info(`Перенос визита ${targetVisitId} на завтра`);
+                await rescheduleTomorrow(targetVisitId);
+                notify.success('Визит успешно перенесен на завтра');
+                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
-                toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
+                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
               }
-            }}>
-                🌅 {t('tomorrow')}
-              </button>
-              <button style={buttonSecondaryStyle} onClick={async () => {
+            }
+          },
+          {
+            label: `📅 ${t('select_date')}`,
+            variant: 'secondary',
+            onClick: async () => {
               if (!rescheduleData) return;
-              const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
+
+              const currentVal = getLocalDateString(
+                rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date()
+              );
               const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
 
-              if (dateStr) {
-                // Simple validation YYYY-MM-DD
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                  toast.error('Неверный формат даты. Используйте YYYY-MM-DD');
-                  return;
-                }
+              if (!dateStr) return;
 
-                try {
-                  setShowSlotsModal(false);
-                  logger.info(`Перенос визита ${rescheduleData.id} на ${dateStr}`);
-                  await api.post(`/visits/${rescheduleData.id}/reschedule`, null, { params: { new_date: dateStr } });
-                  toast.success(`Визит перенесен на ${dateStr}`);
-                  setRescheduleData(null);
-                  loadAppointments({ source: 'reschedule_date' });
-                } catch (e) {
-                  logger.error('Ошибка переноса на дату:', e);
-                  toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
-                }
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                return;
               }
-            }}>
-                📅 {t('select_date')}
-              </button>
-            </div>
-          </div>
-        </div>
-      }
 
-      {/* Модальное окно QR */}
-      {showQRModal &&
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }} role="dialog" aria-modal="true">
+              try {
+                setShowSlotsModal(false);
+                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
+                await rescheduleVisit(targetVisitId, dateStr);
+                notify.success(`Визит перенесен на ${dateStr}`);
+                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
+                setRescheduleData(null);
+                loadAppointments({ source: 'reschedule_date' });
+              } catch (e) {
+                logger.error('Ошибка переноса на дату:', e);
+                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+              }
+            }
+          }
+        ]}>
+        <div style={{ display: 'grid', gap: '16px' }}>
           <div style={{
-          background: cardBg,
-          padding: '24px',
-          borderRadius: '12px',
-          maxWidth: '400px',
-          width: '90%',
-          textAlign: 'center'
-        }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>📱 QR-код для пациента</h3>
-            <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            margin: '16px 0',
-            display: 'inline-block'
+            padding: '16px',
+            borderRadius: '14px',
+            border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.14)'}`,
+            backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.06)'
           }}>
-              {/* Здесь будет QR-код */}
-              <div style={{
-              width: '200px',
-              height: '200px',
-              background: '#f0f0f0',
+            <div style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '14px',
-              color: '#666'
+              alignItems: 'flex-start',
+              gap: '12px'
             }}>
-                QR-код
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)',
+                color: '#3b82f6',
+                flexShrink: 0
+              }}>
+                📅
+              </div>
+              <div>
+                <div style={{
+                  color: getColor('textPrimary'),
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  marginBottom: '4px'
+                }}>
+                  Перенос записи
+                </div>
+                <div style={{
+                  color: getColor('textSecondary'),
+                  fontSize: '13px',
+                  lineHeight: 1.5
+                }}>
+                  Выберите быстрый перенос на завтра или укажите другую дату.
+                </div>
               </div>
             </div>
-            <button
-            onClick={() => setShowQRModal(false)}
-            style={{
-              padding: '8px 16px',
-              background: accentColor,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}>
-
-              Закрыть
-            </button>
           </div>
         </div>
-      }
+      </ModernDialog>
 
       {/* Контекстное меню */}
       {contextMenu.open &&
@@ -4341,9 +4196,11 @@ const RegistrarPanel = () => {
         specialistName={forceMajeureModal.specialistName}
         onSuccess={(action, result) => {
           logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
-          toast.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
+          notify.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
           loadAppointments({ source: 'force_majeure' });
         }} />
+
+      <RoleNotificationCenter role="registrar" />
 
     </div>);
 

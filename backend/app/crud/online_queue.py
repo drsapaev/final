@@ -32,7 +32,7 @@ from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings
@@ -584,7 +584,7 @@ def join_online_queue_multiple(
 
 
 def open_daily_queue(
-    db: Session, day: date, specialist_id: int, user_id: int | None = None
+    db: Session, day: date, specialist_id: int
 ) -> dict[str, Any]:
     """
     Открытие приема и закрытие онлайн-набора
@@ -836,20 +836,16 @@ def get_or_create_daily_queue(
     Получить или создать дневную очередь с поддержкой queue_tag и информации о кабинете
     Теперь очереди уникальны по (day, specialist_id, queue_tag)
 
-    ⭐ ВАЖНО: specialist_id - это user_id (ForeignKey на users.id), а не doctor_id!
+    ⭐ ВАЖНО: specialist_id канонически хранит Doctor.id (ForeignKey на doctors.id).
     """
-    # ✅ ВАЛИДАЦИЯ: Проверяем, что specialist_id существует в таблице users
-    from app.models.user import User
+    doctor_exists = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    if not doctor_exists:
+        raise ValueError(f"Doctor with id {specialist_id} does not exist in doctors table")
 
-    user_exists = db.query(User).filter(User.id == specialist_id).first()
-    if not user_exists:
-        raise ValueError(f"User with id {specialist_id} does not exist in users table")
-
-    # Находим Doctor по user_id для получения информации о кабинете
-    doctor_exists = db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
+    actual_specialist_id = doctor_exists.id
 
     # Ищем очередь с учетом queue_tag
-    query_filters = [DailyQueue.day == day, DailyQueue.specialist_id == specialist_id]
+    query_filters = [DailyQueue.day == day, DailyQueue.specialist_id == actual_specialist_id]
 
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
@@ -866,7 +862,7 @@ def get_or_create_daily_queue(
 
         daily_queue = DailyQueue(
             day=day,
-            specialist_id=specialist_id,
+            specialist_id=actual_specialist_id,
             queue_tag=queue_tag,
             cabinet_number=cabinet_number,
             cabinet_floor=cabinet_floor,

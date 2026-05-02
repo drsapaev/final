@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 import os
 import platform
 import re
@@ -19,6 +20,8 @@ from app.models.activation import (
     Activation,  # type: ignore[attr-defined]
     ActivationStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------- Машинный идентификатор (серверный) ----------
 
@@ -94,6 +97,12 @@ def issue_key(
 ) -> IssueResult:
     key = generate_key()
     exp = datetime.utcnow() + timedelta(days=int(days))
+    logger.info(
+        "[FIX:ACTIVATION] Issuing activation key %s status=%s days=%s",
+        key,
+        status,
+        days,
+    )
     row = Activation(
         key=key,
         machine_hash=None,
@@ -112,6 +121,8 @@ def issue_key(
     )
     db.add(row)
     db.flush()
+    db.commit()
+    logger.info("[FIX:ACTIVATION] Activation key persisted %s", key)
     return IssueResult(key=key, expiry_date=exp.strftime("%Y-%m-%d"), status=row.status)
 
 
@@ -124,9 +135,7 @@ class ActivateResult:
     machine_hash: str | None = None
     expiry_date: str | None = None
     status: str | None = None
-
-
-def activate_key(db: Session, *, key: str) -> ActivateResult:
+def _activate_key(db: Session, *, key: str, commit: bool) -> ActivateResult:
     key = (key or "").strip()
     if not key:
         return ActivateResult(ok=False, reason="EMPTY_KEY")
@@ -152,6 +161,8 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
     if row.expiry_date and datetime.utcnow() > row.expiry_date:
         row.status = ActivationStatus.EXPIRED
         db.flush()
+        if commit:
+            db.commit()
         return ActivateResult(ok=False, reason="EXPIRED", key=key)
 
     # Привязываем к текущей машине при необходимости
@@ -164,7 +175,8 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
         changed = True
     if changed:
         db.flush()
-        db.commit()
+        if commit:
+            db.commit()
 
     # Генерируем оффлайн-токен (JWT)
     claims = {
@@ -185,6 +197,10 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
         expiry_date=exp_dt.strftime("%Y-%m-%d"),
         status=row.status,
     )
+
+
+def activate_key(db: Session, *, key: str, commit: bool = True) -> ActivateResult:
+    return _activate_key(db, key=key, commit=commit)
 
 
 @dataclass

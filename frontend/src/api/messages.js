@@ -4,6 +4,49 @@
 
 import { api } from './client';
 
+const MESSAGE_QUERY_CACHE_MS = 15_000;
+const conversationCache = new Map();
+const unreadCountCache = new Map();
+const conversationPromiseCache = new Map();
+const unreadCountPromiseCache = new Map();
+
+function isFreshCacheEntry(entry, ttlMs = MESSAGE_QUERY_CACHE_MS) {
+  return Boolean(entry) && Date.now() - entry.cachedAt < ttlMs;
+}
+
+function getCachedConversationResult(key) {
+  const entry = conversationCache.get(key);
+  if (isFreshCacheEntry(entry)) {
+    return entry.data;
+  }
+
+  if (entry) {
+    conversationCache.delete(key);
+  }
+
+  return null;
+}
+
+function getCachedUnreadCountResult(key) {
+  const entry = unreadCountCache.get(key);
+  if (isFreshCacheEntry(entry)) {
+    return entry.data;
+  }
+
+  if (entry) {
+    unreadCountCache.delete(key);
+  }
+
+  return null;
+}
+
+export function clearMessageQueryCache() {
+  conversationCache.clear();
+  unreadCountCache.clear();
+  conversationPromiseCache.clear();
+  unreadCountPromiseCache.clear();
+}
+
 /**
  * Отправить сообщение пользователю
  * @param {number} recipientId - ID получателя
@@ -15,6 +58,7 @@ export const sendMessage = async (recipientId, content) => {
         recipient_id: recipientId,
         content: content
     });
+    clearMessageQueryCache();
     return response.data;
 };
 
@@ -23,8 +67,29 @@ export const sendMessage = async (recipientId, content) => {
  * @returns {Promise<Object>} Список бесед и общее количество непрочитанных
  */
 export const getConversations = async () => {
-    const response = await api.get('/messages/conversations');
-    return response.data;
+    const cacheKey = '/messages/conversations';
+    const cached = getCachedConversationResult(cacheKey);
+    if (cached) {
+        return cached;
+    }
+
+    const inFlight = conversationPromiseCache.get(cacheKey);
+    if (inFlight) {
+        return inFlight;
+    }
+
+    const requestPromise = api.get(cacheKey).then((response) => {
+        conversationCache.set(cacheKey, {
+            cachedAt: Date.now(),
+            data: response.data
+        });
+        return response.data;
+    }).finally(() => {
+        conversationPromiseCache.delete(cacheKey);
+    });
+
+    conversationPromiseCache.set(cacheKey, requestPromise);
+    return requestPromise;
 };
 
 /**
@@ -46,8 +111,30 @@ export const getConversation = async (userId, skip = 0, limit = 50) => {
  * @returns {Promise<number>} Количество непрочитанных
  */
 export const getUnreadCount = async () => {
-    const response = await api.get('/messages/unread');
-    return response.data.unread_count;
+    const cacheKey = '/messages/unread';
+    const cached = getCachedUnreadCountResult(cacheKey);
+    if (cached !== null) {
+        return cached;
+    }
+
+    const inFlight = unreadCountPromiseCache.get(cacheKey);
+    if (inFlight) {
+        return inFlight;
+    }
+
+    const requestPromise = api.get(cacheKey).then((response) => {
+        const unreadCount = response.data.unread_count;
+        unreadCountCache.set(cacheKey, {
+            cachedAt: Date.now(),
+            data: unreadCount
+        });
+        return unreadCount;
+    }).finally(() => {
+        unreadCountPromiseCache.delete(cacheKey);
+    });
+
+    unreadCountPromiseCache.set(cacheKey, requestPromise);
+    return requestPromise;
 };
 
 /**
@@ -57,6 +144,7 @@ export const getUnreadCount = async () => {
  */
 export const markAsRead = async (messageId) => {
     const response = await api.patch(`/messages/${messageId}/read`);
+    clearMessageQueryCache();
     return response.data;
 };
 
@@ -67,6 +155,7 @@ export const markAsRead = async (messageId) => {
  */
 export const deleteMessage = async (messageId) => {
     const response = await api.delete(`/messages/${messageId}`);
+    clearMessageQueryCache();
     return response.data;
 };
 
@@ -92,6 +181,7 @@ export const toggleReaction = async (messageId, reaction) => {
     const response = await api.post(`/messages/${messageId}/reactions`, {
         reaction
     });
+    clearMessageQueryCache();
     return response.data;
 };
 
@@ -111,6 +201,7 @@ export const uploadFile = async (recipientId, file) => {
             'Content-Type': 'multipart/form-data'
         }
     });
+    clearMessageQueryCache();
     return response.data;
 };
 

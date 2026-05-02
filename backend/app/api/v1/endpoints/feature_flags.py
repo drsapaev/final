@@ -5,7 +5,7 @@ API эндпоинты для управления фича-флагами
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -38,8 +38,7 @@ class FeatureFlagResponse(BaseModel):
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeatureFlagCreateRequest(BaseModel):
@@ -91,8 +90,7 @@ class FeatureFlagHistoryResponse(BaseModel):
     user_agent: Optional[str] = None
     reason: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeatureFlagStatusResponse(BaseModel):

@@ -103,7 +103,9 @@ class PrescriptionBase(ORMModel):
     """Базовая схема рецепта"""
 
     appointment_id: int
-    emr_id: int
+    visit_id: int | None = None
+    emr_id: int | None = None
+    emr_record_id: int | None = None
     medications: list[MedicationItem] | None = None
     instructions: str | None = Field(None, max_length=2000)
     doctor_notes: str | None = Field(None, max_length=1000)

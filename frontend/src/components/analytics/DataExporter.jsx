@@ -15,6 +15,7 @@ import {
 
 
 'lucide-react';
+import PropTypes from 'prop-types';
 
 /**
  * Компонент для экспорта аналитических данных
@@ -315,6 +316,15 @@ const DataExporter = ({
       </div>
     </Card>);
 
+};
+
+
+DataExporter.propTypes = {
+  ...(DataExporter.propTypes || {}),
+  availableFormats: PropTypes.any,
+  data: PropTypes.any,
+  onExport: PropTypes.any,
+  showAdvanced: PropTypes.any,
 };
 
 export default DataExporter;

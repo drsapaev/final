@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Orchestrator"
+  short_description: "Drive landing run stages safely"
+  default_prompt: "Use $landing-orchestrator to inspect a landing run, update the manifest, and move it through intake, build, audit, and release."

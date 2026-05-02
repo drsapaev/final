@@ -103,13 +103,13 @@ python load_test.py --endpoint /api/v1/patients/ --users 10 --requests 100
 ### 5.1 Using Uvicorn
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 18000 --workers 4
 ```
 
 ### 5.2 Using Gunicorn (Recommended for production)
 
 ```bash
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:18000
 ```
 
 ### 5.3 Using Docker
@@ -124,7 +124,7 @@ docker compose up --build -d
 ### 6.1 Health Check
 
 ```bash
-curl http://localhost:8000/api/v1/health
+curl http://localhost:18000/api/v1/health
 ```
 
 ### 6.2 Run Production Readiness Tests
@@ -153,7 +153,7 @@ PROMETHEUS_PORT=9090
 ### 7.2 Access Metrics
 
 - Prometheus: http://localhost:9090/metrics
-- Health: http://localhost:8000/api/v1/health
+- Health: http://localhost:18000/api/v1/health
 
 ## Step 8: Backup Verification
 
@@ -161,12 +161,12 @@ PROMETHEUS_PORT=9090
 
 ```bash
 # Create manual backup
-curl -X POST http://localhost:8000/api/v1/system/backup/create \
+curl -X POST http://localhost:18000/api/v1/system/backup/create \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 
 # List backups
-curl http://localhost:8000/api/v1/system/backup/list \
+curl http://localhost:18000/api/v1/system/backup/list \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 

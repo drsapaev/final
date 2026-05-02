@@ -39,6 +39,21 @@
   border-color: var(--mac-accent-blue);
 }
 
+.chat-window.compact {
+  animation: none;
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chat-window.compact .chat-header {
+  cursor: default;
+}
+
+.chat-window.compact .chat-resize-handle {
+  display: none;
+}
+
 .chat-resize-handle {
   position: absolute;
   bottom: 0;

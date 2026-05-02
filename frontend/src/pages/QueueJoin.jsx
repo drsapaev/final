@@ -20,12 +20,79 @@ import {
   completeQueueJoinSession,
 } from '../api/queue';
 
-const FALLBACK_SPECIALISTS = [
-  { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: 'var(--mac-error)' },
-  { id: 2, specialty: 'dermatology', specialty_display: 'Дерматолог-косметолог', icon: '✨', color: 'var(--mac-warning)' },
-  { id: 3, specialty: 'stomatology', specialty_display: 'Стоматолог', icon: '🦷', color: A11Y_COLORS.primary },
-  { id: 4, specialty: 'lab', specialty_display: 'Лаборатория', icon: '🔬', color: A11Y_COLORS.success }
-];
+const normalizeSpecialtyKey = (value) => {
+  const normalized = String(value || '').toLowerCase().trim();
+  if (!normalized) return '';
+  if (normalized === 'cardio') return 'cardiology';
+  if (normalized === 'derma') return 'dermatology';
+  if (normalized === 'dentist' || normalized === 'dentistry') return 'stomatology';
+  if (normalized === 'laboratory') return 'lab';
+  return normalized;
+};
+
+const mergeVisibleSpecialists = (profilesPayload, specialistsPayload) => {
+  const profileItems = Array.isArray(profilesPayload?.specialists) ? profilesPayload.specialists : [];
+  const specialistItems = Array.isArray(specialistsPayload) ? specialistsPayload : [];
+
+  if (specialistItems.length === 0) {
+    return [];
+  }
+
+  const profileBySpecialty = new Map(
+    profileItems
+      .map((profile) => [normalizeSpecialtyKey(profile.specialty), profile])
+      .filter(([specialty]) => specialty)
+  );
+  const visibleSpecialties = new Set(profileBySpecialty.keys());
+  const merged = [];
+  const seenIds = new Set();
+
+  specialistItems.forEach((specialist) => {
+    const normalizedSpecialty = normalizeSpecialtyKey(specialist.specialty);
+    if (!normalizedSpecialty) return;
+    if (visibleSpecialties.size > 0 && !visibleSpecialties.has(normalizedSpecialty)) {
+      return;
+    }
+    if (specialist.id === undefined || specialist.id === null || seenIds.has(specialist.id)) {
+      return;
+    }
+
+    const profile = profileBySpecialty.get(normalizedSpecialty);
+    merged.push({
+      ...specialist,
+      specialty: normalizedSpecialty,
+      specialty_display:
+        profile?.specialty_display ||
+        specialist.specialty_display ||
+        specialist.name ||
+        specialist.specialty,
+      icon: profile?.icon || specialist.icon || '👨‍⚕️',
+      color: profile?.color || specialist.color || A11Y_COLORS.primary,
+    });
+    seenIds.add(specialist.id);
+  });
+
+  return merged;
+};
+
+const formatSpecialistLabel = (specialist) => {
+  const doctorName =
+    specialist?.doctor_name ||
+    specialist?.full_name ||
+    specialist?.name ||
+    specialist?.specialty_display ||
+    specialist?.specialty ||
+    'Мутахассис';
+  const specialtyLabel =
+    specialist?.specialty_display ||
+    specialist?.specialty ||
+    '';
+  const cabinetLabel = specialist?.cabinet ? `Каб. ${specialist.cabinet}` : '';
+
+  return [doctorName, specialtyLabel, cabinetLabel]
+    .filter(Boolean)
+    .join(' • ');
+};
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
@@ -109,23 +176,27 @@ const QueueJoin = () => {
   const loadSpecialists = useCallback(async () => {
     setIsSpecialistsLoading(true);
     try {
-      // ⭐ NEW: Используем публичный endpoint из QueueProfiles (SSOT)
-      // Управляется из Admin Panel -> Вкладки регистратуры -> "Показывать на QR-странице"
-      const data = await fetchPublicQueueProfiles();
-      setAvailableSpecialists(data?.specialists || []);
+      const [profilesResult, specialistsResult] = await Promise.allSettled([
+        fetchPublicQueueProfiles(),
+        fetchAvailableSpecialists(),
+      ]);
+
+      const profilesPayload =
+        profilesResult.status === 'fulfilled' ? profilesResult.value : null;
+      const specialistsPayload =
+        specialistsResult.status === 'fulfilled' ? specialistsResult.value : [];
+
+      const filteredSpecialists = mergeVisibleSpecialists(
+        profilesPayload,
+        specialistsPayload
+      ).filter((specialist) => {
+        const specialty = normalizeSpecialtyKey(specialist.specialty);
+        return specialty !== 'ecg' && specialty !== 'general';
+      });
+
+      setAvailableSpecialists(filteredSpecialists);
     } catch {
-      try {
-        // Fallback: старый endpoint специалистов
-        const specialists = await fetchAvailableSpecialists();
-        const filteredSpecialists = specialists.filter((specialist) => {
-          const specialty = (specialist.specialty || '').toLowerCase();
-          return specialty !== 'ecg' && specialty !== 'general';
-        });
-        setAvailableSpecialists(filteredSpecialists);
-      } catch {
-        // Fallback на статический список
-        setAvailableSpecialists(FALLBACK_SPECIALISTS);
-      }
+      setAvailableSpecialists([]);
     } finally {
       setIsSpecialistsLoading(false);
     }
@@ -1186,7 +1257,7 @@ const QueueJoin = () => {
                         fontWeight: '600',
                         color: isSelected ? specialist.color : 'var(--mac-text-primary)'
                       }}>
-                        {specialist.specialty_display || specialist.name}
+                        {formatSpecialistLabel(specialist)}
                       </span>
                     </label>
                   );

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import HTTPException, Request, status
@@ -14,6 +15,7 @@ from app.crud.patient import (
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientUpdate
+from app.services.notifications import notification_sender_service
 from app.services.patient_validation import PatientValidationService
 
 logger = logging.getLogger(__name__)
@@ -127,6 +129,14 @@ class PatientService:
         if patient_in.birth_date and not validate_birthdate(patient_in.birth_date):
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
+        logger.debug(
+            "[FIX:ADM-05] Persisting patient document fields",
+            extra={
+                "doc_type": patient_in.doc_type,
+                "doc_number": patient_in.doc_number,
+            },
+        )
+
         validated_patient = PatientCreate(
             last_name=normalized_last_name,
             first_name=normalized_first_name,
@@ -134,6 +144,8 @@ class PatientService:
             birth_date=patient_in.birth_date,
             sex=patient_in.sex,
             phone=patient_in.phone,
+            email=patient_in.email,
+            doc_type=patient_in.doc_type,
             doc_number=patient_in.doc_number,
             address=patient_in.address,
         )
@@ -164,6 +176,43 @@ class PatientService:
             description=f"Создан пациент: {patient.last_name} {patient.first_name}",
         )
         self.db.commit()
+        try:
+            registration_source = (
+                "self_service"
+                if str(getattr(current_user, "role", "")).lower() == "patient"
+                else "registrar_panel"
+            )
+            canonical_created = asyncio.run(
+                notification_sender_service.send_patient_registered_notification(
+                    db=self.db,
+                    patient=patient,
+                    registration_source=registration_source,
+                    actor_user=current_user,
+                )
+            )
+            if not canonical_created:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
+                    extra={"patient_id": patient.id, "actor_id": current_user.id},
+                )
+        except RuntimeError as exc:
+            logger.warning(
+                "[FIX:NOTIFICATIONS] patient_registered canonical delivery skipped due runtime context",
+                extra={
+                    "patient_id": patient.id,
+                    "actor_id": current_user.id,
+                    "error": str(exc),
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "[FIX:NOTIFICATIONS] patient_registered canonical delivery error",
+                extra={
+                    "patient_id": patient.id,
+                    "actor_id": current_user.id,
+                    "error": str(exc),
+                },
+            )
 
         return patient
 

@@ -64,9 +64,14 @@
   --mac-nav-item-active: var(--mac-accent-blue);
   --mac-nav-item-active-border: var(--mac-accent-blue);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
-  --mac-main-shell-bg: linear-gradient(180deg, rgba(241, 247, 255, 0.9) 0%, rgba(224, 236, 249, 0.98) 100%);
+  --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
   --mac-main-shell-shadow: 0 18px 38px rgba(126, 148, 177, 0.22);
+  --mac-table-header-bg: color-mix(in srgb, var(--mac-nav-item-bg), white 34%);
+  --mac-table-header-hover-bg: color-mix(in srgb, var(--mac-table-header-bg), var(--mac-accent-blue) 16%);
+  --mac-table-header-text: color-mix(in srgb, var(--mac-text-primary), black 12%);
+  --mac-table-row-alt-bg: color-mix(in srgb, var(--mac-card-bg), white 10%);
+  --mac-table-row-hover-bg: color-mix(in srgb, var(--mac-card-bg), var(--mac-accent-blue) 8%);
 
   --mac-success: #30d158;
   --mac-success-hover: #28cd41;
@@ -223,9 +228,14 @@
   --mac-nav-item-active: var(--mac-accent-blue);
   --mac-nav-item-active-border: var(--mac-accent-blue);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
-  --mac-main-shell-bg: linear-gradient(180deg, rgba(241, 247, 255, 0.9) 0%, rgba(224, 236, 249, 0.98) 100%);
+  --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
   --mac-main-shell-shadow: 0 18px 38px rgba(126, 148, 177, 0.22);
+  --mac-table-header-bg: color-mix(in srgb, var(--mac-nav-item-bg), white 34%);
+  --mac-table-header-hover-bg: color-mix(in srgb, var(--mac-table-header-bg), var(--mac-accent-blue) 16%);
+  --mac-table-header-text: color-mix(in srgb, var(--mac-text-primary), black 12%);
+  --mac-table-row-alt-bg: color-mix(in srgb, var(--mac-card-bg), white 10%);
+  --mac-table-row-hover-bg: color-mix(in srgb, var(--mac-card-bg), var(--mac-accent-blue) 8%);
 
   /* macOS Background Patterns - Light Mode */
   --mac-bg-window: #e6edf6;
@@ -258,6 +268,11 @@
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
+  --mac-table-header-bg: color-mix(in srgb, var(--mac-nav-item-bg, var(--mac-bg-secondary)), white 12%);
+  --mac-table-header-hover-bg: color-mix(in srgb, var(--mac-table-header-bg), var(--mac-accent-blue) 22%);
+  --mac-table-header-text: color-mix(in srgb, var(--mac-text-primary), white 14%);
+  --mac-table-row-alt-bg: color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), white 7%);
+  --mac-table-row-hover-bg: color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), var(--mac-accent-blue) 12%);
 
   --mac-separator: #38383a;
   --mac-header-bg: rgba(21, 23, 28, 0.78);
@@ -269,7 +284,7 @@
   --mac-nav-item-active: var(--mac-accent-blue);
   --mac-nav-item-active-border: var(--mac-accent-blue);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
-  --mac-main-shell-bg: linear-gradient(180deg, rgba(28, 28, 30, 0.88) 0%, rgba(24, 24, 27, 0.92) 100%);
+  --mac-main-shell-bg: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
   --mac-main-shell-border: rgba(255, 255, 255, 0.06);
   --mac-main-shell-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
 

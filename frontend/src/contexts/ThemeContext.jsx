@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useInRouterContext, useLocation } from 'react-router-dom';
 import tokens, { colors as tokenColors } from '../theme/tokens';
 import {
   applyColorSchemeToDom,
@@ -9,13 +10,17 @@ import {
   persistColorSchemeLocally,
   resolveThemeMode,
 } from '../theme/colorScheme.js';
+import apiClient from '../api/client.js';
 import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
 
 const ThemeContext = createContext();
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
+const THEME_PREFERENCE_CACHE_MS = 30_000;
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
-let apiClientPromise = null;
+const PUBLIC_PATH_PREFIXES = ['/login', '/health', '/setup', '/forbidden', '/unauthorized', '/not-found'];
+const themePreferenceCache = new Map();
+const themePreferenceRequestPromiseByToken = new Map();
 
 function getAuthTokenSnapshot() {
   if (typeof window === 'undefined') {
@@ -29,23 +34,55 @@ function getAuthTokenSnapshot() {
   }
 }
 
-async function getApiClient() {
-  if (!apiClientPromise) {
-    apiClientPromise = import('../api/client.js').then((module) => {
-      const resolvedApiClient =
-        module.api ||
-        module.default?.api ||
-        module.default ||
-        module;
+function isPublicPath(pathname) {
+  const normalizedPath = String(pathname || '/').toLowerCase();
+  return normalizedPath === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
+}
 
-      if (typeof resolvedApiClient?.get !== 'function' || typeof resolvedApiClient?.put !== 'function') {
-        throw new Error('ThemeContext could not resolve API client instance');
-      }
+function ThemeRouteSync({ onPathnameChange }) {
+  const location = useLocation();
 
-      return resolvedApiClient;
-    });
+  useEffect(() => {
+    onPathnameChange(location.pathname);
+  }, [location.pathname, onPathnameChange]);
+
+  return null;
+}
+
+function getCachedThemePreference(token) {
+  const entry = themePreferenceCache.get(token);
+  if (!entry) {
+    return null;
   }
-  return apiClientPromise;
+
+  if (Date.now() - entry.cachedAt > THEME_PREFERENCE_CACHE_MS) {
+    themePreferenceCache.delete(token);
+    return null;
+  }
+
+  return entry.theme;
+}
+
+function setCachedThemePreference(token, theme) {
+  if (!token || !theme) {
+    return;
+  }
+
+  themePreferenceCache.set(token, {
+    cachedAt: Date.now(),
+    theme,
+  });
+}
+
+function clearCachedThemePreference(token) {
+  if (token) {
+    themePreferenceCache.delete(token);
+    themePreferenceRequestPromiseByToken.delete(token);
+    return;
+  }
+
+  themePreferenceCache.clear();
+  themePreferenceRequestPromiseByToken.clear();
 }
 
 export const useTheme = () => {
@@ -57,6 +94,10 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
+  const hasRouterContext = useInRouterContext();
+  const [pathname, setPathname] = useState(() => (
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  ));
   const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [colorScheme, setColorSchemeState] = useState(() => getStoredColorScheme());
   const [authToken, setAuthToken] = useState(() => getAuthTokenSnapshot());
@@ -65,6 +106,7 @@ export const ThemeProvider = ({ children }) => {
   const skipNextRemoteSaveRef = useRef(false);
   const lastSavedPreferenceRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const routerFallbackLoggedRef = useRef(false);
 
   const theme = resolveThemeMode(colorScheme, systemTheme);
   const isDark = theme === 'dark';
@@ -187,6 +229,17 @@ export const ThemeProvider = ({ children }) => {
   }, [colorScheme, theme]);
 
   useEffect(() => {
+    if (hasRouterContext || routerFallbackLoggedRef.current) {
+      return;
+    }
+
+    routerFallbackLoggedRef.current = true;
+    logger.info('[FIX:THEME] Router context missing, using window pathname fallback', {
+      pathname,
+    });
+  }, [hasRouterContext, pathname]);
+
+  useEffect(() => {
     const root = document.documentElement;
     const computedStyle = window.getComputedStyle(root);
     const macBgPrimary = computedStyle.getPropertyValue('--mac-bg-primary').trim() || tokenColors.semantic.background.primary;
@@ -264,8 +317,9 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     let cancelled = false;
+    const currentPath = pathname;
 
-    if (!authToken) {
+    if (!authToken || isPublicPath(currentPath)) {
       hydratedTokenRef.current = null;
       lastSavedPreferenceRef.current = null;
       setPreferencesReady(true);
@@ -283,15 +337,84 @@ export const ThemeProvider = ({ children }) => {
 
     setPreferencesReady(false);
 
+    const cachedTheme = getCachedThemePreference(authToken);
+    if (cachedTheme) {
+      hydratedTokenRef.current = authToken;
+      lastSavedPreferenceRef.current = cachedTheme;
+      setColorSchemeState((currentColorScheme) => {
+        if (currentColorScheme === cachedTheme) {
+          return currentColorScheme;
+        }
+
+        skipNextRemoteSaveRef.current = true;
+        logger.info('[FIX:THEME] Reusing cached color scheme preference', {
+          colorScheme: cachedTheme,
+        });
+        return cachedTheme;
+      });
+      setPreferencesReady(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const inFlight = themePreferenceRequestPromiseByToken.get(authToken);
+    if (inFlight) {
+      setPreferencesReady(false);
+      void inFlight
+        .then((serverTheme) => {
+          if (cancelled || !serverTheme) {
+            return;
+          }
+          hydratedTokenRef.current = authToken;
+          lastSavedPreferenceRef.current = serverTheme;
+          setColorSchemeState((currentColorScheme) => {
+            if (currentColorScheme === serverTheme) {
+              return currentColorScheme;
+            }
+
+            skipNextRemoteSaveRef.current = true;
+            logger.info('[FIX:THEME] Reusing in-flight color scheme preference', {
+              colorScheme: serverTheme,
+            });
+            return serverTheme;
+          });
+        })
+        .catch((error) => {
+          if (error?.response?.status === 401 || error?.response?.status === 403) {
+            clearCachedThemePreference(authToken);
+            logger.info('[FIX:THEME] Skipping theme preference reuse due to auth state', {
+              status: error?.response?.status,
+            });
+            return;
+          }
+          logger.warn('[FIX:THEME] In-flight theme preference request failed', error);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setPreferencesReady(true);
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const loadThemePreference = async () => {
       try {
-        const api = await getApiClient();
-        const response = await api.get('/users/me/preferences');
+        const requestPromise = apiClient.get('/users/me/preferences').then((response) => {
+          const serverTheme = normalizeColorScheme(response?.data?.theme);
+          if (serverTheme) {
+            setCachedThemePreference(authToken, serverTheme);
+          }
+          return serverTheme;
+        });
+        themePreferenceRequestPromiseByToken.set(authToken, requestPromise);
+        const serverTheme = await requestPromise;
         if (cancelled) {
           return;
         }
 
-        const serverTheme = normalizeColorScheme(response?.data?.theme);
         hydratedTokenRef.current = authToken;
 
         if (serverTheme) {
@@ -309,8 +432,16 @@ export const ThemeProvider = ({ children }) => {
           });
         }
       } catch (error) {
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          clearCachedThemePreference(authToken);
+          logger.info('[FIX:THEME] Skipping theme preference load due to auth state', {
+            status: error?.response?.status,
+          });
+          return;
+        }
         logger.warn('[FIX:THEME] Failed to load user theme preference', error);
       } finally {
+        themePreferenceRequestPromiseByToken.delete(authToken);
         if (!cancelled) {
           setPreferencesReady(true);
         }
@@ -322,7 +453,7 @@ export const ThemeProvider = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+  }, [authToken, pathname]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -330,7 +461,7 @@ export const ThemeProvider = ({ children }) => {
       saveTimeoutRef.current = null;
     }
 
-    if (!authToken || !preferencesReady) {
+    if (!authToken || !preferencesReady || isPublicPath(pathname)) {
       return undefined;
     }
 
@@ -345,16 +476,23 @@ export const ThemeProvider = ({ children }) => {
     }
 
     saveTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        const api = await getApiClient();
-        await api.put('/users/me/preferences', { theme: colorScheme });
-        lastSavedPreferenceRef.current = colorScheme;
-        logger.info('[FIX:THEME] Saved color scheme to user preferences', {
-          colorScheme,
-        });
-      } catch (error) {
-        logger.warn('[FIX:THEME] Failed to save user theme preference', error);
-      }
+        try {
+          await apiClient.put('/users/me/preferences', { theme: colorScheme });
+          setCachedThemePreference(authToken, colorScheme);
+          lastSavedPreferenceRef.current = colorScheme;
+          logger.info('[FIX:THEME] Saved color scheme to user preferences', {
+            colorScheme,
+          });
+        } catch (error) {
+          if (error?.response?.status === 401 || error?.response?.status === 403) {
+            clearCachedThemePreference(authToken);
+            logger.info('[FIX:THEME] Skipping theme preference save due to auth state', {
+              status: error?.response?.status,
+            });
+            return;
+          }
+          logger.warn('[FIX:THEME] Failed to save user theme preference', error);
+        }
     }, THEME_PREFERENCE_SAVE_DEBOUNCE_MS);
 
     return () => {
@@ -363,7 +501,7 @@ export const ThemeProvider = ({ children }) => {
         saveTimeoutRef.current = null;
       }
     };
-  }, [authToken, colorScheme, preferencesReady]);
+  }, [authToken, colorScheme, preferencesReady, pathname]);
 
   const value = useMemo(() => ({
     theme,
@@ -397,8 +535,10 @@ export const ThemeProvider = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={value}>
+      {hasRouterContext ? <ThemeRouteSync onPathnameChange={setPathname} /> : null}
       {children}
-    </ThemeContext.Provider>);
+    </ThemeContext.Provider>
+  );
 
 };
 

@@ -20,7 +20,7 @@ env:
 jobs:
   # GitHub-native merge blockers for PRs into `main`:
   # - `🐍 Backend тесты`
-  # - `🎨 Frontend тесты`
+  # - `🎨 Frontend тесты` (includes registrar-time Playwright e2e)
   # - `🧱 Context Boundary Integrity`
   # - `🔄 Frontend-Backend Parity`
   #
@@ -33,7 +33,7 @@ jobs:
       guardrails_required: ${{ steps.scope.outputs.guardrails_required }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
@@ -72,10 +72,10 @@ jobs:
     timeout-minutes: 20
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -406,7 +406,7 @@ jobs:
     
     - name: 📤 Сохранение отчетов
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: code-quality-reports
         path: backend/quality-reports/
@@ -439,13 +439,13 @@ jobs:
   frontend-tests:
     name: 🎨 Frontend тесты
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 📦 Установка Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
@@ -473,6 +473,12 @@ jobs:
       run: |
         cd frontend
         npm run build
+
+    - name: 🧪 Registrar time e2e (Chromium)
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+        npx playwright test e2e/registrar-time.spec.js --project=chromium
 
   # --- Backend тесты ---
   backend-tests:
@@ -502,10 +508,10 @@ jobs:
       PYTHONUTF8: '1'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -570,7 +576,7 @@ jobs:
           tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
     
     - name: 📊 Загрузка отчета покрытия
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: coverage-report
@@ -594,10 +600,10 @@ jobs:
       needs.ci-scope.outputs.guardrails_required == 'true'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -660,10 +666,10 @@ jobs:
       needs.ci-scope.outputs.guardrails_required == 'true'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
@@ -714,7 +720,7 @@ jobs:
 
     - name: 📤 Upload parity artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: frontend-backend-parity-report
         path: |
@@ -736,10 +742,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -807,7 +813,7 @@ jobs:
 
     - name: 📤 Upload security reports
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: security-reports
         path: backend/security-reports/
@@ -824,7 +830,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐳 Настройка Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -844,7 +850,7 @@ jobs:
         echo "✅ Все Dockerfile'ы найдены"
     
     - name: 🏗️ Сборка Backend Docker
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: ./ops/backend.Dockerfile
@@ -856,7 +862,7 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
     
     - name: 🏗️ Сборка Frontend Docker
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: ./ops/frontend.Dockerfile
@@ -897,10 +903,10 @@ jobs:
       PYTHONUTF8: '1'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1086,7 +1092,7 @@ jobs:
         
         echo "✅ Все импорты успешны"
         echo "🚀 Запускаем сервер..."
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > server.log 2>&1 &
         SERVER_PID=$!
         echo $SERVER_PID > server.pid
         echo "⏳ Ожидаем запуска сервера (PID: $SERVER_PID)..."
@@ -1113,7 +1119,7 @@ jobs:
         # Проверяем доступность сервера
         echo "🔍 Проверяем доступность сервера..."
         for i in {1..5}; do
-          if curl -f http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+          if curl -f http://127.0.0.1:18000/api/v1/health > /dev/null 2>&1; then
             echo "✅ Сервер успешно запущен и отвечает на запросы"
             break
           else
@@ -1135,7 +1141,7 @@ jobs:
         echo "⏳ Ожидаем запуска сервера..."
         SERVER_READY=false
         for i in {1..30}; do
-          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+          if curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
             echo "✅ Сервер запущен и отвечает на запросы"
             SERVER_READY=true
             break
@@ -1205,10 +1211,10 @@ jobs:
       PYTHONUTF8: '1'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1247,11 +1253,11 @@ jobs:
         set +e
         mkdir -p artifacts/load
         cd backend
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > load_server.log 2>&1 &
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > load_server.log 2>&1 &
         echo $! > load_server.pid
         API_READY=0
         for i in {1..30}; do
-          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+          if curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
             echo "✅ API ready for load test"
             API_READY=1
             break
@@ -1273,7 +1279,7 @@ jobs:
           --config ops/load/endpoint_profiles.json \
           --workspace "${{ github.workspace }}" \
           --artifacts-dir artifacts/load \
-          --base-url http://127.0.0.1:8000 \
+          --base-url http://127.0.0.1:18000 \
           --api-ready "${LOAD_API_READY:-0}"
         LOAD_EXIT=$?
         echo "LOAD_PROFILES_EXIT_CODE=$LOAD_EXIT" >> $GITHUB_ENV
@@ -1295,7 +1301,7 @@ jobs:
 
     - name: 📤 Upload load artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: load-test-report
         path: |
@@ -1359,10 +1365,10 @@ jobs:
       WS_DEV_ALLOW: '1'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1399,10 +1405,10 @@ jobs:
     - name: 🚀 Start API for DAST
       run: |
         cd backend
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > zap_server.log 2>&1 &
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 18000 > zap_server.log 2>&1 &
         echo $! > zap_server.pid
         for i in {1..30}; do
-          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+          if curl -s -f "http://127.0.0.1:18000/api/v1/health" > /dev/null 2>&1; then
             echo "✅ API is ready for ZAP scan"
             exit 0
           fi
@@ -1422,7 +1428,7 @@ jobs:
           -v ${{ github.workspace }}/zap-report:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
-          -t http://127.0.0.1:8000 \
+          -t http://127.0.0.1:18000 \
           -J zap-report.json \
           -r zap-report.html \
           -w zap-warnings.md \
@@ -1523,10 +1529,10 @@ jobs:
       WS_DEV_ALLOW: '1'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1639,7 +1645,7 @@ jobs:
         fi
     
     - name: 📤 Загрузка документации
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: api-docs
         path: backend/openapi.json
@@ -1653,7 +1659,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🚀 Deploy to Staging
       run: |
@@ -1674,7 +1680,7 @@ jobs:
       name: production
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🌟 Deploy to Production
       run: |

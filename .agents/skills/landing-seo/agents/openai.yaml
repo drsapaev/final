@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing SEO"
+  short_description: "Audit metadata and crawlability"
+  default_prompt: "Use $landing-seo to review metadata, headings, schema, and crawlability for a landing page."

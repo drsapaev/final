@@ -2,6 +2,7 @@
 API endpoints для управления пользователями
 """
 
+import json
 from datetime import datetime
 from typing import List, Optional
 
@@ -71,6 +72,20 @@ def _normalize_theme(theme: str | None) -> str:
     return theme or "auto"
 
 
+def _coerce_json_mapping(value, default=None):
+    if default is None:
+        default = {}
+
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except Exception:
+            return default
+    return value if isinstance(value, dict) else default
+
+
 # ============================================
 # CURRENT USER SELF-SERVICE ENDPOINTS
 # IMPORTANT: These must be BEFORE /users/{user_id} routes!
@@ -100,7 +115,8 @@ async def get_current_user_preferences(
                 "emr_recent_icd10": [],
                 "emr_recent_templates": [],
                 "emr_favorite_templates": {},
-                "emr_custom_templates": []
+                "emr_custom_templates": [],
+                "security_settings": {},
             }
         
         # Возвращаем все поля из preferences + EMR-специфичные
@@ -115,14 +131,11 @@ async def get_current_user_preferences(
         }
         
         # Добавляем EMR-специфичные поля из JSON или дефолты
-        emr_data = getattr(preferences, 'emr_settings', None) or {}
-        if isinstance(emr_data, str):
-            import json
-            try:
-                emr_data = json.loads(emr_data)
-            except Exception:
-                emr_data = {}
-        
+        emr_data = _coerce_json_mapping(getattr(preferences, 'emr_settings', None))
+        security_settings = _coerce_json_mapping(
+            getattr(preferences, 'security_settings', None)
+        )
+
         result.update({
             "emr_smart_field_mode": emr_data.get("emr_smart_field_mode", "ghost"),
             "emr_show_mode_switcher": emr_data.get("emr_show_mode_switcher", True),
@@ -130,7 +143,8 @@ async def get_current_user_preferences(
             "emr_recent_icd10": emr_data.get("emr_recent_icd10", []),
             "emr_recent_templates": emr_data.get("emr_recent_templates", []),
             "emr_favorite_templates": emr_data.get("emr_favorite_templates", {}),
-            "emr_custom_templates": emr_data.get("emr_custom_templates", [])
+            "emr_custom_templates": emr_data.get("emr_custom_templates", []),
+            "security_settings": security_settings,
         })
         
         return result

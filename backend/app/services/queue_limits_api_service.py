@@ -45,7 +45,7 @@ class QueueLimitsApiService:
             for doctor in spec_data["doctors"]:
                 daily_queue = self.repository.get_daily_queue(
                     day=today,
-                    specialist_id=doctor.user_id,
+                    specialist_id=doctor.id,
                 )
                 if daily_queue:
                     total_usage += self.repository.count_entries(queue_id=daily_queue.id)
@@ -102,7 +102,7 @@ class QueueLimitsApiService:
         for doctor in doctors:
             daily_queue = self.repository.get_daily_queue(
                 day=day,
-                specialist_id=doctor.user_id,
+                specialist_id=doctor.id,
             )
 
             current_entries = 0
@@ -113,13 +113,18 @@ class QueueLimitsApiService:
 
             max_entries = max_per_day_settings.get(doctor.specialty, 15)
             online_available = not queue_opened and current_entries < max_entries
+            doctor_name = f"Врач #{doctor.id}"
+            if doctor.user:
+                doctor_name = (
+                    doctor.user.full_name
+                    or doctor.user.username
+                    or doctor_name
+                )
 
             result.append(
                 {
                     "doctor_id": doctor.id,
-                    "doctor_name": (
-                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                    ),
+                    "doctor_name": doctor_name,
                     "specialty": doctor.specialty,
                     "cabinet": doctor.cabinet,
                     "day": day,
@@ -177,4 +182,3 @@ class QueueLimitsApiService:
 
     def rollback(self) -> None:
         self.repository.rollback()
-

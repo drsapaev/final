@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 export const ControlCenter = ({ onActivate, onLogin }) => {
   return (
     <div className="control-center spotlight-card">
@@ -54,4 +55,11 @@ export const ControlCenter = ({ onActivate, onLogin }) => {
       </div>
     </div>
   );
+};
+
+
+ControlCenter.propTypes = {
+  ...(ControlCenter.propTypes || {}),
+  onActivate: PropTypes.any,
+  onLogin: PropTypes.any,
 };

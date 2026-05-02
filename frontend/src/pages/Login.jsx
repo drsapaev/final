@@ -4,6 +4,7 @@ import { login, me, setToken } from '../api/client';
 import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
+import { getEffectiveRouteByPath } from '../routing/routeSelectors.js';
 import { A11Y_COLORS } from '../constants/a11yTokens';
 import ForgotPassword from '../components/auth/ForgotPassword';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
@@ -33,7 +34,7 @@ const translations = {
     loggingIn: 'Входим...',
     forgotPassword: 'Забыли пароль?',
     backToHome: 'На главную',
-    note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin123).',
+    note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin).',
     flagUrl: 'https://flagcdn.com/w80/ru.png'
   },
   UZ: {
@@ -46,7 +47,7 @@ const translations = {
     loggingIn: 'Kirilmoqda...',
     forgotPassword: 'Parolni unutdingizmi?',
     backToHome: 'Bosh sahifaga',
-    note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin123).',
+    note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin).',
     flagUrl: 'https://flagcdn.com/w80/uz.png'
   },
   EN: {
@@ -59,7 +60,7 @@ const translations = {
     loggingIn: 'Signing in...',
     forgotPassword: 'Forgot password?',
     backToHome: 'Back to Home',
-    note: 'By default, admin is created by create_admin.py script (admin/admin123).',
+    note: 'By default, admin is created by create_admin.py script (admin/admin).',
     flagUrl: 'https://flagcdn.com/w80/gb.png'
   }
 };
@@ -69,7 +70,7 @@ export default function Login() {
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('admin');
   const [username, setUsername] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('admin');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [language, setLanguage] = useState('RU');
@@ -181,11 +182,8 @@ export default function Login() {
   }
 
   function isProtectedPanelPath(pathname) {
-    const prefixes = [
-      '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
-      '/cardiologist', '/dermatologist', '/dentist'
-    ];
-    return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
+    const route = getEffectiveRouteByPath(pathname);
+    return Boolean(route && (route.group === 'clinical' || route.group === 'admin'));
   }
 
   async function onLoginClick(e) {

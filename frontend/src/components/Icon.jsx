@@ -1,6 +1,7 @@
 import iconsMap from '../assets/iconsMap';
 
 import logger from '../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Универсальный компонент иконок
  * Использует глобальный набор иконок из iconsMap.js
@@ -44,6 +45,16 @@ const Icon = ({
       {...props}
     />
   );
+};
+
+
+Icon.propTypes = {
+  ...(Icon.propTypes || {}),
+  className: PropTypes.any,
+  color: PropTypes.any,
+  name: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
 };
 
 export default Icon;

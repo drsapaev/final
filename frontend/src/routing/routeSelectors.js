@@ -1,0 +1,273 @@
+import { generatePath, matchPath } from 'react-router-dom';
+import { buildRouteDocsSnapshot } from './routeDocsSnapshot.js';
+import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
+
+const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Система'];
+
+function isFullPathMatch(routePath, pathname) {
+  return Boolean(matchPath({ path: routePath, end: true }, pathname));
+}
+
+function resolveLegacyMatch(aliasPath, pathname) {
+  return matchPath({ path: aliasPath, end: true }, pathname);
+}
+
+export function normalizeRole(role) {
+  const lowerRole = String(role || '').toLowerCase();
+  return ROLE_ALIASES[lowerRole] || lowerRole;
+}
+
+export function getProfileRoles(profile) {
+  const normalizedRoles = new Set();
+
+  if (profile?.role) normalizedRoles.add(normalizeRole(profile.role));
+  if (profile?.role_name) normalizedRoles.add(normalizeRole(profile.role_name));
+  if (Array.isArray(profile?.roles)) {
+    profile.roles.forEach((role) => normalizedRoles.add(normalizeRole(role)));
+  }
+  if (profile?.is_superuser || profile?.is_admin || profile?.admin) {
+    normalizedRoles.add('admin');
+  }
+
+  return [...normalizedRoles];
+}
+
+export function getProfileIdentifiers(profile) {
+  const identifiers = new Set();
+
+  if (profile?.username) identifiers.add(String(profile.username).trim().toLowerCase());
+  if (profile?.email) identifiers.add(String(profile.email).trim().toLowerCase());
+
+  return [...identifiers];
+}
+
+export function getCanonicalRoutes() {
+  return ROUTE_REGISTRY;
+}
+
+export function getCanonicalRouteById(routeId) {
+  return ROUTE_REGISTRY.find((route) => route.id === routeId) || null;
+}
+
+export function getCanonicalRouteByPath(pathname) {
+  return ROUTE_REGISTRY.find((route) => isFullPathMatch(route.path, pathname)) || null;
+}
+
+export function getLegacyRedirectTarget(pathname) {
+  for (const route of ROUTE_REGISTRY) {
+    for (const aliasPath of route.legacyRedirectFrom || []) {
+      const matched = resolveLegacyMatch(aliasPath, pathname);
+      if (matched) {
+        return {
+          route,
+          aliasPath,
+          targetPath: generatePath(route.path, matched.params || {}),
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getEffectiveRouteByPath(pathname) {
+  const canonical = getCanonicalRouteByPath(pathname);
+  if (canonical) {
+    return canonical;
+  }
+
+  const legacyRedirect = getLegacyRedirectTarget(pathname);
+  return legacyRedirect?.route || null;
+}
+
+export function isRouteAccessibleToProfile(route, profile, options = {}) {
+  if (!route) return false;
+  if (route.group === 'internal-demo' && !options.internalDemoEnabled) {
+    return false;
+  }
+  if (route.auth === 'public') {
+    return true;
+  }
+  if (!profile) {
+    return false;
+  }
+  if (route.auth === 'authenticated') {
+    return true;
+  }
+
+  const currentRoles = getProfileRoles(profile);
+  return route.roles.some((role) => currentRoles.includes(normalizeRole(role)));
+}
+
+export function hasRouteAccess(profile, pathname, options = {}) {
+  const route = getEffectiveRouteByPath(pathname);
+  return isRouteAccessibleToProfile(route, profile, options);
+}
+
+export function routeToRoles(pathname) {
+  const route = getEffectiveRouteByPath(pathname);
+  return route?.roles || [];
+}
+
+export function getRoleHomeRoute(roleOrProfile) {
+  if (roleOrProfile && typeof roleOrProfile === 'object') {
+    const identifiers = getProfileIdentifiers(roleOrProfile);
+    if (identifiers.length > 0) {
+      const usernameHomeRoute = ROUTE_REGISTRY.find((route) =>
+        (route.homeForUsernames || []).some((username) => identifiers.includes(String(username).trim().toLowerCase()))
+      );
+      if (usernameHomeRoute) {
+        return usernameHomeRoute.path;
+      }
+    }
+  }
+
+  const roles = typeof roleOrProfile === 'string'
+    ? [normalizeRole(roleOrProfile)]
+    : getProfileRoles(roleOrProfile);
+
+  for (const preferredRole of ROLE_HOME_PRIORITY) {
+    if (!roles.includes(preferredRole)) {
+      continue;
+    }
+
+    const homeRoute = ROUTE_REGISTRY.find((route) => (route.homeForRoles || []).includes(preferredRole));
+    if (homeRoute) {
+      return homeRoute.path;
+    }
+  }
+
+  return '/clinical/search';
+}
+
+export function getRoutesForRole(roleOrProfile, options = {}) {
+  const roleProfile = typeof roleOrProfile === 'string' ? { role: roleOrProfile } : roleOrProfile;
+  return ROUTE_REGISTRY.filter((route) => isRouteAccessibleToProfile(route, roleProfile, options));
+}
+
+export function getVisibleRoutesForShell(shell, profile, options = {}) {
+  return ROUTE_REGISTRY.filter((route) => {
+    if (route.shell !== shell) {
+      return false;
+    }
+    if (!route.nav) {
+      return false;
+    }
+    if (route.group === 'internal-demo') {
+      return false;
+    }
+    return isRouteAccessibleToProfile(route, profile, options);
+  }).sort((left, right) => (left.nav?.order || 0) - (right.nav?.order || 0));
+}
+
+export function getAdminNavRoutes(profile, options = {}) {
+  return ROUTE_REGISTRY
+    .filter((route) => route.group === 'admin' && route.nav?.sidebar)
+    .filter((route) => isRouteAccessibleToProfile(route, profile, options))
+    .sort((left, right) => {
+      const leftSectionIndex = ADMIN_SECTION_ORDER.indexOf(left.nav?.section || '');
+      const rightSectionIndex = ADMIN_SECTION_ORDER.indexOf(right.nav?.section || '');
+      if (leftSectionIndex !== rightSectionIndex) {
+        return (leftSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : leftSectionIndex) -
+          (rightSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : rightSectionIndex);
+      }
+      return (left.nav?.order || 0) - (right.nav?.order || 0);
+    });
+}
+
+export function getAdminNavSections(profile, options = {}) {
+  return getAdminNavRoutes(profile, options).reduce((sections, route) => {
+    const sectionName = route.nav?.section || 'General';
+    const existingSection = sections.find((section) => section.title === sectionName);
+    const item = {
+      id: route.id,
+      to: route.path,
+      label: route.nav?.label || route.title,
+      icon: route.nav?.icon || 'circle',
+      route,
+    };
+
+    if (existingSection) {
+      existingSection.items.push(item);
+      return sections;
+    }
+
+    sections.push({ title: sectionName, items: [item] });
+    return sections;
+  }, []);
+}
+
+export function getClinicalNavRoutes(profile, options = {}) {
+  return ROUTE_REGISTRY
+    .filter((route) => route.group === 'clinical' && route.nav?.menu)
+    .filter((route) => isRouteAccessibleToProfile(route, profile, options))
+    .sort((left, right) => (left.nav?.order || 0) - (right.nav?.order || 0));
+}
+
+export function getPublicRoutes() {
+  return ROUTE_REGISTRY.filter((route) => route.group === 'public');
+}
+
+export function getInternalDemoRoutes() {
+  return ROUTE_REGISTRY.filter((route) => route.group === 'internal-demo');
+}
+
+export function getRouteDocsSnapshot() {
+  return buildRouteDocsSnapshot();
+}
+
+export function isInternalDemoEnabled() {
+  return Boolean(import.meta.env.DEV || import.meta.env.VITE_ENABLE_INTERNAL_DEMO === '1');
+}
+
+export function getRouteChromeState(pathname, search = '', profile = null) {
+  const route = getEffectiveRouteByPath(pathname) || getCanonicalRouteById('not-found');
+  const routeLayout = route?.layout || {};
+  const sidebarPresetKey = routeLayout.sidebarPreset || null;
+  const sidebarPreset = sidebarPresetKey ? SIDEBAR_PRESETS[sidebarPresetKey] : null;
+  const searchParams = new URLSearchParams(search);
+
+  let sidebarItems = sidebarPreset?.items || [];
+  if (sidebarPresetKey === 'admin') {
+    sidebarItems = getAdminNavRoutes(profile, { internalDemoEnabled: isInternalDemoEnabled() }).map((navRoute) => ({
+      id: navRoute.id,
+      label: navRoute.nav?.label || navRoute.title,
+      icon: navRoute.nav?.icon || 'circle',
+      to: navRoute.path,
+    }));
+  }
+  if (sidebarPresetKey === 'default') {
+    sidebarItems = getClinicalNavRoutes(profile, { internalDemoEnabled: isInternalDemoEnabled() }).map((navRoute) => ({
+      id: navRoute.id,
+      label: navRoute.nav?.label || navRoute.title,
+      icon: navRoute.nav?.icon || 'circle',
+      to: navRoute.path,
+    }));
+  }
+
+  const activeSidebarItem = routeLayout.activeSidebarItem ||
+    searchParams.get(sidebarPreset?.queryParam || '') ||
+    sidebarPreset?.defaultItem ||
+    null;
+
+  return {
+    route,
+    pageTitle: route?.layout?.pageTitle || route?.title || 'Clinic Management System',
+    hideHeader: Boolean(routeLayout.hideHeader),
+    hideSidebar: Boolean(routeLayout.hideSidebar || !sidebarPreset),
+    fullscreen: Boolean(routeLayout.fullscreen),
+    sidebarPreset,
+    sidebarItems,
+    activeSidebarItem,
+  };
+}
+
+export function getCompatibilityRedirects() {
+  return ROUTE_REGISTRY.flatMap((route) =>
+    (route.legacyRedirectFrom || []).map((aliasPath) => ({
+      aliasPath,
+      routeId: route.id,
+      targetPath: route.path,
+    }))
+  );
+}

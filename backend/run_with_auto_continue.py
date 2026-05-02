@@ -83,7 +83,7 @@ def check_server_health():
     import requests
 
     try:
-        response = requests.get("http://localhost:8000/api/v1/health", timeout=2)
+        response = requests.get("http://localhost:18000/api/v1/health", timeout=2)
         return response.status_code == 200
     except:
         return False

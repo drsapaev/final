@@ -10,7 +10,7 @@ token = jwt.encode({**payload, 'exp': datetime.utcnow() + timedelta(hours=1)}, s
 print(f'Токен: {token[:50]}...')
 
 headers = {'Authorization': f'Bearer {token}'}
-response = requests.get('http://localhost:8000/api/v1/users/users', headers=headers)
+response = requests.get('http://localhost:18000/api/v1/users/users', headers=headers)
 print(f'Статус: {response.status_code}')
 if response.status_code == 200:
     print('✅ Успешно!')

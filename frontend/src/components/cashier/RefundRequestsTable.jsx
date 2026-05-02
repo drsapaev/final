@@ -22,6 +22,7 @@ import {
 import { Badge } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import PropTypes from 'prop-types';
 
 const RefundRequestsTable = ({ onRefresh }) => {
   const [requests, setRequests] = useState([]);
@@ -419,6 +420,12 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
         </div>);
 
+};
+
+
+RefundRequestsTable.propTypes = {
+  ...(RefundRequestsTable.propTypes || {}),
+  onRefresh: PropTypes.any,
 };
 
 export default RefundRequestsTable;

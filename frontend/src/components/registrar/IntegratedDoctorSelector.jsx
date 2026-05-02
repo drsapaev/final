@@ -14,6 +14,7 @@ import {
 import { Card, Badge } from '../ui/native';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
+import PropTypes from 'prop-types';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели
@@ -255,6 +256,16 @@ const IntegratedDoctorSelector = ({
       })}
     </div>
   );
+};
+
+
+IntegratedDoctorSelector.propTypes = {
+  ...(IntegratedDoctorSelector.propTypes || {}),
+  className: PropTypes.any,
+  onDoctorChange: PropTypes.any,
+  selectedDoctorId: PropTypes.any,
+  showSchedule: PropTypes.any,
+  specialty: PropTypes.any,
 };
 
 export default IntegratedDoctorSelector;

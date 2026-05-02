@@ -299,7 +299,7 @@ I10 — Эссенциальная [первичная] гипертензия
 |-----------|------------|
 | Frontend | React + Redux |
 | Backend | FastAPI (Python) |
-| Database | SQLite / PostgreSQL |
+| Database | PostgreSQL |
 | AI | DeepSeek API |
 
 ### Ключевые файлы

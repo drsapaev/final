@@ -145,7 +145,7 @@ class AppointmentsApiService:
                         if service:
                             service_code = (
                                 self.repository.get_mapped_service_code(service.id)
-                                or service.code
+                                or service.service_code
                                 or service_item
                             )
                             services_codes.append(service_code)
@@ -167,7 +167,7 @@ class AppointmentsApiService:
                             if service:
                                 service_code = (
                                     self.repository.get_mapped_service_code(service.id)
-                                    or service.code
+                                    or service.service_code
                                     or service_item["code"]
                                 )
                                 services_codes.append(service_code)
@@ -279,7 +279,7 @@ class AppointmentsApiService:
                         if service:
                             service_code = (
                                 self.repository.get_mapped_service_code(vs.service_id)
-                                or service.code
+                                or service.service_code
                                 or f"S{vs.service_id}"
                             )
                     service_name = vs.name

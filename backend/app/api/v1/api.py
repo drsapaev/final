@@ -10,7 +10,9 @@ from app.api.v1.endpoints import (
 )
 from app.api.v1.endpoints import (
     admin_ai,
+    admin_appointments,
     admin_clinic,
+    admin_finance,
     admin_departments,
     admin_display,
     admin_doctors,
@@ -35,6 +37,7 @@ from app.api.v1.endpoints import (
     appointments,
     auth,
     authentication,
+    audit,
     billing,
     cardio,
     cashier,
@@ -67,8 +70,7 @@ from app.api.v1.endpoints import (
     force_majeure,
     global_search,
     group_permissions,
-    lab,
-    lab_specialized,
+    lab_reporting,
     medical_equipment,
     messages,
     minimal_auth,
@@ -103,6 +105,7 @@ from app.api.v1.endpoints import (
     roles,
     schedule,
     services,
+    setup,
     simple_auth,
     sms_providers,
     specialized_panels,
@@ -130,9 +133,6 @@ from app.api.v1.endpoints import (
 )
 from app.api.v1.endpoints import (
     health as health_ep,
-)
-from app.api.v1.endpoints import (
-    print as print_ep,
 )
 from app.api.v1.endpoints import (
     reports as reports_ep,
@@ -240,6 +240,7 @@ api_router.include_router(
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
+api_router.include_router(audit.router, tags=["audit"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
 api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(registrar_integration.router, tags=["registrar"])
@@ -258,6 +259,8 @@ api_router.include_router(ai_chat.router, prefix="/ai/chat", tags=["ai-chat"])
 
 api_router.include_router(ai_cost_analytics.router, prefix="/ai/analytics", tags=["ai-cost-analytics"])
 
+api_router.include_router(admin_finance.router, tags=["admin-finance"])
+
 
 # MCP (Model Context Protocol) endpoints
 if mcp:
@@ -273,12 +276,12 @@ api_router.include_router(
 api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
-api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
-api_router.include_router(reports_ep.router, tags=["reports"])
+api_router.include_router(reports_ep.router, prefix="/reports", tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
 api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]
@@ -384,8 +387,9 @@ api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-leg
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
-api_router.include_router(lab.router, tags=["lab"])
-api_router.include_router(lab_specialized.router, tags=["lab_specialized"])
+api_router.include_router(lab_reporting.router, tags=["lab-reporting"])
+# Legacy /lab CRUD and placeholder routers are intentionally not published.
+# The lab reporting template workflow is the only supported public contract.
 api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )
@@ -412,6 +416,7 @@ api_router.include_router(
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(observability.router, tags=["observability"])
 api_router.include_router(activation_ep.router, tags=["activation"])
+api_router.include_router(setup.router, tags=["setup"])
 api_router.include_router(
     authentication.router, prefix="/authentication", tags=["authentication"]
 )

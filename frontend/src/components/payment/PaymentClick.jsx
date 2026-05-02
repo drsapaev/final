@@ -10,13 +10,16 @@ import {
   Printer } from
 'lucide-react';
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
-import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
+import { getApiBaseUrl } from '../../api/runtime';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
+import { printPanelTicketInBrowser } from '../../services/panelPrint';
+import notify from '../../services/notify';
 import './PaymentClick.css';
+import PropTypes from 'prop-types';
 
-const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+const API_BASE = getApiBaseUrl();
 
 const PaymentClick = ({
   isOpen,
@@ -156,7 +159,7 @@ const PaymentClick = ({
         clearPolling();
         setPaymentState('failed');
         setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
-        toast.error('Время ожидания истекло');
+        notify.error('Время ожидания истекло');
       }
     }, pollingIntervalMs);
   };
@@ -174,7 +177,7 @@ const PaymentClick = ({
         // Получаем данные для печати талонов
         await loadPrintTickets();
 
-        toast.success('Платёж успешно завершён!');
+        notify.success('Платёж успешно завершён!');
 
         // Показываем принтер талонов если есть талоны для печати
         if (printTickets.length > 0) {
@@ -242,48 +245,16 @@ const PaymentClick = ({
   };
 
   const printTicket = (ticket) => {
-    // В реальной реализации здесь будет вызов принтера
-    const printContent = `
-      ТАЛОН НА ПРИЁМ
+    const opened = printPanelTicketInBrowser({
+      ...ticket,
+      specialty_name: ticket.department || ticket.specialty || ticket.queue_name || 'Очередь',
+      source: 'payment',
+    });
 
-      Пациент: ${ticket.patient_name}
-
-      Врач: ${ticket.doctor_name}
-
-      Отделение: ${ticket.department}
-
-      Дата: ${ticket.visit_date}
-
-      Время: ${ticket.visit_time || 'По очереди'}
-
-      Номер в очереди: ${ticket.queue_number}
-
-      ────────────────────────────
-
-      Время печати: ${new Date().toLocaleString()}
-
-    `;
-
-    // Открываем окно печати
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Талон на приём</title>
-          <style>
-            body { font-family: monospace; font-size: 12px; margin: 20px; }
-            .ticket { border: 1px dashed #000; padding: 15px; width: 300px; }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <pre>${printContent}</pre>
-          </div>
-          <script>window.print(); window.close();</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    if (!opened) {
+      logger.warn('Browser popup blocked for payment ticket print', ticket);
+    }
+    return opened;
   };
 
   const printAllTickets = () => {
@@ -614,13 +585,26 @@ const PaymentClick = ({
           onClose={() => setShowTicketPrinter(false)}
           onAllPrinted={() => {
             setShowTicketPrinter(false);
-            toast.success('Все талоны напечатаны!');
+            notify.success('Все талоны напечатаны!');
           }} />
         
       </ModernDialog>
       }
   </>);
 
+};
+
+
+PaymentClick.propTypes = {
+  ...(PaymentClick.propTypes || {}),
+  currency: PropTypes.any,
+  invoiceId: PropTypes.any,
+  isOpen: PropTypes.any,
+  onClose: PropTypes.any,
+  onError: PropTypes.any,
+  onSuccess: PropTypes.any,
+  toLocaleString: PropTypes.any,
+  totalAmount: PropTypes.any,
 };
 
 export default PaymentClick;

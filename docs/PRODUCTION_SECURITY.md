@@ -306,14 +306,14 @@ Three endpoints are available for monitoring:
 livenessProbe:
   httpGet:
     path: /live
-    port: 8000
+    port: 18000
   initialDelaySeconds: 5
   periodSeconds: 10
 
 readinessProbe:
   httpGet:
     path: /ready
-    port: 8000
+    port: 18000
   initialDelaySeconds: 5
   periodSeconds: 5
 ```
@@ -329,7 +329,7 @@ readinessProbe:
 - [ ] Configure `PRODUCTION_CORS_ORIGINS` with actual domains
 - [ ] Ensure `CORS_ALLOW_ALL=false`
 - [ ] Enable rate limiting (`RATE_LIMIT_ENABLED=true`)
-- [ ] Use PostgreSQL instead of SQLite
+- [ ] Use PostgreSQL as the production database
 - [ ] Configure HTTPS (via reverse proxy)
 - [ ] Set up monitoring for `/health`, `/ready`, `/live`
 - [ ] Configure Sentry error tracking (`SENTRY_DSN`)

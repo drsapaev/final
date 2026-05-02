@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import importlib.metadata
+import logging
 from datetime import UTC, datetime, timedelta
+from enum import Enum
 from typing import Any
 
+import argon2 as _argon2
 from jose import jwt
 from passlib.context import CryptContext
+
+logger = logging.getLogger(__name__)
+
+if "__version__" not in vars(_argon2):
+    _argon2.__version__ = importlib.metadata.version("argon2-cffi")
+    logger.debug("[FIX] Applied argon2 version shim for passlib compatibility")
 
 # Настройки с дефолтами
 try:
@@ -49,14 +59,57 @@ def create_access_token(
         to_encode = {**subject, "exp": expire}
         to_encode.setdefault(
             "sub", subject.get("username") or subject.get("id") or "user"
-        )
+    )
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _coerce_role_label(role: Any) -> str:
+    """Normalize a role-like object to a trimmed string label."""
+    if role is None:
+        return ""
+
+    if isinstance(role, Enum):
+        role = role.value
+    elif not isinstance(role, (str, bytes)) and hasattr(role, "value"):
+        value = getattr(role, "value", None)
+        if isinstance(value, str):
+            role = value
+
+    if isinstance(role, bytes):
+        role = role.decode("utf-8", errors="ignore")
+
+    return str(role).strip()
+
+
+def _normalize_required_roles(*roles: Any) -> tuple[str, ...]:
+    """Flatten and normalize role inputs while preserving legacy call styles."""
+    normalized: list[str] = []
+    for role in roles:
+        if role is None:
+            continue
+        if isinstance(role, (list, tuple, set, frozenset)):
+            nested_roles = tuple(role)
+            nested_normalized = _normalize_required_roles(*nested_roles)
+            if nested_normalized:
+                logger.debug(
+                    "[FIX:require_roles] Flattened nested role collection %s -> %s",
+                    nested_roles,
+                    nested_normalized,
+                )
+                normalized.extend(nested_normalized)
+            continue
+
+        role_label = _coerce_role_label(role)
+        if role_label:
+            normalized.append(role_label)
+
+    return tuple(normalized)
 
 
 # ===================== ФУНКЦИИ ПРАВ ДОСТУПА (SSOT) =====================
 
 
-def require_roles(*roles: str):
+def require_roles(*roles: Any):
     """
     Dependency factory для проверки ролей (SSOT) с автоматическим логированием 403.
 
@@ -80,7 +133,15 @@ def require_roles(*roles: str):
         # Получаем Request из contextvar (установлен в AuditMiddleware)
         request = get_current_request()
 
-        if not roles:
+        normalized_roles = _normalize_required_roles(*roles)
+        logger.debug(
+            "[FIX:require_roles] raw_roles=%s normalized_roles=%s user_role=%s",
+            roles,
+            normalized_roles,
+            getattr(current_user, "role", None),
+        )
+
+        if not normalized_roles:
             return current_user
 
         role = getattr(current_user, "role", None)
@@ -90,7 +151,8 @@ def require_roles(*roles: str):
             return current_user
 
         # Проверяем роль с учетом регистра
-        role_lower = str(role).lower() if role else ""
+        role_label = _coerce_role_label(role)
+        role_lower = role_label.lower() if role_label else ""
 
         # ✅ ROLE NORMALIZATION: Map 'receptionist' to 'registrar' for compatibility
         # DB stores 'Receptionist' but API endpoints expect 'Registrar'
@@ -98,15 +160,15 @@ def require_roles(*roles: str):
         if role_normalized == "receptionist":
             role_normalized = "registrar"
 
-        allowed_roles_lower = [r.lower() for r in roles]
+        allowed_roles_lower = [r.lower() for r in normalized_roles]
         # Also add 'receptionist' as allowed if 'registrar' is in allowed roles
         if "registrar" in allowed_roles_lower and "receptionist" not in allowed_roles_lower:
             allowed_roles_lower.append("receptionist")
 
         # ✅ DEBUG LOG: Explicitly log the mismatch
         print(f"DEBUG: Checking roles for user {current_user.id} ({current_user.username})")
-        print(f"DEBUG: User Role: '{role}', Normalized: '{role_normalized}'")
-        print(f"DEBUG: Required Roles: {roles}, Normalized: {allowed_roles_lower}")
+        print(f"DEBUG: User Role: '{role_label}', Normalized: '{role_normalized}'")
+        print(f"DEBUG: Required Roles: {normalized_roles}, Normalized: {allowed_roles_lower}")
 
         if role_normalized not in allowed_roles_lower and role_lower not in allowed_roles_lower:
             print(f"DEBUG: ACCESS DENIED for user {current_user.username}")
@@ -130,17 +192,15 @@ def require_roles(*roles: str):
                     resource_id = int(path_parts[3])
             else:
                 # ✅ FIX: Если request недоступен, логируем с предупреждением
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(
+                audit_logger = logging.getLogger(__name__)
+                audit_logger.warning(
                     f"SECURITY: require_roles: request context unavailable for user_id={current_user.id}, "
                     f"roles={roles}, user_role={role}. Audit log may be incomplete."
                 )
 
             # ✅ DEBUG LOG: Explicitly log the mismatch
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(
+            audit_logger = logging.getLogger(__name__)
+            audit_logger.error(
                 f"ACCESS DENIED DEBUG: User={current_user.username} (ID={current_user.id}), "
                 f"RoleInDB='{role}' (normalized='{role_lower}'), "
                 f"Required='{roles}' (normalized='{allowed_roles_lower}')"
@@ -156,23 +216,22 @@ def require_roles(*roles: str):
                     row_id=resource_id,
                     old_data=None,
                     new_data={
-                        "required_roles": list(roles),
+                        "required_roles": list(normalized_roles),
                         "user_role": role,
                         "request_available": request is not None,
                     },
                     request=request,  # Может быть None
-                    description=f"403 Forbidden: {method_str} {path_str} - требуется роль: {', '.join(roles)}, текущая роль: {role}",
+                    description=f"403 Forbidden: {method_str} {path_str} - требуется роль: {', '.join(normalized_roles)}, текущая роль: {role_label}",
                 )
                 db.commit()
             except Exception as e:
                 # ✅ FIX: Если логирование не удалось, все равно выбрасываем 403
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Failed to log ACCESS_DENIED audit: {e}", exc_info=True)
+                audit_logger = logging.getLogger(__name__)
+                audit_logger.error(f"Failed to log ACCESS_DENIED audit: {e}", exc_info=True)
 
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Доступ запрещен. Требуются роли: {', '.join(roles)}",
+                detail=f"Доступ запрещен. Требуются роли: {', '.join(normalized_roles)}",
             )
 
         return current_user

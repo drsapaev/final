@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ANIMATION_TYPES, ANIMATION_DIRECTIONS } from './types';
+import PropTypes from 'prop-types';
 
 const AnimatedTransition = ({
   children,
@@ -86,6 +87,18 @@ const AnimatedTransition = ({
       {children}
     </div>
   );
+};
+
+
+AnimatedTransition.propTypes = {
+  ...(AnimatedTransition.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  delay: PropTypes.any,
+  direction: PropTypes.any,
+  duration: PropTypes.any,
+  style: PropTypes.any,
+  type: PropTypes.any,
 };
 
 export default AnimatedTransition;

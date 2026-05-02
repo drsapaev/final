@@ -23,6 +23,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import { api as apiClient } from '../api/client';
 
 import logger from '../utils/logger';
+import { openPrintableWindow } from '../utils/printWindow';
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -120,23 +121,29 @@ const PaymentSuccess = () => {
 
   const printReceipt = () => {
     const receiptContent = generateSimpleReceipt();
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    openPrintableWindow({
+      html: `
       <html>
         <head>
           <title>Квитанция ${paymentId}</title>
           <style>
-            body { font-family: monospace; margin: 20px; }
-            pre { white-space: pre-wrap; }
+            body { font-family: monospace; margin: 24px; color: #111827; }
+            h1 { font-size: 20px; margin-bottom: 12px; }
+            .meta { margin-bottom: 16px; line-height: 1.6; }
+            pre { white-space: pre-wrap; font-family: inherit; padding: 16px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; }
           </style>
         </head>
         <body>
+          <h1>Квитанция об оплате</h1>
+          <div class="meta">
+            <div><strong>Платеж:</strong> ${paymentId}</div>
+            <div><strong>Статус:</strong> ${getStatusText(paymentData.status)}</div>
+          </div>
           <pre>${receiptContent}</pre>
         </body>
       </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    `
+    });
   };
 
   const shareReceipt = async () => {
@@ -177,15 +184,27 @@ const PaymentSuccess = () => {
     return names[provider] || provider;
   };
 
+  const normalizePaymentStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
+      return 'completed';
+    }
+
+    return normalized;
+  };
+
   const getStatusText = (status) => {
     const texts = {
       pending: 'Ожидает',
       processing: 'Обработка',
       completed: 'Завершен',
+      paid: 'Оплачен',
       failed: 'Неудачно',
       cancelled: 'Отменен'
     };
-    return texts[status] || status;
+    const normalized = String(status || '').toLowerCase();
+    return texts[normalized] || status;
   };
 
   const getStatusColor = (status) => {
@@ -193,10 +212,12 @@ const PaymentSuccess = () => {
       pending: 'warning',
       processing: 'info',
       completed: 'success',
+      paid: 'success',
       failed: 'error',
       cancelled: 'default'
     };
-    return colors[status] || 'default';
+    const normalized = String(status || '').toLowerCase();
+    return colors[normalized] || 'default';
   };
 
   if (loading) {
@@ -233,7 +254,7 @@ const PaymentSuccess = () => {
     );
   }
 
-  const isSuccess = paymentData?.status === 'completed';
+  const isSuccess = normalizePaymentStatus(paymentData?.status) === 'completed';
 
   return (
     <Box maxWidth="md" mx="auto" mt={4} px={2}>

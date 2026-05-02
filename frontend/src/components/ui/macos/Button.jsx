@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
 
 /**
  * macOS-style Button Component
@@ -159,6 +160,7 @@ const Button = React.forwardRef(({
       style={buttonStyles}
       disabled={disabled || loading}
       onClick={handleClick}
+      aria-busy={loading}
       {...props}>
 
       {/* Loading spinner */}
@@ -255,6 +257,20 @@ const Button = React.forwardRef(({
     </button>);
 
 });
+
+
+Button.propTypes = {
+  ...(Button.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  disabled: PropTypes.any,
+  fullWidth: PropTypes.any,
+  loading: PropTypes.any,
+  onClick: PropTypes.any,
+  size: PropTypes.any,
+  style: PropTypes.any,
+  variant: PropTypes.any,
+};
 
 Button.displayName = 'macOS Button';
 

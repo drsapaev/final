@@ -10,4 +10,4 @@ if (-not $env:CORS_DISABLE) { $env:CORS_DISABLE = "0" }
 $env:REQUIRE_LICENSE = "0"
 
 # Запустить сервер
-uvicorn app.main:app --reload --port 8000 --reload-exclude ".venv"
+uvicorn app.main:app --reload --port 18000 --reload-exclude ".venv"

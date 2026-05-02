@@ -33,7 +33,7 @@ APP_NAME=Clinic Manager
 APP_VERSION=0.9.0
 
 # --- БАЗА ДАННЫХ ---
-DATABASE_URL=sqlite:///./clinic.db
+DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
 
 # --- АУТЕНТИФИКАЦИЯ ---
 SECRET_KEY=your-super-secret-key-change-in-production
@@ -97,7 +97,7 @@ echo. > .env
 # 2. Открыть в редакторе и добавить настройки выше
 
 # 3. Перезапустить backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --host 0.0.0.0 --port 18000
 ```
 
 ## 🔒 Безопасность
