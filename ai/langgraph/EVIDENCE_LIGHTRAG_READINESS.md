@@ -2974,3 +2974,41 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should have connected the state-shape leak in the context object to the canonical type-normalization path faster, reducing retry churn.
+
+## Task 84 - Admin departments merge conflict route-order review
+
+### User task
+Resolve remaining merge conflict in `backend/app/api/v1/endpoints/admin_departments.py` while preserving local route-order fixes and checking remote `/overview` and `/{department_id}/initialize` endpoint placement.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, as a constrained review brief
+- gate_misroute: partial
+- override_used: no
+- known_root_cause_file: backend/app/api/v1/endpoints/admin_departments.py
+
+### What handoff solved well
+- It correctly kept the root-cause file in first-touch scope.
+- It made the route-order risk explicit before accepting either side of the merge.
+
+### Missing relationship mapping
+- The gate added frontend routing files to first-touch even though the conflict was backend-only.
+- Manual inspection was required to see that the local side already contained `/overview` and `/{department_id}/initialize` earlier in the file, while the remote side duplicated them later after dynamic routes.
+
+### Manual reconstruction needed
+- Compared the local and remote route ordering for departments, doctors, clinic management, and webhooks.
+- Preserved the local static-before-dynamic route ordering and config/start-script fixes instead of reintroducing shadowed static routes.
+- Confirmed the active merge state later disappeared after a reset to `HEAD`, so no additional merge commit was produced from this review.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: partial
+- override_used: no
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should distinguish backend route-order conflicts from frontend route registry ownership and avoid adding unrelated first-touch files.
