@@ -3499,3 +3499,40 @@ Continue the QA sweep by removing SQLite and `admin/admin` defaults from the dev
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should distinguish standalone dev scripts from container runtime files while still preserving Postgres-only guardrails.
+
+## Task 98 - Backend env example secret placeholder hardening
+
+### User task
+Continue the QA sweep by hardening remaining backend env example secret placeholders.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/.env.example
+
+### What handoff solved well
+- It identified the tracked env example as a secrets hygiene artifact.
+- It kept the fix out of runtime config code.
+
+### Missing relationship mapping
+- The gate included `.gitignore`, but `.env.example` is intentionally tracked and needed content hardening instead of ignore-rule changes.
+- Manual reconstruction was required to align the sample with required `SECRET_KEY` behavior without changing development defaults in `app.core.config`.
+
+### Manual reconstruction needed
+- Cleared sample `DATABASE_URL` and `SECRET_KEY` values so copied env files require explicit operator input.
+- Replaced the compose alternative DB password placeholder with an empty `DB_PASSWORD` and a non-secret URL placeholder.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should distinguish tracked examples from local env artifacts while still surfacing runnable-looking secret placeholders.
