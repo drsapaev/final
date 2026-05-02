@@ -4062,6 +4062,43 @@ Continue the QA sweep by removing filled database passwords from sibling CI setu
 - would LightRAG likely help here: yes
 - Better graph context should connect duplicated CI setup docs so this can be planned as a bounded sibling-doc series.
 
+## Task 117 - Runtime API docs credential placeholder
+
+### User task
+Continue the QA sweep by removing active hardcoded admin credentials from backend API documentation.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/api_documentation.py
+
+### What handoff solved well
+- It prevented widening into duplicated service mirrors during the first patch slice.
+- It provided a concrete compile validation target for the runtime endpoint file.
+
+### Missing relationship mapping
+- The gate did not connect the endpoint file to similarly named service mirror files.
+
+### Manual reconstruction needed
+- Confirmed `backend/app/api/v1/api.py` registers the endpoint router as the active route.
+- Replaced `admin123` in the active API documentation endpoint with an explicit password placeholder.
+- Left service mirror cleanup for a separate gated slice.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should map active endpoint registration and duplicate service mirrors before execution.
+
 ## Task 114 - CLAUDE env context database placeholder
 
 ### User task
