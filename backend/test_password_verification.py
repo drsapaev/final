@@ -1,51 +1,24 @@
 #!/usr/bin/env python3
-"""
-Тестирование верификации пароля
-"""
+"""Retired root manual password verification smoke script."""
+
+from __future__ import annotations
+
 import sys
-sys.path.append('.')
 
-from app.crud.user import verify_password
-import sqlite3
+MESSAGE = """
+test_password_verification.py is retired.
 
-def test_password_verification():
-    """Тестировать верификацию пароля"""
-    conn = sqlite3.connect("clinic.db")
-    cursor = conn.cursor()
-    
-    try:
-        # Получаем данные админа
-        cursor.execute("SELECT id, username, hashed_password FROM users WHERE username = 'admin'")
-        admin = cursor.fetchone()
-        
-        if not admin:
-            print("❌ Админ не найден")
-            return False
-        
-        print(f"✅ Админ найден: ID={admin[0]}, Username={admin[1]}")
-        print(f"   Stored hash: {admin[2]}")
-        
-        # Тестируем верификацию пароля
-        password = "admin123"
-        stored_hash = admin[2]
-        
-        print(f"   Testing password: {password}")
-        print(f"   Stored hash: {stored_hash}")
-        
-        try:
-            result = verify_password(password, stored_hash)
-            print(f"   Verification result: {result}")
-            return result
-        except Exception as e:
-            print(f"   Verification error: {e}")
-            return False
-        
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        return False
-    finally:
-        conn.close()
+This root-level manual script used built-in credentials or local database
+assumptions and is outside the backend pytest suite. Use backend/tests pytest
+fixtures or an env-driven smoke check against the current Postgres/Alembic
+runtime instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    test_password_verification()
-
+    raise SystemExit(main())

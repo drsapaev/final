@@ -1,44 +1,23 @@
 #!/usr/bin/env python3
-"""
-Тест простых endpoints
-"""
-import requests
-import json
+"""Retired root manual simple endpoints smoke script."""
 
-def test_simple_endpoints():
-    """Тест простых endpoints"""
-    print("🔍 ТЕСТ ПРОСТЫХ ENDPOINTS")
-    print("=" * 40)
-    
-    endpoints = [
-        ("GET", "/api/v1/health", "Health"),
-        ("GET", "/api/v1/status", "Status"),
-        ("GET", "/api/v1/auth/me", "Auth Me (без токена)"),
-        ("GET", "/api/v1/authentication/status", "Auth Status"),
-        ("GET", "/api/v1/authentication/health", "Auth Health"),
-    ]
-    
-    for method, endpoint, name in endpoints:
-        print(f"\n{name} ({method} {endpoint}):")
-        try:
-            if method == "GET":
-                response = requests.get(f"http://localhost:18000{endpoint}", timeout=5)
-            else:
-                response = requests.post(f"http://localhost:18000{endpoint}", timeout=5)
-            
-            print(f"   Статус: {response.status_code}")
-            if response.status_code == 200:
-                print(f"   ✅ {name} работает")
-                try:
-                    data = response.json()
-                    print(f"   Данные: {data}")
-                except:
-                    print(f"   Ответ: {response.text[:100]}")
-            else:
-                print(f"   ❌ {name}: {response.text[:100]}")
-                
-        except Exception as e:
-            print(f"   ❌ Ошибка {name}: {e}")
+from __future__ import annotations
+
+import sys
+
+MESSAGE = """
+test_simple_endpoints.py is retired.
+
+This root-level manual script used direct runtime access outside the backend
+pytest suite. Use backend/tests pytest fixtures against current service or API
+contracts instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    test_simple_endpoints()
+    raise SystemExit(main())

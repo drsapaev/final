@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
-from app.db.session import SessionLocal
-from app.models.user import User
-from sqlalchemy import select
+"""Retired root manual SQLAlchemy smoke script."""
 
-db = SessionLocal()
-stmt = select(User).where(User.id == 19)
-result = db.execute(stmt)
-user = result.scalar_one_or_none()
-print(f"Пользователь найден: {user.username if user else 'None'}")
-if user:
-    print(f"  ID: {user.id}")
-    print(f"  Активен: {user.is_active}")
-db.close()
+from __future__ import annotations
+
+import sys
+
+MESSAGE = """
+test_sqlalchemy.py is retired.
+
+This root-level manual script used direct runtime access outside the backend
+pytest suite. Use backend/tests pytest fixtures against current service or API
+contracts instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,94 +1,23 @@
-"""
-Тест создания корзины с полным traceback
-"""
-import requests
-import json
+#!/usr/bin/env python3
+"""Retired root manual cart error debug smoke script."""
 
-BASE_URL = "http://localhost:18000"
+from __future__ import annotations
 
-# Получаем токен
-login_data = {
-    "username": "registrar@example.com",
-    "password": "registrar123"
-}
+import sys
 
-print("🔐 Авторизация...")
-try:
-    # FastAPI OAuth2 expects form data, not JSON
-    response = requests.post(
-        f"{BASE_URL}/api/v1/auth/login", 
-        data=login_data  # Changed from json= to data=
-    )
-    if response.status_code == 200:
-        token = response.json()["access_token"]
-        print(f"✅ Токен получен: {token[:20]}...")
-    else:
-        print(f"❌ Ошибка авторизации: {response.status_code}")
-        print(response.text)
-        exit(1)
-except Exception as e:
-    print(f"❌ Ошибка: {e}")
-    exit(1)
+MESSAGE = """
+test_cart_error_debug.py is retired.
 
-# Создаем тестовые данные корзины
-cart_data = {
-    "patient_id": 1,  # Используем существующего пациента
-    "visits": [
-        {
-            "visit_date": "2025-11-28",
-            "visit_time": "10:00",
-            "department": "general",  # Строка - возможно тут проблема
-            "doctor_id": None,
-            "notes": "Test visit",
-            "services": [
-                {
-                    "service_id": 3,
-                    "quantity": 1,
-                    "custom_price": None
-                }
-            ]
-        }
-    ],
-    "discount_mode": "none",
-    "payment_method": "cash",
-    "notes": "Test cart"
-}
+This root-level manual script used built-in credentials and is outside the
+backend pytest suite. Use backend/tests pytest fixtures or an env-driven smoke
+check against the current auth runtime instead.
+""".strip()
 
-print("\n📦 Создание корзины...")
-print(f"Данные: {json.dumps(cart_data, indent=2, ensure_ascii=False)}")
 
-headers = {
-    "Authorization": f"Bearer {token}",
-    "Content-Type": "application/json"
-}
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-try:
-    response = requests.post(
-        f"{BASE_URL}/api/v1/registrar/cart",
-        json=cart_data,
-        headers=headers
-    )
-    
-    print(f"\n📊 Статус ответа: {response.status_code}")
-    
-    if response.status_code == 200:
-        print("✅ Корзина создана успешно!")
-        print(json.dumps(response.json(), indent=2, ensure_ascii=False))
-    else:
-        print(f"❌ Ошибка: {response.status_code}")
-        print("\n📋 Детали ошибки:")
-        try:
-            error_detail = response.json()
-            print(json.dumps(error_detail, indent=2, ensure_ascii=False))
-        except:
-            print(response.text)
-            
-except Exception as e:
-    print(f"❌ Исключение: {e}")
-    import traceback
-    traceback.print_exc()
 
-print("\n" + "="*60)
-print("ВАЖНО: Проверьте терминал где запущен backend!")
-print("Там должен быть полный traceback с точным местом ошибки")
-print("="*60)
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
-from app.db.session import SessionLocal
-from app.models.user import User
+"""Retired root manual user query smoke script."""
 
-db = SessionLocal()
-user = db.query(User).filter(User.id == 19).first()
-print(f"Пользователь найден: {user.username if user else 'None'}")
-if user:
-    print(f"  ID: {user.id}")
-    print(f"  Активен: {user.is_active}")
-    print(f"  Суперпользователь: {getattr(user, 'is_superuser', 'N/A')}")
-db.close()
+from __future__ import annotations
+
+import sys
+
+MESSAGE = """
+test_user_query.py is retired.
+
+This root-level manual script used direct runtime access outside the backend
+pytest suite. Use backend/tests pytest fixtures against current service or API
+contracts instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-from datetime import datetime, timedelta
-from jose import jwt
-from app.core.config import settings
-import requests
+"""Retired root manual users endpoint smoke script."""
 
-# Создаем токен с правильным sub (username)
-payload = {'sub': 'admin@example.com', 'user_id': 19, 'username': 'admin@example.com'}
-token = jwt.encode({**payload, 'exp': datetime.utcnow() + timedelta(hours=1)}, settings.SECRET_KEY, algorithm=getattr(settings, 'ALGORITHM', 'HS256'))
-print(f'Токен: {token[:50]}...')
+from __future__ import annotations
 
-headers = {'Authorization': f'Bearer {token}'}
-response = requests.get('http://localhost:18000/api/v1/users/users', headers=headers)
-print(f'Статус: {response.status_code}')
-if response.status_code == 200:
-    print('✅ Успешно!')
-    data = response.json()
-    print(f'Пользователей: {len(data.get("users", []))}')
-else:
-    print(response.text)
+import sys
+
+MESSAGE = """
+test_users_endpoint.py is retired.
+
+This root-level manual script used direct runtime access outside the backend
+pytest suite. Use backend/tests pytest fixtures against current service or API
+contracts instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

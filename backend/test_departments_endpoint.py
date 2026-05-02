@@ -1,38 +1,23 @@
-"""
-Тест проверки endpoint /registrar/departments
-"""
-import requests
+#!/usr/bin/env python3
+"""Retired root manual departments endpoint smoke script."""
 
-BASE_URL = "http://localhost:18000"
+from __future__ import annotations
 
-# Тест 1: Проверка что бэкенд работает
-try:
-    response = requests.get(f"{BASE_URL}/api/v1/health")
-    print(f"✅ Backend is running: {response.status_code}")
-except Exception as e:
-    print(f"❌ Backend is NOT running: {e}")
-    exit(1)
+import sys
 
-# Тест 2: Проверка endpoint без авторизации (ожидаем 401 или 403)
-try:
-    response = requests.get(f"{BASE_URL}/api/v1/registrar/departments")
-    print(f"📊 /registrar/departments without auth: {response.status_code}")
-    if response.status_code == 404:
-        print("❌ ERROR: Endpoint not found! Need to restart backend.")
-    elif response.status_code in [401, 403]:
-        print("✅ Endpoint exists but requires auth (expected)")
-    else:
-        print(f"Response: {response.text[:200]}")
-except Exception as e:
-    print(f"❌ Request failed: {e}")
+MESSAGE = """
+test_departments_endpoint.py is retired.
 
-# Тест 3: Проверка других registrar endpoints
-try:
-    response = requests.get(f"{BASE_URL}/api/v1/registrar/services")
-    print(f"📊 /registrar/services without auth: {response.status_code}")
-except Exception as e:
-    print(f"❌ Request failed: {e}")
+This root-level manual script used direct runtime access outside the backend
+pytest suite. Use backend/tests pytest fixtures against current service or API
+contracts instead.
+""".strip()
 
-print("\n📋 Summary:")
-print("If /registrar/departments returns 404 - backend needs restart")
-print("If it returns 401/403 - endpoint is registered correctly")
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

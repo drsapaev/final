@@ -1,34 +1,24 @@
-"""
-Тест для воспроизведения ошибки 500 в /registrar/cart
-"""
+#!/usr/bin/env python3
+"""Retired root manual cart error smoke script."""
+
+from __future__ import annotations
+
 import sys
-sys.path.insert(0, '.')
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.crud import clinic as crud_clinic
+MESSAGE = """
+test_cart_error.py is retired.
 
-# Создаем сессию БД
-engine = create_engine("sqlite:///./clinic.db", echo=False)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-db = SessionLocal()
+This root-level manual script used built-in credentials or local database
+assumptions and is outside the backend pytest suite. Use backend/tests pytest
+fixtures or an env-driven smoke check against the current Postgres/Alembic
+runtime instead.
+""".strip()
 
-try:
-    print("[*] Тестирование get_queue_settings...")
 
-    # Вызываем функцию, которая вызывается в create_cart_appointments
-    queue_settings = crud_clinic.get_queue_settings(db)
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-    print("[OK] Функция выполнена успешно!")
-    print(f"     Результат: {queue_settings}")
 
-except Exception as e:
-    print(f"[ERROR] Ошибка при выполнении:")
-    print(f"        Тип: {type(e).__name__}")
-    print(f"        Сообщение: {str(e)}")
-    import traceback
-    print("\n[TRACEBACK]")
-    traceback.print_exc()
-
-finally:
-    db.close()
+if __name__ == "__main__":
+    raise SystemExit(main())
