@@ -86,7 +86,7 @@
 
 ```bash
 # База данных
-DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+DATABASE_URL=postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
 
 # CORS и WebSocket
 CORS_DISABLE=1
