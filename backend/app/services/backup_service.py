@@ -297,8 +297,14 @@ class BackupService:
                     "error": "Backup file is empty",
                 }
 
-            # For SQLite, try to open and check integrity
-            if backup_path.suffix == ".db" or (backup_path.suffix == ".gz" and backup_path.stem.endswith(".db")):
+            db_url = _get_database_url()
+            sqlite_like_name = backup_path.suffix == ".db" or (
+                backup_path.suffix == ".gz" and backup_path.stem.endswith(".db")
+            )
+
+            # Only SQLite backups can be verified with PRAGMA integrity_check.
+            # PostgreSQL pg_dump custom-format files may historically use .db names here.
+            if db_url.startswith("sqlite") and sqlite_like_name:
                 import gzip
                 import sqlite3
                 import tempfile
@@ -323,7 +329,7 @@ class BackupService:
                     if backup_path.suffix == ".gz":
                         os.unlink(check_path)
 
-            return {
+                return {
                     "valid": is_valid,
                     "size": size,
                     "size_mb": round(size / (1024 * 1024), 2),

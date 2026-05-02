@@ -3274,3 +3274,41 @@ Continue the QA sweep by removing the SQLite `DATABASE_URL` fallback from the ba
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should distinguish service-level database fallback cleanup from container packaging work and surface scheduled backup/API ownership directly.
+
+## Task 92 - Backup verification Postgres format guard
+
+### User task
+Continue the QA sweep by fixing backup verification so PostgreSQL dump files are not checked as SQLite databases.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/backup_service.py
+
+### What handoff solved well
+- It kept the known backup service root-cause file in first-touch scope.
+- It preserved the database source-of-truth risk framing for backup verification.
+
+### Missing relationship mapping
+- The gate again added Docker packaging files, even though the defect was local to `verify_backup()`.
+- Manual reconstruction was required to see that PostgreSQL dumps historically use `.db` filenames in this service and were therefore routed into SQLite integrity checks.
+
+### Manual reconstruction needed
+- Added a database-type guard before SQLite `PRAGMA integrity_check`.
+- Returned a size-based validity result for non-SQLite backup formats, avoiding undefined `is_valid` and false SQLite verification failures.
+- Left backup creation and restore formats unchanged for a separate slice.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect backup filename conventions, database driver ownership, and verify/restore behavior instead of routing through container packaging files.
