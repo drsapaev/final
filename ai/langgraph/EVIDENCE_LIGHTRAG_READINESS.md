@@ -4025,3 +4025,39 @@ Continue the QA sweep by removing filled database passwords from CI setup docs.
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect sibling CI setup docs that duplicate the same database example.
+
+## Task 112 - README CI-CD database placeholder
+
+### User task
+Continue the QA sweep by removing filled database passwords from sibling CI setup docs.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: README-CI-CD.md
+
+### What handoff solved well
+- It narrowed the first-touch set to `README-CI-CD.md`.
+- It kept the patch bounded to one duplicate CI setup example.
+
+### Missing relationship mapping
+- The same pattern still exists in sibling CI/setup docs, requiring separate narrow slices.
+
+### Manual reconstruction needed
+- Confirmed `README-CI-CD.md` had one `DATABASE_URL` example containing `clinicpwd`.
+- Replaced it with a `<db_password>` placeholder and canonical local Postgres host port `55432`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect duplicated CI setup docs so this can be planned as a bounded sibling-doc series.
