@@ -4111,6 +4111,43 @@ Continue the QA sweep by removing the remaining filled database password from ag
 ### Recommendation
 - Treat duplicated env examples as a bounded series and continue using single-file first-touch slices when the gate narrows to one known-root-cause doc.
 
+## Task 115 - Backend config hardcoded SECRET_KEY sentinel
+
+### User task
+Continue the QA sweep by removing remaining tracked runtime secret/default drift.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/app/core/config.py
+
+### What handoff solved well
+- It identified `backend/app/core/config.py` as the runtime secret-loading root cause.
+- It kept the first-touch set bounded to config and optional gitignore, with no broader auth rewrite.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed the hardcoded value was used as a sentinel for dev secret generation, not intended as a stable runtime credential.
+- Replaced the literal sentinel with a runtime-generated token so scanners and future agents do not see a static SECRET_KEY in code.
+- Preserved the existing dev `.secret_key` generation and production fail-closed flow.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized to the settings secret-loading path.
+
 ## Task 113 - Setup CI-CD database placeholder
 
 ### User task

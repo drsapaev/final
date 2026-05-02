@@ -346,8 +346,8 @@ class Settings(BaseSettings):
         return value
 
 
-# Default SECRET_KEY for development only (will be validated on startup)
-_DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-production"
+# Runtime-only sentinel for missing dev SECRET_KEY; never a stable credential.
+_DEFAULT_SECRET_KEY = secrets.token_urlsafe(32)
 
 
 @lru_cache(1)
