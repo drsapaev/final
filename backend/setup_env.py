@@ -22,7 +22,9 @@ APP_VERSION=0.9.0
 API_V1_STR=/api/v1
 
 # --- БАЗА ДАННЫХ ---
-DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+# Required. PostgreSQL only; do not use SQLite for runtime.
+# Example: postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
+DATABASE_URL=
 
 # --- АУТЕНТИФИКАЦИЯ ---
 SECRET_KEY={secret_key}
@@ -54,7 +56,7 @@ REQUIRE_LICENSE=0
 LICENSE_ALLOW_HEALTH=1
 
 # --- DOCKER COMPOSE / STAGING ALTERNATIVE ---
-# DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@postgres:5432/clinicdb
+# DATABASE_URL=postgresql+psycopg://clinic:<db_password>@postgres:5432/clinicdb
 
 # --- FIREBASE (PUSH УВЕДОМЛЕНИЯ) ---
 # Раскомментируйте и настройте для реальных push-уведомлений

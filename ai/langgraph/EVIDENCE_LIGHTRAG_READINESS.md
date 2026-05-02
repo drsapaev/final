@@ -3868,3 +3868,51 @@ Restore local env files, then continue the QA sweep by removing SQLite/dev-secre
 - current stack sufficient: partial
 - would LightRAG likely help here: no
 - The root cause was localized, but the gate still over-expanded to adjacent Docker files.
+
+## Task 108 - Backend env setup helper database placeholder
+
+### User task
+Continue the QA sweep by removing filled database passwords from env setup helpers.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/setup_env.py
+
+### What handoff solved well
+- It correctly narrowed the first-touch set to `backend/setup_env.py`.
+- It provided the exact compile validation target.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed the helper generated `.env` with `clinicpwd` in both the primary and compose example URLs.
+- Replaced both generated URLs with empty/placeholder PostgreSQL-only values.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The gate routed this narrow helper cleanup correctly.
+
+## Mini-review - Tasks 104-108 env/setup security sweep
+
+### Counts
+- entries reviewed: 5
+- gate_misroute observed: 3
+- override_used observed: 4
+- manual graph reconstruction observed: 4
+- ownership ambiguity observed: 0
+
+### Recommendation
+- Keep using known-root-cause for env/setup QA slices, but prefer narrow override when the gate expands from a confirmed env file into Docker runtime files without concrete evidence.
