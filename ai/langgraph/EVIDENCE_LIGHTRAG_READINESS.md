@@ -3758,3 +3758,39 @@ Continue the QA sweep by hardening tracked staging environment samples.
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The risk was localized to a tracked sample file after filtering out archive and ignored-file noise.
+
+## Task 105 - Alembic config database password placeholder
+
+### User task
+Continue the QA sweep by removing filled database passwords from active migration configuration.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/alembic.ini
+
+### What handoff solved well
+- It recognized that Alembic configuration is database-source-of-truth sensitive.
+- It included the confirmed active migration config in the first-touch set.
+
+### Missing relationship mapping
+- The gate broadened into Docker runtime files even though the concrete issue was a single Alembic fallback URL.
+
+### Manual reconstruction needed
+- Confirmed `backend/alembic/env.py` already resolves `DATABASE_URL` first and raises if no URL remains.
+- Removed the filled `clinicpwd` URL from `backend/alembic.ini` and left the fallback empty.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: no
+- The root cause was localized, but the gate still over-expanded to adjacent Docker files.
