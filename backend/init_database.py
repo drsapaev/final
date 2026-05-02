@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Скрипт для инициализации базы данных
-Создает все необходимые таблицы и добавляет базовых пользователей, отделение и врача.
+Скрипт для инициализации базовых данных.
+Схема должна быть создана миграциями Alembic до запуска этого seed-helper.
 """
 
 import os
@@ -16,7 +16,6 @@ sys.path.insert(0, str(project_root))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import Base
 from app.models.user import User
 from app.models.role_permission import Role, Permission, UserGroup
 from app.models.authentication import RefreshToken, UserActivity, SecurityEvent, LoginAttempt
@@ -26,11 +25,32 @@ from app.core.config import settings
 from passlib.context import CryptContext
 
 # Создаем движок базы данных
-engine = create_engine(settings.DATABASE_URL, echo=True)
+def _database_url() -> str:
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before initializing seed data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("init_database.py requires PostgreSQL with Alembic-applied schema.")
+    return database_url
 
-# Создаем все таблицы
-print("🗄️ Создание таблиц в базе данных...")
-Base.metadata.create_all(bind=engine)
+
+def _password_env_names(username: str) -> list[str]:
+    names = [f"INIT_DATABASE_{username.upper()}_PASSWORD"]
+    if username == "admin":
+        names.insert(0, "ADMIN_PASSWORD")
+    return names
+
+
+def _required_password(username: str) -> str:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    expected = " or ".join(_password_env_names(username))
+    raise RuntimeError(f"Set {expected} before initializing user '{username}'.")
+
+
+engine = create_engine(_database_url(), echo=True)
 
 # Создаем контекст для хеширования паролей
 # Используем argon2 как основной (как настроено в security.py), bcrypt как запасной
@@ -52,6 +72,12 @@ try:
     if existing_users > 0:
         print(f"✅ В базе уже есть {existing_users} пользователей")
     else:
+        passwords = {
+            "admin": _required_password("admin"),
+            "doctor": _required_password("doctor"),
+            "registrar": _required_password("registrar"),
+        }
+
         # Создаем роли (используем правильную модель Role из role_permission.py)
         admin_role = Role(
             name="Admin",
@@ -83,7 +109,7 @@ try:
             username="admin",
             email="admin@clinic.local",
             full_name="Администратор",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=get_password_hash(passwords["admin"]),
             role="Admin",
             is_active=True,
             is_superuser=True,
@@ -93,7 +119,7 @@ try:
             username="doctor",
             email="doctor@clinic.local",
             full_name="Доктор Иванов",
-            hashed_password=get_password_hash("doctor123"),
+            hashed_password=get_password_hash(passwords["doctor"]),
             role="Doctor",
             is_active=True,
             is_superuser=False,
@@ -103,7 +129,7 @@ try:
             username="registrar",
             email="registrar@clinic.local",
             full_name="Регистратор Петрова",
-            hashed_password=get_password_hash("registrar123"),
+            hashed_password=get_password_hash(passwords["registrar"]),
             role="Registrar",
             is_active=True,
             is_superuser=False,
@@ -135,7 +161,7 @@ try:
             active=True,
             start_number_online=1,
             max_online_per_day=20,
-            # Используем time() объект вместо строки для SQLite совместимости
+            # Store a typed time value instead of a string.
             auto_close_time=time(9, 0),
         )
         db.add(doctor)
@@ -148,9 +174,9 @@ try:
         print("  - Registrar (уровень 30)")
         print()
         print("✅ Созданы пользователи:")
-        print("  - admin / admin123 (Администратор)")
-        print("  - doctor / doctor123 (Врач)")
-        print("  - registrar / registrar123 (Регистратор)")
+        print("  - admin (Администратор)")
+        print("  - doctor (Врач)")
+        print("  - registrar (Регистратор)")
         print()
         print(f"✅ Создано отделение: {general_dept.name_ru} (key={general_dept.key})")
         print(f"✅ Создан профиль врача для {doctor_user.full_name} (Doctor.id={doctor.id})")
