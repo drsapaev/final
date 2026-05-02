@@ -3953,3 +3953,39 @@ Continue the QA sweep by removing filled database passwords from active env setu
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The gate routed this active env-doc cleanup correctly.
+
+## Task 110 - Shared env README database placeholder
+
+### User task
+Continue the QA sweep by removing filled database passwords from active env setup docs.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: docs/README_env.md
+
+### What handoff solved well
+- It included the shared env README as a first-touch file.
+- It preserved the Postgres + Alembic source-of-truth boundary.
+
+### Missing relationship mapping
+- The gate included adjacent Docker files even though the concrete issue was one docs URL example.
+
+### Manual reconstruction needed
+- Confirmed the shared env README had one copy-paste local PostgreSQL URL containing `clinicpwd`.
+- Replaced it with a `<db_password>` placeholder and canonical local backend Postgres host port `55432`.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized to one active env documentation line.

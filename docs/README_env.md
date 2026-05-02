@@ -6,7 +6,7 @@
 - `API_V1_STR` — префикс API (по умолчанию `/api/v1`).
 - `CORS_ALLOW_ALL` — `1` чтобы разрешить все источники; иначе перечислите `CORS_ORIGINS` через запятую.
 - `CORS_ORIGINS` — CSV список источников (например, `http://localhost:5173,http://localhost:4173`).
-- `DATABASE_URL` — строка подключения к PostgreSQL (локальный пример: `postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb`).
+- `DATABASE_URL` — строка подключения к PostgreSQL (локальный пример: `postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb`).
 - `AUTH_SECRET` / `ACCESS_TOKEN_EXPIRE_MINUTES` / `AUTH_ALGORITHM` — параметры JWT.
 - `CLINIC_LOGO_PATH` / `PDF_FOOTER_ENABLED` — печать и PDF.
 - `PRINTER_*` — параметры ESC/POS (тип/сеть/USB).
