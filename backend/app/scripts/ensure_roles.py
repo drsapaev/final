@@ -1,39 +1,63 @@
 from __future__ import annotations
 
+import os
+
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
 from app.models.user import User
 
 USERS = [
-    ("admin", "Admin", "admin@ex.com", "admin123"),
-    ("registrar", "Registrar", "reg@ex.com", "registrar123"),
-    ("lab", "Lab", "lab@ex.com", "lab123"),
-    ("doctor", "Doctor", "doc@ex.com", "doctor123"),
-    ("cardio", "cardio", "cardio@ex.com", "cardio123"),
-    ("derma", "derma", "derma@ex.com", "derma123"),
-    ("dentist", "dentist", "dentist@ex.com", "dentist123"),
-    ("cashier", "Cashier", "cash@ex.com", "cashier123"),
+    ("admin", "Admin", "admin@ex.com"),
+    ("registrar", "Registrar", "reg@ex.com"),
+    ("lab", "Lab", "lab@ex.com"),
+    ("doctor", "Doctor", "doc@ex.com"),
+    ("cardio", "cardio", "cardio@ex.com"),
+    ("derma", "derma", "derma@ex.com"),
+    ("dentist", "dentist", "dentist@ex.com"),
+    ("cashier", "Cashier", "cash@ex.com"),
 ]
+
+
+def _password_env_names(username: str) -> list[str]:
+    names = [f"ENSURE_ROLES_{username.upper()}_PASSWORD"]
+    if username == "admin":
+        names.insert(0, "ADMIN_PASSWORD")
+    return names
+
+
+def _role_password(username: str, *, required: bool) -> str | None:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    if required:
+        expected = " or ".join(_password_env_names(username))
+        raise RuntimeError(f"Set {expected} before creating user '{username}'.")
+    return None
 
 
 def upsert_users():
     db = SessionLocal()
     try:
-        for username, role, email, pwd in USERS:
+        for username, role, email in USERS:
             u = db.query(User).filter(User.username == username).first()
             if not u:
                 u = User(
                     username=username,
                     role=role,
                     email=email,
-                    hashed_password=get_password_hash(pwd),
+                    hashed_password=get_password_hash(
+                        _role_password(username, required=True)
+                    ),
                 )
                 db.add(u)
             else:
                 u.role = role
                 u.email = email
-                # Всегда обновляем пароль и активируем пользователя
-                u.hashed_password = get_password_hash(pwd)
+                # Update password only when an explicit env value is provided.
+                password = _role_password(username, required=False)
+                if password:
+                    u.hashed_password = get_password_hash(password)
                 u.is_active = True
             db.commit()
         print("ok")

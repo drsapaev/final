@@ -4148,6 +4148,43 @@ Continue the QA sweep by removing remaining tracked runtime secret/default drift
 - would LightRAG likely help here: no
 - The issue was localized to the settings secret-loading path.
 
+## Task 116 - Ensure roles hardcoded password reset
+
+### User task
+Continue the QA sweep by removing active hardcoded admin/role passwords.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/app/scripts/ensure_roles.py
+
+### What handoff solved well
+- It narrowed the first-touch set to the confirmed role bootstrap script.
+- It provided the exact compile validation target.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed the script created role users with fixed passwords and reset existing user passwords on every run.
+- Removed hardcoded role passwords from the tracked user list.
+- Required explicit env passwords when creating new users and only reset existing passwords when a matching env variable is provided.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized to one role bootstrap script.
+
 ## Task 113 - Setup CI-CD database placeholder
 
 ### User task
