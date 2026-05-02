@@ -483,6 +483,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -653,10 +654,30 @@ async def upload_file_message(
 async def download_chat_file(
     filename: str,
     name: str = Query(None),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    filename = os.path.basename(filename)
     file_path = os.path.join("uploads/chat", filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Файл не найден")
+
+    file_record = db.query(FileModel).filter(FileModel.filename == filename).first()
+    if file_record:
+        message = db.query(Message).filter(Message.file_id == file_record.id).first()
+    else:
+        message = db.query(Message).filter(
+            or_(
+                Message.content.contains(f"/download/{filename}"),
+                Message.content.contains(f"name={filename}"),
+            )
+        ).first()
+
+    if not message or (
+        current_user.id != message.sender_id and current_user.id != message.recipient_id
+    ):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
+
     return FileResponse(path=file_path, filename=name or filename)
+
 
