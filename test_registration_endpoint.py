@@ -2,7 +2,7 @@ import requests
 import json
 
 # Токен из логов фронтенда
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc1OTMzMzY1OH0.kSlNwHRz0LzXZ6u4AXfLeY41zuJHXhIFqWtXEd_FLMg"
+token = "REDACTED_JWT"
 
 # Тестовые данные - используем существующего пациента и услугу
 test_data = {
@@ -49,7 +49,8 @@ try:
 
     if response.status_code == 200:
         data = response.json()
-        print("✅ Запись создана успешно!"        print(f"   Visit IDs: {data.get('visit_ids', [])}")
+        print("registration created successfully")
+        print(f"   Visit IDs: {data.get('visit_ids', [])}")
         print(f"   Invoice ID: {data.get('invoice_id')}")
         print(f"   Total amount: {data.get('total_amount')}")
         print(f"   Message: {data.get('message')}")
@@ -78,7 +79,8 @@ try:
 
     elif response.status_code == 400:
         error_data = response.json()
-        print("❌ Ошибка валидации:"        print(f"   Детали: {error_data.get('detail', 'Неизвестная ошибка')}")
+        print("validation failed")
+        print(f"   Detail: {error_data.get('detail', 'unknown error')}")
 
     elif response.status_code == 404:
         print("❌ Ресурс не найден (пациент или услуга)")

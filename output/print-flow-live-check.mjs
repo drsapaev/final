@@ -4,7 +4,7 @@ const baseURL = 'http://127.0.0.1:5173';
 
 const users = {
   registrar: {
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc3NTc2OTczNH0.OpTBdvzuWxfIDXm-VcO-8i4w0T3nk6FR56Yc95kOng4',
+    token: 'REDACTED_JWT',
     profile: {
       id: 20,
       username: 'registrar@example.com',
@@ -16,7 +16,7 @@ const users = {
     },
   },
   cashier: {
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMyIsInVzZXJfaWQiOjIzLCJ1c2VybmFtZSI6ImNhc2hpZXJAZXhhbXBsZS5jb20iLCJleHAiOjE3NzU3Njk3MzR9.GnLqm3TdNuwN4iGqfPmlJNFvaKYvMB7jPC6qVYu-1Xo',
+    token: 'REDACTED_JWT',
     profile: {
       id: 23,
       username: 'cashier@example.com',

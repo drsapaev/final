@@ -1,7 +1,7 @@
 import { chromium } from 'file:///C:/final/frontend/node_modules/playwright/index.mjs';
 
 const baseURL = 'http://127.0.0.1:5173';
-const registrarToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc3NTc2OTczNH0.OpTBdvzuWxfIDXm-VcO-8i4w0T3nk6FR56Yc95kOng4';
+const registrarToken = 'REDACTED_JWT';
 const registrarProfile = {
   id: 20,
   username: 'registrar@example.com',

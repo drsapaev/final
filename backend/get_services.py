@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import requests
 
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWdpc3RyYXJAZXhhbXBsZS5jb20iLCJleHAiOjE3NTkzMTg3MjV9.8UwEEuHt2Ku4YW_657xgE9yuPDe0NyKRu1Q25Epqffs"
+token = "REDACTED_JWT"
 headers = {"Authorization": f"Bearer {token}"}
 
 print("Получаю список услуг...")

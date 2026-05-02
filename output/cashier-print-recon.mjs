@@ -1,7 +1,7 @@
 import { chromium } from 'file:///C:/final/frontend/node_modules/playwright/index.mjs';
 
 const baseURL = 'http://127.0.0.1:5173';
-const cashierToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMyIsInVzZXJfaWQiOjIzLCJ1c2VybmFtZSI6ImNhc2hpZXJAZXhhbXBsZS5jb20iLCJleHAiOjE3NzU3Njk3MzR9.GnLqm3TdNuwN4iGqfPmlJNFvaKYvMB7jPC6qVYu-1Xo';
+const cashierToken = 'REDACTED_JWT';
 const cashierProfile = {
   id: 23,
   username: 'cashier@example.com',

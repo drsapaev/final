@@ -3012,3 +3012,41 @@ Resolve remaining merge conflict in `backend/app/api/v1/endpoints/admin_departme
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should distinguish backend route-order conflicts from frontend route registry ownership and avoid adding unrelated first-touch files.
+
+## Task 85 - Tracked JWT artifact redaction
+
+### User task
+Continue the QA sweep after the frontend audit and remove the next security-risk artifact found by token scanning.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override after retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/get_services.py
+
+### What handoff solved well
+- It identified the task as secrets/runtime artifact ownership and forced a constrained validation target.
+- The known-root-cause retry correctly recognized that an override was needed.
+
+### Missing relationship mapping
+- The first gate pass only returned `.gitignore` and missed tracked files that already contained full JWT values.
+- The retry returned `backend/get_services.py` but still missed the broader factual `git grep` token set across root helper scripts and tracked diagnostics in `output/`.
+
+### Manual reconstruction needed
+- Built the actual first-touch set from `git grep -l` over full JWT triplet patterns.
+- Redacted only the JWT values, preserving the surrounding diagnostic artifacts instead of deleting generated evidence.
+- Fixed pre-existing concatenated `print(...)` syntax in touched root helper scripts so compile validation could run cleanly.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect secret findings to all tracked artifact locations, not only `.gitignore` or the first known root-cause file.
