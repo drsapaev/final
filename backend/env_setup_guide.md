@@ -33,10 +33,13 @@ APP_NAME=Clinic Manager
 APP_VERSION=0.9.0
 
 # --- БАЗА ДАННЫХ ---
-DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+# PostgreSQL only. Generate/use a local DB password and fill it explicitly.
+# Example: postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
+DATABASE_URL=
 
 # --- АУТЕНТИФИКАЦИЯ ---
-SECRET_KEY=your-super-secret-key-change-in-production
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(48))"
+SECRET_KEY=
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 

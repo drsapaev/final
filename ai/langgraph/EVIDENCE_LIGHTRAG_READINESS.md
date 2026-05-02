@@ -3916,3 +3916,40 @@ Continue the QA sweep by removing filled database passwords from env setup helpe
 
 ### Recommendation
 - Keep using known-root-cause for env/setup QA slices, but prefer narrow override when the gate expands from a confirmed env file into Docker runtime files without concrete evidence.
+
+## Task 109 - Backend env setup guide placeholders
+
+### User task
+Continue the QA sweep by removing filled database passwords from active env setup docs.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/env_setup_guide.md
+
+### What handoff solved well
+- It correctly narrowed the first-touch set to the active backend env setup guide.
+- It kept the change as a docs-only copy-paste safety fix.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed the guide's example block could be copied into `backend/.env`.
+- Replaced the filled database password with an empty required PostgreSQL placeholder.
+- Replaced the static secret placeholder with a generation command and empty `SECRET_KEY`.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: no
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The gate routed this active env-doc cleanup correctly.
