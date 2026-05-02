@@ -3236,3 +3236,41 @@ Continue the QA sweep by aligning the ops README quick start with the hardened P
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should separate canonical runtime files from dependent operator docs so doc-only drift fixes do not reopen runtime first-touch files.
+
+## Task 91 - Backup service DATABASE_URL fallback removal
+
+### User task
+Continue the QA sweep by removing the SQLite `DATABASE_URL` fallback from the backend backup service.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/backup_service.py
+
+### What handoff solved well
+- It identified database source-of-truth risk and kept `backend/app/services/backup_service.py` in the first-touch set.
+- It provided a concrete narrow validation target for Python compilation.
+
+### Missing relationship mapping
+- The gate again added Docker packaging files even though this slice was an in-process service fallback cleanup.
+- Manual reconstruction was required to verify that API endpoints and scheduled backups import the service, making the fallback production-relevant.
+
+### Manual reconstruction needed
+- Added a single `_get_database_url()` helper that reads `settings.DATABASE_URL` and fails closed if missing.
+- Replaced both backup and restore fallback lookups that previously defaulted to a local SQLite path.
+- Left backup format and restore semantics unchanged for the next dedicated slice.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should distinguish service-level database fallback cleanup from container packaging work and surface scheduled backup/API ownership directly.

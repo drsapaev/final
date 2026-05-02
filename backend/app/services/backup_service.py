@@ -15,6 +15,15 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+def _get_database_url() -> str:
+    from app.core.config import settings
+
+    db_url = settings.DATABASE_URL
+    if not db_url:
+        raise ValueError("DATABASE_URL must be configured before backup operations.")
+    return str(db_url)
+
+
 class BackupService:
     """Service for automated database backups"""
 
@@ -38,9 +47,7 @@ class BackupService:
             Backup information dict
         """
         try:
-            # Get database URL
-            from app.core.config import settings
-            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            db_url = _get_database_url()
 
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             backup_filename = f"backup_{backup_type}_{timestamp}.db"
@@ -204,9 +211,7 @@ class BackupService:
             logger.warning("⚠️  Creating safety backup before restore...")
             safety_backup = self.create_backup("before_restore")
 
-            # Get database URL
-            from app.core.config import settings
-            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            db_url = _get_database_url()
 
             # Decompress if needed
             if backup_path.suffix == ".gz":
