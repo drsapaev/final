@@ -3989,3 +3989,39 @@ Continue the QA sweep by removing filled database passwords from active env setu
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The issue was localized to one active env documentation line.
+
+## Task 111 - CI-CD README database placeholder
+
+### User task
+Continue the QA sweep by removing filled database passwords from CI setup docs.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: CI-CD-README.md
+
+### What handoff solved well
+- It identified `CI-CD-README.md` as an explicit first-touch file.
+- It kept the patch bounded to one CI docs example.
+
+### Missing relationship mapping
+- The broader task mentioned three sibling CI setup docs, but the gate allowed only the known-root-cause file for this first slice.
+
+### Manual reconstruction needed
+- Confirmed the file had one `DATABASE_URL` example containing `clinicpwd`.
+- Replaced it with a `<db_password>` placeholder and canonical local Postgres host port `55432`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect sibling CI setup docs that duplicate the same database example.
