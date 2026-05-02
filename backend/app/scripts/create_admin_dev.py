@@ -6,8 +6,32 @@ from typing import Any, Dict, Optional
 from sqlalchemy import create_engine, MetaData, select, Table
 from sqlalchemy.orm import sessionmaker
 
-# Попытка использовать настройки проекта
-DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///clinic.db"
+def _required_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise SystemExit("DATABASE_URL must be set before running create_admin_dev.py.")
+    if database_url.lower().startswith("sqlite"):
+        raise SystemExit("create_admin_dev.py requires a PostgreSQL DATABASE_URL.")
+    return database_url
+
+
+def _required_admin_password() -> str:
+    password = os.getenv("DEV_ADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD")
+    if not password:
+        raise SystemExit("Set DEV_ADMIN_PASSWORD or ADMIN_PASSWORD before creating a dev admin.")
+    return password
+
+
+def _password_value(column_name: str) -> str:
+    password = _required_admin_password()
+    if column_name == "hashed_password":
+        from app.core.security import get_password_hash
+
+        return get_password_hash(password)
+    return password
+
+
+DATABASE_URL = _required_database_url()
 
 # Создаём engine/session на базе DATABASE_URL
 engine = create_engine(DATABASE_URL, future=True)
@@ -34,6 +58,12 @@ def find_users_table(meta: MetaData) -> Optional[Table]:
 
 
 def upsert_admin() -> None:
+    admin_username = os.getenv("DEV_ADMIN_USERNAME") or os.getenv("ADMIN_USERNAME", "admin")
+    admin_email = os.getenv("DEV_ADMIN_EMAIL") or os.getenv("ADMIN_EMAIL", "admin@example.com")
+    admin_full_name = os.getenv("DEV_ADMIN_FULL_NAME") or os.getenv(
+        "ADMIN_FULL_NAME", "Administrator"
+    )
+
     meta = MetaData()
     meta.reflect(bind=engine)
 
@@ -52,24 +82,24 @@ def upsert_admin() -> None:
 
     with engine.begin() as conn:
         # есть ли уже admin?
-        exists = conn.execute(select(users).where(users.c.username == "admin")).first()
+        exists = conn.execute(select(users).where(users.c.username == admin_username)).first()
         if exists:
-            print("✅ Пользователь 'admin' уже существует — оставляю как есть.")
+            print(f"✅ Пользователь '{admin_username}' уже существует — оставляю как есть.")
             return
 
-        row: Dict[str, Any] = {"username": "admin", pwd_col: "admin"}
+        row: Dict[str, Any] = {"username": admin_username, pwd_col: _password_value(pwd_col)}
         # общие «здоровые» поля, если есть
         for k, v in {
             "is_active": True,
             "is_superuser": True,
-            "email": "admin@example.com",
-            "full_name": "Administrator",
+            "email": admin_email,
+            "full_name": admin_full_name,
         }.items():
             if k in cols:
                 row[k] = v
 
         conn.execute(users.insert().values(**row))
-        print("✅ Создан пользователь admin/admin (без bcrypt — dev).")
+        print(f"✅ Создан dev admin '{admin_username}' с паролем из env.")
 
 
 if __name__ == "__main__":

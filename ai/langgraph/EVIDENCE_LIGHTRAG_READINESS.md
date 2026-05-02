@@ -3461,3 +3461,41 @@ Continue the QA sweep by removing the runtime admin password fallback from the b
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The root-cause file contained the full behavioral slice once password-writing paths were identified.
+
+## Task 97 - Dev admin script default removal
+
+### User task
+Continue the QA sweep by removing SQLite and `admin/admin` defaults from the dev admin creation script.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/scripts/create_admin_dev.py
+
+### What handoff solved well
+- It kept the known dev admin script in first-touch scope.
+- It preserved the database source-of-truth risk framing.
+
+### Missing relationship mapping
+- The gate again added container packaging files even though this was a standalone script cleanup.
+- Manual reconstruction was required to decide that the script should require PostgreSQL and an explicit password while preserving its dev-only username defaults.
+
+### Manual reconstruction needed
+- Replaced the SQLite `DATABASE_URL` fallback with a required PostgreSQL `DATABASE_URL`.
+- Required `DEV_ADMIN_PASSWORD` or `ADMIN_PASSWORD` before creating the user.
+- Hashes the password when the reflected table uses a `hashed_password` column and removed the `admin/admin` success message.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should distinguish standalone dev scripts from container runtime files while still preserving Postgres-only guardrails.
