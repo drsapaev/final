@@ -24,12 +24,19 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
+
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError("Set ADMIN_PASSWORD before updating the admin password.")
+    return password
+
 print("🔧 Исправление пароля пользователя admin...")
 
 try:
     with engine.connect() as conn:
         # Обновляем пароль для admin
-        new_password_hash = get_password_hash("admin123")
+        new_password_hash = get_password_hash(_required_admin_password())
         
         result = conn.execute(text("""
             UPDATE users 
@@ -40,7 +47,7 @@ try:
         conn.commit()
         
         if result.rowcount > 0:
-            print("✅ Пароль пользователя admin обновлен на 'admin123'")
+            print("✅ Пароль пользователя admin обновлен")
         else:
             print("❌ Пользователь admin не найден")
             

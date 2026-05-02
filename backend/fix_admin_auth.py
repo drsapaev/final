@@ -6,11 +6,20 @@ import sqlite3
 import os
 from argon2 import PasswordHasher
 
+
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError("Set ADMIN_PASSWORD before fixing or testing admin auth.")
+    return password
+
+
 def fix_admin_auth():
     print("🔧 ИСПРАВЛЕНИЕ АУТЕНТИФИКАЦИИ ADMIN")
     print("=" * 50)
     
     db_path = 'clinic.db'
+    admin_password = _required_admin_password()
     
     try:
         conn = sqlite3.connect(db_path)
@@ -28,14 +37,14 @@ def fix_admin_auth():
             print("2. Проверяем пароль admin...")
             ph = PasswordHasher()
             try:
-                ph.verify(admin_user[2], "admin123")
+                ph.verify(admin_user[2], admin_password)
                 print("   ✅ Пароль admin корректный")
             except Exception as e:
                 print(f"   ❌ Пароль admin некорректный: {e}")
                 
                 # Пересоздаем хеш пароля
                 print("   🔄 Пересоздаем хеш пароля...")
-                new_hash = ph.hash("admin123")
+                new_hash = ph.hash(admin_password)
                 cursor.execute("UPDATE users SET hashed_password = ? WHERE username = 'admin';", (new_hash,))
                 print("   ✅ Хеш пароля обновлен")
         else:
@@ -44,7 +53,7 @@ def fix_admin_auth():
             # Создаем пользователя admin
             print("   🔄 Создаем пользователя admin...")
             ph = PasswordHasher()
-            hashed_password = ph.hash("admin123")
+            hashed_password = ph.hash(admin_password)
             
             cursor.execute("""
                 INSERT INTO users (username, email, hashed_password, full_name, role, is_active, is_verified)
@@ -85,26 +94,26 @@ def fix_admin_auth():
         
         # 6. Тестируем аутентификацию
         print("\n🧪 Тестируем аутентификацию admin...")
-        test_admin_auth()
+        test_admin_auth(admin_password)
         
     except Exception as e:
         print(f"❌ Ошибка: {e}")
 
-def test_admin_auth():
+def test_admin_auth(admin_password: str):
     """Тестирование аутентификации admin"""
     import requests
     
     try:
         response = requests.post(
             "http://localhost:18000/api/v1/auth/login",
-            data={"username": "admin", "password": "admin123"},
+            data={"username": "admin", "password": admin_password},
             timeout=10
         )
         
         if response.status_code == 200:
             token = response.json()["access_token"]
             print(f"   ✅ Admin успешно вошел в систему")
-            print(f"   🔑 Токен получен: {token[:20]}...")
+            print("   🔑 Токен получен")
             return token
         else:
             print(f"   ❌ Ошибка входа admin: {response.status_code}")
