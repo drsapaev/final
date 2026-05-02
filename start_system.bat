@@ -14,7 +14,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :18000') do (
 
 echo [2/4] Запуск Backend API...
 cd /d C:\final\backend
-start "Backend API" cmd /k "python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000"
+start "Backend API" cmd /k ".\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000"
 
 echo [3/4] Ожидание запуска Backend...
 timeout /t 5 /nobreak >nul
