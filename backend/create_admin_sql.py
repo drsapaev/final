@@ -1,50 +1,28 @@
 #!/usr/bin/env python3
+"""Retired legacy SQL admin creation helper."""
+
+from __future__ import annotations
+
 import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.db.session import SessionLocal
-from app.core.security import get_password_hash
-import sqlite3
+MESSAGE = """
+create_admin_sql.py is retired.
+
+This legacy helper created the bootstrap admin through a local direct-SQL path.
+Admin bootstrap belongs to the canonical Postgres/Alembic path:
+
+  python -m app.scripts.ensure_admin
+
+Set ADMIN_PASSWORD before creating the bootstrap admin. For controlled password
+reset on an initialized instance, also set ADMIN_RESET_PASSWORD=1 and
+ENSURE_ADMIN_ALLOW_INITIALIZED=1.
+""".strip()
 
 
-def _required_admin_password() -> str:
-    password = os.getenv("ADMIN_PASSWORD", "").strip()
-    if not password:
-        raise RuntimeError("Set ADMIN_PASSWORD before creating the admin user.")
-    return password
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-
-def create_admin_user_sql():
-    """Создает пользователя admin через SQL"""
-    try:
-        # Подключаемся к базе данных напрямую
-        conn = sqlite3.connect('clinic.db')
-        cursor = conn.cursor()
-        
-        # Проверяем, существует ли уже пользователь admin
-        cursor.execute("SELECT id FROM users WHERE username = ?", ("admin",))
-        if cursor.fetchone():
-            print("✅ Пользователь admin уже существует")
-            conn.close()
-            return
-        
-        # Создаем пользователя admin согласно документации
-        hashed_password = get_password_hash(_required_admin_password())
-        cursor.execute("""
-            INSERT INTO users (username, email, full_name, hashed_password, is_active, is_superuser, role)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, ("admin", "admin@clinic.local", "Администратор", hashed_password, True, True, "Admin"))
-        
-        conn.commit()
-        conn.close()
-        
-        print("✅ Пользователь admin создан успешно")
-        print("   Логин: admin")
-        print("   Пароль: задан через ADMIN_PASSWORD")
-        
-    except Exception as e:
-        print(f"❌ Ошибка создания пользователя: {e}")
 
 if __name__ == "__main__":
-    create_admin_user_sql()
+    raise SystemExit(main())

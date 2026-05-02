@@ -1,42 +1,26 @@
+#!/usr/bin/env python3
+"""Retired async admin bootstrap helper."""
+
 from __future__ import annotations
 
-import asyncio
+import sys
 
-from sqlalchemy import select
+MESSAGE = """
+scripts/ensure_admin_async.py is retired.
 
-# Универсальные импорты сессии
-try:
-    from app.db.session import async_session as SessionMaker  # type: ignore
-except Exception:
-    from app.db.session import SessionLocal as SessionMaker  # type: ignore
+This legacy helper created the bootstrap admin with a built-in credential.
+Admin bootstrap belongs to the canonical Postgres/Alembic path:
 
-from app.core.security import get_password_hash
-from app.models.user import User
+  python -m app.scripts.ensure_admin
 
-USERNAME = "admin"
-PASSWORD = "admin"
-EMAIL = "admin@example.com"
+Set ADMIN_PASSWORD before creating the bootstrap admin.
+""".strip()
 
 
-async def main():
-    async with SessionMaker() as session:  # type: ignore
-        res = await session.execute(select(User).where(User.username == USERNAME))
-        user = res.scalars().first()
-        if user:
-            print("✅ Admin already exists.")
-            return
-        user = User(
-            username=USERNAME,
-            email=EMAIL,
-            full_name="Administrator",
-            is_active=True,
-            is_superuser=True,
-            hashed_password=get_password_hash(PASSWORD),
-        )
-        session.add(user)
-        await session.commit()
-        print("✅ Admin user created:", USERNAME, "/", PASSWORD)
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(main())
