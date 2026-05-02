@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 import sys
 from typing import List, Dict
 
 import requests
 
 
-BASE_URL = "http://127.0.0.1:8003/api/v1"
+BASE_URL = os.getenv("BACKEND_API_BASE_URL", "http://127.0.0.1:18000/api/v1").rstrip("/")
 
 # Критические системные пользователи, которых нельзя трогать
 CRITICAL_USERNAMES = {
@@ -21,7 +22,15 @@ CRITICAL_USERNAMES = {
 }
 
 
-def login_admin(username: str = "admin", password: str = "admin123") -> str:
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError("Set ADMIN_PASSWORD before cleaning up users.")
+    return password
+
+
+def login_admin(username: str = "admin", password: str | None = None) -> str:
+    password = password or _required_admin_password()
     resp = requests.post(
         f"{BASE_URL}/authentication/login",
         json={"username": username, "password": password},
@@ -29,7 +38,6 @@ def login_admin(username: str = "admin", password: str = "admin123") -> str:
     )
     resp.raise_for_status()
     data = resp.json()
-    print(f"LOGIN_RESPONSE: {data}")
     token = data.get("access_token")
     if not token:
         raise RuntimeError(f"No access_token in login response: {data}")
