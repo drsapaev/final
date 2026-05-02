@@ -3610,3 +3610,39 @@ Continue the QA sweep by redacting fixed database passwords from release evidenc
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect paired evidence/runbook files that describe the same restore contour.
+
+## Task 101 - CI Postgres fixture password naming
+
+### User task
+Continue the QA sweep by renaming the fixed CI Postgres fixture password so it is clearly test-only.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override after retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: .github/workflows/load-testing.yml, then .github/workflows/ci-cd-unified.yml
+
+### What handoff solved well
+- It recognized the database/runtime packaging sensitivity of CI database fixture values.
+- It kept the change out of application runtime code.
+
+### Missing relationship mapping
+- The first gate pass found only one workflow; the retry found another, but the same fixture appeared across four tracked workflow files.
+- Manual reconstruction was required to constrain the change to tracked existing workflows and avoid untracked user CI files.
+
+### Manual reconstruction needed
+- Replaced the shared `clinicpwd` fixture with `clinic_ci_test_password` in tracked CI workflow service env and matching `DATABASE_URL` strings.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect duplicated CI fixture strings across workflow files without expanding into unrelated runtime packaging files.
