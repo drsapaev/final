@@ -3646,3 +3646,79 @@ Continue the QA sweep by renaming the fixed CI Postgres fixture password so it i
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect duplicated CI fixture strings across workflow files without expanding into unrelated runtime packaging files.
+
+## Task 102 - PR review template validator strictness
+
+### User task
+Continue the QA sweep by checking the uncommitted PR review quality gate files.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: scripts/check_pr_review_template.py and test_check_pr_review_template.py
+
+### What handoff solved well
+- It identified the validator and its regression test file as the concrete root-cause surfaces.
+- It kept the fix focused on PR body validation behavior instead of broad CI process changes.
+
+### Missing relationship mapping
+- Manual reconstruction was required to see that field parsing used `\s*`, which could consume a newline and treat the next field label as the previous field value.
+- Manual inspection also found that a single field-level `not applicable` with a reason could accidentally satisfy the whole section.
+
+### Manual reconstruction needed
+- Added explicit required field sets for contract, RBAC, realtime, frontend resilience, scope, and validation sections.
+- Restricted whole-section `not applicable` handling to sections without field lists.
+- Changed field parsing to avoid newline consumption and added unittest coverage for partial fields, bare `not applicable`, and field-level `not applicable` leakage.
+- Aligned the PR template guidance and practice-track example with the validator's requirement that `not applicable` includes a short reason.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized to the new validator once the uncommitted PR-review guardrail slice was inspected.
+
+## Task 103 - PR review gate base checkout hardening
+
+### User task
+Continue the QA sweep by checking the uncommitted PR review quality gate workflow.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: partial
+- override_used: yes
+- known_root_cause_file: .github/workflows/pr-review-quality-gate.yml
+
+### What handoff solved well
+- It identified the workflow as the concrete policy surface.
+- It kept the fix limited to the new PR-review quality gate.
+
+### Missing relationship mapping
+- The gate returned a Docker compose validation target even though the touched file is GitHub Actions YAML.
+- Manual reconstruction was required to identify that checking out PR head code lets a PR weaken the validator used to judge its own body.
+
+### Manual reconstruction needed
+- Updated the workflow checkout step to read the validator from `github.event.pull_request.base.sha`.
+- Left the PR body source as the pull request event payload.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: partial
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized after reviewing the workflow trust boundary.

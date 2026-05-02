@@ -24,6 +24,7 @@ These are the checks that matter for pull requests targeting `main`:
 | `🧱 Context Boundary Integrity` | Blocks merges when code crosses forbidden architecture boundaries. |
 | `🔄 Frontend-Backend Parity` | Blocks merges when frontend behavior drifts from backend contracts or role assumptions. |
 | `role-system-check` | Blocks merges on role/RBAC integrity failures in the dedicated auth workflow. |
+| `PR Review Quality Gate` | Blocks incomplete PR descriptions when required review proof sections are missing or left blank. |
 
 Notes:
 
@@ -95,6 +96,21 @@ Role safety is guarded separately in `.github/workflows/role-system-check.yml`.
 
 This is a dedicated safety check because permission drift in a clinical system is not a normal UI bug; it is an access-control failure.
 
+## PR Review Quality Gate
+
+`.github/workflows/pr-review-quality-gate.yml` validates the pull request body against `.github/pull_request_template.md`.
+
+It checks that reviewers get explicit answers for:
+
+- contract impact
+- RBAC and permissions
+- notification/realtime behavior
+- frontend resilience
+- scope gate
+- validation proof
+
+The gate accepts `not applicable` with a short reason. This keeps docs-only and narrow surgical PRs fast while making risky omissions visible before review starts.
+
 ## Checks That Are Important But Not PR Merge Blockers
 
 These checks remain part of the CI system, but they are not intended to block every PR into `main`:
@@ -135,7 +151,8 @@ Use this order:
 5. If `🧱 Context Boundary Integrity` fails, fix the architecture violation.
 6. If `🔄 Frontend-Backend Parity` fails, fix the frontend/backend contract drift.
 7. If `role-system-check` fails, fix RBAC or role-surface integrity.
-8. Treat Vercel separately from the merge gate.
+8. If `PR Review Quality Gate` fails, fill the missing PR template sections or mark them `not applicable` with a reason.
+9. Treat Vercel separately from the merge gate.
 
 Fast interpretation guide:
 
@@ -174,5 +191,8 @@ This separation keeps PR feedback actionable and fast enough for daily work, whi
 ## See Also
 
 - `docs/PLAN_CHECKLIST.md`
+- `docs/runbooks/PR_REVIEW_QUALITY_GATES.md`
+- `scripts/check_pr_review_template.py`
+- `.github/workflows/pr-review-quality-gate.yml`
 - `.github/workflows/ci-cd-unified.yml`
 - `.github/workflows/role-system-check.yml`

@@ -109,6 +109,8 @@
 |----------|-------------|
 | [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
+| [runbooks/PR_REVIEW_QUALITY_GATES.md](./runbooks/PR_REVIEW_QUALITY_GATES.md) | PR review gates for contract, RBAC, realtime, resilience, scope, and release readiness |
+| [runbooks/PR_REVIEW_PRACTICE_TRACK.md](./runbooks/PR_REVIEW_PRACTICE_TRACK.md) | 12-week practical track for applying PR review quality gates |
 | [reports/PRINT_PANEL_AUDIT_REPORT.md](./reports/PRINT_PANEL_AUDIT_REPORT.md) | Unified print audit across registrar, specialists, lab, and admin panels |
 | [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Historical messaging contract and rollout evidence |
 | [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Historical messaging QA evidence |
@@ -134,7 +136,8 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 ### "I'm an AI agent making changes"
 1. **READ FIRST:** [AUTHENTICATION_LAWS_FOR_AI.md](./AUTHENTICATION_LAWS_FOR_AI.md)
 2. **READ SECOND:** [DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md](./DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md)
-3. Then specific area docs
+3. Then [runbooks/PR_REVIEW_QUALITY_GATES.md](./runbooks/PR_REVIEW_QUALITY_GATES.md)
+4. Then specific area docs
 
 ### "I need to deploy"
 1. [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)

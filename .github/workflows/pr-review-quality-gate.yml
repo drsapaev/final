@@ -1,0 +1,33 @@
+name: PR Review Quality Gate
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, edited, synchronize, reopened, ready_for_review ]
+
+jobs:
+  pr-review-quality-gate:
+    name: PR Review Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Checkout base branch validator
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+
+    - name: Run PR review gate unit tests
+      run: |
+        python -m unittest test_check_pr_review_template.py -v
+
+    - name: Validate PR review template
+      env:
+        PR_BODY: ${{ github.event.pull_request.body }}
+      run: |
+        python scripts/check_pr_review_template.py --body-env PR_BODY
