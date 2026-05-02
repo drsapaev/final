@@ -4,7 +4,16 @@
 """
 import sqlite3
 import hashlib
+import os
 import secrets
+
+
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError("Set ADMIN_PASSWORD before creating the admin user.")
+    return password
+
 
 def create_admin():
     """Создать администратора"""
@@ -19,7 +28,7 @@ def create_admin():
             return True
         
         # Создаем хеш пароля
-        password = "admin123"
+        password = _required_admin_password()
         salt = secrets.token_hex(16)
         password_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
         password_hash_hex = password_hash.hex()
@@ -40,7 +49,7 @@ def create_admin():
         ))
         
         conn.commit()
-        print("✅ Администратор создан: admin / admin123")
+        print("✅ Администратор создан: admin")
         return True
         
     except Exception as e:
