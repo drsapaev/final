@@ -3350,3 +3350,40 @@ Continue the QA sweep by removing runnable-looking `change-me` placeholders from
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect env samples, lifecycle scripts, and bootstrap runbooks when searching for deployment-secret placeholders.
+
+## Task 94 - Login default credential hint removal
+
+### User task
+Continue the QA sweep by removing default admin password hints from the frontend login page.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/Login.jsx
+
+### What handoff solved well
+- It correctly identified the root-cause UI file and kept the patch single-file.
+- It provided a frontend build validation target for the auth-facing UI change.
+
+### Missing relationship mapping
+- Manual inspection was still needed to find both the visible `admin/admin` notes and the prefilled password state in the same component.
+
+### Manual reconstruction needed
+- Replaced the Russian, Uzbek, and English login notes with neutral administrator-issued credential guidance.
+- Cleared the default password field so the login form no longer preloads a known admin password.
+- Left role selector and demo username contracts unchanged for a later dedicated routing/demo cleanup.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The task was localized once the root-cause file was known.

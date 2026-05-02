@@ -34,7 +34,7 @@ const translations = {
     loggingIn: 'Входим...',
     forgotPassword: 'Забыли пароль?',
     backToHome: 'На главную',
-    note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin).',
+    note: 'Вход выполняется только с учетными данными, выданными администратором.',
     flagUrl: 'https://flagcdn.com/w80/ru.png'
   },
   UZ: {
@@ -47,7 +47,7 @@ const translations = {
     loggingIn: 'Kirilmoqda...',
     forgotPassword: 'Parolni unutdingizmi?',
     backToHome: 'Bosh sahifaga',
-    note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin).',
+    note: 'Kirish faqat administrator bergan hisob ma’lumotlari bilan bajariladi.',
     flagUrl: 'https://flagcdn.com/w80/uz.png'
   },
   EN: {
@@ -60,7 +60,7 @@ const translations = {
     loggingIn: 'Signing in...',
     forgotPassword: 'Forgot password?',
     backToHome: 'Back to Home',
-    note: 'By default, admin is created by create_admin.py script (admin/admin).',
+    note: 'Sign in only with credentials issued by an administrator.',
     flagUrl: 'https://flagcdn.com/w80/gb.png'
   }
 };
@@ -70,7 +70,7 @@ export default function Login() {
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('admin');
   const [username, setUsername] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [language, setLanguage] = useState('RU');
