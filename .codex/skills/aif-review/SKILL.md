@@ -10,6 +10,18 @@ disable-model-invocation: false
 
 Perform thorough code reviews focusing on correctness, security, performance, and maintainability.
 
+## Step 0: Load Config
+
+**FIRST:** Read `.ai-factory/config.yaml` if it exists to resolve:
+- **Paths:** `paths.description`, `paths.architecture`, `paths.rules_file`, `paths.roadmap`, and `paths.rules`
+- **Language:** `language.ui` for review summary language
+- **Git:** `git.base_branch` for branch comparison guidance
+
+If config.yaml doesn't exist, use defaults:
+- Paths: `.ai-factory/` for all artifacts
+- Language: `en` (English)
+- Git: `base_branch: main`
+
 ## Behavior
 
 ### Without Arguments (Review Staged Changes)
@@ -95,21 +107,35 @@ git rev-parse --verify <argument> 2>/dev/null
 
 Before finalizing review findings, run read-only context gates:
 
-- Check `.ai-factory/ARCHITECTURE.md` (if present) for boundary/dependency alignment issues.
-- Check `.ai-factory/RULES.md` (if present) for explicit convention violations.
-- Check `.ai-factory/ROADMAP.md` (if present) for milestone alignment and mention missing linkage for likely `feat`/`fix`/`perf` work.
+- Check the resolved architecture artifact (if present) for boundary/dependency alignment issues.
+- Check the resolved RULES.md artifact (if present) for explicit convention violations.
+- Check the resolved roadmap artifact (if present) for milestone alignment and mention missing linkage for likely `feat`/`fix`/`perf` work.
 
-Gate result severity:
+Human gate result severity:
 - `WARN` for non-blocking inconsistencies or missing optional files.
 - `ERROR` only for explicit blocking criteria requested by the user/review policy.
 
-`/aif-review` is read-only for context artifacts by default. Do not modify context files unless user explicitly asks.
+If the user wants a standalone rules-only pass, suggest `$aif-rules-check`. Keep human `$aif-review` gate labels at `WARN` / `ERROR`, then append the standard machine-readable gate result with `pass|warn|fail` status.
+
+Machine-readable gate result:
+- Append one final fenced `aif-gate-result` JSON block after the human-readable review.
+- Use `"gate": "review"`.
+- Use `"status": "pass|warn|fail"` where:
+  - `fail` = review findings should block merge, including critical correctness, security, data-loss, performance, or explicit blocking context-gate issues.
+  - `warn` = only non-blocking findings, suggestions, missing optional context, or review uncertainty remain.
+  - `pass` = no material review findings remain.
+- Use `"blocking": true|false`.
+- Include merge-blocking review findings only in `"blockers": [`.
+- Include reviewed or implicated paths in `"affected_files": [`.
+- Set `"suggested_next": {` to `$aif-fix`, `$aif-rules`, `$aif-architecture`, `$aif-roadmap`, `$aif-commit`, or `null`.
+
+`$aif-review` is read-only for context artifacts by default. Do not modify context files unless user explicitly asks.
 
 ### Project Context
 
 **Read `.ai-factory/skill-context/aif-review/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -190,6 +216,25 @@ If any rule is violated — fix the output before presenting it to the user.
 [Good patterns observed]
 ```
 
+Append the final machine-readable result after the markdown summary:
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "review",
+  "status": "pass",
+  "blocking": false,
+  "blockers": [],
+  "affected_files": [],
+  "suggested_next": {
+    "command": "$aif-commit",
+    "reason": "Review found no blocking issues."
+  }
+}
+```
+
+Schema reminder: `"status": "pass|warn|fail"`, `"blocking": true|false`, `"blockers": [`, `"affected_files": [`, `"suggested_next": {`.
+
 ## Review Style
 
 - Be constructive, not critical
@@ -201,22 +246,22 @@ If any rule is violated — fix the output before presenting it to the user.
 
 ## Examples
 
-**User:** `/aif-review`
+**User:** `$aif-review`
 Review staged changes in current repository.
 
-**User:** `/aif-review 123`
+**User:** `$aif-review 123`
 Review PR #123 using GitHub CLI.
 
-**User:** `/aif-review https://github.com/org/repo/pull/123`
+**User:** `$aif-review https://github.com/org/repo/pull/123`
 Review PR from URL.
 
-**User:** `/aif-review 2.x`
+**User:** `$aif-review 2.x`
 Review all commits on the current branch compared to branch `2.x`.
 
-**User:** `/aif-review main`
-Review all commits on the current branch compared to `main`.
+**User:** `$aif-review main`
+Review all commits on the current branch compared to `main` (or to whatever branch is configured as `git.base_branch` in this repository).
 
-**User:** `/aif-review v1.0.0`
+**User:** `$aif-review v1.0.0`
 Review all commits on the current branch compared to tag `v1.0.0`.
 
 ## Integration

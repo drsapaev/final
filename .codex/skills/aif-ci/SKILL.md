@@ -36,7 +36,7 @@ Store project context for later steps. If absent, Step 2 detects everything.
 
 **Read `.ai-factory/skill-context/aif-ci/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -497,4 +497,10 @@ Display summary using format from `references/AUDIT-REPORT.md` (Summary Display 
 
 ### 7.2 Suggest Follow-Up Skills
 
-Suggest: `/aif-build-automation` for CI targets in Makefile/Taskfile, `/aif-dockerize` for containerization.
+Suggest: `$aif-build-automation` for CI targets in Makefile/Taskfile, `$aif-dockerize` for containerization.
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: CI pipeline artifacts such as `.github/workflows/*` and `.gitlab-ci.yml`.
+- Allowed companion updates: none by default outside CI files.
+- Config policy: config-agnostic by design. This skill relies on repository detection and explicit user choices, not `config.yaml`.

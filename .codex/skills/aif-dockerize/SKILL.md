@@ -40,7 +40,7 @@ Store project context for later steps. If absent, Step 2 detects everything.
 
 **Read `.ai-factory/skill-context/aif-dockerize/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -190,7 +190,7 @@ Read dependency files to detect the framework:
 
 ### 2.3 Package Manager & Lock File
 
-Same detection as `/aif-build-automation` Step 2.2.
+Same detection as `$aif-build-automation` Step 2.2.
 
 Store: `PACKAGE_MANAGER`, `LOCK_FILE`.
 
@@ -516,4 +516,10 @@ Templates: `templates/deploy.sh`, `templates/update.sh`, `templates/logs.sh`, `t
 
 Display a summary of all created/updated files using the format from `references/SUMMARY-FORMAT.md`.
 
-Suggest follow-up: `/aif-build-automation` for Docker targets, `/aif-docs` for documentation.
+Suggest follow-up: `$aif-build-automation` for Docker targets, `$aif-docs` for documentation.
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: Docker artifacts (`Dockerfile`, `compose*.yml`, `.dockerignore`, `docker/*`, `deploy/scripts/*`, and related `.env.example` scaffolding when created by this skill).
+- Allowed companion updates: none outside Docker and deployment artifacts by default.
+- Config policy: config-agnostic by design. This skill uses repository detection, explicit infrastructure choices, and fixed AI Factory context files rather than `config.yaml`.

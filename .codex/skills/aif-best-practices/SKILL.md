@@ -14,7 +14,7 @@ Universal code quality guidelines applicable to any language or framework.
 
 **Read `.ai-factory/skill-context/aif-best-practices/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -34,12 +34,12 @@ If any rule is violated — fix the output before presenting it to the user.
 
 ## Quick Reference
 
-- `/aif-best-practices` — Full overview
-- `/aif-best-practices naming` — Naming conventions
-- `/aif-best-practices structure` — Code organization
-- `/aif-best-practices errors` — Error handling
-- `/aif-best-practices testing` — Testing practices
-- `/aif-best-practices review` — Code review checklist
+- `$aif-best-practices` — Full overview
+- `$aif-best-practices naming` — Naming conventions
+- `$aif-best-practices structure` — Code organization
+- `$aif-best-practices errors` — Error handling
+- `$aif-best-practices testing` — Testing practices
+- `$aif-best-practices review` — Code review checklist
 
 ---
 
@@ -245,7 +245,7 @@ describe('calculateDiscount', () => {
 ### Reviewer Checklist
 - [ ] **Correctness**: Does it do what it claims?
 - [ ] **Edge cases**: What could go wrong?
-- [ ] **Security**: Any vulnerabilities? (see `/aif-security-checklist`)
+- [ ] **Security**: Any vulnerabilities? (see `$aif-security-checklist`)
 - [ ] **Performance**: Any obvious bottlenecks?
 - [ ] **Readability**: Can I understand it in 5 minutes?
 - [ ] **Tests**: Are critical paths covered?
@@ -274,3 +274,9 @@ or using optional chaining: `user?.profile?.name`"
 | Errors | Specific types, never swallow, log context |
 | Tests | AAA pattern, test behavior, descriptive names |
 | Reviews | Be specific, suggest solutions, be kind |
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: none. This skill is advisory and reference-only.
+- Write policy: do not create or modify project artifacts by default.
+- Config policy: config-agnostic by design. Follow repository context, `.ai-factory/ARCHITECTURE.md`, and skill-context overrides instead of reading `config.yaml`.
