@@ -44,7 +44,7 @@ async def get_api_docs():
             <div class="example">
                 {
                     "username": "admin",
-                    "password": "admin123"
+                    "password": "REPLACE_WITH_ADMIN_PASSWORD"
                 }
             </div>
         </div>
