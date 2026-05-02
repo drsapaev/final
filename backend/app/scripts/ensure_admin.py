@@ -29,10 +29,17 @@ def _hash_or_plain(pw: str) -> str:
         return pw
 
 
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting the bootstrap admin user."
+        )
+    return password
+
+
 def ensure_admin() -> dict:
-    # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите ADMIN_PASSWORD через переменную окружения!
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
-    password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
     allow_initialized = os.getenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "").strip().lower() in {
@@ -79,6 +86,7 @@ def ensure_admin() -> dict:
                 "true",
                 "yes",
             }:
+                password = _required_admin_password()
                 row.hashed_password = _hash_or_plain(password)
                 changed = True
             if row.role != "Admin":
@@ -105,6 +113,7 @@ def ensure_admin() -> dict:
             existing_email.username = username
             existing_email.role = "Admin"
             existing_email.is_active = True
+            password = _required_admin_password()
             existing_email.hashed_password = _hash_or_plain(password)
             existing_email.full_name = full_name
             db.commit()
@@ -117,6 +126,7 @@ def ensure_admin() -> dict:
                 "role": existing_email.role,
             }
 
+        password = _required_admin_password()
         row = User(
             username=username,
             full_name=full_name,

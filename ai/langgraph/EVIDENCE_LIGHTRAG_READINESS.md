@@ -3424,3 +3424,40 @@ Continue the QA sweep by removing runnable-looking staging and VPS runbook place
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect staging env samples and VPS rollout runbooks when auditing deployment-secret placeholders.
+
+## Task 96 - Ensure admin password fallback removal
+
+### User task
+Continue the QA sweep by removing the runtime admin password fallback from the bootstrap script.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/scripts/ensure_admin.py
+
+### What handoff solved well
+- It correctly identified the runtime bootstrap script as the root-cause file.
+- It kept entrypoint and compose policy unchanged for this first patch slice.
+
+### Missing relationship mapping
+- Manual inspection was needed to avoid requiring `ADMIN_PASSWORD` on safe no-password paths, such as an initialized instance skip or metadata-only admin update.
+
+### Manual reconstruction needed
+- Added a required password helper that raises if `ADMIN_PASSWORD` is missing.
+- Applied it only to create, reset-password, and email-to-admin promotion paths where the script writes a password hash.
+- Preserved existing username/email/full-name defaults and initialized-instance guard behavior.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The root-cause file contained the full behavioral slice once password-writing paths were identified.
