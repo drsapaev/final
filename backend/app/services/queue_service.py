@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
+from app.models.user import User
 
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
