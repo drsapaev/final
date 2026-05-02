@@ -75,7 +75,8 @@ Minimum edits:
 ## Bootstrap Postgres
 
 ```bash
-sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_staging change-me clinic_staging
+DB_PASSWORD="$(openssl rand -base64 24)"
+sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_staging "$DB_PASSWORD" clinic_staging
 ```
 
 ## Deploy

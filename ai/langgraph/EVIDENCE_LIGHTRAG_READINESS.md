@@ -3387,3 +3387,40 @@ Continue the QA sweep by removing default admin password hints from the frontend
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The task was localized once the root-cause file was known.
+
+## Task 95 - Staging rollout placeholder hardening
+
+### User task
+Continue the QA sweep by removing runnable-looking staging and VPS runbook placeholder secrets.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ops/staging.env.sample
+
+### What handoff solved well
+- It identified the staging env sample as the concrete root-cause artifact.
+- It preserved the deployment-sensitive framing and kept runtime scripts out of the first patch.
+
+### Missing relationship mapping
+- The gate missed the matching VPS host rollout runbook command that used the same placeholder password contract.
+- Manual reconstruction was required to keep sample env and operator command guidance aligned.
+
+### Manual reconstruction needed
+- Cleared staging DB/JWT/admin secret placeholders so copied env files require explicit values.
+- Replaced the VPS runbook bootstrap password with a generated shell variable passed into `bootstrap_postgres.sh`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect staging env samples and VPS rollout runbooks when auditing deployment-secret placeholders.
