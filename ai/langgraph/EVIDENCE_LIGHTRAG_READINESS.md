@@ -3125,3 +3125,40 @@ Continue the QA sweep by cleaning the stale Bandit report entry that still refer
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should distinguish generated report cleanup from ignore-rule changes and surface the missing Bandit tool dependency before execution.
+
+## Task 88 - Local env restore tracking cleanup
+
+### User task
+Continue the QA sweep by stopping tracked local `.env.local.restore` files from carrying runtime-ish local configuration.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override after retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: .gitignore, then backend/.env.local.restore
+
+### What handoff solved well
+- It classified the task as env/secrets hygiene and preserved a small first patch slice.
+- It made the stop condition explicit when required edits spread beyond a single file.
+
+### Missing relationship mapping
+- The first pass only returned `.gitignore`; the retry only returned `backend/.env.local.restore`.
+- Manual reconstruction was required to connect the ignore-rule exception to both tracked restore files.
+
+### Manual reconstruction needed
+- Removed the `.env.local.restore` unignore exception from `.gitignore`.
+- Removed `backend/.env.local.restore` and `frontend/.env.local.restore` from the Git index with `git rm --cached`, preserving the local files as ignored local artifacts.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect tracked env restore artifacts to the ignore exception and both frontend/backend local runtime surfaces.
