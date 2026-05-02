@@ -18,7 +18,7 @@ You are an expert Agent Skills architect. You help users create professional, pr
 
 **Read `.ai-factory/skill-context/aif-skill-generator/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -98,7 +98,7 @@ Before running the scanner, find a working Python interpreter:
 ```bash
 PYTHON=$(command -v python3 || command -v python || echo "")
 ```
-If not found — ask user for path, offer to skip scan (at their risk), or suggest installing Python. If skipping, still perform Level 2 (manual review). See `/aif` skill for full detection flow.
+If not found — ask user for path, offer to skip scan (at their risk), or suggest installing Python. If skipping, still perform Level 2 (manual review). See `$aif` skill for full detection flow.
 
 ### Scan Workflow
 
@@ -107,11 +107,11 @@ If not found — ask user for path, offer to skip scan (at their risk), or sugge
 ```
 0. Scope check (MANDATORY):
    - Target path MUST be the external skill being evaluated for install.
-   - If path points to built-in AI Factory skills ({{skills_dir}}/aif or {{skills_dir}}/aif-*), this is wrong target selection for install-time security checks.
+   - If path points to built-in AI Factory skills (.codex/skills$aif or .codex/skills$aif-*), this is wrong target selection for install-time security checks.
    - Do not block external-skill installation decisions based on scans of built-in aif* skills.
 1. Download/fetch the skill content
 2. LEVEL 1 — Run automated scan:
-   $PYTHON ~/{{skills_dir}}/aif-skill-generator/scripts/security-scan.py <skill-path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <skill-path>
    (Optional hard mode: add `--strict` to treat markdown code-block examples as real threats)
 3. Check exit code:
    - Exit 0 → proceed to Level 2
@@ -135,12 +135,12 @@ For threat categories, severity levels, and user communication templates → rea
 
 ## Quick Commands
 
-- `/aif-skill-generator <name>` - Generate a new skill interactively
-- `/aif-skill-generator <url> [url2] [url3]...` - **Learn Mode**: study URLs and generate a skill from them
-- `/aif-skill-generator search <query>` - Search existing skills on skills.sh for inspiration
-- `/aif-skill-generator scan <path>` - **Security scan**: run two-level security check on a skill
-- `/aif-skill-generator validate <path>` - **Full validation**: structure check + two-level security scan
-- `/aif-skill-generator template <type>` - Get a template (basic, task, reference, visual)
+- `$aif-skill-generator <name>` - Generate a new skill interactively
+- `$aif-skill-generator <url> [url2] [url3]...` - **Learn Mode**: study URLs and generate a skill from them
+- `$aif-skill-generator search <query>` - Search existing skills on skills.sh for inspiration
+- `$aif-skill-generator scan <path>` - **Security scan**: run two-level security check on a skill
+- `$aif-skill-generator validate <path>` - **Full validation**: structure check + two-level security scan
+- `$aif-skill-generator template <type>` - Get a template (basic, task, reference, visual)
 
 ## Argument Detection
 
@@ -158,14 +158,14 @@ Check $ARGUMENTS:
 
 ### Security Scan Mode
 
-**Trigger:** `/aif-skill-generator scan <path>`
+**Trigger:** `$aif-skill-generator scan <path>`
 
 When `$ARGUMENTS` starts with `scan`:
 
 1. Extract the path (everything after "scan ")
 2. **LEVEL 1** — Run automated scanner:
    ```bash
-   $PYTHON ~/{{skills_dir}}/aif-skill-generator/scripts/security-scan.py <path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <path>
    ```
 3. Capture exit code and full output
 4. **LEVEL 2** — Read ALL files in the skill directory yourself (SKILL.md + references, scripts, templates)
@@ -201,7 +201,7 @@ When `$ARGUMENTS` starts with `scan`:
 
 ### Validate Mode
 
-**Trigger:** `/aif-skill-generator validate <path>`
+**Trigger:** `$aif-skill-generator validate <path>`
 
 When `$ARGUMENTS` starts with `validate`:
 
@@ -231,7 +231,7 @@ When `$ARGUMENTS` starts with `validate`:
 
 3. **Security scan — Level 1** (automated):
    ```bash
-   $PYTHON ~/{{skills_dir}}/aif-skill-generator/scripts/security-scan.py <path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <path>
    ```
    Capture exit code and full output.
 4. **Security scan — Level 2** (semantic):
@@ -290,7 +290,7 @@ Follow the [Learn Mode Workflow](references/LEARN-MODE.md).
 4. Synthesize all material into a knowledge base
 5. Ask the user 2-3 targeted questions (skill name, type, customization)
 6. Generate a complete skill package enriched with the learned content
-7. **AUTO-SCAN**: Run `/aif-skill-generator scan <generated-skill-path>` on the result
+7. **AUTO-SCAN**: Run `$aif-skill-generator scan <generated-skill-path>` on the result
 
 If NO URLs and no special command detected — proceed with the standard workflow below.
 
@@ -316,8 +316,8 @@ Or browse https://skills.sh for inspiration. Check if similar skills exist to av
 
 **If you install an external skill at this step** — immediately scan it:
 ```bash
-npx skills install {{skills_cli_agent_flag}} <name>
-$PYTHON ~/{{skills_dir}}/aif-skill-generator/scripts/security-scan.py <installed-path>
+npx skills install --agent codex <name>
+$PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <installed-path>
 ```
 If BLOCKED → remove and warn. If WARNINGS → show to user.
 
@@ -402,7 +402,7 @@ npx skills-ref validate ./skill-name
 
 **Always run security scan on the generated skill:**
 ```bash
-$PYTHON ~/{{skills_dir}}/aif-skill-generator/scripts/security-scan.py ./skill-name/
+$PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py ./skill-name/
 ```
 
 This catches any issues introduced during generation (especially in Learn Mode where external content is synthesized).
@@ -465,7 +465,7 @@ allowed-tools: Bash(python *)
 
 Generate dependency graph:
 ```bash
-python ~/{{skills_dir}}/dependency-graph/scripts/visualize.py $ARGUMENTS
+python ~/.codex/skills/dependency-graph/scripts/visualize.py $ARGUMENTS
 ```
 ```
 
@@ -509,8 +509,8 @@ Available variables in skill content:
 
 To share your skill:
 
-1. **Local**: Keep in `~/{{skills_dir}}/` for personal use
-2. **Project**: Add to `{{skills_dir}}/` and commit
+1. **Local**: Keep in `~/.codex/skills/` for personal use
+2. **Project**: Add to `.codex/skills/` and commit
 3. **Community**: Publish to skills.sh:
    ```bash
    npx skills publish <path-to-skill>
@@ -525,3 +525,9 @@ See supporting files for more details:
 - [references/LEARN-MODE.md](references/LEARN-MODE.md) - Learn Mode: self-learning from URLs
 - [scripts/security-scan.py](scripts/security-scan.py) - Security scanner for prompt injection detection
 - [templates/](templates/) - Starter templates
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: generated skill packages (`SKILL.md`, `references/*`, `scripts/*`, `templates/*`, `assets/*`) in the target skill directory.
+- Allowed companion updates: none outside the generated skill package by default.
+- Config policy: config-agnostic by design. Skill generation and validation are driven by user input, external sources, and the Agent Skills spec rather than `config.yaml`.

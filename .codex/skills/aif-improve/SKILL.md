@@ -1,6 +1,6 @@
 ---
 name: aif-improve
-description: Refine and enhance an existing implementation plan with a second iteration. Re-analyzes the codebase, checks for gaps, missing tasks, wrong dependencies, and improves the plan quality. Use after /aif-plan to polish the plan before implementation, or to improve an existing /aif-fix plan.
+description: Refine and enhance an existing implementation plan with a second iteration. Re-analyzes the codebase, checks for gaps, missing tasks, wrong dependencies, and improves the plan quality. Use after $aif-plan to polish the plan before implementation, or to improve an existing $aif-fix plan.
 argument-hint: "[--list] [@plan-file] [improvement prompt or empty for auto-review]"
 allowed-tools: Read Write Edit Glob Grep Bash(git *) TaskCreate TaskUpdate TaskList TaskGet AskUserQuestion Questions
 disable-model-invocation: false
@@ -22,7 +22,21 @@ enhanced plan with better tasks, correct dependencies, more detail
 
 ## Workflow
 
-### Step 0: Find the Plan
+### Step 0: Load Config & Find the Plan
+
+**FIRST:** Read `.ai-factory/config.yaml` if it exists to resolve:
+- **Paths:** `paths.plan`, `paths.plans`, `paths.fix_plan`, `paths.research`, `paths.description`, and `paths.patches`
+- **Language:** `language.ui` for prompts
+- **Git:** `git.enabled`, `git.base_branch`, `git.create_branches`
+
+If config.yaml doesn't exist, use defaults:
+- plan: `paths.plan` (default: `.ai-factory/PLAN.md`)
+- plans/: `.ai-factory/plans/`
+- fix plan: `paths.fix_plan` (default: `.ai-factory/FIX_PLAN.md`)
+- research: `.ai-factory/RESEARCH.md`
+- patches/: `.ai-factory/patches/`
+- DESCRIPTION.md: `.ai-factory/DESCRIPTION.md`
+- Language: `en` (English)
 
 **First parse arguments:**
 
@@ -40,16 +54,17 @@ If `$ARGUMENTS` contains `--list`, run read-only discovery and stop.
 
 ```
 1. Get current branch:
-   git branch --show-current
-2. Convert branch to filename: replace "/" with "-", add ".md"
+   git branch --show-current (git mode only)
+2. Convert branch to filename: replace "/" with "-", add ".md" (git mode only)
 3. Check existence of:
-   - .ai-factory/plans/<branch-name>.md
-   - .ai-factory/PLAN.md
-   - .ai-factory/FIX_PLAN.md
+   - <configured plans dir>/<branch-name>.md
+   - if git mode is off or branch creation is disabled: any `*.md` full-mode plan in `<configured plans dir>/`
+   - <resolved fast plan path>
+   - <resolved fix plan path>
 4. Print availability summary and usage hints:
-   - /aif-improve @<path> <optional prompt>
-   - /aif-improve <optional prompt>      # automatic priority
-5. If none found, suggest creating a plan via /aif-plan or /aif-fix
+   - $aif-improve @<path> <optional prompt>
+   - $aif-improve <optional prompt>      # automatic priority
+5. If none found, suggest creating a plan via $aif-plan or $aif-fix
 6. STOP.
 ```
 
@@ -68,10 +83,14 @@ If `$ARGUMENTS` contains `--list`, run read-only discovery and stop.
 2. No explicit `@<path>` override → Check current git branch:
    git branch --show-current
    → Convert branch name to filename: replace "/" with "-", add ".md"
-   → Look for .ai-factory/plans/<branch-name>.md (from /aif-plan full)
+   → Look for <configured plans dir>/<branch-name>.md (from $aif-plan full)
    Example: feature/user-auth → .ai-factory/plans/feature-user-auth.md
-3. No branch-based plan → Check .ai-factory/PLAN.md (from /aif-plan fast)
-4. No branch-based plan and no .ai-factory/PLAN.md → Check .ai-factory/FIX_PLAN.md (from /aif-fix plan mode)
+3. If the branch-based plan is missing or git mode is off:
+   → Check whether the configured plans dir contains exactly one `*.md` full-mode plan
+   → If exactly one exists, use it
+   → If multiple exist, ask the user to choose or require `@<path>`
+4. No full-mode plan → Check the resolved fast plan path (from $aif-plan fast)
+5. No full-mode plan and no resolved fast plan → Check the resolved fix plan path (from $aif-fix plan mode)
 ```
 
 **If NO plan file found at any location:**
@@ -80,9 +99,9 @@ If `$ARGUMENTS` contains `--list`, run read-only discovery and stop.
 No active plan found.
 
 To create a plan first, use:
-- /aif-plan full <description>  — for a new feature (creates branch + plan)
-- /aif-plan fast <description>  — for a quick task plan
-- /aif-fix <bug description>    — for a bugfix plan (.ai-factory/FIX_PLAN.md)
+- $aif-plan full <description>  — for a new feature (rich full plan; may also create a branch when git settings allow it)
+- $aif-plan fast <description>  — for a quick task plan
+- $aif-fix <bug description>    - for a bugfix plan (use the resolved fix plan path)
 ```
 
 → **STOP here.** Do not proceed without a plan file.
@@ -102,18 +121,20 @@ Read the found plan file completely. Understand:
 
 **1.2: Read project context**
 
-Read `.ai-factory/DESCRIPTION.md` if it exists:
+Read `.ai-factory/DESCRIPTION.md` (use path from config) if it exists:
 - Tech stack
 - Architecture
 - Conventions
 - Non-functional requirements
 
+Read `.ai-factory/RESEARCH.md` (use path from config) if it exists and is relevant to the plan being refined.
+
 **1.3: Read patches (limited fallback)**
 
 Use patches as fallback context, not the default source:
 
-- If `.ai-factory/skill-context/aif-improve/SKILL.md` does not exist and `.ai-factory/patches/` exists:
-  - `Glob: .ai-factory/patches/*.md`
+- If `.ai-factory/skill-context/aif-improve/SKILL.md` does not exist and the resolved patches dir exists:
+  - `Glob: <resolved patches dir>/*.md`
   - Sort patch filenames ascending (lexical), then select the last **10** (or fewer if less exist)
   - Read those selected patch files only
   - Focus on reusable Prevention/Root Cause patterns that affect planning quality
@@ -122,7 +143,7 @@ Use patches as fallback context, not the default source:
 
 **Read `.ai-factory/skill-context/aif-improve/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -150,7 +171,7 @@ Understand what's already been created, what's in progress, what's completed.
 
 ### Step 2: Deep Codebase Analysis
 
-Now do a **deeper** codebase exploration than what `/aif-plan` did initially:
+Now do a **deeper** codebase exploration than what `$aif-plan` did initially:
 
 **2.1: Trace through existing code paths**
 
@@ -288,7 +309,7 @@ Plan: [plan file path]
 Tasks: N
 
 Ready to implement:
-/aif-implement
+$aif-implement
 ```
 
 ### Step 5: Apply Approved Improvements
@@ -351,12 +372,18 @@ Updated plan: [plan file path]
 Total tasks: N
 
 Ready to implement:
-/aif-implement
+$aif-implement
 ```
 
 ### Context Cleanup
 
 Suggest the user to free up context space if needed: `/clear` (full reset) or `/compact` (compress history).
+
+## Artifact Ownership
+
+- Primary ownership: the plan artifact being refined (resolved branch-plan path, named full-plan path, resolved fast plan path, or resolved fix plan path when explicitly targeted).
+- Config use: resolve full-plan directory via `paths.plans`, fast/fix plans via `paths.plan` and `paths.fix_plan`, git behavior via `git.enabled` and `git.create_branches`, optional research context via `paths.research`, and patch fallback via `paths.patches`.
+- Read-only context: description, architecture, roadmap, rules, and research artifacts except where the active plan file itself is being updated.
 
 ## Important Rules
 
@@ -374,7 +401,7 @@ Suggest the user to free up context space if needed: `/clear` (full reset) or `/
 ### Example 1: Auto-review (no arguments)
 
 ```
-User: /aif-improve
+User: $aif-improve
 
 → Found plan: .ai-factory/plans/feature-user-auth.md
 → 6 tasks in plan
@@ -394,9 +421,9 @@ Apply? → Yes → Changes applied
 ### Example 2: With user prompt
 
 ```
-User: /aif-improve добавь обработку ошибок и валидацию входных данных
+User: $aif-improve добавь обработку ошибок и валидацию входных данных
 
-→ Found plan: .ai-factory/PLAN.md
+→ Found plan: <resolved fast plan path>
 → 4 tasks in plan
 → User wants: error handling + input validation
 → Analyzing each task for missing error handling...
@@ -414,24 +441,24 @@ Apply? → Yes → Changes applied
 ### Example 3: No plan found
 
 ```
-User: /aif-improve
+User: $aif-improve
 
-→ Branch: main
-→ No .ai-factory/plans/main.md found
-→ No .ai-factory/PLAN.md found
-→ No .ai-factory/FIX_PLAN.md found
+→ Branch: <current-branch-or-empty>
+→ No matching branch-based full plan found
+→ No resolved fast plan found
+→ No resolved fix plan found
 → No plan file found
 
 "No active plan found. Create one first:
-- /aif-plan full <description>
-- /aif-plan fast <description>
-- /aif-fix <bug description>"
+- $aif-plan full <description>
+- $aif-plan fast <description>
+- $aif-fix <bug description>"
 ```
 
 ### Example 4: Explicit plan file
 
 ```
-User: /aif-improve @my-custom-plan.md add rollback and edge-case handling
+User: $aif-improve @my-custom-plan.md add rollback and edge-case handling
 
 → Explicit plan override: my-custom-plan.md
 → Found plan: my-custom-plan.md
@@ -443,23 +470,23 @@ User: /aif-improve @my-custom-plan.md add rollback and edge-case handling
 ### Example 5: List mode
 
 ```
-User: /aif-improve --list
+User: $aif-improve --list
 
 ## Available Plans
 Current branch: feature/user-auth
 - [x] .ai-factory/plans/feature-user-auth.md
-- [ ] .ai-factory/PLAN.md
-- [x] .ai-factory/FIX_PLAN.md
+- [ ] <resolved fast plan path>
+- [x] <resolved fix plan path>
 
 Use:
-- /aif-improve @.ai-factory/plans/feature-user-auth.md
-- /aif-improve add validation and retries
+- $aif-improve @.ai-factory/plans/feature-user-auth.md
+- $aif-improve add validation and retries
 ```
 
 ### Example 6: Plan already looks good
 
 ```
-User: /aif-improve
+User: $aif-improve
 
 → Found plan: .ai-factory/plans/feature-product-search.md
 → 5 tasks in plan
@@ -467,5 +494,5 @@ User: /aif-improve
 → No significant improvements found
 
 "Plan looks solid! Ready to implement:
-/aif-implement"
+$aif-implement"
 ```

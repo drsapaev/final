@@ -3,7 +3,7 @@ name: aif-verify
 description: >-
   Verify completed implementation against the plan. Checks that all tasks were fully implemented,
   nothing was forgotten, code compiles, tests pass, and quality standards are met.
-  Use after "/aif-implement" completes, or when user says "verify", "check work", "did we miss anything".
+  Use after "$aif-implement" completes, or when user says "verify", "check work", "did we miss anything".
 argument-hint: "[--strict]"
 allowed-tools: Read Edit Glob Grep Bash(git *) Bash(npm *) Bash(npx *) Bash(yarn *) Bash(pnpm *) Bash(bun *) Bash(go *) Bash(python *) Bash(php *) Bash(composer *) Bash(cargo *) Bash(make *) Bash(task *) Bash(just *) Bash(mage *) TaskList TaskGet AskUserQuestion Questions
 disable-model-invocation: false
@@ -17,30 +17,54 @@ metadata:
 
 Verify that the completed implementation matches the plan, nothing was missed, and the code is production-ready.
 
-**This skill is optional** — invoked after `/aif-implement` finishes all tasks, or manually at any time.
+**This skill is optional** — invoked after `$aif-implement` finishes all tasks, or manually at any time.
 
 ---
 
 ## Step 0: Load Context
 
-### 0.0 Load Ownership and Gate Contract
+### 0.0 Load config.yaml
+
+**FIRST:** Read `.ai-factory/config.yaml` if it exists to resolve:
+- **Paths:** `paths.description`, `paths.architecture`, `paths.rules_file`, `paths.roadmap`, `paths.plan`, `paths.plans`, `paths.fix_plan`, `paths.specs`, and `paths.rules`
+- **verify_mode:** default verification strictness (`strict` | `normal` | `lenient`)
+- **Git:** `git.enabled`, `git.base_branch`, `git.create_branches`
+- **Rules hierarchy:** the resolved RULES.md path + `rules.base` + named `rules.<area>` entries
+
+**verify_mode priority:**
+1. `--strict` CLI flag → always use `strict`
+2. config.yaml `workflow.verify_mode` → use configured value
+3. Default → `normal`
+
+If config.yaml doesn't exist, use defaults:
+- Paths: `.ai-factory/` for all artifacts
+- verify_mode: `normal`
+- Rules: RULES.md only
+
+### 0.1 Load Ownership and Gate Contract
 
 - Read `references/CONTEXT-GATES-AND-OWNERSHIP.md` first.
+- Read `references/GATE-RESULT-CONTRACT.md` for the machine-readable quality gate summary.
 - Treat it as the canonical source for:
   - command-to-artifact ownership,
   - read-only behavior for `aif-commit`/`aif-review`/`aif-verify`,
   - normal vs strict context-gate thresholds.
 - If this contract conflicts with older examples in this file, follow the contract.
 
-### 0.1 Find Plan File
+### 0.2 Find Plan File
 
-Same logic as `/aif-implement`:
+Same logic as `$aif-implement`:
 
 ```
-1. .ai-factory/PLAN.md exists? → Use it
-2. No PLAN.md → Check current git branch:
+1. Check current git branch:
    git branch --show-current
-   → Look for .ai-factory/plans/<branch-name>.md
+   → Look for <configured plans dir>/<branch-name>.md
+2. If the branch-based plan is missing or git mode is off:
+   → Check whether the configured plans dir contains exactly one `*.md` full-mode plan
+   → If exactly one exists, use it
+   → If multiple exist, ask the user to choose or use `@<path>` via `$aif-implement`
+3. No full-mode plan → Check the resolved fast plan path
+4. No full-mode plan and no resolved fast plan → fall back to standalone verification choices
 ```
 
 **If no plan file found:**
@@ -49,7 +73,7 @@ AskUserQuestion: No plan file found. What should I verify?
 
 Options:
 1. Verify last commit — Check the most recent commit for completeness
-2. Verify branch diff — Compare current branch against main
+2. Verify branch diff — Compare current branch against the configured base branch
 3. Cancel
 ```
 
@@ -57,14 +81,17 @@ Options:
 
 - Read the plan file to understand what was supposed to be implemented
 - `TaskList` → get all tasks and their statuses
-- Read `.ai-factory/DESCRIPTION.md` for project context (tech stack, conventions)
-- Read `.ai-factory/ARCHITECTURE.md` for dependency and boundary rules (if present)
-- Read `.ai-factory/RULES.md` for project-specific conventions (if present)
-- Read `.ai-factory/ROADMAP.md` for milestone alignment checks (if present)
+- Read `.ai-factory/DESCRIPTION.md` (use path from config) for project context (tech stack, conventions)
+- Read `.ai-factory/ARCHITECTURE.md` (use path from config) for dependency and boundary rules (if present)
+- Read **rules hierarchy** (use paths from config):
+  1. **RULES.md** — axioms (universal project rules)
+  2. **rules/base.md** — project-specific base conventions
+  3. **rules.<area>** — area-specific rule entries resolved from config (for example `rules.api`, `rules.frontend`)
+- Read `.ai-factory/ROADMAP.md` (use path from config) for milestone alignment checks (if present)
 
 **Read `.ai-factory/skill-context/aif-verify/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -86,10 +113,14 @@ If any rule is violated — fix the output before presenting it to the user.
 
 ```bash
 # All files changed during this feature/plan
-git diff --name-only main...HEAD
-# Or if on main, check recent commits
+git diff --name-only <configured-base-branch>...HEAD
+# Or if on the base branch / in no-git mode, check recent commits
 git diff --name-only HEAD~$(number_of_tasks)..HEAD
 ```
+
+If `git.enabled = false`, skip branch diffing entirely and gather changed files from:
+- the working tree (if uncommitted changes exist), or
+- the recent commit window that corresponds to the implemented tasks.
 
 Store as `CHANGED_FILES`.
 
@@ -211,7 +242,7 @@ Check for discrepancies between what the plan says and what was built:
 Search for things that should have been cleaned up:
 
 ```
-Grep in CHANGED_FILES: TODO|FIXME|HACK|XXX|TEMP|PLACEHOLDER|console\.log\(.*debug|print\(.*debug
+Grep in CHANGED_FILES: [T][O][D][O]|[F][I][X][M][E]|HACK|[X][X][X]|TEMP|PLACEHOLDER|console\.log\(.*debug|print\(.*debug
 ```
 
 Report any found — they might be intentional, but flag them.
@@ -268,20 +299,34 @@ Strict mode behavior:
 - Clear roadmap mismatch fails verification.
 - Missing milestone linkage for `feat`/`fix`/`perf` remains a warning (even when `.ai-factory/ROADMAP.md` exists).
 
-Logging/reporting format:
+Human logging/reporting format:
 - Non-blocking findings: `WARN [gate-name] ...`
 - Blocking findings: `ERROR [gate-name] ...`
 
+If the user wants a standalone rules-only pass, suggest `$aif-rules-check`. Keep human context-gate labels at `WARN` / `ERROR`, then derive the final machine-readable gate result from the full verification report.
+
+Machine-readable gate result:
+- Append one final fenced `aif-gate-result` JSON block after the human-readable verification report.
+- Use `"gate": "verify"`.
+- Use `"status": "pass|warn|fail"` where:
+  - `fail` = incomplete required tasks, failed blocking quality checks, strict-mode context gate failures, or other blockers requiring remediation.
+  - `warn` = only non-blocking warnings remain, optional checks were skipped, docs/test gaps were accepted as warnings, or context drift is ambiguous.
+  - `pass` = no blocking or warning findings remain.
+- Use `"blocking": true|false`; set it to `true` only when the result should stop commit or merge flow.
+- Include only blocking findings in `"blockers": [`; keep non-blocking notes in the human summary.
+- Include changed or implicated paths in `"affected_files": [`.
+- Set `"suggested_next": {` to `$aif-fix`, `$aif-rules`, `$aif-architecture`, `$aif-roadmap`, `$aif-commit`, or `null` according to `references/GATE-RESULT-CONTRACT.md`.
+
 ### 3.6 Context Drift (Optional Remediation)
 
-`/aif-verify` is **read-only** for context artifacts. Do not edit or regenerate `.ai-factory/*` files here.
+`$aif-verify` is **read-only** for context artifacts. Do not edit or regenerate `.ai-factory/*` files here.
 
 If you detect that a context artifact is stale, missing, or ambiguous, report it as a drift finding and provide the owner-command remediation:
 
-- `DESCRIPTION.md` drift → suggest `/aif` (or note that `/aif-implement` should have updated it during implementation)
-- `ARCHITECTURE.md` drift → suggest `/aif-architecture`
-- `ROADMAP.md` drift → suggest `/aif-roadmap check` (or `/aif-roadmap <update request>`)
-- `RULES.md` drift → suggest `/aif-rules <rule text>`
+- `DESCRIPTION.md` drift → suggest `$aif` (or note that `$aif-implement` should have updated it during implementation)
+- `ARCHITECTURE.md` drift → suggest `$aif-architecture`
+- `ROADMAP.md` drift → suggest `$aif-roadmap check` (or `$aif-roadmap <update request>`)
+- `RULES.md` drift → suggest `$aif-rules <rule text>`
 
 Ask the user a single optional question **only if** drift was detected and fixing it now would materially improve correctness:
 
@@ -322,7 +367,7 @@ Options:
 ### Issues Found
 1. **Task #3 incomplete** — Password reset endpoint created but email sending not implemented (SendGrid integration missing)
 2. **Task #8 not done** — API documentation not updated despite plan requirement
-3. **2 TODOs found** — src/services/auth.ts:45, src/middleware/rate-limit.ts:12
+3. **2 unfinished markers found** — src/services/auth.ts:45, src/middleware/rate-limit.ts:12
 4. **New env var undocumented** — `SENDGRID_API_KEY` referenced but not in .env.example
 
 ### No Issues
@@ -338,6 +383,27 @@ Options:
 - **Minor Issues** — small gaps that can be fixed quickly
 - **Significant Gaps** — tasks missing or partially done, needs re-implementation
 
+### 4.2.1 Append Machine-Readable Gate Result
+
+After the human-readable report and overall status, append exactly one final `aif-gate-result` fenced JSON block.
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "verify",
+  "status": "pass",
+  "blocking": false,
+  "blockers": [],
+  "affected_files": [],
+  "suggested_next": {
+    "command": "$aif-commit",
+    "reason": "Verification passed without blockers."
+  }
+}
+```
+
+Schema reminder: `"status": "pass|warn|fail"`, `"blocking": true|false`, `"blockers": [`, `"affected_files": [`, `"suggested_next": {`.
+
 ### 4.3 Action on Issues
 
 If issues were found:
@@ -346,20 +412,20 @@ If issues were found:
 AskUserQuestion: Verification found issues. What should we do?
 
 Options:
-1. Fix now (recommended) — Use /aif-fix to address all issues
-2. Fix critical only — Use /aif-fix for incomplete tasks, skip warnings
-3. Fix directly here — Address issues in this session without /aif-fix
+1. Fix now (recommended) — Use $aif-fix to address all issues
+2. Fix critical only — Use $aif-fix for incomplete tasks, skip warnings
+3. Fix directly here — Address issues in this session without $aif-fix
 4. Accept as-is — Mark everything as done, move on
 ```
 
 **If "Fix now" or "Fix critical only":**
-- First suggest using `/aif-fix` and pass a concise issue summary as argument
+- First suggest using `$aif-fix` and pass a concise issue summary as argument
 - Example:
-  - `/aif-fix complete Task #3 password reset email flow, implement Task #8 docs update, remove TODOs in src/services/auth.ts and src/middleware/rate-limit.ts, document SENDGRID_API_KEY in .env.example`
-- If user agrees, proceed via `/aif-fix`
-- If user declines `/aif-fix`, continue with direct implementation in this session
-- For each incomplete/partial task — implement the missing pieces (follow the same implementation rules as `/aif-implement`)
-- For TODOs/debug artifacts — clean them up
+  - `$aif-fix complete Task #3 password reset email flow, implement Task #8 docs update, remove unfinished markers in src/services/auth.ts and src/middleware/rate-limit.ts, document SENDGRID_API_KEY in .env.example`
+- If user agrees, proceed via `$aif-fix`
+- If user declines `$aif-fix`, continue with direct implementation in this session
+- For each incomplete/partial task — implement the missing pieces (follow the same implementation rules as `$aif-implement`)
+- For unfinished markers/debug artifacts — clean them up
 - For undocumented config — update `.env.example` and docs
 - After fixing, re-run the relevant verification checks to confirm
 
@@ -373,7 +439,7 @@ Options:
 
 After verification is complete, suggest next steps based on result:
 
-- If unresolved issues remain (accepted or deferred), suggest `/aif-fix` first
+- If unresolved issues remain (accepted or deferred), suggest `$aif-fix` first
 - If all green, suggest security/review/commit flow
 
 ```
@@ -381,10 +447,10 @@ After verification is complete, suggest next steps based on result:
 
 Suggested next steps:
 
-1. 🛠️ /aif-fix [issue summary] — Fix remaining verification issues
-2. 🔒 /aif-security-checklist — Run security audit on the new code
-3. 👀 /aif-review — Code review of the implementation
-4. 💾 /aif-commit — Commit the changes
+1. 🛠️ $aif-fix [issue summary] — Fix remaining verification issues
+2. 🔒 $aif-security-checklist — Run security audit on the new code
+3. 👀 $aif-review — Code review of the implementation
+4. 💾 $aif-commit — Commit the changes
 
 Which would you like to run? (or skip all)
 ```
@@ -393,18 +459,18 @@ Which would you like to run? (or skip all)
 AskUserQuestion: Run additional checks?
 
 Options:
-1. Fix issues — Run /aif-fix with verification findings
-2. Security check — Run /aif-security-checklist on changed files
-3. Code review — Run /aif-review on the implementation
+1. Fix issues — Run $aif-fix with verification findings
+2. Security check — Run $aif-security-checklist on changed files
+3. Code review — Run $aif-review on the implementation
 4. Both — Run security check, then code review
 5. Skip — Proceed to commit
 ```
 
-**If fix issues selected** → suggest invoking `/aif-fix <issue summary>`
-**If security check selected** → suggest invoking `/aif-security-checklist`
-**If code review selected** → suggest invoking `/aif-review`
+**If fix issues selected** → suggest invoking `$aif-fix <issue summary>`
+**If security check selected** → suggest invoking `$aif-security-checklist`
+**If code review selected** → suggest invoking `$aif-review`
 **If both** → suggest security first, then review
-**If skip** → suggest `/aif-commit`
+**If skip** → suggest `$aif-commit`
 
 ### Context Cleanup
 
@@ -417,14 +483,14 @@ Suggest the user to free up context space if needed: `/clear` (full reset) or `/
 When invoked with `--strict`:
 
 ```
-/aif-verify --strict
+$aif-verify --strict
 ```
 
 - **All tasks must be COMPLETE** — no partial or skipped allowed
 - **Build must pass** — fail verification if build fails
 - **Tests must pass** — fail verification if any test fails (tests are required in strict mode)
 - **Lint must pass** — zero warnings, zero errors
-- **No TODOs/FIXMEs** in changed files
+- **No unfinished task markers** in changed files
 - **No undocumented environment variables**
 - **Architecture gate must pass** — fail on clear boundary/dependency violations
 - **Rules gate must pass** — fail on clear rule violations
@@ -432,7 +498,7 @@ When invoked with `--strict`:
 - Missing milestone linkage for `feat`/`fix`/`perf` is a warning even in strict mode
 - Do not fail strict verification solely because milestone linkage is missing
 
-Strict mode is recommended before merging to main or creating a pull request.
+Strict mode is recommended before merging to the configured base branch or creating a pull request.
 
 ---
 
@@ -440,16 +506,16 @@ Strict mode is recommended before merging to main or creating a pull request.
 
 ### After implement (suggested automatically)
 ```
-/aif-verify
+$aif-verify
 ```
 
 ### Strict mode before merge
 ```
-/aif-verify --strict
+$aif-verify --strict
 ```
 
 ### Standalone (no plan, verify branch diff)
 ```
-/aif-verify
-→ No plan found → verify branch diff against main
+$aif-verify
+→ No plan found → verify branch diff against the configured base branch
 ```
