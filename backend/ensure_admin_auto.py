@@ -1,5 +1,5 @@
 # ensure_admin_auto.py
-# Универсальный сид/сброс пароля admin/admin для FastAPI + SQLAlchemy.
+# Универсальный сид/сброс пароля admin через ADMIN_PASSWORD для FastAPI + SQLAlchemy.
 # Поддерживает sync и async пути. Игнорирует неподготовленный app.db.session.sessionmaker.
 # Запуск:
 #   .venv\Scripts\python.exe ensure_admin_auto.py
@@ -12,8 +12,19 @@ import types
 from sqlalchemy import select
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
+
+
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting the admin user."
+        )
+    return password
+
+
+ADMIN_PASSWORD = _required_admin_password()
 
 print(f"[ensure_admin_auto] target user: {ADMIN_USERNAME}")
 

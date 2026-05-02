@@ -1,5 +1,5 @@
 # ensure_admin_flexible.py
-# Универсальный сид для создания/сброса admin/admin
+# Универсальный сид для создания/сброса admin через ADMIN_PASSWORD.
 # Запуск: .venv\Scripts\python.exe ensure_admin_flexible.py
 # Поддерживает как async, так и sync фабрики сессий.
 
@@ -9,8 +9,19 @@ import sys
 import traceback
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
+
+
+def _required_admin_password():
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting the admin user."
+        )
+    return password
+
+
+ADMIN_PASSWORD = _required_admin_password()
 
 print("ensure_admin_flexible: username=%s" % ADMIN_USERNAME)
 
