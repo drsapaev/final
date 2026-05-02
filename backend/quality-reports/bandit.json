@@ -5,10 +5,10 @@
     "_totals": {
       "CONFIDENCE.HIGH": 85,
       "CONFIDENCE.LOW": 15,
-      "CONFIDENCE.MEDIUM": 6,
+      "CONFIDENCE.MEDIUM": 5,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 12,
-      "SEVERITY.LOW": 76,
+      "SEVERITY.LOW": 75,
       "SEVERITY.MEDIUM": 18,
       "SEVERITY.UNDEFINED": 0,
       "loc": 100706,
@@ -1760,10 +1760,10 @@
     "app\\core\\security.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
-      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
-      "SEVERITY.LOW": 1,
+      "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
       "loc": 111,
@@ -5435,26 +5435,6 @@
       "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
       "test_id": "B110",
       "test_name": "try_except_pass"
-    },
-    {
-      "code": "18 except Exception:\n19     SECRET_KEY = \"dev-secret-key-change-me\"\n20     ALGORITHM = \"HS256\"\n",
-      "col_offset": 17,
-      "end_col_offset": 43,
-      "filename": "app\\core\\security.py",
-      "issue_confidence": "MEDIUM",
-      "issue_cwe": {
-        "id": 259,
-        "link": "https://cwe.mitre.org/data/definitions/259.html"
-      },
-      "issue_severity": "LOW",
-      "issue_text": "Possible hardcoded password: 'dev-secret-key-change-me'",
-      "line_number": 19,
-      "line_range": [
-        19
-      ],
-      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b105_hardcoded_password_string.html",
-      "test_id": "B105",
-      "test_name": "hardcoded_password_string"
     },
     {
       "code": "38     db.commit()\n39     assert row is not None\n40     return dict(row)\n",

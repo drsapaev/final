@@ -3074,8 +3074,8 @@ Continue the QA sweep and remove the hardcoded JWT secret fallback from `backend
 
 ### Manual reconstruction needed
 - Verified `Settings.SECRET_KEY` is required by `app.core.config` and only receives a generated dev secret through the config layer.
-- Removed the catch-all fallback and direct hardcoded `dev-secret-key-change-me` value from the security module.
-- Confirmed the remaining global match for `dev-secret-key-change-me` is a stale generated Bandit report, outside this first-touch patch.
+- Removed the catch-all fallback and direct hardcoded legacy dev JWT secret value from the security module.
+- Confirmed the remaining global match for the legacy dev JWT secret value is a stale generated Bandit report, outside this first-touch patch.
 
 ### Signals observed
 - multi-hop gap: yes
@@ -3088,3 +3088,40 @@ Continue the QA sweep and remove the hardcoded JWT secret fallback from `backend
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect auth security code, config secret generation, and generated quality reports so first-touch scope is narrower and residual stale findings are explicit.
+
+## Task 87 - Stale Bandit JWT finding cleanup
+
+### User task
+Continue the QA sweep by cleaning the stale Bandit report entry that still referenced the removed JWT fallback.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/quality-reports/bandit.json
+
+### What handoff solved well
+- It identified the tracked security artifact as sensitive and kept the first patch slice narrow.
+- The known-root-cause retry preserved the generated report file as the concrete cleanup target.
+
+### Missing relationship mapping
+- The gate again included `.gitignore` even though the issue was a stale generated report entry.
+- Manual reconstruction was required because Bandit was not installed in the backend virtual environment, so full report regeneration was not available without changing tooling state.
+
+### Manual reconstruction needed
+- Parsed the Bandit JSON, removed exactly one stale `B105` result for `app\core\security.py`, and decremented only the matching severity/confidence counters.
+- Verified the report remains valid JSON and no tracked file contains the legacy JWT fallback literal.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should distinguish generated report cleanup from ignore-rule changes and surface the missing Bandit tool dependency before execution.
