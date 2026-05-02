@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 from app.db.session import _get_db_url_from_env_or_settings
 from app.models.clinic import ServiceCategory
@@ -18,6 +18,20 @@ import logging
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+REQUIRED_TABLES = ("service_categories", "services")
+
+
+def missing_required_tables(engine):
+    """Return required seed tables that are absent after migrations."""
+    inspector = inspect(engine)
+    return [
+        table_name
+        for table_name in REQUIRED_TABLES
+        if not inspector.has_table(table_name)
+    ]
+
 
 def seed_service_categories():
     """Создание категорий услуг"""
@@ -899,19 +913,14 @@ def main():
         with SessionLocal() as db:
             logger.info("🚀 Начинаем инициализацию справочника услуг...")
             
-            # Проверяем существование таблиц
-            with engine.connect() as conn:
-                # Проверяем таблицу service_categories
-                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='service_categories'"))
-                if not result.fetchone():
-                    logger.error("❌ Таблица service_categories не найдена. Запустите миграции.")
-                    return False
-                
-                # Проверяем таблицу services
-                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='services'"))
-                if not result.fetchone():
-                    logger.error("❌ Таблица services не найдена. Запустите миграции.")
-                    return False
+            # Проверяем, что Alembic уже создал необходимые таблицы.
+            missing_tables = missing_required_tables(engine)
+            if missing_tables:
+                logger.error(
+                    "❌ Не найдены таблицы для seed_services: %s. Запустите миграции.",
+                    ", ".join(missing_tables),
+                )
+                return False
             
             # Создаем категории услуг
             logger.info("📂 Создаем категории услуг...")
