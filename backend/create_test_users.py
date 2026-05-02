@@ -9,12 +9,33 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base_class import Base
 from app.models.user import User
 from app.core.security import get_password_hash
+from app.core.config import settings
 
-os.environ["DATABASE_URL"] = "sqlite:///./clinic.db"
-os.environ["PYTHONPATH"] = "C:\\final\\backend"
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./clinic.db")
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+def _database_url() -> str:
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating test users.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("create_test_users.py requires PostgreSQL; SQLite is not allowed.")
+    return database_url
+
+
+def _password_env_names(username: str) -> list[str]:
+    return [f"CREATE_TEST_USERS_{username.upper()}_PASSWORD"]
+
+
+def _required_password(username: str) -> str:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    expected = " or ".join(_password_env_names(username))
+    raise RuntimeError(f"Set {expected} before creating or updating user '{username}'.")
+
+
+SQLALCHEMY_DATABASE_URL = _database_url()
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def create_test_users():
@@ -30,54 +51,51 @@ def create_test_users():
                 "email": "registrar@clinic.com",
                 "full_name": "Регистратор Иванов",
                 "role": "registrar",
-                "password": "registrar123"
             },
             {
                 "username": "lab",
                 "email": "lab@clinic.com", 
                 "full_name": "Лаборант Петров",
                 "role": "lab",
-                "password": "lab123"
             },
             {
                 "username": "doctor",
                 "email": "doctor@clinic.com",
                 "full_name": "Доктор Сидоров",
                 "role": "doctor", 
-                "password": "doctor123"
             },
             {
                 "username": "cashier",
                 "email": "cashier@clinic.com",
                 "full_name": "Кассир Козлов",
                 "role": "cashier",
-                "password": "cashier123"
             },
             {
                 "username": "cardio",
                 "email": "cardio@clinic.com",
                 "full_name": "Кардиолог Волков",
                 "role": "cardio",
-                "password": "cardio123"
             },
             {
                 "username": "derma",
                 "email": "derma@clinic.com",
                 "full_name": "Дерматолог Морозов",
                 "role": "derma",
-                "password": "derma123"
             },
             {
                 "username": "dentist",
                 "email": "dentist@clinic.com",
                 "full_name": "Стоматолог Лебедев",
                 "role": "dentist",
-                "password": "dentist123"
             }
         ]
         
         created_count = 0
         updated_count = 0
+        passwords = {
+            user_data["username"]: _required_password(user_data["username"])
+            for user_data in test_users
+        }
         
         for user_data in test_users:
             # Проверяем, существует ли пользователь
@@ -86,7 +104,9 @@ def create_test_users():
             if existing_user:
                 print(f"   ℹ️ Пользователь {user_data['username']} уже существует")
                 # Обновляем пароль
-                existing_user.hashed_password = get_password_hash(user_data["password"])
+                existing_user.hashed_password = get_password_hash(
+                    passwords[user_data["username"]]
+                )
                 existing_user.is_active = True
                 db.commit()
                 updated_count += 1
@@ -96,7 +116,7 @@ def create_test_users():
                     username=user_data["username"],
                     email=user_data["email"],
                     full_name=user_data["full_name"],
-                    hashed_password=get_password_hash(user_data["password"]),
+                    hashed_password=get_password_hash(passwords[user_data["username"]]),
                     role=user_data["role"],
                     is_active=True,
                     is_superuser=False,
