@@ -45,6 +45,10 @@ const PaymentTest = () => {
   // Тестовая авторизация через реальный API
   const handleTestAuth = async () => {
     try {
+      setResult({ type: 'info', message: 'Open /login and sign in before using the internal payment test.' });
+      window.location.assign('/login');
+      return;
+
       setResult({ type: 'info', message: 'Выполняется авторизация...' });
       
       // Проверяем доступность backend
@@ -52,8 +56,8 @@ const PaymentTest = () => {
       
       // Пробуем войти с тестовыми данными (JSON формат)
       const loginData = {
-        username: 'registrar',
-        password: 'registrar123',
+        username: '',
+        password: '',
         remember_me: false
       };
       
@@ -119,9 +123,8 @@ const PaymentTest = () => {
       }
       
       // Fallback: устанавливаем тестовый токен для демонстрации UI
-      const testToken = 'demo_token_for_ui_testing';
-      setToken(testToken);
-      setIsAuthenticated(true);
+      setToken(null);
+      setIsAuthenticated(false);
       setResult({
         type: 'warning',
         message: `Не удалось получить реальный токен: ${errorMessage}. Установлен демо-токен для тестирования UI. Проверьте консоль для подробностей.`
