@@ -3722,3 +3722,39 @@ Continue the QA sweep by checking the uncommitted PR review quality gate workflo
 - current stack sufficient: sufficient
 - would LightRAG likely help here: no
 - The issue was localized after reviewing the workflow trust boundary.
+
+## Task 104 - Backend staging env sample secret placeholders
+
+### User task
+Continue the QA sweep by hardening tracked staging environment samples.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/staging.env.sample
+
+### What handoff solved well
+- It narrowed the first patch slice to the confirmed staging env sample.
+- It kept the change out of runtime code.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed that the apparent `8000` hit in staging compose is the container-internal port, with host exposure already on `18000`.
+- Removed filled staging database password and secret placeholders from the tracked backend staging sample.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The risk was localized to a tracked sample file after filtering out archive and ignored-file noise.
