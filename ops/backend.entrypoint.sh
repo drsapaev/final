@@ -7,37 +7,30 @@ set -euo pipefail
 : "${APP_MODULE:=app.main:app}"
 : "${WORKERS:=1}"
 : "${RELOAD:=0}"
-: "${DATABASE_URL:=sqlite:////data/app.db}"
+: "${DATABASE_URL:?DATABASE_URL must be set to a PostgreSQL connection string}"
 : "${ENSURE_ADMIN:=1}"
-: "${RUN_ALEMBIC_ON_START:=0}"
+: "${RUN_ALEMBIC_ON_START:=1}"
 
 mkdir -p /data
 export DATABASE_URL
 
+case "${DATABASE_URL,,}" in
+  sqlite:*)
+    echo "[entrypoint] Refusing SQLite DATABASE_URL. PostgreSQL + Alembic are the schema source of truth." >&2
+    exit 1
+    ;;
+esac
+
 if [[ "${RUN_ALEMBIC_ON_START}" == "1" ]]; then
   echo "[entrypoint] Running alembic upgrade head..."
   alembic upgrade head
+else
+  echo "[entrypoint] Alembic migration skipped because RUN_ALEMBIC_ON_START=${RUN_ALEMBIC_ON_START}"
 fi
-
-echo "[entrypoint] Creating database tables..."
-python -c "
-import sys
-sys.path.insert(0, '.')
-from app.db.base import Base
-from app.db.session import engine
-try:
-    Base.metadata.create_all(bind=engine)
-    print('✅ Database tables created successfully')
-except Exception as e:
-    print(f'⚠️ Error creating tables: {e}')
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-"
 
 if [[ "${ENSURE_ADMIN}" == "1" ]]; then
   echo "[entrypoint] Ensuring admin user..."
-  python app/scripts/ensure_admin.py || echo "⚠️ Warning: Could not ensure admin user"
+  python app/scripts/ensure_admin.py || echo "[entrypoint] Warning: Could not ensure admin user"
 fi
 
 echo "[entrypoint] Starting Uvicorn ${APP_MODULE} on ${HOST}:${PORT} (workers=${WORKERS}, reload=${RELOAD})"

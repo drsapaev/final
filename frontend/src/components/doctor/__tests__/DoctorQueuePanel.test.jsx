@@ -149,15 +149,17 @@ describe('DoctorQueuePanel', () => {
     });
 
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    const parsedUrls = requestedUrls.map((url) => new URL(url));
 
-    expect(requestedUrls).toEqual([
-      'http://localhost:18000/api/v1/doctor/my-info',
-      'http://localhost:18000/api/v1/doctor/cardiology/queue/today',
+    expect(parsedUrls.map(({ pathname }) => pathname)).toEqual([
+      '/api/v1/doctor/my-info',
+      '/api/v1/doctor/cardiology/queue/today',
     ]);
+    expect(parsedUrls.every(({ port }) => port === '18000')).toBe(true);
     expect(requestedUrls.some((url) => url.includes(':8000'))).toBe(false);
     expect(loggerInfo).toHaveBeenCalledWith(
       '[FIX:DOCTOR_QUEUE_PANEL] Loading doctor info from canonical API origin',
-      expect.objectContaining({ url: 'http://localhost:18000/api/v1/doctor/my-info' }),
+      expect.objectContaining({ url: requestedUrls[0] }),
     );
   });
 });

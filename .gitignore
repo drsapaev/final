@@ -68,6 +68,7 @@ clinic.db
 secrets/
 *.dump
 *.sql
+.ai-factory/profile_tokens.json
 
 # Tooling
 .mypy_cache/
