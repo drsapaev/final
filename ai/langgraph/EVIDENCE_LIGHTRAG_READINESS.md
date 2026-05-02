@@ -3574,3 +3574,39 @@ Continue the QA sweep by failing closed when `DATABASE_URL` is missing instead o
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect settings defaults, session fallback behavior, and production validation as a single runtime database contract.
+
+## Task 100 - Release runbook database password redaction
+
+### User task
+Continue the QA sweep by redacting fixed database passwords from release evidence runbooks.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: docs/runbooks/CLINIC_PRE_RELEASE_EVIDENCE_PACK.md
+
+### What handoff solved well
+- It found one concrete runbook with the fixed database password string.
+- It kept the task doc-only and avoided runtime changes.
+
+### Missing relationship mapping
+- The gate missed the paired Windows pilot host runbook that repeated the same restore URL.
+- Manual reconstruction was required to redact only the credential segment while preserving host, port, database name, and rehearsal evidence.
+
+### Manual reconstruction needed
+- Replaced fixed database password text with `<redacted>` in the release evidence pack and Windows pilot host runbook.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect paired evidence/runbook files that describe the same restore contour.
