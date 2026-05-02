@@ -59,7 +59,7 @@ if __name__ == "__main__":
     print(f"🐍 Python path: {os.environ['PYTHONPATH']}")
     print(f"🌐 Порт: {PORT}")
     print("=" * 80)
-    
+
     # Конфигурация uvicorn с МАКСИМАЛЬНЫМ логированием
     uvicorn.run(
         "app.main:app",
