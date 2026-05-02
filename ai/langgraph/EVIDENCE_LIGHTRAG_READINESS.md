@@ -3199,3 +3199,40 @@ Continue the QA sweep by aligning the ops env example with the hardened Postgres
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect compose-required variables to the env sample and docs so stale operator guidance is found in one pass.
+
+## Task 90 - Ops README compose contract alignment
+
+### User task
+Continue the QA sweep by aligning the ops README quick start with the hardened Postgres Docker compose contract.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ops/README.md
+
+### What handoff solved well
+- It identified the README as runtime packaging guidance and kept the patch on ops deployment context.
+- It preserved the Postgres + Alembic source-of-truth constraint as the key acceptance criterion.
+
+### Missing relationship mapping
+- The gate included runtime entrypoints and compose files even though this slice was documentation drift against already-fixed canonical files.
+- Manual reconstruction was required to replace only the stale quick-start block while preserving staging, VPS, and clinic-host sections.
+
+### Manual reconstruction needed
+- Rewrote the quick-start section to require `ops/.env`, PostgreSQL `DATABASE_URL`, generated secrets, explicit CORS origins, host port `18000`, and Alembic startup.
+- Removed operator guidance that described SQLite volume storage, CORS-all startup, and default admin credentials as normal.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should separate canonical runtime files from dependent operator docs so doc-only drift fixes do not reopen runtime first-touch files.
