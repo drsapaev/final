@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
@@ -22,18 +23,40 @@ from app.core.config import get_settings
 def get_db_url():
     try:
         settings = get_settings()
-        return settings.DATABASE_URL
-    except Exception:
-        return "sqlite:///./clinic.db"
+        db_url = str(settings.DATABASE_URL or "").strip()
+    except Exception as exc:
+        raise RuntimeError(
+            "DATABASE_URL is required; refusing to validate a fallback database"
+        ) from exc
 
-DATABASE_URL = get_db_url()
-if DATABASE_URL.startswith("sqlite+aiosqlite://"):
-    DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL is required; refusing to validate a fallback database"
+        )
+
+    return db_url
+
+
+def normalize_sync_db_url(db_url):
+    if db_url.startswith("sqlite+aiosqlite://"):
+        return db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    return db_url
+
+
+def is_sqlite_url(db_url):
+    return make_url(db_url).drivername.startswith("sqlite")
+
+
+def display_db_url(db_url):
+    return make_url(db_url).render_as_string(hide_password=True)
+
+
+DATABASE_URL = normalize_sync_db_url(get_db_url())
 
 print("=" * 80)
 print("PRODUCTION READINESS VALIDATION")
 print("=" * 80)
-print(f"Database URL: {DATABASE_URL}\n")
+print(f"Database URL: {display_db_url(DATABASE_URL)}\n")
 
 class ValidationResult:
     def __init__(self):
@@ -90,6 +113,10 @@ class ValidationResult:
 def check_fk_enforcement(engine, result):
     """Check that FK enforcement is enabled"""
     print("1. Checking FK Enforcement...")
+    if not is_sqlite_url(DATABASE_URL):
+        result.add_pass("Foreign key enforcement is managed by the database engine")
+        return
+
     try:
         with engine.connect() as conn:
             # Explicitly enable FK enforcement for this connection
@@ -118,9 +145,10 @@ def check_orphaned_records(engine, result):
     check_errors = []
     
     try:
-        # Enable FK enforcement
-        session.execute(text("PRAGMA foreign_keys=ON"))
-        session.commit()
+        if is_sqlite_url(DATABASE_URL):
+            # Enable FK enforcement for SQLite validation connections.
+            session.execute(text("PRAGMA foreign_keys=ON"))
+            session.commit()
         
         tables = inspector.get_table_names()
         
