@@ -2,8 +2,13 @@
 const config = {
   stories: ['../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
   addons: [
-    '@storybook/addon-essentials',
-    '@storybook/addon-interactions',
+    '@storybook/addon-backgrounds',
+    '@storybook/addon-controls',
+    '@storybook/addon-highlight',
+    '@storybook/addon-measure',
+    '@storybook/addon-outline',
+    '@storybook/addon-toolbars',
+    '@storybook/addon-viewport',
     '@storybook/addon-a11y',
     '@storybook/addon-docs'
   ],
