@@ -3794,3 +3794,40 @@ Continue the QA sweep by removing filled database passwords from active migratio
 - current stack sufficient: partial
 - would LightRAG likely help here: no
 - The root cause was localized, but the gate still over-expanded to adjacent Docker files.
+
+## Task 106 - Gemini env helper Postgres guard
+
+### User task
+Restore local env files, then continue the QA sweep by removing SQLite/dev-secret env creation paths.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: setup_gemini_api.py
+
+### What handoff solved well
+- It recognized that a helper which writes `backend/.env` is runtime and database-source-of-truth sensitive.
+- It included the confirmed helper file in the first-touch set.
+
+### Missing relationship mapping
+- The gate broadened into Docker runtime files even though the concrete issue was a root setup helper that could write SQLite and a hardcoded dev secret.
+
+### Manual reconstruction needed
+- Confirmed the helper only needed a single-file change.
+- Added a PostgreSQL URL prompt/guard for generated `backend/.env`.
+- Replaced the hardcoded dev secret with a generated token.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: no
+- The root cause was localized, but the gate still over-expanded to adjacent Docker files.

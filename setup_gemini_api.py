@@ -2,8 +2,27 @@
 Настройка Gemini API ключа
 """
 import os
+import secrets
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+
+
+def _read_postgres_database_url():
+    database_url = input("DATABASE_URL (PostgreSQL, required): ").strip()
+    if not database_url:
+        print("DATABASE_URL is required. Create backend/.env manually or rerun this helper.")
+        return None
+
+    lowered = database_url.lower()
+    if "sqlite" in lowered or not (
+        lowered.startswith("postgresql://")
+        or lowered.startswith("postgresql+psycopg://")
+        or lowered.startswith("postgresql+psycopg2://")
+    ):
+        print("DATABASE_URL must be a PostgreSQL URL; SQLite is not supported for runtime env files.")
+        return None
+
+    return database_url
 
 def setup_gemini_api():
     """Настройка Gemini API"""
@@ -49,6 +68,10 @@ def setup_gemini_api():
         api_key = input("🔑 Введите ваш Gemini API ключ: ").strip()
         
         if api_key and api_key.startswith("AIza"):
+            database_url = _read_postgres_database_url()
+            if not database_url:
+                return
+            secret_key = secrets.token_urlsafe(48)
             env_content = f"""# AI Provider API Keys
 GEMINI_API_KEY={api_key}
 
@@ -61,10 +84,10 @@ MCP_HEALTH_CHECK_INTERVAL=60
 MCP_MAX_BATCH_SIZE=10
 
 # Database
-DATABASE_URL=sqlite:///./clinic.db
+DATABASE_URL={database_url}
 
 # Auth
-SECRET_KEY=dev-secret-key-for-clinic-management-system-change-in-production
+SECRET_KEY={secret_key}
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
