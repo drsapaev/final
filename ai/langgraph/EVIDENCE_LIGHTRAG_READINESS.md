@@ -3795,6 +3795,43 @@ Continue the QA sweep by removing filled database passwords from active migratio
 - would LightRAG likely help here: no
 - The root cause was localized, but the gate still over-expanded to adjacent Docker files.
 
+## Task 107 - Root env example Postgres placeholder
+
+### User task
+Continue the QA sweep by removing SQLite/dev-secret guidance from tracked env examples.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: env_example.txt
+
+### What handoff solved well
+- It recognized that tracked env templates are runtime and database-source-of-truth sensitive.
+- It included the confirmed root env example in the first-touch set.
+
+### Missing relationship mapping
+- The gate broadened into Docker runtime files even though the concrete issue was a root example file.
+
+### Manual reconstruction needed
+- Confirmed the file only needed a template-level patch.
+- Replaced the SQLite runtime example with an empty required PostgreSQL placeholder.
+- Replaced the hardcoded dev secret with an empty required secret placeholder and generation command.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: no
+- The root cause was localized, but the gate still over-expanded to adjacent Docker files.
+
 ## Task 106 - Gemini env helper Postgres guard
 
 ### User task
