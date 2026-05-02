@@ -3050,3 +3050,41 @@ Continue the QA sweep after the frontend audit and remove the next security-risk
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect secret findings to all tracked artifact locations, not only `.gitignore` or the first known root-cause file.
+
+## Task 86 - JWT secret fallback removal
+
+### User task
+Continue the QA sweep and remove the hardcoded JWT secret fallback from `backend/app/core/security.py`.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/core/security.py
+
+### What handoff solved well
+- It identified the change as secrets/runtime behavior and kept the initial validation target narrow.
+- The known-root-cause retry preserved `backend/app/core/security.py` as the concrete file to inspect before editing.
+
+### Missing relationship mapping
+- The gate still included `.gitignore` as first-touch even though this issue was a runtime fallback, not a new ignore-rule problem.
+- Manual inspection was required to connect `app.core.security` to `app.core.config` and confirm that config already owns dev secret generation and production fail-closed validation.
+
+### Manual reconstruction needed
+- Verified `Settings.SECRET_KEY` is required by `app.core.config` and only receives a generated dev secret through the config layer.
+- Removed the catch-all fallback and direct hardcoded `dev-secret-key-change-me` value from the security module.
+- Confirmed the remaining global match for `dev-secret-key-change-me` is a stale generated Bandit report, outside this first-touch patch.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect auth security code, config secret generation, and generated quality reports so first-touch scope is narrower and residual stale findings are explicit.
