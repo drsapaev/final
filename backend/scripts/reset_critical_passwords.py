@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Reset or create critical users with documented passwords/roles.
+Reset or create critical users with explicit environment-provided passwords/roles.
 
 Docs reference:
 - ROLES_AND_ROUTING.md
 """
 from __future__ import annotations
+
+import os
 
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
@@ -13,21 +15,39 @@ from app.models.user import User
 
 
 USERS = [
-    ("admin", "admin123", "Admin"),
-    ("registrar", "registrar123", "Registrar"),
-    ("lab", "lab123", "Lab"),
-    ("doctor", "doctor123", "Doctor"),
-    ("cashier", "cashier123", "Cashier"),
-    ("cardio", "cardio123", "cardio"),
-    ("derma", "derma123", "derma"),
-    ("dentist", "dentist123", "dentist"),
+    ("admin", "Admin"),
+    ("registrar", "Registrar"),
+    ("lab", "Lab"),
+    ("doctor", "Doctor"),
+    ("cashier", "Cashier"),
+    ("cardio", "cardio"),
+    ("derma", "derma"),
+    ("dentist", "dentist"),
 ]
+
+
+def _password_env_names(username: str) -> list[str]:
+    names = [f"RESET_CRITICAL_{username.upper()}_PASSWORD"]
+    if username == "admin":
+        names.insert(0, "ADMIN_PASSWORD")
+    return names
+
+
+def _required_password(username: str) -> str:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    expected = " or ".join(_password_env_names(username))
+    raise RuntimeError(f"Set {expected} before ensuring user '{username}'.")
 
 
 def main() -> None:
     db = SessionLocal()
     try:
-        for username, password, role in USERS:
+        passwords = {username: _required_password(username) for username, _role in USERS}
+        for username, role in USERS:
+            password = passwords[username]
             user = db.query(User).filter(User.username == username).first()
             if user:
                 user.hashed_password = get_password_hash(password)

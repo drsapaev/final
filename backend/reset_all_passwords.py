@@ -3,33 +3,54 @@
 Скрипт для сброса паролей всех пользователей
 """
 
+import os
+
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
 from app.models.user import User
+
+
+USERS = [
+    "admin",
+    "registrar",
+    "lab",
+    "doctor",
+    "cashier",
+    "cardio",
+    "derma",
+    "dentist",
+]
+
+
+def _password_env_names(username: str) -> list[str]:
+    names = [f"RESET_ALL_{username.upper()}_PASSWORD"]
+    if username == "admin":
+        names.insert(0, "ADMIN_PASSWORD")
+    return names
+
+
+def _required_password(username: str) -> str:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    expected = " or ".join(_password_env_names(username))
+    raise RuntimeError(f"Set {expected} before resetting user '{username}'.")
 
 
 def reset_all_passwords():
     """Сброс паролей всех пользователей согласно документации"""
     db = SessionLocal()
     try:
-        # Пользователи и их пароли согласно ROLES_AND_ROUTING.md
-        users_data = [
-            ("admin", "admin123"),
-            ("registrar", "registrar123"),
-            ("lab", "lab123"),
-            ("doctor", "doctor123"),
-            ("cashier", "cashier123"),
-            ("cardio", "cardio123"),
-            ("derma", "derma123"),
-            ("dentist", "dentist123"),
-        ]
+        # Preload all required secrets before mutating any user.
+        passwords = {username: _required_password(username) for username in USERS}
 
-        for username, password in users_data:
+        for username, password in passwords.items():
             user = db.query(User).filter(User.username == username).first()
             if user:
                 # Устанавливаем новый пароль
                 user.hashed_password = get_password_hash(password)
-                print(f"OK: Пароль для {username} сброшен на {password}")
+                print(f"OK: Пароль для {username} сброшен")
             else:
                 print(f"ERROR: Пользователь {username} не найден")
 
