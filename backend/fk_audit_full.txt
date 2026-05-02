@@ -1,0 +1,353 @@
+тЪая╕П  DATABASE_URL ╨╜╨╡ ╤Г╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜, ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╨╝: sqlite:///./clinic.db
+тЬЕ Foreign key enforcement ╨▓╨║╨╗╤О╤З╨╡╨╜ ╨┤╨╗╤П SQLite
+
+тЬЕ Foreign keys ╨▓╨║╨╗╤О╤З╨╡╨╜╤Л ╨▓ SQLite
+
+================================================================================
+╨Р╨г╨Ф╨Ш╨в ╨Т╨Э╨Х╨и╨Э╨Ш╨е ╨Ъ╨Ы╨о╨з╨Х╨Щ ╨Ш ORPHANED RECORDS
+================================================================================
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: appointments
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: backups
+  ЁЯФЧ FK: created_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: branches
+  ЁЯФЧ FK: manager_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: clinic_settings
+  ЁЯФЧ FK: updated_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: daily_queues
+  ЁЯФЧ FK: specialist_id -> doctors.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 80 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: department_queue_settings
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: department_registration_settings
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: department_services
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: service_id -> services.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: doctor_price_overrides
+  ЁЯФЧ FK: approved_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: doctor_id -> doctors.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: service_id -> services.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: visit_id -> visits.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: doctors
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: email_verification_tokens
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: emr
+  ЁЯФЧ FK: appointment_id -> appointments.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 4 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: emr_version_history
+  ЁЯФЧ FK: emr_id -> emr.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: equipment
+  ЁЯФЧ FK: branch_id -> branches.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: equipment_maintenance
+  ЁЯФЧ FK: equipment_id -> equipment.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: file_access_logs
+  ЁЯФЧ FK: file_id -> files.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: file_folders
+  ЁЯФЧ FK: owner_id -> users.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 1 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+  ЁЯФЧ FK: parent_id -> file_folders.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: file_quotas
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: file_shares
+  ЁЯФЧ FK: created_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: file_id -> files.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: shared_with_user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: file_versions
+  ЁЯФЧ FK: created_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: file_id -> files.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: files
+  ЁЯФЧ FK: appointment_id -> appointments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: emr_id -> emr.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: owner_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: patient_id -> patients.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: folder_id -> file_folders.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: group_roles
+  ЁЯФЧ FK: group_id -> user_groups.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: role_id -> roles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: assigned_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: lab_orders
+  ЁЯФЧ FK: visit_id -> visits.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: patient_id -> patients.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: lab_results
+  ЁЯФЧ FK: order_id -> lab_orders.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: license_activations
+  ЁЯФЧ FK: license_id -> licenses.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: activated_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: login_attempts
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: password_reset_tokens
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: patients
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: payment_invoice_visits
+  ЁЯФЧ FK: invoice_id -> payment_invoices.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: visit_id -> visits.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: payment_visits
+  ЁЯФЧ FK: payment_id -> payments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: visit_id -> visits.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: permission_audit_log
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: permission_id -> permissions.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: role_id -> roles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: prescriptions
+  ЁЯФЧ FK: appointment_id -> appointments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: emr_id -> emr.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: queue_entries
+  ЁЯФЧ FK: queue_id -> daily_queues.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: patient_id -> patients.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: queue_join_sessions
+  ЁЯФЧ FK: qr_token -> queue_tokens.token
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: queue_entry_id -> queue_entries.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: queue_statistics
+  ЁЯФЧ FK: queue_id -> daily_queues.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: queue_tokens
+  ЁЯФЧ FK: specialist_id -> doctors.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 2 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+  ЁЯФЧ FK: generated_by_user_id -> users.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 4 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: refresh_tokens
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: role_hierarchy
+  ЁЯФЧ FK: parent_role_id -> roles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: child_role_id -> roles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: created_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: role_permissions
+  ЁЯФЧ FK: role_id -> user_roles.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 8 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+  ЁЯФЧ FK: permission_id -> user_permissions.id
+  тЪая╕П  ╨Ю╤И╨╕╨▒╨║╨░ ╨┐╤А╨╛╨▓╨╡╤А╨║╨╕ role_permissions.permission_id -> user_permissions.id: (sqlite3.OperationalError) no such table: user_permissions
+[SQL: 
+            SELECT COUNT(*) as count
+            FROM "role_permissions" c
+            LEFT JOIN "user_permissions" p ON c."permission_id" = p."id"
+            WHERE c."permission_id" IS NOT NULL AND p."id" IS NULL
+        ]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: roles
+  ЁЯФЧ FK: parent_role_id -> roles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: schedule_templates
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: schedules
+  ЁЯФЧ FK: doctor_id -> doctors.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: security_events
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: resolved_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: services
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: telegram_users
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: patient_id -> patients.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: two_factor_auth
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: two_factor_backup_codes
+  ЁЯФЧ FK: two_factor_auth_id -> two_factor_auth.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: two_factor_devices
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: two_factor_recovery
+  ЁЯФЧ FK: two_factor_auth_id -> two_factor_auth.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: two_factor_sessions
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_activities
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_audit_logs
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_groups_members
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: group_id -> user_groups.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: added_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_notification_settings
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: profile_id -> user_profiles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_permission_overrides
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: permission_id -> permissions.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: granted_by -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_preferences
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: profile_id -> user_profiles.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_profiles
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: user_sessions
+  ЁЯФЧ FK: user_id -> users.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: visit_services
+  ЁЯФЧ FK: visit_id -> visits.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+ЁЯУЛ ╨в╨░╨▒╨╗╨╕╤Ж╨░: visits
+  ЁЯФЧ FK: department_id -> departments.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  ЁЯФЧ FK: doctor_id -> users.id
+    тЭМ ╨Э╨░╨╣╨┤╨╡╨╜╨╛ 9 orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣!
+  ЁЯФЧ FK: patient_id -> patients.id
+    тЬЕ ╨Э╨╡╤В orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+================================================================================
+╨Ш╨в╨Ю╨У╨Ю╨Т╨л╨Щ ╨Ю╨в╨з╨Х╨в
+================================================================================
+╨Т╤Б╨╡╨│╨╛ ╤В╨░╨▒╨╗╨╕╤Ж: 88
+╨в╨░╨▒╨╗╨╕╤Ж ╤Б FK: 60
+╨Т╤Б╨╡╨│╨╛ FK: 99
+Orphaned ╨╖╨░╨┐╨╕╤Б╨╡╨╣ ╨╜╨░╨╣╨┤╨╡╨╜╨╛: 7
+╨Ю╤И╨╕╨▒╨╛╨║: 1
+
+тЪая╕П  ORPHANED RECORDS ╨Э╨Р╨Щ╨Ф╨Х╨Э╨л:
+  - daily_queues.specialist_id -> doctors.id: 80 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - emr.appointment_id -> appointments.id: 4 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - file_folders.owner_id -> users.id: 1 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - queue_tokens.specialist_id -> doctors.id: 2 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - queue_tokens.generated_by_user_id -> users.id: 4 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - role_permissions.role_id -> user_roles.id: 8 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+  - visits.doctor_id -> users.id: 9 ╨╖╨░╨┐╨╕╤Б╨╡╨╣
+
+╨а╨╡╨║╨╛╨╝╨╡╨╜╨┤╨░╤Ж╨╕╤П: ╨Ш╤Б╨┐╤А╨░╨▓╤М╤В╨╡ orphaned ╨╖╨░╨┐╨╕╤Б╨╕ ╨┐╨╡╤А╨╡╨┤ ╨▓╨║╨╗╤О╤З╨╡╨╜╨╕╨╡╨╝ FK enforcement.

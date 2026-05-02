@@ -1,0 +1,6 @@
+- generic [ref=e661]:
+  - heading "Что-то пошло не так" [level=1] [ref=e662]
+  - paragraph [ref=e663]: Произошла неожиданная ошибка. Мы уже работаем над её исправлением.
+  - button "Попробовать снова" [ref=e664] [cursor=pointer]
+  - group [ref=e665]:
+    - generic "Детали ошибки (только для разработки)" [ref=e666] [cursor=pointer]

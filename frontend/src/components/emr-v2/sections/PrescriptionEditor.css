@@ -1,0 +1,223 @@
+/**
+ * PrescriptionEditor Styles
+ */
+
+.prescription-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ============================================
+   LIST
+   ============================================ */
+.prescription-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.prescription-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.prescription-item:hover {
+    border-color: var(--mac-accent-blue, #007aff);
+}
+
+.prescription-item__icon {
+    color: var(--mac-accent-blue, #007aff);
+    opacity: 0.8;
+}
+
+.prescription-item__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.prescription-item__name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mac-text-primary, #1d1d1f);
+}
+
+.prescription-item__details {
+    font-size: 12px;
+    color: var(--mac-text-secondary, #636366);
+}
+
+.prescription-item__actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.prescription-item:hover .prescription-item__actions {
+    opacity: 1;
+}
+
+.prescription-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    border-radius: 4px;
+    transition: color 0.1s;
+}
+
+.prescription-action-btn:hover {
+    color: var(--mac-text-primary, #1d1d1f);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.prescription-action-btn--delete:hover {
+    color: #ff3b30;
+    background: rgba(255, 59, 48, 0.1);
+}
+
+/* ============================================
+   EDITOR FORM (NEW ITEM)
+   ============================================ */
+.prescription-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-radius: 10px;
+    border: 1px dashed var(--mac-border, #d1d1d6);
+}
+
+.prescription-form__row {
+    display: flex;
+    gap: 10px;
+}
+
+.prescription-input-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.prescription-input-group--small {
+    flex: 0.5;
+}
+
+.prescription-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mac-text-secondary, #86868b);
+    text-transform: uppercase;
+}
+
+.prescription-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 6px;
+    background: var(--mac-background, #ffffff);
+}
+
+.prescription-input:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.prescription-add-btn {
+    align-self: flex-end;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+    background: var(--mac-accent-blue, #007aff);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.prescription-add-btn:hover {
+    background: #0066d6;
+}
+
+.prescription-cancel-btn {
+    align-self: flex-end;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--mac-text-secondary, #636366);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.prescription-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-accent-blue, #007aff);
+    background: rgba(0, 122, 255, 0.1);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    width: fit-content;
+    transition: background 0.2s;
+}
+
+.prescription-toggle-btn:hover {
+    background: rgba(0, 122, 255, 0.15);
+}
+
+/* ============================================
+   SUGGESTIONS (MOCK)
+   ============================================ */
+.prescription-suggestions {
+    position: absolute;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+.prescription-suggestion-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.prescription-suggestion-item:hover {
+    background: #f5f5f7;
+}
+
+/* ============================================
+   READ-ONLY
+   ============================================ */
+.prescription-editor--readonly .prescription-item {
+    border-color: transparent;
+    background: var(--mac-background-tertiary, #f5f5f7);
+}
+
+.prescription-editor--readonly .prescription-item:hover {
+    border-color: transparent;
+}

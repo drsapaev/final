@@ -1,0 +1,262 @@
+/**
+ * DentistrySection Styles
+ */
+
+.dentistry-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--mac-separator);
+    flex-wrap: wrap;
+}
+
+.dentistry-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--mac-text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.dentistry-tab:hover:not(:disabled) {
+    color: var(--mac-text-primary);
+}
+
+.dentistry-tab.active {
+    color: var(--mac-blue-500);
+    border-bottom-color: var(--mac-blue-500);
+}
+
+.dentistry-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dentistry-tab-content {
+    padding: 16px 0;
+}
+
+.dentistry-indices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.dentistry-periodontal-info {
+    padding: 16px;
+    background: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+    border-left: 3px solid var(--mac-blue-500);
+}
+
+.dentistry-periodontal-info p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+}
+
+.dentistry-note {
+    font-style: italic;
+    color: var(--mac-text-tertiary);
+}
+
+.dentistry-measurements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.dentistry-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.dentistry-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dentistry-checkbox:hover:not(:has(input:disabled)) {
+    background: var(--mac-bg-tertiary);
+    border-color: var(--mac-blue-500);
+}
+
+.dentistry-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.dentistry-checkbox input[type="checkbox"]:checked+span {
+    color: var(--mac-blue-500);
+    font-weight: 500;
+}
+
+.dentistry-radiographs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.dentistry-radiographs-note {
+    grid-column: 1 / -1;
+    padding: 12px;
+    background: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+    border-left: 3px solid var(--mac-blue-500);
+}
+
+.dentistry-radiographs-note p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    font-style: italic;
+}
+
+/* Periodontal Pockets Visualization */
+.periodontal-jaw-section {
+    margin-top: 20px;
+}
+
+.periodontal-jaw-title {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mac-text-primary);
+}
+
+.periodontal-teeth-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 4px;
+}
+
+@media (max-width: 900px) {
+    .periodontal-teeth-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+
+.periodontal-tooth {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-bg-secondary);
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.periodontal-tooth.normal {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.periodontal-tooth.moderate {
+    border-color: #fcd34d;
+    background: #fffbeb;
+}
+
+.periodontal-tooth.severe {
+    border-color: #f87171;
+    background: #fef2f2;
+}
+
+.periodontal-tooth .tooth-number {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mac-text-secondary);
+    margin-bottom: 4px;
+}
+
+.pocket-depth-input {
+    width: 36px;
+    padding: 4px;
+    text-align: center;
+    border: 1px solid var(--mac-border);
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+}
+
+.pocket-depth-input:focus {
+    outline: none;
+    border-color: var(--mac-blue-500);
+}
+
+.pocket-depth-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.periodontal-tooth .depth-unit {
+    font-size: 10px;
+    color: var(--mac-text-tertiary);
+    margin-top: 2px;
+}
+
+.periodontal-summary {
+    margin-top: 24px;
+}
+
+.periodontal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.periodontal-stats .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+    background: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+    border: 1px solid var(--mac-border);
+}
+
+.periodontal-stats .stat-item.severe {
+    background: #fef2f2;
+    border-color: #f87171;
+}
+
+.periodontal-stats .stat-item.moderate {
+    background: #fffbeb;
+    border-color: #fcd34d;
+}
+
+.periodontal-stats .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--mac-text-primary);
+}
+
+.periodontal-stats .stat-item.severe .stat-value {
+    color: #dc2626;
+}
+
+.periodontal-stats .stat-item.moderate .stat-value {
+    color: #d97706;
+}
+
+.periodontal-stats .stat-label {
+    font-size: 11px;
+    color: var(--mac-text-secondary);
+    text-align: center;
+    margin-top: 4px;
+}

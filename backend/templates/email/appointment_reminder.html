@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Напоминание о записи - Programma Clinic</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3a8a 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .appointment-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .appointment-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            color: #2c5aa0;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .reminder-note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .reminder-note h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+            font-size: 16px;
+        }
+        .reminder-note p {
+            margin: 0;
+            color: #856404;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #2c5aa0;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #2c5aa0;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .cta-button:hover {
+            background-color: #1e3a8a;
+        }
+        @media (max-width: 600px) {
+            .appointment-info {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Programma Clinic</h1>
+            <p>Напоминание о записи к врачу</p>
+        </div>
+        
+        <div class="content">
+            <h2>Здравствуйте, {{ patient_name }}!</h2>
+            
+            <p>Напоминаем о предстоящей записи к врачу:</p>
+            
+            <div class="appointment-card">
+                <div class="appointment-info">
+                    <div class="info-item">
+                        <span class="info-icon">👨‍⚕️</span>
+                        <span class="info-label">Врач:</span>
+                        <span class="info-value">{{ doctor_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🏥</span>
+                        <span class="info-label">Специальность:</span>
+                        <span class="info-value">{{ specialty }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📅</span>
+                        <span class="info-label">Дата:</span>
+                        <span class="info-value">{{ appointment_date }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🕐</span>
+                        <span class="info-label">Время:</span>
+                        <span class="info-value">{{ appointment_time }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🚪</span>
+                        <span class="info-label">Кабинет:</span>
+                        <span class="info-value">{{ cabinet }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📍</span>
+                        <span class="info-label">Адрес:</span>
+                        <span class="info-value">{{ clinic_address }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="reminder-note">
+                <h3>⚠️ Важная информация</h3>
+                <p>Пожалуйста, придите за 10 минут до назначенного времени. Не забудьте взять с собой документы и медицинскую карту.</p>
+            </div>
+            
+            <p>Если у вас есть вопросы или нужно перенести запись, свяжитесь с нами:</p>
+            
+            <div style="text-align: center;">
+                <a href="tel:{{ clinic_phone }}" class="cta-button">📞 Позвонить в клинику</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Programma Clinic</strong></p>
+            <p>{{ clinic_address }}</p>
+            <p>Телефон: <a href="tel:{{ clinic_phone }}">{{ clinic_phone }}</a></p>
+            <p>Email: <a href="mailto:info@programma-clinic.uz">info@programma-clinic.uz</a></p>
+            <p style="margin-top: 20px; font-size: 12px; color: #adb5bd;">
+                Это автоматическое сообщение. Пожалуйста, не отвечайте на это письмо.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

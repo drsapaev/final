@@ -1,0 +1,105 @@
+/**
+ * EMRStatusIndicator CSS
+ */
+
+.emr-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: help;
+    transition: all 0.2s ease;
+}
+
+.emr-status-indicator__content {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.emr-status-indicator__version {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* States */
+
+.emr-status-indicator--new {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.emr-status-indicator--saved {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.emr-status-indicator--dirty {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.emr-status-indicator--saving {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.emr-status-indicator--signed {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 1px solid #a5d6a7;
+}
+
+.emr-status-indicator--conflict {
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffb74d;
+    animation: pulse-conflict 1.5s infinite;
+}
+
+.emr-status-indicator--error {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef9a9a;
+}
+
+/* Spinner animation for saving */
+.emr-status-spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Pulse animation for conflict */
+@keyframes pulse-conflict {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Hover effect */
+.emr-status-indicator:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

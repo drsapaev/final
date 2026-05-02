@@ -1,0 +1,578 @@
+/* Универсальная система темизации для всего проекта */
+
+/* EMR V2 Design Tokens */
+@import './emr-tokens.css';
+
+/* Базовые CSS переменные (будут обновляться ThemeProvider) */
+:root {
+  /* Основные цвета фона */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+
+  /* Цвета текста */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+
+  /* Границы и интерактивные элементы */
+  --border-color: #e2e8f0;
+  --hover-bg: #f1f5f9;
+  --accent-color: #3b82f6;
+
+  /* Статусные цвета */
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #0ea5e9;
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Улучшенные цвета для высокой контрастности */
+  /* Текст на градиентах */
+  --text-on-gradient: #ffffff;
+  --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.8);
+  --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.6);
+
+  /* Улучшенные статусные цвета */
+  --status-success-contrast: #065f46;
+  /* Темно-зеленый для лучшего контраста */
+  --status-warning-contrast: #92400e;
+  /* Темно-оранжевый */
+  --status-danger-contrast: #991b1b;
+  /* Темно-красный */
+  --status-info-contrast: #0c4a6e;
+  /* Темно-синий */
+
+  /* Фоны для статусов с высоким контрастом */
+  --status-success-bg-contrast: rgba(34, 197, 94, 0.15);
+  --status-warning-bg-contrast: rgba(245, 158, 11, 0.15);
+  --status-danger-bg-contrast: rgba(239, 68, 68, 0.15);
+  --status-info-bg-contrast: rgba(14, 165, 233, 0.15);
+
+  /* Overlay для градиентов */
+  --gradient-overlay: rgba(0, 0, 0, 0.3);
+  --gradient-overlay-strong: rgba(0, 0, 0, 0.5);
+
+  /* Современный UI‑шрифт глобально */
+  --ui-font: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+/* Универсальные стили для всех страниц */
+.clinic-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  color: var(--text-primary);
+  font-family: var(--ui-font);
+  line-height: 1.5;
+}
+
+/* Глобальный шрифт для всего приложения */
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--ui-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Универсальные стили для карточек */
+.clinic-card {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(20px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.clinic-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Универсальные стили для кнопок */
+.clinic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  letter-spacing: 0.01em;
+}
+
+.clinic-button-primary {
+  background: linear-gradient(135deg, var(--accent-color) 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+}
+
+/* Новые варианты кнопок для всего приложения */
+.clinic-button-success {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(34, 197, 94, 0.3);
+}
+
+.clinic-button-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.3);
+}
+
+.clinic-button-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #111827;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.3);
+}
+
+.clinic-button-outline {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.clinic-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
+}
+
+.clinic-button-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.clinic-button-secondary:hover {
+  background: var(--hover-bg);
+  transform: translateY(-2px);
+}
+
+/* Улучшенные состояния для доступности */
+.clinic-button:focus {
+  outline: 3px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+}
+
+.clinic-button:disabled {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-tertiary) !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+}
+
+.clinic-button:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Универсальные стили для заголовков */
+.clinic-header {
+  background: linear-gradient(135deg, var(--accent-color) 0%, #1d4ed8 100%);
+  color: white;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+}
+
+.clinic-header h1,
+.clinic-header h2,
+.clinic-header h3 {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* Универсальные стили для форм */
+.clinic-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.clinic-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Высокий контраст для ссылок */
+.clinic-link {
+  color: var(--accent-color);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.clinic-link:hover {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.clinic-link:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Универсальные статусные стили */
+.clinic-status-success {
+  color: var(--success-color);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.clinic-status-warning {
+  color: var(--warning-color);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.clinic-status-danger {
+  color: var(--danger-color);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.clinic-status-info {
+  color: var(--info-color);
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .clinic-card {
+    border-radius: 16px;
+    margin: 8px;
+  }
+
+  .clinic-button {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+
+  .clinic-header {
+    padding: 16px 20px;
+  }
+}
+
+/* Темная тема специфичные стили - УЛУЧШЕННЫЕ (только классическая dark схема) */
+[data-theme="dark"][data-color-scheme="dark"] {
+  --text-on-gradient: #f8fafc;
+  --text-shadow-strong: 0 2px 4px rgba(0, 0, 0, 0.9);
+  --text-shadow-medium: 0 1px 2px rgba(0, 0, 0, 0.7);
+
+  /* Улучшенные фоны для темной темы */
+  --bg-card-dark: #1e293b;
+  --bg-panel-dark: #334155;
+  --border-dark: #475569;
+}
+
+[data-theme="dark"][data-color-scheme="dark"] .clinic-card {
+  background: var(--bg-card-dark) !important;
+  border: 1px solid var(--border-dark) !important;
+}
+
+/* Темная тема: контраст для outline-кнопок */
+[data-theme="dark"][data-color-scheme="dark"] .clinic-button-outline {
+  background: var(--bg-panel-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+}
+
+[data-theme="dark"][data-color-scheme="dark"] .clinic-page {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прозрачные элементы в темной теме */
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(15, 23, 42, 0.8)"] {
+  background: var(--bg-card-dark) !important;
+}
+
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.8)"] {
+  background: var(--bg-card-dark) !important;
+}
+
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.1)"] {
+  border-color: var(--border-dark) !important;
+}
+
+[data-theme="dark"][data-color-scheme="dark"] [style*="rgba(255, 255, 255, 0.2)"] {
+  border-color: var(--border-dark) !important;
+}
+
+/* Анимации */
+.clinic-fade-in {
+  animation: clinicFadeIn 0.3s ease-out;
+}
+
+.clinic-slide-up {
+  animation: clinicSlideUp 0.3s ease-out;
+}
+
+@keyframes clinicFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes clinicSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Скелетоны для загрузки */
+.clinic-skeleton {
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: clinicSkeleton 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes clinicSkeleton {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Улучшенные статусные стили с высоким контрастом */
+.clinic-status-success-contrast {
+  color: var(--status-success-contrast, #065f46);
+  background: var(--status-success-bg-contrast, rgba(34, 197, 94, 0.15));
+  border: 1px solid var(--success-color);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.clinic-status-warning-contrast {
+  color: var(--status-warning-contrast, #92400e);
+  background: var(--status-warning-bg-contrast, rgba(245, 158, 11, 0.15));
+  border: 1px solid var(--warning-color);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.clinic-status-danger-contrast {
+  color: var(--status-danger-contrast, #991b1b);
+  background: var(--status-danger-bg-contrast, rgba(239, 68, 68, 0.15));
+  border: 1px solid var(--danger-color);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.clinic-status-info-contrast {
+  color: var(--status-info-contrast, #0c4a6e);
+  background: var(--status-info-bg-contrast, rgba(14, 165, 233, 0.15));
+  border: 1px solid var(--info-color);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Типографическая система */
+.clinic-text-xs {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.clinic-text-sm {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.clinic-text-base {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.clinic-text-lg {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.clinic-text-xl {
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.clinic-text-2xl {
+  font-size: 24px;
+  line-height: 1.4;
+}
+
+.clinic-text-3xl {
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+.clinic-text-4xl {
+  font-size: 36px;
+  line-height: 1.2;
+}
+
+/* Веса шрифтов */
+.clinic-font-normal {
+  font-weight: 400;
+}
+
+.clinic-font-medium {
+  font-weight: 500;
+}
+
+.clinic-font-semibold {
+  font-weight: 600;
+}
+
+.clinic-font-bold {
+  font-weight: 700;
+}
+
+/* Заголовки с правильной иерархией */
+.clinic-heading-1 {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.clinic-heading-2 {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.clinic-heading-3 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+/* Утилитарные классы */
+.clinic-text-center {
+  text-align: center;
+}
+
+.clinic-text-left {
+  text-align: left;
+}
+
+.clinic-text-right {
+  text-align: right;
+}
+
+.clinic-flex {
+  display: flex;
+}
+
+.clinic-flex-col {
+  flex-direction: column;
+}
+
+.clinic-items-center {
+  align-items: center;
+}
+
+.clinic-justify-center {
+  justify-content: center;
+}
+
+.clinic-justify-between {
+  justify-content: space-between;
+}
+
+.clinic-gap-sm {
+  gap: 8px;
+}
+
+.clinic-gap-md {
+  gap: 16px;
+}
+
+.clinic-gap-lg {
+  gap: 24px;
+}
+
+.clinic-p-sm {
+  padding: 8px;
+}
+
+.clinic-p-md {
+  padding: 16px;
+}
+
+.clinic-p-lg {
+  padding: 24px;
+}
+
+.clinic-m-sm {
+  margin: 8px;
+}
+
+.clinic-m-md {
+  margin: 16px;
+}
+
+.clinic-m-lg {
+  margin: 24px;
+}
+
+.clinic-w-full {
+  width: 100%;
+}
+
+.clinic-h-full {
+  height: 100%;
+}
+
+.clinic-hidden {
+  display: none;
+}
+
+.clinic-visible {
+  display: block;
+}

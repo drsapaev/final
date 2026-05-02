@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ branding.document_title or template_name }}</title>
+</head>
+<body>
+  <div class="page">
+    {% if oam_docx_mode %}
+    {% set physical_section = sections[0] if sections else none %}
+    {% set sediment_section = sections[1] if sections|length > 1 else none %}
+    <table class="header-table">
+      <tr>
+        <td class="logo-cell">
+          {% if branding.logo_file_url %}
+          <img class="logo" src="{{ branding.logo_file_url }}" alt="logo" />
+          {% endif %}
+        </td>
+        <td>
+          <div class="branding-title">{{ branding.clinic_name or 'Doktor Laboratoriyasi' }}</div>
+          {% if branding.address %}
+          <div class="muted">Манзил: {{ branding.address }}</div>
+          {% endif %}
+          {% if branding.document_subtitle or branding.phone %}
+          <div class="muted">Мўлжал: {{ branding.document_subtitle or '' }}{% if branding.phone %}                                                                             Телефон:   {{ branding.phone }}{% endif %}</div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+
+    <table class="patient-table" style="margin-top: 10px;">
+      <tr>
+        <td><strong>ФИШ</strong></td>
+        <td>{{ patient.full_name or '________________________________________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Туғилган йили</strong></td>
+        <td>{{ patient.birth_date or '____________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Манзили</strong></td>
+        <td>{{ patient.address or '________________________________________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Текширув санаси</strong></td>
+        <td>«___» ____________________{{ report_date[-4:] if report_date else '' }}   й</td>
+      </tr>
+    </table>
+
+    <div class="oam-title">{{ (branding.document_title or template_name) | upper }}</div>
+    <table class="lab-table oam-table">
+      <colgroup>
+        <col style="width: 38%;" />
+        <col style="width: 20%;" />
+        <col style="width: 42%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Кўрсаткич</th>
+          <th class="col-result">Натижа</th>
+          <th>Норма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if physical_section %}
+          {% for row in physical_section.fields %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
+              {% if row.value_numeric is not none %}
+                {{ row.value_numeric }}
+              {% else %}
+                {{ row.value_text or '' }}
+              {% endif %}
+            </td>
+            <td>{{ row.reference_text or '' }}</td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        {% if sediment_section %}
+        <tr class="oam-section-row">
+          <td colspan="3">{{ (sediment_section.title or 'ЧЎКМА МИКРОСКОПИЯСИ') | upper }}</td>
+        </tr>
+          {% for row in sediment_section.fields %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td class="col-result {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
+              {% if row.value_numeric is not none %}
+                {{ row.value_numeric }}
+              {% else %}
+                {{ row.value_text or '' }}
+              {% endif %}
+            </td>
+            <td>{{ row.reference_text or '' }}</td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+
+    {% if footer_notes %}
+    <div style="margin-top: 10px;" class="muted">{{ footer_notes }}</div>
+    {% endif %}
+
+    <div class="smear-signature">
+      Врач лаборант:________{{ signers.lab_technician_name or '' }}
+    </div>
+    {% elif docx_three_column_mode %}
+    {% set first_section = sections[0] if sections else none %}
+    <table class="header-table">
+      <tr>
+        <td class="logo-cell">
+          {% if branding.logo_file_url %}
+          <img class="logo" src="{{ branding.logo_file_url }}" alt="logo" />
+          {% endif %}
+        </td>
+        <td>
+          <div class="branding-title">{{ branding.clinic_name or 'Doktor Laboratoriyasi' }}</div>
+          {% if branding.address %}
+          <div class="muted">Манзил: {{ branding.address }}</div>
+          {% endif %}
+          {% if branding.document_subtitle or branding.phone %}
+          <div class="muted">Мўлжал: {{ branding.document_subtitle or '' }}{% if branding.phone %}                                                                             Телефон:   {{ branding.phone }}{% endif %}</div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+
+    <table class="patient-table" style="margin-top: 10px;">
+      <tr>
+        <td><strong>ФИШ</strong></td>
+        <td>{{ patient.full_name or '________________________________________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Туғилган йили</strong></td>
+        <td>{{ patient.birth_date or '____________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Манзили</strong></td>
+        <td>{{ patient.address or '________________________________________________' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Текширув санаси</strong></td>
+        <td>«___» ____________________{{ report_date[-4:] if report_date else '' }}   й</td>
+      </tr>
+    </table>
+
+    <div class="smear-title">{{ (branding.document_title or template_name) | upper }}</div>
+    <table class="lab-table">
+      <colgroup>
+        <col style="width: 38%;" />
+        <col style="width: 20%;" />
+        <col style="width: 42%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Тахлил номи</th>
+          <th class="col-result">Натижа</th>
+          <th>Норма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in first_section.fields if first_section %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td class="col-result">
+            {% if row.value_numeric is not none %}
+              {{ row.value_numeric }}
+            {% else %}
+              {{ row.value_text or '' }}
+            {% endif %}
+          </td>
+          <td>{{ row.reference_text or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if footer_notes %}
+    <div style="margin-top: 10px;" class="muted">{{ footer_notes }}</div>
+    {% endif %}
+
+    <div class="smear-signature">
+      Врач лаборант:________{{ signers.lab_technician_name or '' }}
+    </div>
+    {% else %}
+    {% if smear_matrix_mode %}
+    {% set copy_total = copy_count or 1 %}
+    {% set first_section = sections[0] if sections else none %}
+    {% for copy_index in range(copy_total) %}
+    <table class="header-table">
+      <tr>
+        <td class="logo-cell">
+          {% if branding.logo_file_url %}
+          <img class="logo" src="{{ branding.logo_file_url }}" alt="logo" />
+          {% endif %}
+        </td>
+        <td>
+          <div class="branding-title">{{ branding.clinic_name or 'Doktor Laboratoriyasi' }}</div>
+          {% if branding.address %}
+          <div class="muted">Манзил: {{ branding.address }}</div>
+          {% endif %}
+          {% if branding.phone %}
+          <div class="muted">Телефон: {{ branding.phone }}</div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+
+    <table class="patient-table" style="margin-top: 10px;">
+      <tr>
+        <td><strong>ФИШ</strong></td>
+        <td>{{ patient.full_name or '' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Туғилган йили</strong></td>
+        <td>{{ patient.birth_date or '' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Манзили</strong></td>
+        <td>{{ patient.address or '' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Текширув санаси</strong></td>
+        <td>«      » ________________ {{ report_date[-4:] if report_date else '' }}й</td>
+      </tr>
+    </table>
+
+    <div class="smear-title">СУРТМА ТАХЛИЛИ (степень чистоты)</div>
+    <table class="lab-table smear-matrix-table">
+      <colgroup>
+        <col style="width: 34%;" />
+        <col style="width: 22%;" />
+        <col style="width: 22%;" />
+        <col style="width: 22%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Кўрсатгичлар</th>
+          {% for section in sections %}
+          <th>{{ section.title or section.key }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if first_section %}
+          {% for row_index in range(first_section.fields|length) %}
+          <tr>
+            <td>{{ first_section.fields[row_index].label }}</td>
+            {% for section in sections %}
+              {% set row = section.fields[row_index] %}
+              <td class="smear-site-cell {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
+                {% if row.value_numeric is not none %}
+                  {{ row.value_numeric }}
+                {% else %}
+                  {{ row.value_text or '' }}
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+
+    <div class="smear-signature">
+      Врач лаборант:________{{ signers.lab_technician_name or '' }}
+    </div>
+
+    {% if copy_index < copy_total - 1 %}
+    <div style="page-break-after: always;"></div>
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    <table class="header-table">
+      <tr>
+        <td class="logo-cell">
+          {% if branding.logo_file_url %}
+          <img class="logo" src="{{ branding.logo_file_url }}" alt="logo" />
+          {% endif %}
+        </td>
+        <td>
+          <div class="branding-title">{{ branding.clinic_name }}</div>
+          {% if branding.document_title %}
+          <div class="branding-subtitle">{{ branding.document_title }}</div>
+          {% endif %}
+          {% if branding.document_subtitle %}
+          <div class="muted">{{ branding.document_subtitle }}</div>
+          {% endif %}
+          {% if branding.address %}
+          <div class="muted">{{ branding.address }}</div>
+          {% endif %}
+          {% if branding.phone %}
+          <div class="muted">Tel: {{ branding.phone }}</div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+
+    <table class="patient-table" style="margin-top: 10px;">
+      <tr>
+        <td><strong>ФИО / ФИШ</strong></td>
+        <td>{{ patient.full_name or '' }}</td>
+        <td><strong>Дата</strong></td>
+        <td>{{ report_date }}</td>
+      </tr>
+      <tr>
+        <td><strong>Дата рождения</strong></td>
+        <td>{{ patient.birth_date or '' }}</td>
+        <td><strong>Пол</strong></td>
+        <td>{{ patient.sex or '' }}</td>
+      </tr>
+      <tr>
+        <td><strong>Телефон</strong></td>
+        <td>{{ patient.phone or '' }}</td>
+        <td><strong>Адрес</strong></td>
+        <td>{{ patient.address or '' }}</td>
+      </tr>
+    </table>
+
+    {% if critical_findings %}
+    <div class="critical-block">
+      <div class="critical-title">Critical Findings</div>
+      <table class="critical-table">
+        <thead>
+          <tr>
+            <th>Показатель</th>
+            <th>Результат</th>
+            <th>Норма</th>
+            <th>Порог</th>
+            <th>Флаг</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for finding in critical_findings %}
+          <tr>
+            <td>{{ finding.label }}</td>
+            <td>{{ finding.value_display }}{% if finding.unit %} {{ finding.unit }}{% endif %}</td>
+            <td>{{ finding.reference_text or '' }}</td>
+            <td>{{ finding.threshold_display or '' }}</td>
+            <td class="{% if finding.resolved_flag %}flag-{{ finding.resolved_flag }}{% endif %}">
+              {{ finding.resolved_flag }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% for section in sections %}
+    <div class="section-title">{{ section.title or section.key }}</div>
+    <table class="lab-table">
+      <colgroup>
+        <col style="width: 36%;" />
+        <col style="width: 18%;" />
+        <col style="width: 12%;" />
+        <col style="width: 22%;" />
+        <col style="width: 12%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Показатель</th>
+          <th class="col-result">Результат</th>
+          <th class="col-unit">Ед.</th>
+          <th>Норма</th>
+          <th class="col-flag">Флаг</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in section.fields %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td class="col-result">
+            {% if row.value_numeric is not none %}
+              {{ row.value_numeric }}
+            {% else %}
+              {{ row.value_text or '' }}
+            {% endif %}
+          </td>
+          <td class="col-unit">{{ row.unit or '' }}</td>
+          <td>{{ row.reference_text or '' }}</td>
+          <td class="col-flag {% if row.resolved_flag %}flag-{{ row.resolved_flag }}{% endif %}">
+            {{ row.resolved_flag or '' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+
+    {% if footer_notes %}
+    <div style="margin-top: 10px;" class="muted">{{ footer_notes }}</div>
+    {% endif %}
+
+    <table class="footer-table">
+      <tr>
+        <td>
+          <strong>{{ signers.lab_technician_label }}</strong><br />
+          {{ signers.lab_technician_name or '________________' }}
+        </td>
+        <td>
+          <strong>{{ signers.approver_label }}</strong><br />
+          {{ signers.approver_name or '________________' }}
+        </td>
+      </tr>
+    </table>
+    {% endif %}
+    {% endif %}
+  </div>
+</body>
+</html>

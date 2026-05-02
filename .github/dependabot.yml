@@ -1,0 +1,66 @@
+version: 2
+updates:
+  # Обновление Python зависимостей
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "drsapaev"
+    assignees:
+      - "drsapaev"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      
+  # Обновление GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "drsapaev"
+    assignees:
+      - "drsapaev"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      
+  # Обновление Docker образов
+  - package-ecosystem: "docker"
+    directory: "/ops"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "11:00"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "drsapaev"
+    assignees:
+      - "drsapaev"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+    # Игнорировать определенные обновления для стабильности
+    ignore:
+      # Игнорировать обновления Python до стабильной версии (3.14.0 нестабильна)
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Игнорировать обновления Node.js до стабильной версии  
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

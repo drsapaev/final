@@ -1,0 +1,85 @@
+/**
+ * SmartAssistButton CSS
+ */
+
+.smart-assist-btn {
+    position: relative;
+    border: none;
+    background: #f0f4ff;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.smart-assist-btn--small {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+}
+
+.smart-assist-btn--medium {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+}
+
+.smart-assist-btn:hover:not(:disabled) {
+    background: #e0e8ff;
+    transform: scale(1.05);
+}
+
+.smart-assist-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.smart-assist-btn--has-suggestions {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+    }
+}
+
+.smart-assist-btn__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.smart-assist-btn__spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.smart-assist-btn__badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #4caf50;
+    border-radius: 50%;
+    border: 2px solid white;
+}

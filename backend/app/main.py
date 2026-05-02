@@ -1,0 +1,325 @@
+# --- BEGIN app/main.py ---
+from __future__ import annotations
+
+import logging
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
+
+from app.core.config import get_settings
+from app.core.logging_config import setup_logging
+
+# -----------------------------------------------------------------------------
+# Логирование
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Конфиг
+# -----------------------------------------------------------------------------
+settings = get_settings()
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+setup_logging(level=log_level, structured=settings.LOG_STRUCTURED)
+log = logging.getLogger("clinic.main")
+API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
+
+# Use settings for CORS configuration
+CORS_DISABLE = settings.CORS_DISABLE
+CORS_ALLOW_ALL = settings.CORS_ALLOW_ALL
+CORS_ORIGINS = settings.BACKEND_CORS_ORIGINS
+ENV = os.getenv("ENV", "dev").lower()
+IS_PROD = ENV in ("prod", "production")
+TESTING = os.getenv("TESTING", "0").lower() in ("1", "true", "yes")
+
+# Fail fast on insecure CORS in production
+if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
+    raise ValueError(
+        "Refusing to start in production: CORS_DISABLE or CORS_ALLOW_ALL is enabled. "
+        "Set BACKEND_CORS_ORIGINS to a strict whitelist."
+    )
+
+# Disallow DEV auth fallback knob in production
+if IS_PROD and os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true":
+    raise ValueError("ENABLE_DEV_AUTH must be false in production.")
+
+
+# -----------------------------------------------------------------------------
+# Lifespan Context Manager (replaces deprecated on_event)
+# -----------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # === STARTUP ===
+    await _startup_tasks()
+
+    yield  # Application is running
+
+    # === SHUTDOWN ===
+    # Add any cleanup code here if needed
+    log.info("Application shutdown complete")
+
+
+# -----------------------------------------------------------------------------
+# Приложение
+# -----------------------------------------------------------------------------
+app = FastAPI(
+    title="Clinic Manager API",
+    version=settings.APP_VERSION,
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# -----------------------------------------------------------------------------
+# Регистрация обработчиков исключений
+# -----------------------------------------------------------------------------
+from app.core.exception_handlers import register_exception_handlers  # noqa: E402
+
+register_exception_handlers(app)
+log.info("Exception handlers registered")
+
+# -----------------------------------------------------------------------------
+# WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
+# -----------------------------------------------------------------------------
+from app.ws.chat_ws import chat_websocket_handler  # noqa: E402
+from app.ws.queue_ws import router as queue_ws_router  # noqa: E402
+from app.ws.queue_ws import ws_queue  # noqa: E402
+
+app.include_router(queue_ws_router)  # /ws/queue
+app.add_api_websocket_route("/ws/dev-queue", ws_queue)
+app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user chat
+
+# -----------------------------------------------------------------------------
+# Audit Middleware (должен быть ДО CORS для установки request_id)
+# -----------------------------------------------------------------------------
+from app.middleware.audit_middleware import AuditMiddleware  # noqa: E402
+
+app.add_middleware(AuditMiddleware)
+log.info("Audit middleware registered")
+
+# -----------------------------------------------------------------------------
+# Security Middleware (rate limiting, brute force protection, IP logging)
+# -----------------------------------------------------------------------------
+from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
+from app.middleware.tenant_scope_middleware import TenantScopeMiddleware  # noqa: E402
+
+if TESTING:
+    log.info("Security middleware skipped in testing mode (TESTING=1)")
+else:
+    app.add_middleware(SecurityMiddleware)
+    log.info("Security middleware registered")
+
+# -----------------------------------------------------------------------------
+# Tenant Scope Middleware (feature-flagged, multi-clinic rollout)
+# -----------------------------------------------------------------------------
+app.add_middleware(TenantScopeMiddleware)
+log.info("Tenant scope middleware registered")
+
+# -----------------------------------------------------------------------------
+# Observability Middleware (SLIs, trace-id, structured request logs)
+# -----------------------------------------------------------------------------
+from app.middleware.observability_middleware import (  # noqa: E402
+    ObservabilityMiddleware,
+)
+
+app.add_middleware(ObservabilityMiddleware)
+log.info("Observability middleware registered")
+
+# -----------------------------------------------------------------------------
+# CSRF Protection Middleware (optional, enable via CSRF_ENABLED=1)
+# -----------------------------------------------------------------------------
+CSRF_ENABLED = os.getenv("CSRF_ENABLED", "0") == "1"
+if CSRF_ENABLED:
+    from app.middleware.csrf_middleware import CSRFMiddleware  # noqa: E402
+    app.add_middleware(CSRFMiddleware, enabled=True)
+    log.info("CSRF protection middleware registered")
+else:
+    log.info("CSRF protection disabled (set CSRF_ENABLED=1 to enable)")
+
+# -----------------------------------------------------------------------------
+# CORS
+# -----------------------------------------------------------------------------
+if not CORS_DISABLE:
+    cfg = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if CORS_ALLOW_ALL:
+        app.add_middleware(CORSMiddleware, allow_origins=["*"], **cfg)
+        log.info("[FIX:CORS] CORS middleware enabled for all origins in development mode")
+    else:
+        app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, **cfg)
+        log.info("[FIX:CORS] CORS middleware enabled for origins: %s", CORS_ORIGINS)
+else:
+    log.warning("[FIX:CORS] CORS middleware is disabled via CORS_DISABLE=1")
+
+# -----------------------------------------------------------------------------
+# Попытка импортировать реальную аутентификацию.
+# Если не получилось — включим dev-fallback ниже.
+# -----------------------------------------------------------------------------
+_USE_DEV_AUTH_FALLBACK = False
+try:
+    from app.api.deps import (  # type: ignore  # noqa: E402
+        create_access_token,
+    )
+except Exception as e:  # pragma: no cover
+    if IS_PROD:
+        raise RuntimeError("Authentication dependencies unavailable in production") from e
+    log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
+    _USE_DEV_AUTH_FALLBACK = True
+
+# -----------------------------------------------------------------------------
+# Основные API-роутеры проекта
+# -----------------------------------------------------------------------------
+from app.api.v1.api import api_router as v1_router  # noqa: E402
+from app.graphql import graphql_router  # noqa: E402
+
+app.include_router(v1_router, prefix=API_V1_STR)
+log.info("Included api.v1.api router at %s", API_V1_STR)
+
+# GraphQL API
+app.include_router(graphql_router, prefix="/api")
+log.info("Included GraphQL router at /api/graphql")
+
+# -----------------------------------------------------------------------------
+# DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали
+# -----------------------------------------------------------------------------
+if _USE_DEV_AUTH_FALLBACK:
+    enable_dev = os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true"
+
+    if IS_PROD or not enable_dev:
+        log.warning("DEV auth fallback DISABLED (ENV=%s, ENABLE_DEV_AUTH=%s)", ENV, enable_dev)
+    else:
+        log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
+
+        def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
+            # простой dev-токен
+            return f"dev.{sub}"
+
+        @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
+        async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
+            log.info("Using DEV fallback login for user: %s", form.username)
+            token = create_access_token(form.username)
+            return {"access_token": token, "token_type": "bearer"}
+
+        @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
+        async def _fallback_me():
+            return {"username": "dev", "role": "Admin", "is_active": True}
+
+
+# -----------------------------------------------------------------------------
+# Health
+# -----------------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "name": "Clinic Queue Manager",
+        "version": os.getenv("APP_VERSION", "0.9.0"),
+        "api_v1": API_V1_STR,
+        "env": os.getenv("APP_ENV", "dev"),
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "cors_disabled": CORS_DISABLE,
+        "cors_allow_all": CORS_ALLOW_ALL,
+        "origins": CORS_ORIGINS,
+    }
+
+
+# -----------------------------------------------------------------------------
+# Диагностика подключённых маршрутов (called from lifespan)
+# -----------------------------------------------------------------------------
+async def _startup_tasks() -> None:
+    """Startup tasks - validates security settings and prints routes"""
+    # Validate SECRET_KEY on startup
+    try:
+        from app.core.config import _DEFAULT_SECRET_KEY, get_settings
+
+        settings = get_settings()
+        env = os.getenv("ENV", "dev").lower()
+
+        # Critical security check: fail if default SECRET_KEY in production
+        if settings.SECRET_KEY == _DEFAULT_SECRET_KEY and env in ("prod", "production"):
+            log.error("=" * 80)
+            log.error("CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production!")
+            log.error("Set SECRET_KEY environment variable before starting the server.")
+            log.error("Generate secure key: python -c 'import secrets; print(secrets.token_urlsafe(32))'")
+            log.error("=" * 80)
+            raise ValueError(
+                "Cannot start in production with default SECRET_KEY. "
+                "Set SECRET_KEY environment variable."
+            )
+
+        # Warn if SECRET_KEY is weak
+        if len(settings.SECRET_KEY) < 32:
+            log.warning(
+                "SECRET_KEY is too short (%d chars). Should be at least 32 characters.",
+                len(settings.SECRET_KEY)
+            )
+
+        log.info("Security validation passed: SECRET_KEY is configured")
+
+    except Exception as e:
+        log.error("Security validation failed: %s", e)
+        if os.getenv("ENV", "dev").lower() in ("prod", "production"):
+            raise  # Fail fast in production
+        log.warning("Continuing in development mode despite security warning")
+
+    # ✅ SECURITY: Start scheduled backups if enabled
+    backup_enabled = settings.AUTO_BACKUP_ENABLED
+    if backup_enabled:
+        try:
+            from app.db.session import SessionLocal
+            from app.services.scheduled_backup import ScheduledBackupService
+
+            backup_db = SessionLocal()
+            backup_service = ScheduledBackupService(backup_db)
+
+            # Get backup time from env (default: 2 AM)
+            backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
+            backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
+            from datetime import time
+            backup_time = time(backup_hour, backup_minute)
+
+            await backup_service.start_daily_backups(backup_time)
+            log.info(f"✅ Scheduled backups enabled (daily at {backup_time})")
+        except Exception as e:
+            log.error(f"Failed to start backup scheduler: {e}")
+
+    # Print routes
+    try:
+        lines: list[str] = []
+        for r in app.router.routes:
+            path = getattr(r, "path", "")
+            methods = ",".join(sorted(getattr(r, "methods", []) or []))
+            name = getattr(r, "name", "")
+            lines.append(f"{methods:20s}  {path:40s}  {name}")
+        log.info("Mounted routes:\n%s", "\n".join(lines))
+        log.info(
+            "Flags: WS_DEV_ALLOW=%s CORS_DISABLE=%s",
+            os.getenv("WS_DEV_ALLOW"),
+            os.getenv("CORS_DISABLE"),
+        )
+    except Exception:
+        pass
+
+
+@app.get("/_routes")
+def _routes():
+    items = []
+    for r in app.router.routes:
+        items.append(
+            {
+                "type": r.__class__.__name__,
+                "path": getattr(r, "path", ""),
+                "methods": list(getattr(r, "methods", []) or []),
+                "name": getattr(r, "name", ""),
+            }
+        )
+    return items
+
+
+# --- END app/main.py ---

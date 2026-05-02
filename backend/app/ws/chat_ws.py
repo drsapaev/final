@@ -1,0 +1,292 @@
+"""
+WebSocket для системы сообщений в реальном времени
+"""
+
+import json
+import logging
+
+from fastapi import Query, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.messaging_contract import (
+    CONTRACT_VERSION,
+    MessageEventType,
+    build_ws_event_payload,
+    is_supported_contract_version,
+)
+from app.db.session import SessionLocal
+from app.models.user import User
+
+settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+class ChatConnectionManager:
+    """Менеджер WebSocket соединений для чата"""
+
+    def __init__(self):
+        # user_id -> WebSocket
+        self.active_connections: dict[int, WebSocket] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket) -> bool:
+        """Подключить пользователя"""
+        try:
+            # Закрыть старое соединение если есть
+            if user_id in self.active_connections:
+                try:
+                    await self.active_connections[user_id].close()
+                except Exception:
+                    pass
+
+            await websocket.accept()
+            self.active_connections[user_id] = websocket
+            logger.info(f"Chat WebSocket connected: user_id={user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Chat WebSocket connect error: {e}")
+            return False
+
+    def disconnect(self, user_id: int):
+        """Отключить пользователя"""
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+            logger.info(f"Chat WebSocket disconnected: user_id={user_id}")
+
+    async def send_to_user(self, user_id: int, data: dict) -> bool:
+        """Отправить сообщение конкретному пользователю"""
+        if user_id in self.active_connections:
+            try:
+                # Используем jsonable_encoder для сериализации datetime и других типов
+                await self.active_connections[user_id].send_json(jsonable_encoder(data))
+                return True
+            except Exception as e:
+                logger.error(f"Chat WebSocket send error: {e}")
+                self.disconnect(user_id)
+        return False
+
+    def is_online(self, user_id: int) -> bool:
+        """Проверить, онлайн ли пользователь"""
+        return user_id in self.active_connections
+
+    def get_online_users(self) -> list:
+        """Получить список онлайн пользователей"""
+        return list(self.active_connections.keys())
+
+    async def broadcast_typing(self, sender_id: int, recipient_id: int, is_typing: bool):
+        """Отправить статус набора текста"""
+        await self.send_to_user(
+            recipient_id,
+            build_ws_event_payload(
+                MessageEventType.TYPING,
+                {
+                    "sender_id": sender_id,
+                    "is_typing": is_typing,
+                },
+            ),
+        )
+
+    async def notify_new_message(self, recipient_id: int, message_data: dict):
+        """Уведомить о новом сообщении"""
+        is_online = recipient_id in self.active_connections
+        logger.info(
+            "WS: Notifying user %s about new message. Online: %s",
+            recipient_id,
+            is_online,
+        )
+        if is_online:
+            await self.broadcast_event(
+                [recipient_id],
+                "new_message",
+                {"message": message_data},
+            )
+        else:
+            logger.info("WS: User %s is offline, skipping notification", recipient_id)
+
+    async def notify_message_read(self, sender_id: int, message_id: int):
+        """Уведомить о прочтении сообщения."""
+        await self.broadcast_event(
+            [sender_id],
+            "message_read",
+            {"message_id": message_id},
+        )
+
+    async def notify_messages_read(self, sender_id: int, message_ids: list[int]):
+        """Уведомить отправителя о прочтении нескольких сообщений."""
+        if not message_ids:
+            return
+        await self.broadcast_event(
+            [sender_id],
+            "messages_read",
+            {"message_ids": message_ids},
+        )
+
+    async def broadcast_event(self, user_ids: list[int], event_type: str, data: dict):
+        if not user_ids:
+            return
+
+        payload = build_ws_event_payload(event_type, data)
+
+        for raw_user_id in dict.fromkeys(user_ids):
+            try:
+                user_id = int(raw_user_id)
+            except (TypeError, ValueError):
+                continue
+            await self.send_to_user(user_id, payload)
+
+
+# Глобальный менеджер соединений
+chat_manager = ChatConnectionManager()
+
+
+async def authenticate_websocket(
+    websocket: WebSocket,
+    token: str,
+    db: Session
+) -> User | None:
+    """Аутентификация WebSocket соединения через токен"""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[getattr(settings, "ALGORITHM", "HS256")]
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+
+        # Поддержка и строкового и числового ID
+        if isinstance(user_id, str) and user_id.isdigit():
+            user_id = int(user_id)
+        elif isinstance(user_id, str):
+            # Если это username, ищем по username
+            user = db.query(User).filter(User.username == user_id).first()
+            return user
+
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        return user
+    except JWTError as e:
+        logger.error(f"Chat WebSocket JWT error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Chat WebSocket auth error: {e}")
+        return None
+
+
+async def chat_websocket_handler(
+    websocket: WebSocket,
+    token: str = Query(...)
+):
+    """
+    WebSocket endpoint для чата.
+
+    Подключение: ws://localhost:18000/ws/chat?token=<JWT_TOKEN>
+    """
+
+    logger.info("Chat WebSocket connection attempt. Token provided: %s", bool(token))
+
+    # Аутентификация
+    db = SessionLocal()
+    try:
+        user = await authenticate_websocket(websocket, token, db)
+        if user:
+            logger.info(
+                "Chat WebSocket authenticated: user_id=%s, username=%s",
+                user.id,
+                user.username,
+            )
+        else:
+            logger.warning("Chat WebSocket authentication failed")
+    finally:
+        db.close()
+
+    if not user:
+        try:
+            await websocket.accept()
+        except Exception as e:
+            logger.error(f"Failed to accept websocket: {e}")
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    # Подключение
+    connected = await chat_manager.connect(user.id, websocket)
+    if not connected:
+        return
+
+    try:
+        contract_version_mismatch_logged = False
+        while True:
+            # Получаем сообщение от клиента
+            data = await websocket.receive_text()
+
+            try:
+                message = json.loads(data)
+                msg_type = message.get("type")
+                incoming_contract_version = message.get("contract_version")
+
+                if (
+                    incoming_contract_version
+                    and not is_supported_contract_version(incoming_contract_version)
+                    and not contract_version_mismatch_logged
+                ):
+                    contract_version_mismatch_logged = True
+                    logger.warning(
+                        "Chat WebSocket contract version mismatch: expected=%s, received=%s, user_id=%s, type=%s",
+                        CONTRACT_VERSION,
+                        incoming_contract_version,
+                        user.id,
+                        msg_type,
+                    )
+
+                if msg_type == MessageEventType.TYPING.value:
+                    recipient_id = message.get("recipient_id")
+                    is_typing = message.get("is_typing", False)
+                    if recipient_id:
+                        await chat_manager.broadcast_typing(
+                            sender_id=user.id,
+                            recipient_id=recipient_id,
+                            is_typing=is_typing
+                        )
+
+                elif msg_type == MessageEventType.PING.value:
+                    await websocket.send_json(
+                        build_ws_event_payload(MessageEventType.PONG)
+                    )
+
+                elif msg_type == MessageEventType.GET_ONLINE_STATUS.value:
+                    user_ids = message.get("user_ids", [])
+                    online_status = {
+                        uid: chat_manager.is_online(uid)
+                        for uid in user_ids
+                    }
+                    await websocket.send_json(
+                        build_ws_event_payload(
+                            MessageEventType.ONLINE_STATUS,
+                            {"users": online_status},
+                        )
+                    )
+
+                elif msg_type == MessageEventType.PONG.value:
+                    continue
+
+                else:
+                    await websocket.send_json(
+                        build_ws_event_payload(
+                            "error",
+                            {"message": f"Unknown message type: {msg_type}"},
+                        )
+                    )
+
+            except json.JSONDecodeError:
+                await websocket.send_json(
+                    build_ws_event_payload("error", {"message": "Invalid JSON"})
+                )
+
+    except WebSocketDisconnect:
+        chat_manager.disconnect(user.id)
+    except Exception as e:
+        logger.error(f"Chat WebSocket error: {e}")
+        chat_manager.disconnect(user.id)
+

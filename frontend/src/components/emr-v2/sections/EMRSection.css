@@ -1,0 +1,175 @@
+/**
+ * EMRSection CSS - Single Sheet Integration (Theme-aware)
+ * Uses CSS variables from macos-tokens.css for proper dark/light theme support
+ */
+
+.emr-section {
+    position: relative;
+    border: none;
+    border-bottom: 1px solid var(--mac-separator);
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    transition: background var(--mac-duration-fast) var(--mac-ease);
+}
+
+/* Remove border from last section */
+.emr-section:last-child {
+    border-bottom: none;
+}
+
+.emr-section--disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Focus/Hover state — subtle highlight */
+.emr-section:focus-within {
+    background: var(--mac-bg-tertiary);
+}
+
+/* Header */
+.emr-section__header {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    width: 100%;
+    padding: var(--mac-spacing-4) var(--mac-spacing-6);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    outline: none;
+    transition: background var(--mac-duration-fast) var(--mac-ease);
+}
+
+.emr-section__header:hover {
+    background: var(--mac-bg-tertiary);
+}
+
+.emr-section__header-wrapper {
+    display: flex;
+    align-items: stretch;
+}
+
+.emr-section__header-wrapper .emr-section__header {
+    flex: 1;
+}
+
+.emr-section__title {
+    flex: 1;
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+    letter-spacing: -0.01em;
+}
+
+.emr-section__icon {
+    font-size: var(--mac-font-size-lg);
+    color: var(--mac-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--mac-duration-fast) var(--mac-ease);
+}
+
+.emr-section__header:hover .emr-section__icon {
+    color: var(--mac-text-primary);
+}
+
+/* Chevron Animation */
+.emr-section__chevron {
+    font-size: var(--mac-font-size-xs);
+    color: var(--mac-text-tertiary);
+    transition: transform var(--mac-duration-normal) var(--mac-ease);
+    transform: rotate(-90deg);
+    /* Closed state (pointing right) */
+}
+
+.emr-section__chevron--open {
+    transform: rotate(0deg);
+    /* Open state (pointing down) */
+}
+
+.emr-section__required {
+    color: var(--mac-danger);
+    margin-left: var(--mac-spacing-1);
+    font-size: var(--mac-font-size-lg);
+    line-height: 0;
+    position: relative;
+    top: 2px;
+}
+
+.emr-section__badge {
+    font-size: var(--mac-font-size-xs);
+    font-weight: var(--mac-font-weight-semibold);
+    background: rgba(0, 122, 255, 0.12);
+    color: var(--mac-accent-blue);
+    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+    border-radius: var(--mac-radius-full);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Header Action */
+.emr-section__header-action {
+    display: flex;
+    align-items: center;
+    padding-right: var(--mac-spacing-6);
+}
+
+/* Content Animation Wrapper */
+.emr-section__body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--mac-duration-normal) var(--mac-ease);
+}
+
+.emr-section__body--open {
+    grid-template-rows: 1fr;
+}
+
+.emr-section__body-inner {
+    overflow: hidden;
+}
+
+/* Content */
+.emr-section__content {
+    padding: var(--mac-spacing-1) var(--mac-spacing-6) var(--mac-spacing-6);
+    font-size: var(--mac-font-size-base);
+    line-height: 1.5;
+    color: var(--mac-text-primary);
+    min-height: 0;
+}
+
+/* Textarea inside sections */
+.emr-section__content textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--mac-spacing-3);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+    font-family: inherit;
+    font-size: var(--mac-font-size-base);
+    line-height: 1.5;
+    resize: vertical;
+    transition: border-color var(--mac-duration-fast) var(--mac-ease),
+        box-shadow var(--mac-duration-fast) var(--mac-ease);
+}
+
+.emr-section__content textarea::placeholder {
+    color: var(--mac-text-tertiary);
+}
+
+.emr-section__content textarea:focus {
+    outline: none;
+    border-color: var(--mac-accent-blue);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+/* Animation */
+.emr-section__content[hidden] {
+    display: none;
+}

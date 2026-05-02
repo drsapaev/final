@@ -1,0 +1,1088 @@
+﻿[
+    {
+        "path":  "backend/alembic.ini",
+        "size":  600,
+        "mtime":  "2025-08-17T17:58:47.0839541Z",
+        "sha256":  "3ebb273e81d2e06d005b5a465ac43d020c8e6c19e2e617a35c2f890242f3f13a"
+    },
+    {
+        "path":  "backend/alembic/env.py",
+        "size":  2469,
+        "mtime":  "2025-08-17T19:10:41.5303435Z",
+        "sha256":  "927c312fc2f5b1b5661655b8620cd1a52183cbfca4820903d54d2bd5d19cd84e"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0001_init.py",
+        "size":  2490,
+        "mtime":  "2025-08-17T17:58:47.0994904Z",
+        "sha256":  "eab1d5504166a03e614209455ec65ac727153a705c9cc0aa6dfc484d91e64d38"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0002_auth.py",
+        "size":  1924,
+        "mtime":  "2025-08-17T17:58:47.1056034Z",
+        "sha256":  "fb4728ab92df01f03c32377785b07729ec7c85a04c49b79220a6178dbba28249"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0003_queue.py",
+        "size":  4232,
+        "mtime":  "2025-08-18T01:56:56.8971351Z",
+        "sha256":  "70f25cd5fc55612651c708c367d872ce5cec58cc208a25e94ba71664e0197ff0"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0003_queue.py.bak",
+        "size":  1664,
+        "mtime":  "2025-08-18T01:14:27.8313275Z",
+        "sha256":  "c27cda29d0b96e62c893cad17e09cb8ae0eaa470475b90faeff6e4287de964d4"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0004_visits.py",
+        "size":  2504,
+        "mtime":  "2025-08-17T17:58:47.1127144Z",
+        "sha256":  "6b26e8050be7fd1347dcae7725e6d017a6dc3d00e528e5afc0f8859f4951b932"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0005_lab.py",
+        "size":  2619,
+        "mtime":  "2025-08-17T17:58:47.1147216Z",
+        "sha256":  "cac2b6f5aaae98932abc9a04b839235d326f05cb84601cd2eedfc8af5eb143f2"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0006_payments.py",
+        "size":  1859,
+        "mtime":  "2025-08-17T17:58:47.1216395Z",
+        "sha256":  "badc6fc532eb777f213aaf4eaa1947842a6d30951bc02086b6654989d69a6241"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0007_settings.py",
+        "size":  1153,
+        "mtime":  "2025-08-17T17:58:47.1264496Z",
+        "sha256":  "3ef2f60aa214567a599b3e73adbce1d3364728bd84015fa3f44642c870690db1"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0008_audit.py",
+        "size":  1169,
+        "mtime":  "2025-08-18T01:06:07.7496809Z",
+        "sha256":  "aa43e2ae4db6fc3f73b7cf6e36f99d6e3c675cffb95dcc39d241eb96fe6ab95e"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0008_audit.py.bak",
+        "size":  1178,
+        "mtime":  "2025-08-18T01:06:07.7496809Z",
+        "sha256":  "32b0031209debb315af51e1fd2f5354a79ddfcbfc96d232fa2c1bdec65682c80"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0009_visit_billing.py",
+        "size":  1786,
+        "mtime":  "2025-08-17T17:58:47.1304648Z",
+        "sha256":  "5d4f71ee806904cb39e694ca525c5b478a2c56d5efcd8807a3d829a39e2d8b9e"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0010_service_catalog.py",
+        "size":  1451,
+        "mtime":  "2025-08-17T17:58:47.1385227Z",
+        "sha256":  "edf143f6066931fa709a2b9292d85340276b85e67f42024cdd3e63e6d8372ad1"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0011_scheduling.py",
+        "size":  1595,
+        "mtime":  "2025-08-18T01:06:07.7650408Z",
+        "sha256":  "31ba238eea1b5ed1375e9de5b7716595b5655a60873d32123c4e3f44d3afdb44"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0011_scheduling.py.bak",
+        "size":  1611,
+        "mtime":  "2025-08-18T01:06:07.7650408Z",
+        "sha256":  "fe61f9b52a0f2355db91ef77863cdec6617e655ae8e2cf3e3da2d4c213f55969"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0012_online_queue.py",
+        "size":  1922,
+        "mtime":  "2025-08-18T01:49:04.3497235Z",
+        "sha256":  "aeeccfc289f3bd4206e9c345a9c674ba16032085620eb4b931b65177050f2655"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0012_online_queue.py.bak",
+        "size":  1402,
+        "mtime":  "2025-08-18T01:14:27.8340053Z",
+        "sha256":  "a627833848e674624ec0a684ab6e1d61247f6efdcf4a70f83e7749046c4df592"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0013_activation.py",
+        "size":  1345,
+        "mtime":  "2025-08-18T01:06:07.7971857Z",
+        "sha256":  "86f192fc20cbb1accdd983ae5065b02374d8601a8749bef76031f501d592a841"
+    },
+    {
+        "path":  "backend/alembic/versions/20250814_0013_activation.py.bak",
+        "size":  1358,
+        "mtime":  "2025-08-18T01:06:07.7971857Z",
+        "sha256":  "a129f501184d5cb4f0c1f9d5b6e3dbfb5be643c4c444056b48f5e0b6e2ee397c"
+    },
+    {
+        "path":  "backend/alembic/versions/20250817_0001_perf_indexes.py",
+        "size":  2882,
+        "mtime":  "2025-08-18T01:06:07.7971857Z",
+        "sha256":  "4bf98c4407ccfefe193bd4afe1e09c569d86e8580ee1be747a310d797eec716e"
+    },
+    {
+        "path":  "backend/alembic/versions/20250817_0001_perf_indexes.py.bak",
+        "size":  2803,
+        "mtime":  "2025-08-18T01:06:07.7971857Z",
+        "sha256":  "632c3c0e5b2f51c57fd62291070aff212a25b650a8ea285e355ff4bda0835887"
+    },
+    {
+        "path":  "backend/alembic/versions/20250817_0002_backfill_nullable_defaults.py",
+        "size":  1766,
+        "mtime":  "2025-08-17T17:58:47.1575102Z",
+        "sha256":  "b740b635ab172b3145c73772465e9bfbe246c3d77717fe78e52fbec951d78b32"
+    },
+    {
+        "path":  "backend/alembic/versions/20250817_0003_fk_set_null.py",
+        "size":  1620,
+        "mtime":  "2025-08-17T18:48:08.6796983Z",
+        "sha256":  "12f815fa7e116e14f71c0bc0c74152278a8d1cc7de2819c36dba13c4a8cc2a12"
+    },
+    {
+        "path":  "backend/alembic/versions/20250818_0004_not_null_hardening.py",
+        "size":  4594,
+        "mtime":  "2025-08-18T02:03:17.7448482Z",
+        "sha256":  "9d72de14a78e9aa3455cd37353793c10a8c66e13fce2dfd5d48589030073d9b6"
+    },
+    {
+        "path":  "backend/alembic/versions/20250818_0005_not_null_alignment.py",
+        "size":  3053,
+        "mtime":  "2025-08-18T02:16:52.3868949Z",
+        "sha256":  "0924b672e5c200e168e4c953cfaf18a58d83dd9fa75ea33d4ff87b263b668526"
+    },
+    {
+        "path":  "backend/app/__init__.py",
+        "size":  84,
+        "mtime":  "2025-08-17T17:58:47.1660423Z",
+        "sha256":  "1b43920be5868ed3f90105087f966ac76173a16311ba7abdb04278b03ec35ae1"
+    },
+    {
+        "path":  "backend/app/api/__init__.py",
+        "size":  63,
+        "mtime":  "2025-08-17T17:58:47.1953326Z",
+        "sha256":  "855ca8c033468b7e9f1c9762f4c58d7ef08aa6653131e4bb24da5387f65c4921"
+    },
+    {
+        "path":  "backend/app/api/deps.py",
+        "size":  2093,
+        "mtime":  "2025-08-24T01:16:12.1645724Z",
+        "sha256":  "9eb0061eee0557350ab0055b19504b3f501679b33c3ba19c65ad074aba7ce464"
+    },
+    {
+        "path":  "backend/app/api/v1/__init__.py",
+        "size":  66,
+        "mtime":  "2025-08-17T17:58:47.2032708Z",
+        "sha256":  "572b1dbf37389e6a2cd5cbd3a51fdb0d2aa555e9f55b90ca5a9ec321054480eb"
+    },
+    {
+        "path":  "backend/app/api/v1/api.py",
+        "size":  1223,
+        "mtime":  "2025-08-23T13:19:34.6744618Z",
+        "sha256":  "1156093d9b9d1a080a717fbcfd6fd078dd8007d22c0c511dbe50089b622bb691"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/__init__.py",
+        "size":  436,
+        "mtime":  "2025-08-17T17:58:47.2640128Z",
+        "sha256":  "929b2e843006b6031492f266c10179e2085c9bc87d7a186649d9125d1b08e9b0"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/activation.py",
+        "size":  5349,
+        "mtime":  "2025-08-17T17:58:47.2737319Z",
+        "sha256":  "ba5d8bc7c86c1a5660c701e913da8107838c5fe657024eda2bef4a9b6e5403b0"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/appointments.py",
+        "size":  4922,
+        "mtime":  "2025-08-23T17:51:20.9548250Z",
+        "sha256":  "d102af3d74ba98e5b58e3a0fd342af0491b977594da329d58deef1b2b4f1f32e"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/audit.py",
+        "size":  1811,
+        "mtime":  "2025-08-17T17:58:47.2456098Z",
+        "sha256":  "3776181d7145d20016af76c40a1a5965c8e2253112e0b48d1aa646491ff5da84"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/auth.py",
+        "size":  2075,
+        "mtime":  "2025-08-24T02:59:46.4593894Z",
+        "sha256":  "1776e797604e5019fd19aa577e5a85d1be7d77b7ec531ebbbb2fb340208fefaa"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/health.py",
+        "size":  729,
+        "mtime":  "2025-08-17T17:58:47.2142583Z",
+        "sha256":  "2278c4106118b8394d124a4468fdb8745532fd8299a9854602ba9aef87dab60b"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/lab.py",
+        "size":  2795,
+        "mtime":  "2025-08-17T17:58:47.2300575Z",
+        "sha256":  "d465526924e062205bf46c4991e9a457e30e1e680577315407bbe5a15803e87d"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/online_queue.py",
+        "size":  2112,
+        "mtime":  "2025-08-23T17:51:37.4643619Z",
+        "sha256":  "69cdc5d8cb6b97a2d56199e6b892023126e2b23f69b66a128955ea5456e27f68"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/patients.py",
+        "size":  5805,
+        "mtime":  "2025-08-17T17:58:47.2142583Z",
+        "sha256":  "6e85c6ec615f2b02d15b0416d175f435a513087139b49370690bfc443a51e28b"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/payments.py",
+        "size":  2175,
+        "mtime":  "2025-08-17T17:58:47.2300575Z",
+        "sha256":  "7d91590ee845002d59ea2ad92f595e75f11adcc3ba57bc3d2e84bc930ab862f1"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/print.py",
+        "size":  3855,
+        "mtime":  "2025-08-17T17:58:47.2436009Z",
+        "sha256":  "e51f816f517fc81e33b256b1a48fddb3897d8c398f09c265945d22ed7b86671c"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/queues.py",
+        "size":  1208,
+        "mtime":  "2025-08-22T17:56:01.5596022Z",
+        "sha256":  "676a58f624a4356adbb0dc4c4e04ef8a9f00e06a86b9774ee64fe9d48fe38810"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/schedule.py",
+        "size":  2527,
+        "mtime":  "2025-08-17T17:58:47.2569870Z",
+        "sha256":  "7e9f03625eabfe81c3926cab3c8af22644e302eda5e5e5f59682e49e1bf0240b"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/services.py",
+        "size":  1409,
+        "mtime":  "2025-08-17T17:58:47.2541884Z",
+        "sha256":  "0cf687c6943561332c478dfc6eaf1247bed96454e218e8cb8c40f4f8b9bf8a01"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/settings.py",
+        "size":  555,
+        "mtime":  "2025-08-26T02:35:46.6134633Z",
+        "sha256":  "7521a69068ddbf24d844b9a45da59f06ba770d5774b053f96129d6168e35aa17"
+    },
+    {
+        "path":  "backend/app/api/v1/endpoints/visits.py",
+        "size":  9378,
+        "mtime":  "2025-08-24T08:57:06.9891626Z",
+        "sha256":  "c51aa1fec7e025fcdd0c27603c3eb64c72d1d9cb067cd3b625a737db76d86574"
+    },
+    {
+        "path":  "backend/app/core/__init__.py",
+        "size":  110,
+        "mtime":  "2025-08-17T17:58:47.1670513Z",
+        "sha256":  "a841f726a7c9fe09515d73ea075babd426b0bf7183eb5e270fc4fba96b8a668f"
+    },
+    {
+        "path":  "backend/app/core/activation.py",
+        "size":  6875,
+        "mtime":  "2025-08-17T17:58:47.1850248Z",
+        "sha256":  "7ce7e9e1f26e1e6494710bee723e05f57ce3d26c95ce32523ee82150aaffcaca"
+    },
+    {
+        "path":  "backend/app/core/auth.py",
+        "size":  394,
+        "mtime":  "2025-08-21T08:58:45.7692029Z",
+        "sha256":  "a9dba098bb02c8adb69610892cc42b738fd4d1f27accb986273362e8447749c2"
+    },
+    {
+        "path":  "backend/app/core/config.py",
+        "size":  1278,
+        "mtime":  "2025-08-24T02:01:59.1513907Z",
+        "sha256":  "1e11eac0e4bb52b09a7277e529660ebf2278a293d27bd0c7e34642872406e47b"
+    },
+    {
+        "path":  "backend/app/core/license.py",
+        "size":  1739,
+        "mtime":  "2025-08-17T17:58:47.1830153Z",
+        "sha256":  "edc0dbe330d80c4ea648170b941b7cc4893cf683f5442f130e2d524635f5c2be"
+    },
+    {
+        "path":  "backend/app/crud/__init__.py",
+        "size":  213,
+        "mtime":  "2025-08-21T08:57:52.3839170Z",
+        "sha256":  "d122310551808c67ef67853ab087f3f5b42a333eee02c32a250581eede478593"
+    },
+    {
+        "path":  "backend/app/crud/audit.py",
+        "size":  1392,
+        "mtime":  "2025-08-17T17:58:47.3263483Z",
+        "sha256":  "ef0d0b4580f1f464568b41c6f1f431311dd5732f8c926a74773fb1b3229e1769"
+    },
+    {
+        "path":  "backend/app/crud/lab.py",
+        "size":  2308,
+        "mtime":  "2025-08-17T17:58:47.2947375Z",
+        "sha256":  "87c02924a43ea030c96c965c240cd1e12f16f33b9a822dd601b4a911e9be24ff"
+    },
+    {
+        "path":  "backend/app/crud/patient.py",
+        "size":  2927,
+        "mtime":  "2025-08-17T17:58:47.2767425Z",
+        "sha256":  "d5dbcefff180998d71d8bb49dddd352774b3df50ad569e7704b036c02f86dd63"
+    },
+    {
+        "path":  "backend/app/crud/payment.py",
+        "size":  1330,
+        "mtime":  "2025-08-17T17:58:47.3203858Z",
+        "sha256":  "84ddc94d0ed3ebc9a03af74c3e1faa0f7f34bcc798e52bbe37f0d4d6a1e4310a"
+    },
+    {
+        "path":  "backend/app/crud/queue.py",
+        "size":  4083,
+        "mtime":  "2025-08-17T17:58:47.2947375Z",
+        "sha256":  "afcb914275d4a568257a9c66c00242b01cd2ccefdbcebb0df5189d6cdc31c9f5"
+    },
+    {
+        "path":  "backend/app/crud/schedule.py",
+        "size":  1973,
+        "mtime":  "2025-08-17T17:58:47.3163716Z",
+        "sha256":  "3b8e5348fe99d6bf8502c9c6fd2d5f9391e0cc4fff39433bcd23a262cb689397"
+    },
+    {
+        "path":  "backend/app/crud/service.py",
+        "size":  1098,
+        "mtime":  "2025-08-17T17:58:47.3126607Z",
+        "sha256":  "43e4637c3eb2ac00d66fa3bf36c420b41b1bdaca7b92ba844c1e9d5fcc4e1fe0"
+    },
+    {
+        "path":  "backend/app/crud/setting.py",
+        "size":  1234,
+        "mtime":  "2025-08-25T01:48:57.6658380Z",
+        "sha256":  "b4e2a74302ca318d42bfc6bd6981b3c4b91f663e18e6780db860efad7a97fa39"
+    },
+    {
+        "path":  "backend/app/crud/user.py",
+        "size":  877,
+        "mtime":  "2025-08-22T09:57:59.7536339Z",
+        "sha256":  "a3888a2146fc10a98ad64e29468988daff41fe2b85cd26fedda8df17cb70a4bb"
+    },
+    {
+        "path":  "backend/app/crud/visit.py",
+        "size":  2434,
+        "mtime":  "2025-08-17T17:58:47.2947375Z",
+        "sha256":  "c3c23d5f4639d46b80c0481eafc696ed78664e7c10bfcea0fc97df30f6812433"
+    },
+    {
+        "path":  "backend/app/db/__init__.py",
+        "size":  152,
+        "mtime":  "2025-08-17T17:58:47.3371175Z",
+        "sha256":  "74e0829ec28b488ed6ba087c6e2f3be88c8fac50a9e4d981c1fda8a784d7bad1"
+    },
+    {
+        "path":  "backend/app/db/base.py",
+        "size":  1184,
+        "mtime":  "2025-08-17T17:58:47.3437403Z",
+        "sha256":  "32ba750998018745da1337d73eea5b5136f6fdfddcc08fe705bcd8af57343138"
+    },
+    {
+        "path":  "backend/app/db/base_class.py",
+        "size":  188,
+        "mtime":  "2025-08-17T17:58:47.3401300Z",
+        "sha256":  "5b7b8b1d8dfd748f1307ea763482d14b1f26d5cd0240c5cba667c37ecb5b4368"
+    },
+    {
+        "path":  "backend/app/db/session.py",
+        "size":  455,
+        "mtime":  "2025-08-26T02:35:46.8519607Z",
+        "sha256":  "9938113b4e164bbe5dbc6c9cea679b17646a38d101452a3233e31338f3f28342"
+    },
+    {
+        "path":  "backend/app/main.py",
+        "size":  6110,
+        "mtime":  "2025-08-22T18:06:23.1876474Z",
+        "sha256":  "8ff536c04f56d4b700660b24b0518290ffb4f9fe4ce1afb967c60b558fd9109d"
+    },
+    {
+        "path":  "backend/app/models/__init__.py",
+        "size":  66,
+        "mtime":  "2025-08-17T17:58:47.3437403Z",
+        "sha256":  "208f7dfe42bd9456927eea8ee179259737624ffe0d55cbd8d0ddf951baec27ae"
+    },
+    {
+        "path":  "backend/app/models/activation.py",
+        "size":  2460,
+        "mtime":  "2025-08-17T17:58:47.3941866Z",
+        "sha256":  "a72fbe610cf0590b5a2783746acf42dbb2011c2fb1abb8a98b64b0a7b9085aef"
+    },
+    {
+        "path":  "backend/app/models/audit.py",
+        "size":  903,
+        "mtime":  "2025-08-17T17:58:47.3777665Z",
+        "sha256":  "d163b3dd288cfabcf848c5901023a1939f2845114b685a0fda8f9d9327770596"
+    },
+    {
+        "path":  "backend/app/models/base.py",
+        "size":  122,
+        "mtime":  "2025-08-22T09:57:16.3585176Z",
+        "sha256":  "4433f02b72edbad62600f8300f4e9e386b119138f11691baf26fee0826b451f9"
+    },
+    {
+        "path":  "backend/app/models/lab.py",
+        "size":  1874,
+        "mtime":  "2025-08-17T17:58:47.3720345Z",
+        "sha256":  "69ec93cec3d6fe7a9db80ed00c9376665d76a310b573c0d6444b3f902f0cebb5"
+    },
+    {
+        "path":  "backend/app/models/online.py",
+        "size":  871,
+        "mtime":  "2025-08-17T17:58:47.3921778Z",
+        "sha256":  "cfea0459a4354f94929a79e29b568eb2f4412e85e3fb7e9e5be135a5d9a02216"
+    },
+    {
+        "path":  "backend/app/models/patient.py",
+        "size":  1209,
+        "mtime":  "2025-08-17T17:58:47.3559256Z",
+        "sha256":  "c88286b6966c42867e1d428b0dc5424360d0d096acf9ca3ab77c202634e86bd5"
+    },
+    {
+        "path":  "backend/app/models/payment.py",
+        "size":  1114,
+        "mtime":  "2025-08-17T17:58:47.3757586Z",
+        "sha256":  "7d84d643c4cd31b196ee6a0a83e6f52f6290a4abf5f6349b5f545cd2955c2c78"
+    },
+    {
+        "path":  "backend/app/models/queue.py",
+        "size":  1089,
+        "mtime":  "2025-08-17T17:58:47.3632501Z",
+        "sha256":  "885562b833ffe06daffcdbc8522098d914bb54358c9365376e3bf135dbbe518f"
+    },
+    {
+        "path":  "backend/app/models/schedule.py",
+        "size":  1401,
+        "mtime":  "2025-08-17T17:58:47.3901674Z",
+        "sha256":  "a3e52d972a749676715f09bf648716749c4a06d7242c2cb54930b3ad4889a311"
+    },
+    {
+        "path":  "backend/app/models/service.py",
+        "size":  945,
+        "mtime":  "2025-08-17T17:58:47.3851460Z",
+        "sha256":  "125acc85f3d10295b29ae7bae008626632a3faea09eeec8692eebc68f2d5301c"
+    },
+    {
+        "path":  "backend/app/models/setting.py",
+        "size":  1167,
+        "mtime":  "2025-08-22T17:10:39.5677240Z",
+        "sha256":  "e53e37a998a438e6ce0f96157e440b8ddae570ea3c813d1e2960e327bee8545b"
+    },
+    {
+        "path":  "backend/app/models/user.py",
+        "size":  750,
+        "mtime":  "2025-08-22T09:57:31.9663414Z",
+        "sha256":  "c0f784d0dfc1d8546bc0005f610a3fa59029f5c11c5041464958729c01f2e88b"
+    },
+    {
+        "path":  "backend/app/models/visit.py",
+        "size":  1817,
+        "mtime":  "2025-08-17T17:58:47.3632501Z",
+        "sha256":  "73804d22080a9b623bca88769f5edffc1d285a55b2ef489384de9758e51ea705"
+    },
+    {
+        "path":  "backend/app/schemas/__init__.py",
+        "size":  140,
+        "mtime":  "2025-08-24T03:42:58.4340096Z",
+        "sha256":  "2294e82793cee37254fbcf4b799b4888c7ec91261219a523e135ed5ecd6e4d45"
+    },
+    {
+        "path":  "backend/app/schemas/activation.py",
+        "size":  1750,
+        "mtime":  "2025-08-24T04:16:59.3513094Z",
+        "sha256":  "d7f143355a24d7449de80f0cb2e1688169bb121b96380138dc7664bd905912f1"
+    },
+    {
+        "path":  "backend/app/schemas/audit.py",
+        "size":  637,
+        "mtime":  "2025-08-24T03:42:58.2827485Z",
+        "sha256":  "bd871f1bdd6b28d578573350b1592c0ef10b8c068e14ce96f963b286be46e01e"
+    },
+    {
+        "path":  "backend/app/schemas/base.py",
+        "size":  176,
+        "mtime":  "2025-08-24T03:42:57.3092551Z",
+        "sha256":  "987cd4c62bba403b297574f69caa4c821ad48aa4a6bc88fd7b541c8b5049ef5e"
+    },
+    {
+        "path":  "backend/app/schemas/lab.py",
+        "size":  1172,
+        "mtime":  "2025-08-24T04:16:57.1414070Z",
+        "sha256":  "fe1368fd4239972648e609c5a609a0c58028cd420ea754977a6e9b6dd70c6f71"
+    },
+    {
+        "path":  "backend/app/schemas/online.py",
+        "size":  693,
+        "mtime":  "2025-08-24T04:16:48.5864081Z",
+        "sha256":  "e6328a330ed18f717f90e956da55a9ff7fb0882f460b263fe4606320df7cfbfa"
+    },
+    {
+        "path":  "backend/app/schemas/patient.py",
+        "size":  817,
+        "mtime":  "2025-08-24T04:16:46.6001864Z",
+        "sha256":  "965971d12b90594cc19a0a31d6baa20d90b111636524ec879d6f87a4e8b41daf"
+    },
+    {
+        "path":  "backend/app/schemas/payment.py",
+        "size":  715,
+        "mtime":  "2025-08-24T04:16:29.8119317Z",
+        "sha256":  "7d68c684bab7cd277f782be09333122437c7c76401b539aeceb65e7aac6f4f09"
+    },
+    {
+        "path":  "backend/app/schemas/queue.py",
+        "size":  356,
+        "mtime":  "2025-08-24T04:15:07.5208136Z",
+        "sha256":  "b913c671c939ecb369043cdacdcb26391c4ebbca00b52e9cec07ca1edb0028ff"
+    },
+    {
+        "path":  "backend/app/schemas/schedule.py",
+        "size":  998,
+        "mtime":  "2025-08-24T04:15:04.0277960Z",
+        "sha256":  "4de3a3ed076f3ce7b663584125727f14a766fd915348a1a3a240a582e5aed590"
+    },
+    {
+        "path":  "backend/app/schemas/service.py",
+        "size":  1209,
+        "mtime":  "2025-08-24T04:15:28.6312699Z",
+        "sha256":  "433243807156cc6eac93988eacaba3473cbfe014734b898d1a1ce1f0ec5b0b2f"
+    },
+    {
+        "path":  "backend/app/schemas/setting.py",
+        "size":  148,
+        "mtime":  "2025-08-26T02:35:46.3651381Z",
+        "sha256":  "04f1b1164cf2ae0e970d4d8d4f50f6c91d352756dfc504a6c6617d904c3e66e1"
+    },
+    {
+        "path":  "backend/app/schemas/user.py",
+        "size":  834,
+        "mtime":  "2025-08-24T04:11:32.8220931Z",
+        "sha256":  "c9258b535f2e3dd580c3525b5427ac88e9501b8b7d8a220b6ff9fb21a6b79995"
+    },
+    {
+        "path":  "backend/app/schemas/visit.py",
+        "size":  1127,
+        "mtime":  "2025-08-24T04:16:37.2265382Z",
+        "sha256":  "53be81c751cf4bea6e087d7e54616553ca352a6b33421f5e6e9d652fe6dde19c"
+    },
+    {
+        "path":  "backend/app/scripts/__init__.py",
+        "size":  25,
+        "mtime":  "2025-08-17T17:58:47.4514104Z",
+        "sha256":  "4af89384709d992166064d0a37496ca86f36954f227490166077ca2a287ec571"
+    },
+    {
+        "path":  "backend/app/scripts/add_planned_date.py",
+        "size":  822,
+        "mtime":  "2025-08-24T08:24:38.0670739Z",
+        "sha256":  "59f92faa1f21e04b70916c06b62a136de6936f3d8a2a2fa7da13a63ae073581b"
+    },
+    {
+        "path":  "backend/app/scripts/audit_data.py",
+        "size":  2690,
+        "mtime":  "2025-08-17T17:58:47.4618596Z",
+        "sha256":  "34c52e8a8ab33c7dabfe1235899efb38a37e19e3844de2da897ad962a7bf2c96"
+    },
+    {
+        "path":  "backend/app/scripts/create_admin_dev.py",
+        "size":  2795,
+        "mtime":  "2025-08-18T16:07:02.0207965Z",
+        "sha256":  "eaaa2b3aa633fc309d95d4eab225244e0b5fe985e89ab91a396ef1f8554ef18e"
+    },
+    {
+        "path":  "backend/app/scripts/ensure_admin.py",
+        "size":  2903,
+        "mtime":  "2025-08-24T16:07:33.1984596Z",
+        "sha256":  "daf6a49dc740d88d4eb72f9e7731f8b8ba3654124c724b877f8208bcf3682d0e"
+    },
+    {
+        "path":  "backend/app/scripts/fix_orphans.py",
+        "size":  949,
+        "mtime":  "2025-08-17T18:48:02.1678451Z",
+        "sha256":  "57b3f4f2d770828132562f1889b8e8c110e5eb786b93c6c354a77271c9694b7e"
+    },
+    {
+        "path":  "backend/app/scripts/mint_dev_token.py",
+        "size":  169,
+        "mtime":  "2025-08-18T17:57:05.4724865Z",
+        "sha256":  "2884a08654ccb4761d1875b3b052e96e71e44a835222d05e6542ffab95415373"
+    },
+    {
+        "path":  "backend/app/scripts/move_uc_into_upgrade.py",
+        "size":  0,
+        "mtime":  "2025-08-18T01:18:39.8710108Z",
+        "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+        "path":  "backend/app/scripts/out/audit_orphans.csv",
+        "size":  583,
+        "mtime":  "2025-08-17T18:55:21.8499469Z",
+        "sha256":  "e4e58a970eb8ff1712925faa760ff7f294b3a3f585605db11ee51cbbbec988d3"
+    },
+    {
+        "path":  "backend/app/services/__init__.py",
+        "size":  156,
+        "mtime":  "2025-08-17T17:58:47.4774196Z",
+        "sha256":  "80dd7c9aa5d9697d4547a71bd883b4353f8dee5092214d631402c5f6787663e3"
+    },
+    {
+        "path":  "backend/app/services/escpos.py",
+        "size":  2675,
+        "mtime":  "2025-08-17T17:58:47.4853582Z",
+        "sha256":  "34df084ff76ef7a985fada39795fe187d5b0916c262ca0b1d54a36bc0a429695"
+    },
+    {
+        "path":  "backend/app/services/online_queue.py",
+        "size":  5120,
+        "mtime":  "2025-08-18T16:48:30.1198703Z",
+        "sha256":  "b8db8d55b55ad04f36349c98fd350ba5f124fd95330409decb96034e4a6092e6"
+    },
+    {
+        "path":  "backend/app/services/print.py",
+        "size":  4981,
+        "mtime":  "2025-08-17T17:58:47.4833500Z",
+        "sha256":  "8de5d578953e19fd61066789903550150b6da4768c24fbc94c9987bb954392e5"
+    },
+    {
+        "path":  "backend/app/ws/__init__.py",
+        "size":  93,
+        "mtime":  "2025-08-17T17:58:47.4694644Z",
+        "sha256":  "2920e6f0d6624730d970ffd6a88cee490683586d44194f084be370801e265f50"
+    },
+    {
+        "path":  "backend/app/ws/queue_ws.py",
+        "size":  4698,
+        "mtime":  "2025-08-20T17:06:36.6387881Z",
+        "sha256":  "5fa722a59e2bd6a39421513bf5b23694d0745b0bbc95ff502eccaf6e6a10bed0"
+    },
+    {
+        "path":  "backend/pyproject.toml",
+        "size":  654,
+        "mtime":  "2025-08-17T17:58:47.0716520Z",
+        "sha256":  "b859650e73be5b7c38d3f08d9e48d972ceb65ce43be49ea9bb4a0ed2424c80dd"
+    },
+    {
+        "path":  "backend/requirements.txt",
+        "size":  235,
+        "mtime":  "2025-08-24T03:03:58.6489487Z",
+        "sha256":  "409e3f27efd45f8f94a2b109b17707ba57aca65799ce15d089dcb5b44d2e814f"
+    },
+    {
+        "path":  "docs/detail.md",
+        "size":  149135,
+        "mtime":  "2025-08-17T17:58:47.5046134Z",
+        "sha256":  "72d63e1ae4e8a6f8906a0358a5935c721459266ba671c9a1409a5d9600145e06"
+    },
+    {
+        "path":  "docs/passport.md",
+        "size":  21628,
+        "mtime":  "2025-08-17T17:58:47.4993281Z",
+        "sha256":  "b771009328f254813db6c8bc5be79cf4cec70ccead87071595140ba26c17e382"
+    },
+    {
+        "path":  "docs/README.md",
+        "size":  4327,
+        "mtime":  "2025-08-17T17:58:47.4993281Z",
+        "sha256":  "3e51896a228bd292af3de3a52d5a10a36d85dcd631c66741edc7024427292f24"
+    },
+    {
+        "path":  "docs/README_env.md",
+        "size":  1630,
+        "mtime":  "2025-08-17T17:58:47.5046134Z",
+        "sha256":  "aac9aa586fb17614d21d3113f28d5838af079527fbf5855cdb0d873f174b9980"
+    },
+    {
+        "path":  "docs/Tree_F.md",
+        "size":  896,
+        "mtime":  "2025-08-18T02:46:33.8936468Z",
+        "sha256":  "767ebe587cc484a6cce4f370e6e357178c88e5f34e47dea237a5a9bdbcbf34cc"
+    },
+    {
+        "path":  "frontend/index.html",
+        "size":  378,
+        "mtime":  "2025-08-17T17:58:47.5153752Z",
+        "sha256":  "acc4be26b735422acfaf5ab423906416f6ddc90db1266ccf1cce0916d45e0d3a"
+    },
+    {
+        "path":  "frontend/package.json",
+        "size":  506,
+        "mtime":  "2025-08-25T16:00:27.0584745Z",
+        "sha256":  "a578761c42b08b44f2929d3d5d986c36247df7a86fa37a4d36183f58bf0bd720"
+    },
+    {
+        "path":  "frontend/package-lock.json",
+        "size":  50003,
+        "mtime":  "2025-08-25T16:00:27.0744787Z",
+        "sha256":  "7eaf15ea1ef02a0fee7b09674b536933a73d735223fd78dc09635d8d0b31d433"
+    },
+    {
+        "path":  "frontend/src/api/auth.js",
+        "size":  424,
+        "mtime":  "2025-08-25T16:01:27.9989658Z",
+        "sha256":  "acf3eeb5f94806735bc5822e5a1269b6af0b34cf305e3d8114a5d7b9a8d43fa9"
+    },
+    {
+        "path":  "frontend/src/api/client.js",
+        "size":  3221,
+        "mtime":  "2025-08-25T16:01:28.0039581Z",
+        "sha256":  "2aa804b51854523a50df5830313994090ed966d4bff542d94790ca70d5d3d0cc"
+    },
+    {
+        "path":  "frontend/src/api/client.js.bak",
+        "size":  5023,
+        "mtime":  "2025-08-24T16:32:47.5583826Z",
+        "sha256":  "923c9823cbc0d7974a1546dff32107f99bd288f2463ad15fcf91e3c0728b1775"
+    },
+    {
+        "path":  "frontend/src/api/health.js",
+        "size":  250,
+        "mtime":  "2025-08-26T02:35:46.1831287Z",
+        "sha256":  "6e02b8cd6999f26c8d237599f63749cb8548ed9e6a9734de8bc400d4118a4f83"
+    },
+    {
+        "path":  "frontend/src/api/index.js",
+        "size":  186,
+        "mtime":  "2025-08-26T02:35:45.9784327Z",
+        "sha256":  "9396da50d200581e31b379c214f6d0aba5a814dcc3ee1ea31151a11d311c74f2"
+    },
+    {
+        "path":  "frontend/src/api/index.js.bak",
+        "size":  1336,
+        "mtime":  "2025-08-24T16:32:47.5603829Z",
+        "sha256":  "736cc72f132f65b4c5d8031b4d9748f27f0c589f073c0cfabfb8aecb72370d48"
+    },
+    {
+        "path":  "frontend/src/api/queues.js",
+        "size":  1793,
+        "mtime":  "2025-08-25T16:01:28.0109656Z",
+        "sha256":  "b967c56fa27affbc350044439e6921ecb529d18162d929a3f1801b9110affae3"
+    },
+    {
+        "path":  "frontend/src/api/setting.js",
+        "size":  408,
+        "mtime":  "2025-08-25T16:01:28.0153009Z",
+        "sha256":  "5d0af185e0656c67fa74b0aae17c8f681fdd96861240372478bcf0236e24af61"
+    },
+    {
+        "path":  "frontend/src/api/visits.js",
+        "size":  1041,
+        "mtime":  "2025-08-25T16:12:43.6685705Z",
+        "sha256":  "b8ae848206f4b5b1149f3812ba214e2de3c46d06f12d736852cb99d70443a88a"
+    },
+    {
+        "path":  "frontend/src/api/visits.ts.bak",
+        "size":  1296,
+        "mtime":  "2025-08-24T16:32:47.5613820Z",
+        "sha256":  "f666f6e567221493eb71ccbee9e4f853aae55218c37ccdf93343b4388bcebd03"
+    },
+    {
+        "path":  "frontend/src/api/ws.js",
+        "size":  1489,
+        "mtime":  "2025-08-25T16:01:28.0223141Z",
+        "sha256":  "958a4905e2d9966304fd8aa7177bbfaf58a2c1b7ed61d33498b35cdef2943e3c"
+    },
+    {
+        "path":  "frontend/src/api/ws.js.bak",
+        "size":  1201,
+        "mtime":  "2025-08-24T16:32:47.5653819Z",
+        "sha256":  "1b5fe2cb983cd129a44ac63e33cc102a93d6731ce5df68ebc457628d9231b404"
+    },
+    {
+        "path":  "frontend/src/App.jsx",
+        "size":  4057,
+        "mtime":  "2025-08-25T16:01:28.2344320Z",
+        "sha256":  "488b804937a6c5db7b9bf0f83be34840a2913f6316fd83c4e8f45604f6043bb2"
+    },
+    {
+        "path":  "frontend/src/App.jsx.bak",
+        "size":  4294,
+        "mtime":  "2025-08-24T16:32:47.6549699Z",
+        "sha256":  "c8d9f4717424b1fa65a6d631e958da18763920650d366e7bc3067fccf5ccc26b"
+    },
+    {
+        "path":  "frontend/src/components/Nav.jsx",
+        "size":  3891,
+        "mtime":  "2025-08-25T16:01:28.0262920Z",
+        "sha256":  "4e319188cf15187041b9e7c3f3e856ce6dd537c86952646ad61cc42f4846073c"
+    },
+    {
+        "path":  "frontend/src/components/Nav.jsx.bak",
+        "size":  3015,
+        "mtime":  "2025-08-24T16:32:47.5683833Z",
+        "sha256":  "992772271f49bc3bc9f7ace295a736a5e524e24682a91d950e7835929bb476b8"
+    },
+    {
+        "path":  "frontend/src/components/QueueTable.jsx",
+        "size":  3703,
+        "mtime":  "2025-08-25T16:01:28.0304579Z",
+        "sha256":  "23bbeac29f4cab6e75230b88cfbbfeb88b03648f9504caff68a52ef42428e4f8"
+    },
+    {
+        "path":  "frontend/src/components/QueueTable.jsx.bak",
+        "size":  4449,
+        "mtime":  "2025-08-24T16:32:47.5713828Z",
+        "sha256":  "a6b140df83b911c99512c6981d0f5ad79bb5fd23e75b23b41939c8e9d6a189f1"
+    },
+    {
+        "path":  "frontend/src/components/RescheduleDialog.jsx",
+        "size":  4267,
+        "mtime":  "2025-08-25T16:01:28.0344378Z",
+        "sha256":  "197de342e023333381cda8abd45892811447857c505d9e2c2ab730db28eb88b8"
+    },
+    {
+        "path":  "frontend/src/components/RescheduleDialog.jsx.bak",
+        "size":  3390,
+        "mtime":  "2025-08-24T16:32:47.5743833Z",
+        "sha256":  "7e03b69d362cbf567a14e96f43f7125b06e191d46dbadbb1b8b08367daf54cde"
+    },
+    {
+        "path":  "frontend/src/components/RoleGate.jsx",
+        "size":  3046,
+        "mtime":  "2025-08-25T16:01:28.0373349Z",
+        "sha256":  "e1de41503f17545216018934c111d390cddf23f3af48b4222fff9b250208fee7"
+    },
+    {
+        "path":  "frontend/src/components/RoleGate.jsx.bak",
+        "size":  1663,
+        "mtime":  "2025-08-24T16:32:47.5793918Z",
+        "sha256":  "3259a80bffb751017ca6f32a501eee4d506db6313168f49686ebb6d36be86543"
+    },
+    {
+        "path":  "frontend/src/components/ServicePicker.jsx",
+        "size":  3839,
+        "mtime":  "2025-08-25T16:01:28.0715810Z",
+        "sha256":  "94a1666bb982b2d9bdee834ae615459315713400c4d62e310f72793b4d08e795"
+    },
+    {
+        "path":  "frontend/src/components/ServicePicker.jsx.bak",
+        "size":  4099,
+        "mtime":  "2025-08-24T16:32:47.5853926Z",
+        "sha256":  "2c988a51d72cb38b0c21634f2c1186c3c8ca335d5d2e137c080515cf1a4f4d1a"
+    },
+    {
+        "path":  "frontend/src/components/TimeInput.jsx",
+        "size":  1484,
+        "mtime":  "2025-08-25T16:01:28.1063570Z",
+        "sha256":  "ae994774f6386aca754cc4e7235b181367a8f9e79135d3e6d3f6aeef9ca8b06b"
+    },
+    {
+        "path":  "frontend/src/components/TimeInput.jsx.bak",
+        "size":  1678,
+        "mtime":  "2025-08-24T16:32:47.5904399Z",
+        "sha256":  "380a9c1d31904dd098a01271344546a12819d992407eb9f83bc44addc806321d"
+    },
+    {
+        "path":  "frontend/src/main.jsx",
+        "size":  631,
+        "mtime":  "2025-08-25T16:01:28.2564391Z",
+        "sha256":  "219befdc51b1facb894e50c2910d2c3466002df933f768386d9472f9e2c6afd4"
+    },
+    {
+        "path":  "frontend/src/main.jsx.bak",
+        "size":  632,
+        "mtime":  "2025-08-24T16:32:47.6592194Z",
+        "sha256":  "37e0c03551e121fa2d3d9fb714d7aca4208ae073b0432948f2cdb686474beaff"
+    },
+    {
+        "path":  "frontend/src/pages/Activation.jsx",
+        "size":  5141,
+        "mtime":  "2025-08-25T16:01:28.1343604Z",
+        "sha256":  "0b49f9f264820b92260e0f0796884fd56033c7ed71074dcd6836c6a94d624b26"
+    },
+    {
+        "path":  "frontend/src/pages/Activation.jsx.bak",
+        "size":  7626,
+        "mtime":  "2025-08-24T16:32:47.5944477Z",
+        "sha256":  "ffef22ab02cbecc01ecad10fe1665b8fabf4458acc2f128bdf61637f14d1a1f1"
+    },
+    {
+        "path":  "frontend/src/pages/Appointments.jsx",
+        "size":  5176,
+        "mtime":  "2025-08-25T16:01:28.1382568Z",
+        "sha256":  "d2c26c148cab7e5970eab484137bc29b0ad424eefa2ed13f9a53ab46fa05cab5"
+    },
+    {
+        "path":  "frontend/src/pages/Appointments.jsx.bak",
+        "size":  5681,
+        "mtime":  "2025-08-24T16:32:47.5984465Z",
+        "sha256":  "ca0a721ccf9c3859d99d7b0a4bdad15d4c025b587845b50a3787709085199cf1"
+    },
+    {
+        "path":  "frontend/src/pages/Audit.jsx",
+        "size":  4474,
+        "mtime":  "2025-08-25T16:01:28.1423588Z",
+        "sha256":  "3e4d5763047c8de49f878128efee116ed4bf8104948dab8117f08d542ef101db"
+    },
+    {
+        "path":  "frontend/src/pages/Audit.jsx.bak",
+        "size":  4888,
+        "mtime":  "2025-08-24T16:32:47.6014463Z",
+        "sha256":  "cf4fe4ee569914b4f9ad3c95c9b8fe9cd70e5abe34394082e8b77e83c651dcd2"
+    },
+    {
+        "path":  "frontend/src/pages/Cashier.jsx",
+        "size":  5797,
+        "mtime":  "2025-08-25T16:01:28.1473668Z",
+        "sha256":  "5448b1e774b8a996b4e95ab697e47d5b08e3b7489c38f1f1a71e96304e506934"
+    },
+    {
+        "path":  "frontend/src/pages/Cashier.jsx.bak",
+        "size":  6370,
+        "mtime":  "2025-08-24T16:32:47.6069617Z",
+        "sha256":  "f5f1359afde22c8f96360c8fb686e879c3d40272c36bc25e03b4c221f00e4534"
+    },
+    {
+        "path":  "frontend/src/pages/DisplayBoard.jsx",
+        "size":  4156,
+        "mtime":  "2025-08-25T16:01:28.1814897Z",
+        "sha256":  "ed22c199c4e1d87dedf202026f88c66ac7c3abcd3bb292c9dc6aaec67a84dd62"
+    },
+    {
+        "path":  "frontend/src/pages/DisplayBoard.jsx.bak",
+        "size":  4522,
+        "mtime":  "2025-08-24T16:32:47.6099637Z",
+        "sha256":  "ae9aede71c8070471e717cf73368f7d44d847a17fc606171413ae30ea3d0e640"
+    },
+    {
+        "path":  "frontend/src/pages/Doctor.jsx",
+        "size":  5175,
+        "mtime":  "2025-08-25T16:01:28.1851469Z",
+        "sha256":  "36c51cb19f69d82b197b466d2fa1591c12bc4735da48f64fb49705a767d264b6"
+    },
+    {
+        "path":  "frontend/src/pages/Doctor.jsx.bak",
+        "size":  5713,
+        "mtime":  "2025-08-24T16:32:47.6129623Z",
+        "sha256":  "da39d7018efa01eb9928b3c5fc74836001ac495f169d339b3c094efe6ddf5bbf"
+    },
+    {
+        "path":  "frontend/src/pages/Health.jsx",
+        "size":  2974,
+        "mtime":  "2025-08-25T16:01:28.1891606Z",
+        "sha256":  "9c52faefa7d721f5545e9c953a39a367319c274d0a4cb62cd621c429f733748a"
+    },
+    {
+        "path":  "frontend/src/pages/Health.jsx.bak",
+        "size":  3504,
+        "mtime":  "2025-08-24T16:32:47.6150823Z",
+        "sha256":  "02f2a9b807c70e3e38694771e44f7c286af0cf9394bdab9e6fa0c18d433669b1"
+    },
+    {
+        "path":  "frontend/src/pages/Lab.jsx",
+        "size":  4874,
+        "mtime":  "2025-08-25T16:01:28.1931411Z",
+        "sha256":  "4a978b17ed5aae180eb26aa7289aa358ff2e1a117dda77300519e32b18b2694f"
+    },
+    {
+        "path":  "frontend/src/pages/Lab.jsx.bak",
+        "size":  5289,
+        "mtime":  "2025-08-24T16:32:47.6179626Z",
+        "sha256":  "0564665a481919e621704ef1545b17089a2c5968cb322d12669bf20eb15e24df"
+    },
+    {
+        "path":  "frontend/src/pages/Login.jsx",
+        "size":  5167,
+        "mtime":  "2025-08-25T16:01:28.1971316Z",
+        "sha256":  "a5b3c6b21b5ee4f720cc153e46177fbd3e4fe7338912b4f1442f62810c1f0a52"
+    },
+    {
+        "path":  "frontend/src/pages/Login.jsx.bak",
+        "size":  3628,
+        "mtime":  "2025-08-24T16:32:47.6209656Z",
+        "sha256":  "762bc742715c2457a21d2d45d4afa68b85853d1e59da069f91e238851bd66ff0"
+    },
+    {
+        "path":  "frontend/src/pages/Registrar.jsx",
+        "size":  2300,
+        "mtime":  "2025-08-25T16:01:28.2011393Z",
+        "sha256":  "03d93afe2a29d4d72590b31b068ddbe58d790938b34b6e232cf067a88044248a"
+    },
+    {
+        "path":  "frontend/src/pages/Registrar.jsx.bak",
+        "size":  2592,
+        "mtime":  "2025-08-24T16:32:47.6239636Z",
+        "sha256":  "9cb05e1bf2eb4f93439531a2d4fdb849c7fa43d0f49985fe84dd3671dc069ef1"
+    },
+    {
+        "path":  "frontend/src/pages/Scheduler.jsx",
+        "size":  4927,
+        "mtime":  "2025-08-25T16:01:28.2050340Z",
+        "sha256":  "d40ae8bc63ce0a910ea579d350a23834a6eb0c870a42bf64d44c4da8624a15fb"
+    },
+    {
+        "path":  "frontend/src/pages/Scheduler.jsx.bak",
+        "size":  5404,
+        "mtime":  "2025-08-24T16:32:47.6279671Z",
+        "sha256":  "c0a1434a7b877adcac47be5bd3fa0c29aacb35279ba6453e98140386998a21b1"
+    },
+    {
+        "path":  "frontend/src/pages/Settings.jsx",
+        "size":  8775,
+        "mtime":  "2025-08-25T16:01:28.2101351Z",
+        "sha256":  "d1f13f53f37cce9facaa0170eb1c3565a38adbf4c4679fc2db3a4a48ef815200"
+    },
+    {
+        "path":  "frontend/src/pages/Settings.jsx.bak",
+        "size":  9757,
+        "mtime":  "2025-08-24T16:32:47.6359681Z",
+        "sha256":  "5041b47ee92c2a5c1eff05769e694dcf4e32f87cc2ba160e3678fcebbbb2dbd0"
+    },
+    {
+        "path":  "frontend/src/pages/VisitDetails.jsx",
+        "size":  5379,
+        "mtime":  "2025-08-25T16:01:28.2151734Z",
+        "sha256":  "991324785758d96e01c54f6e8a5b8de5b6d0fe7d287bd53e716e0031c3bcd681"
+    },
+    {
+        "path":  "frontend/src/pages/VisitDetails.jsx.bak",
+        "size":  5770,
+        "mtime":  "2025-08-24T16:32:47.6439752Z",
+        "sha256":  "27b03310762b278c4f24dcd1e1385f12cf00724ce2956c19f9fc19f114b80e20"
+    },
+    {
+        "path":  "frontend/src/stores/auth.js",
+        "size":  5109,
+        "mtime":  "2025-08-25T16:01:28.2304299Z",
+        "sha256":  "895dd2bd9e570bec3a4971d4e6240fa00a7e3eab3c0409717d8b39e6ca750335"
+    },
+    {
+        "path":  "frontend/src/stores/auth.js.bak",
+        "size":  3117,
+        "mtime":  "2025-08-24T16:37:02.8330328Z",
+        "sha256":  "ace881fbdaff642fd217e1941907f59708f59d4175aa6e50d09e436665c1481c"
+    },
+    {
+        "path":  "frontend/vite.config.js",
+        "size":  507,
+        "mtime":  "2025-08-24T18:47:04.4285927Z",
+        "sha256":  "4f4a3bd112f396f8c32221150277a8123caac59550cd3e31846f4230664f9297"
+    },
+    {
+        "path":  "ops/docker-compose.yml",
+        "size":  2084,
+        "mtime":  "2025-08-17T17:58:47.6450634Z",
+        "sha256":  "331ae0f98d2eb39cdae08cc9622bd4284eb82fda018fb09c91c9478f7aae6694"
+    },
+    {
+        "path":  "ops/README.md",
+        "size":  1632,
+        "mtime":  "2025-08-17T17:58:47.6569200Z",
+        "sha256":  "43cebc7af5df5929a5acd77013ea800299557861a7e716a2be56653ae93c5ad2"
+    },
+    {
+        "path":  "ops/scripts/export_tree_F.ps1",
+        "size":  5266,
+        "mtime":  "2025-08-26T06:37:47.4170023Z",
+        "sha256":  "77ed665be0d37920d0f0c7ee354edb8a5d59f84d740dfc472d64d8ee7df5e1d0"
+    }
+]

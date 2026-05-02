@@ -1,0 +1,142 @@
+/**
+ * VitalsWidget Styles
+ */
+
+.emr-vitals {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-radius: 10px;
+    border: 1px solid var(--mac-border, #e5e5e5);
+}
+
+.emr-vitals__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.emr-vitals__separator {
+    font-size: 16px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    margin: 0 -4px;
+    padding-top: 12px;
+}
+
+.emr-vitals__field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 60px;
+    position: relative;
+}
+
+.emr-vitals__field label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--mac-text-secondary, #86868b);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.emr-vitals__field input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--mac-border, #d1d1d6);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.emr-vitals__field input:focus {
+    border-color: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+    outline: none;
+}
+
+/* WARNING STATES */
+.emr-vitals__field--warning input {
+    border-color: #ffcc00 !important;
+    background: rgba(255, 204, 0, 0.05);
+}
+
+.emr-vitals__field--critical input {
+    border-color: #ff3b30 !important;
+    background: rgba(255, 59, 48, 0.05);
+    color: #ff3b30;
+}
+
+/* UNITS */
+.emr-vitals__unit {
+    position: absolute;
+    right: 6px;
+    bottom: 5px;
+    font-size: 10px;
+    color: var(--mac-text-tertiary, #aeaeb2);
+    pointer-events: none;
+}
+
+/* BMI BADGE */
+.emr-vitals__bmi {
+    align-self: flex-end;
+    margin-bottom: 2px;
+    padding: 3px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    background: var(--mac-text-secondary, #636366);
+    border-radius: 4px;
+}
+
+/* WARNING BADGE */
+.emr-vitals__warning {
+    align-self: flex-end;
+    margin-bottom: 2px;
+    padding: 3px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #855307;
+    background: #ffcc00;
+    border-radius: 4px;
+    animation: pulse 2s infinite;
+}
+
+.emr-vitals__warning--critical {
+    color: white;
+    background: #ff3b30;
+    animation: flash 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes flash {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

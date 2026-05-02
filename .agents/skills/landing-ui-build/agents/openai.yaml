@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing UI Build"
+  short_description: "Implement a landing page UI"
+  default_prompt: "Use $landing-ui-build to implement a landing page in the current frontend stack."

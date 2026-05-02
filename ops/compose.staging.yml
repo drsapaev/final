@@ -1,0 +1,104 @@
+name: ${COMPOSE_PROJECT_NAME:-clinic-staging}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${STAGING_POSTGRES_HOST_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.staging
+    restart: unless-stopped
+    environment:
+      ENV: staging
+      APP_NAME: ${APP_NAME:-Clinic Manager Staging}
+      APP_VERSION: ${APP_VERSION:-1.1.0-staging}
+      API_V1_STR: /api/v1
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
+      AUTH_SECRET: ${AUTH_SECRET}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      CORS_ALLOW_ALL: 0
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      CORS_DISABLE: 0
+      TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+      HOST: 0.0.0.0
+      PORT: 8000
+      WORKERS: ${WORKERS:-2}
+      RELOAD: 0
+      RUN_ALEMBIC_ON_START: 1
+      ENSURE_ADMIN: 1
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
+      ADMIN_RESET_PASSWORD: 0
+      REQUIRE_LICENSE: 0
+      LICENSE_ALLOW_HEALTH: 1
+      EMR_LEGACY_WRITE_FREEZE: ${EMR_LEGACY_WRITE_FREEZE:-1}
+      AUTO_BACKUP_ENABLED: 0
+      BACKUP_HOUR: 2
+      BACKUP_MINUTE: 0
+      WS_DEV_ALLOW: 0
+      ENABLE_DEV_AUTH: false
+      LOG_LEVEL: INFO
+      LOG_STRUCTURED: 1
+    volumes:
+      - ../backend:/app:rw
+      - ../backend/backups:/app/backups
+      - staging_backend_data:/data
+    working_dir: /app
+    command: ["/bin/bash", "/entrypoint.sh"]
+    ports:
+      - "${STAGING_BACKEND_PORT:-18000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.staging
+      args:
+        VITE_API_BASE: /api/v1
+        VITE_API_URL: ${STAGING_PUBLIC_BASE_URL}
+        VITE_API_BASE_URL: ${STAGING_PUBLIC_BASE_URL}
+        VITE_WS_URL: ${STAGING_PUBLIC_WS_URL}
+        VITE_WS_HOST: ${STAGING_PUBLIC_WS_HOST}
+    restart: unless-stopped
+    ports:
+      - "${STAGING_FRONTEND_PORT:-18080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  staging_backend_data:
+  staging_postgres_data:

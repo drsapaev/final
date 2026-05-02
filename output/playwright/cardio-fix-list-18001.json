@@ -1,0 +1,1 @@
+[{"id":1,"patient_id":444,"visit_id":729,"doctor_id":24,"test_date":"2026-03-21","cholesterol_total":186.0,"cholesterol_hdl":null,"cholesterol_ldl":108.0,"triglycerides":null,"glucose":94.0,"crp":null,"troponin":null,"interpretation":"Temp 18001 verification","created_at":"2026-03-21T12:11:12.741925+03:00","updated_at":"2026-03-21T12:11:12.741925+03:00"}]

@@ -1,0 +1,54 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:5173",
+      "localStorage": [
+        {
+          "name": "colorScheme",
+          "value": "auto"
+        },
+        {
+          "name": "theme",
+          "value": "light"
+        },
+        {
+          "name": "settingsSubTab",
+          "value": "general"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":45,\"username\":\"admin\",\"email\":\"admin@example.com\",\"full_name\":null,\"role\":\"Admin\",\"is_active\":true,\"is_superuser\":true}"
+        },
+        {
+          "name": "ui_theme",
+          "value": "light"
+        },
+        {
+          "name": "ui.accent",
+          "value": "blue"
+        },
+        {
+          "name": "servicesTab",
+          "value": "catalog"
+        },
+        {
+          "name": "auth_token",
+          "value": "<redacted>"
+        },
+        {
+          "name": "app_language",
+          "value": "ru"
+        },
+        {
+          "name": "language",
+          "value": "ru"
+        },
+        {
+          "name": "auth_profile",
+          "value": "{\"id\":45,\"username\":\"admin\",\"email\":\"admin@example.com\",\"full_name\":null,\"role\":\"Admin\",\"is_active\":true,\"is_superuser\":true}"
+        }
+      ]
+    }
+  ]
+}

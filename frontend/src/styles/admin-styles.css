@@ -1,0 +1,379 @@
+/* Унифицированные стили админ-панели */
+/* Использует новую систему CSS переменных из ThemeContext */
+
+/* Основные CSS переменные (устанавливаются через ThemeContext) */
+:root {
+  /* Семантические цвета */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f8fafc;
+  --color-background-tertiary: #f1f5f9;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #374151;
+  --color-text-tertiary: #6b7280;
+  --color-border-light: #e5e7eb;
+  --color-border-medium: #d1d5db;
+  --color-border-dark: #9ca3af;
+  --color-surface-card: #ffffff;
+  --color-surface-hover: #f8fafc;
+  
+  /* Акцентные цвета */
+  --color-primary-500: #0ea5e9;
+  --color-primary-400: #38bdf8;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #06b6d4;
+  
+  /* Медицинские цвета */
+  --color-medical-cardiology: #dc2626;
+  --color-medical-dermatology: #7c3aed;
+  --color-medical-dentistry: #059669;
+  
+  /* Тени */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Темная тема - переменные устанавливаются через ThemeContext */
+:root[data-theme="dark"] {
+  /* Семантические цвета для темной темы */
+  --color-background-primary: #0f172a;
+  --color-background-secondary: #1e293b;
+  --color-background-tertiary: #334155;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #94a3b8;
+  --color-border-light: #374151;
+  --color-border-medium: #4b5563;
+  --color-border-dark: #6b7280;
+  --color-surface-card: #1e293b;
+  --color-surface-hover: #273746;
+  
+  /* Акцентные цвета для темной темы */
+  --color-primary-500: #60a5fa;
+  --color-primary-400: #93c5fd;
+  --color-success: #34d399;
+  --color-warning: #fcd34d;
+  --color-danger: #f87171;
+  --color-info: #67e8f9;
+  
+  /* Медицинские цвета для темной темы */
+  --color-medical-cardiology: #ef4444;
+  --color-medical-dermatology: #a78bfa;
+  --color-medical-dentistry: #34d399;
+}
+
+/* KPI Grid */
+.admin-kpi-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+@media (min-width: 768px) {
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-kpi-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* Navigation */
+.admin-navigation {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-medium);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-navigation-section {
+  margin-bottom: 1.5rem;
+}
+
+.admin-navigation-section:last-child {
+  margin-bottom: 0;
+}
+
+.admin-navigation-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.admin-navigation-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Cards */
+.admin-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-medium);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.admin-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.admin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.admin-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Tables */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface-card);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-medium);
+}
+
+.admin-table th {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border-medium);
+}
+
+.admin-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border-medium);
+  color: var(--color-text-primary);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tr:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Forms */
+.admin-form-group {
+  margin-bottom: 1rem;
+}
+
+.admin-form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.admin-form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-medium);
+  border-radius: 6px;
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.admin-form-input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.admin-form-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-medium);
+  border-radius: 6px;
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* Buttons */
+.admin-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.admin-button-primary {
+  background: var(--color-primary-500);
+  color: white;
+}
+
+.admin-button-primary:hover {
+  background: var(--color-primary-600);
+  transform: translateY(-1px);
+}
+
+.admin-button-secondary {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-medium);
+}
+
+.admin-button-secondary:hover {
+  background: var(--color-background-tertiary);
+}
+
+/* Status indicators */
+.admin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.admin-status-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.admin-status-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+.admin-status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.admin-status-info {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--color-info);
+}
+
+/* Utility classes */
+.admin-text-center {
+  text-align: center;
+}
+
+.admin-text-right {
+  text-align: right;
+}
+
+.admin-mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.admin-mb-2 {
+  margin-bottom: 1rem;
+}
+
+.admin-mb-3 {
+  margin-bottom: 1.5rem;
+}
+
+.admin-mt-1 {
+  margin-top: 0.5rem;
+}
+
+.admin-mt-2 {
+  margin-top: 1rem;
+}
+
+.admin-mt-3 {
+  margin-top: 1.5rem;
+}
+
+.admin-p-1 {
+  padding: 0.5rem;
+}
+
+.admin-p-2 {
+  padding: 1rem;
+}
+
+.admin-p-3 {
+  padding: 1.5rem;
+}
+
+/* Responsive helpers */
+@media (max-width: 768px) {
+  .admin-mobile-hidden {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .admin-desktop-hidden {
+    display: none;
+  }
+}
+
+/* Medical specialty colors */
+.admin-specialty-cardiology {
+  color: var(--color-medical-cardiology);
+}
+
+.admin-specialty-dermatology {
+  color: var(--color-medical-dermatology);
+}
+
+.admin-specialty-dentistry {
+  color: var(--color-medical-dentistry);
+}
+
+/* Fix for dark theme visibility issues */
+[data-theme="dark"] .admin-card,
+[data-theme="dark"] .admin-table,
+[data-theme="dark"] .admin-navigation {
+  border-color: var(--color-border-medium) !important;
+}
+
+[data-theme="dark"] .admin-form-input,
+[data-theme="dark"] .admin-form-select {
+  background: var(--color-surface-card) !important;
+  border-color: var(--color-border-medium) !important;
+  color: var(--color-text-primary) !important;
+}

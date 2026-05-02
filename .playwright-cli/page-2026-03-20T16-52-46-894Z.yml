@@ -1,0 +1,138 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Clinic Management" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Clinic Management
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Lab User" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img [ref=e82]
+            - text: Lab User
+        - button "Выйти" [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]:
+            - img [ref=e87]
+            - text: Выйти
+    - generic [ref=e90]:
+      - complementary [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: Medical System
+          - button "Collapse sidebar" [ref=e95] [cursor=pointer]:
+            - img [ref=e97]
+        - navigation [ref=e100]:
+          - button "Tests" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Tests
+          - button "Results" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Results
+          - button "Patients" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Patients
+          - button "Appointments" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Appointments
+          - button "Reports" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e127]: Reports
+      - main [ref=e128]:
+        - generic [ref=e129]:
+          - heading "Enterprise Laboratory Panel Очередь 5 Шаблоны 20 Бланки 2" [level=3] [ref=e1133]:
+            - generic [ref=e133]:
+              - img [ref=e134]
+              - text: Enterprise Laboratory Panel
+            - generic [ref=e137]:
+              - button "Очередь 5" [ref=e138] [cursor=pointer]:
+                - generic [ref=e139]:
+                  - img [ref=e140]
+                  - text: Очередь
+                  - generic [ref=e143]: "5"
+              - button "Шаблоны 20" [ref=e144] [cursor=pointer]:
+                - generic [ref=e145]:
+                  - img [ref=e146]
+                  - text: Шаблоны
+                  - generic [ref=e149]: "20"
+              - button "Бланки 2" [ref=e1134] [cursor=pointer]:
+                - generic [ref=e151]:
+                  - img [ref=e152]
+                  - text: Бланки
+                  - generic [ref=e157]: "2"
+          - generic [ref=e1135]:
+            - generic [ref=e1136]:
+              - heading "Редактор лабораторного бланка" [level=3] [ref=e1138]:
+                - img [ref=e1139]
+                - text: Редактор лабораторного бланка
+              - generic [ref=e1145]:
+                - generic [ref=e1146]:
+                  - text: "Пациент:"
+                  - strong [ref=e1147]: Каримова Гликия Севда
+                - generic [ref=e1148]:
+                  - generic [ref=e1149]: Услуги визита
+                  - generic [ref=e1151]: Гликированный гемоглобин (НЬА1C) • L24
+                - generic [ref=e1152]:
+                  - text: "Рекомендуемый бланк:"
+                  - strong [ref=e1153]: HbA1c
+                - generic [ref=e1154]:
+                  - generic [ref=e1155]:
+                    - generic [ref=e1156]: Допустимый бланк
+                    - combobox "Допустимый бланк" [ref=e1157]:
+                      - option "Выберите шаблон"
+                      - option "HbA1c (glycemic)" [selected]
+                  - button "Создать бланк" [ref=e1158] [cursor=pointer]:
+                    - generic [ref=e1159]:
+                      - img [ref=e1160]
+                      - text: Создать бланк
+            - generic [ref=e1163]:
+              - heading "Доступные бланки пациента" [level=3] [ref=e1165]:
+                - img [ref=e1166]
+                - text: Доступные бланки пациента
+              - generic [ref=e1169]:
+                - generic [ref=e1170]:
+                  - button "Все" [ref=e1171] [cursor=pointer]:
+                    - generic [ref=e1172]: Все
+                  - button "Без флагов" [ref=e1173] [cursor=pointer]:
+                    - generic [ref=e1174]: Без флагов
+                  - button "С флагами" [ref=e1175] [cursor=pointer]:
+                    - generic [ref=e1176]: С флагами
+                  - button "Критические" [ref=e1177] [cursor=pointer]:
+                    - generic [ref=e1178]: Критические
+                - button "HbA1c 20.03.2026, 18:50:00 FINALIZED clean" [ref=e1179] [cursor=pointer]:
+                  - generic [ref=e1180]:
+                    - generic [ref=e1181]: HbA1c
+                    - generic [ref=e1182]: 20.03.2026, 18:50:00
+                  - generic [ref=e1183]:
+                    - generic [ref=e1184]: FINALIZED
+                    - generic [ref=e1185]: clean
+                - button "HbA1c 20.03.2026, 18:15:26 FINALIZED clean" [ref=e1186] [cursor=pointer]:
+                  - generic [ref=e1187]:
+                    - generic [ref=e1188]: HbA1c
+                    - generic [ref=e1189]: 20.03.2026, 18:15:26
+                  - generic [ref=e1190]:
+                    - generic [ref=e1191]: FINALIZED
+                    - generic [ref=e1192]: clean
+  - generic [ref=e334]:
+    - generic [ref=e335]:
+      - img [ref=e336]
+      - generic [ref=e339]:
+        - strong [ref=e340]: Включить уведомления?
+        - generic [ref=e341]: Получайте уведомления о новых сообщениях
+    - generic [ref=e342]:
+      - button "Включить" [ref=e343] [cursor=pointer]
+      - button "Закрыть" [ref=e344] [cursor=pointer]:
+        - img [ref=e345]

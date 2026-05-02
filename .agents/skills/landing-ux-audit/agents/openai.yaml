@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing UX Audit"
+  short_description: "Audit clarity and friction"
+  default_prompt: "Use $landing-ux-audit to inspect user flow, CTA clarity, and friction on a landing page."

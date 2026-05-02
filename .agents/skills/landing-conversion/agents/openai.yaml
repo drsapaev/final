@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Conversion"
+  short_description: "Audit persuasion and CTA flow"
+  default_prompt: "Use $landing-conversion to review trust, objections, and conversion flow on a landing page."

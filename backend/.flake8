@@ -1,0 +1,17 @@
+[flake8]
+# Игнорируем F821 (undefined name) в моделях - это forward references для SQLAlchemy
+# Forward references в кавычках валидны благодаря from __future__ import annotations
+per-file-ignores =
+    app/models/*.py:F821
+max-line-length = 88
+exclude =
+    .venv,
+    dist,
+    build,
+    __pycache__,
+    alembic/versions,
+    migrations,
+    scripts,
+    *.pyc,
+    .git
+

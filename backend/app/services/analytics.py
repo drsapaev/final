@@ -1,0 +1,963 @@
+import calendar
+import statistics
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import and_, func
+from sqlalchemy.orm import Session
+
+from app.models.appointment import Appointment
+from app.models.patient import Patient
+from app.models.payment_webhook import PaymentWebhook
+from app.models.service import Service
+from app.models.visit import Visit
+from app.services.queue_service import queue_service
+
+
+class AnalyticsService:
+    """Сервис для аналитики и статистики клиники"""
+
+    @staticmethod
+    def _stringify_dimension(value: Any, fallback: str) -> str:
+        """Normalize analytics labels so JSON responses always have string keys."""
+        if value is None:
+            return fallback
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or fallback
+        if isinstance(value, dict):
+            for candidate_key in ("name", "title", "label", "code", "id"):
+                candidate = value.get(candidate_key)
+                if candidate not in (None, ""):
+                    return str(candidate)
+            return fallback
+
+        for attr_name in ("name", "title", "label", "code", "id"):
+            candidate = getattr(value, attr_name, None)
+            if candidate not in (None, ""):
+                return str(candidate)
+
+        return str(value)
+
+    @staticmethod
+    def _visit_activity_date(visit: Visit) -> datetime.date:
+        """Resolve the most reliable visit date for analytics."""
+        if getattr(visit, "visit_date", None):
+            return visit.visit_date
+        if getattr(visit, "created_at", None):
+            return visit.created_at.date()
+        return datetime.utcnow().date()
+
+    @staticmethod
+    def _visit_activity_hour(visit: Visit) -> int:
+        """Resolve the most reliable visit hour for analytics."""
+        visit_time = getattr(visit, "visit_time", None)
+        if visit_time:
+            for fmt in ("%H:%M:%S", "%H:%M"):
+                try:
+                    return datetime.strptime(visit_time, fmt).hour
+                except ValueError:
+                    continue
+        created_at = getattr(visit, "created_at", None)
+        if created_at:
+            return created_at.hour
+        return 0
+
+    @staticmethod
+    def get_visit_statistics(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """Получение статистики визитов"""
+        visit_date_expr = func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+        query = db.query(Visit).filter(
+            and_(visit_date_expr >= start_date.date(), visit_date_expr <= end_date.date())
+        )
+
+        if department:
+            query = query.filter(Visit.department == department)
+
+        visits = query.all()
+
+        # Общая статистика
+        total_visits = len(visits)
+        completed_visits = len([v for v in visits if v.status == "completed"])
+        cancelled_visits = len([v for v in visits if v.status == "cancelled"])
+        no_show_visits = len([v for v in visits if v.status == "no_show"])
+
+        # Статистика по дням недели
+        day_stats = {}
+        for visit in visits:
+            day_name = calendar.day_name[AnalyticsService._visit_activity_date(visit).weekday()]
+            day_stats[day_name] = day_stats.get(day_name, 0) + 1
+
+        # Статистика по часам
+        hour_stats = {}
+        for visit in visits:
+            hour = AnalyticsService._visit_activity_hour(visit)
+            hour_stats[hour] = hour_stats.get(hour, 0) + 1
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "total_visits": total_visits,
+            "completed_visits": completed_visits,
+            "cancelled_visits": cancelled_visits,
+            "no_show_visits": no_show_visits,
+            "completion_rate": (
+                (completed_visits / total_visits * 100) if total_visits > 0 else 0
+            ),
+            "by_day_of_week": day_stats,
+            "by_hour": hour_stats,
+        }
+
+    @staticmethod
+    def get_patient_statistics(
+        db: Session, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any]:
+        """Получение статистики пациентов"""
+        # Новые пациенты за период
+        new_patients = (
+            db.query(Patient)
+            .filter(
+                and_(Patient.created_at >= start_date, Patient.created_at <= end_date)
+            )
+            .count()
+        )
+
+        # Активные пациенты (с визитами за период)
+        active_patients = (
+            db.query(Visit.patient_id)
+            .filter(
+                and_(
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    >= start_date.date(),
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    <= end_date.date(),
+                )
+            )
+            .distinct()
+            .count()
+        )
+
+        # Возвращающиеся пациенты
+        returning_patients = (
+            db.query(Visit.patient_id)
+            .filter(
+                and_(
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    >= start_date.date(),
+                    func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                    <= end_date.date(),
+                )
+            )
+            .group_by(Visit.patient_id)
+            .having(func.count(Visit.id) > 1)
+            .count()
+        )
+
+        # Статистика по возрастным группам
+        patients = (
+            db.query(Patient)
+            .filter(
+                and_(Patient.created_at >= start_date, Patient.created_at <= end_date)
+            )
+            .all()
+        )
+
+        age_groups = {"0-17": 0, "18-30": 0, "31-50": 0, "51-70": 0, "70+": 0}
+
+        current_year = datetime.now().year
+        for patient in patients:
+            if patient.birth_date:
+                age = current_year - patient.birth_date.year
+                if age <= 17:
+                    age_groups["0-17"] += 1
+                elif age <= 30:
+                    age_groups["18-30"] += 1
+                elif age <= 50:
+                    age_groups["31-50"] += 1
+                elif age <= 70:
+                    age_groups["51-70"] += 1
+                else:
+                    age_groups["70+"] += 1
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "new_patients": new_patients,
+            "active_patients": active_patients,
+            "returning_patients": returning_patients,
+            "retention_rate": (
+                (returning_patients / active_patients * 100)
+                if active_patients > 0
+                else 0
+            ),
+            "age_distribution": age_groups,
+        }
+
+    @staticmethod
+    def calculate_revenue(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Расчёт доходов (SSOT).
+
+        Получение статистики доходов за период с расширенными метриками.
+        """
+        from app.models.payment import Payment
+
+        # Базовые фильтры для платежей
+        filters = [
+            Payment.created_at >= start_date,
+            Payment.created_at <= end_date,
+            Payment.status == "paid",
+        ]
+
+        # Получаем успешные платежи за период (из PaymentWebhook для онлайн-платежей)
+        webhook_payments = (
+            db.query(PaymentWebhook)
+            .filter(
+                and_(
+                    PaymentWebhook.status == "success",
+                    PaymentWebhook.created_at >= start_date,
+                    PaymentWebhook.created_at <= end_date,
+                )
+            )
+            .all()
+        )
+
+        # Получаем платежи из таблицы Payment
+        payment_query = db.query(Payment).filter(and_(*filters))
+        if department:
+            # Если нужна фильтрация по отделению, нужно связать через Visit
+            from app.models.visit import Visit
+
+            payment_query = payment_query.join(Visit).filter(
+                Visit.department == department
+            )
+
+        payments = payment_query.all()
+
+        # Общий доход из PaymentWebhook (онлайн-платежи)
+        webhook_revenue = sum(float(p.amount) / 100 for p in webhook_payments)
+
+        # Общий доход из Payment (все платежи)
+        payment_revenue = sum(float(p.amount) for p in payments)
+
+        total_revenue = webhook_revenue + payment_revenue
+
+        # Доходы по дням
+        daily_revenue = {}
+        for payment in webhook_payments:
+            date_str = payment.created_at.strftime("%Y-%m-%d")
+            daily_revenue[date_str] = (
+                daily_revenue.get(date_str, 0) + float(payment.amount) / 100
+            )
+        for payment in payments:
+            date_str = payment.created_at.strftime("%Y-%m-%d")
+            daily_revenue[date_str] = daily_revenue.get(date_str, 0) + float(
+                payment.amount
+            )
+
+        # Доходы по провайдерам (из PaymentWebhook)
+        provider_revenue = {}
+        for payment in webhook_payments:
+            provider = payment.provider or "unknown"
+            provider_revenue[provider] = (
+                provider_revenue.get(provider, 0) + float(payment.amount) / 100
+            )
+
+        # Доходы по методам оплаты (из Payment)
+        method_revenue = {}
+        for payment in payments:
+            method = payment.method or "cash"
+            method_revenue[method] = method_revenue.get(method, 0) + float(
+                payment.amount
+            )
+
+        # Средний чек
+        total_transactions = len(webhook_payments) + len(payments)
+        avg_check = total_revenue / total_transactions if total_transactions > 0 else 0
+
+        # Средний дневной доход
+        days_in_period = (end_date - start_date).days + 1
+        avg_daily_revenue = total_revenue / days_in_period if days_in_period > 0 else 0
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "total_revenue": round(total_revenue, 2),
+            "total_transactions": total_transactions,
+            "average_check": round(avg_check, 2),
+            "average_daily_revenue": round(avg_daily_revenue, 2),
+            "daily_revenue": daily_revenue,
+            "by_provider": provider_revenue,
+            "by_payment_method": method_revenue,
+        }
+
+    @staticmethod
+    def get_service_statistics(
+        db: Session, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any]:
+        """Получение статистики услуг"""
+        # Получаем все услуги
+        services = db.query(Service).all()
+
+        service_stats = {}
+        for service in services:
+            # Подсчитываем количество визитов с этой услугой
+            visit_count = (
+                db.query(Visit)
+                .filter(
+                    and_(
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        >= start_date.date(),
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        <= end_date.date(),
+                    )
+                )
+                .join(Visit.services)
+                .filter(Service.id == service.id)
+                .count()
+            )
+
+            service_stats[service.name] = {
+                "id": service.id,
+                "name": service.name,
+                "price": float(service.price) if service.price else 0,
+                "visit_count": visit_count,
+                "total_revenue": (
+                    visit_count * float(service.price) if service.price else 0
+                ),
+            }
+
+        # Сортируем по популярности
+        sorted_services = sorted(
+            service_stats.values(), key=lambda x: x["visit_count"], reverse=True
+        )
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "total_services": len(services),
+            "services": sorted_services,
+            "top_services": sorted_services[:5],  # Топ-5 услуг
+        }
+
+    @staticmethod
+    def get_queue_statistics(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """Получение статистики очередей"""
+        # Импортируем здесь, чтобы избежать циклических импортов
+        from app.models.clinic import Doctor
+        from app.models.online_queue import DailyQueue
+
+        # Получаем статистику очередей
+        queue_query = db.query(DailyQueue).filter(
+            and_(DailyQueue.day >= start_date.date(), DailyQueue.day <= end_date.date())
+        )
+
+        if department:
+            queue_query = queue_query.join(DailyQueue.specialist).filter(
+                Doctor.specialty == department
+            )
+
+        queues = queue_query.all()
+
+        total_queues = len(queues)
+        total_entries = sum(len(q.entries) for q in queues)
+        total_served = sum(
+            sum(1 for entry in q.entries if entry.status == "served") for q in queues
+        )
+        total_waiting = sum(
+            sum(
+                1
+                for entry in q.entries
+                if entry.status in {"waiting", "called", "in_service", "diagnostics"}
+            )
+            for q in queues
+        )
+
+        wait_times: list[float] = []
+        for queue in queues:
+            for entry in queue.entries:
+                reference_time = entry.called_at or entry.created_at
+                if entry.queue_time and reference_time:
+                    wait_times.append(
+                        (reference_time - entry.queue_time).total_seconds() / 60
+                    )
+
+        avg_wait_time_minutes = round(statistics.mean(wait_times), 2) if wait_times else 0.0
+        avg_wait_time = f"{avg_wait_time_minutes:.0f} минут" if avg_wait_time_minutes else "0 минут"
+
+        # Статистика по отделениям
+        department_stats = {}
+        for queue in queues:
+            dept = (
+                queue.specialist.specialty
+                if getattr(queue, "specialist", None)
+                and getattr(queue.specialist, "specialty", None)
+                else queue.queue_tag or "Общее"
+            )
+            if dept not in department_stats:
+                department_stats[dept] = {"total_entries": 0, "served": 0, "waiting": 0}
+
+            department_stats[dept]["total_entries"] += len(queue.entries)
+            department_stats[dept]["served"] += sum(
+                1 for entry in queue.entries if entry.status == "served"
+            )
+            department_stats[dept]["waiting"] += sum(
+                1
+                for entry in queue.entries
+                if entry.status in {"waiting", "called", "in_service", "diagnostics"}
+            )
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "total_queues": total_queues,
+            "total_entries": total_entries,
+            "total_served": total_served,
+            "total_waiting": total_waiting,
+            "service_rate": (
+                (total_served / total_entries * 100) if total_entries > 0 else 0
+            ),
+            "average_wait_time_minutes": avg_wait_time_minutes,
+            "average_wait_time": avg_wait_time,
+            "by_department": department_stats,
+        }
+
+    @staticmethod
+    def calculate_statistics(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Расчёт статистики (SSOT).
+
+        Получение комплексного отчёта со всей статистикой.
+        """
+        return {
+            "report_period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "generated_at": queue_service.get_local_timestamp(db).isoformat(),
+            },
+            "visits": AnalyticsService.get_visit_statistics(
+                db, start_date, end_date, department
+            ),
+            "patients": AnalyticsService.get_patient_statistics(
+                db, start_date, end_date
+            ),
+            "revenue": AnalyticsService.calculate_revenue(
+                db, start_date, end_date, department
+            ),
+            "services": AnalyticsService.get_service_statistics(
+                db, start_date, end_date
+            ),
+            "queues": AnalyticsService.get_queue_statistics(
+                db, start_date, end_date, department
+            ),
+        }
+
+    @staticmethod
+    def get_trends(db: Session, days: int = 30) -> dict[str, Any]:
+        """Получение трендов за последние N дней"""
+        end_date = queue_service.get_local_timestamp(db)
+        start_date = end_date - timedelta(days=days)
+
+        # Тренд визитов
+        visit_trend = []
+        for i in range(days):
+            date = start_date + timedelta(days=i)
+            next_date = date + timedelta(days=1)
+
+            visit_count = (
+                db.query(Visit)
+                .filter(
+                    and_(
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        >= date.date(),
+                        func.coalesce(Visit.visit_date, func.date(Visit.created_at))
+                        < next_date.date(),
+                    )
+                )
+                .count()
+            )
+
+            visit_trend.append(
+                {"date": date.strftime("%Y-%m-%d"), "visits": visit_count}
+            )
+
+        # Тренд доходов
+        revenue_trend = []
+        for i in range(days):
+            date = start_date + timedelta(days=i)
+            next_date = date + timedelta(days=1)
+
+            daily_revenue = (
+                db.query(PaymentWebhook)
+                .filter(
+                    and_(
+                        PaymentWebhook.status == "success",
+                        PaymentWebhook.created_at >= date,
+                        PaymentWebhook.created_at < next_date,
+                    )
+                )
+                .all()
+            )
+
+            total = sum(float(p.amount) / 100 for p in daily_revenue)
+
+            revenue_trend.append({"date": date.strftime("%Y-%m-%d"), "revenue": total})
+
+        return {
+            "period_days": days,
+            "visit_trend": visit_trend,
+            "revenue_trend": revenue_trend,
+        }
+
+    @staticmethod
+    def get_payment_provider_analytics(
+        db: Session, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any]:
+        """Аналитика по провайдерам платежей"""
+        from app.models.payment_webhook import PaymentProvider, PaymentTransaction
+
+        # Статистика по провайдерам
+        providers = db.query(PaymentProvider).all()
+        provider_stats = {}
+
+        for provider in providers:
+            # Количество транзакций
+            transaction_count = (
+                db.query(PaymentTransaction)
+                .filter(
+                    and_(
+                        PaymentTransaction.provider == provider.code,
+                        PaymentTransaction.created_at >= start_date,
+                        PaymentTransaction.created_at <= end_date,
+                    )
+                )
+                .count()
+            )
+
+            # Успешные транзакции
+            successful_count = (
+                db.query(PaymentTransaction)
+                .filter(
+                    and_(
+                        PaymentTransaction.provider == provider.code,
+                        PaymentTransaction.status == "success",
+                        PaymentTransaction.created_at >= start_date,
+                        PaymentTransaction.created_at <= end_date,
+                    )
+                )
+                .count()
+            )
+
+            # Общая сумма
+            total_amount = (
+                db.query(func.sum(PaymentTransaction.amount))
+                .filter(
+                    and_(
+                        PaymentTransaction.provider == provider.code,
+                        PaymentTransaction.status == "success",
+                        PaymentTransaction.created_at >= start_date,
+                        PaymentTransaction.created_at <= end_date,
+                    )
+                )
+                .scalar()
+                or 0
+            )
+
+            # Средняя сумма транзакции
+            avg_amount = total_amount / successful_count if successful_count > 0 else 0
+
+            provider_stats[provider.code] = {
+                "name": provider.name,
+                "is_active": provider.is_active,
+                "total_transactions": transaction_count,
+                "successful_transactions": successful_count,
+                "failed_transactions": transaction_count - successful_count,
+                "success_rate": (
+                    (successful_count / transaction_count * 100)
+                    if transaction_count > 0
+                    else 0
+                ),
+                "total_amount": total_amount,
+                "average_amount": avg_amount,
+                "commission_earned": (
+                    total_amount * (provider.commission_percent / 100)
+                    if provider.commission_percent
+                    else 0
+                ),
+            }
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "providers": provider_stats,
+            "summary": {
+                "total_providers": len(providers),
+                "active_providers": len([p for p in providers if p.is_active]),
+                "total_transactions": sum(
+                    stats["total_transactions"] for stats in provider_stats.values()
+                ),
+                "total_revenue": sum(
+                    stats["total_amount"] for stats in provider_stats.values()
+                ),
+                "total_commission": sum(
+                    stats["commission_earned"] for stats in provider_stats.values()
+                ),
+            },
+        }
+
+    @staticmethod
+    def get_appointment_flow_analytics(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """Аналитика потока записей (appointments)"""
+
+        query = db.query(Appointment).filter(
+            and_(
+                Appointment.appointment_date >= start_date.date(),
+                Appointment.appointment_date <= end_date.date(),
+            )
+        )
+
+        if department:
+            query = query.filter(Appointment.department == department)
+
+        appointments = query.all()
+
+        # Статистика по статусам
+        status_stats = {}
+        for appointment in appointments:
+            status = AnalyticsService._stringify_dimension(
+                getattr(appointment, "status", None), "scheduled"
+            )
+            if status not in status_stats:
+                status_stats[status] = 0
+            status_stats[status] += 1
+
+        # Статистика по отделениям
+        department_stats = {}
+        for appointment in appointments:
+            dept = AnalyticsService._stringify_dimension(
+                getattr(appointment, "department", None), "Не указано"
+            )
+            if dept not in department_stats:
+                department_stats[dept] = {"total": 0, "paid": 0, "completed": 0}
+            department_stats[dept]["total"] += 1
+
+            if appointment.status == "paid":
+                department_stats[dept]["paid"] += 1
+            elif appointment.status == "completed":
+                department_stats[dept]["completed"] += 1
+
+        # Статистика по дням недели
+        day_stats = {}
+        for appointment in appointments:
+            day_name = calendar.day_name[appointment.appointment_date.weekday()]
+            if day_name not in day_stats:
+                day_stats[day_name] = 0
+            day_stats[day_name] += 1
+
+        # Конверсия по воронке
+        total_appointments = len(appointments)
+        paid_appointments = len([a for a in appointments if a.status == "paid"])
+        completed_appointments = len(
+            [a for a in appointments if a.status == "completed"]
+        )
+
+        conversion_rates = {
+            "pending_to_paid": (
+                (paid_appointments / total_appointments * 100)
+                if total_appointments > 0
+                else 0
+            ),
+            "paid_to_completed": (
+                (completed_appointments / paid_appointments * 100)
+                if paid_appointments > 0
+                else 0
+            ),
+            "overall_conversion": (
+                (completed_appointments / total_appointments * 100)
+                if total_appointments > 0
+                else 0
+            ),
+        }
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "summary": {
+                "total_appointments": total_appointments,
+                "paid_appointments": paid_appointments,
+                "completed_appointments": completed_appointments,
+                "cancelled_appointments": len(
+                    [a for a in appointments if a.status == "cancelled"]
+                ),
+                "no_show_appointments": len(
+                    [a for a in appointments if a.status == "no_show"]
+                ),
+            },
+            "status_distribution": status_stats,
+            "department_performance": department_stats,
+            "day_of_week_distribution": day_stats,
+            "conversion_rates": conversion_rates,
+        }
+
+    @staticmethod
+    def get_revenue_breakdown_analytics(
+        db: Session,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+    ) -> dict[str, Any]:
+        """Детальная аналитика доходов"""
+        from app.models.payment_webhook import PaymentTransaction
+        from app.models.visit import Visit
+
+        # Доходы по провайдерам
+        provider_revenue = {}
+        transactions = (
+            db.query(PaymentTransaction)
+            .filter(
+                and_(
+                    PaymentTransaction.status == "success",
+                    PaymentTransaction.created_at >= start_date,
+                    PaymentTransaction.created_at <= end_date,
+                )
+            )
+            .all()
+        )
+
+        for transaction in transactions:
+            provider = transaction.provider
+            if provider not in provider_revenue:
+                provider_revenue[provider] = {
+                    "count": 0,
+                    "total_amount": 0,
+                    "average_amount": 0,
+                }
+            provider_revenue[provider]["count"] += 1
+            provider_revenue[provider]["total_amount"] += transaction.amount
+
+        # Вычисляем средние суммы
+        for _provider, stats in provider_revenue.items():
+            stats["average_amount"] = (
+                stats["total_amount"] / stats["count"] if stats["count"] > 0 else 0
+            )
+
+        # Доходы по отделениям (через визиты)
+        department_revenue = {}
+        visits = (
+            db.query(Visit)
+            .filter(and_(Visit.created_at >= start_date, Visit.created_at <= end_date))
+            .all()
+        )
+
+        for visit in visits:
+            dept = "Общее"  # У модели Visit нет поля department
+            if dept not in department_revenue:
+                department_revenue[dept] = {"visits": 0, "total_revenue": 0}
+            department_revenue[dept]["visits"] += 1
+            # Используем payment_amount вместо total_price
+            if hasattr(visit, "payment_amount") and visit.payment_amount:
+                department_revenue[dept]["total_revenue"] += float(visit.payment_amount)
+
+        # Ежедневные доходы
+        daily_revenue = {}
+        for transaction in transactions:
+            date_str = transaction.created_at.strftime("%Y-%m-%d")
+            if date_str not in daily_revenue:
+                daily_revenue[date_str] = 0
+            daily_revenue[date_str] += transaction.amount
+
+        # Сортируем по дате
+        daily_revenue_list = [
+            {"date": date, "amount": amount}
+            for date, amount in sorted(daily_revenue.items())
+        ]
+
+        return {
+            "period": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "total_revenue": sum(t.amount for t in transactions),
+            "total_transactions": len(transactions),
+            "average_transaction": (
+                sum(t.amount for t in transactions) / len(transactions)
+                if transactions
+                else 0
+            ),
+            "provider_breakdown": provider_revenue,
+            "department_breakdown": department_revenue,
+            "daily_revenue": daily_revenue_list,
+        }
+
+    @staticmethod
+    def generate_report(
+        db: Session,
+        report_type: str,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+        format: str = "json",
+    ) -> dict[str, Any]:
+        """
+        Генерация отчёта (SSOT).
+
+        Args:
+            db: Сессия БД
+            report_type: Тип отчёта (revenue|visits|patients|services|comprehensive)
+            start_date: Начальная дата
+            end_date: Конечная дата
+            department: Отделение (опционально)
+            format: Формат отчёта (json|html|csv)
+
+        Returns:
+            Dict с данными отчёта
+        """
+        if report_type == "revenue":
+            report_data = AnalyticsService.calculate_revenue(
+                db, start_date, end_date, department
+            )
+        elif report_type == "visits":
+            report_data = AnalyticsService.get_visit_statistics(
+                db, start_date, end_date, department
+            )
+        elif report_type == "patients":
+            report_data = AnalyticsService.get_patient_statistics(
+                db, start_date, end_date
+            )
+        elif report_type == "services":
+            report_data = AnalyticsService.get_service_statistics(
+                db, start_date, end_date
+            )
+        elif report_type == "comprehensive":
+            report_data = AnalyticsService.calculate_statistics(
+                db, start_date, end_date, department
+            )
+        else:
+            raise ValueError(f"Неизвестный тип отчёта: {report_type}")
+
+        # Добавляем метаданные
+        report_data["report_meta"] = {
+            "report_type": report_type,
+            "format": format,
+            "generated_at": queue_service.get_local_timestamp(db).isoformat(),
+        }
+
+        return report_data
+
+    @staticmethod
+    def export_report(
+        db: Session,
+        report_type: str,
+        start_date: datetime,
+        end_date: datetime,
+        department: str | None = None,
+        export_format: str = "json",
+    ) -> bytes:
+        """
+        Экспорт отчёта (SSOT).
+
+        Args:
+            db: Сессия БД
+            report_type: Тип отчёта
+            start_date: Начальная дата
+            end_date: Конечная дата
+            department: Отделение (опционально)
+            export_format: Формат экспорта (json|csv|excel)
+
+        Returns:
+            bytes - данные отчёта в выбранном формате
+        """
+        import csv
+        import json
+        from io import BytesIO, StringIO
+
+        # Генерируем отчёт
+        report_data = AnalyticsService.generate_report(
+            db, report_type, start_date, end_date, department, format="json"
+        )
+
+        if export_format == "json":
+            return json.dumps(report_data, ensure_ascii=False, indent=2).encode('utf-8')
+
+        elif export_format == "csv":
+            # Преобразуем данные в CSV
+            output = StringIO()
+            writer = csv.writer(output)
+
+            # Заголовки
+            writer.writerow(["Период", "Начало", "Конец"])
+            writer.writerow(
+                [
+                    report_data.get("period", {}).get("start_date", ""),
+                    report_data.get("period", {}).get("end_date", ""),
+                ]
+            )
+
+            # Основные данные (упрощённая версия)
+            if "total_revenue" in report_data:
+                writer.writerow(["Общий доход", report_data["total_revenue"]])
+            if "total_visits" in report_data:
+                writer.writerow(["Всего визитов", report_data["total_visits"]])
+
+            return output.getvalue().encode('utf-8')
+
+        elif export_format == "excel":
+            # Для Excel нужен pandas
+            try:
+                from io import BytesIO
+
+                import pandas as pd
+
+                # Преобразуем данные в DataFrame
+                df = pd.DataFrame([report_data])
+                output = BytesIO()
+                df.to_excel(output, index=False, engine='openpyxl')
+                return output.getvalue()
+            except ImportError:
+                raise ValueError("Для экспорта в Excel требуется pandas и openpyxl")
+
+        else:
+            raise ValueError(f"Неподдерживаемый формат экспорта: {export_format}")
+
+
+# Создаём глобальный экземпляр сервиса
+analytics_service = AnalyticsService()

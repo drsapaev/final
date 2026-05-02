@@ -1,0 +1,8 @@
+CASH-05 browser proof
+- login: cashier@example.com / cashier123
+- route: /cashier-panel
+- tab: История платежей
+- date filter: 2026-03-27
+- observed row: payment_id=196, patient=QA Smoke BCDEFG, visit_id=748, amount=15000.00, method=online, status=paid
+- UI totals: 15 000 сум total, 1 paid row
+- source of truth: UI row + backend GET /api/v1/cashier/payments?page=1&size=20&date_from=2026-03-27&date_to=2026-03-27 => 200

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Performance"
+  short_description: "Audit speed and web vitals"
+  default_prompt: "Use $landing-performance to review Lighthouse results, bundles, and Core Web Vitals for a landing page."

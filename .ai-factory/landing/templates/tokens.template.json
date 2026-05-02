@@ -1,0 +1,28 @@
+{
+  "colors": {
+    "background": "",
+    "surface": "",
+    "text": "",
+    "muted_text": "",
+    "accent": "",
+    "accent_contrast": ""
+  },
+  "typography": {
+    "display": "",
+    "heading": "",
+    "body": "",
+    "mono": ""
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 40
+  },
+  "radius": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24
+  }
+}

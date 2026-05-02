@@ -1,0 +1,432 @@
+# app/api/deps.py
+"""
+Dependency helpers for the API.
+
+This module provides:
+- oauth2_scheme for extracting Bearer token
+- create_access_token(...) helper
+- get_current_user(...) which works with both async and sync SQLAlchemy sessions
+- require_roles(...) dependency factory (алиас для security.require_roles)
+
+It is intentionally defensive: it supports get_db() returning either
+an AsyncSession or a regular (sync) Session / sessionmaker instance.
+"""
+from __future__ import annotations
+
+import inspect
+import logging
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from typing import Any
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+# try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
+from app.core.config import settings  # type: ignore
+
+# import authentication service
+from app.services.authentication_service import get_authentication_service
+
+# import get_db lazily -- it may return AsyncSession or sync Session
+try:
+    from app.db.session import get_db  # type: ignore
+except Exception:
+    # get_db should exist in your project; if not, imports will fail later and you need to provide it.
+    get_db = None  # type: ignore
+
+# import User model
+try:
+    from app.models.user import User  # type: ignore
+except Exception:
+    # If import fails the project is misconfigured; leave User unresolved to raise early.
+    User = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+# Correct tokenUrl to point to our /auth/login
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/minimal-login")
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    """
+    Create a JWT token with `sub` claim taken from data (if provided).
+    Returns encoded JWT string.
+    """
+    to_encode = data.copy()
+    if expires_delta is None:
+        expires_delta = timedelta(
+            minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24)
+        )
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=getattr(settings, "ALGORITHM", "HS256"),
+    )
+    return encoded_jwt
+
+
+def _username_from_token(token: str) -> str | None:
+    """
+    Decode JWT and extract username claim. Returns None if invalid.
+    Tries 'username' field first, then falls back to 'sub' if it's a string.
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+        )
+
+        # Сначала пробуем поле 'username'
+        username = payload.get("username")
+        if isinstance(username, str):
+            return username
+
+        # Fallback на 'sub' - может быть username или ID
+        sub = payload.get("sub")
+        if isinstance(sub, str):
+            # Если sub содержит @, то это username
+            if '@' in sub:
+                return sub
+            # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
+            elif sub.isdigit():
+                return sub
+            else:
+                return sub
+
+        return None
+    except JWTError as e:
+        logger.warning("_username_from_token: JWT decode error: %s", e)
+        return None
+
+
+async def _get_user_by_username(db, username: str) -> User | None:
+    """
+    Universal helper that supports both AsyncSession and sync Session.
+
+    - If db.execute is a coroutine function (AsyncSession) we `await db.execute(...)`
+    - Otherwise we call db.execute(...) in a threadpool to avoid blocking event loop.
+
+    Attempts to return a mapped User instance or None.
+    """
+    logger.debug(f"_get_user_by_username: looking for username={username}")
+    if db is None:
+        logger.debug("_get_user_by_username: db is None")
+        return None
+
+    execute_callable = getattr(db, "execute", None)
+    stmt = select(User).where(User.username == username)
+
+    # AsyncSession: await directly; Sync Session: call directly to avoid SQLite thread issues
+    if inspect.iscoroutinefunction(execute_callable):
+        result = await db.execute(stmt)
+    else:
+        result = db.execute(stmt)
+
+    # Try common extraction patterns for Result / AsyncResult
+    try:
+        user = result.scalar_one_or_none()
+        return user
+    except Exception:
+        pass
+
+    try:
+        # result.scalars() exists for many versions
+        scalars = result.scalars()
+        try:
+            return scalars.first()
+        except Exception:
+            # as last resort, convert to list
+            items = list(scalars)
+            return items[0] if items else None
+    except Exception:
+        pass
+
+    return None
+
+
+async def _get_user_by_id(db, user_id: int) -> User | None:
+    """
+    Получить пользователя по числовому ID, поддерживая как AsyncSession, так и sync Session.
+    """
+    logger.debug(f"_get_user_by_id: looking for user_id={user_id}")
+    if db is None:
+        logger.debug("_get_user_by_id: db is None")
+        return None
+
+    execute_callable = getattr(db, "execute", None)
+    logger.debug(f"_get_user_by_id: execute_callable type={type(execute_callable)}")
+    stmt = select(User).where(User.id == user_id)
+    logger.debug(f"_get_user_by_id: stmt={stmt}")
+
+    if inspect.iscoroutinefunction(execute_callable):
+        logger.debug("_get_user_by_id: using async execute")
+        result = await db.execute(stmt)
+    else:
+        logger.debug("_get_user_by_id: using sync execute")
+        result = db.execute(stmt)
+
+    try:
+        user = result.scalar_one_or_none()
+        logger.debug(f"_get_user_by_id: found user={user.username if user else 'None'}")
+        return user
+    except Exception as e:
+        logger.debug(f"_get_user_by_id: scalar_one_or_none error: {e}")
+        try:
+            user = result.scalars().first()
+            logger.debug(
+                f"_get_user_by_id: found with scalars: {user.username if user else 'None'}"
+            )
+            return user
+        except Exception as e2:
+            logger.debug(f"_get_user_by_id: scalars error: {e2}")
+            return None
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db=Depends(get_db),
+) -> User:
+    """
+    Dependency that returns the current authenticated User.
+    Works with either async or sync DB sessions returned by get_db().
+    Raises 401 on invalid token or missing user.
+    """
+    # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
+    username = _username_from_token(token)
+    user: User | None = None
+
+    try:
+        if username:
+            logger.debug(
+                f"get_current_user: trying to find user by username={username}"
+            )
+            # Если username содержит только цифры, то это ID
+            if username.isdigit():
+                logger.debug(
+                    f"get_current_user: username is digit, trying ID {int(username)}"
+                )
+                user = await _get_user_by_id(db, int(username))
+            else:
+                logger.debug(
+                    f"get_current_user: username is not digit, trying username {username}"
+                )
+                user = await _get_user_by_username(db, username)
+            logger.debug(
+                f"get_current_user: user found={user.username if user else 'None'}"
+            )
+        else:
+            logger.debug("get_current_user: no username, trying payload fallback")
+            # Падаем обратно на извлечение sub и поиск по ID
+            try:
+                payload = jwt.decode(
+                    token,
+                    settings.SECRET_KEY,
+                    algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+                )
+                logger.debug(f"get_current_user: payload={payload}")
+                sub = payload.get("sub")
+                logger.debug(f"get_current_user: sub={sub}, type={type(sub)}")
+                if isinstance(sub, str) and sub.isdigit():
+                    logger.debug(
+                        f"get_current_user: sub is digit string, trying ID {int(sub)}"
+                    )
+                    user = await _get_user_by_id(db, int(sub))
+                elif isinstance(sub, int):
+                    logger.debug(f"get_current_user: sub is int, trying ID {sub}")
+                    user = await _get_user_by_id(db, sub)
+                elif isinstance(sub, str):
+                    logger.debug(
+                        f"get_current_user: sub is string, trying username {sub}"
+                    )
+                    user = await _get_user_by_username(db, sub)
+                logger.debug(
+                    f"get_current_user: user found by fallback={user.username if user else 'None'}"
+                )
+            except JWTError:
+                logger.debug("get_current_user: JWT decode error")
+                user = None
+    except Exception as e:
+        logger.warning(
+            "get_current_user: validation failed: %s (%s)",
+            type(e).__name__,
+            str(e),
+            exc_info=False,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
+    if not user:
+        logger.warning("[deps.get_current_user] user not found (username from token may not exist in DB)")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        logger.debug(
+            f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}"
+        )
+    except Exception:
+        pass
+    return user
+
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependency that returns the current authenticated and active User.
+    Raises 403 if user is not active.
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь деактивирован"
+        )
+    return current_user
+
+
+# require_roles() перемещена в app.core.security (SSOT)
+# Импортируем для обратной совместимости
+def require_roles(*roles: str) -> Callable[..., Any]:
+    """
+    Dependency factory для проверки ролей (перенаправляет на SSOT).
+
+    Эта функция теперь является алиасом для app.core.security.require_roles()
+    для обратной совместимости. Новый код должен использовать security.require_roles().
+    """
+    from app.core.security import require_roles as _require_roles
+
+    return _require_roles(*roles)
+
+
+def get_current_user_from_request(request: Request) -> User | None:
+    """Получить текущего пользователя из состояния запроса (для middleware)"""
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
+        return None
+
+    # Получаем сессию БД
+    db = next(get_db())
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        return user
+    finally:
+        db.close()
+
+
+def get_current_user_id(request: Request) -> int | None:
+    """Получить ID текущего пользователя из состояния запроса"""
+    return getattr(request.state, 'user_id', None)
+
+
+def get_current_user_role(request: Request) -> str | None:
+    """Получить роль текущего пользователя из состояния запроса"""
+    return getattr(request.state, 'role', None)
+
+
+def require_authentication(request: Request) -> User:
+    """Требует аутентификации пользователя"""
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется аутентификация"
+        )
+    return user
+
+
+def require_active_user(request: Request) -> User:
+    """Требует активного пользователя"""
+    user = require_authentication(request)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь деактивирован"
+        )
+    return user
+
+
+def require_superuser(request: Request) -> User:
+    """Требует суперпользователя"""
+    user = require_active_user(request)
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права суперпользователя",
+        )
+    return user
+
+
+def require_admin(request: Request) -> User:
+    """Требует администратора"""
+    user = require_active_user(request)
+    if user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права администратора",
+        )
+    return user
+
+
+def require_doctor_or_admin(request: Request) -> User:
+    """Требует врача или администратора"""
+    user = require_active_user(request)
+    if user.role not in ["Admin", "Doctor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права врача или администратора",
+        )
+    return user
+
+
+def require_staff(request: Request) -> User:
+    """Требует сотрудника клиники"""
+    user = require_active_user(request)
+    if user.role not in ["Admin", "Doctor", "Nurse", "Receptionist"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права сотрудника клиники",
+        )
+    return user
+
+
+def get_optional_user(request: Request) -> User | None:
+    """Получить пользователя, если он аутентифицирован (опционально)"""
+    return get_current_user_from_request(request)
+
+
+def validate_token(token: str, db: Session) -> dict | None:
+    """Валидирует JWT токен"""
+    if not get_authentication_service:
+        return None
+
+    try:
+        auth_service = get_authentication_service()
+        payload = auth_service.verify_token(token, "access")
+        return payload
+    except Exception:
+        return None
+
+
+def get_user_from_token(token: str, db: Session) -> User | None:
+    """Получить пользователя по токену"""
+    payload = validate_token(token, db)
+    if not payload:
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    try:
+        return db.query(User).filter(User.id == int(user_id)).first()
+    except (ValueError, TypeError):
+        return None

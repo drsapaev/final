@@ -1,0 +1,399 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "Admin" [ref=e41] [cursor=pointer]:
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - text: Admin
+        - button "Выйти" [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]:
+            - img [ref=e48]
+            - text: Выйти
+    - main [ref=e52]:
+      - main "Панель регистратора" [ref=e53]:
+        - link "Перейти к основному содержимому" [ref=e54] [cursor=pointer]:
+          - /url: "#main-content"
+        - generic [ref=e57]:
+          - button "Все отделения" [ref=e162] [cursor=pointer]:
+            - img [ref=e164]
+            - generic [ref=e167]: Все отделения
+          - generic [ref=e169]:
+            - button "Кардиолог" [ref=e170] [cursor=pointer]:
+              - generic [ref=e171]:
+                - img [ref=e173]
+                - generic [ref=e175]: Кардиолог
+            - button "ЭКГ" [ref=e176] [cursor=pointer]:
+              - generic [ref=e177]:
+                - img [ref=e179]
+                - generic [ref=e181]: ЭКГ
+            - button "Дерматолог" [ref=e182] [cursor=pointer]:
+              - generic [ref=e183]:
+                - img [ref=e185]
+                - generic [ref=e189]: Дерматолог
+            - button "Стоматолог" [ref=e190] [cursor=pointer]:
+              - generic [ref=e191]:
+                - img [ref=e193]
+                - generic [ref=e196]: Стоматолог
+            - button "Лаборатория" [ref=e197] [cursor=pointer]:
+              - generic [ref=e198]:
+                - img [ref=e200]
+                - generic [ref=e202]: Лаборатория
+            - button "Процедуры" [ref=e203] [cursor=pointer]:
+              - generic [ref=e204]:
+                - img [ref=e206]
+                - generic [ref=e213]: Процедуры
+        - tabpanel [ref=e60]:
+          - generic [ref=e214]:
+            - generic [ref=e216]:
+              - generic [ref=e218]:
+                - img
+                - textbox "Поиск" [ref=e219]
+              - combobox [ref=e220] [cursor=pointer]:
+                - option "Фильтр" [selected]
+                - option "Запланирован"
+                - option "Подтвержден"
+                - option "В очереди"
+                - option "В кабинете"
+                - option "Завершен"
+                - option "Отменен"
+                - option "Ожидает оплаты"
+                - option "Платный"
+              - button "Экспорт" [ref=e221] [cursor=pointer]:
+                - generic [ref=e222]:
+                  - img [ref=e223]
+                  - text: Экспорт
+            - table [ref=e227]:
+              - rowgroup [ref=e228]:
+                - row "№ Пациент Телефон Г.р. Адрес Тип Услуги Оплата Дата Статус Стоимость Действия" [ref=e229]:
+                  - columnheader "№" [ref=e230] [cursor=pointer]:
+                    - generic [ref=e231]: №
+                  - columnheader "Пациент" [ref=e232] [cursor=pointer]:
+                    - generic [ref=e233]: Пациент
+                  - columnheader "Телефон" [ref=e234]
+                  - columnheader "Г.р." [ref=e235] [cursor=pointer]:
+                    - generic [ref=e236]: Г.р.
+                  - columnheader "Адрес" [ref=e237]
+                  - columnheader "Тип" [ref=e238]
+                  - columnheader "Услуги" [ref=e239]
+                  - columnheader "Оплата" [ref=e240]
+                  - columnheader "Дата" [ref=e241] [cursor=pointer]:
+                    - generic [ref=e242]: Дата
+                  - columnheader "Статус" [ref=e243] [cursor=pointer]:
+                    - generic [ref=e244]: Статус
+                  - columnheader "Стоимость" [ref=e245] [cursor=pointer]:
+                    - generic [ref=e246]: Стоимость
+                  - columnheader "Действия" [ref=e247]
+              - rowgroup [ref=e248]:
+                - row "1 Иванов Иван Иванович 41 лет +998 (90) 123-45-67 1985 ул. Навои, д. 15, кв. 23 Платный Консультация кардиолога ЭКГ Консультация дерматолога Дерматоскопия Консультация стоматолога 💳 Карта ✅ 2026-03-28 ✅ Подтверждён 125 000 сум Печать Просмотр Редактировать Еще" [ref=e249] [cursor=pointer]:
+                  - cell "1" [ref=e250]:
+                    - 'generic "Кардиолог: №1" [ref=e251]': "1"
+                  - cell "Иванов Иван Иванович 41 лет" [ref=e252]:
+                    - generic [ref=e253]:
+                      - generic [ref=e255]: Иванов Иван Иванович
+                      - generic [ref=e256]: 41 лет
+                  - cell "+998 (90) 123-45-67" [ref=e257]:
+                    - generic [ref=e258]:
+                      - img [ref=e259]
+                      - text: +998 (90) 123-45-67
+                  - cell "1985" [ref=e261]
+                  - cell "ул. Навои, д. 15, кв. 23" [ref=e262]:
+                    - generic [ref=e263]:
+                      - img [ref=e264]
+                      - generic [ref=e267]: ул. Навои, д. 15, кв. 23
+                  - cell "Платный" [ref=e268]
+                  - cell "Консультация кардиолога ЭКГ Консультация дерматолога Дерматоскопия Консультация стоматолога" [ref=e269]:
+                    - 'generic "Услуги: 1. Консультация кардиолога 2. ЭКГ 3. Консультация дерматолога 4. Дерматоскопия 5. Консультация стоматолога" [ref=e270]':
+                      - generic [ref=e271]: Консультация кардиолога
+                      - generic [ref=e272]: ЭКГ
+                      - generic [ref=e273]: Консультация дерматолога
+                      - generic [ref=e274]: Дерматоскопия
+                      - generic [ref=e275]: Консультация стоматолога
+                  - cell "💳 Карта ✅" [ref=e276]:
+                    - generic [ref=e277]:
+                      - generic [ref=e278]:
+                        - generic [ref=e279]: 💳
+                        - generic [ref=e280]: Карта
+                      - generic [ref=e281]: ✅
+                  - cell "2026-03-28" [ref=e282]:
+                    - generic [ref=e285]:
+                      - img [ref=e286]
+                      - text: 2026-03-28
+                  - cell "✅ Подтверждён" [ref=e288]:
+                    - generic "Подтверждён" [ref=e289]:
+                      - generic [ref=e290]: ✅
+                      - generic [ref=e291]: Подтверждён
+                  - cell "125 000 сум" [ref=e292]
+                  - cell "Печать Просмотр Редактировать Еще" [ref=e293]:
+                    - generic [ref=e294]:
+                      - button "Печать" [ref=e295]:
+                        - img [ref=e296]
+                      - button "Просмотр" [ref=e299]:
+                        - img [ref=e300]
+                      - button "Редактировать" [ref=e303]:
+                        - img [ref=e304]
+                      - button "Еще" [ref=e307]:
+                        - img [ref=e308]
+                - row "2 Петрова Анна Сергеевна 36 лет +998 (91) 234-56-78 1990 пр. Амира Темура, д. 42 Платный ЭКГ Холтер 💵 Наличные ⏳ 2026-03-28 ⏳ В очереди 30 000 сум 💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e312] [cursor=pointer]:
+                  - cell "2" [ref=e313]:
+                    - 'generic "Кардиолог: №2" [ref=e314]': "2"
+                  - cell "Петрова Анна Сергеевна 36 лет" [ref=e315]:
+                    - generic [ref=e316]:
+                      - generic [ref=e318]: Петрова Анна Сергеевна
+                      - generic [ref=e319]: 36 лет
+                  - cell "+998 (91) 234-56-78" [ref=e320]:
+                    - generic [ref=e321]:
+                      - img [ref=e322]
+                      - text: +998 (91) 234-56-78
+                  - cell "1990" [ref=e324]
+                  - cell "пр. Амира Темура, д. 42" [ref=e325]:
+                    - generic [ref=e326]:
+                      - img [ref=e327]
+                      - generic [ref=e330]: пр. Амира Темура, д. 42
+                  - cell "Платный" [ref=e331]
+                  - cell "ЭКГ Холтер" [ref=e332]:
+                    - 'generic "Услуги: 1. ЭКГ 2. Холтер" [ref=e333]':
+                      - generic [ref=e334]: ЭКГ
+                      - generic [ref=e335]: Холтер
+                  - cell "💵 Наличные ⏳" [ref=e336]:
+                    - generic [ref=e337]:
+                      - generic [ref=e338]:
+                        - generic [ref=e339]: 💵
+                        - generic [ref=e340]: Наличные
+                      - generic [ref=e341]: ⏳
+                  - cell "2026-03-28" [ref=e342]:
+                    - generic [ref=e345]:
+                      - img [ref=e346]
+                      - text: 2026-03-28
+                  - cell "⏳ В очереди" [ref=e348]:
+                    - generic "В очереди" [ref=e349]:
+                      - generic [ref=e350]: ⏳
+                      - generic [ref=e351]: В очереди
+                  - cell "30 000 сум" [ref=e352]
+                  - cell "💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e353]:
+                    - generic [ref=e354]:
+                      - button "💸 Оплата" [ref=e355]
+                      - button "📢 Вызвать" [ref=e356]
+                      - button "Печать" [ref=e357]:
+                        - img [ref=e358]
+                      - button "Просмотр" [ref=e361]:
+                        - img [ref=e362]
+                      - button "Редактировать" [ref=e365]:
+                        - img [ref=e366]
+                      - button "Еще" [ref=e369]:
+                        - img [ref=e370]
+                - row "1 Сидоров Петр Александрович 51 лет +998 (93) 345-67-89 1975 ул. Шота Руставели, д. 8, кв. 45 Платный Консультация дерматолога 💳 Карта ✅ 2026-03-28 ✅ Подтверждён 45 000 сум Печать Просмотр Редактировать Еще" [ref=e374] [cursor=pointer]:
+                  - cell "1" [ref=e375]:
+                    - 'generic "Дерматолог: №1" [ref=e376]': "1"
+                  - cell "Сидоров Петр Александрович 51 лет" [ref=e377]:
+                    - generic [ref=e378]:
+                      - generic [ref=e380]: Сидоров Петр Александрович
+                      - generic [ref=e381]: 51 лет
+                  - cell "+998 (93) 345-67-89" [ref=e382]:
+                    - generic [ref=e383]:
+                      - img [ref=e384]
+                      - text: +998 (93) 345-67-89
+                  - cell "1975" [ref=e386]
+                  - cell "ул. Шота Руставели, д. 8, кв. 45" [ref=e387]:
+                    - generic [ref=e388]:
+                      - img [ref=e389]
+                      - generic [ref=e392]: ул. Шота Руставели, д. 8, кв. 45
+                  - cell "Платный" [ref=e393]
+                  - cell "Консультация дерматолога" [ref=e394]:
+                    - generic "Консультация дерматолога" [ref=e395]:
+                      - generic [ref=e396]: Консультация дерматолога
+                  - cell "💳 Карта ✅" [ref=e397]:
+                    - generic [ref=e398]:
+                      - generic [ref=e399]:
+                        - generic [ref=e400]: 💳
+                        - generic [ref=e401]: Карта
+                      - generic [ref=e402]: ✅
+                  - cell "2026-03-28" [ref=e403]:
+                    - generic [ref=e406]:
+                      - img [ref=e407]
+                      - text: 2026-03-28
+                  - cell "✅ Подтверждён" [ref=e409]:
+                    - generic "Подтверждён" [ref=e410]:
+                      - generic [ref=e411]: ✅
+                      - generic [ref=e412]: Подтверждён
+                  - cell "45 000 сум" [ref=e413]
+                  - cell "Печать Просмотр Редактировать Еще" [ref=e414]:
+                    - generic [ref=e415]:
+                      - button "Печать" [ref=e416]:
+                        - img [ref=e417]
+                      - button "Просмотр" [ref=e420]:
+                        - img [ref=e421]
+                      - button "Редактировать" [ref=e424]:
+                        - img [ref=e425]
+                      - button "Еще" [ref=e428]:
+                        - img [ref=e429]
+                - row "1 Козлова Мария Владимировна 38 лет +998 (94) 456-78-90 1988 ул. Бабура, д. 25 Платный Лечение кариеса 💵 Наличные ⏳ 2026-03-28 ⏳ В очереди 60 000 сум 💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e433] [cursor=pointer]:
+                  - cell "1" [ref=e434]:
+                    - 'generic "Стоматолог: №1" [ref=e435]': "1"
+                  - cell "Козлова Мария Владимировна 38 лет" [ref=e436]:
+                    - generic [ref=e437]:
+                      - generic [ref=e439]: Козлова Мария Владимировна
+                      - generic [ref=e440]: 38 лет
+                  - cell "+998 (94) 456-78-90" [ref=e441]:
+                    - generic [ref=e442]:
+                      - img [ref=e443]
+                      - text: +998 (94) 456-78-90
+                  - cell "1988" [ref=e445]
+                  - cell "ул. Бабура, д. 25" [ref=e446]:
+                    - generic [ref=e447]:
+                      - img [ref=e448]
+                      - generic [ref=e451]: ул. Бабура, д. 25
+                  - cell "Платный" [ref=e452]
+                  - cell "Лечение кариеса" [ref=e453]:
+                    - generic "Лечение кариеса" [ref=e454]:
+                      - generic [ref=e455]: Лечение кариеса
+                  - cell "💵 Наличные ⏳" [ref=e456]:
+                    - generic [ref=e457]:
+                      - generic [ref=e458]:
+                        - generic [ref=e459]: 💵
+                        - generic [ref=e460]: Наличные
+                      - generic [ref=e461]: ⏳
+                  - cell "2026-03-28" [ref=e462]:
+                    - generic [ref=e465]:
+                      - img [ref=e466]
+                      - text: 2026-03-28
+                  - cell "⏳ В очереди" [ref=e468]:
+                    - generic "В очереди" [ref=e469]:
+                      - generic [ref=e470]: ⏳
+                      - generic [ref=e471]: В очереди
+                  - cell "60 000 сум" [ref=e472]
+                  - cell "💸 Оплата 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e473]:
+                    - generic [ref=e474]:
+                      - button "💸 Оплата" [ref=e475]
+                      - button "📢 Вызвать" [ref=e476]
+                      - button "Печать" [ref=e477]:
+                        - img [ref=e478]
+                      - button "Просмотр" [ref=e481]:
+                        - img [ref=e482]
+                      - button "Редактировать" [ref=e485]:
+                        - img [ref=e486]
+                      - button "Еще" [ref=e489]:
+                        - img [ref=e490]
+                - row "1 Морозов Алексей Игоревич 34 лет +998 (95) 567-89-01 1992 ул. Мирзо Улугбека, д. 67, кв. 12 Платный Общий анализ крови Биохимия 💳 Карта ✅ 2026-03-28 ✅ Подтверждён 25 000 сум Печать Просмотр Редактировать Еще" [ref=e494] [cursor=pointer]:
+                  - cell "1" [ref=e495]:
+                    - 'generic "Лаборатория: №1" [ref=e496]': "1"
+                  - cell "Морозов Алексей Игоревич 34 лет" [ref=e497]:
+                    - generic [ref=e498]:
+                      - generic [ref=e500]: Морозов Алексей Игоревич
+                      - generic [ref=e501]: 34 лет
+                  - cell "+998 (95) 567-89-01" [ref=e502]:
+                    - generic [ref=e503]:
+                      - img [ref=e504]
+                      - text: +998 (95) 567-89-01
+                  - cell "1992" [ref=e506]
+                  - cell "ул. Мирзо Улугбека, д. 67, кв. 12" [ref=e507]:
+                    - generic [ref=e508]:
+                      - img [ref=e509]
+                      - generic [ref=e512]: ул. Мирзо Улугбека, д. 67, кв. 12
+                  - cell "Платный" [ref=e513]
+                  - cell "Общий анализ крови Биохимия" [ref=e514]:
+                    - 'generic "Услуги: 1. Общий анализ крови 2. Биохимия" [ref=e515]':
+                      - generic [ref=e516]: Общий анализ крови
+                      - generic [ref=e517]: Биохимия
+                  - cell "💳 Карта ✅" [ref=e518]:
+                    - generic [ref=e519]:
+                      - generic [ref=e520]:
+                        - generic [ref=e521]: 💳
+                        - generic [ref=e522]: Карта
+                      - generic [ref=e523]: ✅
+                  - cell "2026-03-28" [ref=e524]:
+                    - generic [ref=e527]:
+                      - img [ref=e528]
+                      - text: 2026-03-28
+                  - cell "✅ Подтверждён" [ref=e530]:
+                    - generic "Подтверждён" [ref=e531]:
+                      - generic [ref=e532]: ✅
+                      - generic [ref=e533]: Подтверждён
+                  - cell "25 000 сум" [ref=e534]
+                  - cell "Печать Просмотр Редактировать Еще" [ref=e535]:
+                    - generic [ref=e536]:
+                      - button "Печать" [ref=e537]:
+                        - img [ref=e538]
+                      - button "Просмотр" [ref=e541]:
+                        - img [ref=e542]
+                      - button "Редактировать" [ref=e545]:
+                        - img [ref=e546]
+                      - button "Еще" [ref=e549]:
+                        - img [ref=e550]
+                - row "1 Волкова Елена Сергеевна 43 лет +998 (97) 678-90-12 1983 ул. Алишера Навои, д. 134 Платный Капельница Инъекция 💵 Наличные ✅ 2026-03-28 ⏳ В очереди 35 000 сум 📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e554] [cursor=pointer]:
+                  - cell "1" [ref=e555]:
+                    - 'generic "Процедуры: №1" [ref=e556]': "1"
+                  - cell "Волкова Елена Сергеевна 43 лет" [ref=e557]:
+                    - generic [ref=e558]:
+                      - generic [ref=e560]: Волкова Елена Сергеевна
+                      - generic [ref=e561]: 43 лет
+                  - cell "+998 (97) 678-90-12" [ref=e562]:
+                    - generic [ref=e563]:
+                      - img [ref=e564]
+                      - text: +998 (97) 678-90-12
+                  - cell "1983" [ref=e566]
+                  - cell "ул. Алишера Навои, д. 134" [ref=e567]:
+                    - generic [ref=e568]:
+                      - img [ref=e569]
+                      - generic [ref=e572]: ул. Алишера Навои, д. 134
+                  - cell "Платный" [ref=e573]
+                  - cell "Капельница Инъекция" [ref=e574]:
+                    - 'generic "Услуги: 1. Капельница 2. Инъекция" [ref=e575]':
+                      - generic [ref=e576]: Капельница
+                      - generic [ref=e577]: Инъекция
+                  - cell "💵 Наличные ✅" [ref=e578]:
+                    - generic [ref=e579]:
+                      - generic [ref=e580]:
+                        - generic [ref=e581]: 💵
+                        - generic [ref=e582]: Наличные
+                      - generic [ref=e583]: ✅
+                  - cell "2026-03-28" [ref=e584]:
+                    - generic [ref=e587]:
+                      - img [ref=e588]
+                      - text: 2026-03-28
+                  - cell "⏳ В очереди" [ref=e590]:
+                    - generic "В очереди" [ref=e591]:
+                      - generic [ref=e592]: ⏳
+                      - generic [ref=e593]: В очереди
+                  - cell "35 000 сум" [ref=e594]
+                  - cell "📢 Вызвать Печать Просмотр Редактировать Еще" [ref=e595]:
+                    - generic [ref=e596]:
+                      - button "📢 Вызвать" [ref=e597]
+                      - button "Печать" [ref=e598]:
+                        - img [ref=e599]
+                      - button "Просмотр" [ref=e602]:
+                        - img [ref=e603]
+                      - button "Редактировать" [ref=e606]:
+                        - img [ref=e607]
+                      - button "Еще" [ref=e610]:
+                        - img [ref=e611]
+  - region "Notifications Alt+T"
+  - generic [ref=e615]:
+    - generic [ref=e616]:
+      - img [ref=e617]
+      - generic [ref=e620]:
+        - strong [ref=e621]: Включить уведомления?
+        - generic [ref=e622]: Получайте уведомления о новых сообщениях
+    - generic [ref=e623]:
+      - button "Включить" [ref=e624] [cursor=pointer]
+      - button "Закрыть" [ref=e625] [cursor=pointer]:
+        - img [ref=e626]

@@ -1,0 +1,213 @@
+/**
+ * EMRConflictDialog CSS
+ */
+
+/* Overlay */
+.emr-conflict-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+/* Dialog */
+.emr-conflict-dialog {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+    max-width: 480px;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Header */
+.emr-conflict-dialog__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    background: #fff3e0;
+    border-bottom: 1px solid #ffcc02;
+}
+
+.emr-conflict-dialog__icon {
+    font-size: 2rem;
+}
+
+.emr-conflict-dialog__header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #e65100;
+}
+
+/* Body */
+.emr-conflict-dialog__body {
+    padding: 20px 24px;
+}
+
+.emr-conflict-dialog__lead {
+    margin: 0 0 16px;
+    font-size: 1rem;
+    color: #333;
+    line-height: 1.5;
+}
+
+/* Info box */
+.emr-conflict-dialog__info {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.emr-conflict-dialog__info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 0.9rem;
+}
+
+.emr-conflict-dialog__info-label {
+    color: #666;
+}
+
+.emr-conflict-dialog__info-value {
+    font-weight: 600;
+    color: #333;
+}
+
+.emr-conflict-dialog__info-value--new {
+    color: #e65100;
+}
+
+/* Warning */
+.emr-conflict-dialog__warning {
+    background: #ffebee;
+    color: #c62828;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Actions */
+.emr-conflict-dialog__actions {
+    padding: 16px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Buttons */
+.emr-conflict-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    padding: 14px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+}
+
+.emr-conflict-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.emr-conflict-btn__hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+/* Primary - Compare */
+.emr-conflict-btn--primary {
+    background: #2196f3;
+    color: white;
+}
+
+.emr-conflict-btn--primary:hover:not(:disabled) {
+    background: #1976d2;
+}
+
+/* Secondary - Reload */
+.emr-conflict-btn--secondary {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.emr-conflict-btn--secondary:hover:not(:disabled) {
+    background: #eeeeee;
+}
+
+/* Warning - Amend */
+.emr-conflict-btn--warning {
+    background: #ff9800;
+    color: white;
+}
+
+.emr-conflict-btn--warning:hover:not(:disabled) {
+    background: #f57c00;
+}
+
+/* Danger - Force overwrite */
+.emr-conflict-btn--danger {
+    background: #f44336;
+    color: white;
+}
+
+.emr-conflict-btn--danger:hover:not(:disabled) {
+    background: #d32f2f;
+}
+
+/* Advanced options */
+.emr-conflict-dialog__advanced {
+    padding: 0 24px 20px;
+}
+
+.emr-conflict-dialog__advanced-toggle {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.emr-conflict-dialog__advanced-toggle:hover {
+    color: #333;
+    text-decoration: underline;
+}
+
+.emr-conflict-dialog__advanced-content {
+    margin-top: 12px;
+}
+
+.emr-conflict-dialog__advanced-warning {
+    font-size: 0.8rem;
+    color: #c62828;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: #ffebee;
+    border-radius: 6px;
+}
+
+/* Loading */
+.emr-conflict-dialog__loading {
+    padding: 12px 24px 20px;
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+}

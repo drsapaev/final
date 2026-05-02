@@ -1,0 +1,237 @@
+.multiple-tickets-printer {
+  background: var(--mac-card-bg);
+  color: var(--mac-text-primary);
+  border: 1px solid var(--mac-card-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  max-width: 800px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.printer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--mac-separator);
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
+}
+
+.printer-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--mac-text-secondary);
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--mac-nav-item-hover);
+  color: var(--mac-text-primary);
+}
+
+.tickets-grid {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ticket-card {
+  border: 2px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--mac-bg-primary);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.ticket-card.printing {
+  border-color: var(--mac-accent);
+  background: var(--mac-accent-bg);
+  transform: scale(1.02);
+}
+
+.ticket-card.printed {
+  border-color: var(--mac-success);
+  background: var(--mac-success-bg);
+}
+
+.ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.queue-name {
+  font-weight: 600;
+  color: var(--mac-text-primary);
+  font-size: 14px;
+}
+
+.queue-number {
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.ticket-card.printed .queue-number {
+  background: var(--mac-success);
+}
+
+.ticket-details {
+  margin-bottom: 16px;
+}
+
+.patient-name {
+  font-weight: 500;
+  color: var(--mac-text-primary);
+  margin-bottom: 4px;
+}
+
+.doctor-name {
+  color: var(--mac-text-secondary);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.visit-info {
+  color: var(--mac-text-tertiary);
+  font-size: 12px;
+}
+
+.ticket-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.print-single-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.print-single-btn:hover {
+  background: color-mix(in srgb, var(--mac-accent), black 14%);
+  transform: translateY(-1px);
+}
+
+.printed-status,
+.printing-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.printed-status {
+  background: var(--mac-success-bg);
+  color: var(--mac-success);
+}
+
+.printing-status {
+  background: var(--mac-accent-bg);
+  color: var(--mac-accent);
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.printer-footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--mac-separator);
+  background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
+  display: flex;
+  justify-content: center;
+}
+
+.print-all-section {
+  display: flex;
+  justify-content: center;
+}
+
+.print-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--mac-success);
+  color: var(--mac-text-on-accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.print-all-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--mac-success), black 14%);
+  transform: translateY(-1px);
+}
+
+.print-all-btn.countdown {
+  background: color-mix(in srgb, var(--mac-bg-tertiary), black 10%);
+  cursor: not-allowed;
+}
+
+.all-printed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mac-success);
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tickets-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  
+  .printer-header {
+    padding: 16px;
+  }
+  
+  .printer-footer {
+    padding: 16px;
+  }
+}

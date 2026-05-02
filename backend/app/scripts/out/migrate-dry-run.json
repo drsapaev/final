@@ -1,0 +1,74 @@
+{
+  "dry_run": true,
+  "errors": [],
+  "migrated_tables": [
+    {
+      "inserted_count": 0,
+      "source_count": 72,
+      "table_name": "appointments",
+      "updated_count": 70
+    },
+    {
+      "inserted_count": 0,
+      "source_count": 78,
+      "table_name": "messages",
+      "updated_count": 64
+    },
+    {
+      "inserted_count": 0,
+      "source_count": 718,
+      "table_name": "visits",
+      "updated_count": 718
+    },
+    {
+      "inserted_count": 0,
+      "source_count": 1239,
+      "table_name": "visit_services",
+      "updated_count": 1239
+    }
+  ],
+  "repaired_foreign_keys": [
+    {
+      "column_name": "doctor_id",
+      "repaired_count": 4,
+      "table_name": "appointments"
+    },
+    {
+      "column_name": "doctor_id",
+      "repaired_count": 4,
+      "table_name": "visits"
+    }
+  ],
+  "repaired_value_mappings": [],
+  "skipped_incompatible": [
+    {
+      "columns": [
+        "chat_id"
+      ],
+      "reason": "required_target_columns_missing_in_source",
+      "table_name": "telegram_messages"
+    }
+  ],
+  "skipped_invalid_rows": [
+    {
+      "reason": "missing_patient_reference",
+      "skipped_count": 2,
+      "table_name": "appointments"
+    },
+    {
+      "reason": "missing_recipient_reference",
+      "skipped_count": 14,
+      "table_name": "messages"
+    }
+  ],
+  "skipped_legacy_incompatible": [
+    {
+      "reason": "legacy_queue_entries_depend_on_incompatible_daily_queues_domain",
+      "table_name": "queue_entries"
+    }
+  ],
+  "skipped_missing_target": [],
+  "source_sqlite_path": "C:\\final\\backend\\clinic.db",
+  "success": true,
+  "target_url": "postgresql+psycopg://clinic:***@localhost:5432/clinicdb"
+}

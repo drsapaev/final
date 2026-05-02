@@ -1,0 +1,153 @@
+/**
+ * ExaminationMatrix Styles
+ */
+
+.ex-matrix {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+    background: var(--mac-background-secondary, #f5f5f7);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid var(--mac-border, #e5e5e5);
+}
+
+.ex-matrix--readonly {
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.ex-matrix__categories {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    /* Hide scrollbar */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ex-matrix__categories::-webkit-scrollbar {
+    display: none;
+}
+
+.ex-matrix__cat-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-text-secondary, #636366);
+    background: var(--mac-background, #ffffff);
+    border: 1px solid transparent;
+    border-radius: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.ex-matrix__cat-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.ex-matrix__cat-btn--active {
+    color: white;
+    background: var(--mac-accent-blue, #007aff);
+    box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
+}
+
+.ex-matrix__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.ex-matrix__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--mac-background, #ffffff);
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--mac-text-primary, #1d1d1f);
+}
+
+/* STATE: Normal (Default) - Gray/Greenish hover */
+.ex-matrix__item--normal {
+    border-left: 3px solid transparent;
+}
+
+/* STATE: Norm (Selected) - Green */
+.ex-matrix__item--norm {
+    border-color: #34c759;
+    background: rgba(52, 199, 89, 0.05);
+}
+
+.ex-matrix__item--norm .ex-matrix__status-norm {
+    opacity: 1;
+}
+
+/* STATE: Path (Selected) - Red */
+.ex-matrix__item--path {
+    border-color: #ff3b30;
+    background: rgba(255, 59, 48, 0.05);
+}
+
+.ex-matrix__item--path .ex-matrix__status-path {
+    opacity: 1;
+}
+
+.ex-matrix__label {
+    flex: 1;
+    font-weight: 500;
+}
+
+.ex-matrix__actions {
+    display: flex;
+    gap: 4px;
+}
+
+.ex-matrix__action-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--mac-border, #e5e5e5);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    color: #aeaeb2;
+    transition: all 0.1s;
+}
+
+.ex-matrix__action-btn:hover {
+    filter: brightness(0.95);
+}
+
+.ex-matrix__action-btn--norm:hover,
+.ex-matrix__status-norm {
+    color: #34c759;
+    border-color: #34c759;
+}
+
+.ex-matrix__action-btn--path:hover,
+.ex-matrix__status-path {
+    color: #ff3b30;
+    border-color: #ff3b30;
+}
+
+/* Selected states for buttons */
+.ex-matrix__item--norm .ex-matrix__action-btn--norm {
+    background: #34c759;
+    color: white;
+    border-color: #34c759;
+}
+
+.ex-matrix__item--path .ex-matrix__action-btn--path {
+    background: #ff3b30;
+    color: white;
+    border-color: #ff3b30;
+}

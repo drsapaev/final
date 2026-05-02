@@ -1,0 +1,96 @@
+name: 🎨 Автоматическое форматирование кода
+
+on:
+  workflow_dispatch:  # Только ручной запуск
+  push:
+    paths:
+      - 'backend/**/*.py'
+      - 'frontend/**/*.{js,jsx,ts,tsx}'
+
+jobs:
+  format-backend:
+    name: 🐍 Форматирование Python кода
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v6
+    
+    - name: 🐍 Установка Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11.10'
+        cache: 'pip'
+    
+    - name: 📦 Установка зависимостей
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install black isort
+    
+    - name: 🎨 Форматирование кода
+      run: |
+        cd backend
+        echo "🎨 Применяем black форматирование..."
+        black . --line-length 88
+        
+        echo "📦 Применяем isort сортировку импортов..."
+        isort . --profile black
+        
+        echo "✅ Форматирование завершено"
+    
+    - name: 📤 Коммит изменений
+      run: |
+        cd backend
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "⚠️ Найдены изменения форматирования, но автопуш отключен"
+          git status --porcelain
+          echo "✅ Форматирование выполнено (без коммита)"
+        else
+          echo "ℹ️ Нет изменений для коммита"
+        fi
+
+  format-frontend:
+    name: 🎨 Форматирование Frontend кода
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v6
+    
+    - name: 📦 Установка Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: 📦 Установка зависимостей
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: 🎨 Форматирование кода
+      run: |
+        cd frontend
+        echo "🎨 Применяем Prettier форматирование..."
+        npm run format || echo "⚠️ Prettier не настроен"
+        
+        echo "🔍 Применяем ESLint исправления..."
+        npm run lint:fix || echo "⚠️ ESLint не настроен"
+        
+        echo "✅ Форматирование завершено"
+    
+    - name: 📤 Коммит изменений
+      run: |
+        cd frontend
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "⚠️ Найдены изменения форматирования frontend, но автопуш отключен"
+          git status --porcelain
+          echo "✅ Frontend форматирование выполнено (без коммита)"
+        else
+          echo "ℹ️ Нет изменений для коммита"
+        fi

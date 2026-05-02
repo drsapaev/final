@@ -1,0 +1,455 @@
+"""
+Pydantic схемы для системы аутентификации
+"""
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic.config import ConfigDict
+
+
+class LoginRequest(BaseModel):
+    """Схема для запроса входа"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
+    remember_me: bool = Field(False, description="Запомнить пользователя")
+    device_fingerprint: str | None = Field(None, max_length=64)
+
+
+class LoginResponse(BaseModel):
+    """Схема для ответа входа"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+    expires_in: int
+    user: dict[str, Any]
+    requires_2fa: bool = False
+    two_factor_method: str | None = None
+    pending_2fa_token: str | None = None
+    must_change_password: bool = False  # Требуется смена пароля при следующем входе
+
+
+class RefreshTokenRequest(BaseModel):
+    """Схема для запроса обновления токена"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    refresh_token: str = Field(..., min_length=1)
+
+
+class RefreshTokenResponse(BaseModel):
+    """Схема для ответа обновления токена"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class LogoutRequest(BaseModel):
+    """Схема для запроса выхода"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    refresh_token: str | None = None
+    logout_all_devices: bool = False
+
+
+class LogoutResponse(BaseModel):
+    """Схема для ответа выхода"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    success: bool
+    message: str
+
+
+class PasswordResetRequest(BaseModel):
+    """Схема для запроса сброса пароля"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    email: EmailStr
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Схема для подтверждения сброса пароля"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    token: str = Field(..., min_length=32, max_length=64)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Пароль должен содержать минимум 8 символов')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну заглавную букву')
+        if not any(c.islower() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну строчную букву')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну цифру')
+        return v
+
+
+class PasswordChangeRequest(BaseModel):
+    """Схема для смены пароля"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Пароль должен содержать минимум 8 символов')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну заглавную букву')
+        if not any(c.islower() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну строчную букву')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну цифру')
+        return v
+
+
+class EmailVerificationRequest(BaseModel):
+    """Схема для запроса верификации email"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    email: EmailStr
+
+
+class EmailVerificationConfirmRequest(BaseModel):
+    """Схема для подтверждения верификации email"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    token: str = Field(..., min_length=32, max_length=64)
+
+
+class UserProfileUpdateRequest(BaseModel):
+    """Схема для обновления профиля пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    middle_name: str | None = Field(None, min_length=1, max_length=50)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, min_length=10, max_length=20)
+    date_of_birth: datetime | None = None
+    gender: str | None = Field(None, max_length=10)
+    nationality: str | None = Field(None, max_length=50)
+    language: str | None = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
+    bio: str | None = Field(None, max_length=1000)
+    website: str | None = Field(None, max_length=200)
+    avatar_url: str | None = Field(None, max_length=500)
+
+
+class UserProfileResponse(BaseModel):
+    """Схема для ответа профиля пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    username: str
+    full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    middle_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    website: str | None = None
+    language: str | None = None
+    timezone: str | None = None
+    nationality: str | None = None
+    date_of_birth: datetime | None = None
+    gender: str | None = None
+    role: str
+    is_active: bool
+    is_superuser: bool
+    email_verified: bool
+    phone_verified: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    last_login: datetime | None = None
+    two_factor_enabled: bool = False
+
+
+class UserSessionResponse(BaseModel):
+    """Схема для ответа сессии пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    session_id: str
+    created_at: datetime
+    last_activity: datetime
+    expires_at: datetime
+    is_active: bool
+    ip_address: str | None = None
+    user_agent: str | None = None
+    device_name: str | None = None
+    current_session: bool = False
+
+
+class LoginAttemptResponse(BaseModel):
+    """Схема для ответа попытки входа"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    username: str | None = None
+    email: str | None = None
+    ip_address: str
+    success: bool
+    failure_reason: str | None = None
+    attempted_at: datetime
+
+
+class UserActivityResponse(BaseModel):
+    """Схема для ответа активности пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    activity_type: str
+    description: str | None = None
+    created_at: datetime
+    ip_address: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class SecurityEventResponse(BaseModel):
+    """Схема для ответа события безопасности"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    id: int
+    event_type: str
+    severity: str
+    description: str
+    created_at: datetime
+    ip_address: str | None = None
+    metadata: dict[str, Any] | None = None
+    resolved: bool
+    resolved_at: datetime | None = None
+
+
+class TokenValidationResponse(BaseModel):
+    """Схема для ответа валидации токена"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    valid: bool
+    user_id: int | None = None
+    username: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    expires_at: datetime | None = None
+    requires_2fa: bool = False
+
+
+class AuthStatusResponse(BaseModel):
+    """Схема для ответа статуса аутентификации"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    authenticated: bool
+    user: UserProfileResponse | None = None
+    session: UserSessionResponse | None = None
+    two_factor_required: bool = False
+    two_factor_verified: bool = False
+
+
+class PasswordStrengthResponse(BaseModel):
+    """Схема для ответа проверки силы пароля"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    score: int = Field(..., ge=0, le=100)
+    strength: str = Field(..., pattern="^(weak|fair|good|strong|very_strong)$")
+    suggestions: list[str] = []
+
+
+class DeviceInfoResponse(BaseModel):
+    """Схема для ответа информации об устройстве"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    device_fingerprint: str
+    ip_address: str
+    user_agent: str
+    device_name: str | None = None
+    is_trusted: bool = False
+    last_used: datetime | None = None
+
+
+class AuthErrorResponse(BaseModel):
+    """Схема для ответа ошибки аутентификации"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    error: str
+    error_description: str
+    error_code: str
+    details: dict[str, Any] | None = None
+
+
+class AuthSuccessResponse(BaseModel):
+    """Схема для ответа успешной аутентификации"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    success: bool
+    message: str
+    data: dict[str, Any] | None = None
+
+
+# Схемы для административных функций
+
+
+class UserListResponse(BaseModel):
+    """Схема для ответа списка пользователей"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    users: list[UserProfileResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
+class UserCreateRequest(BaseModel):
+    """Схема для создания пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    password: str = Field(..., min_length=8, max_length=100)
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$")
+    is_active: bool = True
+    is_superuser: bool = False
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Пароль должен содержать минимум 8 символов')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну заглавную букву')
+        if not any(c.islower() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну строчную букву')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Пароль должен содержать минимум одну цифру')
+        return v
+
+
+class UserUpdateRequest(BaseModel):
+    """Схема для обновления пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    role: str | None = Field(
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+    )
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+
+
+class UserDeleteRequest(BaseModel):
+    """Схема для удаления пользователя"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    confirm: bool = Field(True, description="Подтверждение удаления")
+    transfer_to: int | None = Field(
+        None, description="ID пользователя для передачи данных"
+    )
+
+
+class SessionListResponse(BaseModel):
+    """Схема для ответа списка сессий"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    sessions: list[UserSessionResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
+class SessionRevokeRequest(BaseModel):
+    """Схема для отзыва сессии"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    session_id: int
+    reason: str | None = Field(None, max_length=200)
+
+
+class SecurityEventListResponse(BaseModel):
+    """Схема для ответа списка событий безопасности"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    events: list[SecurityEventResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
+class SecurityEventResolveRequest(BaseModel):
+    """Схема для разрешения события безопасности"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    event_id: int
+    resolution_notes: str | None = Field(None, max_length=500)
+
+
+# Схемы для статистики
+
+
+class AuthStatsResponse(BaseModel):
+    """Схема для ответа статистики аутентификации"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    total_users: int
+    active_users: int
+    total_sessions: int
+    active_sessions: int
+    failed_login_attempts: int
+    security_events: int
+    unresolved_security_events: int
+    two_factor_enabled_users: int
+    last_24h_logins: int
+    last_24h_failed_attempts: int

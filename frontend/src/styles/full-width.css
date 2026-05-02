@@ -1,0 +1,32 @@
+/* Оптимизированные стили для демо-страницы */
+
+.unified-main-content {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.unified-main-content > div {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Убираем горизонтальный скролл */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Оптимизируем grid для равномерного распределения */
+.grid {
+  width: 100%;
+}
+
+/* Обеспечиваем равномерное распределение карточек */
+.grid > * {
+  min-width: 0;
+}

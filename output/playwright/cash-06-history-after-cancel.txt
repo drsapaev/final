@@ -1,0 +1,9 @@
+CASH-06 browser proof
+- login: cashier@example.com / cashier123
+- route: /cashier-panel
+- tab: История платежей
+- date filter: 2026-03-27
+- action: canceled pending payment #195
+- observed UI state after cancel: payment #195 changed from Ожидает to Отменён and cancel/refund buttons became disabled
+- unaffected row: payment #196 remained Оплачено
+- source of truth: UI row state + backend POST /api/v1/cashier/payments/195/cancel => 200 + reload GET /api/v1/cashier/payments?page=1&size=20&date_from=2026-03-27&date_to=2026-03-27 => 200

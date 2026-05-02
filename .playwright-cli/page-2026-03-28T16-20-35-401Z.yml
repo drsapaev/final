@@ -1,0 +1,83 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e25]:
+          - img [ref=e26]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - button "Выбрать тему" [ref=e34] [cursor=pointer]:
+          - img [ref=e37]
+        - button "Lab User" [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]:
+            - img [ref=e42]
+            - text: Lab User
+        - button "Выйти" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Выйти
+    - generic [ref=e50]:
+      - complementary [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Медицинская система
+          - button "Collapse sidebar" [ref=e55] [cursor=pointer]:
+            - img [ref=e57]
+        - navigation [ref=e60]:
+          - button "Очередь" [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+            - generic [ref=e65]: Очередь
+          - button "Шаблоны" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Шаблоны
+          - button "Бланки" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e77]: Бланки
+      - main [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Панель лаборатории Очередь 0 Шаблоны 0 Бланки 0" [level=3] [ref=e82]:
+            - generic [ref=e83]:
+              - img [ref=e84]
+              - text: Панель лаборатории
+            - generic [ref=e87]:
+              - button "Очередь 0" [ref=e88] [cursor=pointer]:
+                - generic [ref=e89]:
+                  - img [ref=e90]
+                  - text: Очередь
+                  - generic [ref=e93]: "0"
+              - button "Шаблоны 0" [ref=e94] [cursor=pointer]:
+                - generic [ref=e95]:
+                  - img [ref=e96]
+                  - text: Шаблоны
+                  - generic [ref=e99]: "0"
+              - button "Бланки 0" [ref=e100] [cursor=pointer]:
+                - generic [ref=e101]:
+                  - img [ref=e102]
+                  - text: Бланки
+                  - generic [ref=e107]: "0"
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - heading "Очередь лаборатории" [level=3] [ref=e111]:
+                - img [ref=e112]
+                - text: Очередь лаборатории
+              - generic [ref=e115]:
+                - generic [ref=e116]: "Всего: 0"
+                - generic [ref=e117]: "В работе: 0"
+                - button "Обновить" [disabled]:
+                  - generic:
+                    - img
+                    - text: Обновить
+            - generic [ref=e119]: Загрузка лабораторной очереди...
+  - region "Notifications Alt+T"

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP API Тестирование</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.success { background-color: #28a745; color: white; }
+        .status.error { background-color: #dc3545; color: white; }
+        .status.info { background-color: #17a2b8; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 MCP API Тестирование</h1>
+        <p>Этот инструмент позволяет протестировать все MCP endpoints через браузер.</p>
+        
+        <div class="section info">
+            <h3>📋 Инструкции:</h3>
+            <ol>
+                <li>Убедитесь, что backend сервер запущен на <code>http://localhost:18000</code></li>
+                <li>Нажмите "Получить токен авторизации" для входа</li>
+                <li>Протестируйте различные MCP endpoints</li>
+                <li>Проверьте результаты в соответствующих разделах</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Авторизация -->
+    <div class="container">
+        <h2>🔐 Авторизация</h2>
+        <div class="section">
+            <h3>Получить токен авторизации</h3>
+            <input type="text" id="username" placeholder="Username" value="mcp_test">
+            <input type="password" id="password" placeholder="Password" value="test123">
+            <button onclick="getAuthToken()">Получить токен</button>
+            <div id="authResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- MCP Health -->
+    <div class="container">
+        <h2>🏥 MCP Health Check</h2>
+        <div class="section">
+            <button onclick="testMCPHealth()" id="healthBtn">Проверить здоровье MCP</button>
+            <div id="healthResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- MCP Status -->
+    <div class="container">
+        <h2>📊 MCP Status</h2>
+        <div class="section">
+            <button onclick="testMCPStatus()" id="statusBtn">Получить статус MCP</button>
+            <div id="statusResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- MCP Capabilities -->
+    <div class="container">
+        <h2>🔧 MCP Capabilities</h2>
+        <div class="section">
+            <button onclick="testMCPCapabilities()" id="capabilitiesBtn">Получить возможности MCP</button>
+            <div id="capabilitiesResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Анализ жалоб -->
+    <div class="container">
+        <h2>🩺 Анализ жалоб</h2>
+        <div class="section">
+            <h3>Проанализировать жалобу пациента</h3>
+            <textarea id="complaintText" placeholder="Введите жалобу пациента..." rows="3">Головная боль и тошнота уже 2 дня, особенно по утрам</textarea>
+            <input type="number" id="patientAge" placeholder="Возраст пациента" value="35">
+            <select id="patientGender">
+                <option value="male">Мужской</option>
+                <option value="female">Женский</option>
+            </select>
+            <button onclick="analyzeComplaint()" id="complaintBtn">Анализировать жалобу</button>
+            <div id="complaintResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Подсказки МКБ-10 -->
+    <div class="container">
+        <h2>📋 Подсказки МКБ-10</h2>
+        <div class="section">
+            <h3>Получить подсказки МКБ-10</h3>
+            <textarea id="symptomsText" placeholder="Введите симптомы через запятую..." rows="2">головная боль, тошнота, светобоязнь</textarea>
+            <input type="text" id="diagnosisText" placeholder="Предварительный диагноз" value="Мигрень">
+            <button onclick="suggestICD10()" id="icd10Btn">Получить подсказки МКБ-10</button>
+            <div id="icd10Result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Интерпретация анализов -->
+    <div class="container">
+        <h2>🧪 Интерпретация лабораторных анализов</h2>
+        <div class="section">
+            <h3>Интерпретировать результаты анализов</h3>
+            <textarea id="labResultsText" placeholder="Введите результаты анализов в JSON формате..." rows="4">[
+  {"name": "Глюкоза", "value": 6.5, "unit": "ммоль/л", "normal_range": "3.3-5.5"},
+  {"name": "Гемоглобин", "value": 110, "unit": "г/л", "normal_range": "120-160"},
+  {"name": "Лейкоциты", "value": 8.5, "unit": "×10⁹/л", "normal_range": "4.0-9.0"},
+  {"name": "СОЭ", "value": 25, "unit": "мм/ч", "normal_range": "2-15"}
+]</textarea>
+            <button onclick="interpretLabResults()" id="labBtn">Интерпретировать анализы</button>
+            <div id="labResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- МКБ-10 поиск -->
+    <div class="container">
+        <h2>🔍 Поиск МКБ-10</h2>
+        <div class="section">
+            <h3>Поиск кодов МКБ-10</h3>
+            <input type="text" id="searchQuery" placeholder="Введите поисковый запрос..." value="мигрень">
+            <button onclick="searchICD10()" id="searchBtn">Поиск МКБ-10</button>
+            <div id="searchResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:18000/api/v1';
+        let authToken = null;
+
+        // Получить токен авторизации
+        async function getAuthToken() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('authResult');
+            
+            try {
+                const response = await fetch(`${BASE_URL}/auth/minimal-login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors',
+                    credentials: 'omit',
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    resultDiv.className = 'result success';
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = `✅ Токен получен успешно!\n\nТокен: ${authToken.substring(0, 50)}...\n\nТеперь вы можете тестировать MCP endpoints.`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = `❌ Ошибка авторизации: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            }
+        }
+
+        // Проверить авторизацию
+        function checkAuth() {
+            if (!authToken) {
+                alert('Сначала получите токен авторизации!');
+                return false;
+            }
+            return true;
+        }
+
+        // Получить заголовки с авторизацией
+        function getAuthHeaders() {
+            return {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Тест здоровья MCP
+        async function testMCPHealth() {
+            if (!checkAuth()) return;
+            
+            const resultDiv = document.getElementById('healthResult');
+            const btn = document.getElementById('healthBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Проверяем...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/health`, {
+                    headers: getAuthHeaders(),
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ MCP Health Check успешен!\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Проверить здоровье MCP';
+            }
+        }
+
+        // Тест статуса MCP
+        async function testMCPStatus() {
+            if (!checkAuth()) return;
+            
+            const resultDiv = document.getElementById('statusResult');
+            const btn = document.getElementById('statusBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Получаем статус...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/status`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ MCP Status получен!\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Получить статус MCP';
+            }
+        }
+
+        // Тест возможностей MCP
+        async function testMCPCapabilities() {
+            if (!checkAuth()) return;
+            
+            const resultDiv = document.getElementById('capabilitiesResult');
+            const btn = document.getElementById('capabilitiesBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Получаем возможности...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/capabilities`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ MCP Capabilities получены!\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Получить возможности MCP';
+            }
+        }
+
+        // Анализ жалоб
+        async function analyzeComplaint() {
+            if (!checkAuth()) return;
+            
+            const complaint = document.getElementById('complaintText').value;
+            const age = parseInt(document.getElementById('patientAge').value);
+            const gender = document.getElementById('patientGender').value;
+            const resultDiv = document.getElementById('complaintResult');
+            const btn = document.getElementById('complaintBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Анализируем...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/complaint/analyze`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        complaint: complaint,
+                        patient_age: age,
+                        patient_gender: gender,
+                        urgency_assessment: true
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Анализ жалоб выполнен!\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Анализировать жалобу';
+            }
+        }
+
+        // Подсказки МКБ-10
+        async function suggestICD10() {
+            if (!checkAuth()) return;
+            
+            const symptoms = document.getElementById('symptomsText').value.split(',').map(s => s.trim());
+            const diagnosis = document.getElementById('diagnosisText').value;
+            const resultDiv = document.getElementById('icd10Result');
+            const btn = document.getElementById('icd10Btn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Получаем подсказки...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/icd10/suggest`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        symptoms: symptoms,
+                        diagnosis: diagnosis,
+                        max_suggestions: 5
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    
+                    // Форматируем результаты МКБ-10
+                    let formattedResult = '✅ Подсказки МКБ-10 получены!\n\n';
+                    
+                    if (data.data && data.data.suggestions) {
+                        formattedResult += '📋 Предложенные коды МКБ-10:\n\n';
+                        data.data.suggestions.forEach((item, index) => {
+                            formattedResult += `${index + 1}. ${item.code} - ${item.name || item.description}\n`;
+                            formattedResult += `   Релевантность: ${item.relevance || 'высокая'}\n\n`;
+                        });
+                    } else {
+                        formattedResult += JSON.stringify(data, null, 2);
+                    }
+                    
+                    resultDiv.textContent = formattedResult;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Получить подсказки МКБ-10';
+            }
+        }
+
+        // Интерпретация анализов
+        async function interpretLabResults() {
+            if (!checkAuth()) return;
+            
+            const resultsText = document.getElementById('labResultsText').value;
+            const resultDiv = document.getElementById('labResult');
+            const btn = document.getElementById('labBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Интерпретируем...';
+            
+            try {
+                const results = JSON.parse(resultsText);
+                
+                const response = await fetch(`${BASE_URL}/mcp/lab/interpret`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        results: results,
+                        patient_info: {
+                            age: 35,
+                            gender: 'female'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    
+                    // Форматируем результаты интерпретации анализов
+                    let formattedResult = '✅ Интерпретация анализов выполнена!\n\n';
+                    
+                    if (data.data && data.data.ai_interpretation) {
+                        const ai = data.data.ai_interpretation;
+                        
+                        formattedResult += `📊 ${ai.summary}\n\n`;
+                        
+                        if (ai.abnormal_values && ai.abnormal_values.length > 0) {
+                            formattedResult += '⚠️ Отклонения от нормы:\n';
+                            ai.abnormal_values.forEach((item, index) => {
+                                formattedResult += `${index + 1}. ${item.parameter}: ${item.value}\n`;
+                                formattedResult += `   ${item.interpretation}\n`;
+                                formattedResult += `   Клиническое значение: ${item.clinical_significance}\n\n`;
+                            });
+                        }
+                        
+                        if (ai.possible_conditions && ai.possible_conditions.length > 0) {
+                            formattedResult += '🔍 Возможные состояния:\n';
+                            ai.possible_conditions.forEach((condition, index) => {
+                                formattedResult += `${index + 1}. ${condition}\n`;
+                            });
+                            formattedResult += '\n';
+                        }
+                        
+                        if (ai.recommendations && ai.recommendations.length > 0) {
+                            formattedResult += '💡 Рекомендации:\n';
+                            ai.recommendations.forEach((rec, index) => {
+                                formattedResult += `${index + 1}. ${rec}\n`;
+                            });
+                            formattedResult += '\n';
+                        }
+                        
+                        formattedResult += `🚨 Срочная консультация: ${ai.urgency === 'да' ? 'Требуется' : 'Не требуется'}\n`;
+                    } else {
+                        formattedResult += JSON.stringify(data, null, 2);
+                    }
+                    
+                    resultDiv.textContent = formattedResult;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Интерпретировать анализы';
+            }
+        }
+
+        // Поиск МКБ-10
+        async function searchICD10() {
+            if (!checkAuth()) return;
+            
+            const query = document.getElementById('searchQuery').value;
+            const resultDiv = document.getElementById('searchResult');
+            const btn = document.getElementById('searchBtn');
+            
+            btn.disabled = true;
+            btn.textContent = 'Ищем...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/icd10/search?query=${encodeURIComponent(query)}`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    
+                    // Форматируем результаты поиска МКБ-10
+                    let formattedResult = '✅ Поиск МКБ-10 выполнен!\n\n';
+                    
+                    if (data.data && data.data.results) {
+                        formattedResult += `🔍 Найдено результатов: ${data.data.total_found}\n`;
+                        formattedResult += `📝 Запрос: "${data.data.query}"\n\n`;
+                        
+                        if (data.data.results.length > 0) {
+                            formattedResult += '📋 Найденные коды:\n\n';
+                            data.data.results.forEach((item, index) => {
+                                formattedResult += `${index + 1}. ${item.code} - ${item.description}\n`;
+                                formattedResult += `   Категория: ${item.category}\n`;
+                                formattedResult += `   Совпадение: ${Math.round((item.match_score || 1) * 100)}%\n\n`;
+                            });
+                        } else {
+                            formattedResult += '❌ Коды не найдены\n';
+                        }
+                    } else {
+                        formattedResult += JSON.stringify(data, null, 2);
+                    }
+                    
+                    resultDiv.textContent = formattedResult;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Ошибка сети: ${error.message}`;
+            } finally {
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Поиск МКБ-10';
+            }
+        }
+
+        // Проверка доступности сервера при загрузке
+        window.onload = async function() {
+            try {
+                const response = await fetch(`${BASE_URL}/health`, {
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                if (response.ok) {
+                    console.log('✅ Backend сервер доступен');
+                    document.body.style.borderTop = '5px solid #28a745';
+                } else {
+                    console.log('⚠️ Backend сервер недоступен');
+                    document.body.style.borderTop = '5px solid #ffc107';
+                }
+            } catch (error) {
+                console.log('❌ Backend сервер недоступен:', error.message);
+                document.body.style.borderTop = '5px solid #dc3545';
+            }
+        };
+    </script>
+</body>
+</html>

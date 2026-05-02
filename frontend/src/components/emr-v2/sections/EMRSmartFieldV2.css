@@ -1,0 +1,140 @@
+/**
+ * EMRSmartFieldV2 CSS
+ */
+
+.emr-smart-field-v2 {
+    position: relative;
+}
+
+.emr-smart-field-v2--disabled {
+    opacity: 0.6;
+}
+
+/* Input wrapper */
+.emr-smart-field-v2__input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* Input/Textarea */
+.emr-smart-field-v2__input {
+    flex: 1;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    transition: all 0.15s ease;
+    background: transparent;
+    /* Allows ghost text to shine through if needed, though we use overlay */
+    z-index: 2;
+    /* input above ghost */
+}
+
+.emr-smart-field-v2__input:focus {
+    outline: none;
+    border-color: #4285f4;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.12);
+}
+
+.emr-smart-field-v2__input:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.emr-smart-field-v2__input::placeholder {
+    color: #aaa;
+}
+
+/* Focus state */
+.emr-smart-field-v2--focused .emr-smart-field-v2__input {
+    border-color: #4285f4;
+}
+
+/* AI Button position */
+.emr-smart-field-v2__ai-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+}
+
+/* Adjust input padding for button */
+.emr-smart-field-v2__input-wrapper .emr-smart-field-v2__input {
+    padding-right: 44px;
+}
+
+/* Hint */
+.emr-smart-field-v2__hint {
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    font-size: 0.75rem;
+    color: #4285f4;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Add space for popover */
+.emr-smart-field-v2 {
+    margin-bottom: 8px;
+}
+
+/* 
+ * EXPERIMENTAL GHOST MODE STYLES 
+ */
+.emr-smart-field-v2__ghost-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    padding: 13px 15px;
+    /* Match input padding + border */
+    font-size: 0.95rem;
+    font-family: inherit;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.emr-smart-field-v2__ghost-invisible {
+    color: transparent;
+}
+
+.emr-smart-field-v2__ghost-text {
+    color: #b0b0b0;
+    opacity: 0.7;
+}
+
+.emr-smart-field-v2__ghost-marker {
+    position: absolute;
+    right: 50px;
+    top: -22px;
+    font-size: 0.7rem;
+    color: #e65100;
+    background: #fff3e0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #ffe0b2;
+    white-space: nowrap;
+}

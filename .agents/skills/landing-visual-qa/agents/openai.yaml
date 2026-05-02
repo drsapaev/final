@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Visual QA"
+  short_description: "Inspect visual regressions"
+  default_prompt: "Use $landing-visual-qa to compare screenshots and spot layout issues on a landing page."

@@ -1,0 +1,259 @@
+/**
+ * EMRContainerV2 CSS - MacOS Design System (Theme-aware)
+ * Uses CSS variables from macos-tokens.css for light/dark theme support
+ */
+
+.emr-v2-container {
+    display: flex;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background-color: var(--mac-bg-secondary);
+    padding: var(--mac-spacing-6);
+    box-sizing: border-box;
+}
+
+.emr-v2-container--with-sidebar .emr-v2-main {
+    max-width: calc(100% - 340px);
+}
+
+/* Main "Paper" Sheet */
+.emr-v2-main {
+    flex: 1;
+    width: 100%;
+    max-width: 1024px;
+    margin: 0 auto;
+    background: var(--mac-bg-primary);
+    border-radius: var(--mac-radius-xl);
+    box-shadow: var(--mac-shadow-md);
+    border: 1px solid var(--mac-border);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    position: relative;
+}
+
+/* Header - Sticky & Blurred */
+.emr-v2-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--mac-spacing-4) var(--mac-spacing-6);
+    background: var(--mac-bg-primary);
+    backdrop-filter: var(--mac-blur-light);
+    -webkit-backdrop-filter: var(--mac-blur-light);
+    border-bottom: 1px solid var(--mac-separator);
+    border-top-left-radius: var(--mac-radius-xl);
+    border-top-right-radius: var(--mac-radius-xl);
+}
+
+.emr-v2-header__left {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+}
+
+.emr-v2-header__left h2 {
+    margin: 0;
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+    letter-spacing: -0.01em;
+}
+
+.emr-v2-patient-id {
+    font-size: var(--mac-font-size-sm);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-secondary);
+    background: var(--mac-bg-tertiary);
+    padding: var(--mac-spacing-1) var(--mac-spacing-2);
+    border-radius: var(--mac-radius-sm);
+}
+
+.emr-v2-header__right {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+}
+
+/* Toolbar */
+.emr-v2-toolbar {
+    padding: var(--mac-spacing-3) var(--mac-spacing-6) 0;
+    display: flex;
+    gap: var(--mac-spacing-2);
+    background: var(--mac-bg-primary);
+}
+
+.emr-v2-toolbar button {
+    padding: var(--mac-spacing-1) var(--mac-spacing-3);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+    background: var(--mac-bg-primary);
+    font-size: var(--mac-font-size-sm);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-primary);
+    cursor: pointer;
+    box-shadow: var(--mac-shadow-sm);
+    transition: all var(--mac-duration-fast) var(--mac-ease);
+}
+
+.emr-v2-toolbar button:hover:not(:disabled) {
+    background: var(--mac-bg-tertiary);
+    border-color: var(--mac-border-secondary);
+}
+
+.emr-v2-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Sections Container */
+.emr-v2-sections {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--mac-bg-primary);
+}
+
+/* Actions Footer */
+.emr-v2-actions {
+    display: flex;
+    gap: var(--mac-spacing-3);
+    align-items: center;
+    padding: var(--mac-spacing-5) var(--mac-spacing-6);
+    background: var(--mac-bg-secondary);
+    border-top: 1px solid var(--mac-separator);
+    border-bottom-left-radius: var(--mac-radius-xl);
+    border-bottom-right-radius: var(--mac-radius-xl);
+}
+
+.emr-v2-actions div {
+    flex: 1;
+}
+
+/* Buttons */
+.emr-v2-btn {
+    padding: var(--mac-spacing-2) var(--mac-spacing-4);
+    border: none;
+    border-radius: var(--mac-radius-md);
+    font-size: var(--mac-font-size-base);
+    font-weight: var(--mac-font-weight-medium);
+    cursor: pointer;
+    transition: all var(--mac-duration-fast) var(--mac-ease);
+}
+
+.emr-v2-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+/* Primary Button (Blue) */
+.emr-v2-btn--primary {
+    background: var(--mac-accent-blue);
+    color: white;
+}
+
+.emr-v2-btn--primary:hover:not(:disabled) {
+    background: var(--mac-accent-blue-hover);
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+}
+
+/* Success Button (Green) */
+.emr-v2-btn--success {
+    background: var(--mac-success);
+    color: white;
+}
+
+.emr-v2-btn--success:hover:not(:disabled) {
+    background: var(--mac-success-hover);
+    box-shadow: 0 2px 8px rgba(48, 209, 88, 0.35);
+}
+
+/* Warning Button (Orange) */
+.emr-v2-btn--warning {
+    background: var(--mac-warning);
+    color: white;
+}
+
+.emr-v2-btn--warning:hover:not(:disabled) {
+    background: var(--mac-warning-hover);
+}
+
+/* Icon Buttons */
+.emr-v2-btn--icon {
+    padding: var(--mac-spacing-2);
+    background: transparent;
+    color: var(--mac-text-secondary);
+    border: none;
+}
+
+.emr-v2-btn--icon:hover {
+    color: var(--mac-text-primary);
+    background: var(--mac-bg-tertiary);
+}
+
+/* Signed Badge */
+.emr-v2-signed-badge {
+    padding: var(--mac-spacing-2) var(--mac-spacing-3);
+    background: rgba(48, 209, 88, 0.15);
+    color: var(--mac-success);
+    border-radius: var(--mac-radius-md);
+    font-weight: var(--mac-font-weight-semibold);
+    font-size: var(--mac-font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-1);
+}
+
+/* Amend Form */
+.emr-v2-amend-form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-3);
+}
+
+.emr-v2-amend-form textarea {
+    padding: var(--mac-spacing-3);
+    border: 1px solid var(--mac-warning);
+    border-radius: var(--mac-radius-md);
+    font-family: inherit;
+    font-size: var(--mac-font-size-base);
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+    box-shadow: 0 2px 6px rgba(255, 159, 10, 0.1);
+    resize: vertical;
+}
+
+.emr-v2-amend-actions {
+    display: flex;
+    gap: var(--mac-spacing-2);
+    justify-content: flex-end;
+}
+
+/* Error Banner */
+.emr-v2-error {
+    margin: var(--mac-spacing-3) var(--mac-spacing-6);
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    background: rgba(255, 69, 58, 0.1);
+    border: 1px solid var(--mac-danger);
+    border-radius: var(--mac-radius-md);
+    color: var(--mac-danger);
+    font-size: var(--mac-font-size-sm);
+}
+
+/* Modal Overlay */
+.emr-v2-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: var(--mac-blur-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: var(--mac-spacing-6);
+}

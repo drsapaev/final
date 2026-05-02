@@ -1,0 +1,69 @@
+тЪая╕П  DATABASE_URL ╨╜╨╡ ╤Г╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜, ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╨╝: sqlite:///./clinic.db
+================================================================================
+╨Р╨г╨Ф╨Ш╨в CASCADE DELETE ╨б╨в╨а╨Р╨в╨Х╨У╨Ш╨Щ
+================================================================================
+
+[ERROR] backups.created_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] branches.manager_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] clinic_settings.updated_by -> users: ╨Э╨Х╨в CASCADE
+[OK] department_queue_settings.department_id -> departments: CASCADE
+[OK] department_registration_settings.department_id -> departments: CASCADE
+[OK] department_services.department_id -> departments: CASCADE
+[ERROR] doctor_price_overrides.approved_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] doctor_price_overrides.visit_id -> visits: ╨Э╨Х╨в CASCADE
+[ERROR] doctors.user_id -> users: ╨Э╨Х╨в CASCADE
+[WARNING] email_verification_tokens.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] file_access_logs.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] file_folders.owner_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] file_quotas.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] file_shares.created_by -> users: ╨Э╨Х╨в CASCADE
+[WARNING] file_shares.file_id -> files
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] file_shares.shared_with_user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] file_versions.created_by -> users: ╨Э╨Х╨в CASCADE
+[WARNING] file_versions.file_id -> files
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] files.owner_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] files.patient_id -> patients: ╨Э╨Х╨в CASCADE
+[ERROR] group_roles.assigned_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] license_activations.activated_by -> users: ╨Э╨Х╨в CASCADE
+[WARNING] login_attempts.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[WARNING] password_reset_tokens.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] patients.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] permission_audit_log.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] queue_entries.patient_id -> patients: ╨Э╨Х╨в CASCADE
+[ERROR] queue_tokens.generated_by_user_id -> users: ╨Э╨Х╨в CASCADE
+[WARNING] refresh_tokens.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] role_hierarchy.created_by -> users: ╨Э╨Х╨в CASCADE
+[WARNING] security_events.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] security_events.resolved_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] telegram_users.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] telegram_users.patient_id -> patients: ╨Э╨Х╨в CASCADE
+[ERROR] two_factor_auth.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] two_factor_devices.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] two_factor_sessions.user_id -> users: ╨Э╨Х╨в CASCADE
+[WARNING] user_activities.user_id -> users
+     ╨в╨╡╨║╤Г╤Й╨╕╨╣: NONE, ╨Ю╨╢╨╕╨┤╨░╨╡╤В╤Б╤П: CASCADE
+[ERROR] user_audit_logs.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] user_groups_members.added_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] user_notification_settings.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] user_permission_overrides.granted_by -> users: ╨Э╨Х╨в CASCADE
+[ERROR] user_preferences.user_id -> users: ╨Э╨Х╨в CASCADE
+[ERROR] user_profiles.user_id -> users: ╨Э╨Х╨в CASCADE
+[OK] user_sessions.user_id -> users: CASCADE
+[OK] visit_services.visit_id -> visits: CASCADE
+
+================================================================================
+╨Ш╨в╨Ю╨У╨Ю╨Т╨л╨Щ ╨Ю╨в╨з╨Х╨в
+================================================================================
+[OK] ╨Я╤А╨░╨▓╨╕╨╗╤М╨╜╤Л╨╡ cascade: 5
+[WARNING] ╨Э╨╡╤Б╨╛╨╛╤В╨▓╨╡╤В╤Б╤В╨▓╨╕╤П: 8
+[ERROR] ╨Ю╤В╤Б╤Г╤В╤Б╤В╨▓╤Г╤О╤Й╨╕╨╡ cascade: 33
+[WARNING] ╨а╨╕╤Б╨║ ╨┐╨╛╤В╨╡╤А╨╕ ╨┤╨░╨╜╨╜╤Л╤Е: 0
+
+[WARNING] ╨Ю╨С╨Э╨Р╨а╨г╨Ц╨Х╨Э╨л ╨Я╨а╨Ю╨С╨Ы╨Х╨Ь╨л ╨б CASCADE DELETE!

@@ -1,0 +1,439 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - button "Управление клиникой" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - text: Управление клиникой
+      - generic [ref=e14]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e15]
+        - generic: ⌘K
+      - generic [ref=e17]:
+        - button "RU" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: RU
+        - generic "Онлайн" [ref=e135]:
+          - img [ref=e136]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Выбрать тему" [ref=e36] [cursor=pointer]:
+          - img [ref=e39]
+        - button "Dentist User" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - text: Dentist User
+        - button "Выйти" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - text: Выйти
+    - generic [ref=e55]:
+      - complementary [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: Медицинская система
+          - button "Collapse sidebar" [ref=e60] [cursor=pointer]:
+            - img [ref=e62]
+        - navigation [ref=e65]:
+          - button "Dashboard" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e70]: Dashboard
+          - button "Patients" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e75]: Patients
+          - button "Appointments" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e80]: Appointments
+          - button "Examinations" [ref=e81] [cursor=pointer]:
+            - img [ref=e82]
+            - generic [ref=e85]: Examinations
+          - button "Diagnoses" [ref=e86] [cursor=pointer]:
+            - img [ref=e87]
+            - generic [ref=e90]: Diagnoses
+          - button "Visit Protocols" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e97]: Visit Protocols
+          - button "Photo Archive" [ref=e98] [cursor=pointer]:
+            - img [ref=e99]
+            - generic [ref=e102]: Photo Archive
+          - button "Templates" [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+            - generic [ref=e107]: Templates
+          - button "Reports" [ref=e108] [cursor=pointer]:
+            - img [ref=e109]
+            - generic [ref=e112]: Reports
+          - button "Dental Chart" [ref=e113] [cursor=pointer]:
+            - img [ref=e114]
+            - generic [ref=e117]: Dental Chart
+          - button "Treatment Plans" [ref=e118] [cursor=pointer]:
+            - img [ref=e119]
+            - generic [ref=e122]: Treatment Plans
+          - button "Prosthetics" [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e127]: Prosthetics
+          - button "AI Assistant" [ref=e128] [cursor=pointer]:
+            - img [ref=e129]
+            - generic [ref=e132]: AI Assistant
+      - main [ref=e133]:
+        - generic [ref=e138]:
+          - generic [ref=e140]:
+            - generic [ref=e1118]:
+              - 'heading "Прием пациента: DENT 01 Пациент 1774146335" [level=3] [ref=e1119]':
+                - img [ref=e1120]
+                - text: "Прием пациента: DENT 01 Пациент 1774146335"
+              - button "Вернуться в очередь" [ref=e1124] [cursor=pointer]:
+                - generic [ref=e1125]: Вернуться в очередь
+            - generic [ref=e1127]:
+              - generic [ref=e1128]:
+                - generic [ref=e1129]:
+                  - heading "ЭМК v2" [level=2] [ref=e1130]
+                  - generic [ref=e1131]: "Пациент #451"
+                - generic [ref=e1132]:
+                  - generic "Начните вводить данные" [ref=e1133]:
+                    - generic [ref=e1134]: Новый документ
+                    - generic "Версия 1" [ref=e1135]: v1
+                  - button "❓" [ref=e1136] [cursor=pointer]
+                  - button "👻" [ref=e1137] [cursor=pointer]
+                  - button "📜" [ref=e1138] [cursor=pointer]
+              - generic [ref=e1139]:
+                - button "↩️ Отменить" [disabled] [ref=e1140]
+                - button "↪️ Повторить" [disabled] [ref=e1141]
+                - button "🔄 Обновить" [ref=e1142] [cursor=pointer]
+              - generic [ref=e1143]:
+                - generic [ref=e1144]:
+                  - generic [ref=e1145]:
+                    - button "📋 Жалобы* ▼" [expanded] [ref=e1146] [cursor=pointer]:
+                      - generic [ref=e1147]: 📋
+                      - generic [ref=e1148]: Жалобы*
+                      - generic [ref=e1149]: ▼
+                    - button "Мой опыт" [ref=e1151] [cursor=pointer]:
+                      - img [ref=e1152]
+                      - generic [ref=e1156]: Мой опыт
+                  - textbox "Введите жалобы пациента..." [ref=e1162]
+                - generic [ref=e1163]:
+                  - generic [ref=e1164]:
+                    - button "📖 Анамнез заболевания ▼" [expanded] [ref=e1165] [cursor=pointer]:
+                      - generic [ref=e1166]: 📖
+                      - generic [ref=e1167]: Анамнез заболевания
+                      - generic [ref=e1168]: ▼
+                    - button "Мой опыт" [ref=e1170] [cursor=pointer]:
+                      - img [ref=e1171]
+                      - generic [ref=e1175]: Мой опыт
+                  - textbox "История текущего заболевания..." [ref=e1181]
+                - generic [ref=e1182]:
+                  - generic [ref=e1183]:
+                    - button "👤 Анамнез жизни и параметры ▼" [expanded] [ref=e1184] [cursor=pointer]:
+                      - generic [ref=e1185]: 👤
+                      - generic [ref=e1186]: Анамнез жизни и параметры
+                      - generic [ref=e1187]: ▼
+                    - button "Мой опыт" [ref=e1189] [cursor=pointer]:
+                      - img [ref=e1190]
+                      - generic [ref=e1194]: Мой опыт
+                  - generic [ref=e1197]:
+                    - generic [ref=e1198]:
+                      - heading "Витальные показатели" [level=4] [ref=e1199]
+                      - generic [ref=e1200]:
+                        - generic [ref=e1201]:
+                          - generic [ref=e1202]:
+                            - generic [ref=e1203]: АД сист.
+                            - spinbutton [ref=e1204]
+                          - generic [ref=e1205]: /
+                          - generic [ref=e1206]:
+                            - generic [ref=e1207]: АД диаст.
+                            - spinbutton [ref=e1208]
+                          - generic [ref=e1209]:
+                            - generic [ref=e1210]: Пульс
+                            - spinbutton [ref=e1211]
+                          - generic [ref=e1212]:
+                            - generic [ref=e1213]: SpO₂
+                            - spinbutton [ref=e1214]
+                            - generic: "%"
+                        - generic [ref=e1215]:
+                          - generic [ref=e1216]:
+                            - generic [ref=e1217]: Рост
+                            - spinbutton [ref=e1218]
+                            - generic: см
+                          - generic [ref=e1219]:
+                            - generic [ref=e1220]: Вес
+                            - spinbutton [ref=e1221]
+                            - generic: кг
+                    - textbox "Хронические заболевания, аллергии, наследственность..." [ref=e1223]
+                - generic [ref=e1224]:
+                  - generic [ref=e1225]:
+                    - button "🔍 Объективный осмотр ▼" [expanded] [ref=e1226] [cursor=pointer]:
+                      - generic [ref=e1227]: 🔍
+                      - generic [ref=e1228]: Объективный осмотр
+                      - generic [ref=e1229]: ▼
+                    - button "Мой опыт" [ref=e1231] [cursor=pointer]:
+                      - img [ref=e1232]
+                      - generic [ref=e1236]: Мой опыт
+                  - generic [ref=e1239]:
+                    - generic [ref=e1241]:
+                      - generic [ref=e1242]:
+                        - button "Общий осмотр" [ref=e1243] [cursor=pointer]
+                        - button "Пародонт" [ref=e1244] [cursor=pointer]
+                        - button "Прикус" [ref=e1245] [cursor=pointer]
+                        - button "Гигиена" [ref=e1246] [cursor=pointer]
+                      - generic [ref=e1247]:
+                        - generic [ref=e1248]:
+                          - generic [ref=e1249]: Состояние слизистой
+                          - generic [ref=e1250]:
+                            - button "Норма" [ref=e1251] [cursor=pointer]:
+                              - img [ref=e1252]
+                            - button "Патология" [ref=e1254] [cursor=pointer]:
+                              - img [ref=e1255]
+                        - generic [ref=e1257]:
+                          - generic [ref=e1258]: Язык
+                          - generic [ref=e1259]:
+                            - button "Норма" [ref=e1260] [cursor=pointer]:
+                              - img [ref=e1261]
+                            - button "Патология" [ref=e1263] [cursor=pointer]:
+                              - img [ref=e1264]
+                        - generic [ref=e1266]:
+                          - generic [ref=e1267]: Губы
+                          - generic [ref=e1268]:
+                            - button "Норма" [ref=e1269] [cursor=pointer]:
+                              - img [ref=e1270]
+                            - button "Патология" [ref=e1272] [cursor=pointer]:
+                              - img [ref=e1273]
+                        - generic [ref=e1275]:
+                          - generic [ref=e1276]: Щеки
+                          - generic [ref=e1277]:
+                            - button "Норма" [ref=e1278] [cursor=pointer]:
+                              - img [ref=e1279]
+                            - button "Патология" [ref=e1281] [cursor=pointer]:
+                              - img [ref=e1282]
+                    - textbox "Общее состояние, кожные покровы, лимфоузлы, органы и системы..." [ref=e1286]
+                - generic [ref=e1287]:
+                  - button "🩺 Диагноз* ▼" [expanded] [ref=e1289] [cursor=pointer]:
+                    - generic [ref=e1290]: 🩺
+                    - generic [ref=e1291]: Диагноз*
+                    - generic [ref=e1292]: ▼
+                  - generic [ref=e1296]:
+                    - generic [ref=e1298]:
+                      - textbox "Основной диагноз..." [ref=e1299]: "[object Object]"
+                      - button "🧠" [ref=e1301] [cursor=pointer]:
+                        - generic [ref=e1302]: 🧠
+                    - generic [ref=e1304]:
+                      - generic [ref=e1305]: Код МКБ-10
+                      - textbox "Код МКБ-10" [ref=e1306]:
+                        - /placeholder: например, J06.9
+                - generic [ref=e1307]:
+                  - generic [ref=e1308]:
+                    - button "💊 Лечение ▼" [expanded] [ref=e1309] [cursor=pointer]:
+                      - generic [ref=e1310]: 💊
+                      - generic [ref=e1311]: Лечение
+                      - generic [ref=e1312]: ▼
+                    - generic [ref=e1314]:
+                      - button "Мой опыт" [ref=e1315] [cursor=pointer]:
+                        - img [ref=e1316]
+                        - text: Мой опыт
+                      - button "📋 Шаблоны" [ref=e1320] [cursor=pointer]
+                  - generic [ref=e1323]:
+                    - textbox "План лечения, назначения..." [ref=e1326]
+                    - generic [ref=e1327]:
+                      - heading "Лекарственные назначения" [level=4] [ref=e1328]
+                      - button "Добавить назначение" [ref=e1330] [cursor=pointer]:
+                        - img [ref=e1331]
+                        - text: Добавить назначение
+                - generic [ref=e1332]:
+                  - generic [ref=e1333]:
+                    - button "💡 Рекомендации ▼" [expanded] [ref=e1334] [cursor=pointer]:
+                      - generic [ref=e1335]: 💡
+                      - generic [ref=e1336]: Рекомендации
+                      - generic [ref=e1337]: ▼
+                    - button "Мой опыт" [ref=e1339] [cursor=pointer]:
+                      - img [ref=e1340]
+                      - generic [ref=e1344]: Мой опыт
+                  - textbox "Рекомендации пациенту, режим, диета..." [ref=e1349]
+                - generic [ref=e1350]:
+                  - generic [ref=e1351]:
+                    - button "📝 Примечания ▼" [ref=e1352] [cursor=pointer]:
+                      - generic [ref=e1353]: 📝
+                      - generic [ref=e1354]: Примечания
+                      - generic [ref=e1355]: ▼
+                    - button "Мой опыт" [ref=e1357] [cursor=pointer]:
+                      - img [ref=e1358]
+                      - generic [ref=e1362]: Мой опыт
+                  - textbox "Дополнительные заметки врача..." [ref=e1365]
+                - generic [ref=e1366]:
+                  - button "🦷 Стоматологические данные ▼" [expanded] [ref=e1368] [cursor=pointer]:
+                    - generic [ref=e1369]: 🦷
+                    - generic [ref=e1370]: Стоматологические данные
+                    - generic [ref=e1371]: ▼
+                  - generic [ref=e1374]:
+                    - generic [ref=e1375]:
+                      - button "Зубная карта" [ref=e1376] [cursor=pointer]
+                      - button "Гигиена" [ref=e1377] [cursor=pointer]
+                      - button "Пародонт" [ref=e1378] [cursor=pointer]
+                      - button "Прикус" [ref=e1379] [cursor=pointer]
+                      - button "Рентген" [ref=e1380] [cursor=pointer]
+                    - generic [ref=e1383]:
+                      - generic [ref=e1384]:
+                        - heading "Зубная карта" [level=6] [ref=e1385]:
+                          - img [ref=e1386]
+                          - text: Зубная карта
+                        - generic [ref=e1390]:
+                          - generic [ref=e1391]:
+                            - button "Постоянные" [ref=e1392] [cursor=pointer]
+                            - button "Молочные" [ref=e1393] [cursor=pointer]
+                          - generic [ref=e1394]:
+                            - button [ref=e1395] [cursor=pointer]:
+                              - img [ref=e1396]
+                            - button [ref=e1399] [cursor=pointer]:
+                              - img [ref=e1400]
+                          - button "Очистить" [ref=e1403] [cursor=pointer]:
+                            - generic [ref=e1404]:
+                              - img [ref=e1405]
+                              - text: Очистить
+                      - generic [ref=e1410]:
+                        - paragraph [ref=e1411]: "Выберите состояние для отметки:"
+                        - generic [ref=e1412]:
+                          - generic [ref=e1413] [cursor=pointer]: Здоров
+                          - generic [ref=e1414] [cursor=pointer]: Кариес
+                          - generic [ref=e1415] [cursor=pointer]: Пломба
+                          - generic [ref=e1416] [cursor=pointer]: Коронка
+                          - generic [ref=e1417] [cursor=pointer]: Имплант
+                          - generic [ref=e1418] [cursor=pointer]: Отсутствует
+                          - generic [ref=e1419] [cursor=pointer]: Корень
+                          - generic [ref=e1420] [cursor=pointer]: Мост
+                      - generic [ref=e1422]:
+                        - generic [ref=e1423]:
+                          - paragraph [ref=e1424]: Верхняя челюсть
+                          - generic [ref=e1425]:
+                            - generic [ref=e1426]:
+                              - paragraph [ref=e1427]: Правая
+                              - generic [ref=e1428]:
+                                - generic "Зуб №11 • Здоров" [ref=e1429]:
+                                  - button [ref=e1430] [cursor=pointer]:
+                                    - img [ref=e1431]
+                                - generic "Зуб №12 • Здоров" [ref=e1433]:
+                                  - button [ref=e1434] [cursor=pointer]:
+                                    - img [ref=e1435]
+                                - generic "Зуб №13 • Здоров" [ref=e1437]:
+                                  - button [ref=e1438] [cursor=pointer]:
+                                    - img [ref=e1439]
+                                - generic "Зуб №14 • Здоров" [ref=e1441]:
+                                  - button [ref=e1442] [cursor=pointer]:
+                                    - img [ref=e1443]
+                                - generic "Зуб №15 • Здоров" [ref=e1445]:
+                                  - button [ref=e1446] [cursor=pointer]:
+                                    - img [ref=e1447]
+                                - generic "Зуб №16 • Здоров" [ref=e1449]:
+                                  - button [ref=e1450] [cursor=pointer]:
+                                    - img [ref=e1451]
+                                - generic "Зуб №17 • Здоров" [ref=e1453]:
+                                  - button [ref=e1454] [cursor=pointer]:
+                                    - img [ref=e1455]
+                                - generic "Зуб №18 • Здоров" [ref=e1457]:
+                                  - button [ref=e1458] [cursor=pointer]:
+                                    - img [ref=e1459]
+                            - generic [ref=e1462]:
+                              - paragraph [ref=e1463]: Левая
+                              - generic [ref=e1464]:
+                                - generic "Зуб №21 • Здоров" [ref=e1465]:
+                                  - button [ref=e1466] [cursor=pointer]:
+                                    - img [ref=e1467]
+                                - generic "Зуб №22 • Здоров" [ref=e1469]:
+                                  - button [ref=e1470] [cursor=pointer]:
+                                    - img [ref=e1471]
+                                - generic "Зуб №23 • Здоров" [ref=e1473]:
+                                  - button [ref=e1474] [cursor=pointer]:
+                                    - img [ref=e1475]
+                                - generic "Зуб №24 • Здоров" [ref=e1477]:
+                                  - button [ref=e1478] [cursor=pointer]:
+                                    - img [ref=e1479]
+                                - generic "Зуб №25 • Здоров" [ref=e1481]:
+                                  - button [ref=e1482] [cursor=pointer]:
+                                    - img [ref=e1483]
+                                - generic "Зуб №26 • Здоров" [ref=e1485]:
+                                  - button [ref=e1486] [cursor=pointer]:
+                                    - img [ref=e1487]
+                                - generic "Зуб №27 • Здоров" [ref=e1489]:
+                                  - button [ref=e1490] [cursor=pointer]:
+                                    - img [ref=e1491]
+                                - generic "Зуб №28 • Здоров" [ref=e1493]:
+                                  - button [ref=e1494] [cursor=pointer]:
+                                    - img [ref=e1495]
+                        - generic [ref=e1498]:
+                          - generic [ref=e1499]:
+                            - generic [ref=e1501]:
+                              - generic "Зуб №48 • Здоров" [ref=e1502]:
+                                - button [ref=e1503] [cursor=pointer]:
+                                  - img [ref=e1504]
+                              - generic "Зуб №47 • Здоров" [ref=e1506]:
+                                - button [ref=e1507] [cursor=pointer]:
+                                  - img [ref=e1508]
+                              - generic "Зуб №46 • Здоров" [ref=e1510]:
+                                - button [ref=e1511] [cursor=pointer]:
+                                  - img [ref=e1512]
+                              - generic "Зуб №45 • Здоров" [ref=e1514]:
+                                - button [ref=e1515] [cursor=pointer]:
+                                  - img [ref=e1516]
+                              - generic "Зуб №44 • Здоров" [ref=e1518]:
+                                - button [ref=e1519] [cursor=pointer]:
+                                  - img [ref=e1520]
+                              - generic "Зуб №43 • Здоров" [ref=e1522]:
+                                - button [ref=e1523] [cursor=pointer]:
+                                  - img [ref=e1524]
+                              - generic "Зуб №42 • Здоров" [ref=e1526]:
+                                - button [ref=e1527] [cursor=pointer]:
+                                  - img [ref=e1528]
+                              - generic "Зуб №41 • Здоров" [ref=e1530]:
+                                - button [ref=e1531] [cursor=pointer]:
+                                  - img [ref=e1532]
+                            - generic [ref=e1536]:
+                              - generic "Зуб №38 • Здоров" [ref=e1537]:
+                                - button [ref=e1538] [cursor=pointer]:
+                                  - img [ref=e1539]
+                              - generic "Зуб №37 • Здоров" [ref=e1541]:
+                                - button [ref=e1542] [cursor=pointer]:
+                                  - img [ref=e1543]
+                              - generic "Зуб №36 • Здоров" [ref=e1545]:
+                                - button [ref=e1546] [cursor=pointer]:
+                                  - img [ref=e1547]
+                              - generic "Зуб №35 • Здоров" [ref=e1549]:
+                                - button [ref=e1550] [cursor=pointer]:
+                                  - img [ref=e1551]
+                              - generic "Зуб №34 • Здоров" [ref=e1553]:
+                                - button [ref=e1554] [cursor=pointer]:
+                                  - img [ref=e1555]
+                              - generic "Зуб №33 • Здоров" [ref=e1557]:
+                                - button [ref=e1558] [cursor=pointer]:
+                                  - img [ref=e1559]
+                              - generic "Зуб №32 • Здоров" [ref=e1561]:
+                                - button [ref=e1562] [cursor=pointer]:
+                                  - img [ref=e1563]
+                              - generic "Зуб №31 • Здоров" [ref=e1565]:
+                                - button [ref=e1566] [cursor=pointer]:
+                                  - img [ref=e1567]
+                          - paragraph [ref=e1569]: Нижняя челюсть
+                      - generic [ref=e1570]:
+                        - paragraph [ref=e1571]: "Обозначения:"
+                        - generic [ref=e1572]:
+                          - paragraph [ref=e1575]: Здоров
+                          - paragraph [ref=e1578]: Кариес
+                          - paragraph [ref=e1581]: Пломба
+                          - paragraph [ref=e1584]: Коронка
+                          - paragraph [ref=e1587]: Имплант
+                          - paragraph [ref=e1590]: Отсутствует
+                          - paragraph [ref=e1593]: Корень
+                          - paragraph [ref=e1596]: Мост
+              - generic [ref=e1597]:
+                - button "💾 Сохранить" [disabled] [ref=e1598]
+                - button "✅ Подписать" [ref=e1599] [cursor=pointer]
+          - button "💬 AI" [ref=e250] [cursor=pointer]:
+            - generic [ref=e251]: 💬
+            - generic [ref=e252]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e253]:
+    - generic [ref=e254]:
+      - img [ref=e255]
+      - generic [ref=e258]:
+        - strong [ref=e259]: Включить уведомления?
+        - generic [ref=e260]: Получайте уведомления о новых сообщениях
+    - generic [ref=e261]:
+      - button "Включить" [ref=e262] [cursor=pointer]
+      - button "Закрыть" [ref=e263] [cursor=pointer]:
+        - img [ref=e264]

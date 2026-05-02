@@ -1,0 +1,20 @@
+{
+  "sections": [
+    {
+      "id": "hero",
+      "intent": "",
+      "desktop_notes": [],
+      "mobile_notes": []
+    }
+  ],
+  "components": {
+    "primary_button": {
+      "style_notes": [],
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ]
+    }
+  }
+}

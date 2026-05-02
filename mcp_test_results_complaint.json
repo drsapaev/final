@@ -1,0 +1,97 @@
+[
+  {
+    "test": 1,
+    "success": true,
+    "data": {
+      "status": "success",
+      "data": {
+        "preliminary_diagnosis": [
+          "Мигрень",
+          "Головная боль напряжения",
+          "Гипертензия"
+        ],
+        "examinations": [
+          {
+            "type": "Инструментальное",
+            "name": "МРТ головного мозга",
+            "reason": "Исключение органической патологии"
+          }
+        ],
+        "lab_tests": [
+          "Общий анализ крови",
+          "Глюкоза крови"
+        ],
+        "consultations": [
+          "Терапевт"
+        ],
+        "urgency": "планово",
+        "red_flags": [],
+        "urgency_level": "scheduled"
+      },
+      "metadata": {
+        "provider_used": "default",
+        "timestamp": "2025-10-11T14:39:30.838637",
+        "complaint_length": 75,
+        "validation_score": 1.0
+      }
+    }
+  },
+  {
+    "test": 2,
+    "success": true,
+    "data": {
+      "status": "success",
+      "data": {
+        "preliminary_diagnosis": [
+          "Требуется дополнительное обследование"
+        ],
+        "examinations": [],
+        "lab_tests": [
+          "Общий анализ крови",
+          "Общий анализ мочи"
+        ],
+        "consultations": [
+          "Терапевт"
+        ],
+        "urgency": "планово",
+        "red_flags": [],
+        "urgency_level": "urgent"
+      },
+      "metadata": {
+        "provider_used": "default",
+        "timestamp": "2025-10-11T14:39:31.841070",
+        "complaint_length": 75,
+        "validation_score": 0.81
+      }
+    }
+  },
+  {
+    "test": 3,
+    "success": true,
+    "data": {
+      "status": "success",
+      "data": {
+        "preliminary_diagnosis": [
+          "Требуется дополнительное обследование"
+        ],
+        "examinations": [],
+        "lab_tests": [
+          "Общий анализ крови",
+          "Общий анализ мочи"
+        ],
+        "consultations": [
+          "Терапевт"
+        ],
+        "urgency": "планово",
+        "red_flags": [],
+        "urgency_level": "scheduled"
+      },
+      "metadata": {
+        "provider_used": "default",
+        "timestamp": "2025-10-11T14:39:32.854119",
+        "complaint_length": 74,
+        "validation_score": 0.81
+      }
+    }
+  }
+]

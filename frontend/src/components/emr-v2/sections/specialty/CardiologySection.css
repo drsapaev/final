@@ -1,0 +1,272 @@
+/**
+ * CardiologySection Styles
+ */
+
+.cardiology-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--mac-separator);
+}
+
+.cardiology-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--mac-text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cardiology-tab:hover:not(:disabled) {
+    color: var(--mac-text-primary);
+}
+
+.cardiology-tab.active {
+    color: var(--mac-blue-500);
+    border-bottom-color: var(--mac-blue-500);
+}
+
+.cardiology-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cardiology-tab-content {
+    padding: 16px 0;
+}
+
+.cardiology-labs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.cardiology-interpretation {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+    border-left: 3px solid var(--mac-blue-500);
+}
+
+.cardiology-interpretation h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mac-text-primary);
+}
+
+.cardiology-interpretation p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    line-height: 1.5;
+}
+
+.cardiology-risk-calculator {
+    padding: 16px;
+    background: var(--mac-bg-secondary);
+    border-radius: var(--mac-radius-md);
+}
+
+.cardiology-risk-calculator h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--mac-text-primary);
+}
+
+.cardiology-info {
+    margin: 0 0 16px 0;
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+}
+
+.cardiology-risk-result {
+    padding: 12px;
+    background: var(--mac-bg-primary);
+    border-radius: var(--mac-radius-sm);
+    border: 1px solid var(--mac-border);
+}
+
+.cardiology-risk-result p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    text-align: center;
+}
+
+/* SCORE2 Calculator Styles */
+.cardiology-risk-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.cardiology-select-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cardiology-select-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-text-secondary);
+}
+
+.cardiology-select {
+    padding: 10px 12px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.cardiology-select:focus {
+    outline: none;
+    border-color: var(--mac-blue-500);
+}
+
+.cardiology-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cardiology-risk-placeholder {
+    text-align: center;
+    padding: 20px;
+    color: var(--mac-text-tertiary);
+    font-style: italic;
+}
+
+.cardiology-risk-display {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+}
+
+.cardiology-risk-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 32px;
+    border-radius: var(--mac-radius-lg);
+    min-width: 150px;
+}
+
+.cardiology-risk-score .risk-value {
+    font-size: 36px;
+    font-weight: 700;
+}
+
+.cardiology-risk-score .risk-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+.cardiology-risk-score.low {
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: #065f46;
+}
+
+.cardiology-risk-score.moderate {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #92400e;
+}
+
+.cardiology-risk-score.high {
+    background: linear-gradient(135deg, #fed7aa, #fdba74);
+    color: #9a3412;
+}
+
+.cardiology-risk-score.very-high {
+    background: linear-gradient(135deg, #fecaca, #fca5a5);
+    color: #991b1b;
+}
+
+.cardiology-risk-category {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 20px;
+    border-radius: var(--mac-radius-md);
+    text-align: center;
+}
+
+.cardiology-risk-category .category-name {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.cardiology-risk-category .category-recommendation {
+    font-size: 13px;
+    margin-top: 4px;
+    opacity: 0.8;
+}
+
+.cardiology-risk-category.low {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.cardiology-risk-category.moderate {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.cardiology-risk-category.high {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.cardiology-risk-category.very-high {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.cardiology-risk-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.cardiology-risk-legend .legend-item {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.cardiology-risk-legend .legend-item.low {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.cardiology-risk-legend .legend-item.moderate {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cardiology-risk-legend .legend-item.high {
+    background: #fed7aa;
+    color: #9a3412;
+}
+
+.cardiology-risk-legend .legend-item.very-high {
+    background: #fecaca;
+    color: #991b1b;
+}

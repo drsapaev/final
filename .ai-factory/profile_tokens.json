@@ -1,0 +1,47 @@
+[
+  {
+    "id": 19,
+    "username": "admin@example.com",
+    "role": "Admin",
+    "profile": {
+      "id": 19,
+      "username": "admin@example.com",
+      "email": "admin@example.com",
+      "full_name": "Admin User",
+      "role": "Admin",
+      "is_active": true,
+      "is_superuser": true
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxOSIsInVzZXJuYW1lIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJ1c2VyX2lkIjoxOSwiZXhwIjoxNzcyNTI0NzIyfQ.jgrA1PxgeMiQzdD2VNA7_u-CJH-zyVTFX_jOBvd0IHI"
+  },
+  {
+    "id": 20,
+    "username": "registrar@example.com",
+    "role": "Receptionist",
+    "profile": {
+      "id": 20,
+      "username": "registrar@example.com",
+      "email": "registrar@example.com",
+      "full_name": "Registrar User",
+      "role": "Receptionist",
+      "is_active": true,
+      "is_superuser": false
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJuYW1lIjoicmVnaXN0cmFyQGV4YW1wbGUuY29tIiwidXNlcl9pZCI6MjAsImV4cCI6MTc3MjUyNDcyMn0.jR-GH-VyAbvZP-MjY12GWeFPV0iRTzQLcSL9uqzqm6M"
+  },
+  {
+    "id": 21,
+    "username": "doctor@example.com",
+    "role": "Doctor",
+    "profile": {
+      "id": 21,
+      "username": "doctor@example.com",
+      "email": "doctor@example.com",
+      "full_name": "Doctor User",
+      "role": "Doctor",
+      "is_active": true,
+      "is_superuser": false
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMSIsInVzZXJuYW1lIjoiZG9jdG9yQGV4YW1wbGUuY29tIiwidXNlcl9pZCI6MjEsImV4cCI6MTc3MjUyNDcyMn0.TwAABD6TSRyRdXrL8KV_ElIGpJnzRXx-d9lFQztPcSM"
+  }
+]

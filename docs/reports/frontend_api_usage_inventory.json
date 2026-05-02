@@ -1,0 +1,2103 @@
+{
+  "generated_at": "2026-02-25T07:03:34.400251+00:00",
+  "frontend_root": "frontend/src",
+  "summary": {
+    "total_calls": 222,
+    "unique_files": 29,
+    "by_method": {
+      "DELETE": 15,
+      "GET": 107,
+      "PATCH": 2,
+      "POST": 84,
+      "PUT": 14
+    },
+    "by_endpoint_kind": {
+      "constant_ref": 53,
+      "literal": 75,
+      "template_dynamic": 88,
+      "unknown_expr": 6
+    },
+    "top_files": [
+      {
+        "file": "frontend/src/api/services.js",
+        "calls": 82
+      },
+      {
+        "file": "frontend/src/api/queue.js",
+        "calls": 13
+      },
+      {
+        "file": "frontend/src/hooks/usePayments.js",
+        "calls": 12
+      },
+      {
+        "file": "frontend/src/api/adminSettings.js",
+        "calls": 9
+      },
+      {
+        "file": "frontend/src/api/messages.js",
+        "calls": 9
+      },
+      {
+        "file": "frontend/src/hooks/useDoctorQueue.js",
+        "calls": 8
+      },
+      {
+        "file": "frontend/src/services/print.js",
+        "calls": 8
+      },
+      {
+        "file": "frontend/src/hooks/useAIChat.js",
+        "calls": 7
+      },
+      {
+        "file": "frontend/src/hooks/useICDSuggestions.js",
+        "calls": 7
+      },
+      {
+        "file": "frontend/src/hooks/useLabResults.js",
+        "calls": 7
+      },
+      {
+        "file": "frontend/src/services/medical.js",
+        "calls": 6
+      },
+      {
+        "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+        "calls": 5
+      },
+      {
+        "file": "frontend/src/hooks/useDoctors.js",
+        "calls": 5
+      },
+      {
+        "file": "frontend/src/hooks/useEchoInterpretation.js",
+        "calls": 5
+      },
+      {
+        "file": "frontend/src/services/payment.js",
+        "calls": 5
+      },
+      {
+        "file": "frontend/src/hooks/useDoctorPhrases.js",
+        "calls": 4
+      },
+      {
+        "file": "frontend/src/hooks/useUsers.js",
+        "calls": 4
+      },
+      {
+        "file": "frontend/src/services/auth.js",
+        "calls": 4
+      },
+      {
+        "file": "frontend/src/api/client.js",
+        "calls": 3
+      },
+      {
+        "file": "frontend/src/api/registrarBatch.js",
+        "calls": 3
+      }
+    ]
+  },
+  "calls": [
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 4,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/admin/wizard-settings'",
+      "endpoint_literal": "/admin/wizard-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 9,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/admin/wizard-settings'",
+      "endpoint_literal": "/admin/wizard-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 14,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/admin/benefit-settings'",
+      "endpoint_literal": "/admin/benefit-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 19,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/admin/benefit-settings'",
+      "endpoint_literal": "/admin/benefit-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 24,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/admin/clinic/settings'",
+      "endpoint_literal": "/admin/clinic/settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 31,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "'/admin/clinic/settings'",
+      "endpoint_literal": "/admin/clinic/settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 36,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/admin/payment-provider-settings'",
+      "endpoint_literal": "/admin/payment-provider-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 41,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/admin/payment-provider-settings'",
+      "endpoint_literal": "/admin/payment-provider-settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/adminSettings.js",
+      "line": 46,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/admin/test-payment-provider'",
+      "endpoint_literal": "/admin/test-payment-provider",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/client.js",
+      "line": 214,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "'/visits'",
+      "endpoint_literal": "/visits",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/client.js",
+      "line": 241,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/auth/me'",
+      "endpoint_literal": "/auth/me",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/client.js",
+      "line": 257,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/auth/login'",
+      "endpoint_literal": "/auth/login",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/health.js",
+      "line": 13,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/health'",
+      "endpoint_literal": "/health",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/health.js",
+      "line": 23,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/activation/status'",
+      "endpoint_literal": "/activation/status",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/interceptors.js",
+      "line": 79,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/authentication/refresh'",
+      "endpoint_literal": "/authentication/refresh",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 14,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/messages/send'",
+      "endpoint_literal": "/messages/send",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 26,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/messages/conversations'",
+      "endpoint_literal": "/messages/conversations",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 38,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/messages/conversation/${userId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 49,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/messages/unread'",
+      "endpoint_literal": "/messages/unread",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 59,
+      "call": "api.patch",
+      "method": "PATCH",
+      "endpoint_expr": "`/messages/${messageId}/read`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 69,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/messages/${messageId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 79,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/messages/users/available'",
+      "endpoint_literal": "/messages/users/available",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 92,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/messages/${messageId}/reactions`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/messages.js",
+      "line": 109,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/messages/upload'",
+      "endpoint_literal": "/messages/upload",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 11,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/queue/available-specialists'",
+      "endpoint_literal": "/queue/available-specialists",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 17,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/queues/profiles/public'",
+      "endpoint_literal": "/queues/profiles/public",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 22,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/queue/qr-tokens/${token}/info`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 27,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/queue/join/start'",
+      "endpoint_literal": "/queue/join/start",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 32,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/queue/join/complete'",
+      "endpoint_literal": "/queue/join/complete",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 37,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/registrar/queues/today'",
+      "endpoint_literal": "/registrar/queues/today",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 55,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/queue/admin/qr-tokens/generate'",
+      "endpoint_literal": "/queue/admin/qr-tokens/generate",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 67,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/queue/admin/qr-tokens/generate-clinic'",
+      "endpoint_literal": "/queue/admin/qr-tokens/generate-clinic",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 75,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/registrar/open-reception'",
+      "endpoint_literal": "/registrar/open-reception",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 85,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/${Number(specialistId)}/call-next`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 101,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/registrar-integration/doctors/${Number(doctorId)}/user-id`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 125,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/registrar-integration/queue/entries/batch'",
+      "endpoint_literal": "/registrar-integration/queue/entries/batch",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/queue.js",
+      "line": 166,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "`/queue/online-entry/${Number(entryId)}/full-update`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/registrarBatch.js",
+      "line": 21,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`/registrar/batch/patients/${patientId}/entries/${date}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/registrarBatch.js",
+      "line": 48,
+      "call": "apiRequest",
+      "method": "PATCH",
+      "endpoint_expr": "`/registrar/batch/patients/${patientId}/entries/${date}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/registrarBatch.js",
+      "line": 65,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "`/registrar/batch/patients/${patientId}/entries/${date}?reason=${encodeURIComponent(reason)}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 15,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.AUTH.LOGIN",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 24,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.AUTH.ME",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 31,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.AUTH.LOGOUT",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 38,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.AUTH.REFRESH",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 51,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.USERS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 58,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.USERS.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 65,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.USERS.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 74,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.USERS.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 83,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.USERS.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 90,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.USERS.ROLES",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 97,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.USERS.PERMISSIONS",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 110,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.PATIENTS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 117,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.PATIENTS.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 124,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.PATIENTS.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 133,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.PATIENTS.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 142,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.PATIENTS.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 151,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.PATIENTS.SEARCH}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 159,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.PATIENTS.STATS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 172,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.DOCTORS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 179,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 186,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 195,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 204,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 211,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.SPECIALIZATIONS",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 218,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.DOCTORS.DEPARTMENTS",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 226,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.DOCTORS.SCHEDULE(id)}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 234,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.DOCTORS.AVAILABILITY(id)}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 247,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.APPOINTMENTS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 254,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 261,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 270,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 279,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 287,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.APPOINTMENTS.STATS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 295,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.APPOINTMENTS.BY_PATIENT(patientId)}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 303,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.APPOINTMENTS.BY_DOCTOR(doctorId)}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 312,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.APPOINTMENTS.BY_DATE}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 319,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.CANCEL(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 326,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.APPOINTMENTS.CONFIRM(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 339,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.QUEUE.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 346,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 353,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 362,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 371,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 379,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.QUEUE.STATS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 388,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.QUEUE.BY_DEPARTMENT}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 395,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.CALL_NEXT",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 404,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.SKIP(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 411,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.QUEUE.COMPLETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 424,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.SERVICES.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 431,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.SERVICES.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 438,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.SERVICES.CREATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 447,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.SERVICES.UPDATE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 456,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.SERVICES.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 465,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.SERVICES.BY_DEPARTMENT}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 473,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.SERVICES.PRICING}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 481,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "'/services/code-mappings'",
+      "endpoint_literal": "/services/code-mappings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 494,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.DASHBOARD}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 502,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.REVENUE}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 510,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.PATIENTS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 518,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.APPOINTMENTS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 526,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.DOCTORS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 534,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.DEPARTMENTS}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 542,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.ANALYTICS.EXPORT}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 555,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.SETTINGS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 562,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.SETTINGS.GET(key)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 569,
+      "call": "apiRequest",
+      "method": "PUT",
+      "endpoint_expr": "API_ENDPOINTS.SETTINGS.UPDATE(key)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 578,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.SETTINGS.BULK_UPDATE",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 587,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.SETTINGS.CATEGORIES",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 600,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 607,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.NOTIFICATIONS.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 614,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 621,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 628,
+      "call": "apiRequest",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.NOTIFICATIONS.SEND",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 637,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.NOTIFICATIONS.TYPES",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 656,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "API_ENDPOINTS.FILES.UPLOAD",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 665,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.FILES.GET(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 672,
+      "call": "apiRequest",
+      "method": "DELETE",
+      "endpoint_expr": "API_ENDPOINTS.FILES.DELETE(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 679,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.FILES.DOWNLOAD(id)",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 689,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "`${API_ENDPOINTS.FILES.LIST}?${queryString}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 701,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.HEALTH.CHECK",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 708,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.HEALTH.STATUS",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/services.js",
+      "line": 715,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "API_ENDPOINTS.HEALTH.METRICS",
+      "endpoint_literal": null,
+      "endpoint_kind": "constant_ref"
+    },
+    {
+      "file": "frontend/src/api/setting.js",
+      "line": 7,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "'/settings'",
+      "endpoint_literal": "/settings",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/api/visits.js",
+      "line": 8,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/visits/${encodeURIComponent(visitId)}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/visits.js",
+      "line": 20,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/visits/${encodeURIComponent(visitId)}/reschedule?${params.toString()}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/api/visits.js",
+      "line": 31,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/visits/${encodeURIComponent(visitId)}/reschedule/tomorrow`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 56,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/ai/chat/sessions'",
+      "endpoint_literal": "/ai/chat/sessions",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 74,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/chat/sessions'",
+      "endpoint_literal": "/ai/chat/sessions",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 102,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/ai/chat/sessions/${sessionId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 106,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/ai/chat/sessions/${sessionId}/messages`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 151,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/ai/chat/sessions/${sessionId}/messages`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 180,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/ai/chat/sessions/${sessionId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAIChat.js",
+      "line": 201,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/ai/chat/messages/${messageId}/feedback`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useAdminData.js",
+      "line": 45,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "cleanUrl",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useApi.js",
+      "line": 79,
+      "call": "apiRequest",
+      "method": "GET",
+      "endpoint_expr": "endpoint",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useApi.js",
+      "line": 217,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "endpoint",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorPhrases.js",
+      "line": 88,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/emr/readiness/${doctorId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorPhrases.js",
+      "line": 150,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/emr/phrase-suggest'",
+      "endpoint_literal": "/emr/phrase-suggest",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorPhrases.js",
+      "line": 254,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/emr/phrase-index'",
+      "endpoint_literal": "/emr/phrase-index",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorPhrases.js",
+      "line": 275,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/emr/telemetry'",
+      "endpoint_literal": "/emr/telemetry",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 41,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/doctors/by-user/${currentUser.id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 68,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/registrar/queues/today'",
+      "endpoint_literal": "/registrar/queues/today",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 118,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/${resolvedDoctorId}/call-next`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 130,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/entry/${entryId}/no-show`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 142,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/entry/${entryId}/restore-next`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 154,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/entry/${entryId}/diagnostics`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 166,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/entry/${entryId}/incomplete`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorQueue.js",
+      "line": 179,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/queue/entry/${entryId}/status`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+      "line": 57,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/emr/doctor-templates/treatment'",
+      "endpoint_literal": "/emr/doctor-templates/treatment",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+      "line": 80,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/emr/doctor-templates/treatment/${templateId}/pin`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+      "line": 92,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/emr/doctor-templates/treatment/${templateId}/pin`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+      "line": 104,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "`/emr/doctor-templates/treatment/${templateId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+      "line": 136,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/emr/doctor-templates/treatment/${templateId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctors.js",
+      "line": 21,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/admin/doctors'",
+      "endpoint_literal": "/admin/doctors",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctors.js",
+      "line": 55,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "userCreateUrl",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctors.js",
+      "line": 97,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/admin/doctors'",
+      "endpoint_literal": "/admin/doctors",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctors.js",
+      "line": 130,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "`/admin/doctors/${id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useDoctors.js",
+      "line": 155,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/admin/doctors/${id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoData.js",
+      "line": 62,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/visits/${visitId}/echo/params`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoData.js",
+      "line": 89,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/visits/${visitId}/echo/params`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoInterpretation.js",
+      "line": 28,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/echo-interpret'",
+      "endpoint_literal": "/ai/echo-interpret",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoInterpretation.js",
+      "line": 63,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/echo-recommendations'",
+      "endpoint_literal": "/ai/echo-recommendations",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoInterpretation.js",
+      "line": 87,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/echo-risk-assessment'",
+      "endpoint_literal": "/ai/echo-risk-assessment",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoInterpretation.js",
+      "line": 111,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/echo-compare'",
+      "endpoint_literal": "/ai/echo-compare",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useEchoInterpretation.js",
+      "line": 134,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/echo-report'",
+      "endpoint_literal": "/ai/echo-report",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 37,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/icd-suggest'",
+      "endpoint_literal": "/ai/icd-suggest",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 72,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/ai/icd-search'",
+      "endpoint_literal": "/ai/icd-search",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 101,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/ai/icd-details/${icdCode}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 123,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/icd-validate'",
+      "endpoint_literal": "/ai/icd-validate",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 146,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/ai/icd-related/${icdCode}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 171,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/ai/icd-compatibility'",
+      "endpoint_literal": "/ai/icd-compatibility",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useICDSuggestions.js",
+      "line": 194,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/ai/icd-stats/${icdCode}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 23,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/visits/${visitId}/lab-results`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 42,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "`/lab-results/${resultData.id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 45,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/lab-results'",
+      "endpoint_literal": "/lab-results",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 68,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/lab-results/${resultId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 94,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/lab-results/upload'",
+      "endpoint_literal": "/lab-results/upload",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 117,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/visits/${visitId}/lab-results/pdf`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useLabResults.js",
+      "line": 144,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/patients/${patientId}/send-lab-results`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 27,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/cashier/pending-payments'",
+      "endpoint_literal": "/cashier/pending-payments",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 72,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/cashier/payments'",
+      "endpoint_literal": "/cashier/payments",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 110,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/cashier/payments'",
+      "endpoint_literal": "/cashier/payments",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 138,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/cashier/visits/${visitId}/mark-paid`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 166,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/cashier/payments/${paymentId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 195,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/cashier/payments/${paymentId}/cancel`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 223,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/cashier/payments/${paymentId}/confirm`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 249,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/cashier/stats'",
+      "endpoint_literal": "/cashier/stats",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 275,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/cashier/payments/export'",
+      "endpoint_literal": "/cashier/payments/export",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 308,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/cashier/payments/${paymentId}/refund`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 336,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/cashier/payments/${paymentId}/receipt`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/usePayments.js",
+      "line": 369,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/cashier/stats/hourly'",
+      "endpoint_literal": "/cashier/stats/hourly",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useRoles.js",
+      "line": 43,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/roles/options'",
+      "endpoint_literal": "/roles/options",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useRoles.js",
+      "line": 80,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/roles'",
+      "endpoint_literal": "/roles",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useUserPreferences.js",
+      "line": 76,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "endpoint",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useUserPreferences.js",
+      "line": 125,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "endpoint",
+      "endpoint_literal": null,
+      "endpoint_kind": "unknown_expr"
+    },
+    {
+      "file": "frontend/src/hooks/useUsers.js",
+      "line": 35,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/users/users'",
+      "endpoint_literal": "/users/users",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useUsers.js",
+      "line": 61,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/users/users'",
+      "endpoint_literal": "/users/users",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/hooks/useUsers.js",
+      "line": 86,
+      "call": "api.put",
+      "method": "PUT",
+      "endpoint_expr": "`/users/users/${id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/hooks/useUsers.js",
+      "line": 111,
+      "call": "api.delete",
+      "method": "DELETE",
+      "endpoint_expr": "`/users/users/${id}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/auth.js",
+      "line": 15,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/auth/login'",
+      "endpoint_literal": "/auth/login",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/auth.js",
+      "line": 44,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/auth/logout'",
+      "endpoint_literal": "/auth/logout",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/auth.js",
+      "line": 62,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/auth/refresh'",
+      "endpoint_literal": "/auth/refresh",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/auth.js",
+      "line": 85,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/auth/me'",
+      "endpoint_literal": "/auth/me",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 13,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/patients/${patientId}/emr`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 32,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/appointments/${appointmentId}/emr`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 51,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/appointments/${appointmentId}/prescription`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 70,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/emr/templates'",
+      "endpoint_literal": "/emr/templates",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 91,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/appointments/${appointmentId}/complete`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/medical.js",
+      "line": 110,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/specialized/patient-history/${patientId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/payment.js",
+      "line": 13,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/payments/providers'",
+      "endpoint_literal": "/payments/providers",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/payment.js",
+      "line": 32,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/payments/init'",
+      "endpoint_literal": "/payments/init",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/payment.js",
+      "line": 51,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/payments/${paymentId}`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/payment.js",
+      "line": 70,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "`/payments/${paymentId}/receipt`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/payment.js",
+      "line": 91,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/payments/${paymentId}/receipt/download`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 13,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/print/printers'",
+      "endpoint_literal": "/print/printers",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 32,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/print/ticket'",
+      "endpoint_literal": "/print/ticket",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 51,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/print/prescription'",
+      "endpoint_literal": "/print/prescription",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 70,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/print/certificate'",
+      "endpoint_literal": "/print/certificate",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 89,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/print/quick'",
+      "endpoint_literal": "/print/quick",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 111,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "'/print/templates'",
+      "endpoint_literal": "/print/templates",
+      "endpoint_kind": "literal"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 132,
+      "call": "api.get",
+      "method": "GET",
+      "endpoint_expr": "`/print/printers/${printerName}/status`",
+      "endpoint_literal": null,
+      "endpoint_kind": "template_dynamic"
+    },
+    {
+      "file": "frontend/src/services/print.js",
+      "line": 151,
+      "call": "api.post",
+      "method": "POST",
+      "endpoint_expr": "'/print/test'",
+      "endpoint_literal": "/print/test",
+      "endpoint_kind": "literal"
+    }
+  ]
+}

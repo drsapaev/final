@@ -1,0 +1,328 @@
+/**
+ * EMR V2 Design Tokens
+ * 
+ * Централизованные CSS переменные для всего EMR интерфейса
+ * Использование: var(--token-name)
+ * 
+ * @see docs/EMR_DESIGN_SYSTEM.md
+ */
+
+:root {
+    /* ============================================
+     SURFACES — Фоны и поверхности
+     ============================================ */
+    --surface-app: #0f0f23;
+    --surface-sidebar: linear-gradient(180deg, #4c1d95 0%, #2563eb 100%);
+    --surface-card: #1a1a2e;
+    --surface-input: #252540;
+    --surface-input-focus: #2d2d4a;
+    --surface-elevated: #1f1f35;
+
+    /* ============================================
+     TEXT — Цвета текста (WCAG compliant)
+     ============================================ */
+    --text-primary: #f0f1f4;
+    /* 12.5:1 AAA */
+    --text-secondary: #a8adb8;
+    /* 6.2:1 AA */
+    --text-muted: #6b7280;
+    /* 3.8:1 - осторожно! */
+    --text-inverse: #1a1a2e;
+    --text-link: #818cf8;
+    --text-link-hover: #a5b4fc;
+
+    /* ============================================
+     ACCENT — Акцентные цвета
+     ============================================ */
+    /* Primary (Indigo) */
+    --accent-primary: #6366f1;
+    --accent-primary-hover: #818cf8;
+    --accent-primary-muted: rgba(99, 102, 241, 0.15);
+
+    /* Success (Green) */
+    --accent-success: #22c55e;
+    --accent-success-hover: #4ade80;
+    --accent-success-muted: rgba(34, 197, 94, 0.15);
+
+    /* Warning (Orange) */
+    --accent-warning: #f59e0b;
+    --accent-warning-hover: #fbbf24;
+    --accent-warning-muted: rgba(245, 158, 11, 0.15);
+
+    /* Danger (Red) */
+    --accent-danger: #ef4444;
+    --accent-danger-hover: #f87171;
+    --accent-danger-muted: rgba(239, 68, 68, 0.15);
+
+    /* ============================================
+     BORDERS
+     ============================================ */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.2);
+    --border-focus: var(--accent-primary);
+
+    /* ============================================
+     SPECIAL: My Experience Button
+     ============================================ */
+    --my-experience-bg: var(--accent-success-muted);
+    --my-experience-border: var(--accent-success);
+    --my-experience-text: #a7f3d0;
+
+    /* ============================================
+     SPECIAL: Templates Button
+     ============================================ */
+    --templates-bg: var(--surface-input);
+    --templates-border: var(--border-default);
+    --templates-text: var(--text-secondary);
+
+    /* ============================================
+     SPECIAL: Pinned Template
+     ============================================ */
+    --pinned-bg: rgba(251, 191, 36, 0.1);
+    --pinned-border: #fbbf24;
+    --pinned-text: #fde68a;
+
+    /* ============================================
+     SPECIAL: Stale Warning
+     ============================================ */
+    --stale-bg: var(--surface-input);
+    --stale-border: var(--border-default);
+    --stale-text: var(--text-muted);
+
+    /* ============================================
+     RADII — Скругления
+     ============================================ */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-brand: 20px;
+    /* Только для sidebar */
+    --radius-full: 9999px;
+
+    /* ============================================
+     SHADOWS
+     ============================================ */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-input-focus: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    --shadow-success-focus: 0 0 0 3px rgba(34, 197, 94, 0.25);
+    --shadow-danger-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);
+
+    /* ============================================
+     SPACING
+     ============================================ */
+    --space-0: 0;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+
+    /* Semantic aliases */
+    --space-xs: var(--space-1);
+    --space-sm: var(--space-2);
+    --space-md: var(--space-3);
+    --space-lg: var(--space-4);
+    --space-xl: var(--space-6);
+
+    /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 24px;
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.625;
+
+    /* ============================================
+     TRANSITIONS
+     ============================================ */
+    --transition-fast: 0.1s ease;
+    --transition-normal: 0.15s ease;
+    --transition-slow: 0.25s ease;
+
+    /* ============================================
+     Z-INDEX SCALE
+     ============================================ */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-modal-backdrop: 500;
+    --z-modal: 510;
+    --z-popover: 600;
+    --z-tooltip: 700;
+    --z-toast: 800;
+}
+
+/* ============================================
+   FOCUS VISIBLE — Accessibility
+   ============================================ */
+:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* Remove outline for mouse users */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ============================================
+   BUTTON STATES — Base
+   ============================================ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   BTN-MY-EXPERIENCE — Мой опыт
+   ============================================ */
+.btn-my-experience {
+    background: var(--my-experience-bg);
+    border: 1px solid var(--my-experience-border);
+    color: var(--my-experience-text);
+}
+
+.btn-my-experience:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: var(--accent-success-hover);
+}
+
+.btn-my-experience:focus-visible {
+    box-shadow: var(--shadow-success-focus);
+}
+
+/* ============================================
+   BTN-TEMPLATES — Шаблоны
+   ============================================ */
+.btn-templates {
+    background: var(--templates-bg);
+    border: 1px solid var(--templates-border);
+    color: var(--templates-text);
+}
+
+.btn-templates:hover:not(:disabled) {
+    background: var(--surface-input-focus);
+    border-color: var(--text-muted);
+}
+
+/* ============================================
+   INPUT FIELDS
+   ============================================ */
+.emr-input {
+    background: var(--surface-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    padding: var(--space-3);
+    transition: all var(--transition-normal);
+}
+
+.emr-input:hover:not(:disabled) {
+    border-color: var(--border-strong);
+}
+
+.emr-input:focus {
+    background: var(--surface-input-focus);
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-input-focus);
+}
+
+.emr-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* ============================================
+   TEMPLATE CARD
+   ============================================ */
+.template-card {
+    background: var(--surface-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    transition: all var(--transition-normal);
+}
+
+.template-card:hover {
+    background: var(--surface-input-focus);
+    border-color: var(--border-strong);
+}
+
+.template-card--pinned {
+    background: var(--pinned-bg);
+    border-color: var(--pinned-border);
+}
+
+.template-card--stale {
+    opacity: 0.7;
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px 6px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-full);
+}
+
+.badge--frequent {
+    background: var(--accent-success-muted);
+    color: var(--accent-success);
+}
+
+.badge--rare {
+    background: var(--surface-input);
+    color: var(--text-muted);
+}
+
+.badge--stale {
+    background: var(--stale-bg);
+    border: 1px solid var(--stale-border);
+    color: var(--stale-text);
+}
+
+.badge--pinned {
+    background: var(--pinned-bg);
+    color: var(--pinned-text);
+}

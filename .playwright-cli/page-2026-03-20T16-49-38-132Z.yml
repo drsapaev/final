@@ -1,0 +1,214 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Clinic Management" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Clinic Management
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Lab User" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img [ref=e82]
+            - text: Lab User
+        - button "Выйти" [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]:
+            - img [ref=e87]
+            - text: Выйти
+    - generic [ref=e90]:
+      - complementary [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: Medical System
+          - button "Collapse sidebar" [ref=e95] [cursor=pointer]:
+            - img [ref=e97]
+        - navigation [ref=e100]:
+          - button "Tests" [ref=e101] [cursor=pointer]:
+            - img [ref=e102]
+            - generic [ref=e105]: Tests
+          - button "Results" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e110]: Results
+          - button "Patients" [ref=e111] [cursor=pointer]:
+            - img [ref=e112]
+            - generic [ref=e115]: Patients
+          - button "Appointments" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+            - generic [ref=e120]: Appointments
+          - button "Reports" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+            - generic [ref=e127]: Reports
+      - main [ref=e128]:
+        - generic [ref=e129]:
+          - heading "Enterprise Laboratory Panel Очередь 5 Шаблоны 20 Бланки 2" [level=3] [ref=e348]:
+            - generic [ref=e133]:
+              - img [ref=e134]
+              - text: Enterprise Laboratory Panel
+            - generic [ref=e137]:
+              - button "Очередь 5" [active] [ref=e138] [cursor=pointer]:
+                - generic [ref=e139]:
+                  - img [ref=e140]
+                  - text: Очередь
+                  - generic [ref=e143]: "5"
+              - button "Шаблоны 20" [ref=e144] [cursor=pointer]:
+                - generic [ref=e145]:
+                  - img [ref=e146]
+                  - text: Шаблоны
+                  - generic [ref=e149]: "20"
+              - button "Бланки 2" [ref=e349] [cursor=pointer]:
+                - generic [ref=e151]:
+                  - img [ref=e152]
+                  - text: Бланки
+                  - generic [ref=e157]: "2"
+          - generic [ref=e427]:
+            - generic [ref=e428]:
+              - generic [ref=e429]:
+                - heading "Очередь лаборатории" [level=3] [ref=e430]:
+                  - img [ref=e431]
+                  - text: Очередь лаборатории
+                - generic [ref=e434]:
+                  - generic [ref=e435]: "Всего: 5"
+                  - generic [ref=e436]: "В работе: 5"
+                  - button "Обновить" [ref=e437] [cursor=pointer]:
+                    - generic [ref=e438]:
+                      - img [ref=e439]
+                      - text: Обновить
+              - generic [ref=e443]:
+                - generic [ref=e444]:
+                  - generic [ref=e445]:
+                    - generic [ref=e446]:
+                      - generic [ref=e447]: Тестов Тест Тестович
+                      - generic [ref=e448]: "Визит: 722 | Телефон: +998901112233"
+                    - generic [ref=e449]: waiting
+                  - generic [ref=e450]:
+                    - strong [ref=e451]: "Услуги:"
+                    - text: Общий анализ крови
+                  - generic [ref=e452]:
+                    - generic [ref=e453]: laboratory
+                    - generic [ref=e454]: "Оплата: pending"
+                    - generic [ref=e455]: 09:00
+                  - generic [ref=e456]:
+                    - generic [ref=e457]: "Пациент ID: 435"
+                    - button "Открыть в редакторе" [ref=e458] [cursor=pointer]:
+                      - generic [ref=e459]:
+                        - img [ref=e460]
+                        - text: Открыть в редакторе
+                - generic [ref=e465]:
+                  - generic [ref=e466]:
+                    - generic [ref=e467]:
+                      - generic [ref=e468]: Абдуллаев Витамин Даврон
+                      - generic [ref=e469]: "Визит: 723 | Телефон: +998901112234"
+                    - generic [ref=e470]: waiting
+                  - generic [ref=e471]:
+                    - strong [ref=e472]: "Услуги:"
+                    - text: Витамин Д
+                  - generic [ref=e473]:
+                    - generic [ref=e474]: laboratory
+                    - generic [ref=e475]: "Оплата: pending"
+                    - generic [ref=e476]: 09:00
+                  - generic [ref=e477]:
+                    - generic [ref=e478]: "Пациент ID: 436"
+                    - button "Открыть в редакторе" [ref=e479] [cursor=pointer]:
+                      - generic [ref=e480]:
+                        - img [ref=e481]
+                        - text: Открыть в редакторе
+                - generic [ref=e486]:
+                  - generic [ref=e487]:
+                    - generic [ref=e488]:
+                      - generic [ref=e489]: Каримова Гликия Севда
+                      - generic [ref=e490]: "Визит: 724 | Телефон: +998901112235"
+                    - generic [ref=e491]: waiting
+                  - generic [ref=e492]:
+                    - strong [ref=e493]: "Услуги:"
+                    - text: Гликированный гемоглобин (НЬА1C)
+                  - generic [ref=e494]:
+                    - generic [ref=e495]: laboratory
+                    - generic [ref=e496]: "Оплата: pending"
+                    - generic [ref=e497]: 09:00
+                  - generic [ref=e498]:
+                    - generic [ref=e499]: "Пациент ID: 437"
+                    - button "Открыть в редакторе" [ref=e500] [cursor=pointer]:
+                      - generic [ref=e501]:
+                        - img [ref=e502]
+                        - text: Открыть в редакторе
+                - generic [ref=e507]:
+                  - generic [ref=e508]:
+                    - generic [ref=e509]:
+                      - generic [ref=e510]: Саидов Тестостерон Жахон
+                      - generic [ref=e511]: "Визит: 725 | Телефон: +998901112236"
+                    - generic [ref=e512]: waiting
+                  - generic [ref=e513]:
+                    - strong [ref=e514]: "Услуги:"
+                    - text: Тестостерон
+                  - generic [ref=e515]:
+                    - generic [ref=e516]: laboratory
+                    - generic [ref=e517]: "Оплата: pending"
+                    - generic [ref=e518]: 09:00
+                  - generic [ref=e519]:
+                    - generic [ref=e520]: "Пациент ID: 438"
+                    - button "Открыть в редакторе" [ref=e521] [cursor=pointer]:
+                      - generic [ref=e522]:
+                        - img [ref=e523]
+                        - text: Открыть в редакторе
+                - generic [ref=e528]:
+                  - generic [ref=e529]:
+                    - generic [ref=e530]:
+                      - generic [ref=e531]: Юлдашева ОАМ Ситора
+                      - generic [ref=e532]: "Визит: 726 | Телефон: +998901112237"
+                    - generic [ref=e533]: waiting
+                  - generic [ref=e534]:
+                    - strong [ref=e535]: "Услуги:"
+                    - text: Общий анализ мочи
+                  - generic [ref=e536]:
+                    - generic [ref=e537]: laboratory
+                    - generic [ref=e538]: "Оплата: pending"
+                    - generic [ref=e539]: 09:00
+                  - generic [ref=e540]:
+                    - generic [ref=e541]: "Пациент ID: 439"
+                    - button "Открыть в редакторе" [ref=e542] [cursor=pointer]:
+                      - generic [ref=e543]:
+                        - img [ref=e544]
+                        - text: Открыть в редакторе
+            - generic [ref=e549]:
+              - heading "История бланков пациента" [level=3] [ref=e551]:
+                - img [ref=e552]
+                - text: История бланков пациента
+              - generic [ref=e556]:
+                - generic [ref=e557]:
+                  - generic [ref=e558]:
+                    - generic [ref=e559]: Vitamin D
+                    - generic [ref=e560]: "Создан: 20.03.2026, 18:47:46 | Статус: PRINTED"
+                  - generic [ref=e561]:
+                    - generic [ref=e562]: PRINTED
+                    - generic [ref=e563]: clean
+                - generic [ref=e564]:
+                  - generic [ref=e565]:
+                    - generic [ref=e566]: Vitamin D
+                    - generic [ref=e567]: "Создан: 20.03.2026, 18:06:57 | Статус: PRINTED"
+                  - generic [ref=e568]:
+                    - generic [ref=e569]: PRINTED
+                    - generic [ref=e570]: flagged
+                    - generic [ref=e571]: 1 флагов
+  - generic [ref=e334]:
+    - generic [ref=e335]:
+      - img [ref=e336]
+      - generic [ref=e339]:
+        - strong [ref=e340]: Включить уведомления?
+        - generic [ref=e341]: Получайте уведомления о новых сообщениях
+    - generic [ref=e342]:
+      - button "Включить" [ref=e343] [cursor=pointer]
+      - button "Закрыть" [ref=e344] [cursor=pointer]:
+        - img [ref=e345]

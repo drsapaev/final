@@ -1,0 +1,21 @@
+{
+  "patient_id": 999,
+  "visits": [
+    {
+      "doctor_id": null,
+      "services": [
+        {
+          "service_id": "K01",
+          "quantity": 1
+        }
+      ],
+      "visit_date": "2025-10-01",
+      "visit_time": null,
+      "department": "cardiology",
+      "notes": null
+    }
+  ],
+  "discount_mode": "none",
+  "payment_method": "cash",
+  "notes": "Тестовая запись через API"
+}

@@ -1,0 +1,139 @@
+- generic [ref=e2]:
+  - generic [ref=e43]:
+    - generic [ref=e45]:
+      - button "Управление клиникой" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Управление клиникой
+      - generic [ref=e54]:
+        - generic: 🔍
+        - textbox "Поиск пациентов, визитов..." [ref=e55]
+        - generic: ⌘K
+      - generic [ref=e57]:
+        - button "RU" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - text: RU
+        - generic "Онлайн" [ref=e65]:
+          - img [ref=e66]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Выбрать тему" [ref=e74] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Dermatologist User" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - text: Dermatologist User
+        - button "Выйти" [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]:
+            - img [ref=e88]
+            - text: Выйти
+    - generic [ref=e91]:
+      - complementary [ref=e93]:
+        - generic [ref=e94]:
+          - generic [ref=e95]: Медицинская система
+          - button "Collapse sidebar" [ref=e96] [cursor=pointer]:
+            - img [ref=e98]
+        - navigation [ref=e101]:
+          - button "Queue" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e106]: Queue
+          - button "Appointments" [active] [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+            - generic [ref=e111]: Appointments
+          - button "Visit" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+            - generic [ref=e116]: Visit
+          - button "Patients" [ref=e117] [cursor=pointer]:
+            - img [ref=e118]
+            - generic [ref=e121]: Patients
+          - button "Photos" [ref=e122] [cursor=pointer]:
+            - img [ref=e123]
+            - generic [ref=e126]: Photos
+          - button "Skin Examination" [ref=e127] [cursor=pointer]:
+            - img [ref=e128]
+            - generic [ref=e131]: Skin Examination
+          - button "Cosmetic" [ref=e132] [cursor=pointer]:
+            - img [ref=e133]
+            - generic [ref=e137]: Cosmetic
+          - button "AI Assistant" [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - generic [ref=e142]: AI Assistant
+          - button "Services" [ref=e143] [cursor=pointer]:
+            - img [ref=e144]
+            - generic [ref=e147]: Services
+          - button "History" [ref=e148] [cursor=pointer]:
+            - img [ref=e149]
+            - generic [ref=e154]: History
+      - main [ref=e155]:
+        - generic [ref=e157]:
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - heading "Записи к дерматологу" [level=3] [ref=e162]:
+                - img [ref=e163]
+                - text: Записи к дерматологу
+              - generic [ref=e165]:
+                - generic [ref=e166]: "Всего: 0"
+                - generic [ref=e167]: "Ожидают: 0"
+                - generic [ref=e168]: "Вызваны: 0"
+                - generic [ref=e169]: "Приняты: 0"
+                - button "Обновить" [ref=e170] [cursor=pointer]:
+                  - generic [ref=e171]:
+                    - img [ref=e172]
+                    - text: Обновить
+            - generic [ref=e177]:
+              - generic [ref=e179]:
+                - generic [ref=e181]:
+                  - img
+                  - textbox "Поиск" [ref=e182]
+                - combobox [ref=e183] [cursor=pointer]:
+                  - option "Фильтр" [selected]
+                  - option "Запланирован"
+                  - option "Подтвержден"
+                  - option "В очереди"
+                  - option "В кабинете"
+                  - option "Завершен"
+                  - option "Отменен"
+                  - option "Ожидает оплаты"
+                  - option "Платный"
+                - button "Экспорт" [ref=e184] [cursor=pointer]:
+                  - generic [ref=e185]:
+                    - img [ref=e186]
+                    - text: Экспорт
+              - table [ref=e190]:
+                - rowgroup [ref=e191]:
+                  - row "№ Пациент Г.р. Тип Услуги Оплата Дата Статус Стоимость Действия" [ref=e192]:
+                    - columnheader "№" [ref=e193] [cursor=pointer]:
+                      - generic [ref=e194]: №
+                    - columnheader "Пациент" [ref=e195] [cursor=pointer]:
+                      - generic [ref=e196]: Пациент
+                    - columnheader "Г.р." [ref=e197] [cursor=pointer]:
+                      - generic [ref=e198]: Г.р.
+                    - columnheader "Тип" [ref=e199]
+                    - columnheader "Услуги" [ref=e200]
+                    - columnheader "Оплата" [ref=e201]
+                    - columnheader "Дата" [ref=e202] [cursor=pointer]:
+                      - generic [ref=e203]: Дата
+                    - columnheader "Статус" [ref=e204] [cursor=pointer]:
+                      - generic [ref=e205]: Статус
+                    - columnheader "Стоимость" [ref=e206] [cursor=pointer]:
+                      - generic [ref=e207]: Стоимость
+                    - columnheader "Действия" [ref=e208]
+                - rowgroup [ref=e209]:
+                  - row "Нет данных" [ref=e210]:
+                    - cell "Нет данных" [ref=e211]
+          - button "💬 AI" [ref=e212] [cursor=pointer]:
+            - generic [ref=e213]: 💬
+            - generic [ref=e214]: AI
+  - region "Notifications Alt+T"
+  - generic [ref=e215]:
+    - generic [ref=e216]:
+      - img [ref=e217]
+      - generic [ref=e220]:
+        - strong [ref=e221]: Включить уведомления?
+        - generic [ref=e222]: Получайте уведомления о новых сообщениях
+    - generic [ref=e223]:
+      - button "Включить" [ref=e224] [cursor=pointer]
+      - button "Закрыть" [ref=e225] [cursor=pointer]:
+        - img [ref=e226]

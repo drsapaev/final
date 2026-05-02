@@ -1,0 +1,56 @@
+.message-context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: var(--mac-bg-primary, white);
+    border: 1px solid var(--mac-border, #ccc);
+    border-radius: 8px;
+    box-shadow: var(--mac-shadow-lg, 0 10px 20px rgba(0, 0, 0, 0.15));
+    padding: 4px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: menuFadeIn 0.1s ease;
+}
+
+@keyframes menuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.message-context-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--mac-text-primary, #333);
+    transition: background-color 0.1s;
+}
+
+.message-context-menu button:hover {
+    background-color: var(--mac-accent-blue, #007AFF);
+    color: white;
+}
+
+.message-context-menu button.delete:hover {
+    background-color: #FF3B30;
+    color: white;
+}
+
+.message-context-menu button span {
+    flex: 1;
+    text-align: left;
+}

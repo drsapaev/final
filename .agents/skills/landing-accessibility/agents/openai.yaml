@@ -1,0 +1,4 @@
+interface:
+  display_name: "Landing Accessibility"
+  short_description: "Audit landing accessibility"
+  default_prompt: "Use $landing-accessibility to check WCAG, keyboard flow, and semantic issues on a landing page."

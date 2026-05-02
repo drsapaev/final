@@ -1,0 +1,183 @@
+/**
+ * CompletenessChecker CSS
+ */
+
+.completeness-checker {
+    position: relative;
+    display: inline-block;
+}
+
+/* Trigger button */
+.completeness-checker__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.completeness-checker__btn:hover:not(:disabled) {
+    background: #e8e8e8;
+}
+
+.completeness-checker__btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.completeness-checker__btn--complete {
+    background: #e8f5e9;
+    border-color: #a5d6a7;
+    color: #2e7d32;
+}
+
+/* Panel */
+.completeness-checker__panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    width: 320px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    /* High z-index to appear above all EMR sections */
+    overflow: hidden;
+}
+
+/* Header */
+.completeness-checker__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.completeness-checker__header button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.completeness-checker__header button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Content */
+.completeness-checker__content {
+    padding: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.completeness-checker__loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.completeness-checker__error {
+    text-align: center;
+    padding: 15px;
+    color: #c62828;
+}
+
+.completeness-checker__success {
+    text-align: center;
+    padding: 20px;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+/* Sections */
+.completeness-checker__section {
+    margin-bottom: 12px;
+}
+
+.completeness-checker__section:last-child {
+    margin-bottom: 0;
+}
+
+.completeness-checker__section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Items */
+.completeness-checker__item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border: none;
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.completeness-checker__item:last-child {
+    margin-bottom: 0;
+}
+
+.completeness-checker__item--error {
+    background: #fff5f5;
+    border-left: 3px solid #f44336;
+}
+
+.completeness-checker__item--error:hover {
+    background: #ffebee;
+}
+
+.completeness-checker__item--suggestion {
+    background: #f0f7ff;
+    border-left: 3px solid #2196f3;
+}
+
+.completeness-checker__item--suggestion:hover {
+    background: #e3f2fd;
+}
+
+.completeness-checker__item-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.completeness-checker__item-reason {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* Footer */
+.completeness-checker__footer {
+    padding: 8px 14px;
+    background: #fff8e1;
+    border-top: 1px solid #ffe082;
+    font-size: 0.7rem;
+    color: #f57c00;
+    text-align: center;
+}

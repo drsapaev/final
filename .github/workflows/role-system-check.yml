@@ -1,0 +1,87 @@
+name: Role System Integrity Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/src/App.jsx"
+      - "frontend/src/pages/Login.jsx"
+      - "frontend/src/pages/UserSelect.jsx"
+      - "backend/app/api/v1/endpoints/*.py"
+      - "backend/app/core/role_validation.py"
+      - "backend/tests/integration/test_rbac_matrix.py"
+
+jobs:
+  role-system-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinicpwd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+      CORS_DISABLE: "1"
+      WS_DEV_ALLOW: "1"
+      DISABLE_2FA_REQUIREMENT: "1"
+      SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
+
+      - name: Run RBAC integrity test
+        run: |
+          cd backend
+          test -f tests/integration/test_rbac_matrix.py
+          set +e
+          python -m pytest -c /dev/null -q tests/integration/test_rbac_matrix.py -rA
+          PYTEST_EXIT=$?
+          set -e
+
+          if [ "$PYTEST_EXIT" -eq 0 ]; then
+            echo "✅ RBAC matrix pytest passed"
+            exit 0
+          fi
+
+          if [ "$PYTEST_EXIT" -ne 4 ]; then
+            echo "❌ RBAC matrix pytest failed with exit code: $PYTEST_EXIT"
+            exit "$PYTEST_EXIT"
+          fi
+
+          echo "::warning::Pytest exited with code 4 (usage/config issue in runner). Running deterministic fallback integrity checks."
+          set +e
+          python scripts/ci/validate_role_integrity.py --verbose
+          FALLBACK_EXIT=$?
+          set -e
+          if [ "$FALLBACK_EXIT" -ne 0 ]; then
+            echo "❌ Fallback role integrity checks failed with exit code: $FALLBACK_EXIT"
+            exit "$FALLBACK_EXIT"
+          fi
+          echo "✅ Fallback role integrity checks passed"

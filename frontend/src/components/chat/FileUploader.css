@@ -1,0 +1,27 @@
+.file-uploader {
+    display: flex;
+    align-items: center;
+}
+
+.file-uploader-btn {
+    background: transparent;
+    border: none;
+    color: var(--mac-text-tertiary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-uploader-btn:hover:not(:disabled) {
+    background-color: var(--mac-bg-secondary);
+    color: var(--mac-accent-blue);
+}
+
+.file-uploader-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

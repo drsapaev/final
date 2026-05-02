@@ -1,0 +1,32 @@
+fix: improve CI/CD integration tests and error handling
+
+
+## 🔧 Исправления CI/CD Pipeline
+
+### Проблемы исправлены:
+- ✅ Deploy Staging job не запускался для PR событий
+- ✅ Интеграционные тесты падали (YAML линтер ошибки)
+- ✅ Генерация документации падала без сообщений
+
+### Что изменилось:
+- 🎯 Улучшены условия запуска Deploy jobs (работает для PR и push)
+- 📝 Создан отдельный файл для интеграционных тестов
+- 🔍 Добавлена детальная диагностика сервера
+- ⚠️ Улучшена обработка ошибок в генерации документации
+
+Связано с #184
+
+---
+
+## ✅ Performance Checklist (EMR v2)
+
+- [ ] Не использую `localStorage` и локальные TTL для кэша внутри компонентов.
+- [ ] Debounce применяется только через `frontend/src/core/debouncePolicy.js` или `useDebouncedCallback`.
+- [ ] При смене `visitId` используется `useVisitLifecycle` (очистка, abort, инвалидация).
+- [ ] Любые async‑загрузки поддерживают отмену (AbortController/axios `signal`) или безопасный ignore.
+
+Ссылки:
+- `docs/architecture/ADR-0001-centralized-caching.md`
+- `docs/architecture/performance-lessons.md`
+- `docs/architecture/performance-checklist.md`
+

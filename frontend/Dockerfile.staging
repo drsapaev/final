@@ -1,0 +1,35 @@
+FROM node:20.19.6-slim AS builder
+
+ARG VITE_API_BASE=/api/v1
+ARG VITE_API_URL=http://localhost:18080
+ARG VITE_API_BASE_URL=http://localhost:18080
+ARG VITE_WS_URL=ws://localhost:18080
+ARG VITE_WS_HOST=localhost:18080
+
+ENV CI=true \
+    NODE_ENV=development \
+    VITE_API_BASE=${VITE_API_BASE} \
+    VITE_API_URL=${VITE_API_URL} \
+    VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+    VITE_WS_URL=${VITE_WS_URL} \
+    VITE_WS_HOST=${VITE_WS_HOST}
+
+WORKDIR /app
+
+COPY package.json /app/package.json
+COPY package-lock.json /app/package-lock.json
+RUN npm ci --legacy-peer-deps --include=dev
+
+COPY src /app/src
+COPY public /app/public
+COPY index.html /app/index.html
+COPY vite.config.js /app/vite.config.js
+
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY docker/nginx.staging.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80

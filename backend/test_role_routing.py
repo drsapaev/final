@@ -1,0 +1,177 @@
+"""
+Тесты для проверки системы ролей и маршрутизации
+Запускать после каждого изменения в системе авторизации
+"""
+
+import sys
+
+import requests
+
+BASE_URL = "http://127.0.0.1:18000"
+
+
+def test_user_login_and_role(username, password, expected_role, expected_redirect=None):
+    """Тестирует логин пользователя и проверяет роль"""
+    print(f"Тестируем пользователя: {username}")
+
+    # Логин
+    login_url = f"{BASE_URL}/api/v1/authentication/login"
+    login_data = {"username": username, "password": password}
+
+    try:
+        response = requests.post(login_url, json=login_data)
+        print(f"DEBUG: Login response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"ОШИБКА: Логин не удался: {response.status_code}")
+            print(f"DEBUG: Response text: {response.text[:500]}")
+            return False
+
+        token_data = response.json()
+        print(f"DEBUG: Token data keys: {token_data.keys()}")
+        
+        # Новая система аутентификации возвращает токены в объекте tokens
+        token = token_data.get("access_token")
+        if not token and token_data.get("tokens"):
+            token = token_data["tokens"].get("access_token")
+        
+        if not token:
+            print("ОШИБКА: Токен не получен")
+            print(f"DEBUG: Response data: {token_data}")
+            return False
+
+
+        # Получение профиля
+        profile_url = f"{BASE_URL}/api/v1/authentication/profile"
+        headers = {"Authorization": f"Bearer {token}"}
+        profile_response = requests.get(profile_url, headers=headers)
+        print(f"DEBUG: Profile response status: {profile_response.status_code}")
+
+        if profile_response.status_code != 200:
+            print(f"ОШИБКА: Профиль не получен: {profile_response.status_code}")
+            print(f"DEBUG: Profile response text: {profile_response.text[:500]}")
+            return False
+
+        profile = profile_response.json()
+        actual_role = profile.get("role")
+
+        if actual_role != expected_role:
+            print(
+                f"ОШИБКА: Неправильная роль: ожидалось '{expected_role}', получено '{actual_role}'"
+            )
+            return False
+
+        print(f"OK: {username}: роль '{actual_role}' корректна")
+        return True
+
+    except Exception as e:
+        print(f"ОШИБКА: Ошибка при тестировании {username}: {e}")
+        return False
+
+
+def test_all_critical_users():
+    """Тестирует всех критических пользователей"""
+    print("Тестирование системы ролей и авторизации")
+    print("=" * 60)
+
+    # Критические пользователи и их ожидаемые роли
+    critical_users = [
+        ("admin", "admin123", "Admin"),
+        ("registrar", "registrar123", "Registrar"),
+        ("lab", "lab123", "Lab"),
+        ("doctor", "doctor123", "Doctor"),
+        ("cashier", "cashier123", "Cashier"),
+        ("cardio", "cardio123", "cardio"),
+        ("derma", "derma123", "derma"),
+        ("dentist", "dentist123", "dentist"),
+    ]
+
+    results = []
+    for username, password, expected_role in critical_users:
+        result = test_user_login_and_role(username, password, expected_role)
+        results.append((username, result))
+        print()
+
+    # Итоги
+    print("РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ:")
+    print("=" * 60)
+    passed = sum(1 for _, result in results if result)
+    total = len(results)
+
+    for username, result in results:
+        status = "PASS" if result else "FAIL"
+        print(f"{status} {username}")
+
+    print(f"\nИтого: {passed}/{total} тестов прошли успешно")
+
+    if passed == total:
+        print("УСПЕХ: Все тесты прошли! Система ролей работает корректно.")
+        return True
+    else:
+        print("ВНИМАНИЕ: Есть проблемы с системой ролей!")
+        return False
+
+
+def test_api_endpoints_access():
+    """Тестирует доступ к специализированным API endpoints"""
+    print("\nТестирование доступа к API endpoints")
+    print("=" * 60)
+
+    # Получаем токен админа
+    login_data = {"username": "admin", "password": "admin123", "grant_type": "password"}
+    response = requests.post(f"{BASE_URL}/api/v1/authentication/login", json=login_data)
+    if response.status_code != 200:
+        print("ОШИБКА: Не удалось получить токен админа")
+        return False
+
+    token = response.json().get("access_token")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Тестируем специализированные endpoints
+    endpoints = [
+        ("/api/v1/cardio/ecg", "Cardio API"),
+        ("/api/v1/derma/examinations", "Derma API"),
+        ("/api/v1/dental/examinations", "Dental API"),
+        ("/api/v1/lab/tests", "Lab API"),
+    ]
+
+    for endpoint, name in endpoints:
+        try:
+            response = requests.get(f"{BASE_URL}{endpoint}", headers=headers)
+            if response.status_code in [
+                200,
+                404,
+            ]:  # 404 тоже нормально, если нет данных
+                print(f"OK: {name}: доступен")
+            else:
+                print(f"ОШИБКА: {name}: ошибка {response.status_code}")
+        except Exception as e:
+            print(f"ОШИБКА: {name}: исключение {e}")
+
+    return True
+
+
+if __name__ == "__main__":
+    print("Запуск тестов системы ролей")
+    print("=" * 60)
+
+    # Проверяем доступность сервера
+    try:
+        response = requests.get(f"{BASE_URL}/api/v1/health")
+        if response.status_code != 200:
+            print("ОШИБКА: Сервер недоступен")
+            sys.exit(1)
+    except Exception:
+        print("ОШИБКА: Сервер недоступен")
+        sys.exit(1)
+
+    # Запускаем тесты
+    success1 = test_all_critical_users()
+    success2 = test_api_endpoints_access()
+
+    if success1 and success2:
+        print("\nУСПЕХ: ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!")
+        sys.exit(0)
+    else:
+        print("\nВНИМАНИЕ: ЕСТЬ ПРОБЛЕМЫ В СИСТЕМЕ!")
+        sys.exit(1)

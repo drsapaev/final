@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, func, literal
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
+
+class Patient(Base):
+    __tablename__ = "patients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True
+    )  # ✅ SECURITY: SET NULL (patient can exist without user account)
+    last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    middle_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sex: Mapped[str | None] = mapped_column(
+        String(8), nullable=True, name="gender"
+    )  # M|F|X
+
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    doc_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    doc_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    # ✅ SOFT-DELETE: Безопасное удаление пациентов
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    # Связь с пользователем
+    user: Mapped[User | None] = relationship("User", back_populates="patient", foreign_keys=[user_id])
+
+    def short_name(self) -> str:
+        """
+        Возвращает короткое имя пациента в формате "Фамилия Имя [Отчество]".
+        Гарантирует, что всегда возвращается непустая строка.
+        """
+        # ✅ ЗАЩИТА: Проверяем, что поля не пустые
+        last_name = (self.last_name or "").strip()
+        first_name = (self.first_name or "").strip()
+        middle_name = (self.middle_name or "").strip() if self.middle_name else ""
+
+        # Если оба поля пустые - это ошибка данных, но возвращаем fallback
+        if not last_name and not first_name:
+            return f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
+
+        # Если одно из полей пустое - используем другое для обоих
+        if not last_name and first_name:
+            last_name = first_name
+        elif last_name and not first_name:
+            first_name = last_name
+
+        # Формируем имя
+        mid = f" {middle_name}" if middle_name else ""
+        result = f"{last_name} {first_name}{mid}".strip()
+
+        # Финальная проверка - если все еще пустое (не должно произойти)
+        return (
+            result
+            if result
+            else f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
+        )
+
+    @hybrid_property
+    def full_name(self) -> str:
+        return self.short_name()
+
+    @full_name.expression
+    def full_name(cls):  # type: ignore[no-redef]
+        return func.trim(
+            func.coalesce(cls.last_name, "")
+            + literal(" ")
+            + func.coalesce(cls.first_name, "")
+            + literal(" ")
+            + func.coalesce(cls.middle_name, "")
+        )

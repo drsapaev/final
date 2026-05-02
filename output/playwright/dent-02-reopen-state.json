@@ -1,0 +1,48 @@
+{
+  "found": true,
+  "key": "dentist_panel_documents_v1",
+  "visitProtocols": [
+    {
+      "visit_id": 746,
+      "patient_id": 451,
+      "patient_name": "DENT 01 Пациент 1774146335",
+      "saved_at": "2026-03-22T07:50:27.752Z",
+      "visitData": {
+        "visitDate": "2026-03-22",
+        "visitTime": "12:48",
+        "doctor": "",
+        "assistant": "",
+        "chiefComplaint": "",
+        "historyOfPresentIllness": "",
+        "procedures": [
+          {
+            "name": "Лечение кариеса",
+            "teeth": "11",
+            "startTime": "12:55",
+            "endTime": "13:10",
+            "description": "Пломбирование кариозной полости зуба 11 с фотополимером.",
+            "completed": false,
+            "complications": false
+          }
+        ],
+        "materials": [],
+        "anesthesia": [],
+        "photos": {
+          "before": [],
+          "during": [],
+          "after": []
+        },
+        "radiographs": [],
+        "prescriptions": [],
+        "recommendations": "",
+        "nextVisit": {
+          "date": "",
+          "time": "",
+          "purpose": ""
+        },
+        "createdAt": "2026-03-22T07:48:57.476Z",
+        "updatedAt": "2026-03-22T07:50:27.751Z"
+      }
+    }
+  ]
+}

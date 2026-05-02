@@ -1,0 +1,62 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - button "Switch to dark mode" [ref=e6] [cursor=pointer]:
+        - img [ref=e8]
+      - button "🇷🇺 RU" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: 🇷🇺
+          - generic [ref=e13]: RU
+    - generic [ref=e14]:
+      - img [ref=e15]
+      - text: status
+    - generic [ref=e17]:
+      - img [ref=e20]
+      - generic [ref=e24]: MediClinic Pro
+      - generic [ref=e25]: Система управления медицинской клиникой
+    - generic [ref=e26]:
+      - button "appointments Запись и управление приемами" [ref=e27] [cursor=pointer]:
+        - img [ref=e29]
+        - generic [ref=e31]:
+          - generic [ref=e32]: appointments
+          - generic [ref=e33]: Запись и управление приемами
+      - button "queue Онлайн-очереди с QR-регистрацией" [ref=e34] [cursor=pointer]:
+        - img [ref=e36]
+        - generic [ref=e38]:
+          - generic [ref=e39]: queue
+          - generic [ref=e40]: Онлайн-очереди с QR-регистрацией
+    - generic [ref=e41]:
+      - button "Войти в систему" [ref=e42] [cursor=pointer]:
+        - generic [ref=e43]:
+          - img [ref=e44]
+          - text: Войти в систему
+      - button "Активировать лицензию" [ref=e47] [cursor=pointer]:
+        - generic [ref=e48]:
+          - img [ref=e49]
+          - text: Активировать лицензию
+  - generic [ref=e53]:
+    - generic [ref=e54]:
+      - img [ref=e55]
+      - text: Контактная информация
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - img [ref=e60]
+        - generic [ref=e63]:
+          - generic [ref=e64]: Адрес
+          - generic [ref=e65]: г. Ташкент, ул. Беруний
+      - generic [ref=e66]:
+        - img [ref=e67]
+        - generic [ref=e69]:
+          - generic [ref=e70]: Телефон
+          - generic [ref=e71]: +998 (95) 104-34-34
+      - generic [ref=e72]:
+        - img [ref=e73]
+        - generic [ref=e76]:
+          - generic [ref=e77]: График работы
+          - generic [ref=e78]: "Пн–Сб: 9:00–17:00"
+      - generic [ref=e79]:
+        - img [ref=e80]
+        - generic [ref=e82]:
+          - generic [ref=e83]: Поддержка
+          - generic [ref=e84]: "@clinic_support"
+  - generic [ref=e85]: v2.1.0 · 2025 · MediClinic Pro

@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.venv/
+.venv.wsl.bak/
+env/
+venv/
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+dist/
+.build/
+.cache/
+.vite/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+.env
+*.env
+.env.*
+!.env.example
+!.env.local.restore
+
+# Alembic / build artifacts
+alembic/**/__pycache__/
+*.log
+
+# Coverage/test
+.coverage
+htmlcov/
+pytest_cache/
+NUL
+nul
+
+# Quality reports (игнорируем файлы отчетов, но не директорию и README)
+backend/quality-reports/*.txt
+backend/quality-reports/*.md
+!backend/quality-reports/README.md
+!backend/quality-reports/.gitkeep.secret_key
+backend/.secret_key
+.secret_key
+*.db.backup*
+
+# Database files (local development)
+*.db
+!backend/clinic.db.example
+
+# Test logs
+pytest_*.txt
+*_log*.txt
+*.db
+*.sqlite
+clinic.db
+
+# Security
+*.pem
+*.key
+*.crt
+secrets/
+*.dump
+*.sql
+
+# Tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Additional security
+*.pem
+*.key
+*.crt
+secrets/
+*.dump
+*.sql
+
+# Local dev artifacts
+.mypy_cache/
+.ruff_cache/
+
+# Generated CI/debug artifacts (large)
+backend/bandit_*
+backend/mypy_ci_check.txt
+run_*.final.html
+run_latest.html
+wf_page*.html
+.ai-factory/landing/runs/*
+!.ai-factory/landing/runs/.gitkeep
+
+# Local staging/runtime artifacts
+output/staging/
+staging-postgres-55432/
+frontend/playwright-report/
+frontend/test-results/
+
+# Полные дубликаты дерева проекта внутри локального архива (не коммитим)
+**/restored_clinic_from_ubuntuproof/
+**/restored_clinic_latest_github_plus_ubuntuproof/
+Архив/

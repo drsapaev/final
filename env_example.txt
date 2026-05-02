@@ -1,0 +1,59 @@
+# AI Provider API Keys
+# Получите ключи на соответствующих сайтах:
+# OpenAI: https://platform.openai.com/api-keys
+# Google Gemini: https://makersuite.google.com/app/apikey
+# DeepSeek: https://platform.deepseek.com/api_keys
+
+# OpenAI (рекомендуется для медицинских задач)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Google Gemini (бесплатный, хорошее качество)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# DeepSeek (дешевый, хорошее качество)
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# MCP Settings
+MCP_ENABLED=true
+MCP_LOG_REQUESTS=true
+MCP_FALLBACK_TO_DIRECT=true
+MCP_REQUEST_TIMEOUT=30
+MCP_HEALTH_CHECK_INTERVAL=60
+MCP_MAX_BATCH_SIZE=10
+
+# Database
+DATABASE_URL=sqlite:///./clinic.db
+
+# Auth
+SECRET_KEY=dev-secret-key-for-clinic-management-system-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
+
+# CORS
+BACKEND_CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8080","http://127.0.0.1:8080"]
+
+# Firebase Cloud Messaging (FCM) для push уведомлений
+# Инструкция по получению ключа:
+# 1. Перейдите в Firebase Console: https://console.firebase.google.com/
+# 2. Создайте проект или выберите существующий
+# 3. Перейдите в Project Settings (⚙️) > Cloud Messaging
+# 4. В разделе "Cloud Messaging API (Legacy)" найдите "Server key"
+# 5. Скопируйте Server key и вставьте ниже
+# 
+# Альтернативный способ (для новых проектов):
+# 1. В Firebase Console: Project Settings > Service accounts
+# 2. Нажмите "Generate new private key" для создания service account
+# 3. Используйте этот JSON файл для аутентификации
+# 
+# FCM_SERVER_KEY - обязательный для работы push уведомлений
+FCM_SERVER_KEY=your_fcm_server_key_here
+
+# FCM_SENDER_ID - опциональный, используется для некоторых функций
+# Находится в Firebase Console > Project Settings > General > Your apps
+FCM_SENDER_ID=your_fcm_sender_id_here
+
+# FCM_PROJECT_ID - опциональный, ID вашего Firebase проекта
+FCM_PROJECT_ID=your_fcm_project_id_here
+
+# Включить/выключить FCM (по умолчанию false, активируется автоматически при наличии FCM_SERVER_KEY)
+FCM_ENABLED=true

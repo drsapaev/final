@@ -1,0 +1,114 @@
+{
+  "generated_at": "2026-02-25T07:03:34.692579+00:00",
+  "summary": {
+    "modules_total": 4,
+    "avg_correctness": 5.0,
+    "avg_usability": 4.38
+  },
+  "modules": [
+    {
+      "id": "registrar_queue",
+      "name": "Registrar Queue",
+      "files_scanned": [
+        "frontend/src/pages/RegistrarPanel.jsx",
+        "frontend/src/components/wizard/AppointmentWizardV2.jsx",
+        "frontend/src/api/queue.js"
+      ],
+      "indicators": {
+        "loading": true,
+        "error_handling": true,
+        "empty_state": true,
+        "validation_feedback": true,
+        "a11y_keyboard": true,
+        "recovery_actions": true
+      },
+      "critical_flow_status": "pass",
+      "correctness_score": 5.0,
+      "usability_score": 5.0,
+      "grade": {
+        "correctness": "excellent",
+        "usability": "excellent"
+      },
+      "gaps": []
+    },
+    {
+      "id": "doctor_emr_rw",
+      "name": "Doctor EMR Read/Write",
+      "files_scanned": [
+        "frontend/src/pages/DoctorPanel.jsx",
+        "frontend/src/hooks/useDoctorPhrases.js",
+        "frontend/src/hooks/useDoctorTreatmentTemplates.js"
+      ],
+      "indicators": {
+        "loading": true,
+        "error_handling": true,
+        "empty_state": true,
+        "validation_feedback": true,
+        "a11y_keyboard": false,
+        "recovery_actions": true
+      },
+      "critical_flow_status": "pass",
+      "correctness_score": 5.0,
+      "usability_score": 3.75,
+      "grade": {
+        "correctness": "excellent",
+        "usability": "fair"
+      },
+      "gaps": [
+        "a11y_keyboard"
+      ]
+    },
+    {
+      "id": "cashier_payment",
+      "name": "Cashier Payment",
+      "files_scanned": [
+        "frontend/src/pages/CashierPanel.jsx",
+        "frontend/src/hooks/usePayments.js",
+        "frontend/src/services/payment.js"
+      ],
+      "indicators": {
+        "loading": true,
+        "error_handling": true,
+        "empty_state": true,
+        "validation_feedback": true,
+        "a11y_keyboard": false,
+        "recovery_actions": true
+      },
+      "critical_flow_status": "pass",
+      "correctness_score": 5.0,
+      "usability_score": 3.75,
+      "grade": {
+        "correctness": "excellent",
+        "usability": "fair"
+      },
+      "gaps": [
+        "a11y_keyboard"
+      ]
+    },
+    {
+      "id": "admin_settings",
+      "name": "Admin Settings",
+      "files_scanned": [
+        "frontend/src/pages/AdminPanel.jsx",
+        "frontend/src/pages/Settings.jsx",
+        "frontend/src/hooks/useSettings.js"
+      ],
+      "indicators": {
+        "loading": true,
+        "error_handling": true,
+        "empty_state": true,
+        "validation_feedback": true,
+        "a11y_keyboard": true,
+        "recovery_actions": true
+      },
+      "critical_flow_status": "pass",
+      "correctness_score": 5.0,
+      "usability_score": 5.0,
+      "grade": {
+        "correctness": "excellent",
+        "usability": "excellent"
+      },
+      "gaps": []
+    }
+  ]
+}

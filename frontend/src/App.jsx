@@ -1,0 +1,325 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import { AppProviders } from './providers/AppProviders';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import './styles/theme.css';
+import './styles/dark-theme-visibility-fix.css';
+import './styles/global-fixes.css';
+import './theme/macos-tokens.css';
+import './styles/macos.css';
+import 'react-toastify/dist/ReactToastify.css';
+import { MacOSThemeProvider } from './theme/macosTheme.jsx';
+import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
+import { Sidebar } from './components/ui/macos';
+import HeaderNew from './components/layout/HeaderNew.jsx';
+import Health from './pages/Health.jsx';
+import Landing from './pages/Landing.jsx';
+import ButtonShowcase from './components/buttons/ButtonShowcase.jsx';
+import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
+import Setup from './pages/Setup.jsx';
+import { useSetupStatus } from './hooks/useSetupStatus.js';
+import TelegramManager from './components/TelegramManager.jsx';
+import EmailSMSManager from './components/notifications/EmailSMSManager.jsx';
+import TwoFactorManager from './components/security/TwoFactorManager.jsx';
+import FileManager from './components/files/FileManager.jsx';
+import UserManagement from './components/admin/UserManagement.jsx';
+import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
+import auth from './stores/auth.js';
+import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
+import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards.jsx';
+import { getRouteChromeState } from './routing/routeSelectors.js';
+
+bootstrapStoredColorScheme();
+
+const CashierPanel = lazy(() => import('./pages/CashierPanel.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
+const Audit = lazy(() => import('./pages/Audit.jsx'));
+const Scheduler = lazy(() => import('./pages/Scheduler.jsx'));
+const Appointments = lazy(() => import('./pages/Appointments.jsx'));
+const VisitDetails = lazy(() => import('./pages/VisitDetails.jsx'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel.jsx'));
+const RegistrarPanel = lazy(() => import('./pages/RegistrarPanel.jsx'));
+const DoctorPanel = lazy(() => import('./pages/DoctorPanel.jsx'));
+const CardiologistPanelUnified = lazy(() => import('./pages/CardiologistPanelUnified.jsx'));
+const DermatologistPanelUnified = lazy(() => import('./pages/DermatologistPanelUnified.jsx'));
+const DentistPanelUnified = lazy(() => import('./pages/DentistPanelUnified.jsx'));
+const LabPanel = lazy(() => import('./pages/LabPanel.jsx'));
+const UserSelect = lazy(() => import('./pages/UserSelect.jsx'));
+const Search = lazy(() => import('./pages/Search.jsx'));
+const QueueJoin = lazy(() => import('./pages/QueueJoin.jsx'));
+const PatientPanel = lazy(() => import('./pages/PatientPanel.jsx'));
+const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified.jsx'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage.jsx'));
+const MediLabDemo = lazy(() => import('./pages/MediLabDemo.jsx'));
+const CSSTestPage = lazy(() => import('./pages/CSSTestPage.jsx'));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess.jsx'));
+const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
+const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
+const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
+const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
+const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
+const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
+
+const ROUTE_COMPONENTS = {
+  Landing,
+  LoginFormStyled,
+  ChangePasswordRequired,
+  Health,
+  QueueJoin,
+  PaymentSuccess,
+  PaymentCancel,
+  DisplayBoardUnified,
+  Setup,
+  AdminPanel,
+  AnalyticsPage,
+  Settings,
+  Audit,
+  TelegramManager,
+  EmailSMSManager,
+  UserManagement,
+  FileManager,
+  UserSelect,
+  RegistrarPanel,
+  DoctorPanel,
+  CashierPanel,
+  LabPanel,
+  PatientPanel,
+  CardiologistPanelUnified,
+  DermatologistPanelUnified,
+  DentistPanelUnified,
+  Scheduler,
+  Appointments,
+  Search,
+  UserProfile,
+  SecurityPage,
+  TwoFactorManager,
+  VisitDetails,
+  PatientPickupView,
+  MediLabDemo,
+  MacOSDemoPage,
+  IntegrationDemo,
+  PaymentTest,
+  CSSTestPage,
+  ButtonShowcase,
+  UnauthorizedPage,
+  ForbiddenPage,
+  NotFoundPage,
+};
+
+function LoadingScreen() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
+      Загрузка...
+    </div>
+  );
+}
+
+function AppShell({ children }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { theme } = useTheme();
+  const [authState, setAuthState] = useState(() => auth.getState());
+  const chrome = getRouteChromeState(location.pathname, location.search, authState.profile);
+
+  useEffect(() => auth.subscribe(setAuthState), []);
+
+  const handleSidebarClick = (item) => {
+    if (chrome.sidebarPreset?.navigation === 'query') {
+      const params = new URLSearchParams(location.search);
+      params.set(chrome.sidebarPreset.queryParam, item.id);
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+      return;
+    }
+
+    if (item.to) {
+      navigate(item.to);
+    }
+  };
+
+  return (
+    <div className="app-shell" style={macOSWrapStyle} data-route-id={chrome.route?.id || 'unknown'}>
+      {!chrome.hideHeader && (
+        <div style={{ padding: '12px', backgroundColor: 'transparent', width: '100vw' }}>
+          <HeaderNew />
+        </div>
+      )}
+
+      <div
+        className="app-shell-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: chrome.hideSidebar ? '1fr' : 'auto 1fr',
+          gap: '16px',
+          flex: 1,
+          minHeight: 0,
+          width: '100vw',
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          padding: chrome.hideHeader ? '0' : '0 0 16px 0',
+        }}
+      >
+        {!chrome.hideSidebar && (
+          <div style={{ marginTop: '0', marginLeft: '12px' }}>
+            <Sidebar
+              items={chrome.sidebarItems}
+              activeItem={chrome.activeSidebarItem}
+              onItemClick={handleSidebarClick}
+              defaultCollapsed={false}
+              collapsible
+            />
+          </div>
+        )}
+
+        <main
+          className={`app-main${chrome.hideSidebar || chrome.fullscreen ? ' app-main--frameless' : ''}`}
+          style={{
+            ...macOSMainStyle,
+            ...(theme === 'light' && { boxShadow: 'none' }),
+            ...(chrome.hideSidebar && {
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 0,
+              boxShadow: 'none',
+              maxWidth: 'none',
+              margin: 0,
+              padding: 0,
+            }),
+            ...(chrome.fullscreen && {
+              maxWidth: 'none',
+              margin: 0,
+              border: 'none',
+              borderRadius: 0,
+              boxShadow: 'none',
+              background: 'transparent',
+              padding: 0,
+            }),
+          }}
+        >
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+AppShell.propTypes = {
+  children: PropTypes.node,
+};
+
+function RouteRenderer({ route }) {
+  const Component = ROUTE_COMPONENTS[route.component];
+
+  if (!Component) {
+    return <NotFoundPage />;
+  }
+
+  let element = <Component />;
+  element = <RouteAccessBoundary route={route}>{element}</RouteAccessBoundary>;
+
+  if (route.shell === 'app-shell') {
+    element = <AppShell>{element}</AppShell>;
+  }
+
+  return element;
+}
+
+RouteRenderer.propTypes = {
+  route: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    component: PropTypes.string.isRequired,
+    shell: PropTypes.string,
+  }).isRequired,
+};
+
+function AppContent() {
+  const location = useLocation();
+  const setupStatus = useSetupStatus();
+
+  if (setupStatus.isLoading && location.pathname !== '/health') {
+    return <LoadingScreen />;
+  }
+
+  if (!setupStatus.error) {
+    const redirectTarget = resolveSetupRedirect(location.pathname, setupStatus.initialized);
+    if (redirectTarget && redirectTarget !== location.pathname) {
+      return <Navigate to={redirectTarget} replace />;
+    }
+  }
+
+  return (
+    <>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          {ROUTE_REGISTRY.map((route) => (
+            <Route
+              key={route.id}
+              path={route.path}
+              element={<RouteRenderer route={route} />}
+            />
+          ))}
+
+          {ROUTE_REGISTRY.flatMap((route) =>
+            (route.legacyRedirectFrom || []).map((legacyPath) => (
+              <Route
+                key={`${route.id}:${legacyPath}`}
+                path={legacyPath}
+                element={<LegacyRouteRedirect />}
+              />
+            ))
+          )}
+
+          <Route path="*" element={<Navigate to="/not-found" replace />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <MacOSThemeProvider>
+      <ThemeProvider>
+        <AppProviders>
+          <AppContent />
+          <ToastContainer
+            position="bottom-right"
+            autoClose={4000}
+            newestOnTop
+            closeOnClick
+            pauseOnHover
+            draggable
+            theme="colored"
+          />
+        </AppProviders>
+      </ThemeProvider>
+    </MacOSThemeProvider>
+  );
+}
+
+const macOSWrapStyle = {
+  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+  background: 'transparent',
+  minHeight: '100vh',
+  color: 'var(--mac-text-primary)',
+  width: '100%',
+  margin: 0,
+  padding: 0,
+  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+};
+
+const macOSMainStyle = {
+  flex: 1,
+  maxWidth: '100%',
+  margin: 0,
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  overflow: 'auto',
+  position: 'relative',
+  isolation: 'isolate',
+};

@@ -1,0 +1,40 @@
+{
+  "request": {
+    "name": "Branch REG02 Smoke 1774508882176",
+    "code": "BR08882176",
+    "address": "",
+    "phone": "+998911234567",
+    "email": "",
+    "status": "active",
+    "capacity": 50,
+    "services_available": [
+      "cardiology",
+      "dermatology",
+      "stomatology"
+    ]
+  },
+  "responseStatus": 201,
+  "responseBody": {
+    "id": 999999,
+    "name": "Branch REG02 Smoke 1774508882176",
+    "code": "BR08882176",
+    "address": "",
+    "phone": "+998911234567",
+    "email": "",
+    "status": "active",
+    "capacity": 50,
+    "services_available": [
+      "cardiology",
+      "dermatology",
+      "stomatology"
+    ],
+    "manager": null,
+    "doctors_count": 0,
+    "equipment_count": 0,
+    "created_at": "2026-03-26T07:08:06.317Z",
+    "updated_at": "2026-03-26T07:08:06.317Z"
+  },
+  "branchName": "Branch REG02 Smoke 1774508882176",
+  "branchCode": "BR08882176",
+  "phoneInput": "998911234567"
+}

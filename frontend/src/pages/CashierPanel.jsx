@@ -1,0 +1,1680 @@
+import { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
+import { Card, Badge, Button } from '../components/ui/macos';
+import Tooltip from '../components/ui/macos/Tooltip';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
+import PaymentWidget from '../components/payment/PaymentWidget';
+import CashPaymentModal from '../components/payment/CashPaymentModal';
+import MacOSTab from '../components/ui/macos/MacOSTab';
+import SegmentedControl from '../components/ui/macos/SegmentedControl';
+import Input from '../components/ui/macos/Input';
+
+// ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
+import useModal from '../hooks/useModal.jsx';
+import { usePayments } from '../hooks/usePayments';
+import { getApiOrigin } from '../api/runtime';
+import { printPanelReceiptInBrowser } from '../services/panelPrint';
+import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager';
+import { getErrorMessage } from '../utils/errorHandler';
+import notify from '../services/notify';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Box,
+  Alert,
+  Skeleton } from
+'../components/ui/macos';
+
+// ✅ Компоненты для возвратов
+import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
+
+// Функция для получения даты в формате YYYY-MM-DD
+const getLocalDateString = (date = new Date()) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Вспомогательная функция для создания прозрачного цвета
+
+
+
+
+
+
+
+// Custom debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+const PAYMENT_METHOD_LABELS = {
+  cash: 'Наличные',
+  card: 'Карта',
+  payme: 'PayMe',
+  click: 'Click'
+};
+
+const resolvePaymentId = (paymentRowOrId) => {
+  if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
+    return paymentRowOrId;
+  }
+
+  return (
+    paymentRowOrId?.id ||
+    paymentRowOrId?.payment_id ||
+    paymentRowOrId?.grouped_payments?.[0] ||
+    null
+  );
+};
+
+const resolvePaymentMethodCode = (method) => {
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+
+  if (!normalizedMethod) return 'cash';
+  if (normalizedMethod === 'наличные') return 'cash';
+  if (normalizedMethod === 'карта') return 'card';
+
+  return normalizedMethod;
+};
+
+const resolvePaymentMethodLabel = (method) => {
+  const methodCode = resolvePaymentMethodCode(method);
+  return PAYMENT_METHOD_LABELS[methodCode] || String(method || 'Наличные');
+};
+
+const extractReceiptDateTime = (paymentRow) => {
+  const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
+  const parsedDate = sourceTimestamp ? new Date(sourceTimestamp) : null;
+  const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
+
+  return {
+    date: paymentRow?.date || (hasValidDate ? parsedDate.toLocaleDateString('ru-RU') : ''),
+    time: paymentRow?.time || (
+      hasValidDate
+        ? parsedDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        : ''
+    )
+  };
+};
+
+const buildReceiptServices = (paymentRow, totalAmount) => {
+  const currency = String(paymentRow?.currency || 'UZS');
+  const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
+
+  if (namedServices.length > 0) {
+    return namedServices
+      .filter(Boolean)
+      .map((serviceName) => ({
+      name: serviceName,
+      quantity: 1,
+      price: totalAmount,
+      total: totalAmount,
+      currency
+      }));
+  }
+
+  if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
+    return paymentRow.services.flatMap((serviceItem) => {
+      if (typeof serviceItem === 'object' && serviceItem !== null) {
+        const displayName = serviceItem.name || serviceItem.code || null;
+        if (!displayName) {
+          return [];
+        }
+        const quantity = Number(serviceItem.quantity || 1);
+        const price = Number(serviceItem.price || totalAmount);
+        return {
+          name: displayName,
+          quantity,
+          price,
+          total: Number(serviceItem.total || price * quantity),
+          currency: serviceItem.currency || currency
+        };
+      }
+
+      if (!serviceItem) {
+        return [];
+      }
+
+      return {
+        name: String(serviceItem),
+        quantity: 1,
+        price: totalAmount,
+        total: totalAmount,
+        currency
+      };
+    });
+  }
+
+  return [];
+};
+
+const buildReceiptPrintPayload = (paymentRow) => {
+  const paymentId = resolvePaymentId(paymentRow);
+  const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
+  const services = buildReceiptServices(paymentRow, totalAmount);
+  const { date, time } = extractReceiptDateTime(paymentRow);
+  const methodCode = resolvePaymentMethodCode(paymentRow?.method);
+
+  return {
+    payment: {
+      number: paymentRow?.receipt_no || `PAY-${paymentId}`,
+      date,
+      time,
+      services,
+      subtotal: totalAmount,
+      discount: 0,
+      total: totalAmount,
+      method: methodCode,
+      method_name: resolvePaymentMethodLabel(paymentRow?.method),
+      status: paymentRow?.status || 'paid',
+      paid_amount: totalAmount,
+      change: 0
+    },
+    patient: {
+      full_name: paymentRow?.patient || paymentRow?.patient_name || 'Пациент',
+      phone: paymentRow?.patient_phone || null
+    },
+    services,
+    clinic: null
+  };
+};
+
+const CashierPanel = () => {void
+  useBreakpoint();
+  const location = useLocation();
+  const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
+  // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
+
+  // ✅ Получаем patientId из URL для автоматического поиска
+  const getPatientIdFromUrl = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+  }, [location.search]);
+
+  // Search state - инициализируем с patientId если есть
+  const [query, setQuery] = useState(() => {
+    const patientId = new URLSearchParams(window.location.search).get('patientId');
+    return patientId ? `patient:${patientId}` : '';
+  });
+  const debouncedQuery = useDebounce(query, 500); // 500ms debounce
+
+  // ✅ Эффект для загрузки пациента из URL
+  useEffect(() => {
+    const patientIdFromUrl = getPatientIdFromUrl();
+    if (patientIdFromUrl && !query.includes(`patient:${patientIdFromUrl}`)) {
+      // Загружаем данные пациента для поиска
+      const loadPatientForSearch = async () => {
+        try {
+          const token = tokenManager.getAccessToken();
+          if (!token) return;
+
+          const API_BASE = getApiOrigin();
+          const response = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (response.ok) {
+            const patientData = await response.json();
+            const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
+            setQuery(patientName);
+            logger.info('[Cashier] Загружен пациент из URL:', patientName);
+          }
+        } catch (error) {
+          logger.error('[Cashier] Не удалось загрузить пациента:', error);
+        }
+      };
+      loadPatientForSearch();
+    }
+  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [status, setStatus] = useState('all');
+  const [payments, setPayments] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
+
+  // Состояния для календаря
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
+  const [dateFrom, setDateFrom] = useState(() => getLocalDateString());
+  const [dateTo, setDateTo] = useState(() => getLocalDateString());
+
+  // Состояние для вкладок
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
+
+  // ✅ УЛУЧШЕНИЕ: Новые состояния для отмены платежа
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  // ✅ УЛУЧШЕНИЕ: Пагинация для истории платежей (Server-side)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 20;
+
+  // ✅ v2.0: Пагинация для ожидающих оплаты
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingTotalPages, setPendingTotalPages] = useState(1);
+  const [pendingTotalItems, setPendingTotalItems] = useState(0);
+
+  // ✅ УЛУЧШЕНИЕ: Ключ для принудительного обновления данных
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ✅ УЛУЧШЕНИЕ: Статистика из API
+  const [stats, setStats] = useState({
+    total_amount: 0,
+    cash_amount: 0,
+    card_amount: 0,
+    pending_count: 0,
+    pending_amount: 0,
+    paid_count: 0,
+    cancelled_count: 0
+  });
+
+  // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
+  const paymentModal = useModal();
+  const paymentWidget = useModal();
+
+  // Вычисляем параметры даты для запроса
+  const getDateParams = useCallback(() => {
+    if (dateMode === 'single') {
+      return {
+        date_from: selectedDate,
+        date_to: selectedDate
+      };
+    } else {
+      return {
+        date_from: dateFrom,
+        date_to: dateTo
+      };
+    }
+  }, [dateMode, selectedDate, dateFrom, dateTo]);
+
+  // Load Data Effect
+  // ✅ v2.1: Отдельные loading состояния для каждой секции
+  const [, setStatsLoading] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка статистики (только при изменении дат)
+  useEffect(() => {
+    const loadStats = async () => {
+      const { date_from, date_to } = getDateParams();
+      logger.log('📊 Loading stats with params:', { date_from, date_to });
+
+      setStatsLoading(true);
+      try {
+        const statsResult = await getStats({
+          date_from: date_from || undefined,
+          date_to: date_to || undefined
+        });
+        if (statsResult.success && statsResult.data) {
+          setStats(statsResult.data);
+        }
+      } catch (error) {
+        logger.error('Error loading stats:', error);
+        setStats({
+          total_amount: 0,
+          cash_amount: 0,
+          card_amount: 0,
+          pending_count: 0,
+          pending_amount: 0,
+          paid_count: 0,
+          cancelled_count: 0
+        });
+      }
+      setStatsLoading(false);
+    };
+
+    loadStats();
+  }, [getDateParams, refreshKey, getStats]);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка pending payments (только при изменении pendingPage)
+  useEffect(() => {
+    const loadPending = async () => {
+      const { date_from, date_to } = getDateParams();
+      logger.log('📋 Loading pending payments:', { date_from, date_to, page: pendingPage });
+
+      setPendingLoading(true);
+      try {
+        const pendingResult = await getPendingPayments({
+          date_from: date_from || undefined,
+          date_to: date_to || undefined,
+          search: debouncedQuery || undefined,
+          page: pendingPage,
+          size: itemsPerPage
+        });
+
+        if (pendingResult.success) {
+          const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
+          setAppointments(appointmentsData);
+
+          if (pendingResult.pagination) {
+            setPendingTotalPages(pendingResult.pagination.pages);
+            setPendingTotalItems(pendingResult.pagination.total);
+          }
+        } else {
+          logger.warn('⚠️ Error loading pending payments:', pendingResult.error);
+          setAppointments([]);
+        }
+      } catch (error) {
+        logger.error('Error loading pending payments:', error);
+        setAppointments([]);
+      }
+      setPendingLoading(false);
+    };
+
+    loadPending();
+  }, [pendingPage, debouncedQuery, getDateParams, refreshKey, getPendingPayments]);
+
+  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка истории платежей (только при изменении currentPage)
+  useEffect(() => {
+    const loadHistory = async () => {
+      const { date_from, date_to } = getDateParams();
+      logger.log('📜 Loading payment history:', { date_from, date_to, page: currentPage, status });
+
+      setHistoryLoading(true);
+      try {
+        const paymentsResult = await getPayments({
+          date_from: date_from || undefined,
+          date_to: date_to || undefined,
+          search: debouncedQuery || undefined,
+          status: status !== 'all' ? status : undefined,
+          page: currentPage,
+          size: itemsPerPage
+        });
+
+        if (paymentsResult.success) {
+          const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
+          setPayments(paymentsData);
+
+          if (paymentsResult.pagination) {
+            setTotalPages(paymentsResult.pagination.pages);
+            setTotalItems(paymentsResult.pagination.total);
+          } else {
+            setTotalPages(1);
+            setTotalItems(paymentsData.length);
+          }
+        } else {
+          logger.warn('⚠️ Error loading payment history:', paymentsResult.error);
+          setPayments([]);
+          setTotalPages(1);
+        }
+      } catch (error) {
+        logger.error('Error loading payment history:', error);
+        setPayments([]);
+      }
+      setHistoryLoading(false);
+    };
+
+    loadHistory();
+  }, [currentPage, debouncedQuery, status, getDateParams, refreshKey, getPayments]);
+
+  // ✅ v2.1: Вычисляемое общее состояние загрузки
+
+
+  // Reset page when date or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setPendingPage(1);
+  }, [dateMode, selectedDate, dateFrom, dateTo, debouncedQuery]);
+
+  const triggerDataReload = useCallback(() => {
+    setCurrentPage(1);
+    setPendingPage(1);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+
+  const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
+
+  // ✅ УЛУЧШЕНИЕ: Обработчики с универсальными хуками
+  const handlePaymentSuccess = (paymentData) => {
+    setPaymentSuccess(paymentData);
+    paymentWidget.closeModal();
+
+    // Force reload to get fresh data
+
+
+
+
+
+
+
+
+    // For now, let's just create a quick local update for UX responsiveness while assuming background fetch works
+    // But since pagination is server-side, local update is complex. 
+    // Best to just re-trigger the main load effect.
+    // We can do this by toggling a 'trigger' state or just calling the load function if we extracted it.
+    // For simplicity in this refactor, I'll rely on the user refreshing or explicit refresh button, 
+    // OR we can make the `load` function available here. 
+    // Actually, let's just reload the page for full consistency as a "safe" move for now, or assume the user sees the success modal.
+
+    // Quick Fix: Let's refetch data by touching a state that triggers useEffect? No.
+    // Let's just update local lists simply for immediate feedback if possible, but with server-side pagination it's tricky.
+    // Correct approach: Call loadData. Since loadData is inside useEffect, we can't call it directly.
+    // Triggering a reload of data:
+    triggerDataReload();
+  };
+
+  const handlePaymentError = (error) => {
+    const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+    setPaymentError(message);
+    logger.error('Ошибка платежа:', error);
+  };
+
+  const handlePaymentCancel = () => {
+    paymentWidget.closeModal();
+  };
+
+  const openPaymentWidget = (appointment) => {
+    paymentWidget.openModal(appointment);
+    setPaymentError(null);
+    setPaymentSuccess(null);
+  };
+
+  // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
+  // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
+  const processPayment = async (appointment, paymentData) => {
+    try {
+      // Получаем все visit_id пациента
+      const visitIds = appointment.visit_ids && appointment.visit_ids.length > 0 ?
+      appointment.visit_ids :
+      [appointment.visit_id || appointment.id];
+
+      // 1. Рассчитываем долг по каждому визиту на основе услуг
+      const visitDebts = {};
+      const services = appointment.services || [];
+
+      // Инициализируем долги нулями
+      visitIds.forEach((id) => visitDebts[id] = 0);
+
+      // Суммируем стоимость услуг для каждого визита
+      services.forEach((s) => {
+        if (s.visit_id) {
+          visitDebts[s.visit_id] = (visitDebts[s.visit_id] || 0) + (s.price || 0) * (s.quantity || 1);
+        }
+      });
+
+      // 2. Распределяем сумму оплаты
+      let remaining = parseFloat(paymentData.amount);
+      const paymentsToMake = [];
+
+      for (const visitId of visitIds) {
+        if (remaining <= 0) break;
+
+        const debt = visitDebts[visitId] || 0;
+        const payAmount = Math.min(remaining, debt);
+
+        if (payAmount > 0) {
+          paymentsToMake.push({ visitId, amount: payAmount });
+          remaining -= payAmount;
+        } else if (debt === 0 && remaining > 0 && visitIds.length === 1) {
+          // Если единственный визит и долг 0, но платим - зачисляем
+          paymentsToMake.push({ visitId, amount: remaining });
+          remaining = 0;
+        }
+      }
+
+      // Если осталась сумма (переплата), закидываем на первый визит
+      if (remaining > 0) {
+        if (paymentsToMake.length > 0) {
+          paymentsToMake[0].amount += remaining;
+        } else if (visitIds.length > 0) {
+          paymentsToMake.push({ visitId: visitIds[0], amount: remaining });
+        }
+      }
+
+      // 3. Выполняем платежи последовательно
+      for (const p of paymentsToMake) {
+        const result = await paymentsHook.createPayment({
+          visit_id: p.visitId,
+          amount: p.amount,
+          method: paymentData.method,
+          note: paymentData.note || 'Оплата медицинских услуг'
+        });
+
+        if (!result.success) {
+          throw new Error(`Не удалось оплатить визит #${p.visitId}: ${result.error}`);
+        }
+      }
+
+      // Fallback если ничего не добавилось в paymentsToMake но сумма есть
+      if (paymentsToMake.length === 0 && parseFloat(paymentData.amount) > 0 && visitIds.length > 0) {
+        await paymentsHook.createPayment({
+          visit_id: visitIds[0],
+          amount: paymentData.amount,
+          method: paymentData.method,
+          note: paymentData.note
+        });
+      }
+
+      notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
+      paymentModal.closeModal();
+      setPendingPage(1);
+      setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
+
+    } catch (error) {
+      logger.error('Ошибка обработки платежа:', error);
+      const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+      setPaymentError(message);
+      notify.error(message);
+    }
+  };
+
+  // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
+  const confirmPayment = async (paymentId) => {
+    if (!window.confirm('Вы уверены, что хотите подтвердить этот платеж вручную?')) {
+      return;
+    }
+
+    try {
+      await paymentsHook.confirmPayment(paymentId);
+      setRefreshKey((prev) => prev + 1); // Обновляем данные
+    } catch (err) {
+      logger.error('Error confirming payment:', err);
+      notify.error(getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'));
+    }
+  };
+
+  const openCancelDialog = (paymentId) => {
+    setConfirmingPaymentId(paymentId);
+    setCancelDialogOpen(true);
+    setCancelReason('');
+  };
+
+  const handleCancelPayment = async () => {
+    if (!confirmingPaymentId) return;
+
+    try {
+      const result = await paymentsHook.cancelPayment(confirmingPaymentId, cancelReason);
+      if (result.success) {
+        setCancelDialogOpen(false);
+        setConfirmingPaymentId(null);
+        notify.info('Платёж отменён');
+        triggerDataReload();
+      } else {
+        notify.error(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+      }
+    } catch (error) {
+      notify.error(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
+    }
+  };
+
+  // ✅ УЛУЧШЕНИЕ: Экспорт в CSV через серверный endpoint
+  const exportToCSV = async () => {
+    const { date_from, date_to } = getDateParams();
+    const result = await paymentsHook.exportPayments({
+      date_from: date_from || undefined,
+      date_to: date_to || undefined
+    });
+
+      if (!result.success) {
+        notify.error(
+          getErrorMessage(
+            result.error,
+            'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
+          )
+        );
+      }
+  };
+
+  // ✅ УЛУЧШЕНИЕ: Кнопка обновления данных
+  const handleRefresh = () => {
+    triggerDataReload();
+  };
+
+  // ✅ v2.0: Состояние для возврата
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundPaymentId, setRefundPaymentId] = useState(null);
+  const [refundPaymentAmount, setRefundPaymentAmount] = useState(0);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+
+  // ✅ v2.0: Обработчик открытия диалога возврата
+  const openRefundDialog = (payment) => {
+    setRefundPaymentId(payment.id);
+    setRefundPaymentAmount(payment.amount);
+    setRefundAmount(String(payment.amount - (payment.refunded_amount || 0)));
+    setRefundReason('');
+    setRefundDialogOpen(true);
+  };
+
+  // ✅ v2.0: Обработчик возврата
+  const handleRefund = async () => {
+    if (!refundAmount || !refundReason || refundReason.length < 3) {
+      notify.warning('Укажите сумму возврата и причину (минимум 3 символа)');
+      return;
+    }
+    try {
+      const result = await paymentsHook.refundPayment(refundPaymentId, {
+        amount: parseFloat(refundAmount),
+        reason: refundReason
+      });
+      if (result.success) {
+        setRefundDialogOpen(false);
+        setRefundPaymentId(null);
+        setRefundReason('');
+        setRefundAmount('');
+        notify.success(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
+        triggerDataReload();
+      } else {
+        notify.error(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
+      }
+    } catch (error) {
+      notify.error(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+    }
+  };
+
+  // ✅ v2.0: Обработчик печати чека
+  const handlePrintReceipt = async (paymentRowOrId) => {
+    const paymentId = resolvePaymentId(paymentRowOrId);
+
+    if (!paymentId) {
+      notify.error('Не удалось определить платеж для печати чека.');
+      return;
+    }
+
+    if (paymentRowOrId && typeof paymentRowOrId === 'object') {
+      try {
+        const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
+        if (opened) {
+          notify.success('Открыт диалог печати этого компьютера.');
+          return;
+        }
+
+        logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
+          paymentId
+        });
+      } catch (error) {
+        logger.error('[Cashier] Unexpected browser receipt print error:', error);
+      }
+    }
+
+    const result = await paymentsHook.getReceipt(paymentId);
+    if (!result.success) {
+      notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+      return;
+    }
+
+    notify.warning('Диалог печати не открылся, поэтому был загружен PDF-чек.');
+  };
+
+  // ✅ v2.0: Состояние для почасовой статистики
+  const [hourlyStats, setHourlyStats] = useState([]);
+  const [showHourlyChart, setShowHourlyChart] = useState(false);
+
+  // ✅ v2.0: Загрузка почасовой статистики
+  const loadHourlyStats = async () => {
+    const result = await paymentsHook.getHourlyStats({ target_date: selectedDate });
+    if (result.success) {
+      setHourlyStats(result.data);
+      setShowHourlyChart(true);
+    } else {
+      notify.error(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
+    }
+  };
+
+  // ✅ ОТОБРАЖЕНИЕ УСЛУГ: Рендерим коды услуг с бейджами и tooltip (как в RegistrarPanel)
+  const renderServiceBadges = (serviceCodes, serviceNames) => {
+    // Если нет кодов, возвращаем пустой элемент
+    if (!serviceCodes || !Array.isArray(serviceCodes) || serviceCodes.length === 0) {
+      return <span style={{ color: 'var(--mac-text-tertiary)' }}>—</span>;
+    }
+
+    // ✅ ИСПРАВЛЕНИЕ: Обрабатываем случай когда services - это массив объектов {id, name, price, quantity}
+    let codes = serviceCodes;
+    let names = serviceNames;
+
+    // Проверяем, является ли первый элемент объектом
+    if (serviceCodes.length > 0 && typeof serviceCodes[0] === 'object' && serviceCodes[0] !== null) {
+      // Извлекаем имена услуг из объектов
+      codes = serviceCodes.map((s) => s.name || s.code || `Услуга #${s.id || '?'}`);
+      names = serviceCodes.map((s) => {
+        const parts = [];
+        if (s.name) parts.push(s.name);
+        if (s.price) parts.push(`${new Intl.NumberFormat('ru-RU').format(s.price)} сум`);
+        if (s.quantity && s.quantity > 1) parts.push(`x${s.quantity}`);
+        return parts.length > 0 ? parts.join(' — ') : `Услуга #${s.id || '?'}`;
+      });
+    }
+
+    // Создаем tooltip с полными названиями услуг
+    const tooltipContent =
+    <div style={{ padding: '4px 0', maxWidth: '300px' }}>
+        {names && Array.isArray(names) && names.length === codes.length ?
+      names.map((name, idx) =>
+      <div key={idx} style={{
+        marginBottom: idx < names.length - 1 ? '6px' : '0',
+        lineHeight: '1.4',
+        fontSize: '12px'
+      }}>
+              {name}
+            </div>
+      ) :
+      codes.map((code, idx) =>
+      <div key={idx} style={{
+        marginBottom: idx < codes.length - 1 ? '6px' : '0',
+        lineHeight: '1.4',
+        fontSize: '12px'
+      }}>
+              {code}
+            </div>
+      )
+      }
+      </div>;
+
+
+    return (
+      <Tooltip
+        content={tooltipContent}
+        position="bottom"
+        delay={200}
+        followCursor>
+
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px',
+          cursor: 'help',
+          maxWidth: '280px'
+        }}>
+          {codes.map((code, idx) =>
+          <span
+            key={idx}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: '600',
+              backgroundColor: 'rgba(0, 122, 255, 0.12)',
+              color: '#007AFF',
+              border: '1px solid rgba(0, 122, 255, 0.25)',
+              whiteSpace: 'nowrap',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+              maxWidth: '150px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+
+              {typeof code === 'string' ? code : String(code)}
+            </span>
+          )}
+        </div>
+      </Tooltip>);
+
+  };
+
+  // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
+  // NOTE: Server pagination makes grouping across pages impossible. 
+  // We only group within the current page.
+  const groupPaymentsByPatientAndTime = (paymentsList) => {
+    if (!paymentsList) return [];
+
+    // Convert backend specific date/time format if needed
+    // The backend returns 'created_at'. We can use that.
+
+    const grouped = {};
+
+    paymentsList.forEach((payment) => {
+      // Parse dates from backend
+      const dateObj = new Date(payment.created_at);
+      const dateKey = dateObj.toLocaleDateString('ru-RU');
+      const timeKey = dateObj.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+      const groupKey = `${payment.patient_id}_${dateKey}_${timeKey}`;
+
+      if (!grouped[groupKey]) {
+        // Создаём новую группу
+        grouped[groupKey] = {
+          ...payment,
+          services: Array.isArray(payment.services) ? [...payment.services] : [],
+          services_names: Array.isArray(payment.services_names) ? [...payment.services_names] : [],
+          grouped_payments: [payment.id],
+          total_amount: Number(payment.amount || 0),
+          date: dateKey, // Display helpers
+          time: timeKey,
+          patient: payment.patient_name,
+          service: payment.service || null
+        };
+      } else {
+        grouped[groupKey].grouped_payments.push(payment.id);
+        grouped[groupKey].total_amount += Number(payment.amount);
+        if (payment.service && !grouped[groupKey].service) {
+          grouped[groupKey].service = payment.service;
+        }
+        if (Array.isArray(payment.services)) {
+          grouped[groupKey].services.push(...payment.services);
+        }
+        if (Array.isArray(payment.services_names)) {
+          grouped[groupKey].services_names.push(...payment.services_names);
+        }
+      }
+    });
+
+    return Object.values(grouped).map((group) => ({
+      ...group,
+      services: Array.from(new Set(group.services.filter(Boolean))),
+      services_names: Array.from(new Set(group.services_names.filter(Boolean))),
+      service: group.service || group.services_names[0] || group.services[0] || null
+    }));
+  };
+
+  // Group payments for display (already filtered by server)
+  const filteredPayments = groupPaymentsByPatientAndTime(payments);
+
+
+  return (
+    <div style={{
+      padding: '0',
+      minHeight: '100vh',
+      background: 'var(--mac-gradient-window)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+      color: 'var(--mac-text-primary)',
+      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
+    }}>
+
+      <div style={{ padding: '0px' }}>
+        <div className="max-w-7xl mx-auto space-y-6">
+
+          {/* Filters */}
+          <Card
+            variant="default"
+            padding="default"
+            style={{ marginBottom: '16px' }}>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+              {/* Поиск */}
+              <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+                <Search style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '16px',
+                  height: '16px',
+                  color: 'var(--mac-text-tertiary)'
+                }} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '40px',
+                    paddingRight: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 'var(--mac-radius-sm)',
+                    backgroundColor: 'var(--mac-bg-primary)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                  }}
+                  placeholder="Поиск по пациенту (Server Search)" />
+
+              </div>
+
+              {/* Статус */}
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  minWidth: '140px'
+                }}>
+
+                <option value="all">Все статусы</option>
+                <option value="paid">Оплачено</option>
+                <option value="pending">Ожидает</option>
+              </select>
+
+              {/* Переключатель режима даты */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar style={{ width: '16px', height: '16px', color: 'var(--mac-text-secondary)' }} />
+                <SegmentedControl
+                  options={[
+                  { label: 'Одна дата', value: 'single' },
+                  { label: 'Диапазон', value: 'range' }]
+                  }
+                  value={dateMode}
+                  onChange={setDateMode}
+                  size="default" />
+
+              </div>
+
+              {/* Поля даты */}
+              {dateMode === 'single' ?
+              <>
+                  <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ minWidth: '160px' }} />
+
+                  <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setSelectedDate(today);
+                  }}>
+
+                    Сегодня
+                  </Button>
+                </> :
+
+              <>
+                  <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{ minWidth: '140px' }} />
+
+                  <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>—</span>
+                  <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{ minWidth: '140px' }} />
+
+                  <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setDateFrom(today);
+                    setDateTo(today);
+                  }}>
+
+                    Сегодня
+                  </Button>
+                </>
+              }
+            </div>
+          </Card>
+
+          {/* ✅ УЛУЧШЕНИЕ: Статистика платежей из API */}
+          <Card variant="outline" style={{ marginBottom: '16px', padding: '16px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '16px',
+              alignItems: 'center'
+            }}>
+              {/* Conditional Stats based on Active Tab */}
+              {activeTab === 'history' ?
+              <>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--mac-accent)' }}>
+                      {format(stats.total_amount)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                      Всего за период
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#34C759' }}>
+                      {format(stats.cash_amount)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                      Наличные
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#007AFF' }}>
+                      {format(stats.card_amount)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                      Карта
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#5856D6' }}>
+                      {stats.paid_count}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                      Оплачено
+                    </div>
+                  </div>
+                  {stats.cancelled_count > 0 &&
+                <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: '#ff4d4f' }}>
+                        {stats.cancelled_count}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--mac-text-secondary)' }}>
+                        Отменено
+                      </div>
+                    </div>
+                }
+                </> :
+
+              <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#FF9500' }}>
+                    {format(stats.pending_amount || 0)}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                    Ожидает оплаты ({stats.pending_count} заявок)
+                  </div>
+                </div>
+              }
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRefresh}
+                  title="Обновить данные">
+
+                  🔄 Обновить
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={exportToCSV}
+                  title="Экспорт в CSV">
+
+                  📥 Экспорт
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={loadHourlyStats}
+                  title="Почасовая статистика">
+
+                  📊 Аналитика
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Объединенная секция с вкладками */}
+          <Card
+            variant="default"
+            padding="default">
+
+            <MacOSTab
+              tabs={[
+              {
+                id: 'pending',
+                label: 'Ожидающие оплаты',
+                icon: DollarSign,
+                badge: appointments.length > 0 ? appointments.length : undefined
+              },
+              {
+                id: 'history',
+                label: 'История платежей',
+                icon: CreditCard
+              },
+              {
+                id: 'refunds',
+                label: 'Возвраты',
+                icon: RefreshCw
+              }]
+              }
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              size="md"
+              variant="default" />
+
+
+            {activeTab === 'pending' &&
+            <div style={{ marginTop: '24px' }}>
+                {pendingLoading ?
+              <Skeleton style={{ height: '192px' }} /> :
+              appointments.length > 0 ?
+              <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%' }}>
+                      <thead>
+                        <tr style={{
+                      backgroundColor: 'var(--mac-bg-tertiary)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуги</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Сумма</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Статус</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appointments.map((appointment, index) =>
+                    <tr
+                      key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
+                      style={{
+                        borderBottom: '1px solid var(--mac-border)',
+                        transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: '500' }}>
+                                  {appointment.created_at ?
+                            new Date(appointment.created_at).toLocaleDateString('ru-RU', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              timeZone: 'Asia/Tashkent'
+                            }) :
+                            appointment.appointment_date || '—'
+                            }
+                                </span>
+                                <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
+                                  {appointment.created_at ?
+                            new Date(appointment.created_at).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'Asia/Tashkent'
+                            }) :
+                            appointment.appointment_time || '—'
+                            }
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              {appointment.patient_last_name && appointment.patient_first_name ?
+                        `${appointment.patient_last_name} ${appointment.patient_first_name}` :
+                        appointment.patient_name || `Пациент #${appointment.patient_id}`
+                        }
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              {renderServiceBadges(appointment.services, appointment.services_names)}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-accent)', fontSize: '14px', fontWeight: '600' }}>
+                              {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <Badge variant="warning">Ожидает оплаты</Badge>
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPaymentWidget(appointment)}>
+
+                                  💳 Онлайн
+                                </Button>
+                                <Button
+                            size="sm"
+                            onClick={() => {
+                              paymentModal.openModal(appointment);
+                            }}>
+
+                                  💵 Касса
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                    )}
+                      </tbody>
+                    </table>
+
+                    {/* ✅ v2.0: Пагинация для ожидающих оплаты */}
+                    {pendingTotalPages > 1 &&
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '16px',
+                  padding: '12px'
+                }}>
+                        <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPage === 1 || pendingLoading}
+                    onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
+
+                          ← Назад
+                        </Button>
+                        <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                          Страница {pendingPage} из {pendingTotalPages} (Всего: {pendingTotalItems})
+                        </span>
+                        <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPage === pendingTotalPages || pendingLoading}
+                    onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
+
+                          Вперёд →
+                        </Button>
+                      </div>
+                }
+                  </div> :
+
+              <div style={{
+                padding: '48px',
+                textAlign: 'center',
+                color: 'var(--mac-text-secondary)',
+                fontSize: '14px'
+              }}>
+                    Нет записей, ожидающих оплаты
+                  </div>
+              }
+              </div>
+            }
+
+            {activeTab === 'history' &&
+            <div style={{ marginTop: '24px' }}>
+                {historyLoading ?
+              <Skeleton style={{ height: '192px' }} /> :
+
+              <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%' }}>
+                      <thead>
+                        <tr style={{
+                      backgroundColor: 'var(--mac-bg-tertiary)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Дата/Время</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Пациент</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Услуга</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Способ</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Сумма</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Статус</th>
+                          <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--mac-text-primary)', fontWeight: '500', fontSize: '14px' }}>Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPayments.length > 0 ?
+                    filteredPayments.map((row, index) =>
+                    <tr key={`payment-${row.id || row.payment_id || index}`} style={{
+                      borderBottom: '1px solid var(--mac-border)',
+                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+
+                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{row.time || '—'}</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                                {row.patient}
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                                {/* TODO: Render services info properly if available in history item */}
+                                 {row.service || '—'}
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                                {row.method}
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px', fontWeight: '500' }}>
+                                {format(row.total_amount || row.amount || 0)}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <Badge variant={
+                        row.status === 'paid' ? 'success' :
+                        row.status === 'partial' ? 'info' :
+                        row.status === 'cancelled' || row.status === 'refunded' ? 'danger' :
+                        'warning'
+                        }>
+                                  {row.status === 'paid' ? 'Оплачено' :
+                          row.status === 'partial' ? 'Частично' :
+                          row.status === 'cancelled' ? 'Отменён' :
+                          row.status === 'refunded' ? 'Возвращено' :
+                          'Ожидает'}
+                                </Badge>
+                              </td>
+                              <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <Button size="sm" variant="outline" onClick={() => confirmPayment(row.id)}>
+                                  ✅ Принять
+                                </Button>
+                                <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openCancelDialog(row.id)}
+                          disabled={row.status === 'cancelled'}>
+
+                                  ❌ Отмена
+                                </Button>
+                                {/* ✅ v2.0: Кнопка возврата */}
+                                <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openRefundDialog(row)}
+                          disabled={row.status === 'cancelled' || row.status === 'refunded'}
+                          title="Возврат средств">
+
+                                  💸 Возврат
+                                </Button>
+                                {/* ✅ v2.0: Кнопка печати чека */}
+                                <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handlePrintReceipt(row)}
+                          title="Печать чека">
+
+                                  🧾 Чек
+                                </Button>
+                              </td>
+                            </tr>
+                    ) :
+
+                    <tr>
+                            <td colSpan="7" style={{
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--mac-text-secondary)',
+                        fontSize: '14px'
+                      }}>
+                              Нет данных для отображения
+                            </td>
+                          </tr>
+                    }
+                      </tbody>
+                    </table>
+
+                    {/* ✅ УЛУЧШЕНИЕ: Пагинация c Server-Side логикой */}
+                    {totalPages > 1 &&
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '16px',
+                  padding: '12px'
+                }}>
+                        <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === 1 || historyLoading}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+
+                          ← Назад
+                        </Button>
+                        <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+                          Страница {currentPage} из {totalPages} (Всего: {totalItems})
+                        </span>
+                        <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage === totalPages || historyLoading}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+
+                          Вперёд →
+                        </Button>
+                      </div>
+                }
+                  </div>
+              }
+              </div>
+            }
+
+            {/* Вкладка Возвраты */}
+            {activeTab === 'refunds' &&
+            <div style={{ marginTop: '24px' }}>
+                <RefundRequestsTable onRefresh={handleRefresh} />
+              </div>
+            }
+
+          </Card>
+
+          {/* ✅ УЛУЧШЕНИЕ: Диалог подтверждения отмены платежа */}
+          <Dialog
+            open={cancelDialogOpen}
+            onClose={() => setCancelDialogOpen(false)}
+            maxWidth="sm"
+            fullWidth>
+
+            <DialogTitle>Отмена платежа</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" style={{ marginBottom: '16px' }}>
+                Вы уверены, что хотите отменить платёж #{confirmingPaymentId}?
+              </Typography>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Причина отмены (необязательно)"
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '8px 12px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  fontSize: '14px'
+                }} />
+
+            </DialogContent>
+            <DialogActions>
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+                Отмена
+              </Button>
+              <Button variant="danger" onClick={handleCancelPayment}>
+                Отменить платёж
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* ✅ УЛУЧШЕНИЕ: Модальное окно оплаты с универсальным хуком */}
+          {paymentModal.isOpen && paymentModal.selectedItem &&
+          <CashPaymentModal
+            appointment={paymentModal.selectedItem}
+            onProcessPayment={processPayment}
+            onClose={paymentModal.closeModal} />
+
+          }
+
+          {/* ✅ УЛУЧШЕНИЕ: Диалог онлайн-оплаты с универсальным хуком */}
+          <Dialog
+            open={paymentWidget.isOpen}
+            onClose={handlePaymentCancel}
+            maxWidth="md"
+            fullWidth>
+
+            <DialogTitle>
+              <Typography variant="h6">
+                Онлайн-оплата
+              </Typography>
+              {paymentWidget.selectedItem &&
+              <Typography variant="body2" color="textSecondary">
+                  Пациент: {paymentWidget.selectedItem.patient_name} • {paymentWidget.selectedItem.department}
+                </Typography>
+              }
+            </DialogTitle>
+
+            <DialogContent>
+              {paymentError &&
+              <Alert severity="error" style={{ marginBottom: 8 }}>
+                  {paymentError}
+                </Alert>
+              }
+
+              {paymentWidget.selectedItem &&
+              <PaymentWidget
+                visitId={paymentWidget.selectedItem.visit_id || paymentWidget.selectedItem.id}
+                amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
+                currency="UZS"
+                description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                onCancel={handlePaymentCancel} />
+
+              }
+            </DialogContent>
+
+            <DialogActions>
+              <Button onClick={handlePaymentCancel}>
+                Закрыть
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Диалог успешной оплаты */}
+          <Dialog
+            open={!!paymentSuccess}
+            onClose={() => setPaymentSuccess(null)}
+            maxWidth="sm"
+            fullWidth>
+
+            <DialogTitle>
+              <Box display="flex" alignItems="center">
+                <CheckCircle style={{ color: 'var(--color-status-success)', marginRight: 8 }} />
+                Оплата успешна!
+              </Box>
+            </DialogTitle>
+
+            <DialogContent>
+              {paymentSuccess &&
+              <Box>
+                  <Typography variant="body1" gutterBottom>
+                    Платеж успешно обработан
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    ID платежа: {paymentSuccess.payment_id}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Провайдер: {paymentSuccess.provider}
+                  </Typography>
+                </Box>
+              }
+            </DialogContent>
+
+            <DialogActions>
+              <Button onClick={() => setPaymentSuccess(null)} variant="contained">
+                OK
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* ✅ v2.0: Диалог возврата */}
+          <Dialog open={refundDialogOpen} onClose={() => setRefundDialogOpen(false)}>
+            <DialogTitle>
+              <Box display="flex" alignItems="center">
+                💸 Возврат средств
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="body2" color="textSecondary">
+                  Исходная сумма платежа: {refundPaymentAmount?.toLocaleString()} UZS
+                </Typography>
+                <Box>
+                  <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
+                  <input
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--mac-border)',
+                      fontSize: '14px'
+                    }}
+                    max={refundPaymentAmount}
+                    min={1} />
+
+                </Box>
+                <Box>
+                  <Typography variant="body2" gutterBottom>Причина возврата:</Typography>
+                  <textarea
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    placeholder="Укажите причину возврата (минимум 3 символа)"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--mac-border)',
+                      fontSize: '14px',
+                      resize: 'vertical'
+                    }} />
+
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+                Отмена
+              </Button>
+              <Button variant="danger" onClick={handleRefund}>
+                Выполнить возврат
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* ✅ v2.0: Диалог почасовой статистики */}
+          <Dialog open={showHourlyChart} onClose={() => setShowHourlyChart(false)}>
+            <DialogTitle>
+              📊 Почасовая статистика за {selectedDate}
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {hourlyStats.filter((h) => h.count > 0).length > 0 ?
+                hourlyStats.filter((h) => h.count > 0).map((h) =>
+                <Box key={h.hour} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography sx={{ width: 60, fontWeight: 600 }}>{h.hour}:00</Typography>
+                      <Box sx={{
+                    flex: 1,
+                    height: 24,
+                    backgroundColor: 'rgba(52, 199, 89, 0.2)',
+                    borderRadius: 4,
+                    position: 'relative'
+                  }}>
+                        <Box sx={{
+                      width: `${Math.min(100, h.count / Math.max(...hourlyStats.map((s) => s.count)) * 100)}%`,
+                      height: '100%',
+                      backgroundColor: 'var(--color-status-success)',
+                      borderRadius: 4
+                    }} />
+                      </Box>
+                      <Typography sx={{ width: 80, textAlign: 'right' }}>
+                        {h.count} / {Number(h.amount).toLocaleString()}
+                      </Typography>
+                    </Box>
+                ) :
+
+                <Typography color="textSecondary">Нет платежей за этот день</Typography>
+                }
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setShowHourlyChart(false)}>Закрыть</Button>
+            </DialogActions>
+          </Dialog>
+        </div>
+      </div>
+    </div>);
+
+};
+
+export default CashierPanel;

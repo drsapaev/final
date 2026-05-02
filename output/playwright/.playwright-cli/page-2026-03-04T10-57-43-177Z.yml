@@ -1,0 +1,125 @@
+- generic [ref=e2]:
+  - generic [ref=e57]:
+    - generic [ref=e59]:
+      - button "Clinic Management" [ref=e61] [cursor=pointer]:
+        - generic [ref=e62]:
+          - img [ref=e63]
+          - text: Clinic Management
+      - generic [ref=e66]:
+        - generic [ref=e68]:
+          - generic: 🔍
+          - textbox "Поиск пациентов, визитов..." [ref=e69]
+          - generic: ⌘K
+        - generic [ref=e70]:
+          - button "Кассир" [ref=e71] [cursor=pointer]:
+            - generic [ref=e72]:
+              - img [ref=e73]
+              - text: Кассир
+          - button "Главная" [ref=e76] [cursor=pointer]:
+            - generic [ref=e77]:
+              - img [ref=e78]
+              - text: Главная
+          - button "Онлайн‑записи" [ref=e81] [cursor=pointer]:
+            - generic [ref=e82]:
+              - img [ref=e83]
+              - text: Онлайн‑записи
+          - button "Новая запись" [ref=e86] [cursor=pointer]:
+            - generic [ref=e87]:
+              - img [ref=e88]
+              - text: Новая запись
+      - generic [ref=e92]:
+        - button "RU" [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]:
+            - img [ref=e96]
+            - text: RU
+        - generic "Онлайн" [ref=e100]:
+          - img [ref=e101]
+          - text: Онлайн
+        - button "Сообщения" [ref=e104] [cursor=pointer]:
+          - img [ref=e105]
+        - button "Выбрать тему" [ref=e109] [cursor=pointer]:
+          - img [ref=e112]
+        - button "Registrar User" [ref=e115] [cursor=pointer]:
+          - generic [ref=e116]:
+            - img [ref=e117]
+            - text: Registrar User
+        - button "Выйти" [ref=e120] [cursor=pointer]:
+          - generic [ref=e121]:
+            - img [ref=e122]
+            - text: Выйти
+    - main [ref=e126]:
+      - main "Панель регистратора" [ref=e127]:
+        - region "Notifications Alt+T":
+          - generic [ref=e128]:
+            - alert [ref=e129]:
+              - img [ref=e131]
+              - text: "Превышен лимит запросов: 100 за 3600 секунд"
+              - button "close" [ref=e133] [cursor=pointer]:
+                - img [ref=e134]
+              - progressbar "notification timer" [ref=e138]
+            - alert [ref=e139]:
+              - img [ref=e141]
+              - text: "Превышен лимит запросов: 100 за 3600 секунд"
+              - button "close" [ref=e143] [cursor=pointer]:
+                - img [ref=e144]
+              - progressbar "notification timer" [ref=e148]
+            - alert [ref=e149]:
+              - img [ref=e151]
+              - text: "Превышен лимит запросов: 100 за 3600 секунд"
+              - button "close" [ref=e153] [cursor=pointer]:
+                - img [ref=e154]
+              - progressbar "notification timer" [ref=e158]
+            - alert [ref=e159]:
+              - img [ref=e161]
+              - text: "Превышен лимит запросов: 100 за 3600 секунд"
+              - button "close" [ref=e163] [cursor=pointer]:
+                - img [ref=e164]
+              - progressbar "notification timer" [ref=e168]
+        - link "Перейти к основному содержимому" [ref=e169] [cursor=pointer]:
+          - /url: "#main-content"
+        - generic [ref=e172]:
+          - button "Все отделения" [ref=e173] [cursor=pointer]:
+            - img [ref=e175]
+            - generic [ref=e178]: Все отделения
+          - generic [ref=e180]:
+            - button "Кардиолог" [ref=e181] [cursor=pointer]:
+              - generic [ref=e182]:
+                - img [ref=e184]
+                - generic [ref=e186]: Кардиолог
+            - button "ЭКГ" [ref=e187] [cursor=pointer]:
+              - generic [ref=e188]:
+                - img [ref=e190]
+                - generic [ref=e192]: ЭКГ
+            - button "Дерматолог" [ref=e193] [cursor=pointer]:
+              - generic [ref=e194]:
+                - img [ref=e196]
+                - generic [ref=e200]: Дерматолог
+            - button "Стоматолог" [ref=e201] [cursor=pointer]:
+              - generic [ref=e202]:
+                - img [ref=e204]
+                - generic [ref=e207]: Стоматолог
+            - button "Лаборатория" [ref=e208] [cursor=pointer]:
+              - generic [ref=e209]:
+                - img [ref=e211]
+                - generic [ref=e213]: Лаборатория
+            - button "Процедуры" [ref=e214] [cursor=pointer]:
+              - generic [ref=e215]:
+                - img [ref=e217]
+                - generic [ref=e224]: Процедуры
+        - tabpanel [ref=e226]:
+          - generic [ref=e228]:
+            - generic [ref=e229]: 📋
+            - heading "Очередь пуста" [level=3] [ref=e230]
+            - paragraph [ref=e231]: Сегодня пока нет записей
+            - button "➕ Создать первую запись" [ref=e232] [cursor=pointer]:
+              - generic [ref=e233]: ➕ Создать первую запись
+  - generic [ref=e43]:
+    - generic [ref=e44]:
+      - img [ref=e45]
+      - generic [ref=e48]:
+        - strong [ref=e49]: Включить уведомления?
+        - generic [ref=e50]: Получайте уведомления о новых сообщениях
+    - generic [ref=e51]:
+      - button "Включить" [ref=e52] [cursor=pointer]
+      - button "Закрыть" [ref=e53] [cursor=pointer]:
+        - img [ref=e54]

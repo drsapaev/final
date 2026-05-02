@@ -1,0 +1,445 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Grid,
+  Paper,
+  Typography,
+} from '@mui/material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import DownloadIcon from '@mui/icons-material/Download';
+import HomeIcon from '@mui/icons-material/Home';
+import PrintIcon from '@mui/icons-material/Print';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import ShareIcon from '@mui/icons-material/Share';
+
+// API клиент
+import { api as apiClient } from '../api/client';
+
+import logger from '../utils/logger';
+import { openPrintableWindow } from '../utils/printWindow';
+const PaymentSuccess = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Состояния
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [paymentData, setPaymentData] = useState(null);
+  const [receiptUrl, setReceiptUrl] = useState(null);
+
+  // Получаем параметры из URL
+  const paymentId = searchParams.get('payment_id');
+
+  const generateReceipt = useCallback(async () => {
+    try {
+      const response = await apiClient.post(`/payments/${paymentId}/receipt`, {
+        format: 'pdf'
+      });
+      
+      if (response.data?.receipt_url) {
+        setReceiptUrl(response.data.receipt_url);
+      }
+    } catch (err) {
+      logger.warn('Не удалось сгенерировать квитанцию:', err);
+    }
+  }, [paymentId]);
+
+  const loadPaymentDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const response = await apiClient.get(`/payments/${paymentId}`);
+      
+      if (response.data) {
+        setPaymentData(response.data);
+        
+        // Если платеж успешен, генерируем квитанцию
+        if (response.data.status === 'completed') {
+          generateReceipt();
+        }
+      } else {
+        setError('Данные платежа не найдены');
+      }
+    } catch (err) {
+      logger.error('Ошибка загрузки платежа:', err);
+      setError('Не удалось загрузить информацию о платеже');
+    } finally {
+      setLoading(false);
+    }
+  }, [paymentId, generateReceipt]);
+
+  useEffect(() => {
+    if (paymentId) {
+      loadPaymentDetails();
+    } else {
+      setError('Не указан ID платежа');
+      setLoading(false);
+    }
+  }, [loadPaymentDetails, paymentId]);
+
+  const downloadReceipt = () => {
+    if (receiptUrl) {
+      window.open(receiptUrl, '_blank');
+    } else {
+      // Генерируем простую квитанцию
+      const receiptContent = generateSimpleReceipt();
+      const blob = new Blob([receiptContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt_${paymentId}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const generateSimpleReceipt = () => {
+    if (!paymentData) return '';
+    
+    return `
+КВИТАНЦИЯ ОБ ОПЛАТЕ
+===================
+
+Номер платежа: ${paymentId}
+Дата: ${new Date(paymentData.created_at).toLocaleString('ru-RU')}
+Сумма: ${formatAmount(paymentData.amount, paymentData.currency)}
+Провайдер: ${getProviderName(paymentData.provider)}
+Статус: ${getStatusText(paymentData.status)}
+
+Описание: ${paymentData.description || 'Оплата медицинских услуг'}
+
+Спасибо за использование наших услуг!
+    `.trim();
+  };
+
+  const printReceipt = () => {
+    const receiptContent = generateSimpleReceipt();
+    openPrintableWindow({
+      html: `
+      <html>
+        <head>
+          <title>Квитанция ${paymentId}</title>
+          <style>
+            body { font-family: monospace; margin: 24px; color: #111827; }
+            h1 { font-size: 20px; margin-bottom: 12px; }
+            .meta { margin-bottom: 16px; line-height: 1.6; }
+            pre { white-space: pre-wrap; font-family: inherit; padding: 16px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h1>Квитанция об оплате</h1>
+          <div class="meta">
+            <div><strong>Платеж:</strong> ${paymentId}</div>
+            <div><strong>Статус:</strong> ${getStatusText(paymentData.status)}</div>
+          </div>
+          <pre>${receiptContent}</pre>
+        </body>
+      </html>
+    `
+    });
+  };
+
+  const shareReceipt = async () => {
+    if (navigator.share && paymentData) {
+      try {
+        await navigator.share({
+          title: `Квитанция об оплате ${paymentId}`,
+          text: `Оплата на сумму ${formatAmount(paymentData.amount, paymentData.currency)} успешно завершена`,
+          url: window.location.href
+        });
+      } catch (err) {
+        logger.log('Ошибка при шаринге:', err);
+      }
+    } else {
+      // Fallback - копируем в буфер обмена
+      navigator.clipboard.writeText(window.location.href);
+      alert('Ссылка скопирована в буфер обмена');
+    }
+  };
+
+  const formatAmount = (amount, currency) => {
+    const numAmount = parseFloat(amount);
+    if (currency === 'UZS') {
+      return `${(numAmount / 100).toLocaleString('ru-RU')} сум`;
+    } else if (currency === 'KZT') {
+      return `${(numAmount / 100).toLocaleString('ru-RU')} тенге`;
+    } else {
+      return `${numAmount} ${currency}`;
+    }
+  };
+
+  const getProviderName = (provider) => {
+    const names = {
+      click: 'Click',
+      payme: 'Payme',
+      kaspi: 'Kaspi Pay'
+    };
+    return names[provider] || provider;
+  };
+
+  const normalizePaymentStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+
+    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
+      return 'completed';
+    }
+
+    return normalized;
+  };
+
+  const getStatusText = (status) => {
+    const texts = {
+      pending: 'Ожидает',
+      processing: 'Обработка',
+      completed: 'Завершен',
+      paid: 'Оплачен',
+      failed: 'Неудачно',
+      cancelled: 'Отменен'
+    };
+    const normalized = String(status || '').toLowerCase();
+    return texts[normalized] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'warning',
+      processing: 'info',
+      completed: 'success',
+      paid: 'success',
+      failed: 'error',
+      cancelled: 'default'
+    };
+    const normalized = String(status || '').toLowerCase();
+    return colors[normalized] || 'default';
+  };
+
+  if (loading) {
+    return (
+      <Box 
+        display="flex" 
+        justifyContent="center" 
+        alignItems="center" 
+        minHeight="60vh"
+      >
+        <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box maxWidth="md" mx="auto" mt={4} px={2}>
+        <Card>
+          <CardContent>
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+            <Button 
+              variant="contained" 
+              startIcon={<HomeIcon />}
+              onClick={() => navigate('/')}
+            >
+              На главную
+            </Button>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
+
+  const isSuccess = normalizePaymentStatus(paymentData?.status) === 'completed';
+
+  return (
+    <Box maxWidth="md" mx="auto" mt={4} px={2}>
+      {/* Заголовок результата */}
+      <Card elevation={3} sx={{ mb: 3 }}>
+        <CardContent sx={{ textAlign: 'center', py: 4 }}>
+          {isSuccess ? (
+            <>
+              <CheckIcon 
+                sx={{ 
+                  fontSize: 80, 
+                  color: 'success.main', 
+                  mb: 2 
+                }} 
+              />
+              <Typography variant="h4" color="success.main" gutterBottom>
+                Оплата успешно завершена!
+              </Typography>
+              <Typography variant="h6" color="textSecondary">
+                Спасибо за использование наших услуг
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography variant="h4" color="warning.main" gutterBottom>
+                Статус платежа: {getStatusText(paymentData?.status)}
+              </Typography>
+              <Typography variant="body1" color="textSecondary">
+                Информация о вашем платеже
+              </Typography>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Детали платежа */}
+      {paymentData && (
+        <Card elevation={2} sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+              <ReceiptIcon sx={{ mr: 1 }} />
+              Детали платежа
+            </Typography>
+            
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Номер платежа
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold">
+                    #{paymentId}
+                  </Typography>
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Сумма
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="primary">
+                    {formatAmount(paymentData.amount, paymentData.currency)}
+                  </Typography>
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Способ оплаты
+                  </Typography>
+                  <Typography variant="body1">
+                    {getProviderName(paymentData.provider)}
+                  </Typography>
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Статус
+                  </Typography>
+                  <Chip 
+                    label={getStatusText(paymentData.status)}
+                    color={getStatusColor(paymentData.status)}
+                    size="small"
+                  />
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Дата и время
+                  </Typography>
+                  <Typography variant="body1">
+                    {new Date(paymentData.created_at).toLocaleString('ru-RU')}
+                  </Typography>
+                </Paper>
+              </Grid>
+              
+              {paymentData.description && (
+                <Grid item xs={12}>
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      Описание
+                    </Typography>
+                    <Typography variant="body1">
+                      {paymentData.description}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Действия */}
+      <Card elevation={2}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Действия
+          </Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<DownloadIcon />}
+                onClick={downloadReceipt}
+                disabled={!paymentData}
+              >
+                Скачать квитанцию
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<PrintIcon />}
+                onClick={printReceipt}
+                disabled={!paymentData}
+              >
+                Печать
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<ShareIcon />}
+                onClick={shareReceipt}
+                disabled={!paymentData}
+              >
+                Поделиться
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<HomeIcon />}
+                onClick={() => navigate('/')}
+              >
+                На главную
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Дополнительная информация */}
+      <Box mt={4} textAlign="center">
+        <Typography variant="body2" color="textSecondary">
+          При возникновении вопросов обратитесь в службу поддержки
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
+export default PaymentSuccess;

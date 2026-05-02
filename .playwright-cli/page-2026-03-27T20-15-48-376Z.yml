@@ -1,0 +1,193 @@
+- generic [ref=e2]:
+  - generic [ref=e44]:
+    - generic [ref=e46]:
+      - button "Управление клиникой" [ref=e48] [cursor=pointer]:
+        - generic [ref=e49]:
+          - img [ref=e50]
+          - text: Управление клиникой
+      - generic [ref=e53]:
+        - generic [ref=e55]:
+          - generic: 🔍
+          - textbox "Поиск пациентов, визитов..." [ref=e56]
+          - generic: ⌘K
+        - button "Касса" [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]:
+            - img [ref=e60]
+            - text: Касса
+      - generic [ref=e64]:
+        - button "RU" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]:
+            - img [ref=e68]
+            - text: RU
+        - generic "Онлайн" [ref=e72]:
+          - img [ref=e73]
+          - text: Онлайн
+        - button "Сообщения (офлайн)" [ref=e76] [cursor=pointer]:
+          - img [ref=e77]
+        - button "Выбрать тему" [ref=e81] [cursor=pointer]:
+          - img [ref=e84]
+        - button "Cashier User" [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]:
+            - img [ref=e90]
+            - text: Cashier User
+        - button "Выйти" [ref=e93] [cursor=pointer]:
+          - generic [ref=e94]:
+            - img [ref=e95]
+            - text: Выйти
+    - main [ref=e99]:
+      - generic [ref=e102]:
+        - generic [ref=e104]:
+          - generic [ref=e105]:
+            - img [ref=e106]
+            - textbox "Поиск по пациенту (Server Search)" [ref=e109]
+          - combobox [ref=e110]:
+            - option "Все статусы" [selected]
+            - option "Оплачено"
+            - option "Ожидает"
+          - generic [ref=e111]:
+            - img [ref=e112]
+            - tablist [ref=e114]:
+              - tab "Одна дата" [selected] [ref=e115] [cursor=pointer]: Одна дата
+              - tab "Диапазон" [ref=e116] [cursor=pointer]
+          - textbox [ref=e118]: 2026-03-27
+          - button "Сегодня" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]: Сегодня
+        - generic [ref=e122]:
+          - generic [ref=e170]:
+            - generic [ref=e171]: 15 000 сум
+            - generic [ref=e172]: Всего за период
+          - generic [ref=e173]:
+            - generic [ref=e174]: 0 сум
+            - generic [ref=e175]: Наличные
+          - generic [ref=e176]:
+            - generic [ref=e177]: 0 сум
+            - generic [ref=e178]: Карта
+          - generic [ref=e179]:
+            - generic [ref=e180]: "1"
+            - generic [ref=e181]: Оплачено
+          - generic [ref=e302]:
+            - generic [ref=e303]: "1"
+            - generic [ref=e304]: Отменено
+          - generic [ref=e126]:
+            - button "🔄 Обновить" [ref=e127] [cursor=pointer]:
+              - generic [ref=e128]: 🔄 Обновить
+            - button "📥 Экспорт" [ref=e129] [cursor=pointer]:
+              - generic [ref=e130]: 📥 Экспорт
+            - button "📊 Аналитика" [ref=e131] [cursor=pointer]:
+              - generic [ref=e132]: 📊 Аналитика
+        - generic [ref=e133]:
+          - generic [ref=e135]:
+            - tab "Ожидающие оплаты" [ref=e136] [cursor=pointer]:
+              - img [ref=e137]
+              - text: Ожидающие оплаты
+            - tab "История платежей" [selected] [ref=e140] [cursor=pointer]:
+              - img [ref=e141]
+              - text: История платежей
+            - tab "Возвраты" [ref=e143] [cursor=pointer]:
+              - img [ref=e144]
+              - text: Возвраты
+            - tab "Депозиты" [ref=e149] [cursor=pointer]:
+              - img [ref=e150]
+              - text: Депозиты
+          - table [ref=e306]:
+            - rowgroup [ref=e307]:
+              - row "Дата/Время Пациент Услуга Способ Сумма Статус Действия" [ref=e308]:
+                - columnheader "Дата/Время" [ref=e309]
+                - columnheader "Пациент" [ref=e310]
+                - columnheader "Услуга" [ref=e311]
+                - columnheader "Способ" [ref=e312]
+                - columnheader "Сумма" [ref=e313]
+                - columnheader "Статус" [ref=e314]
+                - columnheader "Действия" [ref=e315]
+            - rowgroup [ref=e316]:
+              - row "27.03.2026 20:52 QA Smoke BCDEFG Услуга online 15 000 сум Оплачено ✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e317]:
+                - cell "27.03.2026 20:52" [ref=e318]:
+                  - generic [ref=e319]:
+                    - generic [ref=e320]: 27.03.2026
+                    - generic [ref=e321]: 20:52
+                - cell "QA Smoke BCDEFG" [ref=e322]
+                - cell "Услуга" [ref=e323]
+                - cell "online" [ref=e324]
+                - cell "15 000 сум" [ref=e325]
+                - cell "Оплачено" [ref=e326]:
+                  - generic [ref=e327]: Оплачено
+                - cell "✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e328]:
+                  - button "✅ Принять" [ref=e329] [cursor=pointer]:
+                    - generic [ref=e330]: ✅ Принять
+                  - button "❌ Отмена" [ref=e331] [cursor=pointer]:
+                    - generic [ref=e332]: ❌ Отмена
+                  - button "💸 Возврат" [ref=e333] [cursor=pointer]:
+                    - generic [ref=e334]: 💸 Возврат
+                  - button "🧾 Чек" [ref=e335] [cursor=pointer]:
+                    - generic [ref=e336]: 🧾 Чек
+              - row "27.03.2026 20:51 QA Smoke BCDEFG Услуга online 15 000 сум Отменён ✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e337]:
+                - cell "27.03.2026 20:51" [ref=e338]:
+                  - generic [ref=e339]:
+                    - generic [ref=e340]: 27.03.2026
+                    - generic [ref=e341]: 20:51
+                - cell "QA Smoke BCDEFG" [ref=e342]
+                - cell "Услуга" [ref=e343]
+                - cell "online" [ref=e344]
+                - cell "15 000 сум" [ref=e345]
+                - cell "Отменён" [ref=e346]:
+                  - generic [ref=e347]: Отменён
+                - cell "✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e348]:
+                  - button "✅ Принять" [ref=e349] [cursor=pointer]:
+                    - generic [ref=e350]: ✅ Принять
+                  - button "❌ Отмена" [disabled]:
+                    - generic: ❌ Отмена
+                  - button "💸 Возврат" [disabled]:
+                    - generic: 💸 Возврат
+                  - button "🧾 Чек" [ref=e351] [cursor=pointer]:
+                    - generic [ref=e352]: 🧾 Чек
+              - row "27.03.2026 20:42 QA Smoke BCDEFG Услуга online 15 000 сум Ожидает ✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e353]:
+                - cell "27.03.2026 20:42" [ref=e354]:
+                  - generic [ref=e355]:
+                    - generic [ref=e356]: 27.03.2026
+                    - generic [ref=e357]: 20:42
+                - cell "QA Smoke BCDEFG" [ref=e358]
+                - cell "Услуга" [ref=e359]
+                - cell "online" [ref=e360]
+                - cell "15 000 сум" [ref=e361]
+                - cell "Ожидает" [ref=e362]:
+                  - generic [ref=e363]: Ожидает
+                - cell "✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e364]:
+                  - button "✅ Принять" [ref=e365] [cursor=pointer]:
+                    - generic [ref=e366]: ✅ Принять
+                  - button "❌ Отмена" [ref=e367] [cursor=pointer]:
+                    - generic [ref=e368]: ❌ Отмена
+                  - button "💸 Возврат" [ref=e369] [cursor=pointer]:
+                    - generic [ref=e370]: 💸 Возврат
+                  - button "🧾 Чек" [ref=e371] [cursor=pointer]:
+                    - generic [ref=e372]: 🧾 Чек
+              - row "27.03.2026 20:40 QA Smoke BCDEFG Услуга online 15 000 сум Ожидает ✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e373]:
+                - cell "27.03.2026 20:40" [ref=e374]:
+                  - generic [ref=e375]:
+                    - generic [ref=e376]: 27.03.2026
+                    - generic [ref=e377]: 20:40
+                - cell "QA Smoke BCDEFG" [ref=e378]
+                - cell "Услуга" [ref=e379]
+                - cell "online" [ref=e380]
+                - cell "15 000 сум" [ref=e381]
+                - cell "Ожидает" [ref=e382]:
+                  - generic [ref=e383]: Ожидает
+                - cell "✅ Принять ❌ Отмена 💸 Возврат 🧾 Чек" [ref=e384]:
+                  - button "✅ Принять" [ref=e385] [cursor=pointer]:
+                    - generic [ref=e386]: ✅ Принять
+                  - button "❌ Отмена" [ref=e387] [cursor=pointer]:
+                    - generic [ref=e388]: ❌ Отмена
+                  - button "💸 Возврат" [ref=e389] [cursor=pointer]:
+                    - generic [ref=e390]: 💸 Возврат
+                  - button "🧾 Чек" [ref=e391] [cursor=pointer]:
+                    - generic [ref=e392]: 🧾 Чек
+  - region "Notifications Alt+T"
+  - generic [ref=e156]:
+    - generic [ref=e157]:
+      - img [ref=e158]
+      - generic [ref=e161]:
+        - strong [ref=e162]: Включить уведомления?
+        - generic [ref=e163]: Получайте уведомления о новых сообщениях
+    - generic [ref=e164]:
+      - button "Включить" [ref=e165] [cursor=pointer]
+      - button "Закрыть" [ref=e166] [cursor=pointer]:
+        - img [ref=e167]
