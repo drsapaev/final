@@ -4062,6 +4062,55 @@ Continue the QA sweep by removing filled database passwords from sibling CI setu
 - would LightRAG likely help here: yes
 - Better graph context should connect duplicated CI setup docs so this can be planned as a bounded sibling-doc series.
 
+## Task 114 - CLAUDE env context database placeholder
+
+### User task
+Continue the QA sweep by removing the remaining filled database password from agent/environment context.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: CLAUDE.md
+
+### What handoff solved well
+- It narrowed the first-touch set to `CLAUDE.md`.
+- It kept AGENTS.md as the primary anchor and avoided broader instruction rewrites.
+
+### Missing relationship mapping
+- none
+
+### Manual reconstruction needed
+- Confirmed `CLAUDE.md` had one `DATABASE_URL` example containing `clinicpwd`.
+- Replaced it with a `<db_password>` placeholder and canonical local Postgres host port `55432`.
+- Removed "default" wording from that line so agents do not treat a sample URL as runtime default.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: no
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: sufficient
+- would LightRAG likely help here: no
+- The issue was localized to one secondary agent-context env line.
+
+## Mini-review - Tasks 109-114 env docs and agent-context sweep
+
+### Counts
+- entries reviewed: 6
+- gate_misroute observed: 0
+- override_used observed: 5
+- manual graph reconstruction observed: 4
+- ownership ambiguity observed: 0
+
+### Recommendation
+- Treat duplicated env examples as a bounded series and continue using single-file first-touch slices when the gate narrows to one known-root-cause doc.
+
 ## Task 113 - Setup CI-CD database placeholder
 
 ### User task
