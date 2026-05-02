@@ -1,34 +1,25 @@
-#!/usr/bin/env python3
+"""Retired legacy EMR versions schema helper.
+
+The `emr_versions` table is owned by Alembic migrations. Run
+`alembic upgrade head` instead of creating tables from SQLAlchemy metadata.
 """
-Создание таблицы для версий EMR
-"""
+from __future__ import annotations
+
 import sys
-import os
-
-# Добавляем корневую директорию проекта в sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'app')))
-
-from app.db.session import engine
-from app.models.emr_version import EMRVersion
-from app.db.base import Base
 
 
-def create_emr_versions_table():
-    """Создать таблицу для версий EMR"""
-    print("🔄 СОЗДАНИЕ ТАБЛИЦЫ EMR_VERSIONS")
-    print("=" * 40)
-    
-    try:
-        # Создаем таблицу
-        Base.metadata.create_all(bind=engine, tables=[EMRVersion.__table__])
-        print("✅ Таблица emr_versions создана успешно")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Ошибка создания таблицы: {e}")
-        return False
+MESSAGE = """
+create_emr_versions_table.py is retired.
+
+The emr_versions schema is managed by Alembic. This helper intentionally does
+not connect to the database or create schema from SQLAlchemy metadata.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
-    success = create_emr_versions_table()
-    sys.exit(0 if success else 1)
+    raise SystemExit(main())
