@@ -5,6 +5,7 @@ import sys
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker as orm_sessionmaker
 
@@ -51,12 +52,23 @@ def _get_int_env(name: str, default: int) -> int:
     return max(0, value)
 
 
+def _mask_database_url(url: str) -> str:
+    """Return a log-safe database URL with credentials hidden."""
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<unparseable database url>"
+
+
 # Получаем URL
 DATABASE_URL = _get_db_url_from_env_or_settings()
 DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
 
 # небольшая диагностика при импорте (в лог / stderr)
-print(f"[app.db.session] Using DATABASE_URL = {DATABASE_URL}", file=sys.stderr)
+print(
+    f"[app.db.session] Using DATABASE_URL = {_mask_database_url(DATABASE_URL)}",
+    file=sys.stderr,
+)
 
 # Создаём СИНХРОННЫЙ движок
 # ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener
