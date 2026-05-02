@@ -353,6 +353,12 @@ _DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-pro
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
+    # Загружаем backend/.env в os.environ до os.getenv("SECRET_KEY"), иначе ключ из файла игнорируется.
+    if _DEFAULT_ENV_FILE.is_file():
+        from dotenv import load_dotenv
+
+        load_dotenv(_DEFAULT_ENV_FILE, override=False)
+
     # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
     secret_key = os.getenv("SECRET_KEY")
 
