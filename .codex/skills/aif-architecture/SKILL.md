@@ -1,6 +1,6 @@
 ---
 name: aif-architecture
-description: Generate architecture guidelines for the project. Analyzes tech stack from DESCRIPTION.md, recommends an architecture pattern, and creates .ai-factory/ARCHITECTURE.md. Use when setting up project architecture, asking "which architecture", or after /aif setup.
+description: Generate architecture guidelines for the project. Analyzes tech stack from DESCRIPTION.md, recommends an architecture pattern, and creates .ai-factory/ARCHITECTURE.md. Use when setting up project architecture, asking "which architecture", or after $aif setup.
 argument-hint: "[clean|ddd|microservices|monolith|layers]"
 allowed-tools: Read Write Glob Grep Bash(mkdir *) AskUserQuestion Questions
 disable-model-invocation: false
@@ -12,9 +12,20 @@ Generate `.ai-factory/ARCHITECTURE.md` with architecture decisions tailored to t
 
 ## Workflow
 
-### Step 0: Load Project Context
+### Step 0: Load Config & Project Context
 
-**Read `.ai-factory/DESCRIPTION.md`** if it exists to understand:
+**FIRST:** Read `.ai-factory/config.yaml` if it exists to resolve:
+- **Paths:** `paths.description` and `paths.architecture`
+- **Language:** `language.ui` for prompts and `language.artifacts` for generated architecture content
+
+When invoked by `$aif`, assume `.ai-factory/config.yaml` has already been written for the current setup run and already contains the resolved `language.ui` / `language.artifacts` values.
+
+If config.yaml doesn't exist, use defaults:
+- DESCRIPTION.md: `.ai-factory/DESCRIPTION.md`
+- ARCHITECTURE.md: `.ai-factory/ARCHITECTURE.md`
+- Language: `en` (English)
+
+**THEN:** Read `.ai-factory/DESCRIPTION.md` (use path from config) if it exists to understand:
 - Tech stack (language, framework, database, ORM)
 - Project size and complexity
 - Core features and requirements
@@ -24,7 +35,7 @@ Generate `.ai-factory/ARCHITECTURE.md` with architecture decisions tailored to t
 ```
 ⚠️  No project description found.
 
-Run /aif first to set up project context, or describe your project manually:
+Run $aif first to set up project context, or describe your project manually:
 - What are you building?
 - Tech stack (language, framework, database)?
 - Team size?
@@ -35,7 +46,7 @@ Allow standalone usage — if user provides manual input, use that instead.
 
 **Read `.ai-factory/skill-context/aif-architecture/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -57,7 +68,7 @@ If any rule is violated — fix the output before presenting it to the user.
 
 Based on project context, evaluate against the decision matrix and recommend an architecture:
 
-**If `$ARGUMENTS` specifies an architecture** (e.g., `/aif-architecture clean`):
+**If `$ARGUMENTS` specifies an architecture** (e.g., `$aif-architecture clean`):
 - Use that architecture directly, skip to Step 2
 
 **If no specific architecture requested:**
@@ -85,13 +96,11 @@ Architecture options:
 - **Modular Monolith** — single deployment with strong module boundaries, good default for most projects
 - **Layered Architecture** — simple layers (presentation → business → data), good for smaller projects
 
-### Step 2: Generate .ai-factory/ARCHITECTURE.md
+### Step 2: Generate the Architecture Artifact
 
-```bash
-mkdir -p .ai-factory
-```
+Create the parent directory for the resolved architecture path if needed.
 
-Generate `.ai-factory/ARCHITECTURE.md` with the following structure, **adapted to the project's tech stack and language**:
+Generate the resolved architecture artifact (default: `.ai-factory/ARCHITECTURE.md`) with the following structure, **adapted to the project's tech stack and language**:
 
 ```markdown
 # Architecture: [Pattern Name]
@@ -151,44 +160,48 @@ Generate `.ai-factory/ARCHITECTURE.md` with the following structure, **adapted t
 
 ### Step 3: Update DESCRIPTION.md
 
-If `.ai-factory/DESCRIPTION.md` exists, add an `## Architecture` section (or update if it already exists):
+If the resolved DESCRIPTION.md path exists, add or update an architecture-pointer section in resolved `language.artifacts`.
+Use the resolved architecture path from config, not the default path literal.
 
 ```markdown
-## Architecture
-See `.ai-factory/ARCHITECTURE.md` for detailed architecture guidelines.
-Pattern: [chosen pattern name]
+## [Localized heading: Architecture]
+[Localized sentence in resolved artifacts language referencing the resolved architecture artifact path for detailed architecture guidelines.]
+[Localized label: Pattern]: [chosen pattern name]
 ```
 
 ### Step 4: Update AGENTS.md
 
-If `AGENTS.md` exists in the project root, add `.ai-factory/ARCHITECTURE.md` to the "AI Context Files" table:
+If `AGENTS.md` exists in the project root, add the resolved architecture artifact path to the localized "AI Context Files" table in resolved `language.artifacts`:
 
 ```markdown
-| .ai-factory/ARCHITECTURE.md | Architecture decisions and guidelines |
+| [resolved-architecture-path] | [Localized architecture artifact description in resolved artifacts language] |
 ```
 
-Only add if not already present.
+Only add if the resolved architecture path is not already present.
 
 ### Step 5: Confirm
 
+Present the confirmation in resolved `language.ui` and report the resolved architecture path:
+
 ```
-✅ Architecture document generated!
+[Localized success heading in `language.ui`]
 
-Pattern: [chosen pattern]
-File: .ai-factory/ARCHITECTURE.md
+[Localized pattern label in `language.ui`]: [chosen pattern]
+[Localized file label in `language.ui`]: [resolved architecture path]
 
-Key rules:
+[Localized key-rules heading in `language.ui`]:
 - [rule 1]
 - [rule 2]
 - [rule 3]
 
-All workflow skills (/aif-plan, /aif-implement) will now follow these architecture guidelines.
+[Localized closing sentence in `language.ui` about workflow skills following these architecture guidelines.]
 ```
 
 ## Artifact Ownership
 
-- Primary ownership: `.ai-factory/ARCHITECTURE.md`.
-- Allowed companion updates: architecture pointer in `.ai-factory/DESCRIPTION.md`, architecture row in `AGENTS.md` context table.
+- Primary ownership: the resolved architecture artifact path (default: `.ai-factory/ARCHITECTURE.md`).
+- Respect config overrides: write to the resolved architecture path from `config.yaml` when provided.
+- Allowed companion updates: architecture pointer in the resolved DESCRIPTION path from `config.yaml`, architecture row in `AGENTS.md` context table.
 - Read-only context: roadmap, rules, research, and plan artifacts unless user explicitly requests otherwise.
 
 ---

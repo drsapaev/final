@@ -12,41 +12,51 @@ Comprehensive security checklist based on OWASP Top 10 (2021) and industry best 
 
 ## Quick Reference
 
-- `/aif-security-checklist` — Full audit checklist
-- `/aif-security-checklist auth` — Authentication & sessions
-- `/aif-security-checklist injection` — SQL/NoSQL/Command injection
-- `/aif-security-checklist xss` — Cross-site scripting
-- `/aif-security-checklist csrf` — Cross-site request forgery
-- `/aif-security-checklist secrets` — Secrets & credentials
-- `/aif-security-checklist api` — API security
-- `/aif-security-checklist infra` — Infrastructure security
-- `/aif-security-checklist prompt-injection` — LLM prompt injection
-- `/aif-security-checklist race-condition` — Race conditions & TOCTOU
-- `/aif-security-checklist ignore <item>` — Ignore a specific check item
+- `$aif-security-checklist` — Full audit checklist
+- `$aif-security-checklist auth` — Authentication & sessions
+- `$aif-security-checklist injection` — SQL/NoSQL/Command injection
+- `$aif-security-checklist xss` — Cross-site scripting
+- `$aif-security-checklist csrf` — Cross-site request forgery
+- `$aif-security-checklist secrets` — Secrets & credentials
+- `$aif-security-checklist api` — API security
+- `$aif-security-checklist infra` — Infrastructure security
+- `$aif-security-checklist prompt-injection` — LLM prompt injection
+- `$aif-security-checklist race-condition` — Race conditions & TOCTOU
+- `$aif-security-checklist ignore <item>` — Ignore a specific check item
+
+## Config
+
+**FIRST:** Read `.ai-factory/config.yaml` if it exists to resolve:
+- **Paths:** `paths.security`
+- **Language:** `language.ui` for prompts
+
+If config.yaml doesn't exist, use defaults:
+- SECURITY.md: `.ai-factory/SECURITY.md`
+- Language: `en` (English)
 
 ## Ignored Items (SECURITY.md)
 
-Before running any audit, **always read** the file `.ai-factory/SECURITY.md` in the project root. If it exists, it contains a list of security checks the team has decided to ignore.
+Before running any audit, **always read** the resolved SECURITY.md path (default: `.ai-factory/SECURITY.md`). If it exists, it contains a list of security checks the team has decided to ignore.
 
 ### How ignoring works
 
-**When the user runs `/aif-security-checklist ignore <item>`:**
+**When the user runs `$aif-security-checklist ignore <item>`:**
 
-1. Read the current `.ai-factory/SECURITY.md` file (create if doesn't exist)
+1. Read the current resolved SECURITY.md file (create if it doesn't exist)
 2. Ask the user for the reason why this item should be ignored
 3. Add the item to the file following the format below
 4. Confirm the item was added
 
-**When running any audit (`/aif-security-checklist` or a specific category):**
+**When running any audit (`$aif-security-checklist` or a specific category):**
 
-1. Read `.ai-factory/SECURITY.md` at the start
+1. Read the resolved SECURITY.md file at the start
 2. For each ignored item that matches the current audit scope:
    - Do NOT flag it as a finding
    - Instead, show it in a separate section at the end: **"⏭️ Ignored Items"**
    - Display each ignored item with its reason and date, so the team stays aware
 3. Non-ignored items are audited as usual
 
-### `.ai-factory/SECURITY.md` format
+### SECURITY.md format
 
 ```markdown
 # Security: Ignored Items
@@ -78,14 +88,14 @@ Review periodically — ignored risks may become relevant.
 When audit results are shown, append this section at the end:
 
 ```
-⏭️ Ignored Items (from .ai-factory/SECURITY.md)
+⏭️ Ignored Items (from the resolved SECURITY.md artifact)
 ┌─────────────────┬──────────────────────────────────────┬────────────┐
 │ Item            │ Reason                               │ Date       │
 ├─────────────────┼──────────────────────────────────────┼────────────┤
 │ no-csrf         │ SPA with token auth, no cookies used │ 2025-03-15 │
 │ no-rate-limit   │ Internal service, behind API gateway │ 2025-03-15 │
 └─────────────────┴──────────────────────────────────────┴────────────┘
-⚠️  2 items ignored. Run `/aif-security-checklist` without ignores to see full audit.
+⚠️  2 items ignored. Run `$aif-security-checklist` without ignores to see full audit.
 ```
 
 ---
@@ -94,7 +104,7 @@ When audit results are shown, append this section at the end:
 
 **Read `.ai-factory/skill-context/aif-security-checklist/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -119,7 +129,7 @@ If any rule is violated — fix the output before presenting it to the user.
 Run the automated security audit script:
 
 ```bash
-bash ~/{{skills_dir}}/security-checklist/scripts/audit.sh
+bash ~/.codex/skills/security-checklist/scripts/audit.sh
 ```
 
 This checks:
@@ -128,7 +138,44 @@ This checks:
 - .gitignore configuration
 - npm audit (vulnerabilities)
 - console.log in production code
-- Security TODOs
+- Security task markers
+
+---
+
+## Machine-Readable Gate Result
+
+For `$aif-security-checklist` audits (full audit or category audit), keep the human-readable security report first and append one final fenced `aif-gate-result` JSON block.
+
+Do not append this gate block for the `ignore <item>` writer flow unless that invocation also performs and reports an audit result.
+
+Status mapping:
+- `fail`: an unignored critical/high security issue or other explicitly production-blocking finding remains.
+- `warn`: only medium/low findings, ignored items needing review, incomplete audit evidence, or audit command limitations remain.
+- `pass`: the audit completed and no unignored findings remain.
+
+Machine-readable fields:
+- Use `"gate": "security"`.
+- Use `"status": "pass|warn|fail"`.
+- Use `"blocking": true|false`.
+- Include only production-blocking findings in `"blockers": [`.
+- Include implicated paths in `"affected_files": [`.
+- Set `"suggested_next": {` to `$aif-fix` for code/config security fixes or `null` when no workflow command fits.
+- Never include secrets, tokens, raw passwords, or private credentials in the JSON block.
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "security",
+  "status": "warn",
+  "blocking": false,
+  "blockers": [],
+  "affected_files": ["src/api/session.ts"],
+  "suggested_next": {
+    "command": "$aif-fix",
+    "reason": "Address non-blocking security hardening findings."
+  }
+}
+```
 
 ---
 
@@ -454,8 +501,8 @@ grep -rn "password\|secret\|api_key\|token" --include="*.ts" --include="*.js" .
 # Check for vulnerable dependencies
 npm audit --audit-level=high
 
-# Find TODO security items
-grep -rn "TODO.*security\|FIXME.*security\|XXX.*security" .
+# Find unfinished security markers
+grep -rn "[T][O][D][O].*security\|[F][I][X][M][E].*security\|[X][X][X].*security" .
 
 # Check for console.log in production code
 grep -rn "console\.log" src/
@@ -486,3 +533,9 @@ grep -rn "innerHTML.*llm\|innerHTML.*response\|innerHTML.*completion" --include=
 | Missing Headers | 🟢 Low | < 1 month |
 
 > **Tip:** Context is heavy after security audit. Consider `/clear` or `/compact` before continuing with other tasks.
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: the resolved SECURITY.md artifact (default: `.ai-factory/SECURITY.md`) for ignored-item state created through the `ignore` flow.
+- Write policy: audit findings are normally conversational output; persistent writes are limited to the ignore-state artifact above unless the user explicitly asks for more.
+- Config policy: config-aware. Use `paths.security` for the ignore-state artifact while deriving audit scope from repo evidence and audit commands.
