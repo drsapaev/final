@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Resolve the backend root so config can load backend/.env consistently.
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
 _DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
-_DEFAULT_DATABASE_URL = "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
+_DEFAULT_DATABASE_URL = ""
 
 
 class _CompatibleCorsEnvSettingsSource(EnvSettingsSource):
@@ -466,8 +466,12 @@ def get_settings() -> Settings:
                 "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
             )
 
-        # 3. DATABASE_URL должен быть PostgreSQL
-        if "sqlite" in s.DATABASE_URL.lower():
+        # 3. DATABASE_URL должен быть явно настроен и использовать PostgreSQL
+        if not s.DATABASE_URL.strip():
+            errors.append(
+                "DATABASE_URL must be set via environment variable in production."
+            )
+        elif "sqlite" in s.DATABASE_URL.lower():
             errors.append(
                 "SQLite is not recommended for production. "
                 "Set DATABASE_URL to PostgreSQL: postgresql://user:pass@host:5432/dbname"

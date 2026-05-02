@@ -19,16 +19,15 @@ def _get_db_url_from_env_or_settings() -> str:
         )
         if url:
             return str(url)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError("Could not load database settings.") from exc
 
     # 2) env var
     env_url = os.getenv("DATABASE_URL")
     if env_url:
         return env_url
 
-    # 3) default runtime contour
-    return "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
+    raise RuntimeError("DATABASE_URL must be set before creating the database engine.")
 
 
 def _normalize_sqlite_to_sync(url: str) -> str:

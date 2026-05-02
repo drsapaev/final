@@ -3536,3 +3536,41 @@ Continue the QA sweep by hardening remaining backend env example secret placehol
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should distinguish tracked examples from local env artifacts while still surfacing runnable-looking secret placeholders.
+
+## Task 99 - Runtime DATABASE_URL fallback removal
+
+### User task
+Continue the QA sweep by failing closed when `DATABASE_URL` is missing instead of using a hardcoded Postgres password fallback.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, then narrowed through override after retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/core/config.py, then backend/app/db/session.py
+
+### What handoff solved well
+- Each gate pass identified one confirmed half of the runtime fallback.
+- It kept the slice focused on configuration/session ownership.
+
+### Missing relationship mapping
+- The first pass missed `app.db.session`; the retry missed `app.core.config`.
+- Manual reconstruction was required because `app.db.session` swallowed settings import failures and had its own hardcoded fallback independent of `Settings`.
+
+### Manual reconstruction needed
+- Removed the hardcoded default database URL from `Settings`.
+- Added a production validation error when `DATABASE_URL` is empty.
+- Made `app.db.session` raise when settings cannot load or no database URL is configured instead of falling back to a fixed local credential.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better graph context should connect settings defaults, session fallback behavior, and production validation as a single runtime database contract.
