@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.models.payment import Payment
+
 
 class RegistrarWizardApiRepository:
     """Shared DB session adapter for registrar wizard service."""
@@ -13,6 +15,14 @@ class RegistrarWizardApiRepository:
 
     def query(self, *entities):
         return self.db.query(*entities)
+
+    def get_latest_payment_for_visit(self, visit_id: int):
+        return (
+            self.db.query(Payment)
+            .filter(Payment.visit_id == visit_id)
+            .order_by(Payment.created_at.desc())
+            .first()
+        )
 
     def add(self, obj) -> None:
         self.db.add(obj)

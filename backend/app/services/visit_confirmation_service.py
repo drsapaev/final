@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+from app.models.online_queue import DailyQueue
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.queue_service import queue_service
@@ -353,7 +354,8 @@ class VisitConfirmationService:
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
 
-        for queue_tag in unique_queue_tags:
+        for queue_tag in sorted(unique_queue_tags):
+            daily_queue: DailyQueue | None = None
             specialist_doctor_id: int | None = None
             if visit.doctor_id:
                 visit_doctor = self.repository.get_doctor(visit.doctor_id)
@@ -367,36 +369,45 @@ class VisitConfirmationService:
                     if ecg_doctor:
                         specialist_doctor_id = ecg_doctor.id
                     else:
-                        continue
-                else:
-                    continue
+                        logger.warning(
+                            "ECG resource user id=%s has no doctor row",
+                            ecg_resource.id,
+                        )
             elif queue_tag == "lab" and not specialist_doctor_id:
                 lab_resource = self.repository.get_active_user_by_username("lab_resource")
-                if not lab_resource:
-                    continue
-                lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
-                if lab_doctor:
-                    specialist_doctor_id = lab_doctor.id
-                    logger.info(
-                        "For queue_tag=%s using lab resource doctor id=%s",
-                        queue_tag,
-                        specialist_doctor_id,
-                    )
-                else:
-                    logger.warning(
-                        "Lab resource user id=%s has no doctor row",
-                        lab_resource.id,
-                    )
-                    continue
+                if lab_resource:
+                    lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
+                    if lab_doctor:
+                        specialist_doctor_id = lab_doctor.id
+                        logger.info(
+                            "For queue_tag=%s using lab resource doctor id=%s",
+                            queue_tag,
+                            specialist_doctor_id,
+                        )
+                    else:
+                        logger.warning(
+                            "Lab resource user id=%s has no doctor row",
+                            lab_resource.id,
+                        )
 
             if not specialist_doctor_id:
-                continue
+                daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)
+                if not daily_queue:
+                    logger.info(
+                        "No doctor profile or active daily queue for "
+                        "confirmation visit_id=%s doctor_id=%s queue_tag=%s",
+                        visit.id,
+                        visit.doctor_id,
+                        queue_tag,
+                    )
+                    continue
 
-            daily_queue = self.repository.get_or_create_daily_queue(
-                day=today,
-                specialist_id=specialist_doctor_id,
-                queue_tag=queue_tag,
-            )
+            if daily_queue is None:
+                daily_queue = self.repository.get_or_create_daily_queue(
+                    day=today,
+                    specialist_id=specialist_doctor_id,
+                    queue_tag=queue_tag,
+                )
 
             next_number = queue_service.get_next_queue_number(
                 self.repository.db,
@@ -458,3 +469,17 @@ class VisitConfirmationService:
             )
 
         return queue_numbers, print_tickets
+
+    def _get_active_daily_queue_by_tag(
+        self, day: date, queue_tag: str
+    ) -> DailyQueue | None:
+        return (
+            self.repository.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active.is_(True),
+            )
+            .order_by(DailyQueue.id.asc())
+            .first()
+        )

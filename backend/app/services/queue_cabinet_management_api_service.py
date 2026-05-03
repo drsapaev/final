@@ -43,12 +43,30 @@ class QueueCabinetManagementApiService:
             return user.full_name or user.username or f"Специалист #{specialist_id}"
         return f"Специалист #{specialist_id}"
 
+    def _doctor_for_queue(self, queue):
+        specialist_id = getattr(queue, "specialist_id", None)
+        if specialist_id is None or not hasattr(self.repository, "get_doctor"):
+            return None
+        return self.repository.get_doctor(specialist_id)
+
+    def _assign_queue_cabinet_number(self, queue, value: Any) -> None:
+        doctor = self._doctor_for_queue(queue)
+        if doctor and getattr(doctor, "cabinet", None):
+            raise QueueCabinetManagementDomainError(
+                400,
+                "Канонический номер кабинета нельзя менять из этой панели. Обновите кабинет в карточке врача и выполните синхронизацию.",
+            )
+        queue.cabinet_number = value
+
     def _build_queue_payload(self, queue) -> dict[str, Any]:
-        doctor = self.repository.get_doctor(queue.specialist_id)
-        doctor_cabinet = doctor.cabinet if doctor else None
+        queue_id = getattr(queue, "id", None)
+        queue_day = getattr(queue, "day", None)
+        specialist_id = getattr(queue, "specialist_id", None)
+        doctor = self._doctor_for_queue(queue)
+        doctor_cabinet = getattr(doctor, "cabinet", None) if doctor else None
         linked_doctor_found = doctor is not None
         doctor_has_cabinet = bool(doctor_cabinet)
-        queue_cabinet = queue.cabinet_number
+        queue_cabinet = getattr(queue, "cabinet_number", None)
         effective_cabinet = queue_cabinet or doctor_cabinet
         integrity_warnings: list[str] = []
 
@@ -68,18 +86,26 @@ class QueueCabinetManagementApiService:
             integrity_warnings.append("effective_cabinet_missing")
 
         return {
-            "id": queue.id,
-            "day": queue.day.isoformat(),
-            "specialist_id": queue.specialist_id,
-            "specialist_name": self._resolve_specialist_name(queue.specialist_id),
-            "queue_tag": queue.queue_tag,
+            "id": queue_id,
+            "day": queue_day.isoformat() if queue_day else None,
+            "specialist_id": specialist_id,
+            "specialist_name": (
+                self._resolve_specialist_name(specialist_id)
+                if specialist_id is not None
+                else None
+            ),
+            "queue_tag": getattr(queue, "queue_tag", None),
             "cabinet_number": queue_cabinet,
             "doctor_cabinet": doctor_cabinet,
             "effective_cabinet": effective_cabinet,
-            "cabinet_floor": queue.cabinet_floor,
-            "cabinet_building": queue.cabinet_building,
-            "entries_count": self.repository.count_entries(queue_id=queue.id),
-            "active": queue.active,
+            "cabinet_floor": getattr(queue, "cabinet_floor", None),
+            "cabinet_building": getattr(queue, "cabinet_building", None),
+            "entries_count": (
+                self.repository.count_entries(queue_id=queue_id)
+                if queue_id is not None and hasattr(self.repository, "count_entries")
+                else 0
+            ),
+            "active": getattr(queue, "active", None),
             "linked_doctor_found": linked_doctor_found,
             "doctor_has_cabinet": doctor_has_cabinet,
             "sync_status": sync_status,
@@ -128,10 +154,8 @@ class QueueCabinetManagementApiService:
 
         updated = False
         if "cabinet_number" in cabinet_info:
-            raise QueueCabinetManagementDomainError(
-                400,
-                "Канонический номер кабинета нельзя менять из этой панели. Обновите кабинет в карточке врача и выполните синхронизацию.",
-            )
+            self._assign_queue_cabinet_number(queue, cabinet_info["cabinet_number"])
+            updated = True
         if "cabinet_floor" in cabinet_info:
             queue.cabinet_floor = cabinet_info["cabinet_floor"]
             updated = True
@@ -171,13 +195,12 @@ class QueueCabinetManagementApiService:
             updated = False
 
             if "cabinet_number" in cabinet_info:
-                errors.append(
-                    {
-                        "queue_id": update["queue_id"],
-                        "error": "Канонический кабинет нельзя менять вручную из этой панели",
-                    }
-                )
-                continue
+                try:
+                    self._assign_queue_cabinet_number(queue, cabinet_info["cabinet_number"])
+                    updated = True
+                except QueueCabinetManagementDomainError as exc:
+                    errors.append({"queue_id": update["queue_id"], "error": exc.detail})
+                    continue
             if "cabinet_floor" in cabinet_info:
                 queue.cabinet_floor = cabinet_info["cabinet_floor"]
                 updated = True
