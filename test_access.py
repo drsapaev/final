@@ -1,26 +1,23 @@
-import requests
-import json
+#!/usr/bin/env python3
+"""Retired root manual access probe."""
 
-# Тест аутентификации
-login_data = {'username': 'cardio@example.com', 'password': 'cardio123'}
-response = requests.post('http://localhost:18000/api/v1/auth/minimal-login', json=login_data)
+from __future__ import annotations
 
-if response.status_code == 200:
-    data = response.json()
-    token = data['access_token']
-    user_role = data['user']['role']
-    print(f'Аутентификация успешна. Роль: {user_role}')
+import sys
 
-    # Тест доступа к очереди
-    headers = {'Authorization': f'Bearer {token}'}
-    queue_response = requests.get('http://localhost:18000/api/v1/registrar/queues/today', headers=headers)
+MESSAGE = """
+test_access.py is retired.
 
-    if queue_response.status_code == 200:
-        print('Доступ к очереди получен! Статус: 200')
-        print('Ответ сервера:', json.dumps(queue_response.json(), indent=2, ensure_ascii=False)[:500])
-    else:
-        print(f'Доступ запрещён. Статус: {queue_response.status_code}')
-        print('Ошибка:', queue_response.text)
-else:
-    print(f'Аутентификация провалилась. Статус: {response.status_code}')
-    print('Ответ:', response.text)
+This root-level manual probe used built-in credentials and live localhost API
+assumptions outside the canonical test suites. Use backend/tests, frontend/e2e,
+or an env-driven smoke check instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

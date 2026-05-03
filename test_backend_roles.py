@@ -1,40 +1,24 @@
-import requests
-import sqlite3
+#!/usr/bin/env python3
+"""Retired root manual backend role probe."""
 
-# 1. Проверяем роли в базе данных
-print("=== Роли пользователей в БД ===")
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
-cursor.execute('SELECT id, username, email, role FROM users WHERE username IN ("cardio", "derma", "dentist", "lab")')
-for row in cursor.fetchall():
-    print(f'ID: {row[0]}, User: {row[1]}, Email: {row[2]}, Role: {row[3]}')
-conn.close()
+from __future__ import annotations
 
-# 2. Пытаемся аутентифицироваться как cardio
-print("\n=== Тест аутентификации cardio ===")
-login_response = requests.post(
-    'http://localhost:18000/api/v1/auth/minimal-login',
-    json={'username': 'cardio@example.com', 'password': 'cardio123'}
-)
-print(f'Login status: {login_response.status_code}')
+import sys
 
-if login_response.status_code == 200:
-    data = login_response.json()
-    token = data['access_token']
-    user = data['user']
-    print(f'User ID: {user["id"]}, Role: {user["role"]}')
-    
-    # 3. Пытаемся получить доступ к эндпоинту
-    print("\n=== Тест доступа к /api/v1/registrar/queues/today ===")
-    queues_response = requests.get(
-        'http://localhost:18000/api/v1/registrar/queues/today',
-        headers={'Authorization': f'Bearer {token}'}
-    )
-    print(f'Queues status: {queues_response.status_code}')
-    if queues_response.status_code != 200:
-        print(f'Error: {queues_response.text}')
-    else:
-        print(f'Success! Received data: {queues_response.json()}')
-else:
-    print(f'Login failed: {login_response.text}')
+MESSAGE = """
+test_backend_roles.py is retired.
 
+This root-level manual probe mixed built-in credentials, live localhost API
+calls, and direct SQLite access outside the canonical Postgres + Alembic
+runtime contract. Use backend/tests, frontend/e2e, or an env-driven smoke check
+instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
