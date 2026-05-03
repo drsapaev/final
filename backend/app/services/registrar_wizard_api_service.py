@@ -136,14 +136,7 @@ def _resolve_payment_truth(
 ) -> tuple[str, str | None]:
     if visit_id:
         try:
-            from app.models.payment import Payment
-
-            payment_row = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit_id)
-                .order_by(Payment.created_at.desc())
-                .first()
-            )
+            payment_row = _repo(db).get_latest_payment_for_visit(visit_id)
             if payment_row:
                 payment_status = (
                     "paid"
