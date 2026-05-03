@@ -94,8 +94,8 @@ class ServicesApiService:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"РљРѕРґ СѓСЃР»СѓРіРё {normalized_code} РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ РІС‹Р±СЂР°РЅРЅРѕР№ "
-                    f"РєР°С‚РµРіРѕСЂРёРё. Р”РѕРїСѓСЃС‚РёРјС‹Рµ РїСЂРµС„РёРєСЃС‹: {allowed}"
+                    f"Код услуги {normalized_code} не соответствует выбранной "
+                    f"категории. Допустимые префиксы: {allowed}"
                 ),
             )
 
