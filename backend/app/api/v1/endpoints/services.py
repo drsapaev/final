@@ -632,19 +632,6 @@ async def repair_service_code_drift(
     )
 
 
-@router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
-async def get_service(
-    service_id: int,
-    db: Session = Depends(get_db),
-    # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
-):
-    """Delegate service lookup to the service layer."""
-    service = ServicesApiService(db).get_service(service_id=service_id)
-    if not service:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return _row_to_out(service)
-
-
 @router.post("", response_model=ServiceOut, summary="Создать услугу")
 async def create_service(
     service_data: ServiceCreate,
@@ -1077,4 +1064,17 @@ async def get_service_code_mappings(
         specialty_aliases=SPECIALTY_ALIASES,
     )
 
+
+
+@router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
+async def get_service(
+    service_id: int,
+    db: Session = Depends(get_db),
+    # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
+):
+    """Delegate service lookup to the service layer."""
+    service = ServicesApiService(db).get_service(service_id=service_id)
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return _row_to_out(service)
 
