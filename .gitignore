@@ -57,6 +57,9 @@ backend/.secret_key
 # Test logs
 pytest_*.txt
 *_log*.txt
+backend/routes.json
+backend/cascade_audit_*.txt
+backend/fk_audit_*.txt
 *.db
 *.sqlite
 clinic.db
