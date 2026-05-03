@@ -152,6 +152,7 @@ const MacOSInput = React.forwardRef(({
         <button
           type="button"
           aria-label="Clear input"
+          title="Clear input"
           style={clearButtonStyle}
           onClick={(e) => {
             e.stopPropagation();
