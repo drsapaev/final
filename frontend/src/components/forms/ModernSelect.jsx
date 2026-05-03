@@ -246,7 +246,9 @@ const ModernSelect = ({
                   type="button"
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
-                  tabIndex={-1}>
+                  tabIndex={-1}
+                  aria-label="Удалить"
+                  title="Удалить">
                   
                   <X size={12} />
                 </button>
@@ -345,7 +347,8 @@ const ModernSelect = ({
             className="select-action-btn"
             onClick={handleClear}
             tabIndex={-1}
-            aria-label="Очистить выбор">
+            aria-label="Очистить выбор"
+            title="Очистить выбор">
             
               <X size={16} />
             </button>
