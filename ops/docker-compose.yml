@@ -57,7 +57,7 @@ services:
       ENSURE_ADMIN: ${ENSURE_ADMIN:-1}
       # App bind
       HOST: 0.0.0.0
-      PORT: 8000
+      PORT: 18000
       RELOAD: ${RELOAD:-0}
       WORKERS: ${WORKERS:-1}
       RUN_ALEMBIC_ON_START: ${RUN_ALEMBIC_ON_START:-1}
@@ -71,7 +71,7 @@ services:
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "${BACKEND_PORT:-18000}:8000"
+      - "${BACKEND_PORT:-18000}:18000"
     depends_on:
       postgres:
         condition: service_healthy

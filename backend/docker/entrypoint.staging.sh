@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${HOST:=0.0.0.0}"
-: "${PORT:=8000}"
+: "${PORT:=18000}"
 : "${APP_MODULE:=app.main:app}"
 : "${WORKERS:=1}"
 : "${RELOAD:=0}"

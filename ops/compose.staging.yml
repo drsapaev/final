@@ -38,7 +38,7 @@ services:
       CORS_DISABLE: 0
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
       HOST: 0.0.0.0
-      PORT: 8000
+      PORT: 18000
       WORKERS: ${WORKERS:-2}
       RELOAD: 0
       RUN_ALEMBIC_ON_START: 1
@@ -65,12 +65,12 @@ services:
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "${STAGING_BACKEND_PORT:-18000}:8000"
+      - "${STAGING_BACKEND_PORT:-18000}:18000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18000/api/v1/health', timeout=5)"]
       interval: 15s
       timeout: 5s
       retries: 10
