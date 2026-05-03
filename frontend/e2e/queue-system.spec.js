@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+const QA_REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
+const QA_REGISTRAR_PASSWORD = process.env.QA_REGISTRAR_PASSWORD;
+
+function requireRegistrarCredentials() {
+  test.skip(!QA_REGISTRAR_PASSWORD, 'Set QA_REGISTRAR_PASSWORD to run authenticated registrar e2e checks.');
+}
+
 test.describe('Queue System Tests', () => {
   test.beforeEach(async ({ page }) => {
+    requireRegistrarCredentials();
     // Логинимся как регистратор
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'registrar@clinic.com');
-    await page.fill('input[type="password"]', 'registrar123');
+    await page.fill('input[type="text"]', QA_REGISTRAR_USERNAME);
+    await page.fill('input[type="password"]', QA_REGISTRAR_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки панели регистратора

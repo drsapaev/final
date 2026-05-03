@@ -16,9 +16,24 @@ test.use({
 });
 
 const LIVE_CREDENTIALS = {
-  doctor: { username: 'doctor@example.com', password: 'doctor123', route: /\/doctor-panel(\?.*)?$/ },
-  admin: { username: 'admin', password: 'admin123', route: /\/admin(\?.*)?$/ },
+  doctor: {
+    username: process.env.QA_DOCTOR_USERNAME || 'doctor@example.com',
+    password: process.env.QA_DOCTOR_PASSWORD,
+    route: /\/doctor-panel(\?.*)?$/,
+  },
+  admin: {
+    username: process.env.QA_ADMIN_USERNAME || 'admin',
+    password: process.env.QA_ADMIN_PASSWORD,
+    route: /\/admin(\?.*)?$/,
+  },
 };
+
+function requireLiveCredentials() {
+  test.skip(
+    !LIVE_CREDENTIALS.doctor.password || !LIVE_CREDENTIALS.admin.password,
+    'Set QA_DOCTOR_PASSWORD and QA_ADMIN_PASSWORD to run messaging rollout proof e2e checks.',
+  );
+}
 
 function ensureArtifactsDir() {
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -236,6 +251,7 @@ async function sendAiPrompt(page, prompt) {
 
 test('messaging rollout proof: two-user chat, attachment, voice, reconnect', async ({ browser }, testInfo) => {
   testInfo.setTimeout(180000);
+  requireLiveCredentials();
   ensureArtifactsDir();
 
   const networkEvents = [];
@@ -368,6 +384,7 @@ test('messaging rollout proof: two-user chat, attachment, voice, reconnect', asy
 
 test('messaging rollout proof: doctor AI widget round-trip', async ({ browser }, testInfo) => {
   testInfo.setTimeout(120000);
+  requireLiveCredentials();
   ensureArtifactsDir();
 
   const networkEvents = [];

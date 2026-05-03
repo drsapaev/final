@@ -1,6 +1,21 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
+const QA_ADMIN_USERNAME = process.env.QA_ADMIN_USERNAME || 'admin';
+const QA_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD;
+
+function requireAdminCredentials() {
+  test.skip(!QA_ADMIN_PASSWORD, 'Set QA_ADMIN_PASSWORD to run authenticated admin e2e checks.');
+}
+
+async function loginAsAdmin(page) {
+  requireAdminCredentials();
+  await page.goto('/login');
+  await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+  await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
+  await page.click('button[type="submit"]');
+}
+
 test.describe('Базовая функциональность клиники', () => {
   test('главная страница загружается', async ({ page }) => {
     await page.goto('/');
@@ -19,25 +34,14 @@ test.describe('Базовая функциональность клиники', 
   });
 
   test('можно войти в систему', async ({ page }) => {
-    await page.goto('/login');
-    
-    // Заполняем форму логина
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
-    
-    // Нажимаем кнопку входа
-    await page.click('button[type="submit"]');
+    await loginAsAdmin(page);
     
     // Проверяем, что произошел редирект (не остались на странице логина)
     await page.waitForURL('**/dashboard', { timeout: 10000 });
   });
 
   test('панель администратора доступна после входа', async ({ page }) => {
-    // Логинимся
-    await page.goto('/login');
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
-    await page.click('button[type="submit"]');
+    await loginAsAdmin(page);
     
     // Ждем загрузки панели
     await page.waitForURL('**/dashboard', { timeout: 10000 });
@@ -47,11 +51,7 @@ test.describe('Базовая функциональность клиники', 
   });
 
   test('навигация работает', async ({ page }) => {
-    // Логинимся
-    await page.goto('/login');
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
-    await page.click('button[type="submit"]');
+    await loginAsAdmin(page);
     
     await page.waitForURL('**/dashboard', { timeout: 10000 });
     

@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+const QA_DOCTOR_USERNAME = process.env.QA_DOCTOR_USERNAME || 'doctor@clinic.com';
+const QA_DOCTOR_PASSWORD = process.env.QA_DOCTOR_PASSWORD;
+
+function requireDoctorCredentials() {
+  test.skip(!QA_DOCTOR_PASSWORD, 'Set QA_DOCTOR_PASSWORD to run authenticated doctor e2e checks.');
+}
+
 test.describe('Print System Tests', () => {
   test.beforeEach(async ({ page }) => {
+    requireDoctorCredentials();
     // Логинимся как врач
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'doctor@clinic.com');
-    await page.fill('input[type="password"]', 'doctor123');
+    await page.fill('input[type="text"]', QA_DOCTOR_USERNAME);
+    await page.fill('input[type="password"]', QA_DOCTOR_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки панели врача

@@ -1,12 +1,19 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
+const QA_ADMIN_USERNAME = process.env.QA_ADMIN_USERNAME || 'admin';
+const QA_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD;
+
+function requireAdminCredentials() {
+  test.skip(!QA_ADMIN_PASSWORD, 'Set QA_ADMIN_PASSWORD to run authenticated admin navigation e2e checks.');
+}
+
 test.describe('Admin navigation', () => {
   test.beforeEach(async ({ page }) => {
+    requireAdminCredentials();
     await page.goto('/login');
-    // Try default admin credentials
-    await page.fill('input[name="username"]', 'admin');
-    await page.fill('input[name="password"]', 'admin123');
+    await page.fill('input[name="username"]', QA_ADMIN_USERNAME);
+    await page.fill('input[name="password"]', QA_ADMIN_PASSWORD);
     await page.click('button:has-text("Войти")');
     // Graceful: if login fails, navigate directly (CI may have auto-login)
     await page.waitForLoadState('networkidle');

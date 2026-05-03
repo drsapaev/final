@@ -1,11 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+const QA_CASHIER_USERNAME = process.env.QA_CASHIER_USERNAME || 'cashier@clinic.com';
+const QA_CASHIER_PASSWORD = process.env.QA_CASHIER_PASSWORD;
+
+function requireCashierCredentials() {
+  test.skip(!QA_CASHIER_PASSWORD, 'Set QA_CASHIER_PASSWORD to run authenticated cashier e2e checks.');
+}
+
 test.describe('Payment System Tests', () => {
   test.beforeEach(async ({ page }) => {
+    requireCashierCredentials();
     // Логинимся как кассир
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'cashier@clinic.com');
-    await page.fill('input[type="password"]', 'cashier123');
+    await page.fill('input[type="text"]', QA_CASHIER_USERNAME);
+    await page.fill('input[type="password"]', QA_CASHIER_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки панели кассира

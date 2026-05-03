@@ -12,8 +12,12 @@ if (!fs.existsSync(artifactsDir)) {
 const baseUrl = process.env.QA_BASE_URL || 'http://127.0.0.1:4176';
 const apiOrigin = process.env.QA_API_ORIGIN || 'http://127.0.0.1:18006';
 const username = process.env.QA_ADMIN_USERNAME || 'admin@example.com';
-const password = process.env.QA_ADMIN_PASSWORD || 'admin123';
+const password = process.env.QA_ADMIN_PASSWORD;
 const suffix = process.env.QA_SUFFIX || String(Date.now()).slice(-8);
+
+if (!password) {
+  throw new Error('Set QA_ADMIN_PASSWORD to run ADM-05 live e2e proof.');
+}
 
 const patient = {
   lastName: `Админов${suffix.slice(-2)}`,
