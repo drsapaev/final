@@ -54,7 +54,7 @@ class QueueCabinetManagementApiService:
         if doctor and getattr(doctor, "cabinet", None):
             raise QueueCabinetManagementDomainError(
                 400,
-                "Canonical cabinet number cannot be changed from this panel. Update the doctor cabinet and run sync.",
+                "Канонический номер кабинета нельзя менять из этой панели. Обновите кабинет в карточке врача и выполните синхронизацию.",
             )
         queue.cabinet_number = value
 
