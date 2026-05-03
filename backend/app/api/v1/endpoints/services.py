@@ -24,6 +24,7 @@ from app.services.service_mapping import (
     resolve_queue_group_key,
 )
 from app.services.service_audit_service import ServiceAuditService
+from app.services.services_api_service import ServicesApiService
 
 router = APIRouter(tags=["services"])
 logger = logging.getLogger(__name__)
@@ -309,12 +310,8 @@ async def list_service_categories(
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
     active: Optional[bool] = Query(default=None),
 ):
-    """Получить список всех категорий услуг"""
-    query = db.query(ServiceCategory)
-    if active is not None:
-        query = query.filter(ServiceCategory.active == active)
-    categories = query.order_by(ServiceCategory.name_ru).all()
-    return categories
+    """Delegate category listing to the service layer."""
+    return ServicesApiService(db).list_service_categories(active=active)
 
 
 @router.post(
@@ -325,24 +322,13 @@ async def create_service_category(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Создать новую категорию услуг"""
-    # Проверяем уникальность кода
-    existing = (
-        db.query(ServiceCategory)
-        .filter(ServiceCategory.code == category_data.code)
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Категория с кодом '{category_data.code}' уже существует",
+    """Delegate category creation to the service layer."""
+    try:
+        return ServicesApiService(db).create_service_category(
+            category_data=category_data,
         )
-
-    category = ServiceCategory(**category_data.model_dump())
-    db.add(category)
-    db.commit()
-    db.refresh(category)
-    return category
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.put(
@@ -356,32 +342,16 @@ async def update_service_category(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Обновить существующую категорию услуг"""
-    category = (
-        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
-    )
-    if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
-
-    # Проверяем уникальность кода при обновлении
-    if category_data.code and category_data.code != category.code:
-        existing = (
-            db.query(ServiceCategory)
-            .filter(ServiceCategory.code == category_data.code)
-            .first()
+    """Delegate category updates to the service layer."""
+    try:
+        return ServicesApiService(db).update_service_category(
+            category_id=category_id,
+            category_data=category_data,
         )
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Категория с кодом '{category_data.code}' уже существует",
-            )
-
-    for field, value in category_data.model_dump(exclude_unset=True).items():
-        setattr(category, field, value)
-
-    db.commit()
-    db.refresh(category)
-    return category
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/categories/{category_id}", summary="Удалить категорию услуг")
@@ -390,26 +360,15 @@ async def delete_service_category(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Удалить категорию услуг"""
-    category = (
-        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
-    )
-    if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
-
-    # Проверяем, есть ли связанные услуги
-    services_count = (
-        db.query(Service).filter(Service.category_id == category_id).count()
-    )
-    if services_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Нельзя удалить категорию: к ней привязано {services_count} услуг",
+    """Delegate category deletion to the service layer."""
+    try:
+        return ServicesApiService(db).delete_service_category(
+            category_id=category_id,
         )
-
-    db.delete(category)
-    db.commit()
-    return {"message": "Категория успешно удалена"}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ==================== УСЛУГИ ====================
@@ -428,23 +387,22 @@ async def list_services(
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ):
-    """Получить список услуг с фильтрацией"""
+    """Delegate service listing to the service layer."""
     try:
-        rows = crud.list_services(db, q=q, active=active, limit=limit, offset=offset)
-
-        # Дополнительная фильтрация
-        if category_id is not None:
-            rows = [r for r in rows if getattr(r, 'category_id', None) == category_id]
-        if department:
-            rows = [r for r in rows if getattr(r, 'department', None) == department]
-
+        rows = ServicesApiService(db).list_services(
+            q=q,
+            active=active,
+            category_id=category_id,
+            department=department,
+            limit=limit,
+            offset=offset,
+        )
         return [_row_to_out(r) for r in rows]
-    except Exception as e:
-        import traceback
-
-        print(f"Error in list_services: {e}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Ошибка получения услуг: {str(e)}")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing services: {str(exc)}",
+        ) from exc
 
 
 # ==================== QUEUE GROUPS (SSOT) - MUST BE BEFORE /{service_id} ====================
@@ -478,19 +436,19 @@ async def get_queue_groups(
 ):
     """
     ⭐ SSOT: Возвращает структуру групп очередей для синхронизации frontend.
-    
+
     Используется для:
     - Определения какие услуги относятся к какой вкладке регистратуры
     - Фильтрации записей по отделениям
     - Группировки услуг в одну очередь (Shared Queues)
-    
+
     Returns:
         - groups: Словарь групп очередей с их настройками
         - code_to_group: Маппинг service_code -> group_key (K01 -> cardiology)
         - tab_to_group: Маппинг tab_key -> group_key (cardio -> cardiology)
     """
     from app.services.service_mapping import QUEUE_GROUPS, get_queue_group_for_service
-    
+
     # Build groups from SSOT
     groups = {}
     for key, data in QUEUE_GROUPS.items():
@@ -503,15 +461,15 @@ async def get_queue_groups(
             queue_tag=data["queue_tag"],
             tab_key=data["tab_key"],
         )
-    
+
     # Build code_to_group mapping
     code_to_group = {}
-    
+
     # Add explicit service codes
     for key, data in QUEUE_GROUPS.items():
         for code in data.get("service_codes", []):
             code_to_group[code] = key
-    
+
     # Enrich with actual DB data
     try:
         services = db.query(Service).filter(Service.active == True).all()
@@ -522,10 +480,10 @@ async def get_queue_groups(
                     code_to_group[service.service_code] = group
     except Exception:
         pass  # Use static mappings if DB query fails
-    
+
     # Build tab_to_group mapping
     tab_to_group = {data["tab_key"]: key for key, data in QUEUE_GROUPS.items()}
-    
+
     return QueueGroupsResponse(
         groups=groups,
         code_to_group=code_to_group,
@@ -680,10 +638,10 @@ async def get_service(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
-    """Получить конкретную услугу по ID"""
-    service = db.query(Service).filter(Service.id == service_id).first()
+    """Delegate service lookup to the service layer."""
+    service = ServicesApiService(db).get_service(service_id=service_id)
     if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
+        raise HTTPException(status_code=404, detail="Service not found")
     return _row_to_out(service)
 
 
@@ -693,61 +651,12 @@ async def create_service(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Создать новую услугу"""
-    service_dict = service_data.model_dump()
-    canonical_code = _normalize_service_code_payload(service_dict)
-
-    # Проверяем уникальность кода
-    if canonical_code:
-        existing = (
-            db.query(Service)
-            .filter(or_(Service.code == canonical_code, Service.service_code == canonical_code))
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Услуга с кодом '{canonical_code}' уже существует",
-            )
-
-    # Проверяем существование категории
-    category_specialty = _resolve_category_specialty(db, service_dict.get("category_id"))
-
-    if service_dict.get('code'):
-        service_dict['code'] = normalize_service_code(service_dict['code'])
-    if service_dict.get('service_code'):
-        service_dict['service_code'] = normalize_service_code(
-            service_dict['service_code']
-        )
-    if service_dict.get('category_code'):
-        service_dict['category_code'] = _normalize_category_code_value(
-            service_dict['category_code']
-        )
-
-    _validate_service_code_prefix_alignment(
-        service_code=canonical_code,
-        category_specialty=category_specialty,
-        queue_tag=service_dict.get("queue_tag"),
-        department_key=service_dict.get("department_key"),
-        category_code=service_dict.get("category_code"),
-    )
-
-    service = Service(**service_dict)
-    db.add(service)
-    db.commit()
-    db.refresh(service)
-
-    # ✅ AUDIT: Log service creation
+    """Delegate service creation to the service layer."""
     try:
-        audit_service = ServiceAuditService(db)
-        audit_service.log_service_creation(
-            service=service,
-            user_id=None,  # TODO: Get from current_user when auth is enabled
-        )
-    except Exception as e:
-        logger.warning(f"Failed to log service audit: {e}")
-
-    return _row_to_out(service)
+        service = ServicesApiService(db).create_service(service_data=service_data)
+        return _row_to_out(service)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.put("/{service_id}", response_model=ServiceOut, summary="Обновить услугу")
@@ -757,101 +666,17 @@ async def update_service(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Обновить существующую услугу"""
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-    # ✅ AUDIT: Snapshot old service state before changes
-    audit_service = ServiceAuditService(db)
-    old_service_snapshot = Service(
-        id=service.id,
-        code=service.code,
-        service_code=service.service_code,
-        name=service.name,
-        category_id=service.category_id,
-        category_code=service.category_code,
-        price=service.price,
-        currency=service.currency,
-        duration_minutes=service.duration_minutes,
-        doctor_id=service.doctor_id,
-        department_key=service.department_key,
-        queue_tag=service.queue_tag,
-        requires_doctor=service.requires_doctor,
-        is_consultation=service.is_consultation,
-        allow_doctor_price_override=service.allow_doctor_price_override,
-        active=service.active,
-    )
-
-    update_dict = service_data.model_dump(exclude_unset=True)
-    canonical_code = _normalize_service_code_payload(update_dict)
-
-    # Проверяем уникальность кода при обновлении
-    current_code = service.service_code or service.code
-    if canonical_code and canonical_code != current_code:
-        existing = (
-            db.query(Service)
-            .filter(Service.id != service_id)
-            .filter(or_(Service.code == canonical_code, Service.service_code == canonical_code))
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Услуга с кодом '{canonical_code}' уже существует",
-            )
-
-    # Проверяем существование категории
-    category_specialty = _resolve_category_specialty(
-        db, update_dict.get("category_id", service.category_id)
-    )
-
-    if 'code' in update_dict and update_dict['code'] is not None:
-        update_dict['code'] = normalize_service_code(update_dict['code'])
-    if 'service_code' in update_dict and update_dict['service_code'] is not None:
-        update_dict['service_code'] = normalize_service_code(
-            update_dict['service_code']
-        )
-    if 'category_code' in update_dict and update_dict['category_code'] is not None:
-        update_dict['category_code'] = _normalize_category_code_value(
-            update_dict['category_code']
-        )
-
-    if _should_validate_service_code_alignment(update_dict, service):
-        merged_service_code = (
-            update_dict.get("service_code")
-            or update_dict.get("code")
-            or service.service_code
-            or service.code
-        )
-        _validate_service_code_prefix_alignment(
-            service_code=merged_service_code,
-            category_specialty=category_specialty,
-            queue_tag=update_dict.get("queue_tag", service.queue_tag),
-            department_key=update_dict.get("department_key", service.department_key),
-            category_code=update_dict.get("category_code", service.category_code),
-        )
-
-    for field, value in update_dict.items():
-        setattr(service, field, value)
-
-    db.commit()
-    db.refresh(service)
-
-    # ✅ AUDIT: Log the update
+    """Delegate service updates to the service layer."""
     try:
-        audit_service.log_service_update(
-            service_id=service.id,
-            old_service=old_service_snapshot,
-            new_service=service,
-            user_id=None,  # TODO: Get from current_user when auth is enabled
-            # ip_address=request.client.host,  # TODO: Add request dependency
-            # user_agent=request.headers.get("user-agent"),
+        service = ServicesApiService(db).update_service(
+            service_id=service_id,
+            service_data=service_data,
         )
-    except Exception as e:
-        logger.warning(f"Failed to log service audit: {e}")
-
-    return _row_to_out(service)
+        return _row_to_out(service)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/{service_id}", summary="Удалить услугу")
@@ -860,67 +685,11 @@ async def delete_service(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin")),
 ):
-    """Деактивировать услугу вместо физического удаления."""
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
-
-    visit_usage_count = (
-        db.query(VisitService)
-        .filter(VisitService.service_id == service_id)
-        .count()
-    )
-
-    changed = False
-    if service.active:
-        service.active = False
-        changed = True
-
-    if changed:
-        db.add(service)
-
-    db.commit()
-    db.refresh(service)
-
-    # ✅ AUDIT: Log service deactivation/deletion
+    """Delegate service deletion to the service layer."""
     try:
-        audit_service = ServiceAuditService(db)
-        audit_service.log_service_change(
-            service_id=service.id,
-            action="deactivate",
-            user_id=None,  # TODO: Get from current_user when auth is enabled
-            changes={"active": {"old": True, "new": False}},
-            comment=f"Soft delete (visit usage: {visit_usage_count})",
-        )
-    except Exception as e:
-        logger.warning(f"Failed to log service audit: {e}")
-
-    if visit_usage_count > 0:
-        logger.info(
-            "[FIX:SVC-DELETE] service_id=%s has visit history=%s; soft-deactivated instead of deleting",
-            service_id,
-            visit_usage_count,
-        )
-        return {
-            "message": (
-                "Услуга уже использовалась в истории визитов, поэтому она "
-                "деактивирована вместо удаления"
-            ),
-            "service_id": service_id,
-            "active": service.active,
-            "visit_usage_count": visit_usage_count,
-        }
-
-    logger.info(
-        "[FIX:SVC-DELETE] service_id=%s soft-deactivated instead of deleting",
-        service_id,
-    )
-    return {
-        "message": "Услуга деактивирована вместо удаления",
-        "service_id": service_id,
-        "active": service.active,
-        "visit_usage_count": visit_usage_count,
-    }
+        return ServicesApiService(db).delete_service(service_id=service_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # ==================== ВРЕМЕННЫЙ ENDPOINT ДЛЯ ВРАЧЕЙ ====================
@@ -943,9 +712,8 @@ class DoctorOut(BaseModel):
 async def list_doctors_temp(
     db: Session = Depends(get_db),
 ):
-    """Временный endpoint для получения списка врачей"""
-    doctors = db.query(Doctor).filter(Doctor.active == True).all()
-    return doctors
+    """Delegate temporary doctor listing to the service layer."""
+    return ServicesApiService(db).list_doctors_temp()
 
 
 # ==================== ИСТОРИЯ ИЗМЕНЕНИЙ УСЛУГ (AUDIT LOG) ====================
@@ -1246,9 +1014,9 @@ async def get_service_code_mappings(
 ):
     """
     ⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.
-    
+
     Используется для централизации service code resolution на frontend.
-    
+
     Returns:
         - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)
         - code_to_name: Маппинг service code -> display name
@@ -1256,7 +1024,7 @@ async def get_service_code_mappings(
         - specialty_aliases: Алиасы для specialty (derma -> dermatology)
     """
     from app.services.service_mapping import SPECIALTY_ALIASES
-    
+
     # Static mappings from SSOT
     specialty_to_code = {
         "cardiology": "K01",
@@ -1271,7 +1039,7 @@ async def get_service_code_mappings(
         "procedures": "P01",
         "cosmetology": "C01",
     }
-    
+
     code_to_name = {
         "K01": "Консультация кардиолога",
         "K10": "ЭхоКГ",
@@ -1281,7 +1049,7 @@ async def get_service_code_mappings(
         "P01": "Процедуры",
         "C01": "Косметология",
     }
-    
+
     category_mapping = {
         "cardiology": "K",
         "dermatology": "D",
@@ -1290,7 +1058,7 @@ async def get_service_code_mappings(
         "cosmetology": "C",
         "procedures": "P",
     }
-    
+
     # Try to enrich with actual DB data
     try:
         services = db.query(Service).filter(Service.active == True).all()
@@ -1301,7 +1069,7 @@ async def get_service_code_mappings(
                 specialty_to_code[service.queue_tag] = service.service_code
     except Exception:
         pass  # Use static mappings if DB query fails
-    
+
     return ServiceCodeMappingsResponse(
         specialty_to_code=specialty_to_code,
         code_to_name=code_to_name,
