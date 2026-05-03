@@ -1,29 +1,22 @@
-# app/scripts/add_planned_date.py
+#!/usr/bin/env python3
+"""Retired legacy planned-date schema mutator."""
 
-import os
-import sqlite3
+from __future__ import annotations
 
-DB_PATH = "clinic.db"
+import sys
 
-if not os.path.exists(DB_PATH):
-    print("❌ База данных clinic.db не найдена")
-    exit(1)
+MESSAGE = """
+add_planned_date.py is retired.
 
-db = sqlite3.connect(DB_PATH)
-cur = db.cursor()
+Schema changes are owned by Alembic migrations against the current PostgreSQL
+runtime. Do not mutate a local database file from this script.
+""".strip()
 
-# Получаем все колонки таблицы visits
-cur.execute("PRAGMA table_info(visits);")
-columns = [col[1] for col in cur.fetchall()]
 
-if "planned_date" in columns:
-    print("ℹ️ Колонка planned_date уже существует")
-else:
-    cur.execute("ALTER TABLE visits ADD COLUMN planned_date DATE;")
-    cur.execute(
-        "UPDATE visits SET planned_date = DATE('now') WHERE planned_date IS NULL;"
-    )
-    print("✅ Колонка planned_date успешно добавлена и заполнена")
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-db.commit()
-db.close()
+
+if __name__ == "__main__":
+    raise SystemExit(main())

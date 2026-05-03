@@ -161,13 +161,10 @@ const PaymentWidget = ({
       };
 
       // Используем тестовый endpoint если токен демо
-      const currentToken = getToken();
-      const isTestToken = currentToken === 'demo_token_for_ui_testing';
-      const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
+      const endpoint = '/payments/init';
 
       logger.log('📤 Отправляем запрос платежа:', {
         endpoint,
-        isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
         authHeader: apiClient.defaults.headers.common['Authorization'] ?
         apiClient.defaults.headers.common['Authorization'].substring(0, 30) + '...' : 'none',
