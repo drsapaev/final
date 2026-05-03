@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.models.user import User
 from app.repositories.dental_api_repository import DentalApiRepository
-from app.services.service_mapping import get_service_code
 from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
@@ -34,6 +33,16 @@ class DentalApiService:
         repository: DentalApiRepository | None = None,
     ):
         self.repository = repository or DentalApiRepository(db)
+
+    @staticmethod
+    def _service_code(service) -> str | None:
+        if not service:
+            return None
+        service_code = getattr(service, "service_code", None)
+        if service_code:
+            return service_code
+        service_id = getattr(service, "id", None)
+        return str(service_id) if service_id is not None else None
 
     async def create_dental_price_override(self, *, override_data, user: User) -> DoctorPriceOverride:
         visit = self.repository.get_visit(override_data.visit_id)
@@ -106,7 +115,7 @@ class DentalApiService:
             "Изменение цены стоматологом\n\n"
             f"Врач: {doctor_name}\n"
             f"{patient_info}\n"
-            f"Услуга: {service.name} ({service.service_code or get_service_code(service.id, self.repository.db)})\n"
+            f"Услуга: {service.name} ({self._service_code(service)})\n"
             f"Цена: {price_override.original_price} -> {price_override.new_price} UZS\n"
             f"Причина: {price_override.reason}\n"
             f"{details_line}"
@@ -280,12 +289,7 @@ class DentalApiService:
                     "service": {
                         "id": service.id if service else None,
                         "name": service.name if service else f"Услуга #{override.service_id}",
-                        "code": (
-                            service.service_code
-                            or get_service_code(service.id, self.repository.db)
-                            if service
-                            else None
-                        ),
+                        "code": self._service_code(service),
                     },
                     "original_price": float(override.original_price),
                     "new_price": float(override.new_price),
