@@ -15,7 +15,7 @@
       - generic [ref=e23]:
         - generic [ref=e24]: Пароль *
         - generic [ref=e25]:
-          - textbox "Введите пароль" [active] [ref=e27]: cardio123
+          - textbox "Введите пароль" [active] [ref=e27]: <redacted>
           - button "Показать" [ref=e28] [cursor=pointer]:
             - generic [ref=e29]: Показать
       - generic [ref=e30]:

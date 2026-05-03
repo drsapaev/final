@@ -11,11 +11,11 @@
           - img [ref=e17]
       - generic [ref=e19]:
         - generic [ref=e20]: Имя пользователя *
-        - textbox "Введите имя пользователя" [ref=e22]: cardio123cardio
+        - textbox "Введите имя пользователя" [ref=e22]: <redacted>
       - generic [ref=e23]:
         - generic [ref=e24]: Пароль *
         - generic [ref=e25]:
-          - textbox "Введите пароль" [ref=e27]: cardio123
+          - textbox "Введите пароль" [ref=e27]: <redacted>
           - button "Скрыть" [ref=e44] [cursor=pointer]:
             - generic [ref=e29]: Скрыть
       - generic [ref=e30]:
