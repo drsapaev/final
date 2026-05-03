@@ -513,8 +513,153 @@ def _normalize_route_path(path: str) -> str:
     return f"/{path}"
 
 
-def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
-    content = frontend_app_path.read_text(encoding="utf-8")
+def _extract_top_level_js_objects(array_body: str) -> list[str]:
+    objects: list[str] = []
+    start: int | None = None
+    brace_depth = 0
+    in_string: str | None = None
+    escaped = False
+
+    for index, char in enumerate(array_body):
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == in_string:
+                in_string = None
+                continue
+            continue
+
+        if char in {"'", '"', "`"}:
+            in_string = char
+            continue
+
+        if char == "{":
+            if brace_depth == 0:
+                start = index
+            brace_depth += 1
+            continue
+
+        if char == "}":
+            brace_depth -= 1
+            if brace_depth == 0 and start is not None:
+                objects.append(array_body[start : index + 1])
+                start = None
+
+    return objects
+
+
+def _extract_route_registry_body(content: str) -> str | None:
+    marker = "ROUTE_REGISTRY"
+    marker_index = content.find(marker)
+    if marker_index == -1:
+        return None
+
+    array_start = content.find("[", marker_index)
+    if array_start == -1:
+        return None
+
+    bracket_depth = 0
+    in_string: str | None = None
+    escaped = False
+    for index in range(array_start, len(content)):
+        char = content[index]
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == in_string:
+                in_string = None
+                continue
+            continue
+
+        if char in {"'", '"', "`"}:
+            in_string = char
+            continue
+
+        if char == "[":
+            bracket_depth += 1
+            continue
+
+        if char == "]":
+            bracket_depth -= 1
+            if bracket_depth == 0:
+                return content[array_start + 1 : index]
+
+    return None
+
+
+def _parse_route_registry_roles(route_registry_path: Path) -> dict[str, list[str]]:
+    content = route_registry_path.read_text(encoding="utf-8")
+    registry_body = _extract_route_registry_body(content)
+    if registry_body is None:
+        return {}
+
+    role_to_paths: dict[str, set[str]] = defaultdict(set)
+    for route_object in _extract_top_level_js_objects(registry_body):
+        path_match = re.search(r"\bpath:\s*['\"]([^'\"]+)['\"]", route_object)
+        roles_match = re.search(r"\broles:\s*\[(?P<roles>[^\]]*)\]", route_object, re.DOTALL)
+        if path_match is None or roles_match is None:
+            continue
+
+        route_paths = [_normalize_route_path(path_match.group(1).strip())]
+        legacy_match = re.search(
+            r"\blegacyRedirectFrom:\s*\[(?P<paths>[^\]]*)\]",
+            route_object,
+            re.DOTALL,
+        )
+        if legacy_match:
+            route_paths.extend(
+                _normalize_route_path(candidate.strip())
+                for group in ROLE_LITERAL_PATTERN.findall(legacy_match.group("paths"))
+                for candidate in group
+                if candidate.strip()
+            )
+
+        roles = [
+            candidate.strip()
+            for group in ROLE_LITERAL_PATTERN.findall(roles_match.group("roles"))
+            for candidate in group
+            if candidate.strip()
+        ]
+        for role in roles:
+            role_to_paths[role].update(route_paths)
+
+    output = {role: sorted(paths) for role, paths in role_to_paths.items()}
+    LOGGER.info(
+        "frontend_backend_parity.frontend_route_registry_roles_loaded file=%s roles=%d",
+        route_registry_path.as_posix(),
+        len(output),
+    )
+    return output
+
+
+def _resolve_route_registry_path(frontend_app_path: Path, content: str) -> Path | None:
+    match = re.search(
+        r"import\s+\{\s*ROUTE_REGISTRY\s*\}\s+from\s+['\"](?P<path>[^'\"]+)['\"]",
+        content,
+    )
+    if match:
+        import_path = match.group("path")
+        candidate = (frontend_app_path.parent / import_path).resolve()
+        if candidate.suffix == "":
+            candidate = candidate.with_suffix(".js")
+        if candidate.exists():
+            return candidate
+
+    fallback = frontend_app_path.parent / "routing" / "routeRegistry.js"
+    if fallback.exists():
+        return fallback
+    return None
+
+
+def _parse_inline_app_route_roles(content: str) -> dict[str, list[str]]:
     pattern = re.compile(
         r"<Route\s+path=\"(?P<path>[^\"]+)\"[^>]*element=\{<RequireAuth\s+roles=\{\[(?P<roles>[^\]]*)\]\}",
         re.DOTALL,
@@ -533,6 +678,19 @@ def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
         for role in roles:
             role_to_paths[role].add(route_path)
 
+    return {role: sorted(paths) for role, paths in role_to_paths.items()}
+
+
+def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
+    content = frontend_app_path.read_text(encoding="utf-8")
+
+    route_registry_path = _resolve_route_registry_path(frontend_app_path, content)
+    if route_registry_path is not None:
+        registry_roles = _parse_route_registry_roles(route_registry_path)
+        if registry_roles:
+            return registry_roles
+
+    role_to_paths = _parse_inline_app_route_roles(content)
     output = {role: sorted(paths) for role, paths in role_to_paths.items()}
     LOGGER.info(
         "frontend_backend_parity.frontend_roles_loaded file=%s roles=%d",
