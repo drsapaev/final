@@ -357,7 +357,7 @@ readinessProbe:
 
 ```bash
 # Core
-SECRET_KEY=6HK2DZj8qL4xPRvYnM9aS7cWfT3gJbE0uNhXiYlOpQw
+SECRET_KEY=<generate_unique_32_plus_char_secret>
 ENV=production
 
 # Database
