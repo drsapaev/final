@@ -179,7 +179,8 @@ const ModernInput = ({
             className="input-action-btn"
             onClick={() => setShowPassword(!showPassword)}
             tabIndex={-1}
-            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}>
+            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}>
             
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -192,7 +193,8 @@ const ModernInput = ({
             className="input-action-btn"
             onClick={handleClear}
             tabIndex={-1}
-            aria-label="Очистить поле">
+            aria-label="Очистить поле"
+            title="Очистить поле">
             
               <X size={16} />
             </button>
