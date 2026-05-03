@@ -5,6 +5,10 @@ import pytest
 from app.api.v1.endpoints import emr_v2
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 @pytest.mark.unit
 def test_doctor_history_route_is_not_shadowed_by_visit_id(
     client,
@@ -28,7 +32,7 @@ def test_doctor_history_route_is_not_shadowed_by_visit_id(
 
     login_response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]

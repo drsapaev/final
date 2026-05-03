@@ -10,6 +10,10 @@ from app.repositories.user_management_api_repository import (
 )
 
 
+from tests.auth_test_credentials import (
+    GENERIC_TEST_PASSWORD,
+)
+
 @pytest.mark.unit
 def test_ensure_user_support_records_bootstraps_profile_preferences_and_notifications(
     db_session,
@@ -18,7 +22,7 @@ def test_ensure_user_support_records_bootstraps_profile_preferences_and_notifica
         username="preferences_bootstrap",
         email="preferences@example.com",
         full_name="Preferences Bootstrap",
-        hashed_password=get_password_hash("password123"),
+        hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
         role="Doctor",
         is_active=True,
     )

@@ -18,6 +18,11 @@ from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
 
 
+from tests.auth_test_credentials import (
+    DOCTOR_PASSWORD,
+    REGISTRAR_PASSWORD,
+)
+
 # Используем фикстуру client из conftest.py
 # Не создаем новую, чтобы избежать проблем с потоками SQLite
 
@@ -32,7 +37,7 @@ def registrar_user(db_session):
         username="registrar",
         email="registrar@test.com",
         full_name="Test Registrar",
-        hashed_password=get_password_hash("registrar123"),
+        hashed_password=get_password_hash(REGISTRAR_PASSWORD),
         role="Registrar",
         is_active=True,
         is_superuser=False,
@@ -54,7 +59,7 @@ def test_doctor_user(db_session, registrar_user):
         username="doctor",
         email="doctor@test.com",
         full_name="Test Doctor",
-        hashed_password=get_password_hash("doctor123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
         is_superuser=False,
@@ -117,7 +122,7 @@ def test_e2e_clinic_flow(
         "/api/v1/authentication/login",
         json={
             "username": registrar_user.username,
-            "password": "registrar123",
+            "password": REGISTRAR_PASSWORD,
         },
     )
     assert login_response.status_code == 200, f"Login failed: {login_response.text}"
@@ -227,7 +232,7 @@ def test_e2e_clinic_flow(
         "/api/v1/authentication/login",
         json={
             "username": test_doctor_user.username,
-            "password": "doctor123",
+            "password": DOCTOR_PASSWORD,
         },
     )
     assert doctor_login_response.status_code == 200

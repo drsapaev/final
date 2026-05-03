@@ -9,6 +9,10 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
 
+from tests.auth_test_credentials import (
+    DOCTOR_PASSWORD,
+)
+
 @pytest.mark.integration
 def test_diagnostics_return_notification_uses_doctor_user_profile_name(
     client,
@@ -72,7 +76,7 @@ def test_diagnostics_return_notification_uses_doctor_user_profile_name(
 
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": test_doctor_user.username, "password": "doctor123"},
+        json={"username": test_doctor_user.username, "password": DOCTOR_PASSWORD},
     )
     assert login_response.status_code == 200
     headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}

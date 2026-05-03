@@ -8,10 +8,14 @@ from app.models.dynamic_pricing import PricingRule, PricingRuleService, ServiceP
 from app.models.service import Service
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 def _login_admin(client, admin_user):
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert login_response.status_code == 200, login_response.text
     return {"Authorization": f"Bearer {login_response.json()['access_token']}"}

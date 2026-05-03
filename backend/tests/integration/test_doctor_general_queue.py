@@ -12,6 +12,10 @@ from app.core.security import get_password_hash
 from app.models.user import User
 
 
+from tests.auth_test_credentials import (
+    DOCTOR_PASSWORD,
+)
+
 @pytest.mark.integration
 class TestDoctorGeneralQueue:
     def test_general_queue_uses_current_user_when_doctor_row_is_missing(
@@ -46,7 +50,7 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": test_doctor_user.username, "password": "doctor123"},
+            json={"username": test_doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
@@ -73,7 +77,7 @@ class TestDoctorGeneralQueue:
     ):
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": test_doctor_user.username, "password": "doctor123"},
+            json={"username": test_doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
@@ -163,7 +167,7 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": test_doctor_user.username, "password": "doctor123"},
+            json={"username": test_doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
@@ -296,7 +300,7 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": test_doctor_user.username, "password": "doctor123"},
+            json={"username": test_doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}

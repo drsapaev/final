@@ -19,12 +19,16 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: User):
     """Тест: создание пациента должно логироваться"""
     # Получаем токен
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     token = response.json()["access_token"]
 
@@ -68,7 +72,7 @@ def test_audit_log_update_patient(client: TestClient, db: Session, admin_user: U
     # Получаем токен
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     token = response.json()["access_token"]
 
@@ -106,7 +110,7 @@ def test_audit_log_delete_patient(client: TestClient, db: Session, admin_user: U
     # Получаем токен
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     token = response.json()["access_token"]
 
@@ -138,7 +142,7 @@ def test_audit_log_create_payment_init(client: TestClient, db: Session, admin_us
     # Логин админа
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     token = response.json()["access_token"]
 
@@ -232,7 +236,7 @@ def test_audit_log_request_id(client: TestClient, db: Session, admin_user: User)
     # Получаем токен
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     token = response.json()["access_token"]
 

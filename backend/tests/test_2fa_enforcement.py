@@ -17,6 +17,11 @@ from app.models.user import User
 from app.services.two_factor_service import get_two_factor_service
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+    CASHIER_PASSWORD,
+)
+
 @pytest.fixture(autouse=True)
 def enforce_2fa_requirement(monkeypatch):
     """В этой группе тестов 2FA requirement должен быть включен."""
@@ -41,7 +46,7 @@ def admin_user_without_2fa(db_session: Session) -> User:
         username="test_admin_2fa",
         email="admin2fa@test.com",
         full_name="Test Admin 2FA",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=get_password_hash(ADMIN_PASSWORD),
         role="Admin",
         is_active=True,
         is_superuser=False,
@@ -65,7 +70,7 @@ def cashier_user_without_2fa(db_session: Session) -> User:
         username="test_cashier_2fa",
         email="cashier2fa@test.com",
         full_name="Test Cashier 2FA",
-        hashed_password=get_password_hash("cashier123"),
+        hashed_password=get_password_hash(CASHIER_PASSWORD),
         role="Cashier",
         is_active=True,
         is_superuser=False,
@@ -157,7 +162,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user_without_2fa.username,
-                "password": "admin123",
+                "password": ADMIN_PASSWORD,
             },
         )
 
@@ -177,7 +182,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": cashier_user_without_2fa.username,
-                "password": "cashier123",
+                "password": CASHIER_PASSWORD,
             },
         )
 
@@ -204,7 +209,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user.username,
-                "password": "admin123",
+                "password": ADMIN_PASSWORD,
             },
         )
         assert login_response.status_code == 200
@@ -240,7 +245,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user.username,
-                "password": "admin123",
+                "password": ADMIN_PASSWORD,
             },
         )
         assert login_response.status_code == 200
@@ -277,7 +282,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": cashier_user.username,
-                "password": "cashier123",
+                "password": CASHIER_PASSWORD,
             },
         )
         assert login_response.status_code == 200

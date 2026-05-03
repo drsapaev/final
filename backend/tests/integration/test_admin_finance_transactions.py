@@ -6,10 +6,15 @@ from app.models.clinic import Doctor
 from app.models.patient import Patient
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+    REGISTRAR_PASSWORD,
+)
+
 def _login_admin(client, admin_user):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -18,7 +23,7 @@ def _login_admin(client, admin_user):
 def _login_registrar(client, registrar_user):
     response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}

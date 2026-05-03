@@ -17,6 +17,10 @@ from app.models.visit import Visit
 from app.services.notification_platform_service import NotificationPlatformService
 
 
+from tests.auth_test_credentials import (
+    PATIENT_PASSWORD,
+)
+
 def _event_deliveries(db_session, event_type: str):
     return (
         db_session.query(NotificationDelivery, NotificationEvent)
@@ -243,7 +247,7 @@ def test_admin_all_free_approval_creates_registrar_and_patient_notifications(
         username="all_free_patient_user",
         email="all_free_patient@test.local",
         full_name="All Free Patient User",
-        hashed_password=get_password_hash("patient123"),
+        hashed_password=get_password_hash(PATIENT_PASSWORD),
         role="Patient",
         is_active=True,
         is_superuser=False,
@@ -308,7 +312,7 @@ def test_admin_all_free_reject_creates_rejected_notifications_with_reason(
         username="all_free_patient_reject_user",
         email="all_free_patient_reject@test.local",
         full_name="All Free Patient Reject User",
-        hashed_password=get_password_hash("patient123"),
+        hashed_password=get_password_hash(PATIENT_PASSWORD),
         role="Patient",
         is_active=True,
         is_superuser=False,

@@ -24,6 +24,10 @@ from app.models.patient import Patient
 from app.models.user import User
 
 
+from tests.auth_test_credentials import (
+    PATIENT_PASSWORD,
+)
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -38,7 +42,7 @@ def patient_user_with_data(db_session):
             username="e2e_patient",
             email="e2e_patient@test.com",
             full_name="Тест Пациентов",
-            hashed_password=get_password_hash("patient123"),
+            hashed_password=get_password_hash(PATIENT_PASSWORD),
             role="Patient",
             is_active=True,
         )
@@ -121,7 +125,7 @@ def patient_auth_headers(client: TestClient, patient_user_with_data):
     user = patient_user_with_data["user"]
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": user.username, "password": "patient123"},
+        json={"username": user.username, "password": PATIENT_PASSWORD},
     )
     assert response.status_code == 200, f"Login failed: {response.json()}"
     token = response.json()["access_token"]

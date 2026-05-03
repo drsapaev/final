@@ -27,6 +27,10 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+from tests.auth_test_credentials import (
+    DOCTOR_PASSWORD,
+)
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -40,7 +44,7 @@ def doctor_with_queue(db_session):
         doctor_user = User(
             username="e2e_doctor",
             email="e2e_doctor@test.com",
-            hashed_password=get_password_hash("doctor123"),
+            hashed_password=get_password_hash(DOCTOR_PASSWORD),
             role="Doctor",
             is_active=True,
             full_name="Тест Докторов",
@@ -137,7 +141,7 @@ def doctor_auth_headers(client: TestClient, doctor_with_queue):
     user = doctor_with_queue["doctor_user"]
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": user.username, "password": "doctor123"},
+        json={"username": user.username, "password": DOCTOR_PASSWORD},
     )
     assert response.status_code == 200, f"Doctor login failed: {response.json()}"
     token = response.json()["access_token"]

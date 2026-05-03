@@ -8,11 +8,15 @@ from fastapi.testclient import TestClient
 from app.models.user import User
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 @pytest.fixture
 def admin_token(client: TestClient, admin_user: User) -> str:
     response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert response.status_code == 200
     return response.json()["access_token"]

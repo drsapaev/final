@@ -3,13 +3,17 @@ from datetime import date
 import pytest
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 @pytest.mark.integration
 def test_create_patient_accepts_document_type_and_number_pair(client, admin_user):
     login_response = client.post(
         "/api/v1/authentication/login",
         json={
             "username": admin_user.username,
-            "password": "admin123",
+            "password": ADMIN_PASSWORD,
         },
     )
     assert login_response.status_code == 200, login_response.text

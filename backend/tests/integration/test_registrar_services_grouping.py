@@ -6,6 +6,10 @@ from app.models.clinic import ServiceCategory
 from app.models.service import Service
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+)
+
 @pytest.mark.integration
 def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
     client,
@@ -41,7 +45,7 @@ def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
 
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert login_response.status_code == 200, login_response.text
 

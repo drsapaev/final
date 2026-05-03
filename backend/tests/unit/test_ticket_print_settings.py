@@ -6,6 +6,10 @@ from app.models.clinic import ClinicSettings
 from app.schemas.clinic import TicketPrintSettingsUpdate
 
 
+from tests.auth_test_credentials import (
+    REGISTRAR_PASSWORD,
+)
+
 def test_ticket_print_settings_defaults_when_missing(db_session):
     settings = crud_clinic.get_ticket_print_settings(db_session)
 
@@ -50,7 +54,7 @@ def test_ticket_print_settings_schema_rejects_unknown_keys():
 def test_ticket_print_settings_get_is_available_to_active_staff(client, registrar_user):
     login_response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
@@ -69,7 +73,7 @@ def test_ticket_print_settings_get_is_available_to_active_staff(client, registra
 def test_ticket_print_settings_put_remains_admin_only(client, registrar_user):
     login_response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
@@ -86,7 +90,7 @@ def test_ticket_print_settings_put_remains_admin_only(client, registrar_user):
 def test_clinic_settings_list_is_available_to_active_staff(client, registrar_user):
     login_response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]

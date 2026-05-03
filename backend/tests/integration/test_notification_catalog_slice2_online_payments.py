@@ -11,6 +11,10 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+from tests.auth_test_credentials import (
+    PATIENT_PASSWORD,
+)
+
 def _payment_event_deliveries(db_session, *, recipient_id: int):
     return (
         db_session.query(NotificationDelivery, NotificationEvent)
@@ -29,7 +33,7 @@ def _create_patient_visit_with_user(db_session, *, username: str):
         username=username,
         email=f"{username}@test.local",
         full_name=f"{username} full name",
-        hashed_password=get_password_hash("patient123"),
+        hashed_password=get_password_hash(PATIENT_PASSWORD),
         role="Patient",
         is_active=True,
         is_superuser=False,

@@ -6,6 +6,10 @@ from app.core.security import get_password_hash
 from app.models.user import User
 
 
+from tests.auth_test_credentials import (
+    DENTIST_PASSWORD,
+)
+
 @pytest.fixture
 def dentist_user(db_session):
     existing = db_session.query(User).filter(User.username == "test_dentist").first()
@@ -16,7 +20,7 @@ def dentist_user(db_session):
         username="test_dentist",
         email="dentist@test.com",
         full_name="Test Dentist",
-        hashed_password=get_password_hash("dentist123"),
+        hashed_password=get_password_hash(DENTIST_PASSWORD),
         role="dentist",
         is_active=True,
         is_superuser=False,
@@ -31,7 +35,7 @@ def dentist_user(db_session):
 def dentist_auth_headers(client, dentist_user):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": dentist_user.username, "password": "dentist123"},
+        json={"username": dentist_user.username, "password": DENTIST_PASSWORD},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]

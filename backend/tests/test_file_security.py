@@ -15,6 +15,10 @@ from app.models.file_system import File, FileVersion
 from app.models.user import User
 
 
+from tests.auth_test_credentials import (
+    DOCTOR_PASSWORD,
+)
+
 class TestFileSecurity:
     """Тесты безопасности файловой системы"""
 
@@ -31,7 +35,7 @@ class TestFileSecurity:
             doctor_user = User(
                 username="doctor_file_test",
                 email="doctor_file@test.com",
-                hashed_password=get_password_hash("doctor123"),
+                hashed_password=get_password_hash(DOCTOR_PASSWORD),
                 role="Doctor",
                 is_active=True,
                 is_superuser=False,
@@ -43,7 +47,7 @@ class TestFileSecurity:
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
-            json={"username": doctor_user.username, "password": "doctor123"},
+            json={"username": doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
@@ -87,7 +91,7 @@ class TestFileSecurity:
             doctor_user = User(
                 username="doctor_file_test2",
                 email="doctor_file2@test.com",
-                hashed_password=get_password_hash("doctor123"),
+                hashed_password=get_password_hash(DOCTOR_PASSWORD),
                 role="Doctor",
                 is_active=True,
                 is_superuser=False,
@@ -99,7 +103,7 @@ class TestFileSecurity:
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
-            json={"username": doctor_user.username, "password": "doctor123"},
+            json={"username": doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
@@ -190,7 +194,7 @@ class TestFileSecurity:
             doctor_user = User(
                 username="doctor_file_test3",
                 email="doctor_file3@test.com",
-                hashed_password=get_password_hash("doctor123"),
+                hashed_password=get_password_hash(DOCTOR_PASSWORD),
                 role="Doctor",
                 is_active=True,
                 is_superuser=False,
@@ -202,7 +206,7 @@ class TestFileSecurity:
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
-            json={"username": doctor_user.username, "password": "doctor123"},
+            json={"username": doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]
@@ -249,7 +253,7 @@ class TestFileSecurity:
             doctor_user = User(
                 username="doctor_file_test4",
                 email="doctor_file4@test.com",
-                hashed_password=get_password_hash("doctor123"),
+                hashed_password=get_password_hash(DOCTOR_PASSWORD),
                 role="Doctor",
                 is_active=True,
                 is_superuser=False,
@@ -261,7 +265,7 @@ class TestFileSecurity:
         # Получаем токен
         login_response = client.post(
             "/api/v1/auth/minimal-login",
-            json={"username": doctor_user.username, "password": "doctor123"},
+            json={"username": doctor_user.username, "password": DOCTOR_PASSWORD},
         )
         assert login_response.status_code == 200
         token = login_response.json()["access_token"]

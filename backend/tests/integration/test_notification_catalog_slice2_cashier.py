@@ -10,6 +10,10 @@ from app.models.user import User
 from app.models.visit import Visit
 
 
+from tests.auth_test_credentials import (
+    PATIENT_PASSWORD,
+)
+
 def _payment_event_deliveries(db_session, *, recipient_id: int):
     return (
         db_session.query(NotificationDelivery, NotificationEvent)
@@ -32,7 +36,7 @@ def test_cashier_create_payment_creates_canonical_payment_notification(
         username="cashier_payment_patient",
         email="cashier_payment_patient@test.local",
         full_name="Cashier Payment Patient",
-        hashed_password=get_password_hash("patient123"),
+        hashed_password=get_password_hash(PATIENT_PASSWORD),
         role="Patient",
         is_active=True,
         is_superuser=False,
@@ -97,7 +101,7 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
         username="cashier_cancel_patient",
         email="cashier_cancel_patient@test.local",
         full_name="Cashier Cancel Patient",
-        hashed_password=get_password_hash("patient123"),
+        hashed_password=get_password_hash(PATIENT_PASSWORD),
         role="Patient",
         is_active=True,
         is_superuser=False,

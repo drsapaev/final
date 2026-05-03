@@ -3,10 +3,15 @@ from __future__ import annotations
 import pytest
 
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+    REGISTRAR_PASSWORD,
+)
+
 def _login_admin(client, admin_user):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -66,7 +71,7 @@ def test_activation_issue_list_revoke_roundtrip(client, admin_user):
 def test_activation_list_rejects_non_admin_access(client, registrar_user):
     response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert response.status_code == 200, response.text
     headers = {"Authorization": f"Bearer {response.json()['access_token']}"}

@@ -14,6 +14,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.deps import get_db
 from app.core.security import get_password_hash
 
+from tests.auth_test_credentials import (
+    ADMIN_PASSWORD,
+    CARDIO_PASSWORD,
+    DOCTOR_PASSWORD,
+    PATIENT_PASSWORD,
+    REGISTRAR_PASSWORD,
+)
+
 # ✅ КРИТИЧЕСКИ ВАЖНО: Импортируем app.db.base, который загружает ВСЕ модели
 # Это гарантирует, что Base.metadata содержит все таблицы
 from app.db import base  # noqa: F401 - импорт для регистрации моделей
@@ -150,7 +158,7 @@ def admin_user(db_session):
         username="test_admin",
         email="admin@test.com",
         full_name="Test Admin",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=get_password_hash(ADMIN_PASSWORD),
         role="Admin",
         is_active=True,
         is_superuser=True,
@@ -173,7 +181,7 @@ def cardio_user(db_session):
         username="test_cardio",
         email="cardio@test.com",
         full_name="Test Cardiologist",
-        hashed_password=get_password_hash("cardio123"),
+        hashed_password=get_password_hash(CARDIO_PASSWORD),
         role="cardio",
         is_active=True,
         is_superuser=False,
@@ -196,7 +204,7 @@ def test_doctor_user(db_session):
         username="test_doctor",
         email="doctor@test.com",
         full_name="Test Doctor",
-        hashed_password=get_password_hash("doctor123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
         is_superuser=False,
@@ -219,7 +227,7 @@ def registrar_user(db_session):
         username="test_registrar",
         email="registrar@test.com",
         full_name="Test Registrar",
-        hashed_password=get_password_hash("registrar123"),
+        hashed_password=get_password_hash(REGISTRAR_PASSWORD),
         role="Registrar",
         is_active=True,
         is_superuser=False,
@@ -322,7 +330,7 @@ def registrar_token(client: TestClient, registrar_user: User) -> str:
     """Токен регистратора"""
     response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert response.status_code == 200
     return response.json()["access_token"]
@@ -337,7 +345,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
         patient_user = User(
             username="patient_test",
             email="patient@test.com",
-            hashed_password=get_password_hash("patient123"),
+            hashed_password=get_password_hash(PATIENT_PASSWORD),
             role="Patient",
             is_active=True,
             is_superuser=False,
@@ -348,7 +356,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
 
     response = client.post(
         "/api/v1/auth/minimal-login",
-        json={"username": patient_user.username, "password": "patient123"},
+        json={"username": patient_user.username, "password": PATIENT_PASSWORD},
     )
     assert response.status_code == 200
     return response.json()["access_token"]
@@ -379,7 +387,7 @@ def auth_headers(client, admin_user):
     """Создает заголовки авторизации для администратора"""
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": ADMIN_PASSWORD},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]
@@ -391,7 +399,7 @@ def cardio_auth_headers(client, cardio_user):
     """Создает заголовки авторизации для кардиолога"""
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": cardio_user.username, "password": "cardio123"},
+        json={"username": cardio_user.username, "password": CARDIO_PASSWORD},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]
@@ -403,7 +411,7 @@ def registrar_auth_headers(client, registrar_user):
     """Создает заголовки авторизации для регистратора"""
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": registrar_user.username, "password": "registrar123"},
+        json={"username": registrar_user.username, "password": REGISTRAR_PASSWORD},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]

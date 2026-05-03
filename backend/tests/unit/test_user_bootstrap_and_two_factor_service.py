@@ -14,6 +14,10 @@ from app.services.two_factor_service import TwoFactorService
 from app.services.user_management_service import UserManagementService
 
 
+from tests.auth_test_credentials import (
+    GENERIC_TEST_PASSWORD,
+)
+
 @pytest.mark.unit
 def test_ensure_user_support_records_creates_profile_preferences_and_notifications(
     db_session,
@@ -22,7 +26,7 @@ def test_ensure_user_support_records_creates_profile_preferences_and_notificatio
         username="bootstrap_user",
         email="bootstrap@example.com",
         full_name="Bootstrap User",
-        hashed_password=get_password_hash("password123"),
+        hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
         role="Receptionist",
         is_active=True,
     )
@@ -51,7 +55,7 @@ def test_two_factor_service_returns_empty_logs_and_recovery_methods_without_setu
     user = User(
         username="two_factor_empty",
         email="twofactor@example.com",
-        hashed_password=get_password_hash("password123"),
+        hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
         role="Doctor",
         is_active=True,
     )
@@ -70,7 +74,7 @@ def test_setup_two_factor_auth_creates_codes_without_recovery_contact(db_session
     user = User(
         username="two_factor_setup",
         email="setup@example.com",
-        hashed_password=get_password_hash("password123"),
+        hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
         role="Doctor",
         is_active=True,
     )
