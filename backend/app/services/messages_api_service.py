@@ -732,6 +732,8 @@ async def upload_file_message(
             file=file,
             current_user=current_user,
         )
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

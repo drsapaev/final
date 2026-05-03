@@ -98,6 +98,73 @@ class ServicesApiService:
                 ),
             )
 
+
+    @staticmethod
+    def _should_validate_service_code_alignment(
+        change_set: dict[str, Any],
+        existing_service: Service | None = None,
+    ) -> bool:
+        routing_fields = {
+            "code",
+            "service_code",
+            "category_id",
+            "queue_tag",
+            "department_key",
+            "category_code",
+        }
+        if existing_service is None:
+            return True
+        return bool(routing_fields.intersection(change_set.keys()))
+
+    @staticmethod
+    def _service_snapshot(service: Service) -> Service:
+        return Service(
+            id=service.id,
+            code=service.code,
+            service_code=service.service_code,
+            name=service.name,
+            category_id=service.category_id,
+            category_code=service.category_code,
+            price=service.price,
+            currency=service.currency,
+            duration_minutes=service.duration_minutes,
+            doctor_id=service.doctor_id,
+            department_key=service.department_key,
+            queue_tag=service.queue_tag,
+            requires_doctor=service.requires_doctor,
+            is_consultation=service.is_consultation,
+            allow_doctor_price_override=service.allow_doctor_price_override,
+            active=service.active,
+        )
+
+    @staticmethod
+    def _service_validation_payload(service: Service) -> dict[str, Any]:
+        return {
+            "code": service.code,
+            "service_code": service.service_code,
+            "category_id": service.category_id,
+            "category_code": service.category_code,
+            "queue_tag": service.queue_tag,
+            "department_key": service.department_key,
+        }
+
+    def _log_service_creation(self, service: Service) -> None:
+        ServiceAuditService(self.repository.db).log_service_creation(service=service)
+
+    def _log_service_update(
+        self,
+        *,
+        service_id: int,
+        old_service: Service,
+        new_service: Service,
+        comment: str | None = None,
+    ) -> None:
+        ServiceAuditService(self.repository.db).log_service_update(
+            service_id=service_id,
+            old_service=old_service,
+            new_service=new_service,
+            comment=comment,
+        )
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
 
@@ -220,7 +287,7 @@ class ServicesApiService:
 
         canonical_code = self._normalize_service_code_payload(payload)
         if canonical_code:
-            existing = self.repository.get_service_by_code(canonical_code)
+            existing = self.repository.get_service_code_conflict(code=canonical_code)
             if existing:
                 raise ValueError(f"Услуга с кодом '{canonical_code}' уже существует")
 
@@ -248,12 +315,14 @@ class ServicesApiService:
         self.repository.add(service)
         self.repository.commit()
         self.repository.refresh(service)
+        self._log_service_creation(service)
         return service
 
     def update_service(self, *, service_id: int, service_data):
         service = self.repository.get_service(service_id)
         if not service:
-            raise LookupError("Услуга не найдена")
+            raise LookupError("Service not found")
+        old_service = self._service_snapshot(service)
 
         update_data = (
             service_data.model_dump(exclude_unset=True)
@@ -261,38 +330,97 @@ class ServicesApiService:
             else service_data.dict(exclude_unset=True)
         )
 
-        current_code = service.service_code or service.code
-        if "code" in update_data and normalize_service_code(update_data["code"]) != normalize_service_code(current_code or ""):
-            existing = self.repository.get_service_by_code(update_data["code"])
-            if existing:
-                raise ValueError(f"Услуга с кодом '{update_data['code']}' уже существует")
+        if self._should_validate_service_code_alignment(update_data, service):
+            validation_payload = self._service_validation_payload(service)
+            validation_payload.update(update_data)
+            canonical_code = self._normalize_service_code_payload(validation_payload)
+            if canonical_code:
+                existing = self.repository.get_service_code_conflict(
+                    code=canonical_code,
+                    exclude_service_id=service.id,
+                )
+                if existing:
+                    raise ValueError(
+                        f"Service with code {canonical_code!r} already exists"
+                    )
 
-        if update_data.get("category_id"):
+            category_specialty = None
+            category_id = validation_payload.get("category_id")
+            if category_id:
+                category = self.repository.get_service_category(category_id)
+                if not category:
+                    raise ValueError("Selected category not found")
+                category_specialty = category.specialty
+
+            if validation_payload.get("category_code"):
+                validation_payload["category_code"] = self._normalize_category_code_value(
+                    validation_payload["category_code"]
+                )
+
+            self._validate_service_code_prefix_alignment(
+                service_code=canonical_code,
+                queue_tag=validation_payload.get("queue_tag"),
+                department_key=validation_payload.get("department_key"),
+                category_specialty=category_specialty,
+                category_code=validation_payload.get("category_code"),
+            )
+
+            for field in (
+                "code",
+                "service_code",
+                "category_code",
+                "queue_tag",
+                "department_key",
+                "category_id",
+            ):
+                if field in update_data:
+                    update_data[field] = validation_payload.get(field)
+        elif update_data.get("category_id"):
             category = self.repository.get_service_category(update_data["category_id"])
             if not category:
-                raise ValueError("Указанная категория не найдена")
-
-        if "code" in update_data and update_data["code"] is not None:
-            update_data["code"] = normalize_service_code(update_data["code"])
-        if "service_code" in update_data and update_data["service_code"] is not None:
-            update_data["service_code"] = normalize_service_code(update_data["service_code"])
-        if "category_code" in update_data and update_data["category_code"] is not None:
-            update_data["category_code"] = normalize_service_code(update_data["category_code"])
+                raise ValueError("Selected category not found")
 
         for field, value in update_data.items():
             setattr(service, field, value)
 
         self.repository.commit()
         self.repository.refresh(service)
+        self._log_service_update(
+            service_id=service.id,
+            old_service=old_service,
+            new_service=service,
+        )
         return service
 
-    def delete_service(self, *, service_id: int) -> dict[str, str]:
+    def delete_service(self, *, service_id: int) -> dict[str, Any]:
         service = self.repository.get_service(service_id)
         if not service:
-            raise LookupError("Услуга не найдена")
-        self.repository.delete(service)
+            raise LookupError("Service not found")
+
+        old_service = self._service_snapshot(service)
+        visit_services_count = self.repository.count_visit_services_for_service(
+            service_id,
+        )
+        service.active = False
+        self.repository.add(service)
         self.repository.commit()
-        return {"message": "Услуга успешно удалена"}
+        self.repository.refresh(service)
+        self._log_service_update(
+            service_id=service.id,
+            old_service=old_service,
+            new_service=service,
+            comment=(
+                "Soft delete via service catalog API; "
+                f"visit_service_links={visit_services_count}"
+            ),
+        )
+        return {
+            "message": "Service deactivated successfully",
+            "service_id": service.id,
+            "active": service.active,
+            "soft_deleted": True,
+            "visit_service_links": visit_services_count,
+        }
 
     def list_doctors_temp(self):
         return self.repository.list_active_doctors()

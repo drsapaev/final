@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
+from app.models.visit import VisitService
 from app.services.service_mapping import normalize_service_code
 from app.crud import service as crud
 
@@ -35,7 +37,26 @@ class ServicesApiRepository:
         return self.db.query(Service).filter(Service.id == service_id).first()
 
     def get_service_by_code(self, code: str):
-        return self.db.query(Service).filter(Service.code == code).first()
+        return (
+            self.db.query(Service)
+            .filter(or_(Service.code == code, Service.service_code == code))
+            .first()
+        )
+
+    def get_service_code_conflict(self, *, code: str, exclude_service_id: int | None = None):
+        query = self.db.query(Service).filter(
+            or_(Service.code == code, Service.service_code == code)
+        )
+        if exclude_service_id is not None:
+            query = query.filter(Service.id != exclude_service_id)
+        return query.first()
+
+    def count_visit_services_for_service(self, service_id: int) -> int:
+        return (
+            self.db.query(VisitService)
+            .filter(VisitService.service_id == service_id)
+            .count()
+        )
 
     def list_active_services(self):
         return self.db.query(Service).filter(Service.active.is_(True)).all()
