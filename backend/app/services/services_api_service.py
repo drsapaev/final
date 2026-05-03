@@ -1,4 +1,4 @@
-"""Service layer for services endpoints."""
+﻿"""Service layer for services endpoints."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
+from app.services.service_audit_service import ServiceAuditService
 from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
@@ -49,7 +50,7 @@ class ServicesApiService:
         ):
             raise HTTPException(
                 status_code=422,
-                detail="code и service_code должны совпадать после нормализации",
+                detail="code Рё service_code РґРѕР»Р¶РЅС‹ СЃРѕРІРїР°РґР°С‚СЊ РїРѕСЃР»Рµ РЅРѕСЂРјР°Р»РёР·Р°С†РёРё",
             )
 
         if canonical_code:
@@ -93,8 +94,8 @@ class ServicesApiService:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"Код услуги {normalized_code} не соответствует выбранной "
-                    f"категории. Допустимые префиксы: {allowed}"
+                    f"РљРѕРґ СѓСЃР»СѓРіРё {normalized_code} РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ РІС‹Р±СЂР°РЅРЅРѕР№ "
+                    f"РєР°С‚РµРіРѕСЂРёРё. Р”РѕРїСѓСЃС‚РёРјС‹Рµ РїСЂРµС„РёРєСЃС‹: {allowed}"
                 ),
             )
 
@@ -171,7 +172,7 @@ class ServicesApiService:
     def create_service_category(self, *, category_data) -> ServiceCategory:
         existing = self.repository.get_service_category_by_code(category_data.code)
         if existing:
-            raise ValueError(f"Категория с кодом '{category_data.code}' уже существует")
+            raise ValueError(f"РљР°С‚РµРіРѕСЂРёСЏ СЃ РєРѕРґРѕРј '{category_data.code}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
 
         payload = (
             category_data.model_dump()
@@ -187,7 +188,7 @@ class ServicesApiService:
     def update_service_category(self, *, category_id: int, category_data) -> ServiceCategory:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("Категория не найдена")
+            raise LookupError("РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
 
         update_data = (
             category_data.model_dump(exclude_unset=True)
@@ -197,7 +198,7 @@ class ServicesApiService:
         if "code" in update_data and update_data["code"] != category.code:
             existing = self.repository.get_service_category_by_code(update_data["code"])
             if existing:
-                raise ValueError(f"Категория с кодом '{update_data['code']}' уже существует")
+                raise ValueError(f"РљР°С‚РµРіРѕСЂРёСЏ СЃ РєРѕРґРѕРј '{update_data['code']}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
 
         for field, value in update_data.items():
             setattr(category, field, value)
@@ -209,17 +210,17 @@ class ServicesApiService:
     def delete_service_category(self, *, category_id: int) -> dict[str, Any]:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("Категория не найдена")
+            raise LookupError("РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
 
         services_count = self.repository.count_services_in_category(category_id)
         if services_count > 0:
             raise ValueError(
-                f"Нельзя удалить категорию: к ней привязано {services_count} услуг"
+                f"РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ: Рє РЅРµР№ РїСЂРёРІСЏР·Р°РЅРѕ {services_count} СѓСЃР»СѓРі"
             )
 
         self.repository.delete(category)
         self.repository.commit()
-        return {"message": "Категория успешно удалена"}
+        return {"message": "РљР°С‚РµРіРѕСЂРёСЏ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»РµРЅР°"}
 
     def list_services(
         self,
@@ -289,13 +290,13 @@ class ServicesApiService:
         if canonical_code:
             existing = self.repository.get_service_code_conflict(code=canonical_code)
             if existing:
-                raise ValueError(f"Услуга с кодом '{canonical_code}' уже существует")
+                raise ValueError(f"РЈСЃР»СѓРіР° СЃ РєРѕРґРѕРј '{canonical_code}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
 
         category_specialty = None
         if payload.get("category_id"):
             category = self.repository.get_service_category(payload["category_id"])
             if not category:
-                raise ValueError("Указанная категория не найдена")
+                raise ValueError("РЈРєР°Р·Р°РЅРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
             category_specialty = category.specialty
 
         if payload.get("category_code"):
@@ -446,13 +447,13 @@ class ServicesApiService:
         }
 
         code_to_name = {
-            "K01": "Консультация кардиолога",
-            "K10": "ЭхоКГ",
-            "D01": "Консультация дерматолога",
-            "S01": "Консультация стоматолога",
-            "L01": "Лабораторные анализы",
-            "P01": "Процедуры",
-            "C01": "Косметология",
+            "K01": "РљРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ РєР°СЂРґРёРѕР»РѕРіР°",
+            "K10": "Р­С…РѕРљР“",
+            "D01": "РљРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ РґРµСЂРјР°С‚РѕР»РѕРіР°",
+            "S01": "РљРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ СЃС‚РѕРјР°С‚РѕР»РѕРіР°",
+            "L01": "Р›Р°Р±РѕСЂР°С‚РѕСЂРЅС‹Рµ Р°РЅР°Р»РёР·С‹",
+            "P01": "РџСЂРѕС†РµРґСѓСЂС‹",
+            "C01": "РљРѕСЃРјРµС‚РѕР»РѕРіРёСЏ",
         }
 
         category_mapping = {
