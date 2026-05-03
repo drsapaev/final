@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { colors } from '../theme/tokens';
@@ -5,6 +6,8 @@ import PropTypes from 'prop-types';
 
 const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
   const { isDark, toggleTheme, getSpacing } = useTheme();
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const sizes = {
     sm: { size: 16, padding: getSpacing('xs') },
@@ -40,14 +43,17 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
     `0 4px 20px ${colors.semantic.surface.overlay}` :
     `0 4px 20px ${colors.semantic.surface.overlay}`
   };
+  const activeStyle = isHovered || isFocused ? { ...buttonStyle, ...hoverStyle } : buttonStyle;
 
   return (
     <button
       onClick={toggleTheme}
       className={`clinic-theme-toggle ${className}`}
-      style={buttonStyle}
-      onMouseEnter={(e) => Object.assign(e.target.style, hoverStyle)}
-      onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
+      style={activeStyle}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
       title={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
       aria-label={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}>
       
