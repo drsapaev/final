@@ -1,76 +1,23 @@
 #!/usr/bin/env python3
-"""
-Тестовый скрипт для диагностики проблем фронтенда
-"""
+"""Retired root manual frontend API probe."""
 
-import requests
-import json
+from __future__ import annotations
 
-def test_api_endpoints():
-    """Тестируем все API эндпоинты, которые использует фронтенд"""
+import sys
 
-    base_url = "http://localhost:18000"
-    token = None
+MESSAGE = """
+test_frontend_api.py is retired.
 
-    # 1. Получаем токен
-    print("🔐 Получаем токен аутентификации...")
-    try:
-        response = requests.post(
-            f"{base_url}/api/v1/auth/minimal-login",
-            json={"username": "registrar@example.com", "password": "registrar123", "remember_me": False},
-            timeout=5
-        )
-        if response.status_code == 200:
-            data = response.json()
-            token = data.get("access_token")
-            print(f"✅ Токен получен: {token[:30]}...")
-        else:
-            print(f"❌ Ошибка аутентификации: {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ Ошибка при аутентификации: {e}")
-        return False
+This root-level manual probe used built-in credentials or live localhost API
+assumptions outside the canonical test suites. Use frontend/e2e with env-driven
+credentials or backend/tests instead.
+""".strip()
 
-    if not token:
-        print("❌ Не удалось получить токен")
-        return False
 
-    # 2. Тестируем эндпоинты регистратора
-    endpoints = [
-        "/api/v1/registrar/doctors",
-        "/api/v1/registrar/services",
-        "/api/v1/registrar/queue-settings",
-        "/api/v1/registrar/queues/today"
-    ]
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-    headers = {"Authorization": f"Bearer {token}"}
-
-    print("\n🔍 Тестируем API эндпоинты регистратора...")
-    all_success = True
-
-    for endpoint in endpoints:
-        try:
-            response = requests.get(f"{base_url}{endpoint}", headers=headers, timeout=5)
-            status = "✅" if response.status_code == 200 else "❌"
-            print(f"{status} {endpoint}: {response.status_code}")
-
-            if response.status_code != 200:
-                all_success = False
-                try:
-                    error_data = response.json()
-                    print(f"   Ошибка: {error_data}")
-                except:
-                    print(f"   Ошибка: {response.text}")
-        except Exception as e:
-            print(f"❌ {endpoint}: Ошибка подключения - {e}")
-            all_success = False
-
-    return all_success
 
 if __name__ == "__main__":
-    success = test_api_endpoints()
-    if success:
-        print("\n🎉 Все API эндпоинты работают корректно!")
-    else:
-        print("\n⚠️ Некоторые API эндпоинты недоступны")
-    exit(0 if success else 1)
+    raise SystemExit(main())

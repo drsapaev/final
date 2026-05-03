@@ -1,61 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Тест авторизации</title>
-</head>
-<body>
-    <h1>Тест авторизации</h1>
-    <form id="loginForm">
-        <div>
-            <label>Username:</label>
-            <input type="text" id="username" value="admin@example.com" required>
-        </div>
-        <div>
-            <label>Password:</label>
-            <input type="password" id="password" value="admin123" required>
-        </div>
-        <button type="submit">Войти</button>
-    </form>
-    
-    <div id="result"></div>
-
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const resultDiv = document.getElementById('result');
-            
-            const credentials = {
-                username: username,
-                password: password,
-                remember_me: false
-            };
-            
-            console.log('🔍 Отправляемые данные:', credentials);
-            
-            try {
-                const response = await fetch('http://localhost:18000/api/v1/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentials)
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    resultDiv.innerHTML = `<h3 style="color: green;">✅ Успешно!</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } else {
-                    resultDiv.innerHTML = `<h3 style="color: red;">❌ Ошибка ${response.status}</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<h3 style="color: red;">❌ Ошибка сети</h3><pre>${error.message}</pre>`;
-            }
-        });
-    </script>
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Retired manual login probe</title>
+  </head>
+  <body>
+    <main>
+      <h1>test-login.html is retired.</h1>
+      <p>
+        This root-level manual login probe has been retired. Use the canonical
+        frontend e2e suite with environment-provided credentials instead.
+      </p>
+    </main>
+  </body>
 </html>
-
