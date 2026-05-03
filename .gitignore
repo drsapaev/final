@@ -37,6 +37,7 @@ alembic/**/__pycache__/
 .coverage
 htmlcov/
 pytest_cache/
+frontend/eslint-*.json
 NUL
 nul
 
