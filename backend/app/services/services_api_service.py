@@ -1,4 +1,4 @@
-﻿"""Service layer for services endpoints."""
+"""Service layer for services endpoints."""
 
 from __future__ import annotations
 
