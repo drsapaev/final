@@ -175,7 +175,7 @@ Operationalize the new SSOT panel QA runbook so execution progress is preserved 
 - [x] Resume point updated:
   - targeted dentist EMR bootstrap cleanup is verified at UI/network layer; next explicit step is `CASH-06-REVERIFY`
 - [x] Re-verify `CASH-06` same-session cashier refund refresh on the current temp stack:
-  - recovered live cashier credentials from the current Postgres user store (`cashier@example.com` / `cashier123`)
+  - recovered live cashier credentials from the current Postgres user store (`cashier@example.com` / `<set QA_CASHIER_PASSWORD>`)
   - live browser proof on `http://127.0.0.1:8080` created a fresh cash payment for `Пациент Тест`, then opened `История платежей` in the same session
   - canonical refund flow completed through the history row and updated the same row from `Оплачено` to `Возвращено` without a full page reload
   - secondary SoT captured the same-session refresh network family in `cash-06-reverify-network.txt`
