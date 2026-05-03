@@ -24,10 +24,10 @@
 **Исправление:**
 ```bash
 # Было:
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 18000
 
 # Стало:
-cd C:\final\backend && python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+cd C:\final\backend && python -m uvicorn main:app --reload --host 127.0.0.1 --port 18000
 ```
 
 **Причина:** Неправильный путь к модулю. Исправлен на `main:app`.
@@ -56,8 +56,8 @@ cd C:\final\backend && python -m uvicorn main:app --reload --host 127.0.0.1 --po
 4. `frontend/src/components/integration/IntegrationDemo.jsx` - Демо компонент
 
 ### 📊 Результаты тестирования:
-- ✅ Бэкенд: `http://127.0.0.1:8000` - работает
-- ✅ Swagger docs: `http://127.0.0.1:8000/docs` - доступны
+- ✅ Бэкенд: `http://127.0.0.1:18000` - работает
+- ✅ Swagger docs: `http://127.0.0.1:18000/docs` - доступны
 - ✅ Линтеры: ошибок не найдено
 - ✅ Импорты: исправлены проблемные зависимости
 

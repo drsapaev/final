@@ -3,7 +3,7 @@
 ## ✅ **ВСЕ СИСТЕМЫ РАБОТАЮТ!**
 
 ### 🚀 **Статус сервисов:**
-- ✅ **Backend API**: http://127.0.0.1:8000 - **РАБОТАЕТ**
+- ✅ **Backend API**: http://127.0.0.1:18000 - **РАБОТАЕТ**
 - ✅ **Frontend**: http://localhost:5173 - **РАБОТАЕТ**
 - ✅ **API Health Check**: `{"ok":true,"db":"ok"}` - **ОТВЕЧАЕТ**
 
@@ -79,8 +79,8 @@
 
 #### **1. Доступ к приложению:**
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://127.0.0.1:8000
-- **API Docs**: http://127.0.0.1:8000/docs
+- **Backend API**: http://127.0.0.1:18000
+- **API Docs**: http://127.0.0.1:18000/docs
 
 #### **2. Тестирование компонентов:**
 - Откройте `test-components.html` в браузере
@@ -91,7 +91,7 @@
 ```bash
 # Backend
 cd backend
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 --reload
 
 # Frontend
 cd frontend

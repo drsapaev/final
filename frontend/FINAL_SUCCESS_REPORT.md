@@ -79,13 +79,13 @@
 
 #### **1. Доступ к приложению:**
 - **Frontend**: http://localhost:5173
-- **Backend API**: Запустить на свободном порту (8000, 8001, и т.д.)
-- **API Docs**: http://127.0.0.1:8000/docs (после запуска backend)
+- **Backend API**: Запустить на каноничном порту 18000
+- **API Docs**: http://127.0.0.1:18000/docs (после запуска backend)
 
 #### **2. Запуск сервисов:**
 ```bash
 # Backend (из директории backend)
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 --reload
 
 # Frontend (из директории frontend)
 npm run dev
