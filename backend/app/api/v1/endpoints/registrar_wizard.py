@@ -3039,13 +3039,36 @@ def _assign_queue_numbers_on_confirmation(
             else:
                 continue
 
-        if not doctor_id:
-            continue
-
-        # Получаем или создаем дневную очередь
-        daily_queue = crud_queue.get_or_create_daily_queue(
-            db, today, doctor_id, queue_tag
-        )
+        daily_queue = None
+        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first() if doctor_id else None
+        if doctor:
+            # doctor_id is canonical Doctor.id, safe to create/reuse by specialist.
+            daily_queue = crud_queue.get_or_create_daily_queue(
+                db, today, doctor.id, queue_tag
+            )
+        else:
+            # Backward compatibility: old registrar/CI paths can store User.id in
+            # visit.doctor_id. Do not create a new queue with that non-canonical id;
+            # reuse the already active queue for the tag.
+            daily_queue = (
+                db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == today,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active == True,
+                )
+                .order_by(DailyQueue.id.asc())
+                .first()
+            )
+            if not daily_queue:
+                logger.info(
+                    "No canonical doctor or active queue for registrar confirmation "
+                    "visit_id=%s doctor_id=%s queue_tag=%s",
+                    visit.id,
+                    visit.doctor_id,
+                    queue_tag,
+                )
+                continue
 
         start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
         next_number = queue_service.get_next_queue_number(

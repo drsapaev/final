@@ -158,14 +158,26 @@ class PaymentInitService:
             )
             self.repository.commit()
             self.repository.refresh(payment)
-            self._notify_payment_status(
-                payment_id=payment.id,
-                visit_id=visit.id,
-                current_user_id=current_user_id,
-                change_type="failed_init",
-                reason=result.error_message,
-                provider=provider,
-            )
+            try:
+                self._notify_payment_status(
+                    payment_id=payment.id,
+                    visit_id=visit.id,
+                    current_user_id=current_user_id,
+                    change_type="failed_init",
+                    reason=result.error_message,
+                    provider=provider,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "payment_init_service.failed_init_notification_error",
+                    extra={
+                        "payment_id": payment.id,
+                        "visit_id": visit.id,
+                        "provider": provider,
+                        "error": str(exc),
+                    },
+                    exc_info=True,
+                )
             return {
                 "success": False,
                 "payment_id": payment.id,
