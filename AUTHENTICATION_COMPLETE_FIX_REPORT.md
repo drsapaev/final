@@ -112,7 +112,7 @@ if (err?.response?.data?.detail) {
 ```javascript
 // ✅ Добавлено:
 const username = formData.username || 'admin@example.com';
-const password = formData.password || 'admin123';
+const password = formData.password || '<set QA_ADMIN_PASSWORD>';
 
 const credentials = {
   username: username,
@@ -127,14 +127,14 @@ const credentials = {
 
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
-| **Admin** | `admin@example.com` | `admin123` | ✅ |
-| **Registrar** | `registrar@example.com` | `registrar123` | ✅ |
-| **Lab** | `lab@example.com` | `lab123` | ✅ |
-| **Doctor** | `doctor@example.com` | `doctor123` | ✅ |
-| **Cashier** | `cashier@example.com` | `cashier123` | ✅ |
-| **Cardiologist** | `cardio@example.com` | `cardio123` | ✅ |
-| **Dermatologist** | `derma@example.com` | `derma123` | ✅ |
-| **Dentist** | `dentist@example.com` | `dentist123` | ✅ |
+| **Admin** | `admin@example.com` | `<set QA_ADMIN_PASSWORD>` | ✅ |
+| **Registrar** | `registrar@example.com` | `<set QA_REGISTRAR_PASSWORD>` | ✅ |
+| **Lab** | `lab@example.com` | `<set QA_LAB_PASSWORD>` | ✅ |
+| **Doctor** | `doctor@example.com` | `<set QA_DOCTOR_PASSWORD>` | ✅ |
+| **Cashier** | `cashier@example.com` | `<set QA_CASHIER_PASSWORD>` | ✅ |
+| **Cardiologist** | `cardio@example.com` | `<set QA_CARDIO_PASSWORD>` | ✅ |
+| **Dermatologist** | `derma@example.com` | `<set QA_DERMA_PASSWORD>` | ✅ |
+| **Dentist** | `dentist@example.com` | `<set QA_DENTIST_PASSWORD>` | ✅ |
 
 ---
 

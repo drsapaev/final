@@ -41,13 +41,13 @@ http://localhost:18000/docs
 
 ### Администратор
 - **Логин**: admin@clinic.com
-- **Пароль**: admin123
+- **Пароль**: <set QA_ADMIN_PASSWORD>
 - **Роль**: Admin
 - **Доступ**: Полный доступ ко всем функциям
 
 ### Врач
 - **Логин**: doctor@clinic.com
-- **Пароль**: doctor123
+- **Пароль**: <set QA_DOCTOR_PASSWORD>
 - **Роль**: Doctor
 - **Доступ**: Панель врача, EMR, пациенты
 

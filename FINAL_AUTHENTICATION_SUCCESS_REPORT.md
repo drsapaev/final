@@ -78,14 +78,14 @@
 
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
-| **Admin** | `admin@example.com` | `admin123` | ✅ Создан |
-| **Registrar** | `registrar@example.com` | `registrar123` | ✅ Создан |
-| **Lab** | `lab@example.com` | `lab123` | ✅ Создан |
-| **Doctor** | `doctor@example.com` | `doctor123` | ✅ Создан |
-| **Cashier** | `cashier@example.com` | `cashier123` | ✅ Создан |
-| **Cardiologist** | `cardio@example.com` | `cardio123` | ✅ Создан |
-| **Dermatologist** | `derma@example.com` | `derma123` | ✅ Создан |
-| **Dentist** | `dentist@example.com` | `dentist123` | ✅ Создан |
+| **Admin** | `admin@example.com` | `<set QA_ADMIN_PASSWORD>` | ✅ Создан |
+| **Registrar** | `registrar@example.com` | `<set QA_REGISTRAR_PASSWORD>` | ✅ Создан |
+| **Lab** | `lab@example.com` | `<set QA_LAB_PASSWORD>` | ✅ Создан |
+| **Doctor** | `doctor@example.com` | `<set QA_DOCTOR_PASSWORD>` | ✅ Создан |
+| **Cashier** | `cashier@example.com` | `<set QA_CASHIER_PASSWORD>` | ✅ Создан |
+| **Cardiologist** | `cardio@example.com` | `<set QA_CARDIO_PASSWORD>` | ✅ Создан |
+| **Dermatologist** | `derma@example.com` | `<set QA_DERMA_PASSWORD>` | ✅ Создан |
+| **Dentist** | `dentist@example.com` | `<set QA_DENTIST_PASSWORD>` | ✅ Создан |
 
 ### ✅ Исправлены серверы:
 

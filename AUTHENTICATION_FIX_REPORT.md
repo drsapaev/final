@@ -133,14 +133,14 @@ const [username, setUsername] = useState('admin@example.com');
 ```python
 # Созданы пользователи для всех ролей:
 users_to_create = [
-    {"email": "admin@example.com", "password": "admin123", "role": "Admin"},
-    {"email": "registrar@example.com", "password": "registrar123", "role": "Registrar"},
-    {"email": "lab@example.com", "password": "lab123", "role": "Lab"},
-    {"email": "doctor@example.com", "password": "doctor123", "role": "Doctor"},
-    {"email": "cashier@example.com", "password": "cashier123", "role": "Cashier"},
-    {"email": "cardio@example.com", "password": "cardio123", "role": "cardio"},
-    {"email": "derma@example.com", "password": "derma123", "role": "derma"},
-    {"email": "dentist@example.com", "password": "dentist123", "role": "dentist"},
+    {"email": "admin@example.com", "password": "<set QA_ADMIN_PASSWORD>", "role": "Admin"},
+    {"email": "registrar@example.com", "password": "<set QA_REGISTRAR_PASSWORD>", "role": "Registrar"},
+    {"email": "lab@example.com", "password": "<set QA_LAB_PASSWORD>", "role": "Lab"},
+    {"email": "doctor@example.com", "password": "<set QA_DOCTOR_PASSWORD>", "role": "Doctor"},
+    {"email": "cashier@example.com", "password": "<set QA_CASHIER_PASSWORD>", "role": "Cashier"},
+    {"email": "cardio@example.com", "password": "<set QA_CARDIO_PASSWORD>", "role": "cardio"},
+    {"email": "derma@example.com", "password": "<set QA_DERMA_PASSWORD>", "role": "derma"},
+    {"email": "dentist@example.com", "password": "<set QA_DENTIST_PASSWORD>", "role": "dentist"},
 ]
 ```
 
@@ -149,14 +149,14 @@ users_to_create = [
 ## ✅ РЕЗУЛЬТАТЫ ИСПРАВЛЕНИЯ
 
 ### Тестовые пользователи созданы для всех ролей:
-- **Admin:** `admin@example.com` / `admin123`
-- **Registrar:** `registrar@example.com` / `registrar123`
-- **Lab:** `lab@example.com` / `lab123`
-- **Doctor:** `doctor@example.com` / `doctor123`
-- **Cashier:** `cashier@example.com` / `cashier123`
-- **Cardiologist:** `cardio@example.com` / `cardio123`
-- **Dermatologist:** `derma@example.com` / `derma123`
-- **Dentist:** `dentist@example.com` / `dentist123`
+- **Admin:** `admin@example.com` / `<set QA_ADMIN_PASSWORD>`
+- **Registrar:** `registrar@example.com` / `<set QA_REGISTRAR_PASSWORD>`
+- **Lab:** `lab@example.com` / `<set QA_LAB_PASSWORD>`
+- **Doctor:** `doctor@example.com` / `<set QA_DOCTOR_PASSWORD>`
+- **Cashier:** `cashier@example.com` / `<set QA_CASHIER_PASSWORD>`
+- **Cardiologist:** `cardio@example.com` / `<set QA_CARDIO_PASSWORD>`
+- **Dermatologist:** `derma@example.com` / `<set QA_DERMA_PASSWORD>`
+- **Dentist:** `dentist@example.com` / `<set QA_DENTIST_PASSWORD>`
 
 ### Все API endpoints исправлены:
 - ✅ `client.js` - основной API клиент

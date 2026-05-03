@@ -103,7 +103,7 @@ class Roles(str, Enum):
 POST /api/v1/authentication/login
 {
   "username": "admin",
-  "password": "admin123",
+  "password": "<set QA_ADMIN_PASSWORD>",
   "remember_me": false
 }
 
@@ -121,7 +121,7 @@ Response:
 POST /api/v1/authentication/login
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "<set QA_ADMIN_PASSWORD>"
 }
 
 Response (2FA требуется):
@@ -229,14 +229,14 @@ if (requires2FA) {
 
 | Пользователь | Пароль | Роль | Маршрут | Описание |
 |-------------|--------|------|---------|----------|
-| admin | admin123 | Admin | /admin | Администратор системы |
-| registrar | registrar123 | Registrar | /registrar-panel | Регистратура |
-| lab | lab123 | Lab | /lab-panel | Лаборатория |
-| doctor | doctor123 | Doctor | /doctor-panel | Врач общей практики |
-| cashier | cashier123 | Cashier | /cashier-panel | Касса |
-| cardio | cardio123 | cardio | /cardiologist | Кардиолог |
-| derma | derma123 | derma | /dermatologist | Дерматолог-косметолог |
-| dentist | dentist123 | dentist | /dentist | Стоматолог |
+| admin | <set QA_ADMIN_PASSWORD> | Admin | /admin | Администратор системы |
+| registrar | <set QA_REGISTRAR_PASSWORD> | Registrar | /registrar-panel | Регистратура |
+| lab | <set QA_LAB_PASSWORD> | Lab | /lab-panel | Лаборатория |
+| doctor | <set QA_DOCTOR_PASSWORD> | Doctor | /doctor-panel | Врач общей практики |
+| cashier | <set QA_CASHIER_PASSWORD> | Cashier | /cashier-panel | Касса |
+| cardio | <set QA_CARDIO_PASSWORD> | cardio | /cardiologist | Кардиолог |
+| derma | <set QA_DERMA_PASSWORD> | derma | /dermatologist | Дерматолог-косметолог |
+| dentist | <set QA_DENTIST_PASSWORD> | dentist | /dentist | Стоматолог |
 
 ### **Защищенные маршруты** (`App.jsx`):
 ```jsx

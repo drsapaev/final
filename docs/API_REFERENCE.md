@@ -17,7 +17,7 @@ Login and get access token.
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "<set QA_ADMIN_PASSWORD>"
 }
 ```
 

@@ -197,7 +197,7 @@
 # POST /api/v1/auth/login
 {
     "username": "admin",
-    "password": "admin123",
+    "password": "<set QA_ADMIN_PASSWORD>",
     "remember_me": false,
     "device_fingerprint": "optional"
 }

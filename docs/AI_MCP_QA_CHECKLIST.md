@@ -8,7 +8,7 @@
 **Backend:** http://localhost:18000  
 **Frontend:** http://localhost:5173  
 
-**Live smoke note:** backend `18000` is up; authoritative AI/MCP smoke gate is `GET /api/v1/mcp/health` (returned `overall=healthy` on `2026-03-29`). `GET /api/v1/mcp/status` is informational and may still report `healthy=false` until the cached health state refreshes. Evidence: `output/playwright/ai-mcp-health-smoke-2026-03-29.json`. Browser proof on the same stack loaded `/admin/ai-settings` and `/admin/ai-analytics` under `admin@example.com / admin123` with clean console/network evidence: `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, `output/playwright/ai-mcp-ai-analytics-console.log`
+**Live smoke note:** backend `18000` is up; authoritative AI/MCP smoke gate is `GET /api/v1/mcp/health` (returned `overall=healthy` on `2026-03-29`). `GET /api/v1/mcp/status` is informational and may still report `healthy=false` until the cached health state refreshes. Evidence: `output/playwright/ai-mcp-health-smoke-2026-03-29.json`. Browser proof on the same stack loaded `/admin/ai-settings` and `/admin/ai-analytics` under `admin@example.com / <set QA_ADMIN_PASSWORD>` with clean console/network evidence: `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, `output/playwright/ai-mcp-ai-analytics-console.log`
 
 ---
 
