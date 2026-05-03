@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+const QA_ADMIN_USERNAME = process.env.QA_ADMIN_USERNAME || 'admin@clinic.com';
+const QA_ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD;
+
+const requireAdminCredentials = () => {
+  test.skip(!QA_ADMIN_PASSWORD, 'Set QA_ADMIN_PASSWORD to run authenticated admin e2e checks.');
+};
+
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
     // Переходим на страницу логина
@@ -33,9 +40,11 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should login successfully with valid credentials', async ({ page }) => {
+    requireAdminCredentials();
+
     // Вводим валидные данные (тестовый пользователь)
-    await page.fill('input[type="text"]', 'admin@clinic.com');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+    await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Проверяем редирект на дашборд
@@ -47,9 +56,11 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should handle role-based routing', async ({ page }) => {
+    requireAdminCredentials();
+
     // Логинимся как админ
-    await page.fill('input[type="text"]', 'admin@clinic.com');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+    await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки
@@ -61,9 +72,11 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should logout successfully', async ({ page }) => {
+    requireAdminCredentials();
+
     // Логинимся
-    await page.fill('input[type="text"]', 'admin@clinic.com');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+    await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки дашборда
@@ -91,9 +104,11 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should handle session expiration', async ({ page }) => {
+    requireAdminCredentials();
+
     // Логинимся
-    await page.fill('input[type="text"]', 'admin@clinic.com');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+    await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Ждем загрузки
@@ -113,20 +128,22 @@ test.describe('Authentication Flow', () => {
   });
 
   test('should remember user preference (if implemented)', async ({ page }) => {
+    requireAdminCredentials();
+
     // Проверяем чекбокс "Запомнить меня"
     const rememberCheckbox = page.locator('input[type="checkbox"]');
     
     if (await rememberCheckbox.count() > 0) {
       await rememberCheckbox.check();
       
-      await page.fill('input[type="text"]', 'admin@clinic.com');
-      await page.fill('input[type="password"]', 'admin123');
+      await page.fill('input[type="text"]', QA_ADMIN_USERNAME);
+      await page.fill('input[type="password"]', QA_ADMIN_PASSWORD);
       await page.click('button[type="submit"]');
       
       // Проверяем что данные сохранились
       await page.goto('/login');
       const savedEmail = await page.locator('input[type="text"]').inputValue();
-      expect(savedEmail).toBe('admin@clinic.com');
+      expect(savedEmail).toBe(QA_ADMIN_USERNAME);
     }
   });
 });
