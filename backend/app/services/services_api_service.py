@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
-from app.services.service_mapping import normalize_service_code
+from app.services.service_mapping import (
+    get_allowed_service_code_prefixes,
+    normalize_service_code,
+    resolve_queue_group_key,
+)
 
 
 class ServicesApiService:
@@ -21,6 +27,76 @@ class ServicesApiService:
         repository: ServicesApiRepository | None = None,
     ):
         self.repository = repository or ServicesApiRepository(db)
+
+    @staticmethod
+    def _normalize_category_code_value(value: Any) -> str:
+        return normalize_service_code(str(value)).upper()
+
+    @staticmethod
+    def _normalize_service_code_payload(payload: dict[str, Any]) -> str | None:
+        code = payload.get("code")
+        service_code = payload.get("service_code")
+        normalized_code = normalize_service_code(str(code)) if code else None
+        normalized_service_code = (
+            normalize_service_code(str(service_code)) if service_code else None
+        )
+
+        canonical_code = normalized_service_code or normalized_code
+        if (
+            normalized_code
+            and normalized_service_code
+            and normalized_code != normalized_service_code
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="code и service_code должны совпадать после нормализации",
+            )
+
+        if canonical_code:
+            payload["code"] = canonical_code
+            payload["service_code"] = canonical_code
+
+        return canonical_code
+
+    @staticmethod
+    def _validate_service_code_prefix_alignment(
+        *,
+        service_code: str | None,
+        queue_tag: str | None,
+        department_key: str | None,
+        category_specialty: str | None,
+        category_code: str | None,
+    ) -> None:
+        if not service_code:
+            return
+
+        normalized_code = normalize_service_code(str(service_code))
+        if not re.match(r"^[A-Z]\d{1,2}$", normalized_code):
+            return
+
+        expected_group = resolve_queue_group_key(
+            queue_tag=queue_tag,
+            department_key=department_key,
+        )
+        allowed_prefixes = get_allowed_service_code_prefixes(
+            queue_tag=queue_tag,
+            department_key=department_key,
+            category_specialty=category_specialty,
+            category_code=category_code,
+        )
+        if not expected_group or not allowed_prefixes:
+            return
+
+        prefix = normalized_code[0]
+        if prefix not in allowed_prefixes:
+            allowed = ", ".join(sorted(allowed_prefixes))
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Код услуги {normalized_code} не соответствует выбранной "
+                    f"категории. Допустимые префиксы: {allowed}"
+                ),
+            )
 
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
@@ -136,27 +212,37 @@ class ServicesApiService:
         return self.repository.get_service(service_id)
 
     def create_service(self, *, service_data):
-        if service_data.code:
-            existing = self.repository.get_service_by_code(service_data.code)
-            if existing:
-                raise ValueError(f"Услуга с кодом '{service_data.code}' уже существует")
-
-        if service_data.category_id:
-            category = self.repository.get_service_category(service_data.category_id)
-            if not category:
-                raise ValueError("Указанная категория не найдена")
-
         payload = (
             service_data.model_dump()
             if hasattr(service_data, "model_dump")
             else service_data.dict()
         )
-        if payload.get("code"):
-            payload["code"] = normalize_service_code(payload["code"])
-        if payload.get("service_code"):
-            payload["service_code"] = normalize_service_code(payload["service_code"])
+
+        canonical_code = self._normalize_service_code_payload(payload)
+        if canonical_code:
+            existing = self.repository.get_service_by_code(canonical_code)
+            if existing:
+                raise ValueError(f"Услуга с кодом '{canonical_code}' уже существует")
+
+        category_specialty = None
+        if payload.get("category_id"):
+            category = self.repository.get_service_category(payload["category_id"])
+            if not category:
+                raise ValueError("Указанная категория не найдена")
+            category_specialty = category.specialty
+
         if payload.get("category_code"):
-            payload["category_code"] = normalize_service_code(payload["category_code"])
+            payload["category_code"] = self._normalize_category_code_value(
+                payload["category_code"]
+            )
+
+        self._validate_service_code_prefix_alignment(
+            service_code=canonical_code,
+            queue_tag=payload.get("queue_tag"),
+            department_key=payload.get("department_key"),
+            category_specialty=category_specialty,
+            category_code=payload.get("category_code"),
+        )
 
         service = Service(**payload)
         self.repository.add(service)
