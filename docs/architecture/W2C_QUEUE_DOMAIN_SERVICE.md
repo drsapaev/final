@@ -246,3 +246,27 @@ That avoids turning queue refactor into Wave 2D by accident.
    - diagnostics / incomplete
    - visit-linked cancel/reschedule
 4. Leave payment-coupled completion paths for later queue/payment coordination work.
+
+## Phase 1 Implementation Status
+
+Implemented in `backend/app/services/queue_domain_service.py`.
+
+Currently implemented:
+
+- `get_queue_snapshot(queue_id=...)`
+- `get_queue_snapshot_by_specialist_day(specialist_id=..., day=...)`
+
+Skeleton-only methods that intentionally still raise `NotImplementedError`:
+
+- `enqueue`
+- `call_next`
+- `mark_in_service`
+- `complete_visit`
+- `cancel_queue_link`
+- `reschedule_queue_link`
+
+This is intentional for Phase 1:
+
+- read-only queue slices can adopt the service now
+- mutation flows stay in legacy paths until the state machine and transaction rules
+  are migrated explicitly
