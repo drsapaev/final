@@ -49,7 +49,7 @@ class ServicesApiService:
         ):
             raise HTTPException(
                 status_code=422,
-                detail="code Рё service_code РґРѕР»Р¶РЅС‹ СЃРѕРІРїР°РґР°С‚СЊ РїРѕСЃР»Рµ РЅРѕСЂРјР°Р»РёР·Р°С†РёРё",
+                detail="code and service_code must match after normalization",
             )
 
         if canonical_code:
@@ -419,6 +419,7 @@ class ServicesApiService:
             "service_id": service.id,
             "active": service.active,
             "soft_deleted": True,
+            "visit_usage_count": visit_services_count,
             "visit_service_links": visit_services_count,
         }
 
