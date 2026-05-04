@@ -934,6 +934,17 @@ def create_cart_appointments(
         logger.info("REGISTRATION: Инвойс %d создан", invoice.id)
 
         # Связываем визиты с invoice
+        for visit in created_visits:
+            visit_amount = created_visit_amounts.get(visit.id, Decimal("0"))
+            invoice_visit = PaymentInvoiceVisit(
+                invoice_id=invoice.id, visit_id=visit.id, visit_amount=visit_amount
+            )
+            db.add(invoice_visit)
+
+        # Assign queue entries for confirmed same-day visits via extracted seam.
+        queue_numbers = {}
+        today = date.today()
+
         queue_numbers = RegistrarWizardQueueAssignmentService(db).assign_same_day_queue_numbers(
             created_visits,
             target_day=today,
