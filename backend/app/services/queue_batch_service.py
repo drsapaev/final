@@ -107,10 +107,22 @@ class QueueBatchService:
             patient_phone = patient.phone or None
 
             for specialist_id in services_by_specialist:
-                existing_entry = self.repository.find_existing_active_entry(
+                existing_active_entries = self.repository.find_existing_active_entries(
                     specialist_id=specialist_id,
                     day=today,
                     patient_id=patient_id,
+                )
+                if len(existing_active_entries) > 1:
+                    raise QueueBatchDomainError(
+                        status_code=409,
+                        detail=(
+                            "Неоднозначная активная запись очереди для пациента у "
+                            "специалиста на сегодня"
+                        ),
+                    )
+
+                existing_entry = (
+                    existing_active_entries[0] if existing_active_entries else None
                 )
                 if existing_entry:
                     existing_entries_count += 1
