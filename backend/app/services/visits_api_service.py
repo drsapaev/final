@@ -102,7 +102,7 @@ class VisitsApiService:
                 "finished_at": None,
                 "notes": visit.notes,
                 "planned_date": visit.visit_date,
-                "source": getattr(visit, "source", None),
+                "source": getattr(visit, "source", None) or payload.source or "desk",
             }
 
         table = self._visits()
