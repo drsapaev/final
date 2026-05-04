@@ -93,8 +93,8 @@ class ServicesApiService:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"Service code {normalized_code} does not match selected category. "
-                    f"Allowed prefixes: {allowed}"
+                    f"Код услуги {normalized_code} не соответствует выбранной "
+                    f"категории. Допустимые префиксы: {allowed}"
                 ),
             )
 
