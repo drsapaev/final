@@ -105,6 +105,12 @@ Recommended alias mapping during migration:
 - `completed` -> `served` for queue rows only
 - `canceled` -> `cancelled`
 
+## Phase 1 Implementation Note
+
+Wave 2C Phase 1 introduced this alias layer in code through
+`backend/app/services/queue_status.py`, but only for internal comparisons and
+documentation. Persisted values and public payloads remain unchanged.
+
 ## Stop/Go Guidance
 
 Do not refactor queue mutation handlers until the project agrees on:

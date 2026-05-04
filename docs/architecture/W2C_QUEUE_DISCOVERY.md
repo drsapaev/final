@@ -27,6 +27,22 @@ The repo already contains queue-specific API services and repositories for read 
 - transaction boundaries across visit + queue changes
 - post-commit side effects such as websocket and push notifications
 
+## Execution Update (2026-03-07)
+
+Wave 2C Phase 1 introduced three safe foundations without changing queue mutation
+behavior:
+
+- central queue status vocabulary in `backend/app/services/queue_status.py`
+- read-only queue boundary in `backend/app/repositories/queue_read_repository.py`
+- `QueueDomainService` skeleton in `backend/app/services/queue_domain_service.py`
+
+The first migrated read-only slices are:
+
+- `W2C-MS-001` queue-position status normalization helper wiring
+- `W2C-MS-006` queue snapshot/status reads via `QueueDomainService`
+
+Runtime mutation ownership is still fragmented exactly as documented below.
+
 ## Data Model and Storage Map
 
 | File | Element | Current responsibilities | DB tables used | Queue status interactions | Side effects |
