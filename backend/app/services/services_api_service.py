@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
-from app.services.service_mapping import normalize_service_code
+from app.services.service_mapping import (
+    get_allowed_service_code_prefixes,
+    normalize_service_code,
+    resolve_queue_group_key,
+)
 
 
 class ServicesApiService:
@@ -22,13 +28,150 @@ class ServicesApiService:
     ):
         self.repository = repository or ServicesApiRepository(db)
 
+    @staticmethod
+    def _normalize_category_code_value(value: Any) -> str:
+        return normalize_service_code(str(value)).upper()
+
+    @staticmethod
+    def _normalize_service_code_payload(payload: dict[str, Any]) -> str | None:
+        code = payload.get("code")
+        service_code = payload.get("service_code")
+        normalized_code = normalize_service_code(str(code)) if code else None
+        normalized_service_code = (
+            normalize_service_code(str(service_code)) if service_code else None
+        )
+
+        canonical_code = normalized_service_code or normalized_code
+        if (
+            normalized_code
+            and normalized_service_code
+            and normalized_code != normalized_service_code
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="code and service_code must match after normalization",
+            )
+
+        if canonical_code:
+            payload["code"] = canonical_code
+            payload["service_code"] = canonical_code
+
+        return canonical_code
+
+    @staticmethod
+    def _validate_service_code_prefix_alignment(
+        *,
+        service_code: str | None,
+        queue_tag: str | None,
+        department_key: str | None,
+        category_specialty: str | None,
+        category_code: str | None,
+    ) -> None:
+        if not service_code:
+            return
+
+        normalized_code = normalize_service_code(str(service_code))
+        if not re.match(r"^[A-Z]\d{1,2}$", normalized_code):
+            return
+
+        expected_group = resolve_queue_group_key(
+            queue_tag=queue_tag,
+            department_key=department_key,
+        )
+        allowed_prefixes = get_allowed_service_code_prefixes(
+            queue_tag=queue_tag,
+            department_key=department_key,
+            category_specialty=category_specialty,
+            category_code=category_code,
+        )
+        if not expected_group or not allowed_prefixes:
+            return
+
+        prefix = normalized_code[0]
+        if prefix not in allowed_prefixes:
+            allowed = ", ".join(sorted(allowed_prefixes))
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Код услуги {normalized_code} не соответствует выбранной "
+                    f"категории/очереди {expected_group}. Допустимые префиксы: {allowed}"
+                ),
+            )
+
+
+    @staticmethod
+    def _should_validate_service_code_alignment(
+        change_set: dict[str, Any],
+        existing_service: Service | None = None,
+    ) -> bool:
+        routing_fields = {
+            "code",
+            "service_code",
+            "category_id",
+            "queue_tag",
+            "department_key",
+            "category_code",
+        }
+        if existing_service is None:
+            return True
+        return bool(routing_fields.intersection(change_set.keys()))
+
+    @staticmethod
+    def _service_snapshot(service: Service) -> Service:
+        return Service(
+            id=service.id,
+            code=service.code,
+            service_code=service.service_code,
+            name=service.name,
+            category_id=service.category_id,
+            category_code=service.category_code,
+            price=service.price,
+            currency=service.currency,
+            duration_minutes=service.duration_minutes,
+            doctor_id=service.doctor_id,
+            department_key=service.department_key,
+            queue_tag=service.queue_tag,
+            requires_doctor=service.requires_doctor,
+            is_consultation=service.is_consultation,
+            allow_doctor_price_override=service.allow_doctor_price_override,
+            active=service.active,
+        )
+
+    @staticmethod
+    def _service_validation_payload(service: Service) -> dict[str, Any]:
+        return {
+            "code": service.code,
+            "service_code": service.service_code,
+            "category_id": service.category_id,
+            "category_code": service.category_code,
+            "queue_tag": service.queue_tag,
+            "department_key": service.department_key,
+        }
+
+    def _log_service_creation(self, service: Service) -> None:
+        self.repository.log_service_creation(service=service)
+
+    def _log_service_update(
+        self,
+        *,
+        service_id: int,
+        old_service: Service,
+        new_service: Service,
+        comment: str | None = None,
+    ) -> None:
+        self.repository.log_service_update(
+            service_id=service_id,
+            old_service=old_service,
+            new_service=new_service,
+            comment=comment,
+        )
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
 
     def create_service_category(self, *, category_data) -> ServiceCategory:
         existing = self.repository.get_service_category_by_code(category_data.code)
         if existing:
-            raise ValueError(f"Категория с кодом '{category_data.code}' уже существует")
+            raise ValueError(f"Category with code '{category_data.code}' already exists")
 
         payload = (
             category_data.model_dump()
@@ -44,7 +187,7 @@ class ServicesApiService:
     def update_service_category(self, *, category_id: int, category_data) -> ServiceCategory:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("Категория не найдена")
+            raise LookupError("Category not found")
 
         update_data = (
             category_data.model_dump(exclude_unset=True)
@@ -54,7 +197,7 @@ class ServicesApiService:
         if "code" in update_data and update_data["code"] != category.code:
             existing = self.repository.get_service_category_by_code(update_data["code"])
             if existing:
-                raise ValueError(f"Категория с кодом '{update_data['code']}' уже существует")
+                raise ValueError(f"Category with code '{update_data['code']}' already exists")
 
         for field, value in update_data.items():
             setattr(category, field, value)
@@ -66,17 +209,17 @@ class ServicesApiService:
     def delete_service_category(self, *, category_id: int) -> dict[str, Any]:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("Категория не найдена")
+            raise LookupError("Category not found")
 
         services_count = self.repository.count_services_in_category(category_id)
         if services_count > 0:
             raise ValueError(
-                f"Нельзя удалить категорию: к ней привязано {services_count} услуг"
+                f"Cannot delete category: {services_count} services are linked to it"
             )
 
         self.repository.delete(category)
         self.repository.commit()
-        return {"message": "Категория успешно удалена"}
+        return {"message": "Category deleted successfully"}
 
     def list_services(
         self,
@@ -136,38 +279,50 @@ class ServicesApiService:
         return self.repository.get_service(service_id)
 
     def create_service(self, *, service_data):
-        if service_data.code:
-            existing = self.repository.get_service_by_code(service_data.code)
-            if existing:
-                raise ValueError(f"Услуга с кодом '{service_data.code}' уже существует")
-
-        if service_data.category_id:
-            category = self.repository.get_service_category(service_data.category_id)
-            if not category:
-                raise ValueError("Указанная категория не найдена")
-
         payload = (
             service_data.model_dump()
             if hasattr(service_data, "model_dump")
             else service_data.dict()
         )
-        if payload.get("code"):
-            payload["code"] = normalize_service_code(payload["code"])
-        if payload.get("service_code"):
-            payload["service_code"] = normalize_service_code(payload["service_code"])
+
+        canonical_code = self._normalize_service_code_payload(payload)
+        if canonical_code:
+            existing = self.repository.get_service_code_conflict(code=canonical_code)
+            if existing:
+                raise ValueError(f"Service with code '{canonical_code}' already exists")
+
+        category_specialty = None
+        if payload.get("category_id"):
+            category = self.repository.get_service_category(payload["category_id"])
+            if not category:
+                raise ValueError("Selected category not found")
+            category_specialty = category.specialty
+
         if payload.get("category_code"):
-            payload["category_code"] = normalize_service_code(payload["category_code"])
+            payload["category_code"] = self._normalize_category_code_value(
+                payload["category_code"]
+            )
+
+        self._validate_service_code_prefix_alignment(
+            service_code=canonical_code,
+            queue_tag=payload.get("queue_tag"),
+            department_key=payload.get("department_key"),
+            category_specialty=category_specialty,
+            category_code=payload.get("category_code"),
+        )
 
         service = Service(**payload)
         self.repository.add(service)
         self.repository.commit()
         self.repository.refresh(service)
+        self._log_service_creation(service)
         return service
 
     def update_service(self, *, service_id: int, service_data):
         service = self.repository.get_service(service_id)
         if not service:
-            raise LookupError("Услуга не найдена")
+            raise LookupError("Service not found")
+        old_service = self._service_snapshot(service)
 
         update_data = (
             service_data.model_dump(exclude_unset=True)
@@ -175,38 +330,98 @@ class ServicesApiService:
             else service_data.dict(exclude_unset=True)
         )
 
-        current_code = service.service_code or service.code
-        if "code" in update_data and normalize_service_code(update_data["code"]) != normalize_service_code(current_code or ""):
-            existing = self.repository.get_service_by_code(update_data["code"])
-            if existing:
-                raise ValueError(f"Услуга с кодом '{update_data['code']}' уже существует")
+        if self._should_validate_service_code_alignment(update_data, service):
+            validation_payload = self._service_validation_payload(service)
+            validation_payload.update(update_data)
+            canonical_code = self._normalize_service_code_payload(validation_payload)
+            if canonical_code:
+                existing = self.repository.get_service_code_conflict(
+                    code=canonical_code,
+                    exclude_service_id=service.id,
+                )
+                if existing:
+                    raise ValueError(
+                        f"Service with code {canonical_code!r} already exists"
+                    )
 
-        if update_data.get("category_id"):
+            category_specialty = None
+            category_id = validation_payload.get("category_id")
+            if category_id:
+                category = self.repository.get_service_category(category_id)
+                if not category:
+                    raise ValueError("Selected category not found")
+                category_specialty = category.specialty
+
+            if validation_payload.get("category_code"):
+                validation_payload["category_code"] = self._normalize_category_code_value(
+                    validation_payload["category_code"]
+                )
+
+            self._validate_service_code_prefix_alignment(
+                service_code=canonical_code,
+                queue_tag=validation_payload.get("queue_tag"),
+                department_key=validation_payload.get("department_key"),
+                category_specialty=category_specialty,
+                category_code=validation_payload.get("category_code"),
+            )
+
+            for field in (
+                "code",
+                "service_code",
+                "category_code",
+                "queue_tag",
+                "department_key",
+                "category_id",
+            ):
+                if field in update_data:
+                    update_data[field] = validation_payload.get(field)
+        elif update_data.get("category_id"):
             category = self.repository.get_service_category(update_data["category_id"])
             if not category:
-                raise ValueError("Указанная категория не найдена")
-
-        if "code" in update_data and update_data["code"] is not None:
-            update_data["code"] = normalize_service_code(update_data["code"])
-        if "service_code" in update_data and update_data["service_code"] is not None:
-            update_data["service_code"] = normalize_service_code(update_data["service_code"])
-        if "category_code" in update_data and update_data["category_code"] is not None:
-            update_data["category_code"] = normalize_service_code(update_data["category_code"])
+                raise ValueError("Selected category not found")
 
         for field, value in update_data.items():
             setattr(service, field, value)
 
         self.repository.commit()
         self.repository.refresh(service)
+        self._log_service_update(
+            service_id=service.id,
+            old_service=old_service,
+            new_service=service,
+        )
         return service
 
-    def delete_service(self, *, service_id: int) -> dict[str, str]:
+    def delete_service(self, *, service_id: int) -> dict[str, Any]:
         service = self.repository.get_service(service_id)
         if not service:
-            raise LookupError("Услуга не найдена")
-        self.repository.delete(service)
+            raise LookupError("Service not found")
+
+        old_service = self._service_snapshot(service)
+        visit_services_count = self.repository.count_visit_services_for_service(
+            service_id,
+        )
+        service.active = False
+        self.repository.add(service)
         self.repository.commit()
-        return {"message": "Услуга успешно удалена"}
+        self.repository.refresh(service)
+        self._log_service_update(
+            service_id=service.id,
+            old_service=old_service,
+            new_service=service,
+            comment=(
+                "Soft delete via service catalog API; "
+                f"visit_service_links={visit_services_count}"
+            ),
+        )
+        return {
+            "message": "Service deactivated successfully",
+            "service_id": service.id,
+            "active": service.active,
+            "soft_deleted": True,
+            "visit_usage_count": visit_services_count,
+            "visit_service_links": visit_services_count,
+        }
 
     def list_doctors_temp(self):
         return self.repository.list_active_doctors()
@@ -266,347 +481,3 @@ class ServicesApiService:
             "category_mapping": category_mapping,
             "specialty_aliases": SPECIALTY_ALIASES,
         }
-
-# --- API Router moved from app/api/v1/endpoints/services.py ---
-
-
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from pydantic import ConfigDict
-from sqlalchemy.orm import Session
-
-from app.api.deps import get_db
-
-router = APIRouter(tags=["services"])
-
-
-class ServiceCategoryOut(BaseModel):
-    id: int
-    code: str
-    name_ru: Optional[str] = None
-    name_uz: Optional[str] = None
-    name_en: Optional[str] = None
-    specialty: Optional[str] = None
-    active: bool = True
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ServiceCategoryCreate(BaseModel):
-    code: str = Field(..., max_length=50)
-    name_ru: Optional[str] = Field(None, max_length=100)
-    name_uz: Optional[str] = Field(None, max_length=100)
-    name_en: Optional[str] = Field(None, max_length=100)
-    specialty: Optional[str] = Field(None, max_length=100)
-    active: bool = True
-
-
-class ServiceCategoryUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name_ru: Optional[str] = Field(None, max_length=100)
-    name_uz: Optional[str] = Field(None, max_length=100)
-    name_en: Optional[str] = Field(None, max_length=100)
-    specialty: Optional[str] = Field(None, max_length=100)
-    active: Optional[bool] = None
-
-
-class ServiceOut(BaseModel):
-    id: int
-    code: Optional[str] = None
-    name: str
-    department: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
-    currency: Optional[str] = None
-    active: bool = True
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = None
-    doctor_id: Optional[int] = None
-    category_code: Optional[str] = None
-    service_code: Optional[str] = None
-    requires_doctor: Optional[bool] = None
-    queue_tag: Optional[str] = None
-    is_consultation: Optional[bool] = None
-    allow_doctor_price_override: Optional[bool] = None
-    department_key: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ServiceCreate(BaseModel):
-    code: Optional[str] = Field(None, max_length=32)
-    name: str = Field(..., max_length=256)
-    department: Optional[str] = Field(None, max_length=64)
-    unit: Optional[str] = Field(None, max_length=32)
-    price: Optional[Decimal] = None
-    currency: Optional[str] = Field("UZS", max_length=8)
-    active: bool = True
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = Field(30, ge=1, le=480)
-    doctor_id: Optional[int] = None
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
-    service_code: Optional[str] = Field(None, max_length=16)
-    requires_doctor: bool = False
-    queue_tag: Optional[str] = Field(None, max_length=32)
-    is_consultation: bool = False
-    allow_doctor_price_override: bool = False
-    department_key: Optional[str] = Field(None, max_length=50)
-
-
-class ServiceUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=32)
-    name: Optional[str] = Field(None, max_length=256)
-    department: Optional[str] = Field(None, max_length=64)
-    unit: Optional[str] = Field(None, max_length=32)
-    price: Optional[Decimal] = None
-    currency: Optional[str] = Field(None, max_length=8)
-    active: Optional[bool] = None
-    category_id: Optional[int] = None
-    duration_minutes: Optional[int] = Field(None, ge=1, le=480)
-    doctor_id: Optional[int] = None
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
-    service_code: Optional[str] = Field(None, max_length=16)
-    requires_doctor: Optional[bool] = None
-    queue_tag: Optional[str] = Field(None, max_length=32)
-    is_consultation: Optional[bool] = None
-    allow_doctor_price_override: Optional[bool] = None
-    department_key: Optional[str] = Field(None, max_length=50)
-
-
-def _row_to_out(row) -> ServiceOut:
-    price = None
-    try:
-        price = float(row.price) if row.price is not None else None
-    except Exception:
-        price = None
-    return ServiceOut(
-        id=row.id,
-        code=row.code,
-        name=row.name,
-        department=row.department,
-        unit=row.unit,
-        price=price,
-        currency=row.currency,
-        active=bool(row.active),
-        category_id=row.category_id,
-        duration_minutes=row.duration_minutes,
-        doctor_id=row.doctor_id,
-        category_code=getattr(row, "category_code", None),
-        service_code=getattr(row, "service_code", None),
-        requires_doctor=getattr(row, "requires_doctor", None),
-        queue_tag=getattr(row, "queue_tag", None),
-        is_consultation=getattr(row, "is_consultation", None),
-        allow_doctor_price_override=getattr(row, "allow_doctor_price_override", None),
-        department_key=getattr(row, "department_key", None),
-    )
-
-
-class QueueGroupInfo(BaseModel):
-    display_name: str
-    display_name_uz: Optional[str] = None
-    service_codes: List[str] = []
-    service_prefixes: List[str] = []
-    exclude_codes: List[str] = []
-    queue_tag: str
-    tab_key: str
-
-
-class QueueGroupsResponse(BaseModel):
-    groups: Dict[str, QueueGroupInfo] = {}
-    code_to_group: Dict[str, str] = {}
-    tab_to_group: Dict[str, str] = {}
-
-
-class DoctorOut(BaseModel):
-    id: int
-    specialty: str
-    cabinet: Optional[str] = None
-    active: bool = True
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ServiceResolveResponse(BaseModel):
-    service_id: Optional[int] = None
-    service_code: Optional[str] = None
-    normalized_code: Optional[str] = None
-    category: Optional[str] = None
-    subcategory: Optional[str] = None
-    departments: List[str] = []
-    ui_type: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ServiceCodeMappingsResponse(BaseModel):
-    specialty_to_code: dict = {}
-    code_to_name: dict = {}
-    category_mapping: dict = {}
-    specialty_aliases: dict = {}
-
-
-@router.get("/categories", response_model=List[ServiceCategoryOut], summary="Список категорий услуг")
-async def list_service_categories(
-    db: Session = Depends(get_db),
-    active: Optional[bool] = Query(default=None),
-):
-    return ServicesApiService(db).list_service_categories(active=active)
-
-
-@router.post("/categories", response_model=ServiceCategoryOut, summary="Создать категорию услуг")
-async def create_service_category(
-    category_data: ServiceCategoryCreate,
-    db: Session = Depends(get_db),
-):
-    try:
-        return ServicesApiService(db).create_service_category(category_data=category_data)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.put("/categories/{category_id}", response_model=ServiceCategoryOut, summary="Обновить категорию услуг")
-async def update_service_category(
-    category_id: int,
-    category_data: ServiceCategoryUpdate,
-    db: Session = Depends(get_db),
-):
-    try:
-        return ServicesApiService(db).update_service_category(
-            category_id=category_id,
-            category_data=category_data,
-        )
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.delete("/categories/{category_id}", summary="Удалить категорию услуг")
-async def delete_service_category(
-    category_id: int,
-    db: Session = Depends(get_db),
-):
-    try:
-        return ServicesApiService(db).delete_service_category(category_id=category_id)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("", response_model=List[ServiceOut], summary="Каталог услуг")
-async def list_services(
-    db: Session = Depends(get_db),
-    q: Optional[str] = Query(default=None, max_length=120),
-    active: Optional[bool] = Query(default=None),
-    category_id: Optional[int] = Query(default=None),
-    department: Optional[str] = Query(default=None),
-    limit: int = Query(default=200, ge=1, le=1000),
-    offset: int = Query(default=0, ge=0),
-):
-    try:
-        rows = ServicesApiService(db).list_services(
-            q=q,
-            active=active,
-            category_id=category_id,
-            department=department,
-            limit=limit,
-            offset=offset,
-        )
-        return [_row_to_out(row) for row in rows]
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Ошибка получения услуг: {str(exc)}") from exc
-
-
-@router.get("/queue-groups", response_model=QueueGroupsResponse, summary="Получить группы очередей (SSOT)")
-async def get_queue_groups(
-    db: Session = Depends(get_db),
-):
-    payload = ServicesApiService(db).get_queue_groups_payload()
-    return QueueGroupsResponse(**payload)
-
-
-@router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
-async def get_service(
-    service_id: int,
-    db: Session = Depends(get_db),
-):
-    service = ServicesApiService(db).get_service(service_id=service_id)
-    if not service:
-        raise HTTPException(status_code=404, detail="Услуга не найдена")
-    return _row_to_out(service)
-
-
-@router.post("", response_model=ServiceOut, summary="Создать услугу")
-async def create_service(
-    service_data: ServiceCreate,
-    db: Session = Depends(get_db),
-):
-    try:
-        service = ServicesApiService(db).create_service(service_data=service_data)
-        return _row_to_out(service)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.put("/{service_id}", response_model=ServiceOut, summary="Обновить услугу")
-async def update_service(
-    service_id: int,
-    service_data: ServiceUpdate,
-    db: Session = Depends(get_db),
-):
-    try:
-        service = ServicesApiService(db).update_service(
-            service_id=service_id,
-            service_data=service_data,
-        )
-        return _row_to_out(service)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.delete("/{service_id}", summary="Удалить услугу")
-async def delete_service(
-    service_id: int,
-    db: Session = Depends(get_db),
-):
-    try:
-        return ServicesApiService(db).delete_service(service_id=service_id)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.get("/admin/doctors", response_model=List[DoctorOut], summary="Список врачей (временный)")
-async def list_doctors_temp(
-    db: Session = Depends(get_db),
-):
-    return ServicesApiService(db).list_doctors_temp()
-
-
-@router.get("/resolve", response_model=ServiceResolveResponse, summary="Разрешить услугу (SSOT)")
-async def resolve_service_endpoint(
-    service_id: Optional[int] = Query(None, description="ID услуги"),
-    code: Optional[str] = Query(None, description="Код услуги"),
-    db: Session = Depends(get_db),
-):
-    if not service_id and not code:
-        raise HTTPException(
-            status_code=400,
-            detail="Необходимо указать либо service_id, либо code (или оба)",
-        )
-    result = ServicesApiService(db).resolve_service(service_id=service_id, code=code)
-    return ServiceResolveResponse(**result)
-
-
-@router.get("/code-mappings", response_model=ServiceCodeMappingsResponse, summary="Получить маппинги кодов услуг (SSOT)")
-async def get_service_code_mappings(
-    db: Session = Depends(get_db),
-):
-    payload = ServicesApiService(db).get_service_code_mappings_payload()
-    return ServiceCodeMappingsResponse(**payload)
-

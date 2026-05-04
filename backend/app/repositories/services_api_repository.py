@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import logging
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
+from app.models.visit import VisitService
 from app.services.service_mapping import normalize_service_code
+from app.services.service_audit_service import ServiceAuditService
 from app.crud import service as crud
+
+
+logger = logging.getLogger(__name__)
 
 
 class ServicesApiRepository:
@@ -35,7 +43,26 @@ class ServicesApiRepository:
         return self.db.query(Service).filter(Service.id == service_id).first()
 
     def get_service_by_code(self, code: str):
-        return self.db.query(Service).filter(Service.code == code).first()
+        return (
+            self.db.query(Service)
+            .filter(or_(Service.code == code, Service.service_code == code))
+            .first()
+        )
+
+    def get_service_code_conflict(self, *, code: str, exclude_service_id: int | None = None):
+        query = self.db.query(Service).filter(
+            or_(Service.code == code, Service.service_code == code)
+        )
+        if exclude_service_id is not None:
+            query = query.filter(Service.id != exclude_service_id)
+        return query.first()
+
+    def count_visit_services_for_service(self, service_id: int) -> int:
+        return (
+            self.db.query(VisitService)
+            .filter(VisitService.service_id == service_id)
+            .count()
+        )
 
     def list_active_services(self):
         return self.db.query(Service).filter(Service.active.is_(True)).all()
@@ -85,6 +112,38 @@ class ServicesApiRepository:
             "departments": [service.department] if getattr(service, "department", None) else [],
             "ui_type": None,
         }
+
+    def log_service_creation(self, service: Service) -> None:
+        try:
+            ServiceAuditService(self.db).log_service_creation(service=service)
+        except Exception as exc:
+            logger.warning(
+                "Service audit creation failed after service commit: service_id=%s error=%s",
+                getattr(service, "id", None),
+                exc,
+            )
+
+    def log_service_update(
+        self,
+        *,
+        service_id: int,
+        old_service: Service,
+        new_service: Service,
+        comment: str | None = None,
+    ) -> None:
+        try:
+            ServiceAuditService(self.db).log_service_update(
+                service_id=service_id,
+                old_service=old_service,
+                new_service=new_service,
+                comment=comment,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Service audit update failed after service commit: service_id=%s error=%s",
+                service_id,
+                exc,
+            )
 
     def add(self, obj) -> None:
         self.db.add(obj)

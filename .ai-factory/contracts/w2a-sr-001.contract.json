@@ -1,0 +1,58 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2A-SR-001",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/messages.py",
+      "backend/app/services/messages_api_service.py",
+      "backend/app/repositories/messages_api_repository.py",
+      "backend/tests/**",
+      "docs/status/wave2a/**"
+    ],
+    "exclude": [
+      "backend/app/api/v1/endpoints/auth*.py",
+      "backend/app/api/v1/endpoints/payment*.py",
+      "backend/app/api/v1/endpoints/queue*.py",
+      "backend/app/api/v1/endpoints/emr*.py",
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/app/services/auth*",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Move core messages router handlers to service layer calls.",
+    "Keep API contract and behavior stable.",
+    "Keep DB access inside repository/service layers."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 8,
+    "max_diff_lines": 320,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest -q"
+  ],
+  "must_not_touch": [
+    "auth/payment/queue/emr business logic",
+    "alembic migrations",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2a/W2A-SR-001_STATUS.md",
+    "test summary for this slice"
+  ],
+  "stop_conditions": [
+    "Need for protected-zone code changes.",
+    "Detected API behavior drift requiring broader refactor."
+  ]
+}

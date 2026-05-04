@@ -1,0 +1,65 @@
+{
+  "contract_version": "1.0",
+  "task_id": "W2A-SR-010",
+  "task_type": "refactor-module",
+  "repo": "drsapaev/final",
+  "scope": {
+    "include": [
+      "backend/app/api/v1/endpoints/services.py",
+      "backend/app/services/services_api_service.py",
+      "backend/app/repositories/services_api_repository.py",
+      "backend/tests/**",
+      "docs/status/wave2a/**",
+      "docs/status/W2A_EXECUTION_SUMMARY.md",
+      "docs/status/W2A_SERVICE_REPOSITORY_SLICES.md",
+      "docs/architecture/W2A_SERVICE_REPOSITORY_DISCOVERY.md",
+      "docs/architecture/W2A_ARCHITECTURE_GUARDS.md"
+    ],
+    "exclude": [
+      "backend/app/api/v1/endpoints/auth*.py",
+      "backend/app/api/v1/endpoints/payment*.py",
+      "backend/app/api/v1/endpoints/queue*.py",
+      "backend/app/api/v1/endpoints/emr*.py",
+      "backend/app/services/payment*",
+      "backend/app/services/queue*",
+      "backend/app/services/emr*",
+      "backend/app/services/auth*",
+      "backend/alembic/**",
+      ".github/workflows/**",
+      "frontend/**"
+    ]
+  },
+  "goals": [
+    "Move non-protected catalog handlers in services router to service/repository flow.",
+    "Keep queue-adjacent handlers in the same file untouched.",
+    "Preserve response contracts and route behavior."
+  ],
+  "constraints": {
+    "execution_mode": "pr-only",
+    "no_direct_push_to_main": true,
+    "max_files_changed": 9,
+    "max_diff_lines": 340,
+    "must_run_tests": true,
+    "mandatory_human_review": false
+  },
+  "must_run": [
+    "cd backend && pytest -q",
+    "cd backend && pytest tests/test_openapi_contract.py -q"
+  ],
+  "must_not_touch": [
+    "queue-adjacent handlers in services router",
+    "auth/payment/EMR business logic",
+    "alembic migrations",
+    "workflow permissions",
+    "production secrets"
+  ],
+  "required_artifacts": [
+    "docs/status/wave2a/W2A-SR-010_STATUS.md",
+    "test summary for this slice"
+  ],
+  "stop_conditions": [
+    "Need to change queue-adjacent handlers in services router.",
+    "OpenAPI or route behavior starts drifting.",
+    "The refactor grows into multi-module queue or payment work."
+  ]
+}
