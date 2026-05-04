@@ -93,8 +93,8 @@ class ServicesApiService:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"Код услуги {normalized_code} не соответствует выбранной "
-                    f"категории. Допустимые префиксы: {allowed}"
+                    f"Service code {normalized_code} does not match selected category. "
+                    f"Allowed prefixes: {allowed}"
                 ),
             )
 
@@ -171,7 +171,7 @@ class ServicesApiService:
     def create_service_category(self, *, category_data) -> ServiceCategory:
         existing = self.repository.get_service_category_by_code(category_data.code)
         if existing:
-            raise ValueError(f"РљР°С‚РµРіРѕСЂРёСЏ СЃ РєРѕРґРѕРј '{category_data.code}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
+            raise ValueError(f"Category with code '{category_data.code}' already exists")
 
         payload = (
             category_data.model_dump()
@@ -187,7 +187,7 @@ class ServicesApiService:
     def update_service_category(self, *, category_id: int, category_data) -> ServiceCategory:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
+            raise LookupError("Category not found")
 
         update_data = (
             category_data.model_dump(exclude_unset=True)
@@ -197,7 +197,7 @@ class ServicesApiService:
         if "code" in update_data and update_data["code"] != category.code:
             existing = self.repository.get_service_category_by_code(update_data["code"])
             if existing:
-                raise ValueError(f"РљР°С‚РµРіРѕСЂРёСЏ СЃ РєРѕРґРѕРј '{update_data['code']}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
+                raise ValueError(f"Category with code '{update_data['code']}' already exists")
 
         for field, value in update_data.items():
             setattr(category, field, value)
@@ -209,17 +209,17 @@ class ServicesApiService:
     def delete_service_category(self, *, category_id: int) -> dict[str, Any]:
         category = self.repository.get_service_category(category_id)
         if not category:
-            raise LookupError("РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
+            raise LookupError("Category not found")
 
         services_count = self.repository.count_services_in_category(category_id)
         if services_count > 0:
             raise ValueError(
-                f"РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ: Рє РЅРµР№ РїСЂРёРІСЏР·Р°РЅРѕ {services_count} СѓСЃР»СѓРі"
+                f"Cannot delete category: {services_count} services are linked to it"
             )
 
         self.repository.delete(category)
         self.repository.commit()
-        return {"message": "РљР°С‚РµРіРѕСЂРёСЏ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»РµРЅР°"}
+        return {"message": "Category deleted successfully"}
 
     def list_services(
         self,
@@ -289,13 +289,13 @@ class ServicesApiService:
         if canonical_code:
             existing = self.repository.get_service_code_conflict(code=canonical_code)
             if existing:
-                raise ValueError(f"РЈСЃР»СѓРіР° СЃ РєРѕРґРѕРј '{canonical_code}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
+                raise ValueError(f"Service with code '{canonical_code}' already exists")
 
         category_specialty = None
         if payload.get("category_id"):
             category = self.repository.get_service_category(payload["category_id"])
             if not category:
-                raise ValueError("РЈРєР°Р·Р°РЅРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
+                raise ValueError("Selected category not found")
             category_specialty = category.specialty
 
         if payload.get("category_code"):
