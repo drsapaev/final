@@ -9,6 +9,7 @@ from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
 from app.models.visit import VisitService
 from app.services.service_mapping import normalize_service_code
+from app.services.service_audit_service import ServiceAuditService
 from app.crud import service as crud
 
 
@@ -106,6 +107,24 @@ class ServicesApiRepository:
             "departments": [service.department] if getattr(service, "department", None) else [],
             "ui_type": None,
         }
+
+    def log_service_creation(self, service: Service) -> None:
+        ServiceAuditService(self.db).log_service_creation(service=service)
+
+    def log_service_update(
+        self,
+        *,
+        service_id: int,
+        old_service: Service,
+        new_service: Service,
+        comment: str | None = None,
+    ) -> None:
+        ServiceAuditService(self.db).log_service_update(
+            service_id=service_id,
+            old_service=old_service,
+            new_service=new_service,
+            comment=comment,
+        )
 
     def add(self, obj) -> None:
         self.db.add(obj)

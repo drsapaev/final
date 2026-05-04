@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
-from app.services.service_audit_service import ServiceAuditService
 from app.services.service_mapping import (
     get_allowed_service_code_prefixes,
     normalize_service_code,
@@ -150,7 +149,7 @@ class ServicesApiService:
         }
 
     def _log_service_creation(self, service: Service) -> None:
-        ServiceAuditService(self.repository.db).log_service_creation(service=service)
+        self.repository.log_service_creation(service=service)
 
     def _log_service_update(
         self,
@@ -160,7 +159,7 @@ class ServicesApiService:
         new_service: Service,
         comment: str | None = None,
     ) -> None:
-        ServiceAuditService(self.repository.db).log_service_update(
+        self.repository.log_service_update(
             service_id=service_id,
             old_service=old_service,
             new_service=new_service,
