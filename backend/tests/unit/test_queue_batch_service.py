@@ -14,7 +14,9 @@ from app.repositories.queue_batch_repository import (
 
 def _service_with_repo(monkeypatch: pytest.MonkeyPatch, repo: Mock):
     monkeypatch.setattr(batch_module, "QueueBatchRepository", lambda db: repo)
-    return batch_module.QueueBatchService(db=Mock())
+    service = batch_module.QueueBatchService(db=Mock())
+    service.queue_domain_service = Mock()
+    return service
 
 
 def test_create_entries_fails_when_patient_not_found(
@@ -114,9 +116,6 @@ def test_create_entries_reuses_existing_entry(
         )
     ]
 
-    create_queue_entry = Mock()
-    monkeypatch.setattr(batch_module.queue_service, "create_queue_entry", create_queue_entry)
-
     service = _service_with_repo(monkeypatch, repo)
     result = service.create_entries(
         patient_id=1,
@@ -130,7 +129,7 @@ def test_create_entries_reuses_existing_entry(
     assert "уже существовала" in result.message
     repo.commit.assert_called_once()
     repo.rollback.assert_not_called()
-    create_queue_entry.assert_not_called()
+    service.queue_domain_service.allocate_ticket.assert_not_called()
 
 
 def test_create_entries_creates_new_queue_entry(
@@ -154,10 +153,8 @@ def test_create_entries_creates_new_queue_entry(
         number=1,
         queue_time=datetime(2026, 1, 1, 9, 0, 0),
     )
-    create_queue_entry = Mock(return_value=queue_entry)
-    monkeypatch.setattr(batch_module.queue_service, "create_queue_entry", create_queue_entry)
-
     service = _service_with_repo(monkeypatch, repo)
+    service.queue_domain_service.allocate_ticket.return_value = queue_entry
     result = service.create_entries(
         patient_id=1,
         source="online",
@@ -170,9 +167,22 @@ def test_create_entries_creates_new_queue_entry(
     assert "Создано 1 запись" in result.message
     repo.commit.assert_called_once()
     repo.rollback.assert_not_called()
-    create_queue_entry.assert_called_once()
-    assert create_queue_entry.call_args.kwargs["db"] is repo.db
-    assert create_queue_entry.call_args.kwargs["commit"] is False
+    service.queue_domain_service.allocate_ticket.assert_called_once()
+    assert service.queue_domain_service.allocate_ticket.call_args.kwargs[
+        "allocation_mode"
+    ] == "create_entry"
+    assert service.queue_domain_service.allocate_ticket.call_args.kwargs[
+        "daily_queue"
+    ] is repo.get_or_create_daily_queue.return_value
+    assert service.queue_domain_service.allocate_ticket.call_args.kwargs[
+        "patient_id"
+    ] == 1
+    assert service.queue_domain_service.allocate_ticket.call_args.kwargs[
+        "auto_number"
+    ] is True
+    assert service.queue_domain_service.allocate_ticket.call_args.kwargs[
+        "commit"
+    ] is False
 
 
 def test_create_entries_wraps_unexpected_error(
@@ -191,13 +201,8 @@ def test_create_entries_wraps_unexpected_error(
     repo.find_existing_active_entries.return_value = []
     repo.get_or_create_daily_queue.return_value = SimpleNamespace(id=44)
 
-    monkeypatch.setattr(
-        batch_module.queue_service,
-        "create_queue_entry",
-        Mock(side_effect=RuntimeError("boom")),
-    )
-
     service = _service_with_repo(monkeypatch, repo)
+    service.queue_domain_service.allocate_ticket.side_effect = RuntimeError("boom")
 
     with pytest.raises(batch_module.QueueBatchDomainError) as exc:
         service.create_entries(
@@ -230,9 +235,6 @@ def test_create_entries_rejects_ambiguous_active_entries(
         SimpleNamespace(queue_id=55, number=2, queue_time=datetime(2026, 1, 1, 8, 5, 0)),
     ]
 
-    create_queue_entry = Mock()
-    monkeypatch.setattr(batch_module.queue_service, "create_queue_entry", create_queue_entry)
-
     service = _service_with_repo(monkeypatch, repo)
 
     with pytest.raises(batch_module.QueueBatchDomainError) as exc:
@@ -246,7 +248,7 @@ def test_create_entries_rejects_ambiguous_active_entries(
     assert "Неоднозначная активная запись очереди" in exc.value.detail
     repo.rollback.assert_called_once()
     repo.commit.assert_not_called()
-    create_queue_entry.assert_not_called()
+    service.queue_domain_service.allocate_ticket.assert_not_called()
 
 
 def test_registrar_batch_active_duplicate_statuses_include_live_claims() -> None:

@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.repositories.queue_read_repository import QueueReadRepository
+from app.services.queue_service import queue_service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
 
@@ -133,6 +134,12 @@ class QueueDomainService:
         if not queue:
             raise QueueDomainReadError(404, "Очередь не найдена")
         return self._build_cabinet_payload(queue)
+
+    def allocate_ticket(self, *, allocation_mode: str, **kwargs: Any) -> object:
+        if allocation_mode != "create_entry":
+            raise ValueError(f"Unsupported queue allocation mode: {allocation_mode}")
+        db = self.read_repository.db
+        return queue_service.create_queue_entry(db=db, **kwargs)
 
     def enqueue(self, **_: Any) -> QueueSnapshot:
         raise NotImplementedError("QueueDomainService.enqueue is a Phase 2 method")

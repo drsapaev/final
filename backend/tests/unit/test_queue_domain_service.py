@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
+from app.services import queue_domain_service as domain_module
 
 from app.services.queue_domain_service import (
     QueueDomainReadError,
@@ -112,3 +114,47 @@ class TestQueueDomainService:
             service.get_queue_cabinet_info(queue_id=5)
 
         assert exc_info.value.status_code == 404
+
+    def test_allocate_ticket_delegates_create_entry_mode(self, monkeypatch) -> None:
+        db = Mock()
+        queue_entry = SimpleNamespace(id=9)
+        create_queue_entry = Mock(return_value=queue_entry)
+        monkeypatch.setattr(
+            domain_module.queue_service,
+            "create_queue_entry",
+            create_queue_entry,
+        )
+
+        class Repository:
+            def __init__(self):
+                self.db = db
+
+        service = QueueDomainService(db=db, read_repository=Repository())
+        result = service.allocate_ticket(
+            allocation_mode="create_entry",
+            daily_queue=SimpleNamespace(id=3),
+            patient_id=7,
+            patient_name="Test Patient",
+            phone="+998901234567",
+            source="desk",
+            auto_number=True,
+            commit=False,
+        )
+
+        assert result is queue_entry
+        create_queue_entry.assert_called_once()
+        assert create_queue_entry.call_args.kwargs["db"] is db
+        assert create_queue_entry.call_args.kwargs["patient_id"] == 7
+        assert create_queue_entry.call_args.kwargs["auto_number"] is True
+        assert create_queue_entry.call_args.kwargs["commit"] is False
+
+    def test_allocate_ticket_rejects_unknown_mode(self) -> None:
+        class Repository:
+            db = None
+
+        service = QueueDomainService(db=None, read_repository=Repository())
+
+        with pytest.raises(ValueError) as exc_info:
+            service.allocate_ticket(allocation_mode="direct_sql")
+
+        assert "Unsupported queue allocation mode" in str(exc_info.value)
