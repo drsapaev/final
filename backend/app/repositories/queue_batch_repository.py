@@ -13,6 +13,14 @@ from app.models.patient import Patient
 from app.models.service import Service
 
 
+REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES = (
+    "waiting",
+    "called",
+    "in_service",
+    "diagnostics",
+)
+
+
 class QueueBatchRepository:
     """Encapsulates ORM queries used by queue batch service."""
 
@@ -45,13 +53,13 @@ class QueueBatchRepository:
             queue_tag=None,
         )
 
-    def find_existing_active_entry(
+    def find_existing_active_entries(
         self,
         *,
         specialist_id: int,
         day: date,
         patient_id: int,
-    ) -> OnlineQueueEntry | None:
+    ) -> list[OnlineQueueEntry]:
         return (
             self.db.query(OnlineQueueEntry)
             .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
@@ -59,10 +67,25 @@ class QueueBatchRepository:
                 DailyQueue.specialist_id == specialist_id,
                 DailyQueue.day == day,
                 OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
+                OnlineQueueEntry.status.in_(REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES),
             )
-            .first()
+            .order_by(OnlineQueueEntry.id.asc())
+            .all()
         )
+
+    def find_existing_active_entry(
+        self,
+        *,
+        specialist_id: int,
+        day: date,
+        patient_id: int,
+    ) -> OnlineQueueEntry | None:
+        entries = self.find_existing_active_entries(
+            specialist_id=specialist_id,
+            day=day,
+            patient_id=patient_id,
+        )
+        return entries[0] if entries else None
 
     def commit(self) -> None:
         self.db.commit()

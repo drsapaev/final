@@ -7,6 +7,9 @@ from unittest.mock import Mock
 import pytest
 
 from app.services import queue_batch_service as batch_module
+from app.repositories.queue_batch_repository import (
+    REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES,
+)
 
 
 def _service_with_repo(monkeypatch: pytest.MonkeyPatch, repo: Mock):
@@ -103,11 +106,13 @@ def test_create_entries_reuses_existing_entry(
     )
     repo.get_active_service.return_value = SimpleNamespace(id=11)
     repo.resolve_specialist_user_id.return_value = (101, False)
-    repo.find_existing_active_entry.return_value = SimpleNamespace(
+    repo.find_existing_active_entries.return_value = [
+        SimpleNamespace(
         queue_id=22,
         number=5,
         queue_time=datetime(2026, 1, 1, 8, 0, 0),
-    )
+        )
+    ]
 
     create_queue_entry = Mock()
     monkeypatch.setattr(batch_module.queue_service, "create_queue_entry", create_queue_entry)
@@ -141,7 +146,7 @@ def test_create_entries_creates_new_queue_entry(
     )
     repo.get_active_service.return_value = SimpleNamespace(id=12)
     repo.resolve_specialist_user_id.return_value = (202, False)
-    repo.find_existing_active_entry.return_value = None
+    repo.find_existing_active_entries.return_value = []
     repo.get_or_create_daily_queue.return_value = SimpleNamespace(id=33)
 
     queue_entry = SimpleNamespace(
@@ -183,7 +188,7 @@ def test_create_entries_wraps_unexpected_error(
     )
     repo.get_active_service.return_value = SimpleNamespace(id=13)
     repo.resolve_specialist_user_id.return_value = (303, False)
-    repo.find_existing_active_entry.return_value = None
+    repo.find_existing_active_entries.return_value = []
     repo.get_or_create_daily_queue.return_value = SimpleNamespace(id=44)
 
     monkeypatch.setattr(
@@ -205,3 +210,49 @@ def test_create_entries_wraps_unexpected_error(
     assert "массового создания" in exc.value.detail
     repo.rollback.assert_called_once()
     repo.commit.assert_not_called()
+
+
+def test_create_entries_rejects_ambiguous_active_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = Mock()
+    repo.db = Mock()
+    repo.get_patient.return_value = SimpleNamespace(
+        first_name="Test",
+        last_name="Patient",
+        phone="+998901234567",
+        short_name=lambda: "Test Patient",
+    )
+    repo.get_active_service.return_value = SimpleNamespace(id=14)
+    repo.resolve_specialist_user_id.return_value = (404, False)
+    repo.find_existing_active_entries.return_value = [
+        SimpleNamespace(queue_id=55, number=1, queue_time=datetime(2026, 1, 1, 8, 0, 0)),
+        SimpleNamespace(queue_id=55, number=2, queue_time=datetime(2026, 1, 1, 8, 5, 0)),
+    ]
+
+    create_queue_entry = Mock()
+    monkeypatch.setattr(batch_module.queue_service, "create_queue_entry", create_queue_entry)
+
+    service = _service_with_repo(monkeypatch, repo)
+
+    with pytest.raises(batch_module.QueueBatchDomainError) as exc:
+        service.create_entries(
+            patient_id=1,
+            source="desk",
+            services=[batch_module.QueueBatchServiceItem(specialist_id=404, service_id=14)],
+        )
+
+    assert exc.value.status_code == 409
+    assert "Неоднозначная активная запись очереди" in exc.value.detail
+    repo.rollback.assert_called_once()
+    repo.commit.assert_not_called()
+    create_queue_entry.assert_not_called()
+
+
+def test_registrar_batch_active_duplicate_statuses_include_live_claims() -> None:
+    assert REGISTRAR_BATCH_ACTIVE_DUPLICATE_STATUSES == (
+        "waiting",
+        "called",
+        "in_service",
+        "diagnostics",
+    )
