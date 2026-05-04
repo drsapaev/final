@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.repositories.queue_batch_repository import QueueBatchRepository
-from app.services.queue_service import queue_service
+from app.services.queue_domain_service import QueueDomainService
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class QueueBatchService:
 
     def __init__(self, db: Session):
         self.repository = QueueBatchRepository(db)
+        self.queue_domain_service = QueueDomainService(db)
 
     def create_entries(
         self,
@@ -146,14 +147,15 @@ class QueueBatchService:
                 )
 
                 try:
-                    queue_entry = queue_service.create_queue_entry(
-                        db=self.repository.db,
+                    queue_entry = self.queue_domain_service.allocate_ticket(
+                        allocation_mode="create_entry",
                         daily_queue=daily_queue,
                         patient_id=patient_id,
                         patient_name=patient_name,
                         phone=patient_phone,
                         source=source,
                         queue_time=current_time,
+                        auto_number=True,
                         commit=False,
                     )
                 except ValueError as exc:
