@@ -21,6 +21,12 @@ class QueueReadRepository:
     def get_queue(self, queue_id: int) -> DailyQueue | None:
         return self.db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
 
+    def list_active_doctors(self, *, specialty: str | None) -> list[Doctor]:
+        query = self.db.query(Doctor).filter(Doctor.active.is_(True))
+        if specialty:
+            query = query.filter(Doctor.specialty == specialty)
+        return query.all()
+
     def list_daily_queues(
         self,
         *,
