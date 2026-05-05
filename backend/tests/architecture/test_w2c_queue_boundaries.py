@@ -12,12 +12,14 @@ def _function_block(path: Path, function_name: str) -> str:
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
             end = getattr(node, "end_lineno", node.lineno)
-            return "\n".join(lines[node.lineno - 1 : end])
+            return "\
+".join(lines[node.lineno - 1 : end])
         if isinstance(node, ast.ClassDef):
             for inner in node.body:
                 if isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)) and inner.name == function_name:
                     end = getattr(inner, "end_lineno", inner.lineno)
-                    return "\n".join(lines[inner.lineno - 1 : end])
+                    return "\
+".join(lines[inner.lineno - 1 : end])
     raise AssertionError(f"Function {function_name} not found in {path}")
 
 
@@ -62,3 +64,17 @@ def test_queue_cabinet_read_handlers_use_domain_service() -> None:
         block = _function_block(endpoint_path, function_name)
         assert "QueueDomainService(db)" in block
         assert "QueueCabinetManagementApiService(db)" not in block
+
+
+def test_queue_limits_status_handler_uses_domain_service() -> None:
+    endpoint_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "api"
+        / "v1"
+        / "endpoints"
+        / "queue_limits.py"
+    )
+    block = _function_block(endpoint_path, "get_queue_status_with_limits")
+    assert "QueueDomainService(db)" in block
+    assert "QueueLimitsApiService(db).get_queue_status_with_limits" not in block
