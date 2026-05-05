@@ -80,7 +80,7 @@ def _create_daily_queue(
     queue = DailyQueue(
         day=date.today(),
         specialist_id=specialist_id,
-        queue_tag=None,
+        queue_tag="cardiology_common",
         active=True,
     )
     db_session.add(queue)

@@ -28,7 +28,7 @@ canonical queue claim.
 Characterization shows:
 
 - two services for the same specialist but different `queue_tag` values still
-  produce one queue row
+  produce one queue row in the first service queue_tag bucket
 
 That behavior may be correct, but it needs an explicit contract decision before
 boundary migration freezes it.

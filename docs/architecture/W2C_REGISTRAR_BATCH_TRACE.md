@@ -18,15 +18,15 @@ Sequence:
 4. Router iterates over `services[]`:
    - validates that each service exists
    - resolves `specialist_id`
-   - if `specialist_id` matches `doctors.id`, converts it to `user_id`
+   - expects `specialist_id` to match `doctors.id`
    - otherwise accepts raw `users.id`
 5. Router groups all services by resolved `specialist_id`.
 6. For each grouped specialist:
-   - loads `DailyQueue` for `specialist_id + today`
-   - if absent, creates `DailyQueue` inline with `queue_tag=None`
+   - loads `DailyQueue` for `specialist_id + today + first service queue_tag`
+   - if absent, creates that service-tagged `DailyQueue`
 7. Router performs duplicate pre-check:
    - same `patient_id`
-   - same queue/day
+   - same queue/day/service queue_tag
    - statuses only `waiting` / `called`
 8. If duplicate is found:
    - no allocator call
@@ -65,7 +65,7 @@ Sequence:
 ### Same specialist, different service `queue_tag`
 
 - services are grouped by specialist, not by `queue_tag`
-- same-specialist multi-service batch produces a single queue row
+- same-specialist multi-service batch produces a single queue row in the first service queue_tag bucket
 
 ### Existing `diagnostics` row
 
