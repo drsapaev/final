@@ -49,13 +49,28 @@ Migration must follow this order:
 - no production caller migration yet
 - direct SQL and legacy allocators remain untouched
 
+### Phase 2.1: Safe caller migration
+
+Completed in this pass:
+
+- `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
+- `backend/app/services/qr_queue_service.py::complete_join_session()`
+- `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
+
+Why these callers were safe:
+
+- they already delegated allocator policy to `queue_service.join_queue_with_token()`
+- they did not implement direct SQL numbering
+- they did not depend on `OnlineDay`
+- they did not own numbering or duplicate policy themselves
+
 ### Phase 3: Gradually migrate callers
 
 Preferred early caller families:
 
 - SSOT queue-service-backed online join
-- registrar batch path
-- confirmation path that already relies on SSOT queue models
+- registrar batch path only after explicit duplicate-policy review
+- confirmation path only after split allocation is collapsed safely
 
 Later only:
 
@@ -90,6 +105,7 @@ Allocator migration is feasible, but only as a staged domain migration.
 The correct first execution target is:
 
 - single-owner introduction behind `QueueDomainService`
+- followed by thin caller migration into the compatibility boundary
 
 The incorrect first execution target would be:
 

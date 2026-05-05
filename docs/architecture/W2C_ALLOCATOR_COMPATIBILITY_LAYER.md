@@ -49,15 +49,22 @@ Those paths remain external migration targets.
 
 ## Where The Boundary Is Used Today
 
-At the end of Phase 2, the boundary is used in:
+At the end of Phase 2.1, the boundary is used in:
 
 - characterization tests
 - boundary unit tests
+- `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
+- `backend/app/services/qr_queue_service.py::complete_join_session()`
+- `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
 
-It is **not yet wired into production call sites**.
+This is a limited production rollout.
 
-This is intentional. The goal of Phase 2 is to establish the public boundary
-without changing runtime behavior.
+It is intentionally **not** yet wired into:
+
+- registrar batch writers
+- force-majeure allocator paths
+- direct SQL allocator branches
+- legacy `OnlineDay` callers
 
 ## Why This Shape Is Safe
 
@@ -78,3 +85,12 @@ Future migration should replace production callers gradually:
 1. caller keeps current behavior
 2. caller switches from direct `queue_service` use to `QueueDomainService.allocate_ticket()`
 3. only later does the internal allocator implementation change
+
+## Phase 2.1 Outcome
+
+Phase 2.1 narrows the allocator surface area without changing policy:
+
+- thin online join callers now depend on `QueueDomainService`
+- QR session completion callers now depend on `QueueDomainService`
+- numbering, duplicate detection, and queue-time logic still live in the legacy allocator
+- high-risk allocator families remain deferred
