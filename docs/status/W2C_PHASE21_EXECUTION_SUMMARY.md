@@ -56,3 +56,11 @@ Recommended next step:
 Otherwise:
 
 - stop and perform review before touching registrar, direct SQL, force-majeure, or `OnlineDay` allocators
+
+## Superseded Recommendation
+
+That recommendation has now been expanded in Phase 2.2 review docs:
+
+- `docs/architecture/W2C_HIGH_RISK_ALLOCATOR_FAMILIES.md`
+- `docs/status/W2C_HIGH_RISK_MIGRATION_READINESS.md`
+- `docs/status/W2C_NEXT_EXECUTION_UNIT.md`
