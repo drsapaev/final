@@ -116,7 +116,8 @@ def test_confirmation_split_flow_replay_returns_error_and_keeps_single_queue_row
     )
 
     assert second_response.status_code == 400
-    assert "Р’РёР·РёС‚ СѓР¶Рµ РёРјРµРµС‚ СЃС‚Р°С‚СѓСЃ" in second_response.json()["detail"]
+    detail = second_response.json()["detail"]
+    assert detail.endswith(": open")
 
     entries = _queue_entries_for_visit(db_session, test_visit.id)
     assert len(entries) == 1
