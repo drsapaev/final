@@ -167,7 +167,7 @@ def test_registrar_batch_characterization_preserves_desk_source_and_waiting_stat
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
     response = client.post(
@@ -178,7 +178,7 @@ def test_registrar_batch_characterization_preserves_desk_source_and_waiting_stat
             "source": "desk",
             "services": [
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": test_service.id,
                     "quantity": 1,
                 }
