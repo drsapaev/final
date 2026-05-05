@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
@@ -29,6 +30,23 @@ def _create_specialist_user(
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+def _create_doctor_profile(
+    db_session,
+    *,
+    user: User,
+    specialty: str,
+) -> Doctor:
+    doctor = Doctor(
+        user_id=user.id,
+        specialty=specialty,
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    return doctor
 
 
 def _create_service(
@@ -78,7 +96,7 @@ def test_registrar_batch_characterization_preserves_request_source_on_create(
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
     response = client.post(
@@ -89,7 +107,7 @@ def test_registrar_batch_characterization_preserves_request_source_on_create(
             "source": "morning_assignment",
             "services": [
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": test_service.id,
                     "quantity": 1,
                 }
@@ -124,7 +142,7 @@ def test_registrar_batch_characterization_groups_services_by_specialist_not_queu
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
     diagnostics_service = _create_service(
@@ -142,12 +160,12 @@ def test_registrar_batch_characterization_groups_services_by_specialist_not_queu
             "source": "desk",
             "services": [
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": test_service.id,
                     "quantity": 1,
                 },
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": diagnostics_service.id,
                     "quantity": 1,
                 },
@@ -176,7 +194,7 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
     second_specialist = _create_specialist_user(
@@ -185,13 +203,18 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
         email="batch_second_specialist@test.local",
         full_name="Batch Second Specialist",
     )
+    second_doctor = _create_doctor_profile(
+        db_session,
+        user=second_specialist,
+        specialty="batch_second",
+    )
     second_service = _create_service(
         db_session,
         code="BATCH-LAB-01",
         name="Batch Second Service",
         queue_tag="laboratory_general",
     )
-    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    existing_queue = _create_daily_queue(db_session, specialist_id=test_doctor.id)
     existing_queue_time = datetime.now(ZoneInfo("Asia/Tashkent")).replace(microsecond=0)
     existing_entry = OnlineQueueEntry(
         queue_id=existing_queue.id,
@@ -215,12 +238,12 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
             "source": "desk",
             "services": [
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": test_service.id,
                     "quantity": 1,
                 },
                 {
-                    "specialist_id": second_specialist.id,
+                    "specialist_id": second_doctor.id,
                     "service_id": second_service.id,
                     "quantity": 1,
                 },
@@ -236,7 +259,7 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
     entries_by_specialist = {
         item["specialist_id"]: item for item in payload["entries"]
     }
-    assert entries_by_specialist[cardio_user.id]["number"] == 7
+    assert entries_by_specialist[test_doctor.id]["number"] == 7
 
     patient_entries = (
         db_session.query(OnlineQueueEntry)
@@ -249,7 +272,7 @@ def test_registrar_batch_characterization_mixed_specialist_batch_reuses_one_and_
     created_entry = next(entry for entry in patient_entries if entry.id != existing_entry.id)
     assert created_entry.source == "desk"
     assert created_entry.status == "waiting"
-    assert entries_by_specialist[second_specialist.id]["number"] == created_entry.number
+    assert entries_by_specialist[second_doctor.id]["number"] == created_entry.number
 
     db_session.refresh(existing_entry)
     assert existing_entry.queue_time == existing_queue_time.replace(tzinfo=None)
@@ -263,10 +286,10 @@ def test_registrar_batch_characterization_existing_diagnostics_entry_still_alloc
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
-    existing_queue = _create_daily_queue(db_session, specialist_id=cardio_user.id)
+    existing_queue = _create_daily_queue(db_session, specialist_id=test_doctor.id)
     diagnostics_entry = OnlineQueueEntry(
         queue_id=existing_queue.id,
         number=5,
@@ -288,7 +311,7 @@ def test_registrar_batch_characterization_existing_diagnostics_entry_still_alloc
             "source": "desk",
             "services": [
                 {
-                    "specialist_id": cardio_user.id,
+                    "specialist_id": test_doctor.id,
                     "service_id": test_service.id,
                     "quantity": 1,
                 }

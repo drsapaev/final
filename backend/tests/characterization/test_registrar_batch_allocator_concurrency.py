@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy.orm import sessionmaker
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
@@ -28,6 +29,18 @@ def _create_user(session, *, suffix: str) -> User:
     session.commit()
     session.refresh(user)
     return user
+
+
+def _create_doctor(session, *, user: User, suffix: str) -> Doctor:
+    doctor = Doctor(
+        user_id=user.id,
+        specialty=f"batch_concurrency_{suffix}",
+        active=True,
+    )
+    session.add(doctor)
+    session.commit()
+    session.refresh(doctor)
+    return doctor
 
 
 def _create_patient(session, *, suffix: str) -> Patient:
@@ -125,7 +138,8 @@ def test_registrar_batch_concurrency_characterization_parallel_duplicate_reads_c
     seed = session_local()
     suffix = uuid.uuid4().hex[:8]
     try:
-        specialist = _create_user(seed, suffix=suffix)
+        specialist_user = _create_user(seed, suffix=suffix)
+        specialist = _create_doctor(seed, user=specialist_user, suffix=suffix)
         patient = _create_patient(seed, suffix=suffix)
         _create_service(seed, suffix=suffix)
         queue = DailyQueue(
@@ -138,6 +152,7 @@ def test_registrar_batch_concurrency_characterization_parallel_duplicate_reads_c
         seed.commit()
         seed.refresh(queue)
         specialist_id = specialist.id
+        specialist_user_id = specialist_user.id
         patient_id = patient.id
         queue_id = queue.id
     finally:
@@ -178,7 +193,8 @@ def test_registrar_batch_concurrency_characterization_parallel_duplicate_reads_c
             ).delete()
             cleanup.query(DailyQueue).filter(DailyQueue.id == queue_id).delete()
             cleanup.query(Patient).filter(Patient.id == patient_id).delete()
-            cleanup.query(User).filter(User.id == specialist_id).delete()
+            cleanup.query(Doctor).filter(Doctor.id == specialist_id).delete()
+            cleanup.query(User).filter(User.id == specialist_user_id).delete()
             cleanup.commit()
         finally:
             cleanup.close()
