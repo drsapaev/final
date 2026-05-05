@@ -1,7 +1,7 @@
 # Wave 2C Queue Domain Service Proposal
 
-Date: 2026-03-06
-Mode: analysis-first
+Date: 2026-03-07
+Mode: analysis-first, updated with Phase 2 compatibility boundary
 
 ## Goal
 
@@ -257,6 +257,9 @@ Currently implemented:
 - `get_queue_snapshot_by_specialist_day(specialist_id=..., day=...)`
 - `list_queue_cabinet_info(day=..., specialist_id=..., cabinet_number=...)`
 - `get_queue_cabinet_info(queue_id=...)`
+- `get_queue_limits_status(day=..., specialty=...)`
+- `get_queue_groups_payload()`
+- `get_service_code_mappings_payload()`
 
 Skeleton-only methods that intentionally still raise `NotImplementedError`:
 
@@ -272,3 +275,30 @@ This is intentional for Phase 1:
 - read-only queue slices can adopt the service now
 - mutation flows stay in legacy paths until the state machine and transaction rules
   are migrated explicitly
+
+## Phase 2 Compatibility Boundary Status
+
+Implemented in Wave 2C Phase 2:
+
+- `allocate_ticket(allocation_mode="create_entry", **kwargs)`
+- `allocate_ticket(allocation_mode="join_with_token", **kwargs)`
+
+Current behavior:
+
+- the method is a facade only
+- it delegates to the existing `queue_service`
+- it does not change numbering logic
+- it does not change duplicate-policy enforcement
+- it does not change `queue_time` semantics
+
+Current limitation:
+
+- production callers are not yet repointed to this boundary
+- direct SQL allocators and legacy `OnlineDay` flows remain outside it
+- migration risk is reduced by characterization tests, not by runtime unification yet
+
+Notes for the narrowed `W2C-MS-004` slice:
+
+- only queue metadata reads moved under `QueueDomainService`
+- static taxonomy definitions still live in `app/services/service_mapping.py`
+- no queue numbering, duplicate, lifecycle, or QR-window behavior changed
