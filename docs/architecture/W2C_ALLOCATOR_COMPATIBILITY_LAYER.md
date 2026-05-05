@@ -13,6 +13,11 @@ The new public boundary is:
 
 This is a facade only. It does not introduce a new numbering algorithm.
 
+Cross-context callers may reach that boundary through:
+
+- `QueueContextFacade`
+- `QueueDomainServiceContractAdapter`
+
 ## Delegation Rules
 
 `QueueDomainService.allocate_ticket()` currently supports two delegation modes:
@@ -49,13 +54,17 @@ Those paths remain external migration targets.
 
 ## Where The Boundary Is Used Today
 
-At the end of Phase 2.1, the boundary is used in:
+After the confirmation migration slice, the boundary is used in:
 
 - characterization tests
 - boundary unit tests
 - `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
 - `backend/app/services/qr_queue_service.py::complete_join_session()`
 - `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
+- `backend/app/services/visit_confirmation_service.py` for mounted public
+  confirmation allocation when a new queue row is needed
+- mounted registrar confirmation bridge indirectly through
+  `VisitConfirmationService.assign_queue_numbers_on_confirmation()`
 
 This is a limited production rollout.
 
@@ -65,6 +74,8 @@ It is intentionally **not** yet wired into:
 - force-majeure allocator paths
 - direct SQL allocator branches
 - legacy `OnlineDay` callers
+- broader registrar wizard allocator branches outside the mounted confirmation
+  bridge
 
 ## Why This Shape Is Safe
 
@@ -94,3 +105,16 @@ Phase 2.1 narrows the allocator surface area without changing policy:
 - QR session completion callers now depend on `QueueDomainService`
 - numbering, duplicate detection, and queue-time logic still live in the legacy allocator
 - high-risk allocator families remain deferred
+
+## Confirmation Migration Update
+
+The mounted confirmation family now uses the compatibility boundary for queue
+row creation while keeping the number lookup helper unchanged:
+
+1. `queue_service.get_next_queue_number(...)`
+2. `QueueContextFacade.allocate_ticket(...)`
+3. `QueueDomainService.allocate_ticket(...)`
+4. legacy `queue_service.create_queue_entry(...)`
+
+This preserves the corrected confirmation behavior while removing the direct
+confirmation-family dependency on legacy queue-row creation.

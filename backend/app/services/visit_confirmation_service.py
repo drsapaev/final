@@ -10,6 +10,10 @@ from typing import Any
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
+from app.services.context_facades.queue_facade import (
+    QueueContextFacade,
+    QueueDomainServiceContractAdapter,
+)
 from app.services.queue_service import queue_service
 from app.utils.validators import normalize_phone_uz
 
@@ -36,6 +40,7 @@ class VisitConfirmationService:
     def __init__(self, db):
         self.repository = VisitConfirmationRepository(db)
         self.security_service = ConfirmationSecurityService(db)
+        self.queue_facade = QueueContextFacade(QueueDomainServiceContractAdapter(db))
 
     def confirm_by_telegram(
         self,
@@ -555,6 +560,7 @@ class VisitConfirmationService:
                     visit=visit,
                 )
                 queue_number = existing_entry.number
+                queue_id = existing_entry.queue_id
             else:
                 queue_number = queue_service.get_next_queue_number(
                     self.repository.db,
@@ -562,20 +568,22 @@ class VisitConfirmationService:
                     queue_tag=queue_tag,
                 )
 
-                queue_service.create_queue_entry(
-                    self.repository.db,
+                created_entry = self.queue_facade.allocate_ticket(
+                    allocation_mode="create_entry",
                     daily_queue=daily_queue,
                     patient_id=visit.patient_id,
                     visit_id=visit.id,
                     number=queue_number,
                     source="confirmation",
                 )
+                queue_number = created_entry.number
+                queue_id = created_entry.queue_id
 
             queue_numbers.append(
                 {
-                "queue_tag": queue_tag,
-                "number": queue_number,
-                "queue_id": daily_queue.id,
+                    "queue_tag": queue_tag,
+                    "number": queue_number,
+                    "queue_id": queue_id,
                 }
             )
 
@@ -597,7 +605,7 @@ class VisitConfirmationService:
                     "queue_tag": queue_tag,
                     "queue_name": queue_names.get(queue_tag, queue_tag),
                     "queue_number": queue_number,
-                    "queue_id": daily_queue.id,
+                    "queue_id": queue_id,
                     "patient_id": visit.patient_id,
                     "patient_name": (
                         patient.short_name() if patient else "Неизвестный пациент"
