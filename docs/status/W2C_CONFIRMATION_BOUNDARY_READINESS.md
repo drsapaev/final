@@ -1,45 +1,48 @@
-﻿# Wave 2C Confirmation Boundary Readiness
+# Wave 2C Confirmation Boundary Readiness
 
-Date: 2026-03-07
-Mode: characterization-first
-Decision: `READY_AFTER_CONTRACT_CLARIFICATION`
+Date: 2026-05-05
+Mode: post-correction and post-boundary-migration
+Decision: `CONSUMED_BY_BOUNDARY_MIGRATION`
 
-## Why This Is Not Boundary-Ready Yet
+## Why The Status Changed
 
-Characterization now proves the public confirmation flow well enough to avoid
-guessing, but the family is still not ready for a direct migration to
-`QueueDomainService.allocate_ticket()` for three reasons:
+Earlier confirmation readiness was blocked by duplicate-creating behavior and
+split public/registrar semantics. The replacement chain resolved that in two
+steps:
 
-1. Confirmation still has two mounted implementations:
-   - public token flow in `visit_confirmation.py`
-   - registrar bridge in `registrar_wizard.py`
-2. Current runtime behavior allows confirmation to create a second active queue
-   row when the patient already has a waiting row in the same queue.
-3. Parallel validation and pending-visit lookup can both observe the same
-   `pending_confirmation` visit before status flips, so any migration that
-   reorders validation and persistence could change behavior.
+1. #262 preserved the corrected active-entry reuse and explicit ambiguity
+   conflict behavior on current `main`.
+2. This boundary migration slice routes new confirmation queue-row creation
+   through the queue compatibility boundary.
 
-## What Characterization Confirmed
+## Current Confirmation Properties
 
-- same-day public confirmation allocates the next number and creates a queue row
-  with `source="confirmation"`
-- created queue row links back to `visit_id`
-- replayed public confirmation returns an error and does not create a second
-  confirmation row
-- registrar confirmation also creates `source="confirmation"` queue rows
-- pre-existing active queue rows do not block confirmation-based queue creation
+- clear existing active row is reused
+- no new ticket is allocated in the reuse case
+- ambiguous ownership returns explicit conflict
+- public confirmation and mounted registrar confirmation share the same service
+  assignment path
+- when a new row is needed, creation goes through `QueueContextFacade` and
+  `QueueDomainService.allocate_ticket()`
 
-## What Still Needs Clarification
+## What Still Remains Legacy
 
-- Should confirmation preserve the current "create another active row" behavior
-  when an active queue entry already exists for that patient?
-- Should public confirmation and registrar confirmation be migrated as one
-  family or as two separate compatibility slices?
-- Is `allocate_ticket(allocation_mode="create_entry")` enough for confirmation,
-  or should the boundary own the split allocation preconditions too?
+- standalone number lookup remains legacy
+- allocator internals still delegate to the legacy queue service
+- broader registrar wizard/batch allocation families remain deferred
+- `qr_queue`, `force_majeure`, and `OnlineDay` allocator families remain out of
+  scope
 
 ## Current Verdict
 
-`QueueDomainService.allocate_ticket()` can support the persistence side of the
-flow, but migrating the confirmation family safely still requires a domain-level
-decision on duplicate-preserving behavior and family boundaries.
+The mounted confirmation family no longer blocks the queue boundary track. The
+next useful allocator step should be characterization-first for the next risky
+family, not more confirmation plumbing.
+
+## Later Progress
+
+This readiness result has now been consumed by the boundary migration slice.
+See:
+
+- `docs/architecture/W2C_CONFIRMATION_BOUNDARY_MIGRATION.md`
+- `docs/status/W2C_CONFIRMATION_BOUNDARY_MIGRATION_STATUS.md`
