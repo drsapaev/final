@@ -293,9 +293,9 @@ class QueueDomainService:
         """
 
         if allocation_mode == "create_entry":
-            return self.allocator_service.create_queue_entry(self.db, **kwargs)
+            return self.allocator_service.create_queue_entry(db=self.db, **kwargs)
         if allocation_mode == "join_with_token":
-            return self.allocator_service.join_queue_with_token(self.db, **kwargs)
+            return self.allocator_service.join_queue_with_token(db=self.db, **kwargs)
         raise ValueError(f"Unsupported queue allocation mode: {allocation_mode}")
 
     def enqueue(self, **_: Any) -> QueueSnapshot:

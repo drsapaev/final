@@ -40,7 +40,7 @@ def test_allocate_ticket_create_entry_delegates_to_legacy_allocator() -> None:
 
     assert result is expected_entry
     allocator.create_queue_entry.assert_called_once()
-    assert allocator.create_queue_entry.call_args.args[0] == "db-session"
+    assert allocator.create_queue_entry.call_args.kwargs["db"] == "db-session"
     assert allocator.create_queue_entry.call_args.kwargs["patient_id"] == 1
     assert allocator.create_queue_entry.call_args.kwargs["source"] == "desk"
     assert allocator.create_queue_entry.call_args.kwargs["commit"] is False
@@ -74,7 +74,7 @@ def test_allocate_ticket_join_with_token_preserves_legacy_duplicate_result() -> 
 
     assert result == expected
     allocator.join_queue_with_token.assert_called_once()
-    assert allocator.join_queue_with_token.call_args.args[0] == "db-session"
+    assert allocator.join_queue_with_token.call_args.kwargs["db"] == "db-session"
     assert allocator.join_queue_with_token.call_args.kwargs["token_str"] == "qr-token"
     assert allocator.join_queue_with_token.call_args.kwargs["source"] == "online"
 
