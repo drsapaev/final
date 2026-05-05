@@ -81,7 +81,7 @@ def test_registrar_batch_concurrency_characterization_repeated_submission_reuses
     db_session,
     registrar_auth_headers,
     test_patient,
-    cardio_user,
+    test_doctor,
     test_service,
 ):
     request_payload = {
@@ -89,7 +89,7 @@ def test_registrar_batch_concurrency_characterization_repeated_submission_reuses
         "source": "desk",
         "services": [
             {
-                "specialist_id": cardio_user.id,
+                "specialist_id": test_doctor.id,
                 "service_id": test_service.id,
                 "quantity": 1,
             }
