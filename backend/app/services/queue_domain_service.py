@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import get_queue_settings
 from app.repositories.queue_read_repository import QueueReadRepository
 from app.services.queue_service import queue_service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
@@ -135,6 +136,53 @@ class QueueDomainService:
             raise QueueDomainReadError(404, "Очередь не найдена")
         return self._build_cabinet_payload(queue)
 
+    def get_queue_limits_status(
+        self,
+        *,
+        day: date,
+        specialty: str | None,
+    ) -> list[dict[str, Any]]:
+        queue_settings = self._get_settings(self.db) or {}
+        max_per_day_settings = queue_settings.get("max_per_day", {})
+        doctors = self.read_repository.list_active_doctors(specialty=specialty)
+
+        result: list[dict[str, Any]] = []
+        for doctor in doctors:
+            # Preserve current runtime behavior: limits read paths resolve DailyQueue
+            # by Doctor.user_id even though DailyQueue.specialist_id is modeled
+            # against doctors.id.
+            daily_queue = self.read_repository.get_queue_by_specialist_day(
+                specialist_id=doctor.user_id,
+                day=day,
+            )
+
+            current_entries = 0
+            queue_opened = False
+            if daily_queue:
+                current_entries = self.read_repository.count_entries(
+                    queue_id=daily_queue.id
+                )
+                queue_opened = daily_queue.opened_at is not None
+
+            max_entries = max_per_day_settings.get(doctor.specialty, 15)
+            result.append(
+                {
+                    "doctor_id": doctor.id,
+                    "doctor_name": (
+                        doctor.user.full_name if doctor.user else f"Doctor #{doctor.id}"
+                    ),
+                    "specialty": doctor.specialty,
+                    "cabinet": doctor.cabinet,
+                    "day": day,
+                    "current_entries": current_entries,
+                    "max_entries": max_entries,
+                    "limit_reached": current_entries >= max_entries,
+                    "queue_opened": queue_opened,
+                    "online_available": (not queue_opened and current_entries < max_entries),
+                }
+            )
+
+        return result
     def allocate_ticket(self, *, allocation_mode: str, **kwargs: Any) -> object:
         if allocation_mode != "create_entry":
             raise ValueError(f"Unsupported queue allocation mode: {allocation_mode}")

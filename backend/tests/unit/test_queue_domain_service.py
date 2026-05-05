@@ -165,6 +165,7 @@ class TestQueueDomainService:
                 "online_available": True,
             }
         ]
+
     def test_allocate_ticket_delegates_create_entry_mode(self, monkeypatch) -> None:
         db = Mock()
         queue_entry = SimpleNamespace(id=9)
