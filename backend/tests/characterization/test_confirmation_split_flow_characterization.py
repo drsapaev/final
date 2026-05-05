@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -128,7 +129,7 @@ def test_confirmation_split_flow_replay_returns_error_and_keeps_single_queue_row
 @pytest.mark.integration
 @pytest.mark.queue
 @pytest.mark.confirmation
-def test_confirmation_split_flow_with_existing_active_entry_creates_second_active_row(
+def test_confirmation_split_flow_with_existing_active_entry_reuses_active_row(
     client,
     db_session,
     test_visit,
@@ -137,15 +138,17 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
     test_patient,
 ):
     _attach_visit_service(db_session, test_visit, test_service)
+    original_queue_time = datetime.utcnow().replace(microsecond=0)
 
     existing_active_entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
-        number=1,
+        number=3,
         patient_id=test_patient.id,
         patient_name=test_patient.short_name(),
         phone=test_patient.phone,
         source="online",
         status="waiting",
+        queue_time=original_queue_time,
     )
     db_session.add(existing_active_entry)
     db_session.commit()
@@ -159,6 +162,7 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
     )
 
     assert response.status_code == 200
+    payload = response.json()
 
     same_patient_entries = (
         db_session.query(OnlineQueueEntry)
@@ -171,9 +175,13 @@ def test_confirmation_split_flow_with_existing_active_entry_creates_second_activ
         .all()
     )
 
-    assert [entry.number for entry in same_patient_entries] == [1, 2]
-    assert [entry.source for entry in same_patient_entries] == ["online", "confirmation"]
-    assert same_patient_entries[1].visit_id == test_visit.id
+    db_session.refresh(existing_active_entry)
+    assert len(same_patient_entries) == 1
+    assert same_patient_entries[0].id == existing_active_entry.id
+    assert same_patient_entries[0].number == 3
+    assert same_patient_entries[0].visit_id == test_visit.id
+    assert same_patient_entries[0].queue_time == original_queue_time
+    assert payload["queue_numbers"][0]["number"] == 3
 
 
 @pytest.mark.integration
