@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.service import Service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
 
@@ -20,6 +21,9 @@ class QueueReadRepository:
 
     def get_queue(self, queue_id: int) -> DailyQueue | None:
         return self.db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+
+    def list_active_services(self) -> list[Service]:
+        return self.db.query(Service).filter(Service.active.is_(True)).all()
 
     def list_active_doctors(self, *, specialty: str | None) -> list[Doctor]:
         query = self.db.query(Doctor).filter(Doctor.active.is_(True))
