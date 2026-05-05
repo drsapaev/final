@@ -953,36 +953,33 @@ async def batch_update_services(
     )
 
 
-@router.get(
-    "/code-mappings",
-    response_model=ServiceCodeMappingsResponse,
-    summary="Получить маппинги кодов услуг (SSOT)",
-)
 class ServiceCodeMappingsResponse(BaseModel):
     """Response schema for service code mappings endpoint"""
 
     specialty_to_code: dict = {}
     code_to_name: dict = {}
     category_mapping: dict = {}
-    specialty_aliases: dict = {}
 
+
+@router.get(
+    "/code-mappings",
+    response_model=ServiceCodeMappingsResponse,
+    summary="Получить маппинги кодов услуг (SSOT)",
+)
 async def get_service_code_mappings(
     db: Session = Depends(get_db),
 ):
     """
     ⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.
 
-    Используется для централизации service code resolution на frontend.
-
-    Returns:
-        - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)
-        - code_to_name: Маппинг service code -> display name
-        - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)
+    Используется frontend для:
         - specialty_aliases: Алиасы для specialty (derma -> dermatology)
+        - specialty_to_code: Маппинг specialty -> service_code
+        - code_to_name: Человекочитаемые названия кодов
+        - category_mapping: Категории услуг для фильтрации
     """
     payload = QueueDomainService(db).get_service_code_mappings_payload()
     return ServiceCodeMappingsResponse(**payload)
-
 @router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
 async def get_service(
     service_id: int,
