@@ -33,8 +33,11 @@ class QueueDomainService:
         self,
         db: Session,
         read_repository: QueueReadRepository | None = None,
+        get_settings: Callable[[Session], dict] | None = None,
     ):
+        self.db = db
         self.read_repository = read_repository or QueueReadRepository(db)
+        self._get_settings = get_settings or get_queue_settings
 
     def get_queue_snapshot(self, *, queue_id: int) -> QueueSnapshot:
         queue = self.read_repository.get_queue(queue_id)
