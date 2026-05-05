@@ -90,4 +90,4 @@ def test_allocate_ticket_raises_for_unsupported_mode() -> None:
     with pytest.raises(ValueError) as exc_info:
         service.allocate_ticket(allocation_mode="unsupported")
 
-    assert "Unsupported allocation_mode" in str(exc_info.value)
+    assert "Unsupported queue allocation mode" in str(exc_info.value)
