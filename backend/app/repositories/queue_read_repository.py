@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.service import Service
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
 
