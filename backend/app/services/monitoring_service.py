@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,6 +16,38 @@ from sqlalchemy import create_engine, text
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        logger.error(
+            "Refusing SQLite DATABASE_URL for monitoring metrics without explicit legacy/test opt-in"
+        )
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for monitoring metrics. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
+def _get_database_url() -> str:
+    db_url = settings.DATABASE_URL
+    if not db_url:
+        raise ValueError("DATABASE_URL must be configured before monitoring metrics.")
+    url = str(db_url)
+    _validate_database_url(url)
+    return url
 
 
 class MonitoringService:
@@ -123,16 +156,17 @@ class MonitoringService:
     def _get_database_metrics(self) -> dict[str, Any]:
         """Получает метрики базы данных"""
         try:
-            engine = create_engine(settings.DATABASE_URL)
+            db_url = _get_database_url()
+            engine = create_engine(db_url)
 
             with engine.connect() as conn:
                 # Количество активных соединений
-                if "sqlite" in settings.DATABASE_URL:
+                if _is_sqlite_url(db_url):
                     # Для SQLite соединения не актуальны
                     active_connections = 1
 
                     # Размер БД
-                    db_file = settings.DATABASE_URL.replace("sqlite:///", "")
+                    db_file = db_url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
                     db_size = (
                         Path(db_file).stat().st_size if Path(db_file).exists() else 0
                     )
@@ -256,7 +290,8 @@ class MonitoringService:
             # Время отклика БД
             start_time = time.time()
             try:
-                engine = create_engine(settings.DATABASE_URL)
+                db_url = _get_database_url()
+                engine = create_engine(db_url)
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
                 db_response_time = time.time() - start_time
