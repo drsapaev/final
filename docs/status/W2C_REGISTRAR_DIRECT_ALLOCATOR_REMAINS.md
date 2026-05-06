@@ -2,10 +2,12 @@
 
 
 Date: 2026-05-06
-Current-main replacement for stale PR #91 after parent #90 was superseded by merged PR #269.
+Current-main replacement for stale PR #92 after parent #91 was superseded by merged PR #270.
 ## Verdict
 
 Registrar-related direct allocator usage still remains in one production-relevant mounted path.
+
+That path is now characterization-confirmed as `LIVE_BUT_BROKEN`, not merely suspected from static inspection.
 
 ## Production-Relevant Remaining Path
 
@@ -51,20 +53,20 @@ Why:
 
 - the path is mounted and production-relevant;
 - it bypasses the queue boundary architecture;
-- it is not characterized yet;
+- it is characterized as live-but-broken;
 - static inspection shows a concrete runtime drift signal:
   [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py)
   imports `QueueService`, but [`backend/app/services/queue_service.py`](C:/final/backend/app/services/queue_service.py) exports `QueueBusinessService` and `queue_service`, not `QueueService`.
 
-## Current-main Import Drift Evidence
+## Verified Import Drift
 
-This replacement verified the drift by static inspection against current `main` after PR #269:
+This pass verified the import directly in the backend runtime environment:
 
-- `backend/app/services/batch_patient_service.py` imports `QueueService`;
-- `backend/app/services/queue_service.py` exports `QueueBusinessService`, `queue_service`, and `get_queue_service()`, not `QueueService`;
-- `_create_entry()` therefore still needs characterization before any migration or retirement decision.
+```text
+ImportError: cannot import name 'QueueService' from 'app.services.queue_service'
+```
 
-That means the remaining mounted registrar allocator path is outside the queue boundary and has a concrete stale-import risk when the create-action branch is exercised.
+That means the remaining mounted registrar allocator path is not only outside the boundary, but is now verified as broken when the create-action branch is exercised.
 
 ## Non-Production Direct Allocator Remains
 

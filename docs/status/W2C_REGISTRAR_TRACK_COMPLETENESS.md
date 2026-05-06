@@ -2,7 +2,7 @@
 
 
 Date: 2026-05-06
-Current-main replacement for stale PR #91 after parent #90 was superseded by merged PR #269.
+Current-main replacement for stale PR #92 after parent #91 was superseded by merged PR #270.
 ## Assessed Families
 
 Completed / effectively covered:
@@ -17,6 +17,13 @@ Still remaining:
   [`backend/app/api/v1/endpoints/registrar_batch.py`](C:/final/backend/app/api/v1/endpoints/registrar_batch.py)
   and
   [`backend/app/services/batch_patient_service.py`](C:/final/backend/app/services/batch_patient_service.py)
+
+Current status of that remaining path:
+
+- mounted and reachable;
+- characterization-confirmed;
+- currently `LIVE_BUT_BROKEN`;
+- behaves as a separate registrar legacy micro-family, not as part of the already migrated batch-only family.
 
 Unmounted duplicates:
 
@@ -35,8 +42,8 @@ Unmounted duplicates:
 The registrar allocator track cannot yet be marked effectively complete because one mounted production-relevant path still:
 
 - creates queue entries outside `QueueDomainService.allocate_ticket()`;
-- has not gone through characterization;
-- appears to rely on a stale `QueueService` import path.
+- has now been characterized as live-but-broken;
+- relies on a stale `QueueService` import path.
 
 If that `/registrar/batch` create-action branch did not exist, the remaining registrar allocator surfaces would be only duplicate/unmounted code and the track could be considered effectively complete.
 
@@ -48,6 +55,6 @@ It needs exactly one narrow registrar follow-up slice focused on:
 
 - mounted `/registrar/batch` create-action behavior;
 - `BatchPatientService._create_entry()`;
-- allocator ownership and runtime truth for that branch only.
+- a runtime fix or explicit retirement decision for that branch only.
 
 So the remaining work is narrow, not a renewed broad registrar refactor.
