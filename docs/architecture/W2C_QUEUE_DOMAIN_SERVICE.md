@@ -313,7 +313,7 @@ yet a safe public migration target for all allocator families.
 
 Still outside the safe boundary:
 
-- registrar wizard split allocation
+- registrar wizard shadow/unmounted split allocation outside the mounted same-day handoff
 - `qr_queue.py` direct SQL allocator branches
 - force-majeure transfer allocator
 - all `OnlineDay` legacy allocators
@@ -342,3 +342,9 @@ Notes for the narrowed `W2C-MS-004` slice:
 - only queue metadata reads moved under `QueueDomainService`
 - static taxonomy definitions still live in `app/services/service_mapping.py`
 - no queue numbering, duplicate, lifecycle, or QR-window behavior changed
+
+## Wizard Family Update (2026-05-06)
+
+`QueueDomainService.allocate_ticket(allocation_mode="create_entry")` is now the mounted registrar wizard create-branch boundary. `RegistrarWizardQueueAssignmentService` receives `MorningAssignmentCreateBranchHandoff` values from the morning-assignment preparation layer and delegates materialization to the domain service.
+
+Still deferred: shadow router branches, unmounted wizard compatibility paths, and broad deletion of historical allocator docs. These require a separate compatibility review before removal.

@@ -118,3 +118,16 @@ row creation while keeping the number lookup helper unchanged:
 
 This preserves the corrected confirmation behavior while removing the direct
 confirmation-family dependency on legacy queue-row creation.
+
+## Wizard Migration Update (2026-05-06)
+
+Mounted same-day wizard create-branch allocation now stays behind the queue domain boundary.
+
+Current path:
+
+1. `MorningAssignmentService.prepare_wizard_queue_assignment(...)` returns a reuse payload or `MorningAssignmentCreateBranchHandoff`.
+2. `RegistrarWizardQueueAssignmentService._allocate_create_branch_handoff(...)` materializes the handoff.
+3. `QueueDomainService.allocate_ticket(allocation_mode="create_entry", **kwargs)` owns the allocator boundary.
+4. The legacy allocator remains a compatibility implementation behind `QueueDomainService`, not a wizard caller dependency.
+
+Compatibility rule: wizard tests may inject `create_entry_allocator` for legacy seam characterization, but default production flow must use the queue domain service factory.

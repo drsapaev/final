@@ -147,3 +147,9 @@ Still deferred inside the broader confirmation/registrar surface:
 - standalone number lookup remains legacy
 - unmounted duplicate confirmation modules
 - broader registrar wizard/batch allocator families
+
+## Wizard Boundary Migration Update (2026-05-06)
+
+The mounted same-day registrar wizard create-branch path has moved from direct queue-service materialization to the `QueueDomainService.allocate_ticket(...)` boundary.
+
+This narrows the remaining wizard work to shadow/unmounted route review and broader dead-code cleanup. Future slices should not reintroduce direct wizard calls to `queue_service.create_queue_entry(...)`; if a route still needs create-entry allocation, it should pass through the domain boundary or be explicitly documented as a compatibility path.
