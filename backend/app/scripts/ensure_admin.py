@@ -35,21 +35,27 @@ def ensure_admin() -> dict:
     password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
-    allow_initialized = os.getenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "").strip().lower() in {
+    allow_initialized = os.getenv(INITIALIZED_OVERRIDE_ENV, "").strip().lower() in {
         "1",
         "true",
         "yes",
     }
+    confirm_initialized_override = (
+        os.getenv(INITIALIZED_OVERRIDE_CONFIRM_ENV, "").strip().lower()
+        in {"1", "true", "yes"}
+    )
 
     with SessionLocal() as db:  # type: ignore # type: Session
-        if SetupService(db).is_initialized() and not allow_initialized:
-            return {
-                "skipped": True,
-                "reason": (
-                    "initialized_instance_requires_explicit_ops_override; "
-                    "set ENSURE_ADMIN_ALLOW_INITIALIZED=1 for controlled recovery"
-                ),
-            }
+        if SetupService(db).is_initialized():
+            if not allow_initialized or not confirm_initialized_override:
+                return {
+                    "skipped": True,
+                    "reason": (
+                        "initialized_instance_requires_explicit_ops_override; "
+                        f"set {INITIALIZED_OVERRIDE_ENV}=1 and "
+                        f"{INITIALIZED_OVERRIDE_CONFIRM_ENV}=1 for controlled recovery"
+                    ),
+                }
 
         # Check by username first
         row = (

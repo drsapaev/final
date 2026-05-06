@@ -15,6 +15,40 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        logger.error(
+            "Refusing SQLite DATABASE_URL for backup operation without explicit legacy/test opt-in"
+        )
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for backup operations. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
+def _get_database_url() -> str:
+    from app.core.config import settings
+
+    db_url = getattr(settings, "DATABASE_URL", "")
+    if not db_url:
+        raise ValueError("DATABASE_URL must be configured before backup operations.")
+    url = str(db_url)
+    _validate_database_url(url)
+    return url
+
+
 class BackupService:
     """Service for automated database backups"""
 
@@ -39,8 +73,7 @@ class BackupService:
         """
         try:
             # Get database URL
-            from app.core.config import settings
-            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            db_url = _get_database_url()
 
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             backup_filename = f"backup_{backup_type}_{timestamp}.db"
@@ -205,8 +238,7 @@ class BackupService:
             safety_backup = self.create_backup("before_restore")
 
             # Get database URL
-            from app.core.config import settings
-            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            db_url = _get_database_url()
 
             # Decompress if needed
             if backup_path.suffix == ".gz":
