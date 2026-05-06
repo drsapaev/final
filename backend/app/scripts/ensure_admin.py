@@ -18,6 +18,9 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
 from app.services.setup_service import SetupService  # noqa: E402
 
+INITIALIZED_OVERRIDE_ENV = "ENSURE_ADMIN_ALLOW_INITIALIZED"
+INITIALIZED_OVERRIDE_CONFIRM_ENV = "ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE"
+
 
 def _hash_or_plain(pw: str) -> str:
     """Вернуть bcrypt-хэш, если passlib доступен, иначе исходную строку (для dev)."""
