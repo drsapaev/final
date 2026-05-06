@@ -2,14 +2,14 @@
 
 
 Date: 2026-05-06
-Current-main replacement for stale PR #91 after parent #90 was superseded by merged PR #269.
+Current-main replacement for stale PR #92 after parent #91 was superseded by merged PR #270.
 ## Decision
 
 `B) one more narrow registrar slice`
 
 ## Recommended Execution Unit
 
-`Registrar batch-edit create-action characterization`
+`Narrow runtime fix for mounted registrar batch create-action`
 
 ## Target Scope
 
@@ -23,16 +23,16 @@ Only:
 ## Why This Is The Right Next Step
 
 - it is the only remaining production-relevant registrar allocator path outside the boundary architecture;
+- it has now been characterized as live-but-broken;
 - it is narrower than a broad registrar follow-up;
-- it should be characterized before any migration or correction;
-- it already shows concrete runtime drift (`QueueService` import mismatch), so moving to `qr_queue` now would leave one mounted registrar allocator path unresolved.
+- moving to `qr_queue` now would leave one mounted registrar allocator path unresolved.
 
 ## Not Recommended As The Next Step
 
 - `qr_queue` direct SQL characterization now:
   premature while one mounted registrar allocator branch remains unresolved
 - `human review needed`:
-  not necessary yet, because the next missing work is technical characterization, not contract ambiguity
+  not necessary yet, because the next missing work is a narrow runtime correction or explicit retirement decision, not contract ambiguity
 - broad registrar refactor:
   disproportionate to the remaining scope
 
@@ -40,7 +40,7 @@ Only:
 
 A safe next slice should:
 
-- be characterization-first;
-- verify whether `/registrar/batch` create-action is actually exercised and how it behaves;
-- add tests around `_create_entry()` and mounted create-action dispatch;
-- determine whether the path needs a narrow runtime correction before any later boundary migration or can be retired as dead UI surface.
+- repair or explicitly retire the mounted create-action branch;
+- keep scope limited to `registrar_batch.py` and `batch_patient_service.py`;
+- avoid any broader registrar, `qr_queue`, `OnlineDay`, or `force_majeure` work;
+- preserve non-create batch-edit semantics.
