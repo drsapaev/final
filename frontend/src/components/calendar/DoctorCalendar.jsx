@@ -321,7 +321,7 @@ const DoctorCalendar = ({
       }}
       onClick={() => slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)}
       onKeyDown={(event) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
-      
+
                 <div style={{ fontWeight: '500' }}>{slot.time || slot.start_time}</div>
                 {slot.patient_name &&
       <div style={{ fontSize: '10px', opacity: 0.8 }}>{slot.patient_name}</div>
@@ -345,13 +345,13 @@ const DoctorCalendar = ({
         }}
         onClick={() => setSelectedDay(date)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedDay(date))}>
-        
+
                 <div
           style={{
             ...styles.dayNumber,
             ...(today ? styles.dayNumberToday : {})
           }}>
-          
+
                     {date.getDate()}
                 </div>
                 {renderDaySlots(date)}
@@ -378,31 +378,34 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={goToPrevWeek}
-            title="Предыдущая неделя">
-            
+            title="Предыдущая неделя"
+            aria-label="Предыдущая неделя">
+
                         <ChevronLeft size={18} />
                     </button>
 
                     <button
             style={styles.todayButton}
             onClick={goToToday}>
-            
+
                         Сегодня
                     </button>
 
                     <button
             style={styles.navButton}
             onClick={goToNextWeek}
-            title="Следующая неделя">
-            
+            title="Следующая неделя"
+            aria-label="Следующая неделя">
+
                         <ChevronRight size={18} />
                     </button>
 
                     <button
             style={styles.navButton}
             onClick={loadSchedule}
-            title="Обновить">
-            
+            title="Обновить"
+            aria-label="Обновить">
+
                         <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                     </button>
                 </div>
