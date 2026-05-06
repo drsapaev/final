@@ -8,7 +8,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.visit import Visit
-from app.services.morning_assignment import MorningAssignmentService
+from app.services.morning_assignment import (
+    MorningAssignmentCreateBranchHandoff,
+    MorningAssignmentPreparedQueueAssignment,
+    MorningAssignmentService,
+)
+from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +27,18 @@ class RegistrarWizardQueueAssignmentService:
         *,
         assignment_service_factory: Callable[[Session], MorningAssignmentService]
         | None = None,
+        create_entry_allocator: Callable[
+            [MorningAssignmentCreateBranchHandoff],
+            Any,
+        ]
+        | None = None,
     ) -> None:
         self.db = db
         self._assignment_service_factory = (
             assignment_service_factory or (lambda session: MorningAssignmentService(session))
+        )
+        self._create_entry_allocator = (
+            create_entry_allocator or self._allocate_create_branch_handoff
         )
 
     def assign_same_day_queue_numbers(
@@ -43,7 +56,8 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
             try:
-                queue_assignments = assignment_service._assign_queues_for_visit(
+                queue_assignments = self._assign_same_day_queues_for_visit(
+                    assignment_service,
                     visit,
                     target_day,
                     source=source,
@@ -74,3 +88,76 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
         return queue_numbers
+
+    def _assign_same_day_queues_for_visit(
+        self,
+        assignment_service: MorningAssignmentService,
+        visit: Visit,
+        target_day: date,
+        *,
+        source: str,
+    ) -> list[dict[str, Any]]:
+        unique_queue_tags = assignment_service._get_visit_queue_tags(visit)
+        if not unique_queue_tags:
+            logger.warning("Визит %d: нет queue_tag в услугах", visit.id)
+            return []
+
+        queue_assignments: list[dict[str, Any]] = []
+        for queue_tag in unique_queue_tags:
+            try:
+                prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
+                    visit,
+                    queue_tag,
+                    target_day,
+                    source=source,
+                )
+                assignment = self._materialize_prepared_assignment(prepared_assignment)
+                if assignment:
+                    queue_assignments.append(assignment)
+            except Exception as exc:
+                logger.error(
+                    "Ошибка присвоения очереди %s для визита %d: %s",
+                    queue_tag,
+                    visit.id,
+                    str(exc),
+                    exc_info=True,
+                )
+                self._rollback_session()
+
+        return queue_assignments
+
+    def _materialize_prepared_assignment(
+        self,
+        prepared_assignment: MorningAssignmentPreparedQueueAssignment | None,
+    ) -> dict[str, Any] | None:
+        if prepared_assignment is None:
+            return None
+
+        if prepared_assignment.assignment is not None:
+            return prepared_assignment.assignment
+
+        create_handoff = prepared_assignment.create_handoff
+        if create_handoff is None:
+            return None
+
+        queue_entry = self._create_entry_allocator(create_handoff)
+        return create_handoff.build_assigned_payload(number=queue_entry.number)
+
+    def _allocate_create_branch_handoff(
+        self,
+        handoff: MorningAssignmentCreateBranchHandoff,
+    ) -> Any:
+        return queue_service.create_queue_entry(
+            self.db,
+            **handoff.create_entry_kwargs,
+        )
+
+    def _rollback_session(self) -> None:
+        rollback = getattr(self.db, "rollback", None)
+        if not callable(rollback):
+            return
+
+        try:
+            rollback()
+        except Exception as rollback_error:
+            logger.error("Ошибка при rollback wizard queue assignment: %s", rollback_error)
