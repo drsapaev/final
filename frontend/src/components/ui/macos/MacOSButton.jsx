@@ -1,5 +1,12 @@
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 const MacOSButton = ({
+  onMouseEnter,
+  onMouseLeave,
+  onMouseDown,
+  onMouseUp,
+  onFocus,
+  onBlur,
   children,
   variant = 'default',
   size = 'md',
@@ -13,6 +20,8 @@ const MacOSButton = ({
   endIcon,   // Destructure to prevent passing to DOM (not implemented yet)
   ...props
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   // Размеры кнопок
   const sizeStyles = {
     sm: {
@@ -129,6 +138,28 @@ const MacOSButton = ({
     }
   };
 
+  const currentVariantStyles = variantStyles[variant] || {};
+  const hoverStyles = currentVariantStyles['&:hover'] || {};
+  const activeStyles = currentVariantStyles['&:active'] || {};
+
+  // Remove pseudo-class keys to get base variant styles
+  const baseVariantStyles = Object.keys(currentVariantStyles).reduce((acc, key) => {
+    if (!key.startsWith('&')) {
+      acc[key] = currentVariantStyles[key];
+    }
+    return acc;
+  }, {});
+
+  const dynamicStyles = {
+    ...(isHovered ? hoverStyles : {}),
+    ...(isActive ? activeStyles : {}),
+  };
+
+  // Clean up pseudo-class keys from dynamic styles just in case
+  Object.keys(dynamicStyles).forEach(key => {
+    if (key.startsWith('&')) delete dynamicStyles[key];
+  });
+
   const baseStyles = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -143,7 +174,8 @@ const MacOSButton = ({
     position: 'relative',
     overflow: 'hidden',
     ...sizeStyles[size],
-    ...variantStyles[variant]
+    ...baseVariantStyles,
+    ...dynamicStyles
   };
 
   const handleClick = (e) => {
@@ -158,44 +190,40 @@ const MacOSButton = ({
     }
   };
 
-  const handleMouseEnter = (e) => {
-    if (disabled || loading) return;
-    const hoverStyles = variantStyles[variant]['&:hover'];
-    if (hoverStyles) {
-      Object.keys(hoverStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = hoverStyles[key];
-      });
+  const handleMouseEnterWrapper = (e) => {
+    if (!disabled && !loading) setIsHovered(true);
+    if (onMouseEnter) onMouseEnter(e);
+  };
+
+  const handleMouseLeaveWrapper = (e) => {
+    if (!disabled && !loading) {
+      setIsHovered(false);
+      setIsActive(false);
     }
+    if (onMouseLeave) onMouseLeave(e);
   };
 
-  const handleMouseLeave = (e) => {
-    if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
-    Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
-    });
+  const handleMouseDownWrapper = (e) => {
+    if (!disabled && !loading) setIsActive(true);
+    if (onMouseDown) onMouseDown(e);
   };
 
-  const handleMouseDown = (e) => {
-    if (disabled || loading) return;
-    const activeStyles = variantStyles[variant]['&:active'];
-    if (activeStyles) {
-      Object.keys(activeStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = activeStyles[key];
-      });
+  const handleMouseUpWrapper = (e) => {
+    if (!disabled && !loading) setIsActive(false);
+    if (onMouseUp) onMouseUp(e);
+  };
+
+  const handleFocusWrapper = (e) => {
+    if (!disabled && !loading) setIsHovered(true);
+    if (onFocus) onFocus(e);
+  };
+
+  const handleBlurWrapper = (e) => {
+    if (!disabled && !loading) {
+      setIsHovered(false);
+      setIsActive(false);
     }
-  };
-
-  const handleMouseUp = (e) => {
-    if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
-    Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
-    });
+    if (onBlur) onBlur(e);
   };
 
   return (
@@ -208,10 +236,12 @@ const MacOSButton = ({
       }}
       disabled={disabled || loading}
       onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
+      onMouseEnter={handleMouseEnterWrapper}
+      onMouseLeave={handleMouseLeaveWrapper}
+      onMouseDown={handleMouseDownWrapper}
+      onMouseUp={handleMouseUpWrapper}
+      onFocus={handleFocusWrapper}
+      onBlur={handleBlurWrapper}
       aria-busy={loading}
       {...props}
     >
@@ -249,6 +279,12 @@ MacOSButton.propTypes = {
   endIcon: PropTypes.any,
   loading: PropTypes.any,
   onClick: PropTypes.any,
+  onMouseEnter: PropTypes.any,
+  onMouseLeave: PropTypes.any,
+  onMouseDown: PropTypes.any,
+  onMouseUp: PropTypes.any,
+  onFocus: PropTypes.any,
+  onBlur: PropTypes.any,
   size: PropTypes.any,
   startIcon: PropTypes.any,
   style: PropTypes.any,

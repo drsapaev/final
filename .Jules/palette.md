@@ -1,0 +1,3 @@
+## 2024-05-18 - [State-Based Event Styling Anti-Pattern]
+**Learning:** Found a critical anti-pattern in `MacOSButton.jsx` where pseudo-classes (`:hover`, `:active`) were simulated using direct DOM manipulation (`e.target.style[key] = ...`) on mouse events. This bypasses React's virtual DOM, causing styling to fall out of sync and making it extremely difficult to map keyboard focus states to these styles correctly.
+**Action:** When implementing custom interactive states (like focus rings simulating hover effects), always use React state (`useState`) to drive dynamic inline styles or class names instead of manual DOM manipulation. This ensures accessibility handlers (`onFocus`, `onBlur`) can seamlessly trigger the same visual feedback as pointer events.
