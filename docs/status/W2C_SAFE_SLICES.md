@@ -19,6 +19,23 @@ They avoid changing queue semantics, payment behavior, and visit lifecycle orche
 | `W2C-MS-005` | Number-allocation boundary extraction | `backend/app/services/queue_service.py`, future `QueueRepository` | Can centralize `get_next_queue_number` and duplicate-check policy without changing outward API if done behind existing callers | targeted queue numbering tests, then `cd backend && pytest -q` |
 | `W2C-MS-006` | Queue snapshot status endpoints | `backend/app/api/v1/endpoints/queue_reorder.py` read status handlers only | `get_queue_status*` can move to a common queue snapshot read boundary without touching reorder writes | targeted reorder-status tests, then `cd backend && pytest -q` |
 
+## Execution Update (2026-03-07)
+
+Completed in Phase 1:
+
+- `W2C-MS-001`
+- `W2C-MS-006`
+- `W2C-MS-003` (narrowed to cabinet info read handlers only)
+
+Still pending safe candidates:
+
+- `W2C-MS-002`
+- `W2C-MS-005`
+- optional `W2C-MS-004`
+
+Cabinet write and sync/statistics paths remain on the legacy service path and were not
+included in the executed `W2C-MS-003` slice.
+
 ## Not Safe for the First Queue Refactor Pass
 
 These should not be auto-refactored before the domain service and state machine are agreed.
@@ -36,11 +53,9 @@ These should not be auto-refactored before the domain service and state machine 
 
 ## Recommended Order
 
-1. `W2C-MS-001`
-2. `W2C-MS-003`
-3. `W2C-MS-002`
-4. `W2C-MS-006`
-5. `W2C-MS-005`
+1. `W2C-MS-002`
+2. `W2C-MS-005`
+3. optional `W2C-MS-004`
 
 `W2C-MS-004` stays optional because queue taxonomy is queue-domain policy, not just catalog metadata.
 

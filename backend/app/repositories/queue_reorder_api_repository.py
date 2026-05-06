@@ -7,12 +7,13 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
 
 class QueueReorderApiRepository:
     """Encapsulates ORM operations used for queue reorder operations."""
 
-    ACTIVE_ENTRY_STATUSES = ["waiting", "called"]
+    ACTIVE_ENTRY_STATUSES = REORDER_ACTIVE_RAW_STATUSES
 
     def __init__(self, db: Session):
         self.db = db

@@ -1,7 +1,7 @@
 # Wave 2C Queue Domain Service Proposal
 
-Date: 2026-03-06
-Mode: analysis-first
+Date: 2026-03-07
+Mode: analysis-first, updated with Phase 2 compatibility boundary
 
 ## Goal
 
@@ -246,3 +246,105 @@ That avoids turning queue refactor into Wave 2D by accident.
    - diagnostics / incomplete
    - visit-linked cancel/reschedule
 4. Leave payment-coupled completion paths for later queue/payment coordination work.
+
+## Phase 1 Implementation Status
+
+Implemented in `backend/app/services/queue_domain_service.py`.
+
+Currently implemented:
+
+- `get_queue_snapshot(queue_id=...)`
+- `get_queue_snapshot_by_specialist_day(specialist_id=..., day=...)`
+- `list_queue_cabinet_info(day=..., specialist_id=..., cabinet_number=...)`
+- `get_queue_cabinet_info(queue_id=...)`
+- `get_queue_limits_status(day=..., specialty=...)`
+- `get_queue_groups_payload()`
+- `get_service_code_mappings_payload()`
+
+Skeleton-only methods that intentionally still raise `NotImplementedError`:
+
+- `enqueue`
+- `call_next`
+- `mark_in_service`
+- `complete_visit`
+- `cancel_queue_link`
+- `reschedule_queue_link`
+
+This is intentional for Phase 1:
+
+- read-only queue slices can adopt the service now
+- mutation flows stay in legacy paths until the state machine and transaction rules
+  are migrated explicitly
+
+## Phase 2 Compatibility Boundary Status
+
+Implemented in Wave 2C Phase 2:
+
+- `allocate_ticket(allocation_mode="create_entry", **kwargs)`
+- `allocate_ticket(allocation_mode="join_with_token", **kwargs)`
+
+Current behavior:
+
+- the method is a facade only
+- it delegates to the existing `queue_service`
+- it does not change numbering logic
+- it does not change duplicate-policy enforcement
+- it does not change `queue_time` semantics
+
+Current limitation:
+
+- only a narrow set of production callers is repointed to this boundary
+- direct SQL allocators and legacy `OnlineDay` flows remain outside it
+- migration risk is still controlled by characterization tests because the internal allocator has not changed
+
+Current production callers through `allocate_ticket()`:
+
+- `backend/app/api/v1/endpoints/online_queue_new.py::join_queue()`
+- `backend/app/services/qr_queue_service.py::complete_join_session()`
+- `backend/app/services/qr_queue_service.py::complete_join_session_multiple()`
+- `backend/app/services/visit_confirmation_service.py` through
+  `QueueContextFacade(QueueDomainServiceContractAdapter)` when a new queue row
+  is needed during mounted confirmation
+
+## Phase 2.2 Boundary Limits
+
+The current `QueueDomainService.allocate_ticket()` compatibility boundary is not
+yet a safe public migration target for all allocator families.
+
+Still outside the safe boundary:
+
+- registrar wizard shadow/unmounted split allocation outside the mounted same-day handoff
+- `qr_queue.py` direct SQL allocator branches
+- force-majeure transfer allocator
+- all `OnlineDay` legacy allocators
+- registrar batch allocator family
+- unmounted duplicate confirmation modules
+
+Reason:
+
+- some families still own transaction semantics
+- some families still own duplicate-policy shortcuts
+- some families are not yet narrowed enough to preserve behavior through a thin
+  boundary migration
+
+### Confirmation family note
+
+Mounted confirmation is no longer blocked here:
+
+- Phase 2.4 corrected same-queue duplicate drift
+- the current slice moved mounted confirmation queue-row creation through the
+  compatibility boundary
+- remaining confirmation work is limited to cleanup/dead-path clarification, not
+  allocator ownership
+
+Notes for the narrowed `W2C-MS-004` slice:
+
+- only queue metadata reads moved under `QueueDomainService`
+- static taxonomy definitions still live in `app/services/service_mapping.py`
+- no queue numbering, duplicate, lifecycle, or QR-window behavior changed
+
+## Wizard Family Update (2026-05-06)
+
+`QueueDomainService.allocate_ticket(allocation_mode="create_entry")` is now the mounted registrar wizard create-branch boundary. `RegistrarWizardQueueAssignmentService` receives `MorningAssignmentCreateBranchHandoff` values from the morning-assignment preparation layer and delegates materialization to the domain service.
+
+Still deferred: shadow router branches, unmounted wizard compatibility paths, and broad deletion of historical allocator docs. These require a separate compatibility review before removal.

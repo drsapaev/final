@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.repositories.queue_batch_repository import QueueBatchRepository
-from app.services.queue_service import queue_service
+from app.services.queue_domain_service import QueueDomainService
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class QueueBatchService:
 
     def __init__(self, db: Session):
         self.repository = QueueBatchRepository(db)
+        self.queue_domain_service = QueueDomainService(db)
 
     def create_entries(
         self,
@@ -107,10 +108,22 @@ class QueueBatchService:
             patient_phone = patient.phone or None
 
             for specialist_id in services_by_specialist:
-                existing_entry = self.repository.find_existing_active_entry(
+                existing_active_entries = self.repository.find_existing_active_entries(
                     specialist_id=specialist_id,
                     day=today,
                     patient_id=patient_id,
+                )
+                if len(existing_active_entries) > 1:
+                    raise QueueBatchDomainError(
+                        status_code=409,
+                        detail=(
+                            "Неоднозначная активная запись очереди для пациента у "
+                            "специалиста на сегодня"
+                        ),
+                    )
+
+                existing_entry = (
+                    existing_active_entries[0] if existing_active_entries else None
                 )
                 if existing_entry:
                     existing_entries_count += 1
@@ -134,14 +147,15 @@ class QueueBatchService:
                 )
 
                 try:
-                    queue_entry = queue_service.create_queue_entry(
-                        db=self.repository.db,
+                    queue_entry = self.queue_domain_service.allocate_ticket(
+                        allocation_mode="create_entry",
                         daily_queue=daily_queue,
                         patient_id=patient_id,
                         patient_name=patient_name,
                         phone=patient_phone,
                         source=source,
                         queue_time=current_time,
+                        auto_number=True,
                         commit=False,
                     )
                 except ValueError as exc:
