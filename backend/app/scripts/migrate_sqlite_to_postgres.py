@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sqlite3
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -725,6 +726,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _require_live_migration_confirmation(*, dry_run: bool) -> None:
+    if dry_run:
+        return
+    if os.getenv("CONFIRM_SQLITE_TO_POSTGRES_MIGRATION") != "1":
+        raise SystemExit(
+            "Refusing to run live SQLite to PostgreSQL migration without "
+            "CONFIRM_SQLITE_TO_POSTGRES_MIGRATION=1. Use --dry-run for a read-only plan."
+        )
+
+
 def _mask_engine_url(engine: Engine) -> str:
     rendered = str(engine.url)
     password = engine.url.password
@@ -736,6 +747,7 @@ def _mask_engine_url(engine: Engine) -> str:
 def main() -> int:
     parser = _build_arg_parser()
     args = parser.parse_args()
+    _require_live_migration_confirmation(dry_run=args.dry_run)
 
     if args.target_url:
         target_engine = create_engine(args.target_url)
