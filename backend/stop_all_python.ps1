@@ -1,72 +1,79 @@
-# Простой и надежный скрипт для остановки всех процессов Python в проекте
-Write-Host "=" * 60
-Write-Host "🛑 Остановка всех процессов Python в проекте..." -ForegroundColor Yellow
-Write-Host "=" * 60
+param(
+    [switch]$ForcePortOwners
+)
+
+Write-Host ("=" * 60)
+Write-Host "Stopping project Python processes..." -ForegroundColor Yellow
+Write-Host ("=" * 60)
 
 $stopped = 0
+$allowPortOwnerKill = $ForcePortOwners -or ($env:CONFIRM_STOP_ALL_PYTHON_PORT_OWNERS -eq "1")
 
-# Метод 1: Через Get-Process
 Get-Process python -ErrorAction SilentlyContinue | Where-Object {
-    $_.Path -like '*final*'
+    $_.Path -like "*final*"
 } | ForEach-Object {
-    Write-Host "Останавливаем: $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Cyan
-    Write-Host "  Путь: $($_.Path)"
+    Write-Host "Stopping project process: $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Cyan
+    Write-Host "  Path: $($_.Path)"
     Stop-Process -Id $_.Id -Force
     $stopped++
 }
 
 if ($stopped -gt 0) {
     Write-Host ""
-    Write-Host "✅ Остановлено процессов: $stopped" -ForegroundColor Green
+    Write-Host "[OK] Stopped project Python processes: $stopped" -ForegroundColor Green
     Start-Sleep -Seconds 2
 }
 else {
-    Write-Host "ℹ️ Процессы Python не найдены" -ForegroundColor Gray
+    Write-Host "[INFO] No project Python processes found." -ForegroundColor Gray
 }
 
-# Метод 2: Проверка порта 18000 через netstat
 Write-Host ""
-Write-Host "Проверка порта 18000..." -ForegroundColor Yellow
+Write-Host "Checking port 18000..." -ForegroundColor Yellow
 $netstat = netstat -ano | Select-String ":18000.*LISTENING"
 
 if ($netstat) {
-    Write-Host "⚠️ Порт 18000 все еще занят, принудительная очистка..." -ForegroundColor Yellow
+    Write-Host "[WARN] Port 18000 is still busy." -ForegroundColor Yellow
     $netstat | ForEach-Object {
         $line = $_.Line
         $processId = ($line -split '\s+')[-1]
-        Write-Host "Останавливаем процесс PID: $processId"
+        if (-not $allowPortOwnerKill) {
+            Write-Host "Refusing to kill unmanaged port owner PID $processId without -ForcePortOwners or CONFIRM_STOP_ALL_PYTHON_PORT_OWNERS=1" -ForegroundColor Red
+            return
+        }
+        Write-Host "Killing unmanaged port owner PID: $processId"
         taskkill /PID $processId /F 2>$null
     }
-    
-    # Даем время на освобождение порта
-    Write-Host "Ожидание освобождения порта..." -ForegroundColor Yellow
+
+    Write-Host "Waiting for port release..." -ForegroundColor Yellow
     Start-Sleep -Seconds 3
-    
-    # Повторная проверка и очистка
+
     $netstat2 = netstat -ano | Select-String ":18000.*LISTENING"
     if ($netstat2) {
-        Write-Host "Повторная попытка очистки порта..." -ForegroundColor Yellow
+        Write-Host "Second port cleanup attempt..." -ForegroundColor Yellow
         $netstat2 | ForEach-Object {
             $line = $_.Line
             $processId = ($line -split '\s+')[-1]
+            if (-not $allowPortOwnerKill) {
+                Write-Host "Refusing second unmanaged port-owner kill for PID $processId without explicit confirmation" -ForegroundColor Red
+                return
+            }
             taskkill /PID $processId /F 2>$null
         }
         Start-Sleep -Seconds 2
     }
 }
 
-# Финальная проверка
 $finalCheck = netstat -ano | Select-String ":18000.*LISTENING"
 if (-not $finalCheck) {
     Write-Host ""
-    Write-Host "=" * 60
-    Write-Host "✅ Порт 18000 свободен и готов к использованию!" -ForegroundColor Green
-    Write-Host "=" * 60
+    Write-Host ("=" * 60)
+    Write-Host "[OK] Port 18000 is free and ready." -ForegroundColor Green
+    Write-Host ("=" * 60)
 }
 else {
     Write-Host ""
-    Write-Host "=" * 60
-    Write-Host "⚠️ ВНИМАНИЕ: Порт 18000 все еще занят!" -ForegroundColor Red
-    Write-Host "Попробуйте закрыть процессы вручную через Диспетчер задач" -ForegroundColor Yellow
-    Write-Host "=" * 60
+    Write-Host ("=" * 60)
+    Write-Host "[WARN] Port 18000 is still busy." -ForegroundColor Red
+    Write-Host "Close the owning process manually or rerun with explicit confirmation." -ForegroundColor Yellow
+    Write-Host ("=" * 60)
 }
