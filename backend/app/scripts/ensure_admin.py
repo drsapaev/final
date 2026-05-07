@@ -32,10 +32,17 @@ def _hash_or_plain(pw: str) -> str:
         return pw
 
 
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting the bootstrap admin user."
+        )
+    return password
+
+
 def ensure_admin() -> dict:
-    # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите ADMIN_PASSWORD через переменную окружения!
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
-    password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
     allow_initialized = os.getenv(INITIALIZED_OVERRIDE_ENV, "").strip().lower() in {
@@ -60,12 +67,10 @@ def ensure_admin() -> dict:
                     ),
                 }
 
-        # Check by username first
         row = (
             db.execute(select(User).where(User.username == username)).scalars().first()
         )
 
-        # If not found by username, check by email
         if not row and email:
             row = (
                 db.execute(select(User).where(User.email == email)).scalars().first()
@@ -73,10 +78,14 @@ def ensure_admin() -> dict:
 
         if row:
             changed = False
-            # Only update email if it's different and doesn't conflict
             if email and row.email != email:
-                # Check if new email already exists
-                existing = db.execute(select(User).where(User.email == email, User.id != row.id)).scalars().first()
+                existing = (
+                    db.execute(
+                        select(User).where(User.email == email, User.id != row.id)
+                    )
+                    .scalars()
+                    .first()
+                )
                 if not existing:
                     row.email = email
                     changed = True
@@ -88,6 +97,7 @@ def ensure_admin() -> dict:
                 "true",
                 "yes",
             }:
+                password = _required_admin_password()
                 row.hashed_password = _hash_or_plain(password)
                 changed = True
             if row.role != "Admin":
@@ -107,13 +117,14 @@ def ensure_admin() -> dict:
                 "role": row.role,
             }
 
-        # Check if email already exists
-        existing_email = db.execute(select(User).where(User.email == email)).scalars().first()
+        existing_email = (
+            db.execute(select(User).where(User.email == email)).scalars().first()
+        )
         if existing_email:
-            # Update existing user to admin
             existing_email.username = username
             existing_email.role = "Admin"
             existing_email.is_active = True
+            password = _required_admin_password()
             existing_email.hashed_password = _hash_or_plain(password)
             existing_email.full_name = full_name
             db.commit()
@@ -126,6 +137,7 @@ def ensure_admin() -> dict:
                 "role": existing_email.role,
             }
 
+        password = _required_admin_password()
         row = User(
             username=username,
             full_name=full_name,
