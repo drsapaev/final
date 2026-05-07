@@ -7,8 +7,10 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from clinic_lifecycle_common import (
+    DatabaseTarget,
     backend_dir,
     fail,
     load_clinic_env,
@@ -17,6 +19,51 @@ from clinic_lifecycle_common import (
     postgres_tool,
     run_command,
 )
+
+
+def _redact_database_url(database_url: str) -> str:
+    parsed = urlsplit(database_url)
+    if not parsed.password:
+        return database_url
+
+    username = parsed.username or ""
+    hostname = parsed.hostname or ""
+    host = hostname
+    if ":" in hostname and not hostname.startswith("["):
+        host = f"[{hostname}]"
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+
+    netloc = f"{username}:***@{host}" if username else host
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+
+def _is_same_database_target(left: DatabaseTarget, right: DatabaseTarget) -> bool:
+    return (
+        left.host.lower(),
+        left.port,
+        left.name,
+    ) == (
+        right.host.lower(),
+        right.port,
+        right.name,
+    )
+
+
+def _require_live_restore_confirmation(*, target_database_url: str) -> None:
+    runtime_database_url = os.environ.get("DATABASE_URL")
+    if runtime_database_url:
+        runtime_target = parse_database_url(runtime_database_url)
+        restore_target = parse_database_url(target_database_url)
+        if not _is_same_database_target(runtime_target, restore_target):
+            return
+    if os.environ.get("CONFIRM_RESTORE_DB") == "1":
+        return
+    fail(
+        "Refusing to restore into DATABASE_URL without explicit confirmation. "
+        "Set RESTORE_DATABASE_URL to a separate rehearsal target, or set "
+        "CONFIRM_RESTORE_DB=1 only for an intentional live database restore."
+    )
 
 
 def _prepare_restore_source(backup_file: Path) -> Path:
@@ -49,6 +96,8 @@ def main() -> int:
     target_url = args.target_database_url
     if not target_url:
         fail("RESTORE_DATABASE_URL (or DATABASE_URL) is required")
+
+    _require_live_restore_confirmation(target_database_url=target_url)
 
     target = parse_database_url(target_url)
     restore_source = _prepare_restore_source(backup_file)
@@ -93,7 +142,7 @@ def main() -> int:
             restore_source.unlink(missing_ok=True)
 
     print(f"RESTORED_BACKUP_FILE={backup_file}", flush=True)
-    print(f"RESTORE_DATABASE_URL={target_url}", flush=True)
+    print(f"RESTORE_DATABASE_URL={_redact_database_url(target_url)}", flush=True)
     pass_message(f"restore_db restored {backup_file} into {target.name}")
     return 0
 
