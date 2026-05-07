@@ -12,9 +12,60 @@ from typing import Dict, List, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
+from sqlalchemy.engine import make_url
 
 # Добавляем путь к приложению
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def get_database_url() -> str:
+    url = os.getenv("DATABASE_URL", "").strip()
+    if url:
+        return url
+
+    settings_error = None
+    try:
+        from app.core.config import settings
+
+        configured = getattr(settings, "DATABASE_URL", None)
+        if configured:
+            return str(configured).strip()
+    except Exception as exc:
+        settings_error = exc
+
+    raise SystemExit(
+        "DATABASE_URL is required; refusing to audit a fallback database"
+    ) from settings_error
+
+
+def normalize_sync_database_url(url: str) -> str:
+    if url.startswith("sqlite+aiosqlite://"):
+        return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    return url
+
+
+def is_sqlite_database_url(url: str) -> bool:
+    return make_url(url).drivername.startswith("sqlite")
+
+
+def allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enforce_database_url_policy(url: str) -> None:
+    if is_sqlite_database_url(url) and not allow_sqlite_database_url():
+        raise SystemExit(
+            "SQLite DATABASE_URL is disabled for audit_foreign_keys.py. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
+def display_database_url(url: str) -> str:
+    return make_url(url).render_as_string(hide_password=True)
+
 
 
 def get_foreign_keys(conn, table_name: str) -> List[Dict]:
@@ -111,22 +162,9 @@ def audit_all_foreign_keys(conn) -> Dict[str, any]:
 
 def main():
     """Основная функция"""
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        # Пробуем получить из настроек
-        try:
-            from app.core.config import settings
-            url = getattr(settings, "DATABASE_URL", None)
-        except Exception:
-            pass
-
-    if not url:
-        url = "sqlite:///./clinic.db"
-        print(f"⚠️  DATABASE_URL не установлен, используем: {url}", file=sys.stderr)
-
-    # Нормализуем SQLite URL
-    if url.startswith("sqlite+aiosqlite://"):
-        url = url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    url = normalize_sync_database_url(get_database_url())
+    enforce_database_url_policy(url)
+    print(f"Database URL: {display_database_url(url)}")
 
     engine = sa.create_engine(url, future=True)
 
