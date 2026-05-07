@@ -5,12 +5,13 @@ import sys
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker as orm_sessionmaker
 
 
 def _get_db_url_from_env_or_settings() -> str:
-    # 1) settings (если есть)
+    # 1) settings (РµСЃР»Рё РµСЃС‚СЊ)
     try:
         from app.core.config import settings  # type: ignore
 
@@ -33,12 +34,39 @@ def _get_db_url_from_env_or_settings() -> str:
 
 def _normalize_sqlite_to_sync(url: str) -> str:
     """
-    Если URL асинхронный (sqlite+aiosqlite), приводим к синхронному sqlite:///...
-    Ничего не трогаем для других драйверов.
+    Р•СЃР»Рё URL Р°СЃРёРЅС…СЂРѕРЅРЅС‹Р№ (sqlite+aiosqlite), РїСЂРёРІРѕРґРёРј Рє СЃРёРЅС…СЂРѕРЅРЅРѕРјСѓ sqlite:///...
+    РќРёС‡РµРіРѕ РЅРµ С‚СЂРѕРіР°РµРј РґР»СЏ РґСЂСѓРіРёС… РґСЂР°Р№РІРµСЂРѕРІ.
     """
     if url.startswith("sqlite+aiosqlite://"):
         return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
     return url
+
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_runtime_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for runtime. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for tests or explicit legacy tools."
+        )
+
+
+def _safe_database_url_for_log(url: str) -> str:
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<invalid database url>"
 
 
 def _get_int_env(name: str, default: int) -> int:
@@ -52,15 +80,19 @@ def _get_int_env(name: str, default: int) -> int:
     return max(0, value)
 
 
-# Получаем URL
+# РџРѕР»СѓС‡Р°РµРј URL
 DATABASE_URL = _get_db_url_from_env_or_settings()
+_validate_runtime_database_url(DATABASE_URL)
 DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
 
-# небольшая диагностика при импорте (в лог / stderr)
-print(f"[app.db.session] Using DATABASE_URL = {DATABASE_URL}", file=sys.stderr)
+# РЅРµР±РѕР»СЊС€Р°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР° РїСЂРё РёРјРїРѕСЂС‚Рµ (РІ Р»РѕРі / stderr)
+print(
+    f"[app.db.session] Using DATABASE_URL = {_safe_database_url_for_log(DATABASE_URL)}",
+    file=sys.stderr,
+)
 
-# Создаём СИНХРОННЫЙ движок
-# ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener
+# РЎРѕР·РґР°С‘Рј РЎРРќРҐР РћРќРќР«Р™ РґРІРёР¶РѕРє
+# вњ… SECURITY: Enable foreign key enforcement for SQLite via event listener
 def _enable_sqlite_fk(dbapi_conn, connection_record):
     """
     Enable foreign key enforcement for SQLite connections.
@@ -75,12 +107,12 @@ def _enable_sqlite_fk(dbapi_conn, connection_record):
             cursor.execute("PRAGMA foreign_keys")
             fk_status = cursor.fetchone()
             if fk_status and fk_status[0] == 1:
-                print(f"[app.db.session] ✅ Foreign keys enabled on connection (verified: {fk_status[0]})", file=sys.stderr)
+                print(f"[app.db.session] вњ… Foreign keys enabled on connection (verified: {fk_status[0]})", file=sys.stderr)
             else:
-                print(f"[app.db.session] ⚠️  WARNING: Foreign keys NOT enabled on connection (status: {fk_status})", file=sys.stderr)
+                print(f"[app.db.session] вљ пёЏ  WARNING: Foreign keys NOT enabled on connection (status: {fk_status})", file=sys.stderr)
             cursor.close()
         except Exception as e:
-            print(f"[app.db.session] ❌ ERROR enabling foreign keys: {e}", file=sys.stderr)
+            print(f"[app.db.session] вќЊ ERROR enabling foreign keys: {e}", file=sys.stderr)
             raise
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
@@ -105,7 +137,7 @@ engine = create_engine(
     **_engine_kwargs,
 )
 
-# ✅ SECURITY: Register event listener for SQLite FK enforcement
+# вњ… SECURITY: Register event listener for SQLite FK enforcement
 if _is_sqlite:
     event.listen(engine, "connect", _enable_sqlite_fk)
     print("[app.db.session] Foreign key enforcement enabled for SQLite via event listener", file=sys.stderr)
@@ -115,22 +147,22 @@ SessionLocal = orm_sessionmaker(
     bind=engine, autocommit=False, autoflush=False, future=True
 )
 
-# Совместимые имена (некоторый внешний код импортирует "sessionmaker" как объект)
+# РЎРѕРІРјРµСЃС‚РёРјС‹Рµ РёРјРµРЅР° (РЅРµРєРѕС‚РѕСЂС‹Р№ РІРЅРµС€РЅРёР№ РєРѕРґ РёРјРїРѕСЂС‚РёСЂСѓРµС‚ "sessionmaker" РєР°Рє РѕР±СЉРµРєС‚)
 sessionmaker = SessionLocal  # type: ignore
 
 
 def get_db() -> Generator[Session, None, None]:
     """
-    Синхронный dependency — отдаёт обычный Session (как ожидают ваши эндпоинты).
-    ✅ SECURITY: Foreign key enforcement is enabled via event listener for SQLite.
+    РЎРёРЅС…СЂРѕРЅРЅС‹Р№ dependency вЂ” РѕС‚РґР°С‘С‚ РѕР±С‹С‡РЅС‹Р№ Session (РєР°Рє РѕР¶РёРґР°СЋС‚ РІР°С€Рё СЌРЅРґРїРѕРёРЅС‚С‹).
+    вњ… SECURITY: Foreign key enforcement is enabled via event listener for SQLite.
     Additional PRAGMA execution here ensures FK is enabled even if event listener fails.
     """
     db = SessionLocal()
     try:
-        # ✅ SECURITY: Ensure foreign keys are enabled for this connection (SQLite)
+        # вњ… SECURITY: Ensure foreign keys are enabled for this connection (SQLite)
         # Event listener should have already enabled it, but we verify/ensure here as well
         if DATABASE_URL.startswith("sqlite"):
-            db.execute(text("PRAGMA foreign_keys=ON"))  # ✅ Используем text()
+            db.execute(text("PRAGMA foreign_keys=ON"))  # вњ… РСЃРїРѕР»СЊР·СѓРµРј text()
             # Verify FK is enabled (for safety)
             result = db.execute(text("PRAGMA foreign_keys")).scalar()
             if result != 1:
