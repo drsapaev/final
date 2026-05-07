@@ -1,12 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
+import os
 import sys
 from typing import List, Dict
 
 import requests
 
 
-BASE_URL = "http://127.0.0.1:8003/api/v1"
+BASE_URL = os.getenv("BACKEND_API_BASE_URL", "http://127.0.0.1:18000/api/v1").rstrip("/")
 
 # Критические системные пользователи, которых нельзя трогать
 CRITICAL_USERNAMES = {
@@ -21,15 +22,31 @@ CRITICAL_USERNAMES = {
 }
 
 
-def login_admin(username: str = "admin", password: str = "admin123") -> str:
+def _required_admin_password() -> str:
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError("Set ADMIN_PASSWORD before cleaning up users.")
+    return password
+
+
+def _require_cleanup_confirmation(action: str) -> None:
+    expected = f"CONFIRM_CLEANUP_NON_EXAMPLE_USERS_{action.upper()}"
+    if os.getenv(expected) != "1":
+        raise RuntimeError(
+            f"Refusing to {action} non-example users. "
+            f"Set {expected}=1 only for an explicit admin cleanup run."
+        )
+
+
+def login_admin(username: str = "admin", admin_password: str | None = None) -> str:
+    admin_password = admin_password or _required_admin_password()
     resp = requests.post(
         f"{BASE_URL}/authentication/login",
-        json={"username": username, "password": password},
+        json={"username": username, "password": admin_password},
         timeout=15,
     )
     resp.raise_for_status()
     data = resp.json()
-    print(f"LOGIN_RESPONSE: {data}")
     token = data.get("access_token")
     if not token:
         raise RuntimeError(f"No access_token in login response: {data}")
@@ -76,7 +93,7 @@ def bulk_action(token: str, user_ids: List[int], action: str) -> Dict:
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = {"action": action, "user_ids": user_ids}
     print(f"BULK_ACTION: URL={BASE_URL}/users/users/bulk-action")
-    print(f"BULK_ACTION: headers={headers}")
+    print("BULK_ACTION: Authorization header is set")
     print(f"BULK_ACTION: body={body}")
     r = requests.post(
         f"{BASE_URL}/users/users/bulk-action",
@@ -106,6 +123,7 @@ def main():
         sys.exit(2)
 
     action = sys.argv[1]
+    _require_cleanup_confirmation(action)
     token = login_admin()
     users = fetch_all_users(token)
     ids = select_non_example_ids(users)
