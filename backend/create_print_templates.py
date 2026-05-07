@@ -1,12 +1,34 @@
 """
 Создание шаблонов печати в БД
 """
+import os
+
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.print_config import PrinterConfig, PrintTemplate
 from app.crud import print_config as crud_print
 
+def _require_confirmation():
+    if os.getenv("CONFIRM_CREATE_PRINT_TEMPLATES") != "1":
+        raise RuntimeError(
+            "Refusing to create print templates. "
+            "Set CONFIRM_CREATE_PRINT_TEMPLATES=1 only for an explicit print setup run."
+        )
+
+
+def _require_postgres_database_url():
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating print templates.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("create_print_templates.py requires PostgreSQL; SQLite is not allowed.")
+
+
 def create_templates():
     """Создать стандартные шаблоны"""
+    _require_confirmation()
+    _require_postgres_database_url()
+
     print('📄 Создание шаблонов печати в БД...')
 
     db = SessionLocal()

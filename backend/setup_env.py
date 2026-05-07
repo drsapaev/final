@@ -67,13 +67,13 @@ LICENSE_ALLOW_HEALTH=1
 
 # --- TELEGRAM (УВЕДОМЛЕНИЯ) ---
 # Раскомментируйте для интеграции с Telegram
-# TELEGRAM_BOT_TOKEN=your-bot-token
-# TELEGRAM_CHAT_ID=your-chat-id
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_CHAT_ID=
 
 # --- ПЛАТЕЖИ ---
 # Раскомментируйте для интеграции с платежными системами
-# PAYME_MERCHANT_ID=your-merchant-id
-# PAYME_SECRET_KEY=your-secret-key
+# PAYME_MERCHANT_ID=
+# PAYME_SECRET_KEY=
 # PAYME_TEST_MODE=1
 """
 
