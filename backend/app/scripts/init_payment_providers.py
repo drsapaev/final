@@ -8,13 +8,23 @@ import sys
 # Добавляем путь к приложению
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from app.crud.payment_webhook import create_provider
-from app.db.session import get_db
-from app.schemas.payment_webhook import PaymentProviderCreate
+
+def _require_init_payment_providers_confirmation() -> None:
+    if os.getenv("CONFIRM_INIT_PAYMENT_PROVIDERS") != "1":
+        raise SystemExit(
+            "Refusing to initialize payment providers without "
+            "CONFIRM_INIT_PAYMENT_PROVIDERS=1."
+        )
 
 
 def init_payment_providers():
     """Инициализируем провайдеров платежей"""
+    _require_init_payment_providers_confirmation()
+
+    from app.crud.payment_webhook import create_provider
+    from app.db.session import get_db
+    from app.schemas.payment_webhook import PaymentProviderCreate
+
     print("🚀 Инициализация провайдеров платежей...")
 
     db = next(get_db())
