@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from clinic_lifecycle_common import (
     app_root,
@@ -12,6 +13,23 @@ from clinic_lifecycle_common import (
     pass_message,
     run_command,
 )
+
+
+def _redact_database_url(database_url: str) -> str:
+    parsed = urlsplit(database_url)
+    if not parsed.password:
+        return database_url
+
+    username = parsed.username or ""
+    hostname = parsed.hostname or ""
+    host = hostname
+    if ":" in hostname and not hostname.startswith("["):
+        host = f"[{hostname}]"
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+
+    netloc = f"{username}:***@{host}" if username else host
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
 
 
 def _script(name: str) -> Path:
@@ -85,7 +103,7 @@ def main() -> int:
     )
 
     print(f"RESTORE_BACKUP_FILE={backup_file}", flush=True)
-    print(f"RESTORE_DATABASE_URL={restore_database_url}", flush=True)
+    print(f"RESTORE_DATABASE_URL={_redact_database_url(restore_database_url)}", flush=True)
     print(f"RESTORE_BACKEND_URL={restore_backend_url}", flush=True)
     print(f"RESTORE_PUBLIC_URL={restore_public_url}", flush=True)
     pass_message("run_backup_restore_rehearsal completed successfully")
