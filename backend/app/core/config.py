@@ -113,25 +113,6 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
     CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
 
-    # --- Payment Providers ---
-    CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
-    CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")
-    CLICK_MERCHANT_ID: str | None = Field(default=None, description="Click merchant id")
-    CLICK_SECRET_KEY: str | None = Field(default=None, description="Click secret key")
-    CLICK_BASE_URL: str = Field(default="https://api.click.uz/v2")
-
-    PAYME_ENABLED: bool = Field(default=False, description="Enable PayMe payments")
-    PAYME_MERCHANT_ID: str | None = Field(default=None, description="PayMe merchant id")
-    PAYME_SECRET_KEY: str | None = Field(default=None, description="PayMe secret key")
-    PAYME_BASE_URL: str = Field(default="https://checkout.paycom.uz")
-    PAYME_API_URL: str = Field(default="https://api.paycom.uz")
-
-    KASPI_ENABLED: bool = Field(default=False, description="Enable Kaspi payments")
-    KASPI_MERCHANT_ID: str | None = Field(default=None, description="Kaspi merchant id")
-    KASPI_SECRET_KEY: str | None = Field(default=None, description="Kaspi secret key")
-    KASPI_BASE_URL: str = Field(default="https://kaspi.kz/pay")
-    KASPI_API_URL: str = Field(default="https://api.kaspi.kz/pay/v1")
-
     # --- App meta ---
     APP_NAME: str = "Clinic Manager"
     APP_VERSION: str = "0.9.0"
