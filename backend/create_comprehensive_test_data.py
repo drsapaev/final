@@ -23,10 +23,40 @@ from app.models.visit import Visit
 from app.models.emr import EMR
 from app.models.payment import Payment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.core.config import settings
 from app.core.security import get_password_hash
+
+def _require_confirmation():
+    if os.getenv("CONFIRM_CREATE_COMPREHENSIVE_TEST_DATA") != "1":
+        raise RuntimeError(
+            "Refusing to create comprehensive test data. "
+            "Set CONFIRM_CREATE_COMPREHENSIVE_TEST_DATA=1 only for an explicit local seed run."
+        )
+
+
+def _require_postgres_database_url():
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating comprehensive test data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError(
+            "create_comprehensive_test_data.py requires PostgreSQL; SQLite is not allowed."
+        )
+
+def required_test_user_password():
+    password = os.getenv("COMPREHENSIVE_TEST_DATA_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "Set COMPREHENSIVE_TEST_DATA_PASSWORD before creating test users."
+        )
+    return password
+
 
 def create_test_data():
     """Создание комплексных тестовых данных"""
+    _require_confirmation()
+    _require_postgres_database_url()
+    test_user_password = required_test_user_password()
     db = SessionLocal()
     
     try:
@@ -55,7 +85,7 @@ def create_test_data():
                     full_name=user_data["full_name"],
                     role=user_data["role"],
                     is_active=True,
-                    hashed_password=get_password_hash("test123"),
+                    hashed_password=get_password_hash(test_user_password),
                 )
                 db.add(user)
                 db.flush()

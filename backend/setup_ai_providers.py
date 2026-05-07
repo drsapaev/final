@@ -2,9 +2,29 @@
 Настройка стандартных AI провайдеров и промпт-шаблонов
 Основа: passport.md стр. 3325-3888
 """
+import os
+
 from app.db.session import SessionLocal
 from app.models.ai_config import AIProvider, AIPromptTemplate
 from app.crud import ai_config as crud_ai
+
+def require_ai_setup_confirmation():
+    if os.getenv("CONFIRM_SETUP_AI_PROVIDERS") != "1":
+        raise RuntimeError(
+            "Refusing to setup AI providers. "
+            "Set CONFIRM_SETUP_AI_PROVIDERS=1 only for an explicit AI catalog setup run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before setting up AI providers.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("setup_ai_providers.py requires PostgreSQL; SQLite is not allowed.")
+
 
 def create_ai_providers():
     """Создать стандартных AI провайдеров"""
@@ -263,6 +283,9 @@ def create_prompt_templates():
 
 def main():
     """Основная функция настройки"""
+    require_ai_setup_confirmation()
+    require_postgres_database_url()
+
     print("🚀 НАСТРОЙКА AI СИСТЕМЫ")
     print("=" * 50)
     

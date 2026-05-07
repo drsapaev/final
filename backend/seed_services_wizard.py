@@ -10,8 +10,27 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.service import Service
 from app.models.clinic import ServiceCategory
+import os
 
 # Данные из файла "Услуги и врачи в нашей клинике.txt"
+def require_seed_services_wizard_confirmation():
+    if os.getenv("CONFIRM_SEED_SERVICES_WIZARD") != "1":
+        raise RuntimeError(
+            "Refusing to seed wizard services. "
+            "Set CONFIRM_SEED_SERVICES_WIZARD=1 only for an explicit catalog seed run."
+        )
+
+
+def require_postgres_database_url() -> None:
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before seeding wizard services.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("seed_services_wizard.py requires a PostgreSQL DATABASE_URL.")
+
+
 SERVICES_DATA = [
     # ===== ЛАБОРАТОРНЫЕ АНАЛИЗЫ (L) =====
     # Общий анализ крови
@@ -116,6 +135,9 @@ CATEGORIES_DATA = [
 
 def seed_services():
     """Заполнение справочника услуг"""
+    require_seed_services_wizard_confirmation()
+    require_postgres_database_url()
+
     db = SessionLocal()
     try:
         print("🔄 Начинаем заполнение справочника услуг...")
