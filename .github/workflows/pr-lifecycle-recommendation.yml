@@ -1,0 +1,102 @@
+name: PR Lifecycle Recommendation
+
+on:
+  pull_request:
+    branches: [ main ]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - edited
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  recommend:
+    name: Recommend PR lifecycle state
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - name: Checkout trusted base automation
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Collect PR files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json files > pr-files.json
+
+      - name: Build lifecycle recommendation
+        run: |
+          python scripts/recommend_pr_lifecycle.py \
+            --event-file "$GITHUB_EVENT_PATH" \
+            --files-json pr-files.json \
+            --output-comment pr-lifecycle-comment.md \
+            --output-labels pr-lifecycle-labels.txt \
+            --output-known-labels pr-lifecycle-known-labels.txt
+
+      - name: Refresh lifecycle labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+            gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "$label" || true
+          done < pr-lifecycle-known-labels.txt
+
+          while IFS= read -r label; do
+            [ -z "$label" ] && continue
+            gh label create "$label" --repo "$REPO" --color "6f42c1" --description "Automated PR lifecycle recommendation" || true
+            gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "$label"
+          done < pr-lifecycle-labels.txt
+
+      - name: Upsert lifecycle recommendation comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- pr-lifecycle-recommendation -->";
+            const body = fs.readFileSync("pr-lifecycle-comment.md", "utf8");
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const previous = comments.find((comment) =>
+              comment.user.type === "Bot" && comment.body && comment.body.includes(marker)
+            );
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
