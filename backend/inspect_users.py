@@ -1,5 +1,6 @@
 # inspect_users.py
 import asyncio
+import os
 import traceback
 
 candidates_session = [
@@ -18,6 +19,14 @@ candidates_user = [
 ]
 
 
+def require_inspect_users_confirmation():
+    if os.getenv("CONFIRM_INSPECT_USERS") != "1":
+        raise RuntimeError(
+            "Refusing to inspect user records. "
+            "Set CONFIRM_INSPECT_USERS=1 only for an explicit local diagnostic read."
+        )
+
+
 def try_import(path):
     try:
         module_path, attr = path.rsplit(".", 1)
@@ -28,6 +37,8 @@ def try_import(path):
 
 
 async def run_async():
+    require_inspect_users_confirmation()
+
     SessionCandidate = None
     get_async_session = None
     for p in candidates_session:
