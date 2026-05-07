@@ -6,6 +6,39 @@ set -euo pipefail
 : "${APP_ROOT:=/opt/clinic}"
 : "${RUN_AS_USER:=$(whoami)}"
 
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
+validate_identifier() {
+  local name="$1"
+  local value="$2"
+  if [[ ! "${value}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$ ]]; then
+    fail "${name} must use letters, digits, underscores, or hyphens; max 63 chars; must start with a letter or digit"
+  fi
+}
+
+validate_app_root() {
+  local name="$1"
+  local value="$2"
+  if [[ ! "${value}" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+    fail "${name} must be an absolute Unix path using only letters, digits, dots, underscores, hyphens, and slashes"
+  fi
+}
+
+validate_host() {
+  local value="$1"
+  if [[ ! "${value}" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$ ]]; then
+    fail "APP_HOST must be a hostname without scheme, path, port, spaces, or template metacharacters"
+  fi
+}
+
+validate_identifier "APP_ENV" "${APP_ENV}"
+validate_identifier "RUN_AS_USER" "${RUN_AS_USER}"
+validate_app_root "APP_ROOT" "${APP_ROOT}"
+validate_host "${APP_HOST}"
+
 BACKEND_DIR="${APP_ROOT}/backend"
 FRONTEND_DIR="${APP_ROOT}/frontend"
 OUTPUT_DIR="${APP_ROOT}/output/vps"

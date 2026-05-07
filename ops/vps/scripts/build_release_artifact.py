@@ -12,15 +12,35 @@ from pathlib import Path
 from clinic_lifecycle_common import app_root, fail, load_clinic_env, pass_message, run_command
 
 
+_REF_FORBIDDEN_CHARS = set(":\\ \t\r\n")
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
 def _safe_name(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())
     cleaned = cleaned.strip("-._")
     return cleaned or "release"
 
 
-def _git_output(args: list[str]) -> str:
-    result = run_command(["git", *args], cwd=app_root())
-    return result.stdout.strip()
+def _validate_build_ref(value: str) -> str:
+    git_ref = value.strip()
+    if not git_ref:
+        fail("Release artifact --ref must not be empty")
+    if git_ref.startswith("-") or any(char in _REF_FORBIDDEN_CHARS or ord(char) < 32 for char in git_ref):
+        fail(f"Release artifact --ref is unsafe: {git_ref}")
+    return git_ref
+
+
+def _resolve_commit(git_ref: str) -> str:
+    result = run_command(
+        ["git", "rev-parse", "--verify", "--quiet", f"{git_ref}^{{commit}}"],
+        cwd=app_root(),
+        check=False,
+    )
+    commit_sha = result.stdout.strip()
+    if result.returncode != 0 or not _COMMIT_SHA_RE.fullmatch(commit_sha):
+        fail(f"Release artifact --ref does not resolve to a commit: {git_ref}")
+    return commit_sha
 
 
 def main() -> int:
@@ -46,7 +66,8 @@ def main() -> int:
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    commit_sha = _git_output(["rev-parse", args.git_ref])
+    git_ref = _validate_build_ref(args.git_ref)
+    commit_sha = _resolve_commit(git_ref)
     short_sha = commit_sha[:12]
     release_name = _safe_name(args.release_name or f"clinic-release-{short_sha}")
 
@@ -56,7 +77,7 @@ def main() -> int:
         manifest_path = temp_dir / "release-manifest.json"
 
         run_command(
-            ["git", "bundle", "create", str(bundle_path), args.git_ref],
+            ["git", "bundle", "create", str(bundle_path), git_ref],
             cwd=root,
         )
 
@@ -64,7 +85,7 @@ def main() -> int:
             "format_version": 1,
             "artifact_kind": "approved_release_artifact",
             "release_name": release_name,
-            "bundle_ref": args.git_ref,
+            "bundle_ref": git_ref,
             "commit_sha": commit_sha,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
             "delivery_modes": ["github_release_asset", "offline_package"],
@@ -79,7 +100,7 @@ def main() -> int:
 
     print(f"ARTIFACT_FILE={artifact_path}", flush=True)
     print(f"ARTIFACT_RELEASE_NAME={release_name}", flush=True)
-    print(f"ARTIFACT_RELEASE_REF={args.git_ref}", flush=True)
+    print(f"ARTIFACT_RELEASE_REF={git_ref}", flush=True)
     print(f"ARTIFACT_COMMIT_SHA={commit_sha}", flush=True)
     pass_message("build_release_artifact completed successfully")
     return 0
