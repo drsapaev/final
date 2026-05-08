@@ -41,19 +41,19 @@ http://localhost:18000/docs
 
 ### Администратор
 - **Логин**: admin@clinic.com
-- **Пароль**: admin123
+- **Пароль**: `QA_ADMIN_PASSWORD` env var
 - **Роль**: Admin
 - **Доступ**: Полный доступ ко всем функциям
 
 ### Врач
 - **Логин**: doctor@clinic.com
-- **Пароль**: doctor123
+- **Пароль**: `QA_DOCTOR_PASSWORD` env var
 - **Роль**: Doctor
 - **Доступ**: Панель врача, EMR, пациенты
 
 ### Медсестра
 - **Логин**: nurse@clinic.com
-- **Пароль**: nurse123
+- **Пароль**: `QA_NURSE_PASSWORD` env var
 - **Роль**: Nurse
 - **Доступ**: EMR, файлы, уведомления
 
