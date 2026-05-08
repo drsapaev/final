@@ -16,19 +16,12 @@ if "__version__" not in vars(_argon2):
     _argon2.__version__ = importlib.metadata.version("argon2-cffi")
     logger.debug("[FIX] Applied argon2 version shim for passlib compatibility")
 
-# Настройки с дефолтами
-try:
-    from app.core.config import settings  # type: ignore
+# JWT configuration is owned by app.core.config and fails closed on invalid env.
+from app.core.config import settings  # type: ignore
 
-    SECRET_KEY: str = getattr(settings, "SECRET_KEY", "dev-secret-key-change-me")
-    ALGORITHM: str = getattr(settings, "ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
-        getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60)
-    )
-except Exception:
-    SECRET_KEY = "dev-secret-key-change-me"
-    ALGORITHM = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES = 60
+SECRET_KEY: str = settings.SECRET_KEY
+ALGORITHM: str = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 # Поддерживаем верификацию старых хэшей bcrypt, новые хешируем argon2
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
