@@ -67,7 +67,7 @@ def create_resource(
 ):
     # Создаем ресурс
     resource = crud.create(db=db, obj_in=resource_in)
-    
+
     # ✅ AUDIT LOG: Логируем создание
     _, new_data = extract_model_changes(None, resource)
     log_critical_change(
@@ -82,7 +82,7 @@ def create_resource(
         description=f"Создан ресурс: {resource.name}",
     )
     db.commit()
-    
+
     return resource
 ```
 
@@ -127,9 +127,9 @@ def create_resource(
 
 ## ✅ Проверка работы
 
-### Вручную через SQLite:
+### Manual check through Postgres:
 ```powershell
-sqlite3 backend/clinic.db "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
+psql "$env:DATABASE_URL" -c "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
 ```
 
 ### Через тесты:

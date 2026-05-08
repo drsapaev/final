@@ -1,93 +1,122 @@
 #!/usr/bin/env python3
-"""
-Скрипт для диагностики проблем с тестами ролей.
-Симулирует то, что делает CI при создании пользователей.
-"""
+"""Diagnose role-test user creation in an isolated temporary database."""
 
+import os
 import sys
-import os
+import tempfile
+from pathlib import Path
 
-# Добавляем путь к проекту
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
-# Устанавливаем переменные окружения как в CI
-os.environ['DATABASE_URL'] = 'sqlite:///./test_ci_db.db'
-os.environ['CORS_DISABLE'] = '1'
-os.environ['WS_DEV_ALLOW'] = '1'
 
-from app.db.base import Base
-from app.db.session import engine, SessionLocal
-from app.models.user import User
-from app.core.security import get_password_hash, verify_password
+ROLE_USERS = [
+    ("admin", "Admin"),
+    ("registrar", "Registrar"),
+    ("doctor", "Doctor"),
+    ("cashier", "Cashier"),
+    ("lab", "Lab"),
+    ("cardio", "cardio"),
+    ("derma", "derma"),
+    ("dentist", "dentist"),
+]
 
-# Create tables
-print("Creating tables...")
-Base.metadata.create_all(bind=engine)
 
-db = SessionLocal()
+def required_password(username: str) -> str:
+    env_name = f"DIAGNOSE_CI_{username.upper()}_PASSWORD"
+    password = os.getenv(env_name)
+    if not password:
+        raise RuntimeError(f"{env_name} is required for diagnose_ci.py")
+    return password
 
-try:
-    # Создаем пользователей как в CI
-    print("\nСоздание пользователей...")
-    
-    users_data = [
-        ("admin", "admin123", "Admin"),
-        ("registrar", "registrar123", "Registrar"),
-        ("doctor", "doctor123", "Doctor"),
-        ("cashier", "cashier123", "Cashier"),
-        ("lab", "lab123", "Lab"),
-        ("cardio", "cardio123", "cardio"),
-        ("derma", "derma123", "derma"),
-        ("dentist", "dentist123", "dentist"),
-    ]
-    
-    for username, password, role in users_data:
-        existing = db.query(User).filter(User.username == username).first()
-        if existing:
-            print(f"  - {username}: уже существует")
-            continue
-            
-        hashed = get_password_hash(password)
-        user = User(
-            username=username,
-            full_name=username.title(),
-            role=role,
-            hashed_password=hashed,
-            is_active=True
+
+def require_temp_sqlite_confirmation() -> None:
+    if os.getenv("CONFIRM_DIAGNOSE_CI_TEMP_SQLITE") != "1":
+        raise RuntimeError(
+            "diagnose_ci.py creates schema with SQLAlchemy metadata in an isolated "
+            "temporary SQLite database. Set CONFIRM_DIAGNOSE_CI_TEMP_SQLITE=1 only "
+            "for an explicit diagnostic run."
         )
-        db.add(user)
-        print(f"  - {username}: создан с ролью '{role}'")
-    
-    db.commit()
-    print("\n✅ Пользователи созданы!")
-    
-    # Теперь проверяем, что можем верифицировать пароли
-    print("\nПроверка верификации паролей:")
-    for username, password, role in users_data:
-        user = db.query(User).filter(User.username == username).first()
-        if not user:
-            print(f"  ❌ {username}: не найден в БД!")
-            continue
-        
-        # Проверяем пароль
-        is_valid = verify_password(password, user.hashed_password)
-        if is_valid:
-            print(f"  ✅ {username}: пароль верифицирован, роль = '{user.role}'")
-        else:
-            print(f"  ❌ {username}: пароль НЕ ВЕРИФИЦИРОВАН!")
-            print(f"      Ожидаемый пароль: {password}")
-            print(f"      Хеш в БД: {user.hashed_password[:50]}...")
 
-except Exception as e:
-    print(f"\n❌ Ошибка: {e}")
-    import traceback
-    traceback.print_exc()
-    db.rollback()
-finally:
-    db.close()
-    
-# Удаляем тестовую БД
-import os
-if os.path.exists('test_ci_db.db'):
-    os.remove('test_ci_db.db')
-    print("\n🗑️ Тестовая БД удалена")
+
+def main() -> None:
+    require_temp_sqlite_confirmation()
+
+    diagnostic_db_dir = tempfile.TemporaryDirectory(prefix="diagnose-ci-")
+    diagnostic_db_path = Path(diagnostic_db_dir.name) / "diagnose_ci.db"
+
+    # This helper is intentionally isolated from runtime DB settings.
+    os.environ["DATABASE_URL"] = f"sqlite:///{diagnostic_db_path.as_posix()}"
+    os.environ["ALLOW_SQLITE_DATABASE_URL"] = "1"
+    os.environ["CORS_DISABLE"] = "0"
+    os.environ["WS_DEV_ALLOW"] = "1"
+
+    db = None
+    engine = None
+    try:
+        from app.core.security import get_password_hash, verify_password
+        from app.db.base import Base
+        from app.db.session import SessionLocal, engine
+        from app.models.user import User
+
+        users_data = [
+            (username, required_password(username), role)
+            for username, role in ROLE_USERS
+        ]
+
+        print("Creating diagnostic tables in a temporary SQLite database...")
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+
+        print("\nCreating role users...")
+        for username, password, role in users_data:
+            existing = db.query(User).filter(User.username == username).first()
+            if existing:
+                print(f"  - {username}: already exists")
+                continue
+
+            user = User(
+                username=username,
+                full_name=username.title(),
+                role=role,
+                hashed_password=get_password_hash(password),
+                is_active=True,
+            )
+            db.add(user)
+            print(f"  - {username}: created with role '{role}'")
+
+        db.commit()
+        print("\nUsers created.")
+
+        print("\nVerifying passwords:")
+        for username, password, role in users_data:
+            user = db.query(User).filter(User.username == username).first()
+            if not user:
+                print(f"  FAILED {username}: not found in DB")
+                continue
+
+            is_valid = verify_password(password, user.hashed_password)
+            if is_valid:
+                print(f"  OK {username}: password verified, role = '{user.role}'")
+            else:
+                print(f"  FAILED {username}: password was not verified")
+                print(
+                    "      Password value is supplied through the "
+                    "DIAGNOSE_CI_*_PASSWORD environment."
+                )
+
+    except Exception as exc:
+        print(f"\nError: {exc}")
+        if db is not None:
+            db.rollback()
+        raise
+    finally:
+        if db is not None:
+            db.close()
+        if engine is not None:
+            engine.dispose()
+        diagnostic_db_dir.cleanup()
+        print("\nTemporary diagnostic DB removed")
+
+
+if __name__ == "__main__":
+    main()

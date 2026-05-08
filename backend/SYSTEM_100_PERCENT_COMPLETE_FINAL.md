@@ -16,7 +16,7 @@
 ## 🏗️ АРХИТЕКТУРА СИСТЕМЫ
 
 ### Backend (FastAPI + SQLAlchemy)
-- **База данных**: SQLite (clinic.db) с полной схемой
+- **Database**: PostgreSQL schema managed by Alembic migrations
 - **Аутентификация**: OAuth2 + JWT + Argon2 хеширование
 - **API endpoints**: 1000+ эндпоинтов работают
 - **Модели данных**: 50+ SQLAlchemy моделей

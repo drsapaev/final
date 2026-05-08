@@ -126,7 +126,7 @@ python test_role_routing.py
 python test_user_management_system.py
 
 # 3. Проверить целостность
-python check_system_integrity.py
+python -m compileall -q app
 ```
 
 ### **ПОСЛЕ ИЗМЕНЕНИЙ:**
@@ -206,7 +206,7 @@ docs/AUTHENTICATION_LAWS_FOR_AI.md         # Этот файл
 ### **ЕСЛИ СИСТЕМА СЛОМАЛАСЬ:**
 1. **ОСТАНОВИТЬ** все изменения
 2. **ПРОВЕРИТЬ** логи: `tail -f uvicorn.log`
-3. **ЗАПУСТИТЬ** диагностику: `python check_system_integrity.py`
+3. **ЗАПУСТИТЬ** диагностику: `python -m compileall -q app`
 4. **ВОССТАНОВИТЬ** из последней рабочей версии
 5. **ИСПРАВИТЬ** проблемы согласно законам
 6. **ПРОТЕСТИРОВАТЬ** все критические функции

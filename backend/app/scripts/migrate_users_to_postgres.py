@@ -381,6 +381,7 @@ def main() -> int:
     )
     parser = _build_parser()
     args = parser.parse_args()
+    _require_live_migration_confirmation(dry_run=args.dry_run)
     source_path = args.source.resolve()
 
     if not source_path.exists():
@@ -389,7 +390,6 @@ def main() -> int:
         )
 
     target_url = _resolve_target_url(args.target_url)
-    _require_live_migration_confirmation(dry_run=args.dry_run)
     logger.info(
         "[FIX:USER-MIGRATION] Starting migration source=%s target=%s dry_run=%s",
         source_path,

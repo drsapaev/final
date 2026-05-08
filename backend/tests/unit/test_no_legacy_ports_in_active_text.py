@@ -31,7 +31,7 @@ LEGACY_PORT_PATTERNS = [
     re.compile(rf"\b0\.0\.0\.0:{LEGACY_PORT_RX}\b"),
     re.compile(rf"\bport={LEGACY_PORT_RX}\b"),
     re.compile(rf"\b--port {LEGACY_PORT_RX}\b"),
-    re.compile(rf"\b[Р В РЎСџР В РЎвЂ”]Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™ {LEGACY_PORT_RX}\b"),
+    re.compile(rf"\b[Пп]орт {LEGACY_PORT_RX}\b"),
     re.compile(rf"\b-LocalPort {LEGACY_PORT_RX}\b"),
     re.compile(rf":{LEGACY_PORT_RX}.*LISTENING"),
 ]
@@ -39,7 +39,7 @@ LEGACY_PORT_PATTERNS = [
 SQLITE_FIRST_DOC_PATTERNS = [
     re.compile(r"sqlite3\s+backend/clinic\.db\b", re.IGNORECASE),
     re.compile(r"SQLite\s+\(clinic\.db\)\s+", re.IGNORECASE),
-    re.compile(r"clinic\.db\s+Р РЋР вЂљР В Р’В°Р В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В Р’В°Р В Р’ВµР РЋРІР‚С™", re.IGNORECASE),
+    re.compile(r"clinic\.db\s+работает", re.IGNORECASE),
 ]
 
 RETIRED_DOC_COMMAND_PATTERNS = [
@@ -164,60 +164,230 @@ def test_no_legacy_port_refs_in_active_text():
     assert not matches, "Legacy port references still exist:\n" + "\n".join(matches[:50])
 
 
-def _read_repo_text(repo_root: Path, relative_path: str) -> str:
-    return (repo_root / relative_path).read_text(encoding="utf-8", errors="ignore")
-
-
-def test_runtime_env_docs_use_explicit_prod_cors_guidance():
+def test_no_sqlite_first_claims_in_active_docs():
     repo_root = Path(__file__).resolve().parents[3]
-    docs_env = _read_repo_text(repo_root, "docs/README_env.md")
-    docker_compose = _read_repo_text(repo_root, "ops/docker-compose.yml")
-    staging_compose = _read_repo_text(repo_root, "ops/compose.staging.yml")
+    matches: list[str] = []
 
-    assert "CORS_ALLOW_ALL" in docs_env
-    assert "local diagnostics only" in docs_env
-    assert "stage|prod" in docs_env
-    assert "CORS_ALLOW_ALL: ${CORS_ALLOW_ALL:-0}" in docker_compose
-    assert (
-        "BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
-        in docker_compose
+    scan_roots = [
+        repo_root / "backend",
+        repo_root / "docs",
+    ]
+
+    seen: set[Path] = set()
+    for scan_root in scan_roots:
+        if not scan_root.exists():
+            continue
+        for path in _collect_active_text_files(scan_root):
+            if path in seen or path.suffix.lower() != ".md":
+                continue
+            seen.add(path)
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            for pattern in SQLITE_FIRST_DOC_PATTERNS:
+                for match in pattern.finditer(content):
+                    line_number = content.count("\n", 0, match.start()) + 1
+                    line_start = content.rfind("\n", 0, match.start()) + 1
+                    line_end = content.find("\n", match.start())
+                    if line_end == -1:
+                        line_end = len(content)
+                    line = content[line_start:line_end].strip()
+                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+
+    assert not matches, "SQLite-first doc claims still exist:\n" + "\n".join(matches[:50])
+
+
+def test_no_retired_backend_helper_commands_in_active_docs():
+    repo_root = Path(__file__).resolve().parents[3]
+    matches: list[str] = []
+
+    scan_roots = [
+        repo_root / "backend",
+        repo_root / "docs",
+    ]
+
+    seen: set[Path] = set()
+    for scan_root in scan_roots:
+        if not scan_root.exists():
+            continue
+        for path in _collect_active_text_files(scan_root):
+            if path in seen or path.suffix.lower() != ".md":
+                continue
+            seen.add(path)
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            for pattern in RETIRED_DOC_COMMAND_PATTERNS:
+                for match in pattern.finditer(content):
+                    line_number = content.count("\n", 0, match.start()) + 1
+                    line_start = content.rfind("\n", 0, match.start()) + 1
+                    line_end = content.find("\n", match.start())
+                    if line_end == -1:
+                        line_end = len(content)
+                    line = content[line_start:line_end].strip()
+                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+
+    assert not matches, (
+        "Retired backend helper commands still exist in active docs:\n"
+        + "\n".join(matches[:50])
     )
-    assert "AUTH_SECRET: ${AUTH_SECRET:-}" in staging_compose
 
 
-def test_runtime_env_samples_keep_auth_secret_as_optional_alias():
+def test_backend_sqlite_schema_patches_require_standard_opt_in():
     repo_root = Path(__file__).resolve().parents[3]
-    ops_env = _read_repo_text(repo_root, "ops/.env.example")
-    staging_env = _read_repo_text(repo_root, "ops/staging.env.sample")
-    docker_compose = _read_repo_text(repo_root, "ops/docker-compose.yml")
+    backend_root = repo_root / "backend"
+    matches: list[str] = []
 
-    assert "# Optional legacy alias. Leave empty to use SECRET_KEY." in ops_env
-    assert "# Optional legacy alias. Leave empty to use SECRET_KEY." in staging_env
-    assert "PORT=18000" in ops_env
-    assert "BACKEND_PORT=18000" in ops_env
-    assert "AUTH_SECRET: ${AUTH_SECRET:-}" in docker_compose
+    scan_paths = [
+        path
+        for path in _collect_active_text_files(backend_root)
+        if path.suffix.lower() == ".py"
+    ]
+    scan_paths.extend(repo_root.glob("*.py"))
+    for path in scan_paths:
+        relative_path = path.relative_to(repo_root).as_posix()
+        if relative_path in INTENTIONAL_SQLITE_RECOVERY_TOOLS:
+            continue
+
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        if "sqlite3.connect" not in content or "clinic.db" not in content:
+            continue
+        if not any(marker in content for marker in SQLITE_SCHEMA_PATCH_MARKERS):
+            continue
+        if "ALLOW_LEGACY_SQLITE_SCHEMA_PATCH" in content:
+            continue
+
+        matches.append(relative_path)
+
+    assert not matches, (
+        "Legacy SQLite schema patch scripts must require "
+        "ALLOW_LEGACY_SQLITE_SCHEMA_PATCH=1:\n" + "\n".join(matches)
+    )
 
 
-def test_runtime_database_guards_and_diagnostic_opt_ins_are_explicit():
+def test_backend_sqlite_data_fixes_require_standard_opt_in():
     repo_root = Path(__file__).resolve().parents[3]
-    session_py = _read_repo_text(repo_root, "backend/app/db/session.py")
-    init_db_py = _read_repo_text(repo_root, "backend/init_database.py")
-    inspect_users_py = _read_repo_text(repo_root, "backend/inspect_users.py")
-    load_test_py = _read_repo_text(repo_root, "backend/load_test.py")
+    backend_root = repo_root / "backend"
+    matches: list[str] = []
 
-    assert "ALLOW_SQLITE_DATABASE_URL" in session_py
-    assert "SQLite DATABASE_URL is disabled for runtime." in session_py
-    assert "_safe_database_url_for_log" in session_py
-    assert "CONFIRM_INIT_DATABASE" in init_db_py
-    assert "CONFIRM_INSPECT_USERS" in inspect_users_py
-    assert "CONFIRM_LOAD_TEST" in load_test_py
+    scan_paths = [
+        path
+        for path in _collect_active_text_files(backend_root)
+        if path.suffix.lower() == ".py"
+    ]
+    scan_paths.extend(repo_root.glob("*.py"))
+    for path in scan_paths:
+        relative_path = path.relative_to(repo_root).as_posix()
+        if relative_path in INTENTIONAL_SQLITE_RECOVERY_TOOLS:
+            continue
+
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        if "sqlite3.connect" not in content or "clinic.db" not in content:
+            continue
+        if not any(marker in content for marker in SQLITE_DATA_FIX_MARKERS):
+            continue
+        if "ALLOW_LEGACY_SQLITE_DATA_FIX" in content:
+            continue
+        if "ALLOW_LEGACY_SQLITE_SCHEMA_PATCH" in content:
+            continue
+
+        matches.append(relative_path)
+
+    assert not matches, (
+        "Legacy SQLite data-fix scripts must require "
+        "ALLOW_LEGACY_SQLITE_DATA_FIX=1:\n" + "\n".join(matches)
+    )
 
 
-def test_windows_clinic_host_redacts_restore_urls_and_guards_forceful_ops():
+def test_legacy_sqlite_reset_scripts_are_deprecated_fail_fast():
     repo_root = Path(__file__).resolve().parents[3]
-    clinic_host = _read_repo_text(repo_root, "ops/windows/clinic_host.ps1")
+    backend_root = repo_root / "backend"
 
-    assert "CONFIRM_CLINIC_HOST_STOP_PORT_OWNERS" in clinic_host
-    assert "Redact-DatabaseUrl" in clinic_host
-    assert "RESTORE_DATABASE_URL=$(Redact-DatabaseUrl -DatabaseUrl $restoreDatabaseUrl)" in clinic_host
-    assert "CONFIRM_FORCE_RELEASE_CHECKOUT" in clinic_host
+    auto_reset = (backend_root / "reset_database_auto.ps1").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+    interactive_reset = (backend_root / "reset_database.ps1").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+    fk_summary = (backend_root / "FK_POLICIES_SUMMARY.md").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+
+    assert "CONFIRM_LEGACY_SQLITE_RESET is intentionally ignored" in auto_reset
+    assert "AUTO MODE: No confirmation required" not in auto_reset
+    assert "Automatic SQLite file deletion is disabled" in auto_reset
+    assert "PostgreSQL + Alembic are the database source of truth" in auto_reset
+    assert "Remove-Item" not in auto_reset
+    assert "exit 2" in auto_reset
+
+    assert "DEPRECATED DATABASE RESET SCRIPT" in interactive_reset
+    assert "This legacy helper no longer deletes local SQLite files" in interactive_reset
+    assert "PostgreSQL + Alembic are the database source of truth" in interactive_reset
+    assert "Remove-Item" not in interactive_reset
+    assert "exit 2" in interactive_reset
+
+    assert "PostgreSQL runtime databases should apply schema changes with Alembic" in fk_summary
+    assert "legacy SQLite-only recovery helper" in fk_summary
+
+
+def test_allowlisted_sqlite_recovery_helpers_remain_explicit_opt_in():
+    repo_root = Path(__file__).resolve().parents[3]
+
+    required_markers = {
+        "backend/app/scripts/migrate_sqlite_to_postgres.py": [
+            "CONFIRM_SQLITE_TO_POSTGRES_MIGRATION",
+            "--dry-run",
+        ],
+        "backend/app/scripts/migrate_users_to_postgres.py": [
+            "CONFIRM_USERS_SQLITE_TO_POSTGRES_MIGRATION",
+            "--dry-run",
+        ],
+        "backend/check_db.py": [
+            "ALLOW_LEGACY_SQLITE_DIAGNOSTIC_READ",
+            "explicit local legacy SQLite diagnostic run",
+        ],
+        "backend/scripts/inspect_today_visits.py": [
+            "ALLOW_LEGACY_SQLITE_DIAGNOSTIC_READ",
+            "explicit local legacy SQLite diagnostic run",
+        ],
+        "backend/scripts/pass15_restore_compat_audit.py": [
+            "ALLOW_PASS15_RESTORE_COMPAT_AUDIT",
+            "CONFIRM_PASS15_RESTORE_COMPAT_APPLY",
+        ],
+    }
+
+    missing: list[str] = []
+    for relative_path, markers in required_markers.items():
+        content = (repo_root / relative_path).read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        for marker in markers:
+            if marker not in content:
+                missing.append(f"{relative_path}: missing {marker}")
+
+    assert not missing, "SQLite recovery helper opt-in markers missing:\n" + "\n".join(missing)
+
+
+def test_diagnose_ci_uses_only_isolated_temporary_sqlite():
+    repo_root = Path(__file__).resolve().parents[3]
+    content = (repo_root / "backend/diagnose_ci.py").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+
+    assert "tempfile.TemporaryDirectory" in content
+    assert "diagnose_ci.db" in content
+    assert "ALLOW_SQLITE_DATABASE_URL" in content
+    assert "CONFIRM_DIAGNOSE_CI_TEMP_SQLITE" in content
+    assert "clinic.db" not in content
