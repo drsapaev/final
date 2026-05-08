@@ -169,7 +169,7 @@ export default function LabPanel() {
 
   const switchTab = useCallback((tabId) => {
     setActiveTab(tabId);
-    navigate(`/lab-panel?tab=${tabId}`, { replace: true });
+    navigate(`/lab?tab=${tabId}`, { replace: true });
   }, [navigate]);
 
   const loadLabAppointments = useCallback(async () => {

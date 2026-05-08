@@ -15,6 +15,7 @@ describe('RBAC route parity', () => {
 
   it('keeps receptionist compatibility through registrar alias', () => {
     const profile = { role: 'Receptionist' };
+    expect(hasRouteAccess(profile, '/registrar')).toBe(true);
     expect(hasRouteAccess(profile, '/registrar-panel')).toBe(true);
     expect(hasRouteAccess(profile, '/clinical/appointments')).toBe(true);
   });
