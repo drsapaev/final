@@ -798,6 +798,8 @@ function Ensure-RestoreSmokeAdmin {
             ADMIN_USERNAME = $Username
             ADMIN_PASSWORD = $Password
             ADMIN_EMAIL = 'admin@example.com'
+            ADMIN_RESET_PASSWORD = '1'
+            ENSURE_ADMIN_ALLOW_INITIALIZED = '1'
         }
 }
 
@@ -819,7 +821,10 @@ function Invoke-RestoreRehearsal {
     $restoreBackendUrl = "http://127.0.0.1:$RestoreBackendPort"
     $restorePublicUrl = "http://127.0.0.1:$RestoreFrontendPort"
     $smokeLoginUsername = if ($env:SMOKE_LOGIN_USERNAME) { $env:SMOKE_LOGIN_USERNAME } elseif ($env:SETUP_ADMIN_USERNAME) { $env:SETUP_ADMIN_USERNAME } else { 'admin' }
-    $smokeLoginPassword = if ($env:SMOKE_LOGIN_PASSWORD) { $env:SMOKE_LOGIN_PASSWORD } elseif ($env:SETUP_ADMIN_PASSWORD) { $env:SETUP_ADMIN_PASSWORD } else { 'admin' }
+    $smokeLoginPassword = if ($env:SMOKE_LOGIN_PASSWORD) { $env:SMOKE_LOGIN_PASSWORD } elseif ($env:SETUP_ADMIN_PASSWORD) { $env:SETUP_ADMIN_PASSWORD } else { $null }
+    if (-not $smokeLoginPassword) {
+        Write-Fail 'Set SMOKE_LOGIN_PASSWORD or SETUP_ADMIN_PASSWORD before restore smoke admin seeding.'
+    }
 
     Write-Step 'Preparing isolated restore target...'
     Initialize-RestorePostgres

@@ -55,8 +55,9 @@ Minimum values:
 ```env
 APP_ENV=production
 APP_HOST=clinic.internal.example
-DATABASE_URL=postgresql://clinic_host:clinic_host_password@127.0.0.1:5432/clinic_host
-SECRET_KEY=<unique_secret>
+DATABASE_URL=postgresql://clinic_host:<db_password>@127.0.0.1:5432/clinic_host
+# Generate a fresh value during install; do not commit or reuse examples.
+SECRET_KEY=
 BACKEND_CORS_ORIGINS=https://clinic.internal.example
 ENSURE_ADMIN=0
 ENSURE_ADMIN_ALLOW_INITIALIZED=0
