@@ -68,7 +68,7 @@ jobs:
           done < pr-lifecycle-labels.txt
 
       - name: Upsert lifecycle recommendation comment
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
