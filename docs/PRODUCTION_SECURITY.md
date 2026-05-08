@@ -17,13 +17,14 @@
 ```bash
 # CRITICAL: Generate secure key for JWT tokens
 # python -c "import secrets; print(secrets.token_urlsafe(32))"
-SECRET_KEY=your-32-char-or-longer-secret-key
+# Paste a freshly generated value; do not commit or reuse examples.
+SECRET_KEY=
 
 # Set environment to production
 ENV=production
 
 # Database URL (use PostgreSQL in production)
-DATABASE_URL=postgresql://user:password@host:5432/clinic_db
+DATABASE_URL=postgresql://<db_user>:<db_password>@host:5432/clinic_db
 ```
 
 ### CORS Configuration
@@ -132,9 +133,10 @@ export PRODUCTION_CORS_ORIGINS="https://clinic.example.com,https://api.clinic.ex
 ```
 
 ### Behind Reverse Proxy (Nginx/Caddy)
-If your reverse proxy handles CORS, you can disable it in the application:
+Keep application CORS enabled and mirror the reverse-proxy allowlist in the application:
 ```bash
-export CORS_DISABLE=true
+export CORS_DISABLE=false
+export BACKEND_CORS_ORIGINS="https://clinic.example.com,https://api.clinic.example.com"
 ```
 
 ---
@@ -357,11 +359,12 @@ readinessProbe:
 
 ```bash
 # Core
-SECRET_KEY=6HK2DZj8qL4xPRvYnM9aS7cWfT3gJbE0uNhXiYlOpQw
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=
 ENV=production
 
 # Database
-DATABASE_URL=postgresql://clinic:strongpassword@db.example.com:5432/clinic_prod
+DATABASE_URL=postgresql://clinic:<db_password>@db.example.com:5432/clinic_prod
 
 # Database Connection Pool
 DB_POOL_SIZE=10
