@@ -15,6 +15,7 @@ SAMPLE_BODY_FILES = (
     REPO_ROOT / "docs" / "runbooks" / "pr-review-samples" / "docs-only-pr.md",
     REPO_ROOT / "docs" / "runbooks" / "pr-review-samples" / "runtime-contract-pr.md",
 )
+DEPENDABOT_AUTHORS = {"app/dependabot", "dependabot[bot]"}
 
 
 def _ensure_repo_imports() -> None:
@@ -29,6 +30,7 @@ def _run_unit_tests() -> bool:
         [
             "test_check_pr_review_template",
             "test_add_pr_review_adoption_entry",
+            "test_run_pr_review_gate_checks",
         ]
     )
     result = unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite)
@@ -77,6 +79,18 @@ def _read_pr_body(args: argparse.Namespace) -> tuple[str, str] | None:
     return None
 
 
+def _read_pr_author(args: argparse.Namespace) -> str:
+    if args.author:
+        return args.author
+    if args.author_env:
+        return os.environ.get(args.author_env, "")
+    return os.environ.get("PR_AUTHOR", "")
+
+
+def _is_dependabot_author(author: str) -> bool:
+    return author.strip().lower() in DEPENDABOT_AUTHORS
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run PR review gate unit tests, samples, and optional PR body validation."
@@ -84,6 +98,8 @@ def main() -> int:
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--body-file", help="Path to a markdown file containing PR body.")
     source.add_argument("--body-env", help="Environment variable containing PR body text.")
+    parser.add_argument("--author", help="Pull request author login.")
+    parser.add_argument("--author-env", help="Environment variable containing the PR author login.")
     args = parser.parse_args()
 
     ok = True
@@ -96,7 +112,14 @@ def main() -> int:
     pr_body = _read_pr_body(args)
     if pr_body:
         label, body = pr_body
-        ok = _validate_body(label, body) and ok
+        author = _read_pr_author(args)
+        if _is_dependabot_author(author):
+            print(
+                f"\nSkipping live PR body validation for Dependabot author `{author}`; "
+                "Dependabot bodies are generated release notes, not the human review template."
+            )
+        else:
+            ok = _validate_body(label, body) and ok
     else:
         print("\nNo live PR body provided; skipped live PR body validation.")
 
