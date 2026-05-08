@@ -7,12 +7,17 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-clinic}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinicpwd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-clinicdb}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   backend:
     build:
@@ -21,14 +26,12 @@ services:
       target: runtime
     container_name: clinic-backend
     restart: unless-stopped
-    env_file:
-      - ./backend/.env.production
     environment:
       # Core
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://clinic:clinicpwd@postgres:5432/clinicdb}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set to a PostgreSQL connection string}
       APP_NAME: ${APP_NAME:-Clinic Queue Manager}
       APP_VERSION: ${APP_VERSION:-0.1.0}
-      ENV: ${ENV:-dev}
+      ENV: ${ENV:-production}
       # Auth
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
       AUTH_SECRET: ${AUTH_SECRET:-}
@@ -46,19 +49,21 @@ services:
       PRINTER_USB_VID: ${PRINTER_USB_VID:-}
       PRINTER_USB_PID: ${PRINTER_USB_PID:-}
       # Admin bootstrap
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Administrator}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:?ADMIN_FULL_NAME must be set}
       ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-0}
+      ENSURE_ADMIN: ${ENSURE_ADMIN:-1}
       # App bind
       HOST: 0.0.0.0
-      PORT: 8000
+      PORT: 18000
       RELOAD: ${RELOAD:-0}
       WORKERS: ${WORKERS:-1}
+      RUN_ALEMBIC_ON_START: ${RUN_ALEMBIC_ON_START:-1}
       # Licensing / Activation
-      REQUIRE_LICENSE: ${REQUIRE_LICENSE:-1}         # <Р Р†Р вЂљРІР‚Сњ NEW (Р В Р вЂ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂќР РЋРЎвЂњ)
-      LICENSE_MODE: ${LICENSE_MODE:-activation}      # <Р Р†Р вЂљРІР‚Сњ NEW (Р В РЎвЂР РЋР С“Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р В Р’В°Р В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚В Р РЋРЎвЂњ activations)
+      REQUIRE_LICENSE: ${REQUIRE_LICENSE:-1}
+      LICENSE_MODE: ${LICENSE_MODE:-activation}
       LICENSE_ALLOW_HEALTH: ${LICENSE_ALLOW_HEALTH:-1}
     volumes:
       - ./backend:/app:rw
@@ -66,9 +71,10 @@ services:
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-18000}:18000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:
@@ -77,10 +83,12 @@ services:
     container_name: clinic-frontend
     restart: unless-stopped
     environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:18000}
       VITE_API_BASE: ${VITE_API_BASE:-http://localhost:18000/api/v1}
     volumes:
       - ./frontend:/app:rw
     working_dir: /app
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
     ports:
       - "5173:5173"
     depends_on:
