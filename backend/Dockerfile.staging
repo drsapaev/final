@@ -21,6 +21,6 @@ RUN chmod +x /entrypoint.sh
 
 ENV PYTHONPATH=/app
 
-EXPOSE 8000
+EXPOSE 18000
 
 CMD ["/bin/bash", "/entrypoint.sh"]
