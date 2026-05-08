@@ -130,23 +130,19 @@ python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py
 - Do not broaden scope without returning a report to the user.
 - If the gate fails or cannot run, stop and report instead of editing.
 - If the gate returns a misroute or misses the confirmed root-cause file, retry at most once with `--known-root-cause`.
-- If the retry still misses the confirmed file, switch to `narrow_override`: edit only the approved narrow file set, preserve stop conditions, do not expand scope, and record evidence.
-- Record `gate_misroute`, `override_used`, and `known_root_cause_file` in the LightRAG evidence entry for that risky task when applicable.
+- If the retry still misses the confirmed file, switch to `narrow_override`: edit only the approved narrow file set, preserve stop conditions, do not expand scope, and report the override in the task outcome.
+- When a LightRAG/dev-brain evaluation entry is explicitly created, include `gate_misroute`, `override_used`, and `known_root_cause_file` when applicable.
 - Do not use `agent_gate.py` as a ritual for every small safe task.
 
-## LightRAG Readiness Evidence
+## LightRAG Evidence Policy
 
-For every real risky change-task executed through `agent_gate` or handoff, append one factual evidence entry to:
+`C:\final\ai\langgraph\EVIDENCE_LIGHTRAG_READINESS.md` is a historical decision log from the period before LightRAG was accepted into the dev-brain stack.
 
-```text
-C:\final\ai\langgraph\EVIDENCE_LIGHTRAG_READINESS.md
-```
-
-- Create the file if it does not exist.
-- Record what the handoff solved well, missing relationship mapping, manual reconstruction needed, and whether multi-hop gap, ownership ambiguity, or manual graph reconstruction occurred.
-- Do not inflate the signal: write `none` when no gap was observed and mark LightRAG as helpful only when the task produced a concrete observed gap.
-- After 5 to 10 risky task entries, add a short evidence-based mini-review with counts and a recommendation.
-- Do not change `backend/`, `frontend/`, or `ops/` only for this evidence log.
+- Do not append routine entries for every `agent_gate`, handoff, or risky change-task.
+- Preserve the file as historical evidence; do not delete or rewrite it during normal implementation work.
+- Append a new factual entry only when explicitly evaluating LightRAG/dev-brain quality or when a concrete gate/retrieval regression is observed.
+- Examples that may justify a new entry: gate misroute, LightRAG retrieval missing an expected canonical relationship, before/after retrieval comparison, or a deliberate acceptance/regression review.
+- When such an evaluation entry is needed, record the task context, observed gap or regression, whether LightRAG/gate/prompt rules helped or missed, and the concrete follow-up.
 
 ## Strict Mode Triggers
 
