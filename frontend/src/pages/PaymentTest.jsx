@@ -22,7 +22,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import ScienceIcon from '@mui/icons-material/Science';
 
 import PaymentWidget from '../components/payment/PaymentWidget';
-import { buildApiUrl, getApiOrigin, setToken, getToken } from '../api/client';
+import { getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
 const PaymentTest = () => {
@@ -42,91 +42,12 @@ const PaymentTest = () => {
     setIsAuthenticated(!!token);
   }, []);
 
-  // Тестовая авторизация через реальный API
-  const handleTestAuth = async () => {
-    try {
-      setResult({ type: 'info', message: 'Выполняется авторизация...' });
-      
-      // Проверяем доступность backend
-      logger.log('🔍 Проверяем доступность backend...');
-      
-      // Пробуем войти с тестовыми данными (JSON формат)
-      const loginData = {
-        username: 'registrar',
-        password: 'registrar123',
-        remember_me: false
-      };
-      
-      logger.log('📤 Отправляем запрос авторизации:', {
-        url: buildApiUrl('/auth/login'),
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginData)
-      });
-
-      const response = await fetch(buildApiUrl('/auth/login'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData)
-      });
-
-      logger.log('📥 Получен ответ:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const token = data.access_token;
-        
-        if (token) {
-          setToken(token);
-          setIsAuthenticated(true);
-          setResult({
-            type: 'success',
-            message: 'Авторизация выполнена успешно!'
-          });
-        } else {
-          throw new Error('Токен не получен');
-        }
-      } else {
-        let errorMessage = 'Ошибка авторизации';
-        try {
-          const errorData = await response.json();
-          if (errorData.detail) {
-            errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
-          } else if (errorData.message) {
-            errorMessage = errorData.message;
-          }
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-    } catch (error) {
-      logger.error('Ошибка авторизации:', error);
-      
-      // Получаем понятное сообщение об ошибке
-      let errorMessage = 'Неизвестная ошибка';
-      if (error.message && error.message !== '[object Object]') {
-        errorMessage = error.message;
-      } else if (error.toString && error.toString() !== '[object Object]') {
-        errorMessage = error.toString();
-      }
-      
-      // Fallback: устанавливаем тестовый токен для демонстрации UI
-      const testToken = 'demo_token_for_ui_testing';
-      setToken(testToken);
-      setIsAuthenticated(true);
-      setResult({
-        type: 'warning',
-        message: `Не удалось получить реальный токен: ${errorMessage}. Установлен демо-токен для тестирования UI. Проверьте консоль для подробностей.`
-      });
-    }
+  const handleTestAuth = () => {
+    setResult({
+      type: 'info',
+      message: 'Open /login and sign in before using the internal payment test.'
+    });
+    window.location.assign('/login');
   };
 
   const handlePaymentSuccess = (paymentData) => {
@@ -234,7 +155,7 @@ const PaymentTest = () => {
                     onClick={handleTestAuth}
                     sx={{ mb: 2 }}
                   >
-                    🔐 Тестовая авторизация
+                    🔐 Открыть вход
                   </Button>
                 ) : (
                   <Box sx={{ mb: 2 }}>
