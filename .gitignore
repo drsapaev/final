@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 *.sqlite3
 .venv/
+.venv.wsl.bak/
 env/
 venv/
 *.sqlite3
@@ -34,8 +35,11 @@ alembic/**/__pycache__/
 
 # Coverage/test
 .coverage
+coverage.xml
+frontend/coverage/
 htmlcov/
 pytest_cache/
+frontend/eslint-*.json
 NUL
 nul
 
@@ -55,6 +59,9 @@ backend/.secret_key
 # Test logs
 pytest_*.txt
 *_log*.txt
+backend/routes.json
+backend/cascade_audit_*.txt
+backend/fk_audit_*.txt
 *.db
 *.sqlite
 clinic.db
@@ -95,7 +102,35 @@ wf_page*.html
 !.ai-factory/landing/runs/.gitkeep
 
 # Local staging/runtime artifacts
+.playwright-cli/
+output/
+frontend/output/
+ops/meta/
+output/**/.playwright-cli/
+backend/storage/files/
+storage/files/
 output/staging/
+output/**/*.pid
+output/playwright/start-*.cmd
+output/playwright/inspect_*.ps1
+output/playwright/inspect_*.py
+output/playwright/verify_*.mjs
+output/playwright/verify_*.py
+output/*-recon.mjs
+output/*-live-check.mjs
+output/browser_row_actions_smoke.cjs
+job_*.html
+run_*.html
 staging-postgres-55432/
 frontend/playwright-report/
 frontend/test-results/
+test-results/
+frontend/vite.config.js.timestamp-*.mjs
+frontend/lint_report*.txt
+frontend/temp_*.js
+temp_token.json
+temp_old.jsx
+test_auth.json
+tree_F.txt
+mcp_test_report.json
+mcp_test_results_complaint.json
