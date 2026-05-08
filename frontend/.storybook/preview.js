@@ -31,13 +31,15 @@ const preview = {
     }
   },
   decorators: [
-    (Story) => (
-      <div style={{ 
-        fontFamily: designTokens.typography.fontFamily.sans.join(', '),
-        lineHeight: designTokens.typography.lineHeight.normal
-      }}>
-        <Story />
-      </div>
+    (Story) => React.createElement(
+      'div',
+      {
+        style: {
+          fontFamily: designTokens.typography.fontFamily.sans.join(', '),
+          lineHeight: designTokens.typography.lineHeight.normal
+        }
+      },
+      React.createElement(Story)
     )
   ]
 };
