@@ -22,7 +22,9 @@ APP_VERSION=0.9.0
 API_V1_STR=/api/v1
 
 # --- БАЗА ДАННЫХ ---
-DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+# Required. PostgreSQL only; do not use SQLite for runtime.
+# Example: postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
+DATABASE_URL=
 
 # --- АУТЕНТИФИКАЦИЯ ---
 SECRET_KEY={secret_key}
@@ -54,7 +56,7 @@ REQUIRE_LICENSE=0
 LICENSE_ALLOW_HEALTH=1
 
 # --- DOCKER COMPOSE / STAGING ALTERNATIVE ---
-# DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@postgres:5432/clinicdb
+# DATABASE_URL=postgresql+psycopg://clinic:<db_password>@postgres:5432/clinicdb
 
 # --- FIREBASE (PUSH УВЕДОМЛЕНИЯ) ---
 # Раскомментируйте и настройте для реальных push-уведомлений
@@ -79,10 +81,10 @@ LICENSE_ALLOW_HEALTH=1
 
     # Проверяем, существует ли уже .env
     if os.path.exists('.env'):
-        print("⚠️  Файл .env уже существует!")
+        print("WARN: Файл .env уже существует!")
         response = input("Перезаписать? (y/N): ").lower().strip()
         if response != 'y':
-            print("❌ Отменено")
+            print("CANCEL: Отменено")
             return False
     
     # Создаем .env файл
@@ -90,9 +92,9 @@ LICENSE_ALLOW_HEALTH=1
         with open('.env', 'w', encoding='utf-8') as f:
             f.write(env_content)
         
-        print("✅ Файл .env создан успешно!")
-        print(f"🔑 SECRET_KEY сгенерирован: {secret_key[:20]}...")
-        print("\n📋 Следующие шаги:")
+        print("OK: Файл .env создан успешно!")
+        print(f"KEY: SECRET_KEY сгенерирован: {secret_key[:20]}...")
+        print("\nNEXT: Следующие шаги:")
         print("1. Перезапустите backend")
         print("2. При необходимости добавьте дополнительные настройки")
         print("3. Для продакшена смените SECRET_KEY")
@@ -100,10 +102,10 @@ LICENSE_ALLOW_HEALTH=1
         return True
         
     except Exception as e:
-        print(f"❌ Ошибка создания .env: {e}")
+        print(f"ERROR: Ошибка создания .env: {e}")
         return False
 
 if __name__ == "__main__":
-    print("🚀 Настройка переменных окружения для клиники")
+    print("Настройка переменных окружения для клиники")
     print("=" * 50)
     create_env_file()
