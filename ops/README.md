@@ -1,55 +1,50 @@
 
 # Ops / Deployment
 
-## Быстрый старт (Docker Compose)
+## Quick Start (Docker Compose)
+
+Run from the project root:
 
 ```bash
-# из project-root/ops/
-docker compose up --build
+cp ops/.env.example ops/.env
+# Fill every empty required value in ops/.env before starting the stack.
+docker compose --env-file ops/.env -f ops/docker-compose.yml up --build
+```
 
-Сервисы:
+Services:
 
-Backend: http://localhost:18000  (OpenAPI: http://localhost:18000/docs)
+- Backend: `http://localhost:18000` (OpenAPI: `http://localhost:18000/docs`)
+- Frontend (Vite dev): `http://localhost:5173`
+- Postgres host port: `localhost:55432`
 
-Frontend (Vite dev): http://localhost:5173
+Minimum required environment:
 
+- `DATABASE_URL`: PostgreSQL connection string using the compose service host, for example `postgresql+psycopg://clinic:<password>@postgres:5432/clinicdb`.
+- `POSTGRES_PASSWORD`: unique database password.
+- `SECRET_KEY` and `AUTH_SECRET`: unique generated secrets.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_FULL_NAME`: bootstrap admin identity.
+- `CORS_ALLOW_ALL=0` and `BACKEND_CORS_ORIGINS`: explicit frontend origins.
+- `RUN_ALEMBIC_ON_START=1`: keep Alembic as the schema source of truth on startup.
 
-Переменные окружения (минимум):
+Runtime notes:
 
-DATABASE_URL=sqlite:////data/app.db — БД в volume backend_data
+- PostgreSQL + Alembic are the Docker runtime source of truth. SQLite is not a compose runtime target.
+- The backend container listens on port `18000` internally and is published as host port `18000` by default.
+- `postgres_data` stores PostgreSQL data. `backend_data` is only for backend runtime artifacts.
+- The backend entrypoint rejects missing or SQLite `DATABASE_URL` values before starting Uvicorn.
 
-AUTH_SECRET=change-me-in-prod — секрет для JWT
+Commands:
 
-CORS_ALLOW_ALL=1 — разрешить CORS всем источникам (для локалки)
+```bash
+docker compose --env-file ops/.env -f ops/docker-compose.yml build
+docker compose --env-file ops/.env -f ops/docker-compose.yml up -d --build
+docker compose --env-file ops/.env -f ops/docker-compose.yml logs -f backend
+docker compose --env-file ops/.env -f ops/docker-compose.yml logs -f frontend
+```
 
-ESC/POS (опционально): PRINTER_TYPE=none|network|usb, PRINTER_NET_HOST, PRINTER_NET_PORT, PRINTER_USB_VID, PRINTER_USB_PID
+Admin bootstrap is handled by backend startup scripts when `ENSURE_ADMIN=1`. Use a unique `ADMIN_PASSWORD`; do not rely on default admin credentials.
 
-
-Volume:
-
-backend_data:/data — хранит SQLite-файл и артефакты
-
-
-Команды
-
-Пересобрать: docker compose build
-
-Перезапустить: docker compose up -d --build
-
-Логи backend: docker compose logs -f backend
-
-Логи frontend: docker compose logs -f frontend
-
-
-Админ по умолчанию
-
-Скрипт backend/app/scripts/ensure_admin.py создаёт пользователя admin/admin (настраивается переменными ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL, ADMIN_FULL_NAME).
-
-Прод
-
-Для прод-сборки фронтенда используйте отдельный Nginx-контейнер с vite build и выдачей статики из dist/.
-
-Backend рекомендуется запускать за реверс-прокси (Nginx) с TLS и переменными окружения, вынесенными в .env (не коммитить).
+For production, run the backend behind a TLS reverse proxy and keep filled env files out of git.
 
 ## Staging
 
