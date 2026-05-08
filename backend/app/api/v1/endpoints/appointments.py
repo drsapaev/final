@@ -204,7 +204,7 @@ def create_appointment(
     return appointment
 
 
-@router.get("/pending-payments", include_in_schema=False)
+@router.get("/pending-payments")
 async def get_pending_payments(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
@@ -688,8 +688,9 @@ def qrcode_png(
     return {"format": "text", "data": payload}
 
 
-@router.get("/pending-payments")
-async def get_pending_payments(
+# Legacy duplicate kept unregistered; the active route is defined above so the
+# static path is registered before `/{appointment_id}`.
+async def _legacy_get_pending_payments_unregistered(
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),

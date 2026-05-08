@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
-from app.services.registrar_notifications_api_service import (
-    RegistrarNotificationsApiDomainError,
-    RegistrarNotificationsApiService,
+from app.services.registrar_notifications_endpoint_service import (
+    RegistrarNotificationsDomainError,
+    RegistrarNotificationsEndpointService,
 )
 from app.services.registrar_notification_service import (
     get_registrar_notification_service,
@@ -154,7 +154,7 @@ async def notify_new_appointment(
     """Отправить уведомление о новой записи"""
     try:
         service = get_registrar_notification_service(db)
-        appointment, patient, services = RegistrarNotificationsApiService(
+        appointment, patient, services = RegistrarNotificationsEndpointService(
             db
         ).get_appointment_context(
             appointment_id=request_data.appointment_id,
@@ -176,7 +176,7 @@ async def notify_new_appointment(
             results=result.get("results", []),
         )
 
-    except RegistrarNotificationsApiDomainError as exc:
+    except RegistrarNotificationsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -203,7 +203,7 @@ async def notify_price_change(
             service_obj,
             visit,
             patient,
-        ) = RegistrarNotificationsApiService(db).get_price_change_context(
+        ) = RegistrarNotificationsEndpointService(db).get_price_change_context(
             price_override_id=request_data.price_override_id
         )
 
@@ -223,7 +223,7 @@ async def notify_price_change(
             results=result.get("results", []),
         )
 
-    except RegistrarNotificationsApiDomainError as exc:
+    except RegistrarNotificationsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -244,7 +244,7 @@ async def notify_queue_status(
     """Отправить уведомление о статусе очереди"""
     try:
         service = get_registrar_notification_service(db)
-        queue_entry = RegistrarNotificationsApiService(db).get_queue_entry(
+        queue_entry = RegistrarNotificationsEndpointService(db).get_queue_entry(
             queue_entry_id=request_data.queue_entry_id
         )
 
@@ -262,7 +262,7 @@ async def notify_queue_status(
             results=result.get("results", []),
         )
 
-    except RegistrarNotificationsApiDomainError as exc:
+    except RegistrarNotificationsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

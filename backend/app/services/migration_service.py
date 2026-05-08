@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, text
+from sqlalchemy import and_, inspect, text
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -32,12 +32,8 @@ class MigrationService:
 
             # Проверяем существование старой таблицы queue_tickets
             try:
-                result = self.db.execute(
-                    text(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name='queue_tickets'"
-                    )
-                )
-                if result.fetchone():
+                inspector = inspect(self.db.get_bind())
+                if inspector.has_table("queue_tickets"):
                     # Мигрируем данные из старой таблицы
                     migrated_count = self._migrate_from_queue_tickets()
                 else:

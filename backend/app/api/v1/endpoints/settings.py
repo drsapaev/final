@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.schemas.setting import Setting as SettingSchema
-from app.services.setting_api_service import SettingApiDomainError, SettingApiService
+from app.services.setting_endpoint_service import SettingDomainError, SettingService
 
 router = APIRouter()
 
@@ -17,10 +17,10 @@ def get_settings(
     Return list of settings for given category.
     Example: GET /api/v1/settings?category=printer
     """
-    service = SettingApiService(db)
+    service = SettingService(db)
     try:
         return service.get_settings(category=category)
-    except SettingApiDomainError as exc:
+    except SettingDomainError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=exc.detail
         ) from exc

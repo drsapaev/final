@@ -1,36 +1,23 @@
 #!/usr/bin/env python3
-"""
-Проверка структуры таблицы users
-"""
+"""Retired root manual SQLite users structure probe."""
 
-import sqlite3
+from __future__ import annotations
 
-def check_users_structure():
-    """Проверяем структуру таблицы users"""
-    conn = sqlite3.connect('backend/clinic.db')
-    cursor = conn.cursor()
-    
-    print("🔍 СТРУКТУРА ТАБЛИЦЫ USERS")
-    print("=" * 50)
-    
-    # Получаем структуру таблицы
-    cursor.execute("PRAGMA table_info(users)")
-    columns = cursor.fetchall()
-    
-    print("📋 Колонки таблицы users:")
-    for col in columns:
-        print(f"  {col[1]} ({col[2]}) - {'NOT NULL' if col[3] else 'NULL'}")
-    
-    # Проверяем пользователя registrar
-    cursor.execute("SELECT * FROM users WHERE username = 'registrar'")
-    registrar = cursor.fetchone()
-    
-    if registrar:
-        print(f"\n👤 Данные пользователя registrar:")
-        for i, col in enumerate(columns):
-            print(f"  {col[1]}: {registrar[i]}")
-    
-    conn.close()
+import sys
+
+MESSAGE = """
+check_users_structure.py is retired.
+
+This root-level manual probe opened the legacy SQLite database file directly
+and printed user schema/state. Use Alembic migrations, backend/tests, or
+explicit Postgres diagnostics instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    check_users_structure()
+    raise SystemExit(main())

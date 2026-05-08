@@ -46,9 +46,9 @@
 - **Размер бандла**: 1.3MB (оптимизирован)
 
 ### **База данных** ✅ РАБОТАЕТ
-- **Тип**: SQLite
+- **Тип**: PostgreSQL
 - **Статус**: ✅ Подключена и работает
-- **Расположение**: C:\final\clinic.db
+- **Источник правды**: `$DATABASE_URL` + Alembic migrations
 
 ---
 
@@ -61,7 +61,7 @@ curl -X POST -d "username=admin&password=<set QA_ADMIN_PASSWORD>&grant_type=pass
   http://localhost:18000/api/v1/auth/login
 
 # Возвращает JWT токен
-{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
+{"access_token":"<access_token>","token_type":"bearer"}
 ```
 
 ---
@@ -117,7 +117,7 @@ npm run dev
 ### **Процессы**
 - ✅ Backend процесс: PID активен
 - ✅ Frontend процесс: PID активен на порту 5173
-- ✅ База данных: SQLite подключена
+- ✅ База данных: PostgreSQL подключена
 
 ---
 

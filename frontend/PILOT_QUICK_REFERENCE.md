@@ -114,7 +114,8 @@ npm run test:lighthouse
 
 ### Rollback Drill (Day 4)
 ```bash
-git reset --hard HEAD~20
+git switch -c recovery/pilot-drill HEAD~20
+# Prefer reverting pilot commits on the original branch after the drill is validated.
 npm install
 npm test
 ```

@@ -4,6 +4,9 @@ Use this 12-week practice track with `docs/runbooks/PR_REVIEW_QUALITY_GATES.md`.
 
 The quality gates define what every risky PR must prove. This track defines how the team builds that review muscle week by week using real pull requests, small exercises, and repeatable evidence.
 
+Record weekly use in `docs/runbooks/PR_REVIEW_ADOPTION_LOG.md`.
+Use `scripts/add_pr_review_adoption_entry.py` to format entries consistently before writing them.
+
 ## Operating Rhythm
 
 Each two-week sprint should end with one reusable artifact:
@@ -11,6 +14,7 @@ Each two-week sprint should end with one reusable artifact:
 - one completed PR gate checklist from a real PR
 - one targeted regression or browser smoke proof
 - one short note about a repeated failure mode that the next PR should avoid
+- one adoption log entry with the gate result and repeated gap, even when the gap is `none`
 
 Keep the cadence small:
 
@@ -191,3 +195,5 @@ Track these small metrics after each sprint:
 | CI/env failures from lockfile, port, or Postgres/SQLite drift | Zero repeats. |
 
 If a metric repeats twice, add a candidate project rule through the normal rules workflow instead of expanding the checklist indefinitely.
+
+Use `docs/runbooks/PR_REVIEW_ADOPTION_LOG.md` for the weekly metric snapshot and evidence notes.

@@ -21,6 +21,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
+from tests.auth_test_credentials import DUMMY_PASSWORD_HASH
 
 
 @pytest.fixture(scope="function")
@@ -87,7 +88,7 @@ def test_specialists(db_session):
         username="cardio_specialist",
         email="cardio@clinic.com",
         full_name="Кардиолог Иванов",
-        hashed_password="hashed",
+        hashed_password=DUMMY_PASSWORD_HASH,
         role="cardio",
         is_active=True
     )
@@ -98,7 +99,7 @@ def test_specialists(db_session):
         username="lab_specialist",
         email="lab@clinic.com",
         full_name="Лаборант Петрова",
-        hashed_password="hashed",
+        hashed_password=DUMMY_PASSWORD_HASH,
         role="Lab",
         is_active=True
     )

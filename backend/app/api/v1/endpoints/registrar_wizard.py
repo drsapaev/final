@@ -15,6 +15,7 @@ from sqlalchemy import String, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.config import settings
 from app.crud import clinic as crud_clinic, online_queue as crud_queue
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
@@ -32,6 +33,32 @@ from app.services.service_mapping import get_service_code, normalize_service_cod
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _settings_value(name: str, default: Any = None) -> Any:
+    return getattr(settings, name, default)
+
+
+def _provider_config_is_ready(
+    provider_name: str, config: Dict[str, Any], required_keys: tuple[str, ...]
+) -> bool:
+    enabled = bool(_settings_value(f"{provider_name.upper()}_ENABLED", False))
+    if not enabled:
+        logger.warning(
+            "Payment provider is disabled",
+            extra={"provider": provider_name},
+        )
+        return False
+
+    missing = [key for key in required_keys if not config.get(key)]
+    if missing:
+        logger.warning(
+            "Payment provider config is incomplete",
+            extra={"provider": provider_name, "missing_keys": missing},
+        )
+        return False
+
+    return True
 
 # ===================== СХЕМЫ ДЛЯ КОРЗИНЫ =====================
 
@@ -527,29 +554,50 @@ def init_invoice_payment(
             )
 
         # Инициализируем провайдер платежей
-        if payment_req.provider == "click":
+        provider_name = payment_req.provider.lower()
+        if provider_name == "click":
             from app.services.payment_providers.click import ClickProvider
 
             # Конфигурация Click (в реальном проекте из настроек)
             provider_config = {
-                "service_id": "test_service",
-                "merchant_id": "test_merchant",
-                "secret_key": "test_secret",
-                "base_url": "https://api.click.uz/v2",
+                "service_id": _settings_value("CLICK_SERVICE_ID"),
+                "merchant_id": _settings_value("CLICK_MERCHANT_ID"),
+                "secret_key": _settings_value("CLICK_SECRET_KEY"),
+                "base_url": _settings_value(
+                    "CLICK_BASE_URL", "https://api.click.uz/v2"
+                ),
             }
+
+            if not _provider_config_is_ready(
+                "click", provider_config, ("service_id", "merchant_id", "secret_key")
+            ):
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message=f"Provider {payment_req.provider} is not configured",
+                )
 
             provider = ClickProvider(provider_config)
 
-        elif payment_req.provider == "payme":
+        elif provider_name == "payme":
             from app.services.payment_providers.payme import PayMeProvider
 
             # Конфигурация PayMe (в реальном проекте из настроек)
             provider_config = {
-                "merchant_id": "test_merchant_payme",
-                "secret_key": "test_secret_payme",
-                "base_url": "https://checkout.paycom.uz",
-                "api_url": "https://api.paycom.uz",
+                "merchant_id": _settings_value("PAYME_MERCHANT_ID"),
+                "secret_key": _settings_value("PAYME_SECRET_KEY"),
+                "base_url": _settings_value(
+                    "PAYME_BASE_URL", "https://checkout.paycom.uz"
+                ),
+                "api_url": _settings_value("PAYME_API_URL", "https://api.paycom.uz"),
             }
+
+            if not _provider_config_is_ready(
+                "payme", provider_config, ("merchant_id", "secret_key")
+            ):
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message=f"Provider {payment_req.provider} is not configured",
+                )
 
             provider = PayMeProvider(provider_config)
 
@@ -572,8 +620,8 @@ def init_invoice_payment(
         if result.success:
             # Обновляем invoice
             invoice.provider_payment_id = result.payment_id
-            invoice.payment_method = payment_req.provider
-            invoice.provider = payment_req.provider
+            invoice.payment_method = provider_name
+            invoice.provider = provider_name
             invoice.status = "processing"
             invoice.provider_data = result.provider_data
             db.commit()
@@ -626,29 +674,45 @@ def check_invoice_status(
         if invoice.provider_payment_id and invoice.provider:
             provider = None
 
-            if invoice.provider == "click":
+            provider_name = invoice.provider.lower()
+
+            if provider_name == "click":
                 from app.services.payment_providers.click import ClickProvider
 
                 provider_config = {
-                    "service_id": "test_service",
-                    "merchant_id": "test_merchant",
-                    "secret_key": "test_secret",
-                    "base_url": "https://api.click.uz/v2",
+                    "service_id": _settings_value("CLICK_SERVICE_ID"),
+                    "merchant_id": _settings_value("CLICK_MERCHANT_ID"),
+                    "secret_key": _settings_value("CLICK_SECRET_KEY"),
+                    "base_url": _settings_value(
+                        "CLICK_BASE_URL", "https://api.click.uz/v2"
+                    ),
                 }
 
-                provider = ClickProvider(provider_config)
+                if _provider_config_is_ready(
+                    "click",
+                    provider_config,
+                    ("service_id", "merchant_id", "secret_key"),
+                ):
+                    provider = ClickProvider(provider_config)
 
-            elif invoice.provider == "payme":
+            elif provider_name == "payme":
                 from app.services.payment_providers.payme import PayMeProvider
 
                 provider_config = {
-                    "merchant_id": "test_merchant_payme",
-                    "secret_key": "test_secret_payme",
-                    "base_url": "https://checkout.paycom.uz",
-                    "api_url": "https://api.paycom.uz",
+                    "merchant_id": _settings_value("PAYME_MERCHANT_ID"),
+                    "secret_key": _settings_value("PAYME_SECRET_KEY"),
+                    "base_url": _settings_value(
+                        "PAYME_BASE_URL", "https://checkout.paycom.uz"
+                    ),
+                    "api_url": _settings_value(
+                        "PAYME_API_URL", "https://api.paycom.uz"
+                    ),
                 }
 
-                provider = PayMeProvider(provider_config)
+                if _provider_config_is_ready(
+                    "payme", provider_config, ("merchant_id", "secret_key")
+                ):
+                    provider = PayMeProvider(provider_config)
 
             if provider:
                 result = provider.check_payment_status(invoice.provider_payment_id)
@@ -3000,8 +3064,24 @@ def _assign_queue_numbers_on_confirmation(
     queue_settings = {}  # Можно загрузить из настроек
 
     for queue_tag in unique_queue_tags:
+        daily_queue = (
+            db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == today,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .first()
+        )
         # Определяем врача для очереди
-        doctor_id = visit.doctor_id
+        doctor_id = None
+        if visit.doctor_id:
+            visit_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+            if visit_doctor:
+                doctor_id = visit_doctor.id
+
+        if not doctor_id and daily_queue:
+            doctor_id = daily_queue.specialist_id
 
         # Для очередей без конкретного врача используем ресурс-врачей
         if queue_tag == "ecg" and not doctor_id:
@@ -3043,9 +3123,10 @@ def _assign_queue_numbers_on_confirmation(
             continue
 
         # Получаем или создаем дневную очередь
-        daily_queue = crud_queue.get_or_create_daily_queue(
-            db, today, doctor_id, queue_tag
-        )
+        if not daily_queue:
+            daily_queue = crud_queue.get_or_create_daily_queue(
+                db, today, doctor_id, queue_tag
+            )
 
         start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
         next_number = queue_service.get_next_queue_number(

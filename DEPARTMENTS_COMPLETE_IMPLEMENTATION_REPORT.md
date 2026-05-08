@@ -225,10 +225,9 @@ cd backend
 alembic revision --autogenerate -m "add departments table"
 alembic upgrade head
 
-# Вариант 2: Пересоздать таблицу вручную
-python -c "from sqlalchemy import create_engine; \
-engine = create_engine('sqlite:///./clinic.db'); \
-with engine.begin() as conn: conn.execute('DROP TABLE IF EXISTS departments')"
+# Вариант 2: откатить и повторно применить Alembic-миграции в Postgres-контуре
+alembic downgrade -1
+alembic upgrade head
 
 python init_departments.py
 ```

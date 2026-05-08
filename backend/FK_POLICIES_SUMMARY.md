@@ -239,7 +239,20 @@ After database reset, verify:
 
 ## Database Reset
 
-To apply these changes:
+PostgreSQL runtime databases should apply schema changes with Alembic:
+
+```powershell
+cd backend
+alembic upgrade head
+python verify_fk_enforcement.py
+python app/scripts/audit_foreign_keys.py
+```
+
+`reset_database.ps1` is a legacy SQLite-only recovery helper. Do not use it as
+the PostgreSQL runtime reset path. It deletes local `clinic.db*` files after
+interactive confirmation.
+
+For intentional legacy SQLite recovery only:
 
 ```powershell
 cd backend
@@ -247,8 +260,8 @@ cd backend
 ```
 
 This will:
-1. Backup existing database
-2. Delete all database files
+1. Backup existing legacy `clinic.db`
+2. Delete local legacy SQLite database files
 3. Run `alembic upgrade head` to create fresh schema
 4. Verify FK enforcement
 5. Check for orphaned records

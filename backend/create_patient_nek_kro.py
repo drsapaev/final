@@ -14,23 +14,47 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from datetime import date, datetime
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-from app.db.session import _get_db_url_from_env_or_settings
-from app.models.patient import Patient
-from app.models.appointment import Appointment
-from app.models.service import Service
+from datetime import date
 import logging
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def require_patient_creation_confirmation():
+    if os.getenv("CONFIRM_CREATE_PATIENT_NEK_KRO") != "1":
+        raise RuntimeError(
+            "Refusing to run manual patient creation script. "
+            "Set CONFIRM_CREATE_PATIENT_NEK_KRO=1 only for an explicit local data setup run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating manual patient data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError(
+            "create_patient_nek_kro.py requires PostgreSQL; SQLite is not allowed."
+        )
+
+
 def create_patient_nek_kro():
     """Создание пациента и записи на приём"""
+    require_patient_creation_confirmation()
+    require_postgres_database_url()
 
     try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from app.db.session import _get_db_url_from_env_or_settings
+        from app.models.appointment import Appointment
+        from app.models.patient import Patient
+        from app.models.service import Service
+
         # Создаем подключение к базе данных
         db_url = _get_db_url_from_env_or_settings()
         engine = create_engine(db_url)

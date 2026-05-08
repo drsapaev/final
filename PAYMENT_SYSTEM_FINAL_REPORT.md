@@ -230,17 +230,17 @@ INFO: Payment completed: ID=123, Duration=45s
 ```bash
 # Провайдеры платежей
 CLICK_ENABLED=true
-CLICK_SERVICE_ID=your_service_id
-CLICK_MERCHANT_ID=your_merchant_id
-CLICK_SECRET_KEY=your_secret_key
+CLICK_SERVICE_ID=
+CLICK_MERCHANT_ID=
+CLICK_SECRET_KEY=
 
 PAYME_ENABLED=true
-PAYME_MERCHANT_ID=your_merchant_id
-PAYME_SECRET_KEY=your_secret_key
+PAYME_MERCHANT_ID=
+PAYME_SECRET_KEY=
 
 KASPI_ENABLED=true
-KASPI_MERCHANT_ID=your_merchant_id
-KASPI_SECRET_KEY=your_secret_key
+KASPI_MERCHANT_ID=
+KASPI_SECRET_KEY=
 
 # База данных
 DATABASE_URL=postgresql://user:pass@localhost/medilab

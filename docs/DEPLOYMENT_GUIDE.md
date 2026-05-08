@@ -154,13 +154,14 @@ nano .env
 # ===================
 ENV=production
 DEBUG=false
-SECRET_KEY=your-256-bit-secret-key-here
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=
 CORS_ORIGINS=["https://clinic.example.com"]
 
 # ===================
 # Database
 # ===================
-DATABASE_URL=postgresql://clinic_user:strong_password@localhost:5432/clinic_db
+DATABASE_URL=postgresql://clinic_user:<db_password>@localhost:5432/clinic_db
 DB_POOL_SIZE=10
 DB_MAX_OVERFLOW=20
 DB_POOL_TIMEOUT=30
@@ -169,7 +170,7 @@ DB_POOL_RECYCLE=1800
 # ===================
 # Security
 # ===================
-JWT_SECRET_KEY=your-jwt-secret-key-here
+JWT_SECRET_KEY=
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
@@ -234,7 +235,7 @@ sudo systemctl enable postgresql
 
 # Create database and user
 sudo -u postgres psql << EOF
-CREATE USER clinic_user WITH PASSWORD 'strong_password_here';
+CREATE USER clinic_user WITH PASSWORD '<generated_secure_password>';
 CREATE DATABASE clinic_db OWNER clinic_user;
 GRANT ALL PRIVILEGES ON DATABASE clinic_db TO clinic_user;
 \c clinic_db
@@ -549,7 +550,7 @@ services:
       dockerfile: Dockerfile.prod
     environment:
       - ENV=production
-      - DATABASE_URL=postgresql://clinic:password@db:5432/clinic
+      - DATABASE_URL=postgresql://clinic:<db_password>@db:5432/clinic
     env_file:
       - .env
     depends_on:

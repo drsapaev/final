@@ -81,6 +81,8 @@ PLACEHOLDER_PATTERNS = (
 
 FIELD_RE = re.compile(r"^[ \t]*-[ \t]*([^:\n]+):[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+UTF8_BOM = "\ufeff"
 
 
 @dataclass(frozen=True)
@@ -109,7 +111,16 @@ def _extract_sections(body: str) -> dict[str, str]:
     return sections
 
 
+def _strip_html_comments(text: str) -> str:
+    return HTML_COMMENT_RE.sub("", text)
+
+
+def _strip_utf8_bom(text: str) -> str:
+    return text.lstrip(UTF8_BOM)
+
+
 def _strip_guidance_lines(text: str) -> str:
+    text = _strip_html_comments(text)
     kept: list[str] = []
     for line in text.splitlines():
         normalized = line.strip().lower()
@@ -182,6 +193,8 @@ def _missing_required_field_answers(section: str, text: str) -> list[str]:
 def validate_pr_body(body: str) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
+    body = _strip_utf8_bom(body)
+    body = _strip_html_comments(body)
 
     if not body.strip():
         return ValidationResult(

@@ -25,7 +25,7 @@ from app.db.session import get_db
 
 # ORM user model
 from app.models.user import User
-from app.services.auth_api_service import AuthApiDomainError, AuthApiService
+from app.services.auth_endpoint_service import AuthDomainError, AuthEndpointService
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,11 @@ async def login(
     """
     logger.info(f"Login attempt for username: {form_data.username}")
     try:
-        return await AuthApiService(db).login_oauth_payload(
+        return await AuthEndpointService(db).login_oauth_payload(
             username=form_data.username,
             password=form_data.password,
         )
-    except AuthApiDomainError as exc:
+    except AuthDomainError as exc:
         raise HTTPException(
             status_code=exc.status_code,
             detail=exc.detail,
@@ -133,7 +133,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
     """
     try:
         logger.info(f"JSON login called with username={request_data.username}")
-        payload = await AuthApiService(db).json_login_payload(
+        payload = await AuthEndpointService(db).json_login_payload(
             username=request_data.username,
             password=request_data.password,
             remember_me=request_data.remember_me,
@@ -143,7 +143,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
             token_type=payload["token_type"],
             user=payload["user"],
         )
-    except AuthApiDomainError as exc:
+    except AuthDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

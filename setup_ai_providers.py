@@ -5,9 +5,9 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-from backend.app.services.ai.ai_manager import get_ai_manager, AIProviderType
-
 def setup_ai_providers():
+    from backend.app.services.ai.ai_manager import get_ai_manager
+
     """Настройка AI провайдеров"""
     print("🔧 Настройка AI провайдеров для получения реальных результатов...")
     
@@ -27,7 +27,7 @@ def setup_ai_providers():
     
     for key_name, key_value in env_keys.items():
         if key_value and key_value != "your_openai_api_key_here":
-            print(f"  ✅ {key_name}: {'*' * 8}...{key_value[-4:]}")
+            print(f"  ✅ {key_name}: configured (value hidden)")
         else:
             print(f"  ❌ {key_name}: не настроен")
     
@@ -38,9 +38,9 @@ def setup_ai_providers():
     print(f"   - DeepSeek: https://platform.deepseek.com/api_keys")
     print(f"")
     print(f"2. Создайте файл backend/.env с ключами:")
-    print(f"   OPENAI_API_KEY=sk-your-key-here")
-    print(f"   GEMINI_API_KEY=your-gemini-key-here")
-    print(f"   DEEPSEEK_API_KEY=your-deepseek-key-here")
+    print(f"   OPENAI_API_KEY=<openai_api_key>")
+    print(f"   GEMINI_API_KEY=<gemini_api_key>")
+    print(f"   DEEPSEEK_API_KEY=<deepseek_api_key>")
     print(f"")
     print(f"3. Перезапустите backend сервер")
     

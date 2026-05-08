@@ -12,9 +12,9 @@ from app.schemas.payment_webhook import (
     PaymentTransactionOut,
     PaymentWebhookOut,
 )
-from app.services.payment_webhook_api_service import (
-    PaymentWebhookApiDomainError,
-    PaymentWebhookApiService,
+from app.services.payment_webhook_endpoint_service import (
+    PaymentWebhookDomainError,
+    PaymentWebhookEndpointService,
 )
 
 router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
 @router.post("/payment/payme", name="payme_webhook")
 async def payme_webhook(request: Request, db: Session = Depends(get_db)):
     """Вебхук от Payme для обработки платежей"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         # Получаем данные из запроса
         data = await request.json()
@@ -50,7 +50,7 @@ async def payme_webhook(request: Request, db: Session = Depends(get_db)):
 @router.post("/payment/click", name="click_webhook")
 async def click_webhook(request: Request, db: Session = Depends(get_db)):
     """Вебхук от Click для обработки платежей"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         # Получаем данные из формы
         form_data = await request.form()
@@ -73,7 +73,7 @@ def list_providers(
     db: Session = Depends(get_db), current_user=Depends(require_roles("Admin"))
 ):
     """Список провайдеров платежей"""
-    return PaymentWebhookApiService(db).list_providers()
+    return PaymentWebhookEndpointService(db).list_providers()
 
 
 @router.post(
@@ -85,10 +85,10 @@ def create_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Создание нового провайдера платежей"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.create_provider(provider_in)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -103,10 +103,10 @@ def get_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Получение провайдера по ID"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.get_provider(provider_id)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -122,10 +122,10 @@ def update_provider(
     current_user=Depends(require_roles("Admin")),
 ):
     """Обновление провайдера платежей"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.update_provider(provider_id, provider_in)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -136,10 +136,10 @@ def delete_provider_endpoint(
     current_user=Depends(require_roles("Admin")),
 ):
     """Удаление провайдера платежей"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.delete_provider(provider_id)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -156,7 +156,7 @@ def list_webhooks(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Список вебхуков оплат"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     return service.list_webhooks(
         skip=skip,
         limit=limit,
@@ -180,7 +180,7 @@ def list_transactions(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Список транзакций оплат"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.list_transactions(
             skip=skip,
@@ -204,7 +204,7 @@ def get_webhook_summary(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Сводка по вебхукам и транзакциям"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.get_webhook_summary(provider=provider)
     except Exception as e:
@@ -226,10 +226,10 @@ def get_transaction(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Получение транзакции по ID"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.get_transaction(transaction_id)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -242,8 +242,8 @@ def get_webhook(
     current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     """Получение вебхука по ID"""
-    service = PaymentWebhookApiService(db)
+    service = PaymentWebhookEndpointService(db)
     try:
         return service.get_webhook(webhook_id)
-    except PaymentWebhookApiDomainError as exc:
+    except PaymentWebhookDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)

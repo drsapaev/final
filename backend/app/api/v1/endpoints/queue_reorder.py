@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.services.queue_reorder_api_service import (
-    QueueReorderApiDomainError,
-    QueueReorderApiService,
+from app.services.queue_reorder_endpoint_service import (
+    QueueReorderDomainError,
+    QueueReorderEndpointService,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,8 +80,8 @@ async def reorder_queue(
     Доступно администраторам, регистраторам и врачам
     """
     try:
-        queue_api_service = QueueReorderApiService(db)
-        updated_count, queue_info = queue_api_service.reorder_queue(
+        queue_endpoint_service = QueueReorderEndpointService(db)
+        updated_count, queue_info = queue_endpoint_service.reorder_queue(
             queue_id=request.queue_id,
             entry_orders=request.entry_orders,
             current_user=current_user,
@@ -94,7 +94,7 @@ async def reorder_queue(
             queue_info=queue_info,
         )
 
-    except QueueReorderApiDomainError as exc:
+    except QueueReorderDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -117,8 +117,8 @@ async def move_queue_entry(
     Автоматически сдвигает остальные записи
     """
     try:
-        queue_api_service = QueueReorderApiService(db)
-        message, updated_count, queue_info = queue_api_service.move_queue_entry(
+        queue_endpoint_service = QueueReorderEndpointService(db)
+        message, updated_count, queue_info = queue_endpoint_service.move_queue_entry(
             entry_id=request.entry_id,
             new_position=request.new_position,
             current_user=current_user,
@@ -131,7 +131,7 @@ async def move_queue_entry(
             queue_info=queue_info,
         )
 
-    except QueueReorderApiDomainError as exc:
+    except QueueReorderDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -154,12 +154,12 @@ async def get_queue_status_by_specialist(
     Получение текущего состояния очереди по специалисту и дню
     """
     try:
-        return QueueReorderApiService(db).get_queue_status_by_specialist(
+        return QueueReorderEndpointService(db).get_queue_status_by_specialist(
             specialist_id=specialist_id,
             day=day,
         )
 
-    except QueueReorderApiDomainError as exc:
+    except QueueReorderDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -181,9 +181,9 @@ async def get_queue_status(
     Получение текущего состояния очереди по ID
     """
     try:
-        return QueueReorderApiService(db).get_queue_status(queue_id=queue_id)
+        return QueueReorderEndpointService(db).get_queue_status(queue_id=queue_id)
 
-    except QueueReorderApiDomainError as exc:
+    except QueueReorderDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

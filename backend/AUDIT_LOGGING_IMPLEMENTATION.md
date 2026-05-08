@@ -95,9 +95,9 @@ def create_patient(
    python -m pytest tests/test_audit_logs.py -k audit -v
    ```
 
-4. **Проверить вручную:**
+4. **Manual Postgres check:**
    ```powershell
-   sqlite3 backend/clinic.db "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
+   psql "$env:DATABASE_URL" -c "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
    ```
 
 ## ⚠️ Важные замечания

@@ -322,8 +322,8 @@ git revert COMMIT_RANGE
 # 3. Restore original ESLint config
 git checkout main .eslintrc.migration.js
 
-# 4. Remove migration codemods (optional)
-rm -rf codemods/
+# 4. Remove migration codemods manually after confirming the path
+# PowerShell: Remove-Item -LiteralPath .\codemods -Recurse -Force
 
 # 5. Verify build
 npm run build

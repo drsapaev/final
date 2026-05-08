@@ -1,6 +1,6 @@
-# ws_diag.py
 import asyncio
 import logging
+import os
 import threading
 
 import uvicorn
@@ -13,6 +13,11 @@ WS_PATH = "/ws/diag"
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
+
+
+def require_ws_diag_confirmation():
+    if os.getenv("CONFIRM_WS_DIAG") != "1":
+        raise SystemExit("Set CONFIRM_WS_DIAG=1 before starting ws_diag.py.")
 
 
 @app.websocket(WS_PATH)
@@ -28,7 +33,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 def start_server():
-    config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
+    config = uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="info")
     server = uvicorn.Server(config)
     server.run()
 
@@ -47,6 +52,8 @@ async def run_client():
 
 
 if __name__ == "__main__":
+    require_ws_diag_confirmation()
+
     thread = threading.Thread(target=start_server, daemon=True)
     thread.start()
 

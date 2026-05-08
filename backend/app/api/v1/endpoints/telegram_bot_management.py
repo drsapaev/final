@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.services.telegram_bot_management_api_service import (
-    TelegramBotManagementApiService,
+from app.services.telegram_bot_management_endpoint_service import (
+    TelegramBotManagementEndpointService,
 )
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
@@ -54,7 +54,7 @@ async def get_telegram_bot_stats(
 ):
     """Получить статистику Telegram бота"""
     try:
-        payload = TelegramBotManagementApiService(db).get_stats_payload()
+        payload = TelegramBotManagementEndpointService(db).get_stats_payload()
         return TelegramBotStatsResponse(**payload)
 
     except Exception as e:
@@ -76,7 +76,7 @@ async def send_telegram_notification(
     """Отправить уведомление через Telegram бота"""
     try:
         bot = get_enhanced_telegram_bot()
-        api_service = TelegramBotManagementApiService(db)
+        api_service = TelegramBotManagementEndpointService(db)
 
         if not bot.active:
             raise HTTPException(
@@ -163,7 +163,7 @@ async def get_users_with_telegram(
 ):
     """Получить список пользователей с настроенным Telegram"""
     try:
-        return TelegramBotManagementApiService(db).get_users_with_telegram_payload()
+        return TelegramBotManagementEndpointService(db).get_users_with_telegram_payload()
 
     except Exception as e:
         raise HTTPException(
@@ -226,7 +226,7 @@ async def broadcast_system_message(
     """Системное сообщение для всех пользователей (только для SuperAdmin)"""
     try:
         bot = get_enhanced_telegram_bot()
-        api_service = TelegramBotManagementApiService(db)
+        api_service = TelegramBotManagementEndpointService(db)
 
         if not bot.active:
             raise HTTPException(

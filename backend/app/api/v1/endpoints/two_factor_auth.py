@@ -35,7 +35,7 @@ from app.schemas.two_factor_auth import (
 )
 from app.services.authentication_service import get_authentication_service
 from app.services.two_factor_service import get_two_factor_service, TwoFactorService
-from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
+from app.services.two_factor_auth_endpoint_service import TwoFactorAuthService
 
 router = APIRouter()
 
@@ -176,7 +176,7 @@ async def verify_two_factor(
         
         # Если access_token не сработал, пробуем pending_2fa_token
         if not user and request_data.pending_2fa_token:
-            user = TwoFactorAuthApiService(db).get_user_from_pending_token(
+            user = TwoFactorAuthService(db).get_user_from_pending_token(
                 request_data.pending_2fa_token
             )
         
@@ -215,7 +215,7 @@ async def verify_two_factor(
             tokens_payload = None
             if pending:
                 auth = get_authentication_service()
-                tokens_payload = TwoFactorAuthApiService(
+                tokens_payload = TwoFactorAuthService(
                     db
                 ).exchange_pending_token_for_tokens(
                     user=user,
@@ -448,8 +448,8 @@ async def regenerate_backup_codes(
         )
 
 
-@router.get("/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False)
-async def get_trusted_devices(
+# Legacy duplicate kept unregistered; canonical /2fa/devices lives in two_factor_devices.py.
+async def _legacy_get_trusted_devices_unregistered(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Получить список доверенных устройств"""
@@ -464,8 +464,8 @@ async def get_trusted_devices(
         )
 
 
-@router.delete("/devices/{device_id}")
-async def untrust_device(
+# Legacy duplicate kept unregistered; canonical /2fa/devices/{device_id} lives in two_factor_devices.py.
+async def _legacy_untrust_device_unregistered(
     device_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

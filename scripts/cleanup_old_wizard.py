@@ -13,6 +13,17 @@ import argparse
 import shutil
 from pathlib import Path
 
+EXECUTE_CONFIRM_ENV = "CONFIRM_CLEANUP_OLD_WIZARD_EXECUTE"
+
+
+def require_execute_confirmation():
+    if os.getenv(EXECUTE_CONFIRM_ENV) != "1":
+        raise SystemExit(
+            f"Refusing destructive old-wizard cleanup. Set {EXECUTE_CONFIRM_ENV}=1 "
+            "only after a reviewed dry-run and frontend route/import verification."
+        )
+
+
 class WizardCleanup:
     def __init__(self, dry_run=True):
         self.dry_run = dry_run
@@ -343,6 +354,8 @@ def main():
     args = parser.parse_args()
     
     if args.execute:
+        require_execute_confirmation()
+
         print("⚠️  ВНИМАНИЕ: Вы собираетесь удалить старый мастер регистрации!")
         print("⚠️  Убедитесь, что новый мастер работает стабильно в продакшене!")
         print("⚠️  Создана резервная копия важных файлов!")

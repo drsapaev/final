@@ -6,6 +6,15 @@ from typing import Any, Dict, Optional
 from sqlalchemy import create_engine, MetaData, select, Table
 from sqlalchemy.orm import sessionmaker
 
+
+def _require_create_admin_dev_confirmation() -> None:
+    if os.getenv("CONFIRM_CREATE_ADMIN_DEV") != "1":
+        raise SystemExit(
+            "Refusing to create or inspect dev admin without "
+            "CONFIRM_CREATE_ADMIN_DEV=1."
+        )
+
+
 def _required_database_url() -> str:
     database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
@@ -31,6 +40,7 @@ def _password_value(column_name: str) -> str:
     return password
 
 
+_require_create_admin_dev_confirmation()
 DATABASE_URL = _required_database_url()
 
 # Создаём engine/session на базе DATABASE_URL

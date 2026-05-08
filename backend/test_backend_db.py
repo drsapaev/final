@@ -1,13 +1,22 @@
-from app.core.database import engine
-from sqlalchemy import text
+"""Retired manual DB smoke.
 
-with engine.connect() as conn:
-    result = conn.execute(text('SELECT id, username, role FROM users WHERE username="cardio"')).fetchone()
-    if result:
-        print(f'From backend DB: ID={result[0]}, User={result[1]}, Role={result[2]}')
-    else:
-        print('User not found in backend DB')
-    
-    # Проверяем путь к БД
-    print(f'\nDatabase URL: {engine.url}')
+Use tracked tests under backend/tests instead. This root script used to connect
+to the configured runtime database at import time and print the database URL,
+which is unsafe for local QA and CI-like runs.
+"""
 
+from __future__ import annotations
+
+import sys
+
+
+def main() -> int:
+    print(
+        "backend/test_backend_db.py is retired. "
+        "Use backend/tests with an isolated test database instead."
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

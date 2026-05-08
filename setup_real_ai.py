@@ -5,6 +5,15 @@
 import os
 import sys
 
+
+def require_env_write_confirmation():
+    if os.getenv("CONFIRM_SETUP_REAL_AI_WRITE_ENV") != "1":
+        raise RuntimeError(
+            "Refusing to create or update backend/.env from setup_real_ai.py. "
+            "Set CONFIRM_SETUP_REAL_AI_WRITE_ENV=1 only for an explicit local secret update."
+        )
+
+
 def setup_gemini_api():
     print("=" * 60)
     print("🔧 НАСТРОЙКА GEMINI AI ПРОВАЙДЕРА")
@@ -14,6 +23,7 @@ def setup_gemini_api():
     
     # Проверяем существование файла
     if not os.path.exists(env_path):
+        require_env_write_confirmation()
         print(f"\n📝 Создаем файл {env_path}...")
         with open(env_path, "w", encoding="utf-8") as f:
             f.write("# AI Provider API Keys\n")
@@ -32,12 +42,12 @@ def setup_gemini_api():
         if "GEMINI_API_KEY=AIza" in content:
             print("\n✅ GEMINI_API_KEY уже настроен!")
             
-            # Показываем текущий ключ (частично)
+            # Показываем наличие ключа без раскрытия значения.
             for line in content.split("\n"):
                 if line.startswith("GEMINI_API_KEY="):
                     key = line.split("=")[1].strip()
                     if key and key != "":
-                        print(f"   Текущий ключ: {key[:20]}...")
+                        print("   Текущий ключ: настроен (значение скрыто)")
                         
                         update = input("\n🔄 Обновить ключ? (y/n): ").strip().lower()
                         if update != 'y':
@@ -84,6 +94,7 @@ def setup_gemini_api():
         updated_lines.append(f"\nGEMINI_API_KEY={api_key}")
     
     # Записываем обновленный файл
+    require_env_write_confirmation()
     with open(env_path, "w", encoding="utf-8") as f:
         f.write("\n".join(updated_lines))
     
@@ -91,7 +102,7 @@ def setup_gemini_api():
     print("✅ НАСТРОЙКА ЗАВЕРШЕНА")
     print("=" * 60)
     print(f"📁 Файл: {env_path}")
-    print(f"🔑 Ключ: {api_key[:20]}...")
+    print("🔑 Ключ: настроен (значение скрыто)")
     print("\n📋 СЛЕДУЮЩИЕ ШАГИ:")
     print("1. Перезапустите backend сервер")
     print("2. Система автоматически переключится на Gemini AI")
@@ -101,8 +112,8 @@ def setup_gemini_api():
     # Предлагаем перезапустить сервер
     restart = input("\n🔄 Перезапустить backend сервер сейчас? (y/n): ").strip().lower()
     if restart == 'y':
-        print("\n⏳ Останавливаем текущий сервер...")
-        os.system("taskkill /F /IM python.exe /T >nul 2>&1")
+        print("\n⏳ Перед запуском остановите текущий backend вручную...")
+        print("   Automatic taskkill is disabled; stop only the backend terminal you started.")
         
         print("⏳ Запускаем новый сервер...")
         print("   Откройте новый терминал и запустите:")

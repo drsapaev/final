@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,12 @@ from clinic_lifecycle_common import (
     require_env,
     run_command,
 )
+
+
+def _safe_backup_stem(database_name: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", database_name.strip())
+    stem = stem.strip("._-")
+    return stem or "database"
 
 
 def main() -> int:
@@ -39,7 +46,7 @@ def main() -> int:
         backup_file.parent.mkdir(parents=True, exist_ok=True)
     else:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        backup_file = backup_dir / f"{target.name}_{timestamp}.dump"
+        backup_file = backup_dir / f"{_safe_backup_stem(target.name)}_{timestamp}.dump"
 
     cmd = [
         postgres_tool("pg_dump"),

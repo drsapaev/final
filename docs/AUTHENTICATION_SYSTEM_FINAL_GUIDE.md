@@ -103,14 +103,14 @@ class Roles(str, Enum):
 POST /api/v1/authentication/login
 {
   "username": "admin",
-  "password": "<set QA_ADMIN_PASSWORD>",
+  "password": "<admin_password_from_environment>",
   "remember_me": false
 }
 
 Response:
 {
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
+  "access_token": "<access_token>",
+  "refresh_token": "<refresh_token>",
   "token_type": "bearer",
   "expires_in": 86400
 }
@@ -121,7 +121,7 @@ Response:
 POST /api/v1/authentication/login
 {
   "username": "admin",
-  "password": "<set QA_ADMIN_PASSWORD>"
+  "password": "<admin_password_from_environment>"
 }
 
 Response (2FA требуется):
@@ -140,8 +140,8 @@ POST /api/v1/2fa/verify
 
 Response (после успешной верификации):
 {
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
+  "access_token": "<access_token>",
+  "refresh_token": "<refresh_token>",
   "token_type": "bearer",
   "expires_in": 86400
 }
@@ -229,23 +229,24 @@ if (requires2FA) {
 
 | Пользователь | Пароль | Роль | Маршрут | Описание |
 |-------------|--------|------|---------|----------|
-| admin | <set QA_ADMIN_PASSWORD> | Admin | /admin | Администратор системы |
-| registrar | <set QA_REGISTRAR_PASSWORD> | Registrar | /registrar-panel | Регистратура |
-| lab | <set QA_LAB_PASSWORD> | Lab | /lab-panel | Лаборатория |
-| doctor | <set QA_DOCTOR_PASSWORD> | Doctor | /doctor-panel | Врач общей практики |
-| cashier | <set QA_CASHIER_PASSWORD> | Cashier | /cashier-panel | Касса |
-| cardio | <set QA_CARDIO_PASSWORD> | cardio | /cardiologist | Кардиолог |
-| derma | <set QA_DERMA_PASSWORD> | derma | /dermatologist | Дерматолог-косметолог |
-| dentist | <set QA_DENTIST_PASSWORD> | dentist | /dentist | Стоматолог |
+| admin | `QA_ADMIN_PASSWORD` env var | Admin | /admin | Администратор системы |
+| registrar | `QA_REGISTRAR_PASSWORD` env var | Registrar | /registrar | Регистратура |
+| lab | `QA_LAB_PASSWORD` env var | Lab | /lab | Лаборатория |
+| doctor | `QA_DOCTOR_PASSWORD` env var | Doctor | /doctor | Врач общей практики |
+| cashier | `QA_CASHIER_PASSWORD` env var | Cashier | /cashier | Касса |
+| cardio | `QA_CARDIO_PASSWORD` env var | cardio | /doctor/cardiology | Кардиолог |
+| derma | `QA_DERMA_PASSWORD` env var | derma | /doctor/dermatology | Дерматолог-косметолог |
+| dentist | `QA_DENTIST_PASSWORD` env var | dentist | /doctor/dentistry | Стоматолог |
 
 ### **Защищенные маршруты** (`App.jsx`):
 ```jsx
 // КРИТИЧЕСКИ ВАЖНО: Не изменять роли без обновления тестов!
-<Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
-<Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-<Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
-<Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
-<Route path="dentist" element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
+// Canonical frontend routes are generated from frontend/src/routing/routeRegistry.js.
+<Route path="/registrar" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
+<Route path="/doctor" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
+<Route path="/doctor/cardiology" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
+<Route path="/doctor/dermatology" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
+<Route path="/doctor/dentistry" element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
 ```
 
 ---
@@ -288,7 +289,7 @@ DELETE /api/v1/users/{id}                  # Удаление пользоват
 cd backend
 
 # Быстрая проверка
-python quick_check.py
+python -m pytest --no-cov tests/unit/test_user_bootstrap_and_two_factor_service.py tests/unit/test_user_management_endpoint_service.py tests/unit/test_user_management_service_guardrails.py
 
 # Полная проверка системы ролей
 python test_role_routing.py
@@ -297,7 +298,7 @@ python test_role_routing.py
 python test_user_management_system.py
 
 # Проверка целостности системы
-python check_system_integrity.py
+python -m compileall -q app
 ```
 
 ### **Что тестируется**:

@@ -313,8 +313,8 @@ SELECT id, patient_name, services FROM online_queue_entry WHERE patient_id = <ID
  [INFO] 📊 После агрегации: 0 пациентов
  [INFO] 🚀 Starting initial data load (guarded)...
  [INFO] 🔧 loadIntegratedData called at: 2025-12-17T06:54:48.857Z
- [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
- [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+ [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+ [INFO] 🔍 Загружаем врачей с токеном: <access_token>
  [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
  [INFO] 🔔 appointments state изменился: Object
  [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -801,8 +801,8 @@ logger.js:200 [LOG] ✅ QR-запись успешно обновлена: {succ
 logger.js:209 [INFO] AppointmentWizardV2 completed successfully: {success: true, message: 'Запись успешно обновлена', entry: {…}}
 logger.js:209 [INFO] AppointmentWizardV2 closing
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-17T06:56:17.047Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/queues/today {params: {…}, data: undefined}
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}
 logger.js:200 [LOG] 🔍 [api/client.js] Request interceptor: {url: '/registrar/queues/today', hasToken: '[REDACTED]', tokenPreview: '[REDACTED]', headers: {…}}
@@ -2323,8 +2323,8 @@ logger.js:200 [LOG] ✅ QR-запись успешно обновлена: {succ
 logger.js:209 [INFO] AppointmentWizardV2 completed successfully: {success: true, message: 'Запись успешно обновлена', entry: {…}}
 logger.js:209 [INFO] AppointmentWizardV2 closing
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-17T06:57:50.487Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/queues/today {params: {…}, data: undefined}
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}
 logger.js:200 [LOG] 🔍 [api/client.js] Request interceptor: {url: '/registrar/queues/today', hasToken: '[REDACTED]', tokenPreview: '[REDACTED]', headers: {…}}
@@ -5102,8 +5102,8 @@ logger.js:209 [INFO] 🔍 QR-записей в фильтре: 0
 logger.js:209 [INFO] 📊 После агрегации: 0 пациентов
 logger.js:209 [INFO] 🚀 Starting initial data load (guarded)...
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-17T07:36:09.679Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
 logger.js:209 [INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: '2025-12-17', first3: Array(0)}
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -10241,8 +10241,8 @@ logger.js:209 [INFO] 🔍 QR-записей в фильтре: 0
 logger.js:209 [INFO] 📊 После агрегации: 0 пациентов
 logger.js:209 [INFO] 🚀 Starting initial data load (guarded)...
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:13:36.995Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
 logger.js:209 [INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: '2025-12-18', first3: Array(0)}
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -10400,7 +10400,7 @@ logger.js:200 [LOG] 🔍 getDepartmentByService: serviceId=81, queue_tag=cardiol
 logger.js:200 [LOG] 🎯 getDepartmentByService результат: serviceId=81, category_code=K, department=cardiology (прямой маппинг)
 logger.js:200 [LOG] 🔍 getDepartmentByService: serviceId=11, queue_tag=general, category_code=L
 logger.js:200 [LOG] 🎯 getDepartmentByService результат: serviceId=11, category_code=L, department=laboratory (прямой маппинг)
-logger.js:200 [LOG] 🔑 Токен для создания пациента: eyJhbGciOiJIUzI1NiIs...
+logger.js:200 [LOG] 🔑 Токен для создания пациента: <access_token>
 logger.js:200 [LOG] 📊 Длина токена: 184
 logger.js:200 [LOG] 📋 Данные для создания пациента: {full_name: '[REDACTED]', gender: 'male', last_name: '[REDACTED]', first_name: '[REDACTED]', middle_name: '[REDACTED]', …}
 logger.js:200 [LOG] ✅ Пациент создан успешно: 360
@@ -10408,8 +10408,8 @@ logger.js:200 [LOG] ✅ Запись создана успешно на backend:
 logger.js:209 [INFO] AppointmentWizardV2 completed successfully: {success: true, message: 'Корзина создана успешно. Присвоено номеров в очередях: 2', invoice_id: 283, visit_ids: Array(2), total_amount: '158000.0', …}
 logger.js:209 [INFO] AppointmentWizardV2 closing
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:14:17.235Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/queues/today {params: {…}, data: undefined}
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}
 logger.js:200 [LOG] 🔍 [api/client.js] Request interceptor: {url: '/registrar/queues/today', hasToken: '[REDACTED]', tokenPreview: '[REDACTED]', headers: {…}}
@@ -10702,7 +10702,7 @@ logger.js:200 [LOG] 🔍 getDepartmentByService: serviceId=101, queue_tag=proced
 logger.js:200 [LOG] 🎯 getDepartmentByService результат: serviceId=101, category_code=P, department=procedures (прямой маппинг)
 logger.js:200 [LOG] 🔍 getDepartmentByService: serviceId=104, queue_tag=procedures, category_code=P
 logger.js:200 [LOG] 🎯 getDepartmentByService результат: serviceId=104, category_code=P, department=procedures (прямой маппинг)
-logger.js:200 [LOG] 🔑 Токен для создания пациента: eyJhbGciOiJIUzI1NiIs...
+logger.js:200 [LOG] 🔑 Токен для создания пациента: <access_token>
 logger.js:200 [LOG] 📊 Длина токена: 184
 logger.js:200 [LOG] 📋 Данные для создания пациента: {full_name: '[REDACTED]', gender: 'male', last_name: '[REDACTED]', first_name: '[REDACTED]', middle_name: '[REDACTED]', …}
 logger.js:200 [LOG] ✅ Пациент создан успешно: 361
@@ -10710,8 +10710,8 @@ logger.js:200 [LOG] ✅ Запись создана успешно на backend:
 logger.js:209 [INFO] AppointmentWizardV2 completed successfully: {success: true, message: 'Корзина создана успешно. Присвоено номеров в очередях: 4', invoice_id: 284, visit_ids: Array(4), total_amount: '128000.0', …}
 logger.js:209 [INFO] AppointmentWizardV2 closing
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:16:55.162Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/queues/today {params: {…}, data: undefined}
 logger.js:200 [LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}
 logger.js:200 [LOG] 🔍 [api/client.js] Request interceptor: {url: '/registrar/queues/today', hasToken: '[REDACTED]', tokenPreview: '[REDACTED]', headers: {…}}
@@ -12185,8 +12185,8 @@ logger.js:209 [INFO] 🔍 QR-записей в фильтре: 0
 logger.js:209 [INFO] 📊 После агрегации: 0 пациентов
 logger.js:209 [INFO] 🚀 Starting initial data load (guarded)...
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:44:35.947Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
 logger.js:209 [INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: '2025-12-18', first3: Array(0)}
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -12660,8 +12660,8 @@ logger.js:209 [INFO] 🔍 QR-записей в фильтре: 0
 logger.js:209 [INFO] 📊 После агрегации: 0 пациентов
 logger.js:209 [INFO] 🚀 Starting initial data load (guarded)...
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:49:41.147Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
 logger.js:209 [INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: '2025-12-18', first3: Array(0)}
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -12891,8 +12891,8 @@ logger.js:209 [INFO] 🔍 QR-записей в фильтре: 0
 logger.js:209 [INFO] 📊 После агрегации: 0 пациентов
 logger.js:209 [INFO] 🚀 Starting initial data load (guarded)...
 logger.js:209 [INFO] 🔧 loadIntegratedData called at: 2025-12-18T03:54:17.858Z
-logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+logger.js:209 [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+logger.js:209 [INFO] 🔍 Загружаем врачей с токеном: <access_token>
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
 logger.js:209 [INFO] 🔔 appointments state изменился: {count: 0, showCalendar: false, historyDate: '2025-12-18', first3: Array(0)}
 logger.js:209 [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -15255,8 +15255,8 @@ dispatchDiscreteEvent @ chunk-HKYTXVPL.js?v=be52e9d5:5455
  [INFO] AppointmentWizardV2 completed successfully: {success: true, message: 'Запись успешно обновлена', entry: {…}}
  [INFO] AppointmentWizardV2 closing
  [INFO] 🔧 loadIntegratedData called at: 2025-12-18T07:44:56.852Z
- [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
- [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+ [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+ [INFO] 🔍 Загружаем врачей с токеном: <access_token>
  [LOG] 🔄 API Request: GET /registrar/queues/today {params: {…}, data: undefined}
  [LOG] 🔄 API Request: GET /registrar/doctors {params: undefined, data: undefined}
  [LOG] 🔍 [api/client.js] Request interceptor: {url: '/registrar/queues/today', hasToken: '[REDACTED]', tokenPreview: '[REDACTED]', headers: {…}}
@@ -16047,8 +16047,8 @@ if entry.visit_id and len(new_service_ids) > 0:
  [INFO] 📊 После агрегации: 0 пациентов
  [INFO] 🚀 Starting initial data load (guarded)...
  [INFO] 🔧 loadIntegratedData called at: 2025-12-18T07:54:21.822Z
- [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
- [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+ [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+ [INFO] 🔍 Загружаем врачей с токеном: <access_token>
  [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
  [INFO] 🔔 appointments state изменился: Object
  [INFO] 🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)
@@ -16434,8 +16434,8 @@ warn @ logger.js:191
  [INFO] AppointmentWizardV2 completed successfully: Object
  [INFO] AppointmentWizardV2 closing
  [INFO] 🔧 loadIntegratedData called at: 2025-12-18T07:56:05.750Z
- [INFO] 🔍 RegistrarPanel: token from localStorage: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
- [INFO] 🔍 Загружаем врачей с токеном: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+ [INFO] 🔍 RegistrarPanel: token from localStorage: <access_token>
+ [INFO] 🔍 Загружаем врачей с токеном: <access_token>
  [LOG] 🔄 API Request: GET /registrar/queues/today Object
  [LOG] 🔄 API Request: GET /registrar/doctors Object
  [LOG] 🔍 [api/client.js] Request interceptor: Object

@@ -22,13 +22,13 @@ CRITICAL_ROLES = {
 # Ожидаемые маршруты для ролей
 ROLE_ROUTES = {
     "Admin": "/admin",
-    "Registrar": "/registrar-panel",
-    "Lab": "/lab-panel",
-    "Doctor": "/doctor-panel",
-    "Cashier": "/cashier-panel",
-    "cardio": "/cardiologist",
-    "derma": "/dermatologist",
-    "dentist": "/dentist",
+    "Registrar": "/registrar",
+    "Lab": "/lab",
+    "Doctor": "/doctor",
+    "Cashier": "/cashier",
+    "cardio": "/doctor/cardiology",
+    "derma": "/doctor/dermatology",
+    "dentist": "/doctor/dentistry",
 }
 
 # Ожидаемые API endpoints для ролей

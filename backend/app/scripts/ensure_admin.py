@@ -18,6 +18,9 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
 from app.services.setup_service import SetupService  # noqa: E402
 
+INITIALIZED_OVERRIDE_ENV = "ENSURE_ADMIN_ALLOW_INITIALIZED"
+INITIALIZED_OVERRIDE_CONFIRM_ENV = "CONFIRM_ENSURE_ADMIN_INITIALIZED_OVERRIDE"
+
 
 def _hash_or_plain(pw: str) -> str:
     """Вернуть bcrypt-хэш, если passlib доступен, иначе исходную строку (для dev)."""
@@ -42,21 +45,27 @@ def ensure_admin() -> dict:
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
-    allow_initialized = os.getenv("ENSURE_ADMIN_ALLOW_INITIALIZED", "").strip().lower() in {
+    allow_initialized = os.getenv(INITIALIZED_OVERRIDE_ENV, "").strip().lower() in {
         "1",
         "true",
         "yes",
     }
+    confirm_initialized_override = (
+        os.getenv(INITIALIZED_OVERRIDE_CONFIRM_ENV, "").strip().lower()
+        in {"1", "true", "yes"}
+    )
 
     with SessionLocal() as db:  # type: ignore # type: Session
-        if SetupService(db).is_initialized() and not allow_initialized:
-            return {
-                "skipped": True,
-                "reason": (
-                    "initialized_instance_requires_explicit_ops_override; "
-                    "set ENSURE_ADMIN_ALLOW_INITIALIZED=1 for controlled recovery"
-                ),
-            }
+        if SetupService(db).is_initialized():
+            if not allow_initialized or not confirm_initialized_override:
+                return {
+                    "skipped": True,
+                    "reason": (
+                        "initialized_instance_requires_explicit_ops_override; "
+                        f"set {INITIALIZED_OVERRIDE_ENV}=1 and "
+                        f"{INITIALIZED_OVERRIDE_CONFIRM_ENV}=1 for controlled recovery"
+                    ),
+                }
 
         # Check by username first
         row = (

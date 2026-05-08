@@ -1,51 +1,23 @@
-"""
-Тест AI провайдеров из backend директории
-"""
-import os
+#!/usr/bin/env python3
+"""Retired root manual AI provider inspection script."""
+
+from __future__ import annotations
+
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-# Меняем рабочую директорию на backend
-os.chdir(os.path.join(os.path.dirname(__file__), 'backend'))
+MESSAGE = """
+test_ai_from_backend.py is retired.
 
-from app.services.ai.ai_manager import get_ai_manager, AIProviderType
-from app.core.config import get_settings
+This root-level helper looked like a pytest module and inspected local AI API
+key configuration, including key prefixes. Use backend/tests pytest fixtures or
+an explicit, env-driven smoke check that never prints secret material.
+""".strip()
 
-def test_ai_providers_from_backend():
-    """Тестируем AI провайдеры из backend директории"""
-    print("🔧 Тестирование AI провайдеров из backend директории...")
-    print(f"📁 Рабочая директория: {os.getcwd()}")
-    print(f"📁 Файл .env: {os.path.exists('.env')}")
-    
-    # Проверяем настройки
-    settings = get_settings()
-    print(f"\n📋 Настройки из config.py:")
-    print(f"  - OPENAI_API_KEY: {'есть' if settings.OPENAI_API_KEY else 'нет'}")
-    print(f"  - GEMINI_API_KEY: {'есть' if settings.GEMINI_API_KEY else 'нет'}")
-    print(f"  - DEEPSEEK_API_KEY: {'есть' if settings.DEEPSEEK_API_KEY else 'нет'}")
-    
-    if settings.GEMINI_API_KEY:
-        print(f"  - GEMINI_API_KEY: {settings.GEMINI_API_KEY[:10]}...")
-    
-    # Проверяем переменные окружения
-    print(f"\n🔑 Переменные окружения:")
-    print(f"  - OPENAI_API_KEY: {'есть' if os.getenv('OPENAI_API_KEY') else 'нет'}")
-    print(f"  - GEMINI_API_KEY: {'есть' if os.getenv('GEMINI_API_KEY') else 'нет'}")
-    print(f"  - DEEPSEEK_API_KEY: {'есть' if os.getenv('DEEPSEEK_API_KEY') else 'нет'}")
-    
-    if os.getenv('GEMINI_API_KEY'):
-        print(f"  - GEMINI_API_KEY: {os.getenv('GEMINI_API_KEY')[:10]}...")
-    
-    # Проверяем AI менеджер
-    ai_manager = get_ai_manager()
-    available_providers = ai_manager.get_available_providers()
-    print(f"\n📋 Доступные провайдеры: {available_providers}")
-    print(f"📋 Default провайдер: {ai_manager.default_provider}")
-    
-    if "gemini" in available_providers:
-        print("✅ Gemini провайдер настроен!")
-    else:
-        print("❌ Gemini провайдер не настроен")
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    test_ai_providers_from_backend()
+    raise SystemExit(main())

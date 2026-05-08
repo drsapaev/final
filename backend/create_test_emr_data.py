@@ -10,14 +10,33 @@ from datetime import datetime
 # Добавляем корневую директорию проекта в sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'app')))
 
-from app.db.session import SessionLocal, engine
-from app.models.emr import EMR
-from app.models.emr_version import EMRVersion
-from app.models.lab import LabOrder, LabResult
-from sqlalchemy import text
+def require_test_emr_data_confirmation():
+    if os.getenv("CONFIRM_CREATE_TEST_EMR_DATA") != "1":
+        raise RuntimeError(
+            "Refusing to create EMR test data. "
+            "Set CONFIRM_CREATE_TEST_EMR_DATA=1 only for an explicit local seed run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating EMR test data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("create_test_emr_data.py requires PostgreSQL; SQLite is not allowed.")
 
 
 def create_test_data():
+    require_test_emr_data_confirmation()
+    require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.models.emr import EMR
+    from app.models.emr_version import EMRVersion
+    from app.models.lab import LabOrder, LabResult
+
     """Создать тестовые данные для EMR"""
     print("🔄 СОЗДАНИЕ ТЕСТОВЫХ ДАННЫХ ДЛЯ EMR")
     print("=" * 40)

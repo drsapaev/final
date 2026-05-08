@@ -111,6 +111,8 @@
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
 | [runbooks/PR_REVIEW_QUALITY_GATES.md](./runbooks/PR_REVIEW_QUALITY_GATES.md) | PR review gates for contract, RBAC, realtime, resilience, scope, and release readiness |
 | [runbooks/PR_REVIEW_PRACTICE_TRACK.md](./runbooks/PR_REVIEW_PRACTICE_TRACK.md) | 12-week practical track for applying PR review quality gates |
+| [runbooks/PR_REVIEW_ADOPTION_LOG.md](./runbooks/PR_REVIEW_ADOPTION_LOG.md) | Weekly adoption log for PR review gate practice and repeated gaps |
+| [runbooks/PR_REVIEW_SAMPLE_BODIES.md](./runbooks/PR_REVIEW_SAMPLE_BODIES.md) | Valid example PR bodies for docs-only and runtime contract changes |
 | [reports/PRINT_PANEL_AUDIT_REPORT.md](./reports/PRINT_PANEL_AUDIT_REPORT.md) | Unified print audit across registrar, specialists, lab, and admin panels |
 | [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Historical messaging contract and rollout evidence |
 | [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Historical messaging QA evidence |
@@ -132,6 +134,22 @@ Historical reports, completed fixes, and obsolete documentation are in [archives
 2. Then [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md)
 3. Then [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md)
 4. Then [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md)
+
+### "I need the PR review quality gate"
+
+1. Read [runbooks/PR_REVIEW_QUALITY_GATES.md](runbooks/PR_REVIEW_QUALITY_GATES.md).
+2. Copy one sample from [runbooks/PR_REVIEW_SAMPLE_BODIES.md](runbooks/PR_REVIEW_SAMPLE_BODIES.md) or fill the PR template.
+3. Run the local gate before review:
+
+```powershell
+python scripts/run_pr_review_gate_checks.py --body-file docs\runbooks\pr-review-samples\runtime-contract-pr.md
+```
+
+4. Record one adoption note when the gate catches or prevents a repeat issue:
+
+```powershell
+python scripts/add_pr_review_adoption_entry.py --focus "PR #123" --track "Contract / RBAC" --evidence "PR body, diff, tests" --gate-result passed --gap "none" --prevention "targeted proof added" --next-action "watch next similar PR"
+```
 
 ### "I'm an AI agent making changes"
 1. **READ FIRST:** [AUTHENTICATION_LAWS_FOR_AI.md](./AUTHENTICATION_LAWS_FOR_AI.md)

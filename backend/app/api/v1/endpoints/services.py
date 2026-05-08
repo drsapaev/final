@@ -1267,14 +1267,17 @@ async def get_service_code_mappings(
         "dental": "S01",
         "laboratory": "L01",
         "lab": "L01",
-        "echokg": "K10",
+        "ecg": "K10",
+        "echokg": "K11",
+        "echo": "K11",
         "procedures": "P01",
         "cosmetology": "C01",
     }
     
     code_to_name = {
         "K01": "Консультация кардиолога",
-        "K10": "ЭхоКГ",
+        "K10": "ЭКГ",
+        "K11": "ЭхоКГ",
         "D01": "Консультация дерматолога",
         "S01": "Консультация стоматолога",
         "L01": "Лабораторные анализы",
@@ -1284,6 +1287,8 @@ async def get_service_code_mappings(
     
     category_mapping = {
         "cardiology": "K",
+        "ecg": "K",
+        "echokg": "K",
         "dermatology": "D",
         "laboratory": "L",
         "stomatology": "S",
@@ -1298,6 +1303,8 @@ async def get_service_code_mappings(
             if service.service_code and service.name:
                 code_to_name[service.service_code] = service.name
             if service.queue_tag and service.service_code:
+                if service.queue_tag in {"ecg", "echokg", "echo"}:
+                    continue
                 specialty_to_code[service.queue_tag] = service.service_code
     except Exception:
         pass  # Use static mappings if DB query fails

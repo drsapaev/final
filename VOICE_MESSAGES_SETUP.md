@@ -129,8 +129,10 @@ alembic downgrade -1
 
 ### Удаление файлов
 
-```bash
-rm -rf backend/uploads/voice_messages
+```powershell
+# Safer cleanup: quarantine files first, then delete manually after verification.
+New-Item -ItemType Directory -Force -Path backend\uploads\voice_messages_quarantine
+Get-ChildItem -LiteralPath backend\uploads\voice_messages | Move-Item -Destination backend\uploads\voice_messages_quarantine
 ```
 
 Готово! 🎙️

@@ -139,11 +139,11 @@ npm run build
 Если что-то пошло не так, можно откатить изменения:
 
 ```bash
-# Откат через git
-git checkout -- frontend/src/
+# Сначала сохранить текущее состояние в отдельной ветке
+git switch -c recovery/frontend-migration-review
 
-# Или восстановление конкретного файла
-git checkout HEAD -- frontend/src/components/example/Component.jsx
+# Затем вручную сравнить и восстановить только нужные файлы через IDE или git diff
+git diff -- frontend/src/components/example/Component.jsx
 ```
 
 ## Поддержка

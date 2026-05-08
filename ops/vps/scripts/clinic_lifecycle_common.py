@@ -253,6 +253,7 @@ def run_command(
 ) -> subprocess.CompletedProcess[str]:
     printable = shlex.join(args)
     log(f"+ {printable}")
+    _require_safe_force_checkout(args, cwd)
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
@@ -330,6 +331,25 @@ def read_json_payload(path: str | None, inline_json: str | None = None) -> dict[
     return json.loads(payload_path.read_text(encoding="utf-8"))
 
 
+def _redact_url_for_message(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return "<invalid-url>"
+
+    if not parsed.netloc or "@" not in parsed.netloc:
+        return url
+
+    host_part = parsed.hostname or ""
+    if parsed.port:
+        host_part = f"{host_part}:{parsed.port}"
+    if parsed.username:
+        safe_netloc = f"{parsed.username}:***@{host_part}"
+    else:
+        safe_netloc = f"***@{host_part}"
+    return parsed._replace(netloc=safe_netloc).geturl()
+
+
 def parse_database_url(url: str) -> DatabaseTarget:
     if not url:
         fail("DATABASE_URL is required")
@@ -340,11 +360,11 @@ def parse_database_url(url: str) -> DatabaseTarget:
     )
     parsed = urlparse(normalized)
     if parsed.scheme not in {"postgresql", "postgres"}:
-        fail(f"Unsupported database scheme in URL: {url}")
+        fail(f"Unsupported database scheme in URL: {_redact_url_for_message(url)}")
 
     name = parsed.path.lstrip("/")
     if not name:
-        fail(f"Database name is missing in URL: {url}")
+        fail(f"Database name is missing in URL: {_redact_url_for_message(url)}")
 
     return DatabaseTarget(
         url=url,
@@ -365,6 +385,50 @@ def git_head(root: Path | None = None) -> str:
         text=True,
     ).strip()
     return result
+
+
+def _git_has_tracked_changes(root: Path) -> bool:
+    worktree_dirty = subprocess.run(
+        ["git", "diff", "--quiet"],
+        cwd=str(root),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode != 0
+    index_dirty = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=str(root),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode != 0
+    return worktree_dirty or index_dirty
+
+
+def _require_safe_force_checkout(args: list[str], cwd: Path | None) -> None:
+    if len(args) < 4 or args[0] != "git" or args[1] != "checkout" or args[2] != "--force":
+        return
+
+    release_ref = args[3]
+    root = (cwd or app_root()).resolve()
+    if not release_ref.strip() or any(char.isspace() for char in release_ref):
+        raise LifecycleError("Refusing forced release checkout with an empty or whitespace-containing ref")
+
+    ref_check = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"{release_ref}^{{commit}}"],
+        cwd=str(root),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if ref_check.returncode != 0:
+        raise LifecycleError(f"Refusing forced release checkout because ref does not resolve to a commit: {release_ref}")
+
+    if env_bool("CONFIRM_FORCE_RELEASE_CHECKOUT", False):
+        return
+
+    if _git_has_tracked_changes(root):
+        raise LifecycleError(
+            "Refusing forced release checkout with tracked local changes. "
+            "Commit/stash the changes, or set CONFIRM_FORCE_RELEASE_CHECKOUT=1 for an intentional release operation."
+        )
 
 
 def ensure_tool(name: str) -> None:

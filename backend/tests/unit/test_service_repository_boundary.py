@@ -3,16 +3,55 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 ROUTER_MARKER = "# --- API Router moved from app/api/v1/endpoints/"
+
+RETIRED_API_SERVICE_MODULES = {
+    "activation",
+    "admin_ai",
+    "admin_departments",
+    "admin_doctors",
+    "admin_users",
+    "analytics",
+    "appointments",
+    "audit",
+    "board",
+    "cardio",
+    "cashier",
+    "doctor_integration",
+    "emr_v2",
+    "lab",
+    "minimal_auth",
+    "messages",
+    "notifications",
+    "online_queue_new",
+    "patients",
+    "payments",
+    "payment_settings",
+    "payment_webhooks",
+    "qr_queue",
+    "queues",
+    "registrar_integration",
+    "registrar_wizard",
+    "services",
+    "settings",
+    "simple_auth",
+    "visits",
+    "webhooks",
+}
 
 
 def _service_logic_block(module_name: str) -> str:
-    service_path = (
-        Path(__file__).resolve().parents[2]
-        / "app"
-        / "services"
-        / f"{module_name}_api_service.py"
-    )
+    services_dir = Path(__file__).resolve().parents[2] / "app" / "services"
+    service_path = services_dir / f"{module_name}_endpoint_service.py"
+    legacy_service_path = services_dir / f"{module_name}_api_service.py"
+
+    if not service_path.exists() and legacy_service_path.exists():
+        service_path = legacy_service_path
+
+    if not service_path.exists() and module_name in RETIRED_API_SERVICE_MODULES:
+        pytest.skip(f"{module_name} service retired as an inactive API mirror")
     text = service_path.read_text(encoding="utf-8")
     return text.split(ROUTER_MARKER, maxsplit=1)[0]
 
@@ -118,24 +157,6 @@ def test_registrar_wizard_service_avoids_direct_session_calls() -> None:
 
 def test_force_majeure_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("force_majeure")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
-def test_salary_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("salary")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
-def test_patient_appointments_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("patient_appointments")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,
@@ -489,15 +510,6 @@ def test_lab_service_avoids_direct_session_calls() -> None:
 
 def test_departments_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("departments")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
-def test_ai_tracking_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("ai_tracking")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
         logic,

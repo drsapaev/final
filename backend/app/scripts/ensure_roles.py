@@ -2,10 +2,6 @@ from __future__ import annotations
 
 import os
 
-from app.core.security import get_password_hash
-from app.db.session import SessionLocal
-from app.models.user import User
-
 USERS = [
     ("admin", "Admin", "admin@ex.com"),
     ("registrar", "Registrar", "reg@ex.com"),
@@ -16,6 +12,13 @@ USERS = [
     ("dentist", "dentist", "dentist@ex.com"),
     ("cashier", "Cashier", "cash@ex.com"),
 ]
+
+
+def _require_ensure_roles_confirmation() -> None:
+    if os.getenv("CONFIRM_ENSURE_ROLES") != "1":
+        raise SystemExit(
+            "Refusing to create or update role users without CONFIRM_ENSURE_ROLES=1."
+        )
 
 
 def _password_env_names(username: str) -> list[str]:
@@ -37,6 +40,12 @@ def _role_password(username: str, *, required: bool) -> str | None:
 
 
 def upsert_users():
+    _require_ensure_roles_confirmation()
+
+    from app.core.security import get_password_hash
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
     db = SessionLocal()
     try:
         for username, role, email in USERS:

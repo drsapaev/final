@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.group_permissions_api_service import (
-    GroupPermissionsApiDomainError,
-    GroupPermissionsApiService,
+from app.services.group_permissions_endpoint_service import (
+    GroupPermissionsDomainError,
+    GroupPermissionsService,
 )
 from app.services.group_permissions_service import get_group_permissions_service
 
@@ -108,12 +108,12 @@ def get_user_permissions(
     Включает разрешения из ролей, групп и индивидуальные переопределения
     """
     try:
-        payload = GroupPermissionsApiService(db).get_user_permissions_payload(
+        payload = GroupPermissionsService(db).get_user_permissions_payload(
             user_id=user_id,
             use_cache=use_cache,
         )
         return UserPermissionsResponse(**payload)
-    except GroupPermissionsApiDomainError as exc:
+    except GroupPermissionsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -172,7 +172,7 @@ def get_groups(
     Получить список групп пользователей
     """
     try:
-        payload = GroupPermissionsApiService(db).list_groups_payload(
+        payload = GroupPermissionsService(db).list_groups_payload(
             active_only=active_only,
             group_type=group_type,
             limit=limit,
@@ -365,7 +365,7 @@ def get_roles(
     Получить список ролей
     """
     try:
-        payload = GroupPermissionsApiService(db).list_roles_payload(
+        payload = GroupPermissionsService(db).list_roles_payload(
             active_only=active_only,
             include_system=include_system,
             limit=limit,
@@ -391,7 +391,7 @@ def get_permissions(
     Получить список разрешений
     """
     try:
-        payload = GroupPermissionsApiService(db).list_permissions_payload(
+        payload = GroupPermissionsService(db).list_permissions_payload(
             active_only=active_only,
             category=category,
             limit=limit,
@@ -417,7 +417,7 @@ def create_permission_override(
     """
     Создать индивидуальное переопределение разрешения для пользователя
     """
-    api_service = GroupPermissionsApiService(db)
+    api_service = GroupPermissionsService(db)
     try:
         return api_service.create_permission_override(
             user_id=request.user_id,
@@ -428,7 +428,7 @@ def create_permission_override(
             granted_by_user_id=current_user.id,
             granted_by_username=current_user.username,
         )
-    except GroupPermissionsApiDomainError as exc:
+    except GroupPermissionsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

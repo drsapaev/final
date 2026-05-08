@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.services.payment_reconciliation_api_service import (
-    PaymentReconciliationApiDomainError,
-    PaymentReconciliationApiService,
+from app.services.payment_reconciliation_endpoint_service import (
+    PaymentReconciliationDomainError,
+    PaymentReconciliationEndpointService,
 )
 
 router = APIRouter()
@@ -32,14 +32,14 @@ async def reconcile_provider(
 
     ✅ SECURITY: Requires Admin or Cashier role
     """
-    service = PaymentReconciliationApiService(db)
+    service = PaymentReconciliationEndpointService(db)
     try:
         return service.reconcile_provider(
             provider=provider,
             start_date=start_date,
             end_date=end_date,
         )
-    except PaymentReconciliationApiDomainError as exc:
+    except PaymentReconciliationDomainError as exc:
         logger.error("Error in reconcile_provider: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -56,13 +56,13 @@ async def reconcile_all_providers(
 
     ✅ SECURITY: Requires Admin role
     """
-    service = PaymentReconciliationApiService(db)
+    service = PaymentReconciliationEndpointService(db)
     try:
         return service.reconcile_all_providers(
             start_date=start_date,
             end_date=end_date,
         )
-    except PaymentReconciliationApiDomainError as exc:
+    except PaymentReconciliationDomainError as exc:
         logger.error("Error in reconcile_all_providers: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -79,13 +79,13 @@ async def get_reconciliation_report(
 
     ✅ SECURITY: Requires Admin or Cashier role
     """
-    service = PaymentReconciliationApiService(db)
+    service = PaymentReconciliationEndpointService(db)
     try:
         return service.get_reconciliation_report(
             start_date=start_date,
             end_date=end_date,
         )
-    except PaymentReconciliationApiDomainError as exc:
+    except PaymentReconciliationDomainError as exc:
         logger.error("Error generating reconciliation report: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -102,10 +102,10 @@ async def get_missing_payments(
 
     ✅ SECURITY: Requires Admin or Cashier role
     """
-    service = PaymentReconciliationApiService(db)
+    service = PaymentReconciliationEndpointService(db)
     try:
         return service.get_missing_payments(provider=provider, days=days)
-    except PaymentReconciliationApiDomainError as exc:
+    except PaymentReconciliationDomainError as exc:
         logger.error("Error detecting missing payments: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -121,10 +121,10 @@ async def get_reconciliation_alerts(
 
     ✅ SECURITY: Requires Admin role
     """
-    service = PaymentReconciliationApiService(db)
+    service = PaymentReconciliationEndpointService(db)
     try:
         return service.get_reconciliation_alerts(threshold=threshold)
-    except PaymentReconciliationApiDomainError as exc:
+    except PaymentReconciliationDomainError as exc:
         logger.error("Error getting reconciliation alerts: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

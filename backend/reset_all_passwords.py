@@ -5,10 +5,6 @@
 
 import os
 
-from app.core.security import get_password_hash
-from app.db.session import SessionLocal
-from app.models.user import User
-
 
 USERS = [
     "admin",
@@ -20,6 +16,22 @@ USERS = [
     "derma",
     "dentist",
 ]
+
+
+def _require_confirmation() -> None:
+    value = os.getenv("CONFIRM_RESET_ALL_PASSWORDS", "").strip().lower()
+    if value not in {"1", "true", "yes", "on"}:
+        raise RuntimeError(
+            "Set CONFIRM_RESET_ALL_PASSWORDS=1 before resetting all user passwords."
+        )
+
+
+def _require_postgres_database_url() -> None:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before resetting user passwords.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("reset_all_passwords.py requires a PostgreSQL DATABASE_URL.")
 
 
 def _password_env_names(username: str) -> list[str]:
@@ -40,6 +52,13 @@ def _required_password(username: str) -> str:
 
 def reset_all_passwords():
     """Сброс паролей всех пользователей согласно документации"""
+    _require_confirmation()
+    _require_postgres_database_url()
+
+    from app.core.security import get_password_hash
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
     db = SessionLocal()
     try:
         # Preload all required secrets before mutating any user.

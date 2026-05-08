@@ -6,6 +6,7 @@ from clinic_lifecycle_common import (
     backend_dir,
     fail,
     load_clinic_env,
+    parse_database_url,
     pass_message,
     require_env,
     run_command,
@@ -14,7 +15,7 @@ from clinic_lifecycle_common import (
 
 def main() -> int:
     load_clinic_env()
-    require_env("DATABASE_URL")
+    parse_database_url(require_env("DATABASE_URL"))
 
     cmd = backend_alembic_cmd()
     run_command(cmd + ["upgrade", "head"], cwd=backend_dir())

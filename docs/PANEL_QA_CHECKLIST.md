@@ -40,13 +40,13 @@
 
 | Area | Canonical route | Notes |
 |---|---|---|
-| Регистратура | `/registrar-panel` | Вкладки через `?tab=` |
-| Касса | `/cashier-panel` | Вкладки через локальный tab-state |
-| Общий врач | `/doctor-panel` | Вкладки `dashboard / patients / appointments / queue / ai / reports` |
-| Кардиолог | `/cardiologist` | Вкладки через `?tab=` |
-| Дерматолог | `/dermatologist` | Вкладки через `?tab=` |
-| Стоматолог | `/dentist` | Вкладки через `?tab=` |
-| Лаборатория | `/lab-panel` | Вкладки `queue / templates / reports` |
+| Регистратура | `/registrar` | Вкладки через `?tab=` |
+| Касса | `/cashier` | Вкладки через локальный tab-state |
+| Общий врач | `/doctor` | Вкладки `dashboard / patients / appointments / queue / ai / reports` |
+| Кардиолог | `/doctor/cardiology` | Вкладки через `?tab=` |
+| Дерматолог | `/doctor/dermatology` | Вкладки через `?tab=` |
+| Стоматолог | `/doctor/dentistry` | Вкладки через `?tab=` |
+| Лаборатория | `/lab` | Вкладки `queue / templates / reports` |
 | Админка | `/admin` | Подразделы через path и query params |
 
 ### Legacy aliases
@@ -253,20 +253,20 @@ Cleanup / reset:
 
 ### Scope
 
-- Основной маршрут: `/registrar-panel`
+- Основной маршрут: `/registrar`
 - Критичные вкладки: `welcome`, `appointments`, профильные направления, `queue`
 - Обязательный handoff: `регистратура -> касса`, `регистратура -> врач`, `регистратура -> лаборатория`
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `REG-01` | Smoke | P0 | Registrar | `/registrar-panel?tab=appointments` | Валидный логин регистратора | Открыть панель; проверить, что список записей и табы загрузились без ошибок | Вход, табы панели | `auth ok`; список отображается | `SOT-AUTH-01` | `SOT-REG-UI-01` | Можно стартовать поток пациента | Скрин header + список | `-` |
-| `REG-02` | Smoke | P0 | Registrar | `/registrar-panel?tab=appointments` | Есть свободный тестовый слот и тестовая услуга | Создать нового пациента и новую запись; сохранить через мастер | `Новая запись`, `Далее`, `Сохранить` | Новая запись появляется как `scheduled`/`confirmed` по реализации среды | `SOT-REG-UI-01` | `SOT-REG-API-01` | Появляется канонический patient/appointment объект | Скрин summary мастера + строка записи | `-` |
-| `REG-03` | Smoke | P0 | Registrar | `/registrar-panel?tab=appointments` | Запись из `REG-02` создана с лабораторной или врачебной услугой | Добавить запись в очередь и проверить downstream | `Добавить в очередь`, профильный таб, `Онлайн-очередь` | Строка получает queue indicator / `queued` по среде | `SOT-REG-UI-01` | `SOT-LAB-UI-01` или `SOT-DOC-UI-01` | Визит виден в целевой очереди по `visit_id` | Скрин registrar row + downstream row | `-` |
-| `REG-04` | Regression | P1 | Registrar | `/registrar-panel?tab=appointments` | Уже существует пациент с уникальным телефоном/ФИО | Найти пациента, открыть карточку, создать повторную запись без дубля пациента | Поиск, открыть найденного пациента, `Новая запись` | Новый визит создаётся без нового patient record | `SOT-REG-UI-02` | `SOT-REG-API-01` | История пациента продолжается в одной сущности | Скрин поиска + patient summary | `-` |
-| `REG-05` | Regression | P1 | Registrar | `/registrar-panel?tab=appointments` | Есть запись с непогашенной оплатой | Передать запись в кассовый поток и проверить, что она попала в pending payments | `Оплата` или переход в payment flow | Статус оплаты остаётся `pending`, запись видна кассиру | `SOT-REG-UI-01` | `SOT-CASH-UI-01` | Кассир видит тот же визит/пациента | Скрин registrar row + cashier pending row | `-` |
-| `REG-06` | Regression | P1 | Registrar | `/registrar-panel?tab=appointments` | Есть сохранённая запись | Напечатать талон и убедиться в понятном feedback | `Печать талона` | Данные записи не меняются; печать завершается без ошибки | `SOT-REG-UI-01` | `SOT-REG-API-01` | Пациент может идти дальше по потоку с корректным ticket output | Скрин success feedback / preview / opened doc | `-` |
-| `REG-07` | Regression | P1 | Registrar | `/registrar-panel?tab=appointments` | Есть активная будущая запись | Перенести запись на другой слот и проверить, что downstream не сломан | `Редактировать`, reschedule actions, `Сохранить` | Дата/время меняются, запись остаётся валидной | `SOT-REG-UI-01` | `SOT-REG-API-01` | У врача/лаба отражается новое время, не создаётся дубль | Скрин before/after row | `-` |
-| `REG-08` | Destructive | P1 | Registrar | `/registrar-panel?tab=appointments` | Только staging/test data; есть тестовая запись | Отменить запись или отметить `Неявка`; проверить, что запись уходит из рабочего happy path | `Отменить`, `Подтвердить`, `Неявка` | Статус меняется на `cancelled` или `no_show` по среде и перестаёт участвовать в обычном потоке | `SOT-REG-UI-01` | `SOT-DOC-UI-01` или `SOT-CASH-UI-01` | Downstream-панели не продолжают вести отменённый визит как активный | Скрин reason dialog + итоговая строка | Вернуть запись только вручную при наличии штатного restore path |
+| `REG-01` | Smoke | P0 | Registrar | `/registrar?tab=appointments` | Валидный логин регистратора | Открыть панель; проверить, что список записей и табы загрузились без ошибок | Вход, табы панели | `auth ok`; список отображается | `SOT-AUTH-01` | `SOT-REG-UI-01` | Можно стартовать поток пациента | Скрин header + список | `-` |
+| `REG-02` | Smoke | P0 | Registrar | `/registrar?tab=appointments` | Есть свободный тестовый слот и тестовая услуга | Создать нового пациента и новую запись; сохранить через мастер | `Новая запись`, `Далее`, `Сохранить` | Новая запись появляется как `scheduled`/`confirmed` по реализации среды | `SOT-REG-UI-01` | `SOT-REG-API-01` | Появляется канонический patient/appointment объект | Скрин summary мастера + строка записи | `-` |
+| `REG-03` | Smoke | P0 | Registrar | `/registrar?tab=appointments` | Запись из `REG-02` создана с лабораторной или врачебной услугой | Добавить запись в очередь и проверить downstream | `Добавить в очередь`, профильный таб, `Онлайн-очередь` | Строка получает queue indicator / `queued` по среде | `SOT-REG-UI-01` | `SOT-LAB-UI-01` или `SOT-DOC-UI-01` | Визит виден в целевой очереди по `visit_id` | Скрин registrar row + downstream row | `-` |
+| `REG-04` | Regression | P1 | Registrar | `/registrar?tab=appointments` | Уже существует пациент с уникальным телефоном/ФИО | Найти пациента, открыть карточку, создать повторную запись без дубля пациента | Поиск, открыть найденного пациента, `Новая запись` | Новый визит создаётся без нового patient record | `SOT-REG-UI-02` | `SOT-REG-API-01` | История пациента продолжается в одной сущности | Скрин поиска + patient summary | `-` |
+| `REG-05` | Regression | P1 | Registrar | `/registrar?tab=appointments` | Есть запись с непогашенной оплатой | Передать запись в кассовый поток и проверить, что она попала в pending payments | `Оплата` или переход в payment flow | Статус оплаты остаётся `pending`, запись видна кассиру | `SOT-REG-UI-01` | `SOT-CASH-UI-01` | Кассир видит тот же визит/пациента | Скрин registrar row + cashier pending row | `-` |
+| `REG-06` | Regression | P1 | Registrar | `/registrar?tab=appointments` | Есть сохранённая запись | Напечатать талон и убедиться в понятном feedback | `Печать талона` | Данные записи не меняются; печать завершается без ошибки | `SOT-REG-UI-01` | `SOT-REG-API-01` | Пациент может идти дальше по потоку с корректным ticket output | Скрин success feedback / preview / opened doc | `-` |
+| `REG-07` | Regression | P1 | Registrar | `/registrar?tab=appointments` | Есть активная будущая запись | Перенести запись на другой слот и проверить, что downstream не сломан | `Редактировать`, reschedule actions, `Сохранить` | Дата/время меняются, запись остаётся валидной | `SOT-REG-UI-01` | `SOT-REG-API-01` | У врача/лаба отражается новое время, не создаётся дубль | Скрин before/after row | `-` |
+| `REG-08` | Destructive | P1 | Registrar | `/registrar?tab=appointments` | Только staging/test data; есть тестовая запись | Отменить запись или отметить `Неявка`; проверить, что запись уходит из рабочего happy path | `Отменить`, `Подтвердить`, `Неявка` | Статус меняется на `cancelled` или `no_show` по среде и перестаёт участвовать в обычном потоке | `SOT-REG-UI-01` | `SOT-DOC-UI-01` или `SOT-CASH-UI-01` | Downstream-панели не продолжают вести отменённый визит как активный | Скрин reason dialog + итоговая строка | Вернуть запись только вручную при наличии штатного restore path |
 
 ---
 
@@ -274,35 +274,35 @@ Cleanup / reset:
 
 ### Scope
 
-- Основной маршрут: `/cashier-panel`
+- Основной маршрут: `/cashier`
 - Критичные зоны: `Ожидающие оплаты`, `История платежей`, `Возвраты`
 - Обязательный handoff: `касса -> регистратура/врач` через payment status
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `CASH-01` | Smoke | P0 | Cashier | `/cashier-panel` | Валидный логин кассира; есть минимум одна pending запись | Открыть кассу, проверить pending list, totals и базовый поиск | Поиск, фильтр статуса | Pending row корректно отображается как `pending` | `SOT-AUTH-01` | `SOT-CASH-UI-01` | Кассир видит именно ожидающие оплаты записи | Скрин pending list + totals | `-` |
-| `CASH-02` | Smoke | P0 | Cashier | `/cashier-panel` | Есть тестовый визит с `pending` оплатой | Провести оплату для одной записи | `Онлайн-оплата` / payment modal / submit | `pending -> completed` | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | У визита исчезает pending badge в downstream UI | Скрин modal + completed row | `-` |
-| `CASH-03` | Regression | P1 | Cashier | `/cashier-panel` | `CASH-02` завершён | Проверить, что обновлённый payment status виден вне кассы | История/refresh/переход в связанный поток | Статус остаётся `completed` и не откатывается | `SOT-CASH-UI-01` | `SOT-REG-UI-01` или `SOT-DOC-UI-02` | Регистратура/врач видят оплаченный визит | Скрин cashier row + downstream badge | `-` |
-| `CASH-04` | Regression | P1 | Cashier | `/cashier-panel` | Есть completed payment | Напечатать чек или открыть receipt download | `Чек` | Печать/receipt открывается без потери статуса | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | Чек можно отдать пациенту без ручной правки | Скрин opened receipt / success feedback | `-` |
-| `CASH-05` | Regression | P1 | Cashier | `/cashier-panel` | Есть минимум один completed payment | Открыть `История платежей`, проверить сумму, провайдера, статус и дату | Переключение вкладки, поиск | Историческая запись остаётся консистентной | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | История пригодна для повторной сверки и поддержки | Скрин history row | `-` |
-| `CASH-06` | Destructive | P1 | Cashier | `/cashier-panel` | Только staging/test data; есть completed payment | Выполнить отмену pending-платежа или возврат completed-платежа с причиной | `Отмена`, `Возврат`, submit reason | `pending -> cancelled` или `completed -> refunded` | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | Downstream-визит больше не считается полностью оплаченным | Скрин reason modal + итоговый row state | Вернуть тестовую запись к исходному состоянию через отдельный test payment при необходимости |
+| `CASH-01` | Smoke | P0 | Cashier | `/cashier` | Валидный логин кассира; есть минимум одна pending запись | Открыть кассу, проверить pending list, totals и базовый поиск | Поиск, фильтр статуса | Pending row корректно отображается как `pending` | `SOT-AUTH-01` | `SOT-CASH-UI-01` | Кассир видит именно ожидающие оплаты записи | Скрин pending list + totals | `-` |
+| `CASH-02` | Smoke | P0 | Cashier | `/cashier` | Есть тестовый визит с `pending` оплатой | Провести оплату для одной записи | `Онлайн-оплата` / payment modal / submit | `pending -> completed` | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | У визита исчезает pending badge в downstream UI | Скрин modal + completed row | `-` |
+| `CASH-03` | Regression | P1 | Cashier | `/cashier` | `CASH-02` завершён | Проверить, что обновлённый payment status виден вне кассы | История/refresh/переход в связанный поток | Статус остаётся `completed` и не откатывается | `SOT-CASH-UI-01` | `SOT-REG-UI-01` или `SOT-DOC-UI-02` | Регистратура/врач видят оплаченный визит | Скрин cashier row + downstream badge | `-` |
+| `CASH-04` | Regression | P1 | Cashier | `/cashier` | Есть completed payment | Напечатать чек или открыть receipt download | `Чек` | Печать/receipt открывается без потери статуса | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | Чек можно отдать пациенту без ручной правки | Скрин opened receipt / success feedback | `-` |
+| `CASH-05` | Regression | P1 | Cashier | `/cashier` | Есть минимум один completed payment | Открыть `История платежей`, проверить сумму, провайдера, статус и дату | Переключение вкладки, поиск | Историческая запись остаётся консистентной | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | История пригодна для повторной сверки и поддержки | Скрин history row | `-` |
+| `CASH-06` | Destructive | P1 | Cashier | `/cashier` | Только staging/test data; есть completed payment | Выполнить отмену pending-платежа или возврат completed-платежа с причиной | `Отмена`, `Возврат`, submit reason | `pending -> cancelled` или `completed -> refunded` | `SOT-CASH-UI-01` | `SOT-CASH-API-01` | Downstream-визит больше не считается полностью оплаченным | Скрин reason modal + итоговый row state | Вернуть тестовую запись к исходному состоянию через отдельный test payment при необходимости |
 
 ## 8.3 Специалисты: общий врачебный поток
 
 ### Scope
 
-- Основной маршрут: `/doctor-panel`
+- Основной маршрут: `/doctor`
 - Критичные вкладки: `patients`, `appointments`, `queue`
 - Обязательный handoff: `очередь врача -> статус визита -> следующий визит`
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `DOC-01` | Smoke | P0 | Doctor | `/doctor-panel?tab=queue` | Валидный логин врача; есть waiting entry | Открыть вкладку очереди; убедиться, что видны только релевантные врачу записи | `Queue` tab | Очередь загружена без лишних чужих записей | `SOT-AUTH-01` | `SOT-DOC-UI-01` | Врач работает со своей queue slice | Скрин queue table | `-` |
-| `DOC-02` | Smoke | P0 | Doctor | `/doctor-panel?tab=queue` | Есть минимум одна `waiting` запись | Вызвать следующего пациента и открыть рабочий контекст | `Вызвать следующего`, открыть пациента/визит | `waiting -> called` | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Пациент переходит в активный клинический шаг | Скрин before/after queue row | `-` |
-| `DOC-03` | Regression | P1 | Doctor | `/doctor-panel?tab=queue` | Есть `called` запись | Отправить пациента на диагностику, затем вернуть его по штатному пути | `На обследование`, `Вернуть с диагностики (Push)` | `called -> diagnostics -> called/active` по среде | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Очередь и визит не теряют пациента между этапами | Скрин diagnostics row + return action | `-` |
-| `DOC-04` | Regression | P1 | Doctor | `/doctor-panel?tab=queue` | Есть вызванный или вернувшийся пациент | Завершить приём и убедиться, что рабочая запись покидает активную очередь | `Завершить приём` | `called/diagnostics -> served` и связанный визит уходит из активной очереди | `SOT-DOC-UI-01` | `SOT-REG-UI-01` | Регистратура/очередь не считают визит активным | Скрин final queue row state | `-` |
-| `DOC-05` | Regression | P1 | Doctor | `/doctor-panel?tab=appointments` | Есть пациент, которому нужен follow-up | Назначить следующий визит через штатный модал | `Назначить следующий визит` | Создаётся новый follow-up visit со своим временем | `SOT-DOC-UI-02` | `SOT-REG-UI-01` | Новый визит виден в регистрационном/appointment потоке | Скрин schedule modal + created appointment row | `-` |
-| `DOC-06` | Destructive | P1 | Doctor | `/doctor-panel?tab=queue` | Только staging/test data; есть active queue entry | Пометить `Не явился`, затем проверить path `Восстановить следующим` или `Не вернулся`/`incomplete` | `Не явился`, `Восстановить следующим`, `Не вернулся` | `called/waiting -> no_show` или `diagnostics -> incomplete` | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Очередь не зависает на проблемном пациенте и поддерживает штатное восстановление | Скрин destructive state + restore path | После прогона восстановить запись или создать новую тестовую |
+| `DOC-01` | Smoke | P0 | Doctor | `/doctor?tab=queue` | Валидный логин врача; есть waiting entry | Открыть вкладку очереди; убедиться, что видны только релевантные врачу записи | `Queue` tab | Очередь загружена без лишних чужих записей | `SOT-AUTH-01` | `SOT-DOC-UI-01` | Врач работает со своей queue slice | Скрин queue table | `-` |
+| `DOC-02` | Smoke | P0 | Doctor | `/doctor?tab=queue` | Есть минимум одна `waiting` запись | Вызвать следующего пациента и открыть рабочий контекст | `Вызвать следующего`, открыть пациента/визит | `waiting -> called` | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Пациент переходит в активный клинический шаг | Скрин before/after queue row | `-` |
+| `DOC-03` | Regression | P1 | Doctor | `/doctor?tab=queue` | Есть `called` запись | Отправить пациента на диагностику, затем вернуть его по штатному пути | `На обследование`, `Вернуть с диагностики (Push)` | `called -> diagnostics -> called/active` по среде | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Очередь и визит не теряют пациента между этапами | Скрин diagnostics row + return action | `-` |
+| `DOC-04` | Regression | P1 | Doctor | `/doctor?tab=queue` | Есть вызванный или вернувшийся пациент | Завершить приём и убедиться, что рабочая запись покидает активную очередь | `Завершить приём` | `called/diagnostics -> served` и связанный визит уходит из активной очереди | `SOT-DOC-UI-01` | `SOT-REG-UI-01` | Регистратура/очередь не считают визит активным | Скрин final queue row state | `-` |
+| `DOC-05` | Regression | P1 | Doctor | `/doctor?tab=appointments` | Есть пациент, которому нужен follow-up | Назначить следующий визит через штатный модал | `Назначить следующий визит` | Создаётся новый follow-up visit со своим временем | `SOT-DOC-UI-02` | `SOT-REG-UI-01` | Новый визит виден в регистрационном/appointment потоке | Скрин schedule modal + created appointment row | `-` |
+| `DOC-06` | Destructive | P1 | Doctor | `/doctor?tab=queue` | Только staging/test data; есть active queue entry | Пометить `Не явился`, затем проверить path `Восстановить следующим` или `Не вернулся`/`incomplete` | `Не явился`, `Восстановить следующим`, `Не вернулся` | `called/waiting -> no_show` или `diagnostics -> incomplete` | `SOT-DOC-UI-01` | `SOT-DOC-API-01` | Очередь не зависает на проблемном пациенте и поддерживает штатное восстановление | Скрин destructive state + restore path | После прогона восстановить запись или создать новую тестовую |
 
 ## 8.4 Кардиолог: delta к общему врачу
 
@@ -314,9 +314,9 @@ Cleanup / reset:
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `CARD-01` | Smoke | P1 | Cardiologist | `/cardiologist?tab=appointments` | Есть кардиологический визит с релевантной услугой | Открыть `Appointments`, перейти в `Visit`, заполнить один профильный блок (`ECG` или `Blood Tests`) и сохранить | Таб-переходы, профильная форма, save action среды | Визит остаётся рабочим; профильные данные сохраняются без потери контекста | `SOT-CARD-UI-01` | `SOT-DOC-UI-02` | Кардиологический визит продолжает общий клинический поток | Скрин form + saved state | `-` |
-| `CARD-02` | Regression | P1 | Cardiologist | `/cardiologist?tab=history` | Есть ранее сохранённые профильные данные | Проверить историю и повторное открытие сохранённого исследования | `History`, открыть сохранённый элемент | Данные открываются без дубля и без потери visit linkage | `SOT-CARD-UI-01` | `SOT-DOC-API-01` | История пригодна для повторной клинической интерпретации | Скрин history item + reopened data | `-` |
-| `CARD-03` | Regression | P2 | Cardiologist | `/cardiologist?tab=services` | Есть активный визит | Пройти supporting tabs и убедиться, что нет broken navigation | `Services`, `AI`, `History` | Навигация и контекст пациента не ломаются | `SOT-CARD-UI-01` | `SOT-DOC-UI-02` | Supporting tabs не разрывают happy path | Скрин tabs sequence | `-` |
+| `CARD-01` | Smoke | P1 | Cardiologist | `/doctor/cardiology?tab=appointments` | Есть кардиологический визит с релевантной услугой | Открыть `Appointments`, перейти в `Visit`, заполнить один профильный блок (`ECG` или `Blood Tests`) и сохранить | Таб-переходы, профильная форма, save action среды | Визит остаётся рабочим; профильные данные сохраняются без потери контекста | `SOT-CARD-UI-01` | `SOT-DOC-UI-02` | Кардиологический визит продолжает общий клинический поток | Скрин form + saved state | `-` |
+| `CARD-02` | Regression | P1 | Cardiologist | `/doctor/cardiology?tab=history` | Есть ранее сохранённые профильные данные | Проверить историю и повторное открытие сохранённого исследования | `History`, открыть сохранённый элемент | Данные открываются без дубля и без потери visit linkage | `SOT-CARD-UI-01` | `SOT-DOC-API-01` | История пригодна для повторной клинической интерпретации | Скрин history item + reopened data | `-` |
+| `CARD-03` | Regression | P2 | Cardiologist | `/doctor/cardiology?tab=services` | Есть активный визит | Пройти supporting tabs и убедиться, что нет broken navigation | `Services`, `AI`, `History` | Навигация и контекст пациента не ломаются | `SOT-CARD-UI-01` | `SOT-DOC-UI-02` | Supporting tabs не разрывают happy path | Скрин tabs sequence | `-` |
 
 ## 8.5 Дерматолог: delta к общему врачу
 
@@ -328,9 +328,9 @@ Cleanup / reset:
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `DERM-01` | Smoke | P1 | Dermatologist | `/dermatologist?tab=appointments` | Есть дерматологический визит | Открыть обязательные табы и сохранить один `Skin Examination` или `Cosmetic` кейс | Таб-переходы, профильная форма, save action среды | Осмотр/процедура сохраняется без потери visit context | `SOT-DERM-UI-01` | `SOT-DOC-UI-02` | В истории пациента появляется профильный след | Скрин saved profile block | `-` |
-| `DERM-02` | Regression | P1 | Dermatologist | `/dermatologist?tab=history` | Есть ранее сохранённый дерматологический артефакт | Проверить открытие history и повторное чтение данных | `History`, открыть элемент | История и карточка пациента согласованы | `SOT-DERM-UI-01` | `SOT-DOC-API-01` | История осмотров/процедур доступна без дублей | Скрин history + reopened item | `-` |
-| `DERM-03` | Regression | P2 | Dermatologist | `/dermatologist?tab=photos` | Есть активный дерматологический визит | Пройти supporting tabs и проверить, что они не теряют пациента/визит | `Photos`, `Services`, `AI`, `Patients` | Навигация целостна, контекст пациента не пропадает | `SOT-DERM-UI-01` | `SOT-DOC-UI-02` | Supporting workflow не ломает основной осмотр | Скрин tabs sequence | `-` |
+| `DERM-01` | Smoke | P1 | Dermatologist | `/doctor/dermatology?tab=appointments` | Есть дерматологический визит | Открыть обязательные табы и сохранить один `Skin Examination` или `Cosmetic` кейс | Таб-переходы, профильная форма, save action среды | Осмотр/процедура сохраняется без потери visit context | `SOT-DERM-UI-01` | `SOT-DOC-UI-02` | В истории пациента появляется профильный след | Скрин saved profile block | `-` |
+| `DERM-02` | Regression | P1 | Dermatologist | `/doctor/dermatology?tab=history` | Есть ранее сохранённый дерматологический артефакт | Проверить открытие history и повторное чтение данных | `History`, открыть элемент | История и карточка пациента согласованы | `SOT-DERM-UI-01` | `SOT-DOC-API-01` | История осмотров/процедур доступна без дублей | Скрин history + reopened item | `-` |
+| `DERM-03` | Regression | P2 | Dermatologist | `/doctor/dermatology?tab=photos` | Есть активный дерматологический визит | Пройти supporting tabs и проверить, что они не теряют пациента/визит | `Photos`, `Services`, `AI`, `Patients` | Навигация целостна, контекст пациента не пропадает | `SOT-DERM-UI-01` | `SOT-DOC-UI-02` | Supporting workflow не ломает основной осмотр | Скрин tabs sequence | `-` |
 
 ## 8.6 Стоматолог: delta к общему врачу
 
@@ -342,9 +342,9 @@ Cleanup / reset:
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `DENT-01` | Smoke | P1 | Dentist | `/dentist?tab=appointments` | Есть стоматологический визит | Открыть mandatory tabs и сохранить один диагноз/осмотр или протокол визита | `Appointments`, `Examinations/Diagnoses`, `Visit Protocols`, save action | Стоматологическая запись сохраняется и остаётся связанной с визитом | `SOT-DENT-UI-01` | `SOT-DOC-UI-02` | Клинический документ доступен повторно | Скрин saved protocol/diagnosis | `-` |
-| `DENT-02` | Regression | P1 | Dentist | `/dentist?tab=reports` | Есть сохранённый dental visit protocol | Открыть документ/историю повторно и убедиться, что данные не пропали | `Reports`, `Templates` или history-equivalent среды | Документ доступен без перезаписи и рассинхрона | `SOT-DENT-UI-01` | `SOT-DOC-API-01` | История пациента остаётся консистентной | Скрин reopened document | `-` |
-| `DENT-03` | Regression | P2 | Dentist | `/dentist?tab=dental-chart` | Есть активный визит | Пройти supporting tabs и проверить отсутствие broken navigation | `Dental Chart`, `Treatment Plans`, `Photo Archive`, `AI` | Контекст пациента сохраняется во всех поддерживающих табах | `SOT-DENT-UI-01` | `SOT-DOC-UI-02` | Supporting tabs не ломают основной visit flow | Скрин tabs sequence | `-` |
+| `DENT-01` | Smoke | P1 | Dentist | `/doctor/dentistry?tab=appointments` | Есть стоматологический визит | Открыть mandatory tabs и сохранить один диагноз/осмотр или протокол визита | `Appointments`, `Examinations/Diagnoses`, `Visit Protocols`, save action | Стоматологическая запись сохраняется и остаётся связанной с визитом | `SOT-DENT-UI-01` | `SOT-DOC-UI-02` | Клинический документ доступен повторно | Скрин saved protocol/diagnosis | `-` |
+| `DENT-02` | Regression | P1 | Dentist | `/doctor/dentistry?tab=reports` | Есть сохранённый dental visit protocol | Открыть документ/историю повторно и убедиться, что данные не пропали | `Reports`, `Templates` или history-equivalent среды | Документ доступен без перезаписи и рассинхрона | `SOT-DENT-UI-01` | `SOT-DOC-API-01` | История пациента остаётся консистентной | Скрин reopened document | `-` |
+| `DENT-03` | Regression | P2 | Dentist | `/doctor/dentistry?tab=dental-chart` | Есть активный визит | Пройти supporting tabs и проверить отсутствие broken navigation | `Dental Chart`, `Treatment Plans`, `Photo Archive`, `AI` | Контекст пациента сохраняется во всех поддерживающих табах | `SOT-DENT-UI-01` | `SOT-DOC-UI-02` | Supporting tabs не ломают основной visit flow | Скрин tabs sequence | `-` |
 
 ## 8.7 Лаборатория
 
@@ -356,14 +356,14 @@ Cleanup / reset:
 
 | Case ID | Tier | Pri | Role | Canonical route/tab | Preconditions | Steps | Buttons / actions | Expected status transition | Primary SoT | Secondary SoT | Downstream effect | Evidence to attach | Cleanup / reset |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `LAB-01` | Smoke | P0 | Lab | `/lab-panel?tab=queue` | Есть визит, созданный в регистратуре, с lab service | Открыть лабораторную очередь и проверить canonical `visit_id`, patient context и template resolution | `Очередь`, открыть запись | В queue row есть валидный visit context; доступен только разрешённый template set | `SOT-LAB-UI-01` | `SOT-LAB-API-01` | Лаборатория работает от `visit`, а не от абстрактного списка анализов | Скрин queue row + resolution hint | `-` |
-| `LAB-02` | Smoke | P0 | Lab | `/lab-panel?tab=reports` | Есть запись из `LAB-01`; для визита есть один допустимый шаблон | Создать или auto-open бланк и сохранить значения | `Создать бланк`, `Сохранить черновик` | `DRAFT -> IN_PROGRESS` | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Бланк создаётся без ручного обхода и сохраняет values batch-wise | Скрин header + saved fields | `-` |
-| `LAB-03` | Smoke | P0 | Lab | `/lab-panel?tab=reports` | Есть `IN_PROGRESS` бланк | Провести цепочку готовности до печати | `Отметить готовым`, `Финализировать`, `Печать PDF` | `IN_PROGRESS -> READY -> FINALIZED -> PRINTED` | `SOT-LAB-UI-02` | `SOT-LAB-UI-01` | Очередь и история получают финальный статус по тому же визиту | Скрин status chain + queue update | `-` |
-| `LAB-04` | Regression | P1 | Lab | `/lab-panel?tab=reports` | Есть `PRINTED` или `FINALIZED` бланк | Повторно напечатать PDF и убедиться, что reprint не ломает сущность | `Печать PDF` | Статус остаётся `PRINTED` или переходит в `PRINTED` повторно без новой мутации данных | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Reprint пригоден для выдачи результата без ручной правки | Скрин repeat print feedback | `-` |
-| `LAB-05` | Regression | P1 | Lab | `/lab-panel?tab=reports` | Есть finalized/printed бланк | Создать ревизию и проверить неизменяемость старой версии | `Создать ревизию` | Старая версия остаётся `FINALIZED/PRINTED`; новая ревизия открывается отдельно | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | История показывает независимые версии, а не перезапись финала | Скрин old vs revised instances | `-` |
-| `LAB-06` | Regression | P1 | Lab | `/lab-panel?tab=queue` или `/lab-panel?tab=reports` | Есть минимум две версии одного lab visit | Проверить историю пациента и фильтрацию по visit | `История бланков пациента`, открыть историю | Версии отображаются в правильном порядке и с правильными статусами | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Пациентская история пригодна для повторной клинической проверки | Скрин history list | `-` |
-| `LAB-07` | Regression | P1 | Lab | `/lab-panel?tab=reports` | Есть визит с настроенным mapping service_code -> template | Попробовать открыть/создать недопустимый шаблон для визита | template picker, create/open | Неверный template choice блокируется; wrong report instance не создаётся | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Система не допускает ошибочный бланк в клиническом потоке | Скрин error message / blocked create | `-` |
-| `LAB-08` | Destructive | P1 | Lab | `/lab-panel?tab=templates` | Только staging/test data; есть template draft/published version | Создать/обновить draft version, опубликовать или клонировать шаблон, затем проверить, что существующие finalized reports не изменились | `Создать шаблон`, `Сохранить черновик`, `Опубликовать`, `Копировать` | Draft/published badges обновляются; старые finalized report instances остаются неизменными | `SOT-LAB-UI-03` | `SOT-LAB-UI-02` | Template versioning не ломает исторические документы | Скрин template badges + unaffected finalized report | Вернуть template changes или использовать isolated test template |
+| `LAB-01` | Smoke | P0 | Lab | `/lab?tab=queue` | Есть визит, созданный в регистратуре, с lab service | Открыть лабораторную очередь и проверить canonical `visit_id`, patient context и template resolution | `Очередь`, открыть запись | В queue row есть валидный visit context; доступен только разрешённый template set | `SOT-LAB-UI-01` | `SOT-LAB-API-01` | Лаборатория работает от `visit`, а не от абстрактного списка анализов | Скрин queue row + resolution hint | `-` |
+| `LAB-02` | Smoke | P0 | Lab | `/lab?tab=reports` | Есть запись из `LAB-01`; для визита есть один допустимый шаблон | Создать или auto-open бланк и сохранить значения | `Создать бланк`, `Сохранить черновик` | `DRAFT -> IN_PROGRESS` | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Бланк создаётся без ручного обхода и сохраняет values batch-wise | Скрин header + saved fields | `-` |
+| `LAB-03` | Smoke | P0 | Lab | `/lab?tab=reports` | Есть `IN_PROGRESS` бланк | Провести цепочку готовности до печати | `Отметить готовым`, `Финализировать`, `Печать PDF` | `IN_PROGRESS -> READY -> FINALIZED -> PRINTED` | `SOT-LAB-UI-02` | `SOT-LAB-UI-01` | Очередь и история получают финальный статус по тому же визиту | Скрин status chain + queue update | `-` |
+| `LAB-04` | Regression | P1 | Lab | `/lab?tab=reports` | Есть `PRINTED` или `FINALIZED` бланк | Повторно напечатать PDF и убедиться, что reprint не ломает сущность | `Печать PDF` | Статус остаётся `PRINTED` или переходит в `PRINTED` повторно без новой мутации данных | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Reprint пригоден для выдачи результата без ручной правки | Скрин repeat print feedback | `-` |
+| `LAB-05` | Regression | P1 | Lab | `/lab?tab=reports` | Есть finalized/printed бланк | Создать ревизию и проверить неизменяемость старой версии | `Создать ревизию` | Старая версия остаётся `FINALIZED/PRINTED`; новая ревизия открывается отдельно | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | История показывает независимые версии, а не перезапись финала | Скрин old vs revised instances | `-` |
+| `LAB-06` | Regression | P1 | Lab | `/lab?tab=queue` или `/lab?tab=reports` | Есть минимум две версии одного lab visit | Проверить историю пациента и фильтрацию по visit | `История бланков пациента`, открыть историю | Версии отображаются в правильном порядке и с правильными статусами | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Пациентская история пригодна для повторной клинической проверки | Скрин history list | `-` |
+| `LAB-07` | Regression | P1 | Lab | `/lab?tab=reports` | Есть визит с настроенным mapping service_code -> template | Попробовать открыть/создать недопустимый шаблон для визита | template picker, create/open | Неверный template choice блокируется; wrong report instance не создаётся | `SOT-LAB-UI-02` | `SOT-LAB-API-01` | Система не допускает ошибочный бланк в клиническом потоке | Скрин error message / blocked create | `-` |
+| `LAB-08` | Destructive | P1 | Lab | `/lab?tab=templates` | Только staging/test data; есть template draft/published version | Создать/обновить draft version, опубликовать или клонировать шаблон, затем проверить, что существующие finalized reports не изменились | `Создать шаблон`, `Сохранить черновик`, `Опубликовать`, `Копировать` | Draft/published badges обновляются; старые finalized report instances остаются неизменными | `SOT-LAB-UI-03` | `SOT-LAB-UI-02` | Template versioning не ломает исторические документы | Скрин template badges + unaffected finalized report | Вернуть template changes или использовать isolated test template |
 
 ## 8.8 Админка
 
@@ -404,20 +404,20 @@ Cleanup / reset:
 | ID | Primary check | Where / how to verify |
 |---|---|---|
 | `SOT-AUTH-01` | Роль и landing route после логина | UI landing panel + URL после входа |
-| `SOT-REG-UI-01` | Строка записи, статус, queue badges в регистратуре | `/registrar-panel`, appointments/queue-related tabs |
-| `SOT-REG-UI-02` | Поисковая выдача и patient summary в мастере/карточке | `/registrar-panel`, search + wizard summary |
+| `SOT-REG-UI-01` | Строка записи, статус, queue badges в регистратуре | `/registrar`, appointments/queue-related tabs |
+| `SOT-REG-UI-02` | Поисковая выдача и patient summary в мастере/карточке | `/registrar`, search + wizard summary |
 | `SOT-REG-API-01` | Patient/appointment/queue network families | Browser network: `patients`, `appointments`, `queue` |
-| `SOT-CASH-UI-01` | Pending/history/refund rows, totals, badges | `/cashier-panel`, pending/history/refunds |
+| `SOT-CASH-UI-01` | Pending/history/refund rows, totals, badges | `/cashier`, pending/history/refunds |
 | `SOT-CASH-API-01` | Payment network families | Browser network: `pending-payments`, `payments`, `receipt` |
-| `SOT-DOC-UI-01` | Queue row, action buttons, queue status | `/doctor-panel?tab=queue` |
-| `SOT-DOC-UI-02` | Patient/appointment rows and schedule-next flow | `/doctor-panel?tab=patients` and `/doctor-panel?tab=appointments` |
+| `SOT-DOC-UI-01` | Queue row, action buttons, queue status | `/doctor?tab=queue` |
+| `SOT-DOC-UI-02` | Patient/appointment rows and schedule-next flow | `/doctor?tab=patients` and `/doctor?tab=appointments` |
 | `SOT-DOC-API-01` | Doctor queue and follow-up API families | Browser network: `queue/*`, `doctor/visits/schedule-next` |
-| `SOT-CARD-UI-01` | Cardio-specific forms and history | `/cardiologist`, tabs `ecg`, `blood`, `history` |
-| `SOT-DERM-UI-01` | Derm-specific forms and history | `/dermatologist`, tabs `skin`, `cosmetic`, `history`, `photos` |
-| `SOT-DENT-UI-01` | Dental protocol, diagnosis, document/history blocks | `/dentist`, visit/report-oriented tabs |
-| `SOT-LAB-UI-01` | Queue workbench row with visit/template/status context | `/lab-panel?tab=queue` |
-| `SOT-LAB-UI-02` | Report workbench header, field state, version/history list | `/lab-panel?tab=reports` |
-| `SOT-LAB-UI-03` | Template draft/published/version badges | `/lab-panel?tab=templates` |
+| `SOT-CARD-UI-01` | Cardio-specific forms and history | `/doctor/cardiology`, tabs `ecg`, `blood`, `history` |
+| `SOT-DERM-UI-01` | Derm-specific forms and history | `/doctor/dermatology`, tabs `skin`, `cosmetic`, `history`, `photos` |
+| `SOT-DENT-UI-01` | Dental protocol, diagnosis, document/history blocks | `/doctor/dentistry`, visit/report-oriented tabs |
+| `SOT-LAB-UI-01` | Queue workbench row with visit/template/status context | `/lab?tab=queue` |
+| `SOT-LAB-UI-02` | Report workbench header, field state, version/history list | `/lab?tab=reports` |
+| `SOT-LAB-UI-03` | Template draft/published/version badges | `/lab?tab=templates` |
 | `SOT-LAB-API-01` | Lab network families | Browser network: `lab/report-instances`, `lab/template-resolutions`, `lab/templates`, `lab/catalog` |
 | `SOT-ADM-UI-01` | Admin tables/forms for core sections | `/admin/*`, tables, filters, CRUD modals |
 | `SOT-ADM-UI-02` | Settings persistence and success/error feedback | `/admin/settings` |

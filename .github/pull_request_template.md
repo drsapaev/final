@@ -1,3 +1,11 @@
+<!--
+Before requesting review:
+- Run the local gate when you can: `python scripts/run_pr_review_gate_checks.py --body-file <path-to-this-pr-body.md>`.
+- Use examples from `docs/runbooks/PR_REVIEW_SAMPLE_BODIES.md`.
+- Replace irrelevant sections with `not applicable - <short reason>`.
+- Keep proof narrow: targeted test, smoke, diff inspection, or explicit not-checked note.
+-->
+
 ## Summary
 
 Describe the change in 2-4 bullets.

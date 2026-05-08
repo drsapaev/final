@@ -13,6 +13,7 @@ from app.models.user import User
 
 
 from tests.auth_test_credentials import (
+    CARDIO_PASSWORD,
     DOCTOR_PASSWORD,
 )
 
@@ -198,7 +199,7 @@ class TestDoctorGeneralQueue:
             username="test_cardiologist",
             email="cardiologist@test.com",
             full_name="Test Cardiologist",
-            hashed_password=get_password_hash("cardiologist123"),
+            hashed_password=get_password_hash(CARDIO_PASSWORD),
             role="Cardiologist",
             is_active=True,
             is_superuser=False,
@@ -242,7 +243,7 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/auth/minimal-login",
-            json={"username": cardiologist_user.username, "password": "cardiologist123"},
+            json={"username": cardiologist_user.username, "password": CARDIO_PASSWORD},
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}

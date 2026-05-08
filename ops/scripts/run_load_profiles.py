@@ -104,6 +104,23 @@ def _fallback_summary(reason: str) -> dict[str, Any]:
     }
 
 
+def _is_ci() -> bool:
+    return os.getenv("GITHUB_ACTIONS", "").strip().lower() == "true" or os.getenv(
+        "CI", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _require_load_profiles_confirmation() -> None:
+    if _is_ci():
+        return
+    if os.getenv("CONFIRM_RUN_LOAD_PROFILES") == "1":
+        return
+    raise RuntimeError(
+        "Refusing to run local k6 load profiles without explicit confirmation. "
+        "Set CONFIRM_RUN_LOAD_PROFILES=1 only for an intentional local load test."
+    )
+
+
 def _build_aggregate_markdown(rows: list[dict[str, Any]]) -> str:
     lines = [
         "# Load Test Regression Report",
@@ -147,6 +164,7 @@ def main() -> int:
     parser.add_argument("--docker-image", default="grafana/k6:latest")
     parser.add_argument("--api-ready", default=1, type=int)
     args = parser.parse_args()
+    _require_load_profiles_confirmation()
 
     workspace = args.workspace.resolve()
     artifacts_dir = args.artifacts_dir.resolve()

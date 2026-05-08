@@ -6,6 +6,7 @@ helper; it intentionally does not create tables.
 from __future__ import annotations
 
 import sys
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -63,11 +64,33 @@ INITIAL_DEPARTMENTS = [
 ]
 
 
+def require_init_departments_confirmation() -> None:
+    if os.getenv("CONFIRM_INIT_DEPARTMENTS") != "1":
+        raise RuntimeError(
+            "Refusing to seed departments. "
+            "Set CONFIRM_INIT_DEPARTMENTS=1 only for an explicit catalog seed run."
+        )
+
+
+def require_postgres_database_url() -> None:
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before seeding departments.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("init_departments.py requires a PostgreSQL DATABASE_URL.")
+
+
 def init_departments() -> bool:
     """Seed departments if the configured database has none yet."""
+    require_init_departments_confirmation()
+    require_postgres_database_url()
+
     from app.db.session import SessionLocal
     from app.models.department import Department
 
+    print("Seeding departments...")
     db = SessionLocal()
     try:
         existing_count = db.query(Department).count()
@@ -98,5 +121,4 @@ def init_departments() -> bool:
 
 
 if __name__ == "__main__":
-    print("Seeding departments...")
     raise SystemExit(0 if init_departments() else 1)

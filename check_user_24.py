@@ -1,17 +1,22 @@
-import sqlite3
+#!/usr/bin/env python3
+"""Retired root manual SQLite user probe."""
 
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
+from __future__ import annotations
 
-print('=== All users with username "cardio" or ID 24 ===')
-cursor.execute('SELECT id, username, email, role FROM users WHERE username="cardio" OR id=24 ORDER BY id')
-for row in cursor.fetchall():
-    print(f'ID: {row[0]}, User: {row[1]}, Email: {row[2]}, Role: {row[3]}')
+import sys
 
-print('\n=== Recent users (last 10) ===')
-cursor.execute('SELECT id, username, email, role FROM users ORDER BY id DESC LIMIT 10')
-for row in cursor.fetchall():
-    print(f'ID: {row[0]}, User: {row[1]}, Email: {row[2]}, Role: {row[3]}')
+MESSAGE = """
+check_user_24.py is retired.
 
-conn.close()
+This root-level manual probe opened the legacy SQLite database file directly for a specific user id.
+Use backend/tests or explicit Postgres diagnostics instead.
+""".strip()
 
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

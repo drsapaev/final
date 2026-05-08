@@ -56,6 +56,22 @@ class VisitConfirmationRepository:
             .first()
         )
 
+    def get_active_daily_queue_by_tag(
+        self,
+        *,
+        day: date,
+        queue_tag: str,
+    ) -> DailyQueue | None:
+        return (
+            self.db.query(DailyQueue)
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active == True,
+            )
+            .first()
+        )
+
     def get_or_create_daily_queue(self, day: date, specialist_id: int, queue_tag: str):
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if not doctor:

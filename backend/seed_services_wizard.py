@@ -5,13 +5,28 @@
 """
 
 import asyncio
+import os
 from decimal import Decimal
-from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
-from app.models.service import Service
-from app.models.clinic import ServiceCategory
+
+
+def require_seed_services_wizard_confirmation():
+    if os.getenv("CONFIRM_SEED_SERVICES_WIZARD") != "1":
+        raise RuntimeError(
+            "Refusing to seed wizard services. "
+            "Set CONFIRM_SEED_SERVICES_WIZARD=1 only for an explicit catalog seed run."
+        )
 
 # Данные из файла "Услуги и врачи в нашей клинике.txt"
+def require_postgres_database_url() -> None:
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before seeding wizard services.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("seed_services_wizard.py requires a PostgreSQL DATABASE_URL.")
+
+
 SERVICES_DATA = [
     # ===== ЛАБОРАТОРНЫЕ АНАЛИЗЫ (L) =====
     # Общий анализ крови
@@ -69,9 +84,9 @@ SERVICES_DATA = [
     {"name": "Иммуноглобулин Е", "category_code": "L", "service_code": "L042", "price": 80000, "queue_tag": "lab", "requires_doctor": False, "is_consultation": False, "allow_doctor_price_override": False},
     
     # ===== КАРДИОЛОГИЯ (K) =====
-    {"name": "Консультация кардиолога", "category_code": "K", "service_code": "K001", "price": 150000, "queue_tag": "cardiology_common", "requires_doctor": True, "is_consultation": True, "allow_doctor_price_override": False},
-    {"name": "ЭКГ", "category_code": "K", "service_code": "K002", "price": 50000, "queue_tag": "ecg", "requires_doctor": False, "is_consultation": False, "allow_doctor_price_override": False},
-    {"name": "ЭхоКГ", "category_code": "K", "service_code": "K003", "price": 200000, "queue_tag": "cardiology_common", "requires_doctor": True, "is_consultation": False, "allow_doctor_price_override": False},
+    {"name": "Консультация кардиолога", "category_code": "K", "service_code": "K01", "price": 150000, "queue_tag": "cardiology_common", "requires_doctor": True, "is_consultation": True, "allow_doctor_price_override": False},
+    {"name": "ЭКГ", "category_code": "K", "service_code": "K10", "price": 50000, "queue_tag": "ecg", "requires_doctor": False, "is_consultation": False, "allow_doctor_price_override": False},
+    {"name": "ЭхоКГ", "category_code": "K", "service_code": "K11", "price": 200000, "queue_tag": "cardiology_common", "requires_doctor": True, "is_consultation": False, "allow_doctor_price_override": False},
     
     # ===== СТОМАТОЛОГИЯ (S) =====
     {"name": "Консультация стоматолога", "category_code": "S", "service_code": "S001", "price": 100000, "queue_tag": "stomatology", "requires_doctor": True, "is_consultation": True, "allow_doctor_price_override": True},
@@ -116,6 +131,13 @@ CATEGORIES_DATA = [
 
 def seed_services():
     """Заполнение справочника услуг"""
+    require_seed_services_wizard_confirmation()
+    require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.models.clinic import ServiceCategory
+    from app.models.service import Service
+
     db = SessionLocal()
     try:
         print("🔄 Начинаем заполнение справочника услуг...")

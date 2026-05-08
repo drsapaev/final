@@ -5,6 +5,15 @@
 import os
 import sys
 
+
+def require_env_write_confirmation():
+    if os.getenv("CONFIRM_SETUP_DEEPSEEK_WRITE_ENV") != "1":
+        raise RuntimeError(
+            "Refusing to create or update backend/.env from setup_deepseek.py. "
+            "Set CONFIRM_SETUP_DEEPSEEK_WRITE_ENV=1 only for an explicit local secret update."
+        )
+
+
 def setup_deepseek_api():
     print("=" * 60)
     print("🔧 НАСТРОЙКА DEEPSEEK AI")
@@ -16,6 +25,7 @@ def setup_deepseek_api():
     
     # Проверяем существование файла
     if not os.path.exists(env_path):
+        require_env_write_confirmation()
         with open(env_path, "w", encoding="utf-8") as f:
             f.write("# AI Provider API Keys\n")
         print(f"✅ Файл {env_path} создан")
@@ -31,7 +41,7 @@ def setup_deepseek_api():
             if line.startswith("DEEPSEEK_API_KEY="):
                 key = line.split("=")[1].strip()
                 if key and key != "":
-                    print(f"   Текущий ключ: {key[:20]}...")
+                    print("   Текущий ключ: настроен (значение скрыто)")
                     update = input("\n🔄 Обновить ключ? (y/n): ").strip().lower()
                     if update != 'y':
                         print("\n✅ Используем существующий ключ")
@@ -79,6 +89,7 @@ def setup_deepseek_api():
         updated_lines.append(f"DEEPSEEK_API_KEY={api_key}")
     
     # Записываем обновленный файл
+    require_env_write_confirmation()
     with open(env_path, "w", encoding="utf-8") as f:
         f.write("\n".join(updated_lines))
     
@@ -86,7 +97,7 @@ def setup_deepseek_api():
     print("✅ НАСТРОЙКА ЗАВЕРШЕНА")
     print("=" * 60)
     print(f"📁 Файл: {env_path}")
-    print(f"🔑 Ключ: {api_key[:20]}...")
+    print("🔑 Ключ: настроен (значение скрыто)")
     print("\n📋 СЛЕДУЮЩИЕ ШАГИ:")
     print("1. Перезапустите backend сервер")
     print("2. Система автоматически будет использовать DeepSeek AI")

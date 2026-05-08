@@ -3,13 +3,22 @@ $ErrorActionPreference = "Stop"
 function Import-EnvFile {
     param([string]$Path)
 
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Missing env file: $Path"
+    }
+
     foreach ($line in Get-Content $Path) {
         $trimmed = $line.Trim()
         if (-not $trimmed -or $trimmed.StartsWith("#") -or -not $trimmed.Contains("=")) {
             continue
         }
         $pair = $trimmed -split "=", 2
-        [System.Environment]::SetEnvironmentVariable($pair[0], $pair[1], "Process")
+        $key = $pair[0].Trim()
+        $value = $pair[1].Trim().Trim('"').Trim("'")
+        if (-not $key) {
+            continue
+        }
+        [System.Environment]::SetEnvironmentVariable($key, $value, "Process")
     }
 }
 
@@ -39,7 +48,7 @@ if (-not $publicHost) {
     "http://$publicHost`:18080,http://localhost:18080,http://127.0.0.1:18080",
     "Process"
 )
-[System.Environment]::SetEnvironmentVariable("VITE_API_BASE_URL", "http://localhost:18000", "Process")
+[System.Environment]::SetEnvironmentVariable("VITE_API_BASE_URL", "http://$publicHost`:18000", "Process")
 
 $backendPython = Join-Path $backendDir ".venv\\Scripts\\python.exe"
 if (-not (Test-Path $backendPython)) {

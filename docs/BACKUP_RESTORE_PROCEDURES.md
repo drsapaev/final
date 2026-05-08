@@ -202,7 +202,7 @@ cp -r /etc/letsencrypt/live/clinic.example.com "$BACKUP_DIR/$TIMESTAMP/ssl/"
 
 tar -czf "$BACKUP_DIR/config_${TIMESTAMP}.tar.gz" \
     -C "$BACKUP_DIR" "$TIMESTAMP"
-rm -rf "$BACKUP_DIR/$TIMESTAMP"
+python3 -c 'import os, pathlib, shutil; root=pathlib.Path(os.environ["BACKUP_DIR"]).resolve(); target=(root / os.environ["TIMESTAMP"]).resolve(); assert root in target.parents; shutil.rmtree(target)'
 
 echo "Config backup completed"
 ```
@@ -316,7 +316,7 @@ cp /etc/systemd/system/clinic-*.service "$CONFIG_DIR/" 2>/dev/null || true
 
 tar -czf "$BACKUP_ROOT/config/config_${TIMESTAMP}.tar.gz" \
     -C "$BACKUP_ROOT/config" "config_${TIMESTAMP}"
-rm -rf "$CONFIG_DIR"
+python3 -c 'import os, pathlib, shutil; root=(pathlib.Path(os.environ["BACKUP_ROOT"]) / "config").resolve(); target=pathlib.Path(os.environ["CONFIG_DIR"]).resolve(); assert root in target.parents; shutil.rmtree(target)'
 
 log "Config backup completed"
 
@@ -538,7 +538,7 @@ nginx -t && systemctl reload nginx
 cp "$TEMP_DIR"/*/clinic-*.service /etc/systemd/system/
 systemctl daemon-reload
 
-rm -rf "$TEMP_DIR"
+python3 -c 'import os, pathlib, shutil; target=pathlib.Path(os.environ["TEMP_DIR"]).resolve(); assert str(target).startswith("/tmp/clinic_restore_"); shutil.rmtree(target)'
 echo "Configuration restored"
 ```
 

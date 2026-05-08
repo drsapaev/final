@@ -65,6 +65,15 @@ def display_database_url(url: str) -> str:
     return make_url(url).render_as_string(hide_password=True)
 
 
+def require_sqlite_fk_write_test_confirmation() -> None:
+    if os.getenv("CONFIRM_VERIFY_SQLITE_FK_WRITE_TEST") != "1":
+        raise RuntimeError(
+            "Refusing to run SQLite FK write test. "
+            "It intentionally inserts a violating row to verify enforcement. "
+            "Set CONFIRM_VERIFY_SQLITE_FK_WRITE_TEST=1 only for an explicit local diagnostic run."
+        )
+
+
 def _print_header(url: str) -> None:
     print("=" * 80)
     print("FOREIGN KEY ENFORCEMENT VERIFICATION")
@@ -99,6 +108,13 @@ def verify_fk_enforcement() -> int:
         print("Use Alembic and production readiness checks for cross-database validation.")
         print()
         return 0
+
+    try:
+        require_sqlite_fk_write_test_confirmation()
+    except Exception as exc:
+        print(f"Error: {exc}")
+        print()
+        return 2
 
     try:
         engine = create_engine(url, future=True, pool_pre_ping=True)

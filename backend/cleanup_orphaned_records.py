@@ -13,17 +13,25 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app.core.config import get_settings
 
+
+def require_cleanup_confirmation():
+    if os.getenv("CONFIRM_CLEANUP_ORPHANED_RECORDS") != "1":
+        raise SystemExit(
+            "Set CONFIRM_CLEANUP_ORPHANED_RECORDS=1 before running orphan cleanup."
+        )
+
+
 def get_db_url():
     try:
         settings = get_settings()
         db_url = str(settings.DATABASE_URL or "").strip()
     except Exception as exc:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to run orphan cleanup against a fallback database"
         ) from exc
 
     if not db_url:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to run orphan cleanup against a fallback database"
         )
 
@@ -40,10 +48,28 @@ def is_sqlite_url(db_url):
     return make_url(db_url).drivername.startswith("sqlite")
 
 
+def allow_sqlite_database_url():
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enforce_database_url_policy(db_url):
+    if is_sqlite_url(db_url) and not allow_sqlite_database_url():
+        raise SystemExit(
+            "SQLite DATABASE_URL is disabled for cleanup_orphaned_records.py. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
 def display_db_url(db_url):
     return make_url(db_url).render_as_string(hide_password=True)
 
+require_cleanup_confirmation()
 DATABASE_URL = normalize_sync_db_url(get_db_url())
+enforce_database_url_policy(DATABASE_URL)
 
 print("=" * 80)
 print("CLEANUP ORPHANED RECORDS")

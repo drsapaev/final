@@ -290,8 +290,8 @@ npm test -- --testPathPattern="(buttons|forms|cards|dialogs|tables|lists|layout)
 
 **Steps**:
 ```bash
-# Reset to pre-pilot
-git reset --hard HEAD~[number]
+# Create a recovery branch at the pre-pilot point and validate rollback there.
+git switch -c recovery/pilot-execution-log HEAD~[number]
 npm install
 npm test
 npm build

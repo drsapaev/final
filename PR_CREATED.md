@@ -84,7 +84,7 @@ git push origin fix/rbac-harden
 cd backend
 # Backup
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-Copy-Item clinic.db "clinic.db.backup.$timestamp"
+pg_dump "$env:DATABASE_URL" -Fc -f "postgres.backup.$timestamp.dump"
 
 # Migrations
 alembic upgrade head
@@ -102,7 +102,7 @@ docker compose -f docker-compose.yml up -d --no-deps --build backend
 ```powershell
 cd backend
 # Check ACCESS_DENIED count
-sqlite3 clinic.db "
+psql "$env:DATABASE_URL" -c "
 SELECT COUNT(*) 
 FROM user_audit_logs 
 WHERE action = 'ACCESS_DENIED' 

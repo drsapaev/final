@@ -18,7 +18,7 @@ python generate_secret_key.py
 Copy the generated key to your `.env` file:
 
 ```env
-SECRET_KEY=your-generated-secret-key-here
+SECRET_KEY=
 ```
 
 ### 1.3 Configure Required Variables
@@ -27,11 +27,11 @@ Edit `.env` and set at minimum:
 
 ```env
 # CRITICAL
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=
 ENV=production
 
 # DATABASE
-DATABASE_URL=postgresql://user:password@localhost:5432/clinic
+DATABASE_URL=postgresql://<db_user>:<db_password>@localhost:5432/clinic
 
 # CORS
 BACKEND_CORS_ORIGINS=https://your-domain.com

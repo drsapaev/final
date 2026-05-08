@@ -513,6 +513,105 @@ def _normalize_route_path(path: str) -> str:
     return f"/{path}"
 
 
+def _iter_route_registry_entries(content: str) -> list[str]:
+    start_token = "export const ROUTE_REGISTRY = ["
+    start = content.find(start_token)
+    if start < 0:
+        return []
+    array_start = content.find("[", start)
+    if array_start < 0:
+        return []
+
+    entries: list[str] = []
+    entry_start: int | None = None
+    brace_depth = 0
+    quote: str | None = None
+    escaped = False
+
+    for idx in range(array_start + 1, len(content)):
+        char = content[idx]
+
+        if quote:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == quote:
+                quote = None
+            continue
+
+        if char in {"'", '"', "`"}:
+            quote = char
+            continue
+
+        if char == "{":
+            if brace_depth == 0:
+                entry_start = idx
+            brace_depth += 1
+            continue
+
+        if char == "}":
+            if brace_depth == 0:
+                continue
+            brace_depth -= 1
+            if brace_depth == 0 and entry_start is not None:
+                entries.append(content[entry_start : idx + 1])
+                entry_start = None
+            continue
+
+        if char == "]" and brace_depth == 0:
+            break
+
+    return entries
+
+
+def _parse_route_registry_roles(route_registry_path: Path) -> dict[str, list[str]]:
+    content = route_registry_path.read_text(encoding="utf-8")
+    role_to_paths: dict[str, set[str]] = defaultdict(set)
+
+    for entry in _iter_route_registry_entries(content):
+        path_match = re.search(r"\bpath:\s*['\"]([^'\"]+)['\"]", entry)
+        roles_match = re.search(r"\broles:\s*\[(?P<roles>[^\]]*)\]", entry, re.DOTALL)
+        if not path_match or not roles_match:
+            continue
+
+        roles = [
+            candidate.strip()
+            for group in ROLE_LITERAL_PATTERN.findall(roles_match.group("roles"))
+            for candidate in group
+            if candidate.strip()
+        ]
+        if not roles:
+            continue
+
+        paths = {_normalize_route_path(path_match.group(1).strip())}
+        legacy_match = re.search(
+            r"\blegacyRedirectFrom:\s*\[(?P<legacy>[^\]]*)\]",
+            entry,
+            re.DOTALL,
+        )
+        if legacy_match:
+            paths.update(
+                _normalize_route_path(candidate.strip())
+                for group in ROLE_LITERAL_PATTERN.findall(legacy_match.group("legacy"))
+                for candidate in group
+                if candidate.strip()
+            )
+
+        for role in roles:
+            role_to_paths[role].update(paths)
+
+    output = {role: sorted(paths) for role, paths in role_to_paths.items()}
+    LOGGER.info(
+        "frontend_backend_parity.route_registry_roles_loaded file=%s roles=%d",
+        route_registry_path.as_posix(),
+        len(output),
+    )
+    return output
+
+
 def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
     content = frontend_app_path.read_text(encoding="utf-8")
     pattern = re.compile(
@@ -534,6 +633,13 @@ def parse_frontend_route_roles(frontend_app_path: Path) -> dict[str, list[str]]:
             role_to_paths[role].add(route_path)
 
     output = {role: sorted(paths) for role, paths in role_to_paths.items()}
+    if not output:
+        route_registry_path = frontend_app_path
+        if frontend_app_path.name != "routeRegistry.js":
+            route_registry_path = frontend_app_path.parent / "routing" / "routeRegistry.js"
+        if route_registry_path.exists():
+            output = _parse_route_registry_roles(route_registry_path)
+
     LOGGER.info(
         "frontend_backend_parity.frontend_roles_loaded file=%s roles=%d",
         frontend_app_path.as_posix(),

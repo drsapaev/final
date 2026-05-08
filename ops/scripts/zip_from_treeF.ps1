@@ -5,7 +5,7 @@
 [CmdletBinding()]
 param(
   [string]$ProjectPath = "C:\final",
-  [string]$TreeFile = "C:\final\tree_F.txt",
+  [string]$TreeFile = "$ProjectPath\ops\meta\tree_F.txt",
   [string]$OutDir = "$ProjectPath\archives",
   [string]$NameSuffix = "",
   [switch]$DryRun
@@ -37,7 +37,38 @@ $ExcludeGlobs = @(
 )
 
 function Ensure-Dir([string]$p) {
-  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
+  if (-not (Test-Path -LiteralPath $p)) {
+    New-Item -ItemType Directory -Path $p | Out-Null
+  }
+}
+
+function Resolve-ExistingPath([string]$p) {
+  (Resolve-Path -LiteralPath $p -ErrorAction Stop).ProviderPath
+}
+
+function Assert-UnderPath([string]$ChildPath, [string]$ParentPath, [string]$Label) {
+  $child = [IO.Path]::GetFullPath($ChildPath).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+  $parent = [IO.Path]::GetFullPath($ParentPath).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+  $prefix = $parent + [IO.Path]::DirectorySeparatorChar
+
+  if (($child -ne $parent) -and (-not $child.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase))) {
+    Write-Error "$Label escapes allowed root: $child"; exit 1
+  }
+}
+
+function ConvertTo-SafeFileSegment([string]$Value) {
+  if ($null -eq $Value) { return "" }
+
+  $segment = $Value.Trim()
+  if ($segment -eq "") { return "" }
+
+  $segment = [Regex]::Replace($segment, '[^A-Za-z0-9._-]+', '_')
+  $segment = $segment.Trim([char[]]"._-")
+  if ($segment.Length -gt 64) {
+    $segment = $segment.Substring(0, 64).Trim([char[]]"._-")
+  }
+
+  return $segment
 }
 
 function RelPosix([string]$base, [string]$full) {
@@ -55,13 +86,18 @@ function GlobToRegex([string]$glob) {
 }
 
 # ------------ Validate paths ------------
-if (-not (Test-Path $ProjectPath)) {
+if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
   Write-Error "ProjectPath not found: $ProjectPath"; exit 1
 }
-if (-not (Test-Path $TreeFile)) {
+if (-not (Test-Path -LiteralPath $TreeFile -PathType Leaf)) {
   Write-Error "TreeFile not found: $TreeFile"; exit 1
 }
 Ensure-Dir $OutDir
+
+$ProjectPath = Resolve-ExistingPath $ProjectPath
+$TreeFile = Resolve-ExistingPath $TreeFile
+$OutDir = Resolve-ExistingPath $OutDir
+Assert-UnderPath $TreeFile $ProjectPath "TreeFile"
 
 # ------------ Parse tree_F.txt -> file list ------------
 # Expected line format like: "FILE /backend/app/main.py  [6110 bytes]"
@@ -93,6 +129,9 @@ $missingOnDisk = New-Object System.Collections.Generic.List[string]
 foreach ($rel in $fileRelPaths) {
   $rel = $rel.Trim()
   if ([string]::IsNullOrWhiteSpace($rel)) { continue }
+  if ([IO.Path]::IsPathRooted($rel) -or ($rel -match '^[A-Za-z]:') -or (($rel -split '/') -contains '..')) {
+    Write-Error "Unsafe FILE entry escapes project root: $rel"; exit 1
+  }
 
   # filter by exclude globs
   $isExcluded = $false
@@ -103,8 +142,10 @@ foreach ($rel in $fileRelPaths) {
 
   # check existence
   $abs = Join-Path $ProjectPath ($rel -replace '/','\')
-  if (Test-Path -LiteralPath $abs) {
-    $selected.Add($abs) | Out-Null
+  $absFull = [IO.Path]::GetFullPath($abs)
+  Assert-UnderPath $absFull $ProjectPath "FILE entry"
+  if (Test-Path -LiteralPath $absFull -PathType Leaf) {
+    $selected.Add($absFull) | Out-Null
   } else {
     $missingOnDisk.Add($rel) | Out-Null
   }
@@ -117,14 +158,25 @@ if ($selected.Count -eq 0) {
 # ------------ Name and path for zip ------------
 $Date = Get-Date -Format "yyyy-MM-dd"
 $ZipName = "clinic_project_$Date"
-if ($NameSuffix -ne "") { $ZipName += "_$NameSuffix" }
+if ($NameSuffix -ne "") {
+  $safeNameSuffix = ConvertTo-SafeFileSegment $NameSuffix
+  if ($safeNameSuffix -eq "") {
+    Write-Error "NameSuffix does not contain safe filename characters."; exit 1
+  }
+  if ($safeNameSuffix -ne $NameSuffix.Trim()) {
+    Write-Host "NameSuffix sanitized to: $safeNameSuffix"
+  }
+  $ZipName += "_$safeNameSuffix"
+}
 $ZipName += ".zip"
 $ZipPath = Join-Path $OutDir $ZipName
-if (Test-Path $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
+$ZipPathFull = [IO.Path]::GetFullPath($ZipPath)
+Assert-UnderPath $ZipPathFull $OutDir "ZipPath"
+if (Test-Path -LiteralPath $ZipPathFull) { Remove-Item -LiteralPath $ZipPathFull -Force }
 
 # ------------ Dry run or compress ------------
 if ($DryRun) {
-  Write-Host "DRY-RUN: would zip $($selected.Count) files -> $ZipPath"
+  Write-Host "DRY-RUN: would zip $($selected.Count) files -> $ZipPathFull"
   Write-Host "Excluded by pattern: $($excludedByPattern.Count); Missing: $($missingOnDisk.Count)"
   if ($excludedByPattern.Count -gt 0) {
     Write-Host "---- excluded examples ----"
@@ -138,10 +190,10 @@ if ($DryRun) {
 }
 
 # Compress
-Compress-Archive -Path $selected -DestinationPath $ZipPath -Force
+Compress-Archive -Path $selected -DestinationPath $ZipPathFull -Force
 
 # Summary
-$sizeBytes = (Get-Item -LiteralPath $ZipPath).Length
-Write-Host "OK: zip created -> $ZipPath"
+$sizeBytes = (Get-Item -LiteralPath $ZipPathFull).Length
+Write-Host "OK: zip created -> $ZipPathFull"
 Write-Host "Included: $($selected.Count) files; Excluded: $($excludedByPattern.Count); Missing: $($missingOnDisk.Count)"
 Write-Host ("Zip size: {0:N0} bytes" -f $sizeBytes)

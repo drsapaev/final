@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-import sqlite3
+"""Retired root manual SQLite table probe."""
 
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
-cursor.execute('SELECT name FROM sqlite_master WHERE type="table"')
-tables = [row[0] for row in cursor.fetchall()]
-print("Таблицы в базе данных:")
-for table in tables:
-    print(f"  - {table}")
-conn.close()
+from __future__ import annotations
+
+import sys
+
+MESSAGE = """
+check_tables.py is retired.
+
+This root-level manual probe opened the legacy SQLite database file directly and inspected SQLite
+tables. Use Alembic migrations, backend/tests, or explicit Postgres diagnostics
+instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

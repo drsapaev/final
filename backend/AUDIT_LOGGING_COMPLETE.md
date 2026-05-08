@@ -127,9 +127,9 @@ def create_resource(
 
 ## ✅ Проверка работы
 
-### Вручную через SQLite:
+### Manual check through Postgres:
 ```powershell
-sqlite3 backend/clinic.db "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
+psql "$env:DATABASE_URL" -c "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
 ```
 
 ### Через тесты:

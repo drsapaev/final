@@ -10,6 +10,7 @@ from app.models.user_profile import (
     UserPreferences,
     UserProfile,
 )
+from tests.auth_test_credentials import GENERIC_TEST_PASSWORD
 
 
 def build_payload(**overrides):
@@ -31,7 +32,7 @@ def build_payload(**overrides):
         },
         "admin": {
             "username": "admin",
-            "password": "strongpass123",
+            "password": GENERIC_TEST_PASSWORD,
             "full_name": "Clinic Admin",
             "email": "admin@example.com",
         },

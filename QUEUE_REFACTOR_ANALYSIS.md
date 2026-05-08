@@ -2,7 +2,7 @@
 
 **Дата анализа**: 2025-11-24
 **Ветка**: feat/macos-ui-refactor
-**Backup БД**: clinic.db.backup_refactor
+**Backup БД**: Postgres logical backup before refactor
 
 ---
 

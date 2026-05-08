@@ -7,6 +7,14 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 
+def _require_env_write_confirmation():
+    if os.getenv("CONFIRM_SETUP_GEMINI_WRITE_ENV") != "1":
+        raise RuntimeError(
+            "Refusing to create or overwrite backend/.env from setup_gemini_api.py. "
+            "Set CONFIRM_SETUP_GEMINI_WRITE_ENV=1 only for an explicit local secret update."
+        )
+
+
 def _read_postgres_database_url():
     database_url = input("DATABASE_URL (PostgreSQL, required): ").strip()
     if not database_url:
@@ -51,7 +59,7 @@ def setup_gemini_api():
     print(f"\n🔍 Проверка переменных окружения:")
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key and gemini_key != "ваш_ключ_здесь":
-        print(f"✅ GEMINI_API_KEY: {'*' * 8}...{gemini_key[-4:]}")
+        print("✅ GEMINI_API_KEY: настроен (значение скрыто)")
     else:
         print("❌ GEMINI_API_KEY: не настроен")
     
@@ -95,6 +103,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=10080
 BACKEND_CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8080","http://127.0.0.1:8080"]
 """
             
+            _require_env_write_confirmation()
             with open(env_file, 'w', encoding='utf-8') as f:
                 f.write(env_content)
             

@@ -172,6 +172,43 @@ def test_get_settings_prod_without_secret_key_fails_closed(
     )
 
 
+def test_get_settings_dev_defaults_auth_secret_to_secret_key(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Legacy JWT helpers must always receive AUTH_SECRET from runtime settings."""
+    monkeypatch.setenv("ENV", "dev")
+    monkeypatch.setenv("SECRET_KEY", "b" * 64)
+    monkeypatch.delenv("AUTH_SECRET", raising=False)
+    _reset_settings_cache()
+    try:
+        settings = get_settings()
+    finally:
+        _reset_settings_cache()
+    assert settings.AUTH_SECRET == settings.SECRET_KEY
+    assert settings.AUTH_ALGORITHM == "HS256"
+
+
+def test_get_settings_prod_defaults_auth_secret_to_secret_key(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """AUTH_SECRET is a legacy alias; production startup only requires SECRET_KEY."""
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "b" * 64)
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://clinic:clinic@localhost:5432/clinicdb",
+    )
+    monkeypatch.setenv("CORS_ALLOW_ALL", "0")
+    monkeypatch.delenv("AUTH_SECRET", raising=False)
+    _reset_settings_cache()
+    try:
+        settings = get_settings()
+    finally:
+        _reset_settings_cache()
+    assert settings.AUTH_SECRET == settings.SECRET_KEY
+    assert settings.AUTH_ALGORITHM == "HS256"
+
+
 def test_get_settings_prod_validation_path_uses_env_without_unboundlocal(
     monkeypatch: pytest.MonkeyPatch,
 ):

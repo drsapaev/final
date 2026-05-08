@@ -13,6 +13,7 @@ CARDIO_PASSWORD = _credential("cardio")
 CASHIER_PASSWORD = _credential("cashier")
 DENTIST_PASSWORD = _credential("dentist")
 DOCTOR_PASSWORD = _credential("doctor")
+DUMMY_PASSWORD_HASH = "qa-test-hash-placeholder"
 GENERIC_TEST_PASSWORD = _credential("generic")
 PATIENT_PASSWORD = _credential("patient")
 REGISTRAR_PASSWORD = _credential("registrar")

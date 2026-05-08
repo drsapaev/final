@@ -19,9 +19,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.services.queue_position_api_service import (
-    QueuePositionApiDomainError,
-    QueuePositionApiService,
+from app.services.queue_position_endpoint_service import (
+    QueuePositionDomainError,
+    QueuePositionEndpointService,
 )
 from app.services.queue_position_notifications import (
     get_queue_position_service
@@ -85,8 +85,8 @@ async def get_queue_position(
     или в мобильном приложении.
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry(entry_id=entry_id)
-    except QueuePositionApiDomainError as exc:
+        entry = QueuePositionEndpointService(db).get_position_entry(entry_id=entry_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)
@@ -107,11 +107,11 @@ async def get_queue_position_by_number(
     Используется для поиска позиции по талону.
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry_by_number(
+        entry = QueuePositionEndpointService(db).get_position_entry_by_number(
             queue_number=queue_number,
             specialist_id=specialist_id,
         )
-    except QueuePositionApiDomainError as exc:
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)
@@ -135,8 +135,8 @@ async def send_position_notification(
     Доступно: Admin, Registrar, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
-    except QueuePositionApiDomainError as exc:
+        entry = QueuePositionEndpointService(db).get_position_entry(entry_id=request.entry_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)
@@ -165,8 +165,8 @@ async def send_call_notification(
     Доступно: Admin, Registrar, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
-    except QueuePositionApiDomainError as exc:
+        entry = QueuePositionEndpointService(db).get_position_entry(entry_id=request.entry_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     result = await get_queue_position_service(db).notify_patient_called(
@@ -193,8 +193,8 @@ async def send_queue_update_notifications(
     Доступно: Admin, Registrar
     """
     try:
-        QueuePositionApiService(db).get_queue_or_error(queue_id=queue_id)
-    except QueuePositionApiDomainError as exc:
+        QueuePositionEndpointService(db).get_queue_or_error(queue_id=queue_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)
@@ -220,8 +220,8 @@ async def send_diagnostics_return_notification(
     Доступно: Admin, Doctor
     """
     try:
-        entry = QueuePositionApiService(db).get_diagnostics_entry_or_error(entry_id=entry_id)
-    except QueuePositionApiDomainError as exc:
+        entry = QueuePositionEndpointService(db).get_diagnostics_entry_or_error(entry_id=entry_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     # Doctor identity lives on the related User profile in the current schema.
@@ -277,8 +277,8 @@ async def send_waiting_reminder(
     Доступно: Admin, Registrar
     """
     try:
-        entry = QueuePositionApiService(db).get_waiting_entry_or_error(entry_id=entry_id)
-    except QueuePositionApiDomainError as exc:
+        entry = QueuePositionEndpointService(db).get_waiting_entry_or_error(entry_id=entry_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     result = await get_queue_position_service(db).send_waiting_reminder(entry=entry)
@@ -300,8 +300,8 @@ async def get_queue_positions_stats(
     Возвращает список всех записей с их позициями.
     """
     try:
-        queue, entries = QueuePositionApiService(db).get_queue_entries_stats(queue_id=queue_id)
-    except QueuePositionApiDomainError as exc:
+        queue, entries = QueuePositionEndpointService(db).get_queue_entries_stats(queue_id=queue_id)
+    except QueuePositionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     service = get_queue_position_service(db)

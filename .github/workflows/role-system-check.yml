@@ -23,7 +23,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -32,8 +32,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: "1"
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: "0"
+      BACKEND_CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,http://localhost:18080,http://127.0.0.1:18080"
       WS_DEV_ALLOW: "1"
       DISABLE_2FA_REQUIREMENT: "1"
       SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"

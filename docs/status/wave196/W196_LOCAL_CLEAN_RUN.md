@@ -10,7 +10,6 @@ Status: `done`
 
 ```bash
 cd frontend
-rm -rf node_modules
 npm ci
 ```
 

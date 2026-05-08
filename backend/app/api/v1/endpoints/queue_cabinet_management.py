@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.queue_cabinet_management_api_service import (
-    QueueCabinetManagementApiService,
+from app.services.queue_cabinet_management_endpoint_service import (
+    QueueCabinetManagementEndpointService,
     QueueCabinetManagementDomainError,
 )
 
@@ -73,7 +73,7 @@ def get_queues_cabinet_info(
     Получить информацию о кабинетах для очередей
     """
     try:
-        payload = QueueCabinetManagementApiService(db).get_queues_cabinet_info(
+        payload = QueueCabinetManagementEndpointService(db).get_queues_cabinet_info(
             day=day,
             specialist_id=specialist_id,
             cabinet_number=cabinet_number,
@@ -99,7 +99,7 @@ def get_queue_cabinet_info(
     Получить информацию о кабинете для конкретной очереди
     """
     try:
-        payload = QueueCabinetManagementApiService(db).get_queue_cabinet_info(queue_id=queue_id)
+        payload = QueueCabinetManagementEndpointService(db).get_queue_cabinet_info(queue_id=queue_id)
         return QueueCabinetResponse(**payload)
     except QueueCabinetManagementDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -127,7 +127,7 @@ def update_queue_cabinet_info(
     Обновить информацию о кабинете для очереди
     Доступно только администраторам и регистраторам
     """
-    service = QueueCabinetManagementApiService(db)
+    service = QueueCabinetManagementEndpointService(db)
     try:
         return service.update_queue_cabinet_info(
             queue_id=queue_id,
@@ -160,7 +160,7 @@ def bulk_update_cabinet_info(
     """
     Массовое обновление информации о кабинетах для нескольких очередей
     """
-    service = QueueCabinetManagementApiService(db)
+    service = QueueCabinetManagementEndpointService(db)
     try:
         updates = (
             request.model_dump(exclude_unset=True)["updates"]
@@ -198,7 +198,7 @@ def sync_cabinet_info_from_doctors(
     Синхронизировать информацию о кабинетах из таблицы doctors
     Доступно только администраторам
     """
-    service = QueueCabinetManagementApiService(db)
+    service = QueueCabinetManagementEndpointService(db)
     try:
         return service.sync_cabinet_info_from_doctors(
             day=day,
@@ -234,7 +234,7 @@ def get_cabinet_statistics(
     Получить статистику использования кабинетов
     """
     try:
-        return QueueCabinetManagementApiService(db).get_cabinet_statistics(
+        return QueueCabinetManagementEndpointService(db).get_cabinet_statistics(
             date_from=date_from,
             date_to=date_to,
         )

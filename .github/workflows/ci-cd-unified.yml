@@ -13,8 +13,9 @@ on:
 env:
   PYTHON_VERSION: '3.11.10'
   NODE_VERSION: '20'
-  DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-  CORS_DISABLE: '1'
+  DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+  CORS_DISABLE: '0'
+  BACKEND_CORS_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:4174,http://127.0.0.1:4174,http://localhost:8080,http://127.0.0.1:8080,http://localhost:18080,http://127.0.0.1:18080'
   WS_DEV_ALLOW: '1'
 
 jobs:
@@ -492,7 +493,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -501,8 +502,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: '1'
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: '0'
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
@@ -887,7 +888,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -896,8 +897,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: '1'
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: '0'
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
@@ -953,7 +954,7 @@ jobs:
         set -e
         cd backend
         export DATABASE_URL="${DATABASE_URL}"
-        export CORS_DISABLE="1"
+        export CORS_DISABLE="0"
         export WS_DEV_ALLOW="1"
         export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
         
@@ -963,8 +964,8 @@ jobs:
         python -c "
         import os
         import sys
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Python version:', sys.version[:5])
         print('Debug: Current dir:', os.getcwd())
@@ -980,8 +981,8 @@ jobs:
         echo "  - Testing app.ws.queue_ws..."
         python -c "
         import os
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         from app.ws.queue_ws import router, ws_queue
         print('✅ queue_ws OK')
@@ -990,8 +991,8 @@ jobs:
         echo "  - Testing app.api.deps..."
         python -c "
         import os
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         from app.api.deps import create_access_token
         print('✅ deps OK')
@@ -1002,8 +1003,8 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing api.v1.api import...')
         try:
@@ -1020,8 +1021,8 @@ jobs:
           python -c "
           import os
           import sys
-          os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-          os.environ['CORS_DISABLE'] = '1'
+          assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+          os.environ['CORS_DISABLE'] = '0'
           os.environ['WS_DEV_ALLOW'] = '1'
           modules_to_test = [
               'app.api.v1.endpoints.auth',
@@ -1051,8 +1052,8 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing app.main import...')
         try:
@@ -1073,8 +1074,8 @@ jobs:
         import os
         import sys
         import traceback
-        os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-        os.environ['CORS_DISABLE'] = '1'
+        assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+        os.environ['CORS_DISABLE'] = '0'
         os.environ['WS_DEV_ALLOW'] = '1'
         print('Debug: Testing app from app.main import...')
         try:
@@ -1195,7 +1196,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -1204,8 +1205,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: '1'
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: '0'
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
       PYTHONUTF8: '1'
@@ -1351,7 +1352,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -1360,8 +1361,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: '1'
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: '0'
       WS_DEV_ALLOW: '1'
 
     steps:
@@ -1515,7 +1516,7 @@ jobs:
         env:
           POSTGRES_DB: clinicdb
           POSTGRES_USER: clinic
-          POSTGRES_PASSWORD: clinic_ci_test_password
+          POSTGRES_PASSWORD: "${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}"
         ports:
           - 5432:5432
         options: >-
@@ -1524,8 +1525,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb
-      CORS_DISABLE: '1'
+      DATABASE_URL: "postgresql+psycopg://clinic:${{ format('clinic_ci_{0}_{1}', github.run_id, github.run_attempt) }}@localhost:5432/clinicdb"
+      CORS_DISABLE: '0'
       WS_DEV_ALLOW: '1'
     
     steps:
@@ -1587,8 +1588,8 @@ jobs:
             sys.path.insert(0, '.')
             
             # Устанавливаем переменные окружения ПЕРЕД импортом
-            os.environ['DATABASE_URL'] = 'postgresql+psycopg://clinic:clinic_ci_test_password@localhost:5432/clinicdb'
-            os.environ['CORS_DISABLE'] = '1'
+            assert os.environ.get('DATABASE_URL'), 'DATABASE_URL is required'
+            os.environ['CORS_DISABLE'] = '0'
             os.environ['WS_DEV_ALLOW'] = '1'
             
             print('🔧 Настройка окружения завершена')

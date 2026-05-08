@@ -13,6 +13,16 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+def require_init_database_confirmation():
+    if os.getenv("CONFIRM_INIT_DATABASE") != "1":
+        raise RuntimeError(
+            "Refusing to initialize database seed data. "
+            "Run Alembic migrations first and set CONFIRM_INIT_DATABASE=1 only for an explicit bootstrap run."
+        )
+
+
+require_init_database_confirmation()
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

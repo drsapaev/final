@@ -193,6 +193,11 @@ def _ops_command(mode: str, *, pretty: bool, limit: int | None) -> list[str]:
 
 def main() -> int:
     args = _parse_args()
+    if os.getenv("CONFIRM_RUN_EMR_CUTOVER") != "1":
+        raise RuntimeError(
+            "Refusing to run full EMR cutover workflow. "
+            "Set CONFIRM_RUN_EMR_CUTOVER=1 only for an explicit operator-approved cutover run."
+        )
     backend_root = _backend_root()
     env = os.environ.copy()
     _load_dotenv_defaults(env)

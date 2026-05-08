@@ -47,7 +47,9 @@ const PaymentTest = () => {
     try {
       setResult({ type: 'info', message: 'Open /login and sign in before using the internal payment test.' });
       window.location.assign('/login');
-      return;
+      if (window.location.pathname !== '/login') {
+        return;
+      }
 
       setResult({ type: 'info', message: 'Выполняется авторизация...' });
       

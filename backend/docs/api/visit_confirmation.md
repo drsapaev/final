@@ -311,7 +311,7 @@
 # 1. Врач авторизуется
 curl -X POST "http://localhost:18000/api/v1/authentication/login" \
   -H "Content-Type: application/json" \
-  -d '{"username": "doctor", "password": "password"}'
+  -d '{"username": "doctor", "password": "<DOCTOR_PASSWORD_FROM_ENV>"}'
 
 # 2. Назначает визит
 curl -X POST "http://localhost:18000/api/v1/doctor/visits/schedule-next" \

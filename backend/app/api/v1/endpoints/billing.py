@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
 from app.models.user import User
-from app.services.billing_api_service import BillingApiDomainError, BillingApiService
+from app.services.billing_endpoint_service import BillingDomainError, BillingEndpointService
 from app.services.billing_service import BillingService
 
 router = APIRouter()
@@ -172,7 +172,7 @@ def create_invoice(
 ):
     """Создать счет"""
     service = BillingService(db)
-    billing_api_service = BillingApiService(db)
+    billing_endpoint_service = BillingEndpointService(db)
 
     try:
         # Преобразуем данные позиций
@@ -202,7 +202,7 @@ def create_invoice(
 
         # Настраиваем периодичность если нужно
         if invoice_data.is_recurring:
-            billing_api_service.configure_recurring_invoice(
+            billing_endpoint_service.configure_recurring_invoice(
                 invoice=invoice,
                 recurrence_type=invoice_data.recurrence_type,
                 recurrence_interval=invoice_data.recurrence_interval,
@@ -231,7 +231,7 @@ def get_invoices(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список счетов"""
-    return BillingApiService(db).list_invoices(
+    return BillingEndpointService(db).list_invoices(
         skip=skip,
         limit=limit,
         patient_id=patient_id,
@@ -250,8 +250,8 @@ def get_invoice(
 ):
     """Получить счет по ID"""
     try:
-        return BillingApiService(db).get_invoice_or_error(invoice_id=invoice_id)
-    except BillingApiDomainError as exc:
+        return BillingEndpointService(db).get_invoice_or_error(invoice_id=invoice_id)
+    except BillingDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -264,11 +264,11 @@ def update_invoice(
 ):
     """Обновить счет"""
     try:
-        return BillingApiService(db).update_invoice(
+        return BillingEndpointService(db).update_invoice(
             invoice_id=invoice_id,
             update_data=invoice_data.dict(exclude_unset=True),
         )
-    except BillingApiDomainError as exc:
+    except BillingDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -280,8 +280,8 @@ def delete_invoice(
 ):
     """Удалить счет"""
     try:
-        BillingApiService(db).delete_invoice(invoice_id=invoice_id)
-    except BillingApiDomainError as exc:
+        BillingEndpointService(db).delete_invoice(invoice_id=invoice_id)
+    except BillingDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return {"message": "Счет удален"}
 
@@ -356,13 +356,13 @@ def get_payments(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить список платежей"""
-    payments = BillingApiService(db).list_payments(
+    payments = BillingEndpointService(db).list_payments(
         skip=skip,
         limit=limit,
         date_from=date_from,
         date_to=date_to,
     )
-    return BillingApiService(db).serialize_payments(payments)
+    return BillingEndpointService(db).serialize_payments(payments)
 
 
 @router.post("/auto-generate/visit/{visit_id}")
@@ -476,7 +476,7 @@ def update_billing_settings(
     """Обновить настройки биллинга"""
     service = BillingService(db)
     settings = service.get_billing_settings()
-    BillingApiService(db).update_billing_settings(
+    BillingEndpointService(db).update_billing_settings(
         settings=settings,
         update_data=settings_data.dict(exclude_unset=True),
         updated_by=current_user.id,
@@ -492,7 +492,7 @@ def get_billing_analytics(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить аналитику по счетам"""
-    return BillingApiService(db).get_billing_analytics(
+    return BillingEndpointService(db).get_billing_analytics(
         date_from=date_from,
         date_to=date_to,
     )

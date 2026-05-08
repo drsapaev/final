@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.specialized_panels_api_service import (
-    SpecializedPanelsApiDomainError,
-    SpecializedPanelsApiService,
+from app.services.specialized_panels_endpoint_service import (
+    SpecializedPanelsDomainError,
+    SpecializedPanelsService,
 )
 
 router = APIRouter()
@@ -27,7 +27,7 @@ async def get_cardiology_patients(
     db: Session = Depends(get_db),
 ):
     """Получить пациентов кардиологического отделения"""
-    return SpecializedPanelsApiService(db).get_cardiology_patients(
+    return SpecializedPanelsService(db).get_cardiology_patients(
         skip=skip,
         limit=limit,
         search=search,
@@ -46,7 +46,7 @@ async def get_cardiology_visits(
     db: Session = Depends(get_db),
 ):
     """Получить визиты кардиологического отделения"""
-    return SpecializedPanelsApiService(db).get_cardiology_visits(
+    return SpecializedPanelsService(db).get_cardiology_visits(
         skip=skip,
         limit=limit,
         patient_id=patient_id,
@@ -64,7 +64,7 @@ async def get_cardiology_analytics(
     db: Session = Depends(get_db),
 ):
     """Получить аналитику кардиологического отделения"""
-    return SpecializedPanelsApiService(db).get_cardiology_analytics(
+    return SpecializedPanelsService(db).get_cardiology_analytics(
         start_date=start_date,
         end_date=end_date,
     )
@@ -79,7 +79,7 @@ async def get_dentistry_patients(
     db: Session = Depends(get_db),
 ):
     """Получить пациентов стоматологического отделения"""
-    return SpecializedPanelsApiService(db).get_dentistry_patients(
+    return SpecializedPanelsService(db).get_dentistry_patients(
         skip=skip,
         limit=limit,
         search=search,
@@ -98,7 +98,7 @@ async def get_dentistry_visits(
     db: Session = Depends(get_db),
 ):
     """Получить визиты стоматологического отделения"""
-    return SpecializedPanelsApiService(db).get_dentistry_visits(
+    return SpecializedPanelsService(db).get_dentistry_visits(
         skip=skip,
         limit=limit,
         patient_id=patient_id,
@@ -116,7 +116,7 @@ async def get_dentistry_analytics(
     db: Session = Depends(get_db),
 ):
     """Получить аналитику стоматологического отделения"""
-    return SpecializedPanelsApiService(db).get_dentistry_analytics(
+    return SpecializedPanelsService(db).get_dentistry_analytics(
         start_date=start_date,
         end_date=end_date,
     )
@@ -131,7 +131,7 @@ async def get_specialized_services(
     db: Session = Depends(get_db),
 ):
     """Получить услуги специализированных отделений"""
-    return SpecializedPanelsApiService(db).get_specialized_services(department=department)
+    return SpecializedPanelsService(db).get_specialized_services(department=department)
 
 
 @router.get("/specialized/patient-history/{patient_id}")
@@ -145,11 +145,11 @@ async def get_specialized_patient_history(
 ):
     """Получить историю пациента в специализированном отделении"""
     try:
-        return SpecializedPanelsApiService(db).get_specialized_patient_history(
+        return SpecializedPanelsService(db).get_specialized_patient_history(
             patient_id=patient_id,
             department=department,
         )
-    except SpecializedPanelsApiDomainError as exc:
+    except SpecializedPanelsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -161,7 +161,7 @@ async def get_specialized_statistics(
     db: Session = Depends(get_db),
 ):
     """Получить общую статистику по специализированным отделениям"""
-    return SpecializedPanelsApiService(db).get_specialized_statistics(
+    return SpecializedPanelsService(db).get_specialized_statistics(
         start_date=start_date,
         end_date=end_date,
     )

@@ -1,62 +1,23 @@
-import requests
-import json
+#!/usr/bin/env python3
+"""Retired root manual registration API probe."""
 
-# Токен из логов
-token = "REDACTED_JWT"
+from __future__ import annotations
 
-# Тестовые данные для создания записи
-test_data = {
-    "patient_id": 1,  # Используем существующего пациента
-    "visits": [
-        {
-            "doctor_id": None,
-            "services": [
-                {
-                    "service_id": 1,  # Предполагаемая услуга
-                    "quantity": 1
-                }
-            ],
-            "visit_date": "2025-10-01",
-            "visit_time": "10:00",
-            "department": "cardiology",
-            "notes": None
-        }
-    ],
-    "discount_mode": "none",
-    "payment_method": "cash",
-    "all_free": False,
-    "notes": None
-}
+import sys
 
-try:
-    print("📤 Отправляем тестовый запрос на создание записи...")
+MESSAGE = """
+test_registration_api.py is retired.
 
-    response = requests.post(
-        'http://localhost:18000/api/v1/registrar/cart',
-        headers={
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        },
-        json=test_data
-    )
+This root-level manual probe used a copied JWT and live localhost registrar API
+assumptions outside the canonical test suites. Use backend/tests or explicit
+env-driven registrar smoke scripts instead.
+""".strip()
 
-    print(f"📊 Статус ответа: {response.status_code}")
 
-    if response.status_code == 200:
-        data = response.json()
-        print("registration created successfully")
-        print(f"   Visit IDs: {data.get('visit_ids', [])}")
-        print(f"   Invoice ID: {data.get('invoice_id')}")
-        print(f"   Total amount: {data.get('total_amount')}")
-    else:
-        print("registration creation failed")
-        print(f"   Status: {response.status_code}")
-        try:
-            error_data = response.json()
-            print(f"   Детали: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
-        except:
-            print(f"   Текст: {response.text}")
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-except Exception as e:
-    print(f"❌ Ошибка запроса: {e}")
 
+if __name__ == "__main__":
+    raise SystemExit(main())

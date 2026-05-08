@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.services.global_search_api_service import GlobalSearchApiService
+from app.services.global_search_endpoint_service import GlobalSearchService
 
 
 router = APIRouter(tags=["search"])
@@ -81,7 +81,7 @@ async def global_search(
     Returns grouped results from all domains.
     """
     query = q.strip()
-    search_service = GlobalSearchApiService(db)
+    search_service = GlobalSearchService(db)
     patients, visits, lab_results = search_service.search_all(
         query=query,
         limit=limit,
@@ -121,7 +121,7 @@ async def log_search_click(
     Log when user clicks on a search result.
     Required for audit compliance.
     """
-    return GlobalSearchApiService(db).log_search_click(
+    return GlobalSearchService(db).log_search_click(
         user=current_user,
         query=request.query,
         opened_type=request.opened_type,

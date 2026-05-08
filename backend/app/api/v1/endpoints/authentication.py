@@ -16,9 +16,9 @@ from app.models.user import User
 from app.services.authentication_service import (
     get_authentication_service,
 )
-from app.services.authentication_api_service import (
-    AuthenticationApiDomainError,
-    AuthenticationApiService,
+from app.services.authentication_endpoint_service import (
+    AuthenticationDomainError,
+    AuthenticationEndpointService,
 )
 from app.services.user_management_service import get_user_management_service
 
@@ -387,7 +387,7 @@ async def update_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     """Обновить профиль пользователя"""
-    api_service = AuthenticationApiService(db)
+    api_service = AuthenticationEndpointService(db)
     try:
         service = get_authentication_service()
         profile = api_service.update_user_profile(
@@ -401,7 +401,7 @@ async def update_user_profile(
 
         return UserProfileResponse(**profile)
 
-    except AuthenticationApiDomainError as exc:
+    except AuthenticationDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         api_service.rollback()
@@ -645,8 +645,8 @@ async def get_current_session(
         )
 
 
-@router.get("/sessions", include_in_schema=False)
-async def get_user_sessions(
+# Legacy duplicate kept unregistered; the active paginated route is defined above.
+async def _legacy_get_user_sessions_unregistered(
     active_only: bool = Query(True, description="Только активные сессии"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -687,7 +687,7 @@ async def revoke_session(
     """Отозвать сессию"""
     try:
         auth_service = get_authentication_service()
-        AuthenticationApiService(db).ensure_session_access(
+        AuthenticationEndpointService(db).ensure_session_access(
             session_id=session_id,
             current_user_id=current_user.id,
             allow_admin_access=False,
@@ -707,7 +707,7 @@ async def revoke_session(
             "reason": reason,
         }
 
-    except AuthenticationApiDomainError as exc:
+    except AuthenticationDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -800,7 +800,7 @@ async def get_session_info(
     """Получить информацию о сессии"""
     try:
         auth_service = get_authentication_service()
-        AuthenticationApiService(db).ensure_session_access(
+        AuthenticationEndpointService(db).ensure_session_access(
             session_id=session_id,
             current_user_id=current_user.id,
             allow_admin_access=current_user.role in ["Admin", "SuperAdmin"],
@@ -820,7 +820,7 @@ async def get_session_info(
             "session": session_info,
         }
 
-    except AuthenticationApiDomainError as exc:
+    except AuthenticationDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

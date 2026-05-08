@@ -8,16 +8,26 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-from app.db.session import _get_db_url_from_env_or_settings
-from app.models.clinic import ServiceCategory
-from app.models.service import Service
 import logging
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def require_seed_services_confirmation():
+    if os.getenv("CONFIRM_SEED_SERVICES") != "1":
+        raise RuntimeError(
+            "Refusing to seed services. "
+            "Set CONFIRM_SEED_SERVICES=1 only for an explicit catalog seed run."
+        )
+
+def require_postgres_database_url(database_url: str) -> str:
+    database_url = database_url.strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before seeding services.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("seed_services.py requires a PostgreSQL DATABASE_URL.")
+    return database_url
 
 def seed_service_categories():
     """Создание категорий услуг"""
@@ -890,9 +900,19 @@ def seed_services():
 
 def main():
     """Основная функция инициализации"""
+    require_seed_services_confirmation()
+
+    from sqlalchemy import create_engine, inspect
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import settings
+
     try:
         # Создаем подключение к базе данных
-        db_url = _get_db_url_from_env_or_settings()
+        db_url = require_postgres_database_url(str(settings.DATABASE_URL))
+        from app.models.clinic import ServiceCategory
+        from app.models.service import Service
+
         engine = create_engine(db_url)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
@@ -900,18 +920,18 @@ def main():
             logger.info("🚀 Начинаем инициализацию справочника услуг...")
             
             # Проверяем существование таблиц
-            with engine.connect() as conn:
-                # Проверяем таблицу service_categories
-                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='service_categories'"))
-                if not result.fetchone():
-                    logger.error("❌ Таблица service_categories не найдена. Запустите миграции.")
-                    return False
+            inspector = inspect(engine)
+            # Проверяем таблицу service_categories
+            result = inspector.has_table("service_categories")
+            if not result:
+                logger.error("❌ Таблица service_categories не найдена. Запустите миграции.")
+                return False
                 
-                # Проверяем таблицу services
-                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='services'"))
-                if not result.fetchone():
-                    logger.error("❌ Таблица services не найдена. Запустите миграции.")
-                    return False
+            # Проверяем таблицу services
+            result = inspector.has_table("services")
+            if not result:
+                logger.error("❌ Таблица services не найдена. Запустите миграции.")
+                return False
             
             # Создаем категории услуг
             logger.info("📂 Создаем категории услуг...")

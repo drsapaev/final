@@ -1,37 +1,43 @@
 @echo off
-echo ========================================
-echo    ЗАПУСК СИСТЕМЫ КЛИНИКИ
-echo ========================================
+setlocal
 
+echo ========================================
+echo    CLINIC SYSTEM START
+echo ========================================
 echo.
-echo [1/4] Остановка старых процессов...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173') do (
-    taskkill /PID %%a /F >nul 2>&1
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :18000') do (
-    taskkill /PID %%a /F >nul 2>&1
+
+echo [1/4] Checking canonical ports 5173 and 18000...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0frontend\kill_port_5173.ps1"
+if errorlevel 1 (
+    echo Port 5173 is busy. Close the owning process or set CONFIRM_KILL_PORT_5173_OWNER=1 before retrying.
+    exit /b 1
 )
 
-echo [2/4] Запуск Backend API...
-cd /d C:\final\backend
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0backend\kill_port_18000.ps1"
+if errorlevel 1 (
+    echo Port 18000 is busy. Close the owning process or set CONFIRM_KILL_PORT_18000_OWNER=1 before retrying.
+    exit /b 1
+)
+
+echo [2/4] Starting Backend API on 18000...
+cd /d "%~dp0backend"
 start "Backend API" cmd /k ".\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 18000"
 
-echo [3/4] Ожидание запуска Backend...
+echo [3/4] Waiting for Backend...
 timeout /t 5 /nobreak >nul
 
-echo [4/4] Запуск Frontend...
-cd /d C:\final\frontend
-start "Frontend" cmd /k "npm run dev -- --host 0.0.0.0 --port 18080"
+echo [4/4] Starting Frontend on 5173...
+cd /d "%~dp0frontend"
+start "Frontend" cmd /k "npm run dev -- --host 0.0.0.0 --port 5173"
 
 echo.
 echo ========================================
-echo    СИСТЕМА ЗАПУЩЕНА!
+echo    CLINIC SYSTEM STARTED
 echo ========================================
-echo Frontend: http://localhost:18080
+echo Frontend: http://localhost:5173
 echo Backend:  http://localhost:18000
 echo API Docs: http://localhost:18000/docs
 echo.
-echo Логин: admin
-echo Пароль: admin
+echo Use credentials from your local backend/frontend .env files.
 echo.
 pause

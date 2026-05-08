@@ -20,7 +20,7 @@ from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.config import settings
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
 from app.models.user import User
-from app.services.ai_chat_api_service import AIChatApiDomainError, AIChatApiService
+from app.services.ai_chat_endpoint_service import AIChatDomainError, AIChatEndpointService
 from app.services.ai.chat_service import get_chat_service
 
 logger = logging.getLogger(__name__)
@@ -172,12 +172,12 @@ async def get_session(
     Получить информацию о сессии.
     """
     try:
-        payload = AIChatApiService(db).get_session_payload(
+        payload = AIChatEndpointService(db).get_session_payload(
             session_id=session_id,
             user_id=current_user.id,
         )
         return ChatSessionResponse(**payload)
-    except AIChatApiDomainError as exc:
+    except AIChatDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -212,14 +212,14 @@ async def get_messages(
     Получить историю сообщений сессии.
     """
     try:
-        payload = await AIChatApiService(db).get_messages_payload(
+        payload = await AIChatEndpointService(db).get_messages_payload(
             session_id=session_id,
             user_id=current_user.id,
             limit=limit,
             before_id=before_id,
         )
         return [ChatMessageResponse(**item) for item in payload]
-    except AIChatApiDomainError as exc:
+    except AIChatDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -276,14 +276,14 @@ async def add_feedback(
     Используется для улучшения качества AI.
     """
     try:
-        return await AIChatApiService(db).add_feedback_payload(
+        return await AIChatEndpointService(db).add_feedback_payload(
             message_id=message_id,
             user_id=current_user.id,
             feedback_type=request.feedback_type,
             comment=request.comment,
             correction=request.correction,
         )
-    except AIChatApiDomainError as exc:
+    except AIChatDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -295,7 +295,7 @@ async def authenticate_websocket(token: str, db: Session) -> Optional[User]:
     """
     Аутентификация WebSocket по JWT token.
     """
-    return AIChatApiService(db).authenticate_websocket_user(
+    return AIChatEndpointService(db).authenticate_websocket_user(
         token=token,
         secret_key=settings.SECRET_KEY,
         algorithm=settings.ALGORITHM,

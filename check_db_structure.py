@@ -1,45 +1,22 @@
 #!/usr/bin/env python3
-"""
-Проверка структуры базы данных
-"""
+"""Retired root manual SQLite database structure probe."""
+
+from __future__ import annotations
+
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
-from app.db.session import SessionLocal
-from sqlalchemy import text
+MESSAGE = """
+check_db_structure.py is retired.
 
-def check_db_structure():
-    """Проверить структуру БД"""
-    db = SessionLocal()
-    try:
-        # Проверяем структуру таблицы users
-        result = db.execute(text("PRAGMA table_info(users);"))
-        columns = result.fetchall()
-        
-        print("📊 Структура таблицы 'users':")
-        for column in columns:
-            print(f"  - {column[1]} ({column[2]}) - NOT NULL: {column[3]}, DEFAULT: {column[4]}")
-            
-        # Проверяем, есть ли данные в таблице
-        result = db.execute(text("SELECT COUNT(*) FROM users;"))
-        count = result.fetchone()[0]
-        print(f"\n📈 Количество записей в таблице users: {count}")
-        
-        if count > 0:
-            # Показываем первые несколько записей
-            result = db.execute(text("SELECT id, username, email, role FROM users LIMIT 5;"))
-            users = result.fetchall()
-            print("\n👥 Первые пользователи:")
-            for user in users:
-                print(f"  - ID: {user[0]}, Username: {user[1]}, Email: {user[2]}, Role: {user[3]}")
-            
-    except Exception as e:
-        print(f"❌ Ошибка при проверке структуры БД: {e}")
-    finally:
-        db.close()
+This root-level manual probe inspected SQLite schema state outside Alembic.
+Use Alembic migrations, backend/tests, or explicit Postgres diagnostics instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    print("🔍 Проверка структуры базы данных...")
-    check_db_structure()
-
+    raise SystemExit(main())

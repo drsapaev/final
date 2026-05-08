@@ -109,8 +109,8 @@ docker build -f ops/frontend.Dockerfile -t clinic-frontend .
 
 ```bash
 # Backend
-DATABASE_URL=postgresql+psycopg://clinic:<password>@localhost:5432/clinicdb
-CORS_DISABLE=1
+DATABASE_URL=postgresql+psycopg://clinic:<db_password>@localhost:5432/clinicdb
+CORS_DISABLE=0
 WS_DEV_ALLOW=1
 
 # Frontend

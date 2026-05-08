@@ -57,8 +57,8 @@ async def simple_login(
         ) from exc
 
 
-@router.get("/me")
-async def get_current_user_simple(
+# Legacy duplicate kept unregistered; canonical /auth/me lives in auth.py.
+async def _legacy_get_current_user_simple_unregistered(
     db: Session = Depends(get_db),
     current_user: User = Depends(lambda: None)  # Временно отключено
 ):

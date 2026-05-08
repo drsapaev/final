@@ -7,20 +7,33 @@ import sys
 import os
 from datetime import datetime
 
-# Добавляем путь к backend
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+def _ensure_backend_path():
+    backend_path = os.path.join(os.path.dirname(__file__), 'backend')
+    if backend_path not in sys.path:
+        sys.path.insert(0, backend_path)
 
-from backend.app.services.mcp.mcp_manager import get_mcp_manager
-from backend.app.services.mcp.mcp_client import get_mcp_client
+
+async def _get_mcp_client():
+    _ensure_backend_path()
+    from backend.app.services.mcp.mcp_client import get_mcp_client
+
+    return await get_mcp_client()
 
 
-async def test_mcp_health():
+async def _get_mcp_manager():
+    _ensure_backend_path()
+    from backend.app.services.mcp.mcp_manager import get_mcp_manager
+
+    return await get_mcp_manager()
+
+
+async def run_mcp_health():
     """Тест здоровья MCP системы"""
     print("\n🔍 Тестирование здоровья MCP системы...")
     
     try:
         # Получаем MCP клиент
-        client = await get_mcp_client()
+        client = await _get_mcp_client()
         
         # Проверяем здоровье
         health = await client.health_check()
@@ -43,7 +56,7 @@ async def test_mcp_health():
         return False
 
 
-async def test_complaint_analysis():
+async def run_complaint_analysis():
     """Тест анализа жалоб через MCP"""
     print("\n🔍 Тестирование анализа жалоб через MCP...")
     
@@ -63,7 +76,7 @@ async def test_complaint_analysis():
     ]
     
     try:
-        client = await get_mcp_client()
+        client = await _get_mcp_client()
         results = []
         
         for i, test_case in enumerate(test_complaints, 1):
@@ -121,7 +134,7 @@ async def test_complaint_analysis():
         return False
 
 
-async def test_icd10_suggestions():
+async def run_icd10_suggestions():
     """Тест подсказок МКБ-10 через MCP"""
     print("\n🔍 Тестирование подсказок МКБ-10 через MCP...")
     
@@ -141,7 +154,7 @@ async def test_icd10_suggestions():
     ]
     
     try:
-        client = await get_mcp_client()
+        client = await _get_mcp_client()
         
         for i, test_case in enumerate(test_cases, 1):
             print(f"\n  Тест {i}: {test_case['diagnosis']}")
@@ -170,7 +183,7 @@ async def test_icd10_suggestions():
         return False
 
 
-async def test_lab_interpretation():
+async def run_lab_interpretation():
     """Тест интерпретации лабораторных анализов через MCP"""
     print("\n🔍 Тестирование интерпретации лабораторных анализов через MCP...")
     
@@ -182,7 +195,7 @@ async def test_lab_interpretation():
     ]
     
     try:
-        client = await get_mcp_client()
+        client = await _get_mcp_client()
         
         # Проверяем критические значения
         print("\n  Проверка критических значений...")
@@ -231,12 +244,12 @@ async def test_lab_interpretation():
         return False
 
 
-async def test_mcp_metrics():
+async def run_mcp_metrics():
     """Тест метрик MCP"""
     print("\n🔍 Тестирование метрик MCP...")
     
     try:
-        manager = await get_mcp_manager()
+        manager = await _get_mcp_manager()
         
         # Получаем метрики
         metrics = manager.get_metrics()
@@ -269,12 +282,12 @@ async def test_mcp_metrics():
         return False
 
 
-async def test_batch_processing():
+async def run_batch_processing():
     """Тест пакетной обработки через MCP"""
     print("\n🔍 Тестирование пакетной обработки через MCP...")
     
     try:
-        manager = await get_mcp_manager()
+        manager = await _get_mcp_manager()
         
         # Создаем пакет запросов
         batch_requests = [
@@ -325,12 +338,12 @@ async def main():
     
     # Запускаем тесты
     tests = [
-        ("Здоровье системы", test_mcp_health),
-        ("Анализ жалоб", test_complaint_analysis),
-        ("Подсказки МКБ-10", test_icd10_suggestions),
-        ("Лабораторные анализы", test_lab_interpretation),
-        ("Метрики MCP", test_mcp_metrics),
-        ("Пакетная обработка", test_batch_processing)
+        ("Здоровье системы", run_mcp_health),
+        ("Анализ жалоб", run_complaint_analysis),
+        ("Подсказки МКБ-10", run_icd10_suggestions),
+        ("Лабораторные анализы", run_lab_interpretation),
+        ("Метрики MCP", run_mcp_metrics),
+        ("Пакетная обработка", run_batch_processing)
     ]
     
     for test_name, test_func in tests:

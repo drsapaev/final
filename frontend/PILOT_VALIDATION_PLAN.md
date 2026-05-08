@@ -340,8 +340,8 @@ Bundle size: ___ KB
 
 - [ ] **Dry-run rollback**:
   ```bash
-  # Reset to baseline
-  git reset --hard HEAD~20
+  # Create a recovery branch at the baseline and validate it there.
+  git switch -c recovery/pilot-validation-baseline HEAD~20
   npm install
   npm test
   ```

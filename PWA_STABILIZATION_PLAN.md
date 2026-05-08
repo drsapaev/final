@@ -42,11 +42,12 @@ cd frontend
 # 1. Обновить package.json до актуальной версии
 npm install react@18.2.0 react-dom@18.2.0 --save-exact
 
-# 2. Удалить node_modules и package-lock
-rm -rf node_modules package-lock.json
-
-# 3. Чистая установка
+# 2. Чистая установка без ручного удаления дерева зависимостей
+# npm ci сам синхронизирует node_modules с package-lock.json
 npm ci
+
+# 3. Проверка
+npm run build
 
 # 4. Проверить отсутствие дубликатов
 npm ls react react-dom

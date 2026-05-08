@@ -1,30 +1,23 @@
-import sqlite3
+#!/usr/bin/env python3
+"""Retired root manual SQLite current database probe."""
 
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
+from __future__ import annotations
 
-# Проверим количество записей на сегодня
-cursor.execute('SELECT COUNT(*) FROM visits WHERE visit_date = "2025-10-01"')
-today_count = cursor.fetchone()[0]
-print(f'Визитов на сегодня в базе: {today_count}')
+import sys
 
-# Последние 5 записей на сегодня
-cursor.execute('''
-    SELECT v.id,
-           (p.last_name || ' ' || p.first_name || ' ' || COALESCE(p.middle_name, '')) as fio,
-           v.created_at,
-           v.department
-    FROM visits v
-    JOIN patients p ON v.patient_id = p.id
-    WHERE v.visit_date = "2025-10-01"
-    ORDER BY v.created_at DESC
-    LIMIT 5
-''')
+MESSAGE = """
+check_db_current.py is retired.
 
-rows = cursor.fetchall()
-print('Последние записи на сегодня:')
-for row in rows:
-    print(f'ID: {row[0]} | {row[1]} | {row[2]} | {row[3]}')
+This root-level manual probe opened the legacy SQLite database file directly with fixed historical
+dates. PostgreSQL plus Alembic is the runtime schema source of truth; use
+backend/tests or explicit Postgres diagnostics instead.
+""".strip()
 
-conn.close()
 
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

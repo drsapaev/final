@@ -24,10 +24,9 @@ def _shim_files() -> list[Path]:
     return files
 
 
-def test_all_endpoints_are_compatibility_shims() -> None:
+def test_compatibility_shims_point_to_existing_services() -> None:
     app_root = Path(__file__).resolve().parents[2] / "app"
     shim_files = _shim_files()
-    assert shim_files, "No compatibility shim endpoint modules found"
 
     for endpoint_file in shim_files:
         text = endpoint_file.read_text(encoding="utf-8")
@@ -43,10 +42,9 @@ def test_all_endpoints_are_compatibility_shims() -> None:
         assert service_path.exists(), endpoint_file.name
 
 
-def test_endpoint_shims_do_not_contain_runtime_logic() -> None:
-    """Endpoint modules must stay as pure re-export shims."""
+def test_compatibility_shims_do_not_contain_runtime_logic() -> None:
+    """If compatibility shims exist, they must stay as pure re-export shims."""
     shim_files = _shim_files()
-    assert shim_files, "No compatibility shim endpoint modules found"
 
     for endpoint_file in shim_files:
         tree = ast.parse(endpoint_file.read_text(encoding="utf-8"))

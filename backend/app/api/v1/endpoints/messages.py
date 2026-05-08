@@ -20,6 +20,7 @@ from app.core.messaging_config import MESSAGING_PERMISSIONS, can_send_message
 from app.models.file_system import File as FileModel, FileType
 from app.models.user import User
 from app.crud.message import message as message_crud
+from app.services.notifications import notification_sender_service
 from app.utils.file_validator import FileCategory, validate_upload_file
 from app.schemas.message import (
     MessageCreate, 
@@ -34,6 +35,11 @@ from app.schemas.message import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _build_conversation_id(first_user_id: int, second_user_id: int) -> str:
+    ordered_ids = sorted([int(first_user_id), int(second_user_id)])
+    return f"{ordered_ids[0]}:{ordered_ids[1]}"
 
 
 def sanitize_content(content: str) -> str:
@@ -204,6 +210,17 @@ async def send_message(
     # Отправить уведомление через WebSocket получателю
     from app.ws.chat_ws import chat_manager
     enriched_message = enrich_message(new_message, db)
+
+    await notification_sender_service.send_message_received_notification(
+        db=db,
+        recipient=recipient,
+        sender=current_user,
+        message_id=new_message.id,
+        conversation_id=_build_conversation_id(current_user.id, recipient.id),
+        message_type=new_message.message_type,
+        preview=sanitized_message_data.content,
+        patient_id=getattr(new_message, "patient_id", None),
+    )
     
     # Асинхронно отправляем уведомление (если получатель онлайн)
     import asyncio

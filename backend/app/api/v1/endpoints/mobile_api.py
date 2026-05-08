@@ -35,7 +35,7 @@ from app.schemas.mobile import (
     MobileVisitDetailOut,
     PatientProfileOut,
 )
-from app.services.mobile_api_service import MobileApiService
+from app.services.mobile_endpoint_service import MobileService
 from app.services.notifications import notification_sender_service
 
 router = APIRouter()
@@ -60,6 +60,7 @@ def compress_json_response(data: dict) -> Response:
         return JSONResponse(content=data)
 
 
+@router.post("/auth/login", response_model=MobileLoginResponse)
 @router.post("/mobile/auth/login", response_model=MobileLoginResponse)
 async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db)):
     """
@@ -109,7 +110,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
 
         # Обновляем токен устройства
         if credentials.device_token:
-            MobileApiService(db).update_user_device_token(
+            MobileService(db).update_user_device_token(
                 user=user,
                 device_token=credentials.device_token,
             )
@@ -471,7 +472,7 @@ async def mark_notification_read(
         # MobileNotificationService used 'read' field.
         
         if hasattr(notification, 'read'):
-             success = MobileApiService(db).mark_notification_as_read(
+             success = MobileService(db).mark_notification_as_read(
                  notification=notification
              )
         else:

@@ -21,6 +21,37 @@ from clinic_lifecycle_common import (
 )
 
 
+SENSITIVE_KEYS = {
+    "access_token",
+    "activation_key",
+    "authorization",
+    "password",
+    "refresh_token",
+    "secret",
+    "token",
+}
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if str(key).lower() in SENSITIVE_KEYS:
+                redacted[key] = "***"
+            else:
+                redacted[key] = _redact_sensitive(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    return value
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return _redact_sensitive(value)
+    return value
+
+
 def _run_health_check(expected_initialized: bool) -> None:
     helper = Path(__file__).resolve().parent / "health_check.py"
     env = os.environ.copy()
@@ -101,9 +132,9 @@ def _post_setup_initialize(payload: dict[str, Any]) -> dict[str, Any]:
         payload=payload,
     )
     if status != 200 or not isinstance(response, dict):
-        fail(f"setup initialize failed: HTTP {status} {raw}")
+        fail(f"setup initialize failed: HTTP {status} {_safe_payload(response or raw)}")
     if not response.get("initialized"):
-        fail(f"setup initialize returned unexpected payload: {response}")
+        fail(f"setup initialize returned unexpected payload: {_safe_payload(response)}")
     return response
 
 
@@ -129,9 +160,9 @@ def _maybe_login(payload: dict[str, Any]) -> None:
         payload={"username": username, "password": password, "remember_me": False},
     )
     if status != 200 or not isinstance(response, dict):
-        fail(f"Login smoke failed: HTTP {status} {raw}")
+        fail(f"Login smoke failed: HTTP {status} {_safe_payload(response or raw)}")
     if not response.get("access_token"):
-        fail(f"Login smoke returned no access token: {response}")
+        fail(f"Login smoke returned no access token: {_safe_payload(response)}")
 
 
 def main() -> int:
@@ -143,7 +174,10 @@ def main() -> int:
         f"{backend_url()}/api/v1/setup/status",
     )
     if status_status != 200 or not isinstance(status_payload, dict):
-        fail(f"setup/status check before install failed: HTTP {status_status} {status_raw}")
+        fail(
+            "setup/status check before install failed: "
+            f"HTTP {status_status} {_safe_payload(status_payload or status_raw)}"
+        )
     if bool(status_payload.get("initialized")):
         fail("Fresh install smoke expected an uninitialized deployment before setup")
 

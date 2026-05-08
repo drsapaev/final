@@ -1,7 +1,7 @@
 # Domain Context Map
 
 Status: draft for Phase 4 (`Domain Modules`)  
-Last updated: 2026-02-22
+Last updated: 2026-05-06
 
 ## Purpose
 
@@ -27,8 +27,9 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/family_relation.py`
 - `backend/app/models/user_profile.py` (patient-linked profile scenarios)
 - Owned services:
-- `backend/app/services/patients_api_service.py`
-- `backend/app/services/patient_appointments_api_service.py`
+- `backend/app/services/patient_service.py`
+- `backend/app/services/patient_portal_service.py`
+- `backend/app/services/patient_validation.py`
 - Owned repositories:
 - `backend/app/repositories/patients_api_repository.py`
 - `backend/app/repositories/patient_appointments_api_repository.py`
@@ -38,9 +39,8 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/appointment.py`
 - `backend/app/models/schedule.py`
 - Owned services:
-- `backend/app/services/appointments_api_service.py`
-- `backend/app/services/schedule_api_service.py`
-- `backend/app/services/appointment_flow_api_service.py`
+- `backend/app/services/appointment_flow_endpoint_service.py`
+- `backend/app/services/morning_assignment.py`
 - Owned repositories:
 - `backend/app/repositories/appointments_api_repository.py`
 - `backend/app/repositories/schedule_api_repository.py`
@@ -52,9 +52,10 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/queue_profile.py`
 - `backend/app/models/display_config.py`
 - Owned services:
-- `backend/app/services/queue_api_service.py`
-- `backend/app/services/online_queue_api_service.py`
-- `backend/app/services/qr_queue_api_service.py`
+- `backend/app/services/queue_endpoint_service.py`
+- `backend/app/services/queue_service.py`
+- `backend/app/services/online_queue.py`
+- `backend/app/services/qr_queue_service.py`
 - `backend/app/services/display_websocket.py`
 - Owned repositories:
 - `backend/app/repositories/queue_api_repository.py`
@@ -71,11 +72,14 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/refund_deposit.py`
 - `backend/app/models/dynamic_pricing.py`
 - Owned services:
-- `backend/app/services/billing_api_service.py`
-- `backend/app/services/payments_api_service.py`
+- `backend/app/services/billing_endpoint_service.py`
 - `backend/app/services/payment_init_service.py`
-- `backend/app/services/payment_webhooks_api_service.py`
-- `backend/app/services/payment_reconciliation_api_service.py`
+- `backend/app/services/payment_read_service.py`
+- `backend/app/services/payment_create_service.py`
+- `backend/app/services/payment_webhook.py`
+- `backend/app/services/payment_webhook_endpoint_service.py`
+- `backend/app/services/payment_reconciliation.py`
+- `backend/app/services/payment_reconciliation_endpoint_service.py`
 - Owned repositories:
 - `backend/app/repositories/billing_api_repository.py`
 - `backend/app/repositories/payments_api_repository.py`
@@ -94,12 +98,12 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/dermatology_photos.py`
 - `backend/app/models/ecg_data.py`
 - Owned services:
-- `backend/app/services/emr_v2_api_service.py`
-- `backend/app/services/emr_templates_api_service.py`
-- `backend/app/services/doctor_templates_api_service.py`
-- `backend/app/services/dental_api_service.py`
-- `backend/app/services/derma_api_service.py`
-- `backend/app/services/cardio_api_service.py`
+- `backend/app/services/emr_v2_service.py`
+- `backend/app/services/emr_templates.py`
+- `backend/app/services/doctor_templates_service.py`
+- `backend/app/services/dental_endpoint_service.py`
+- `backend/app/services/derma_endpoint_service.py`
+- `backend/app/services/emr_export_service.py`
 - Owned repositories:
 - `backend/app/repositories/emr_v2_api_repository.py`
 - `backend/app/repositories/emr_templates_api_repository.py`
@@ -115,11 +119,11 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/role_permission.py`
 - `backend/app/models/two_factor_auth.py`
 - Owned services:
-- `backend/app/services/auth_api_service.py`
-- `backend/app/services/authentication_api_service.py`
-- `backend/app/services/roles_api_service.py`
-- `backend/app/services/group_permissions_api_service.py`
-- `backend/app/services/two_factor_auth_api_service.py`
+- `backend/app/services/auth_endpoint_service.py`
+- `backend/app/services/authentication_endpoint_service.py`
+- `backend/app/services/roles_endpoint_service.py`
+- `backend/app/services/group_permissions_endpoint_service.py`
+- `backend/app/services/two_factor_auth_endpoint_service.py`
 - Owned repositories:
 - `backend/app/repositories/auth_api_repository.py`
 - `backend/app/repositories/authentication_api_repository.py`
@@ -145,7 +149,7 @@ All cross-context calls must use explicit contracts/facades (Phase 4 target), no
 | Caller context | Forbidden direct dependency | Required integration path |
 |---|---|---|
 | Any context | Importing another context's `backend/app/repositories/*` module directly | Use target context facade/contract package |
-| Any context | Importing another context's internal `backend/app/services/*_api_service.py` for business orchestration | Use public facade method only |
+| Any context | Importing another context's internal `backend/app/services/*_endpoint_service.py` or private service module for business orchestration | Use public facade method only |
 | `queue` | Direct use of billing repositories (`*payment*`, `billing_*`) | `billing` facade/contract (`payment status`, `charge`, `refund`) |
 | `billing` | Direct use of queue repositories (`queue_*`, `online_queue_*`, `qr_queue_*`) | `queue` facade/contract (`queue state`, `token state`) |
 | `scheduling` | Direct use of patient repositories for profile mutation | `patient` facade/contract (`lookup`, `validate`, `link`) |
@@ -169,4 +173,4 @@ All cross-context calls must use explicit contracts/facades (Phase 4 target), no
 ## Notes
 
 - This document maps boundaries; it does not replace detailed service-level API contracts.
-- Runtime service files were not modified in Task 1, so no service startup logging changes were applied yet.
+- Historical API-service mirror modules have been retired or renamed to explicit `*_endpoint_service.py` service-layer modules where tests still anchor endpoint behavior.

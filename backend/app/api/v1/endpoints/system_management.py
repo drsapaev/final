@@ -102,6 +102,8 @@ async def create_backup(
         else:
             raise HTTPException(status_code=400, detail="Неподдерживаемый тип бэкапа")
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка создания бэкапа: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -362,7 +364,11 @@ async def update_monitoring_thresholds(
         monitoring_service = get_monitoring_service()
 
         # Фильтруем только заданные значения
-        new_thresholds = {k: v for k, v in thresholds.dict().items() if v is not None}
+        new_thresholds = {
+            key: value
+            for key, value in thresholds.model_dump().items()
+            if value is not None
+        }
 
         result = monitoring_service.update_thresholds(new_thresholds)
 

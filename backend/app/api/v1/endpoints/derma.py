@@ -21,7 +21,7 @@ from app.schemas.derma import (
     DermaProcedureCreate,
     DermaProcedureOut,
 )
-from app.services.derma_api_service import DermaApiDomainError, DermaApiService
+from app.services.derma_endpoint_service import DermaDomainError, DermaService
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
@@ -298,7 +298,7 @@ async def create_price_override(
     Дерматолог изменяет цену процедуры с указанием причины
     """
     try:
-        service = DermaApiService(db)
+        service = DermaService(db)
         price_override = service.create_price_override(
             override_data=override_data,
             user_id=user.id,
@@ -316,7 +316,7 @@ async def create_price_override(
             created_at=price_override.created_at,
         )
 
-    except DermaApiDomainError as exc:
+    except DermaDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -340,7 +340,7 @@ async def get_price_overrides(
     Получить список изменений цен дерматолога
     """
     try:
-        overrides = DermaApiService(db).get_price_overrides(
+        overrides = DermaService(db).get_price_overrides(
             user_id=user.id,
             visit_id=visit_id,
             status=status,
@@ -362,7 +362,7 @@ async def get_price_overrides(
             for override in overrides
         ]
 
-    except DermaApiDomainError as exc:
+    except DermaDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

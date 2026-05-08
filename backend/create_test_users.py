@@ -4,16 +4,17 @@
 """
 import os
 from datetime import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.db.base_class import Base
-from app.models.user import User
-from app.core.security import get_password_hash
-from app.core.config import settings
 
 
-def _database_url() -> str:
-    database_url = str(settings.DATABASE_URL).strip()
+def _require_create_test_users_confirmation() -> None:
+    if os.getenv("CONFIRM_CREATE_TEST_USERS") != "1":
+        raise SystemExit(
+            "Set CONFIRM_CREATE_TEST_USERS=1 before creating or updating test users."
+        )
+
+
+def _database_url(database_url_value: str) -> str:
+    database_url = database_url_value.strip()
     if not database_url:
         raise RuntimeError("DATABASE_URL must be set before creating test users.")
     if database_url.lower().startswith("sqlite"):
@@ -34,12 +35,21 @@ def _required_password(username: str) -> str:
     raise RuntimeError(f"Set {expected} before creating or updating user '{username}'.")
 
 
-SQLALCHEMY_DATABASE_URL = _database_url()
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 def create_test_users():
-    db = SessionLocal()
+    _require_create_test_users_confirmation()
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import settings
+    from app.core.security import get_password_hash
+    from app.models.user import User
+
+    sql_url = _database_url(str(settings.DATABASE_URL))
+    engine = create_engine(sql_url)
+    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db = session_local()
     try:
         print("🔧 СОЗДАНИЕ ТЕСТОВЫХ ПОЛЬЗОВАТЕЛЕЙ")
         print("=================================")

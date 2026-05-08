@@ -1,37 +1,23 @@
-import requests
-import json
+#!/usr/bin/env python3
+"""Retired root manual registrar API probe."""
 
-# Токен из логов
-token = "REDACTED_JWT"
+from __future__ import annotations
 
-try:
-    response = requests.get(
-        'http://localhost:18000/api/v1/registrar/queues/today',
-        headers={'Authorization': f'Bearer {token}'}
-    )
+import sys
 
-    if response.status_code == 200:
-        data = response.json()
-        print(f"✅ API вернул данные: {response.status_code}")
-        print(f"📊 Очередей: {len(data.get('queues', []))}")
+MESSAGE = """
+test_api.py is retired.
 
-        total_entries = 0
-        for queue in data.get('queues', []):
-            entries = len(queue.get('entries', []))
-            total_entries += entries
-            print(f"  {queue['specialty']}: {entries} записей")
+This root-level manual probe used a copied JWT and live localhost registrar API
+assumptions outside the canonical test suites. Use backend/tests or explicit
+env-driven smoke scripts instead.
+""".strip()
 
-        print(f"📋 Всего записей: {total_entries}")
 
-        if total_entries > 6:
-            print("✅ НОВАЯ ЗАПИСЬ ОБНАРУЖЕНА!")
-        else:
-            print("❌ Новая запись НЕ найдена")
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-    else:
-        print(f"❌ Ошибка API: {response.status_code}")
-        print(response.text)
 
-except Exception as e:
-    print(f"❌ Ошибка запроса: {e}")
-
+if __name__ == "__main__":
+    raise SystemExit(main())

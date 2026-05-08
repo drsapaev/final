@@ -58,6 +58,11 @@ class Settings(BaseSettings):
         description="JWT secret key - MUST be set via environment variable in production (min 32 chars)"
     )  # ⚠️ REQUIRED: No default value for security
     ALGORITHM: str = "HS256"
+    AUTH_SECRET: str | None = Field(
+        default=None,
+        description="Legacy JWT helper secret. Defaults to SECRET_KEY when unset.",
+    )
+    AUTH_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
     # --- CORS (при необходимости) ---
@@ -65,10 +70,6 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5174",
-            "http://localhost:18080",
-            "http://127.0.0.1:18080",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
         ],
@@ -111,6 +112,25 @@ class Settings(BaseSettings):
     # --- Celery ---
     CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
     CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
+
+    # --- Payment Providers ---
+    CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
+    CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")
+    CLICK_MERCHANT_ID: str | None = Field(default=None, description="Click merchant id")
+    CLICK_SECRET_KEY: str | None = Field(default=None, description="Click secret key")
+    CLICK_BASE_URL: str = Field(default="https://api.click.uz/v2")
+
+    PAYME_ENABLED: bool = Field(default=False, description="Enable PayMe payments")
+    PAYME_MERCHANT_ID: str | None = Field(default=None, description="PayMe merchant id")
+    PAYME_SECRET_KEY: str | None = Field(default=None, description="PayMe secret key")
+    PAYME_BASE_URL: str = Field(default="https://checkout.paycom.uz")
+    PAYME_API_URL: str = Field(default="https://api.paycom.uz")
+
+    KASPI_ENABLED: bool = Field(default=False, description="Enable Kaspi payments")
+    KASPI_MERCHANT_ID: str | None = Field(default=None, description="Kaspi merchant id")
+    KASPI_SECRET_KEY: str | None = Field(default=None, description="Kaspi secret key")
+    KASPI_BASE_URL: str = Field(default="https://kaspi.kz/pay")
+    KASPI_API_URL: str = Field(default="https://api.kaspi.kz/pay/v1")
 
     # --- App meta ---
     APP_NAME: str = "Clinic Manager"
@@ -353,6 +373,7 @@ _DEFAULT_SECRET_KEY = secrets.token_urlsafe(32)
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
+    secret_key_from_process_env = os.getenv("SECRET_KEY")
     # Загружаем backend/.env в os.environ до os.getenv("SECRET_KEY"), иначе ключ из файла игнорируется.
     if _DEFAULT_ENV_FILE.is_file():
         from dotenv import load_dotenv
@@ -369,6 +390,12 @@ def get_settings() -> Settings:
         # Fallback для dev mode - используем default или persistent key
         s = Settings(SECRET_KEY=_DEFAULT_SECRET_KEY)
     env = (s.ENV or os.getenv("ENV", "dev")).lower()
+
+    if env in ("prod", "production") and not secret_key_from_process_env:
+        raise ValueError(
+            "SECRET_KEY must be set via environment variable in production. "
+            "Do not rely on backend/.env for production secrets."
+        )
 
     # Validate SECRET_KEY on load
     if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
@@ -440,6 +467,13 @@ def get_settings() -> Settings:
     if len(s.SECRET_KEY) < 32:
         raise ValueError(
             f"SECRET_KEY must be at least 32 characters long. Current length: {len(s.SECRET_KEY)}"
+        )
+
+    if not s.AUTH_SECRET:
+        s.AUTH_SECRET = s.SECRET_KEY
+    if len(s.AUTH_SECRET) < 32:
+        raise ValueError(
+            f"AUTH_SECRET must be at least 32 characters long. Current length: {len(s.AUTH_SECRET)}"
         )
 
     if os.getenv("CORS_ORIGINS") and not os.getenv("BACKEND_CORS_ORIGINS"):

@@ -5,6 +5,7 @@ from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue
 from app.models.user import User
+from tests.auth_test_credentials import DOCTOR_PASSWORD
 
 
 def test_available_doctor_users_excludes_already_linked_accounts(
@@ -16,7 +17,7 @@ def test_available_doctor_users_excludes_already_linked_accounts(
         username="linked_doc",
         email="linked@test.com",
         full_name="Linked Doctor",
-        hashed_password=get_password_hash("secret123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
     )
@@ -24,7 +25,7 @@ def test_available_doctor_users_excludes_already_linked_accounts(
         username="free_doc",
         email="free@test.com",
         full_name="Free Doctor",
-        hashed_password=get_password_hash("secret123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
     )
@@ -71,7 +72,7 @@ def test_admin_appointments_returns_enriched_doctor_and_effective_cabinet(
         username="enriched_doc",
         email="enriched@test.com",
         full_name="Enriched Doctor",
-        hashed_password=get_password_hash("secret123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
     )
@@ -134,7 +135,7 @@ def test_queue_cabinet_info_reports_sync_status_and_rejects_manual_canonical_cha
         username="queue_doc",
         email="queue@test.com",
         full_name="Queue Doctor",
-        hashed_password=get_password_hash("secret123"),
+        hashed_password=get_password_hash(DOCTOR_PASSWORD),
         role="Doctor",
         is_active=True,
     )

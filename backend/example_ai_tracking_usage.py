@@ -3,12 +3,37 @@
 Пример использования трекинга AI моделей в авто режиме
 """
 import asyncio
-from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
-from app.services.ai_service_enhanced import get_enhanced_ai_service
+import os
+
+
+def require_ai_tracking_example_confirmation():
+    if os.getenv("CONFIRM_AI_TRACKING_EXAMPLE") != "1":
+        raise RuntimeError(
+            "Refusing to run AI tracking example. "
+            "It can call external AI providers and write tracking records. "
+            "Set CONFIRM_AI_TRACKING_EXAMPLE=1 only for an explicit local example run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before running the AI tracking example.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError(
+            "example_ai_tracking_usage.py requires PostgreSQL; SQLite is not allowed."
+        )
 
 
 async def example_ai_tracking():
+    require_ai_tracking_example_confirmation()
+    require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.services.ai_service_enhanced import get_enhanced_ai_service
+
     """Пример использования трекинга AI моделей"""
     
     # Создаем сессию базы данных

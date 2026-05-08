@@ -3,13 +3,14 @@ from __future__ import annotations
 from pydantic import ValidationError
 
 from app.schemas.user_management import UserCreateRequest, UserUpdateRequest
+from tests.auth_test_credentials import GENERIC_TEST_PASSWORD
 
 
 def test_user_create_request_allows_reserved_test_domain() -> None:
     request = UserCreateRequest(
         username="qa_admin_reserved",
         email="QA_Admin@Test.Local",
-        password="Admin1234",
+        password=GENERIC_TEST_PASSWORD,
         role="Admin",
         full_name="QA Admin Reserved",
     )
@@ -30,7 +31,7 @@ def test_user_create_request_rejects_invalid_email() -> None:
         UserCreateRequest(
             username="qa_admin_invalid",
             email="user@localhost",
-            password="Admin1234",
+            password=GENERIC_TEST_PASSWORD,
             role="Admin",
         )
     except ValidationError as exc:

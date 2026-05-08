@@ -1,29 +1,47 @@
-# Скрипт для остановки всех процессов на порту 18000
-Write-Host "[*] Поиск процессов на порту 18000..." -ForegroundColor Cyan
+param(
+    [switch]$ForcePortOwner
+)
 
-$connections = Get-NetTCPConnection -LocalPort 18000 -ErrorAction SilentlyContinue
+$port = 18000
+$allowKill = $ForcePortOwner -or ($env:CONFIRM_KILL_PORT_18000_OWNER -eq "1")
 
-if ($connections) {
-    $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+Write-Host "[*] Searching for listeners on port $port..." -ForegroundColor Cyan
 
-    foreach ($processId in $pids) {
-        try {
-            $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-            if ($process) {
-                Write-Host "[!] Остановка процесса: $($process.ProcessName) (PID: $processId)" -ForegroundColor Yellow
-                Stop-Process -Id $processId -Force
-                Write-Host "[OK] Процесс PID $processId остановлен" -ForegroundColor Green
-            }
-        }
-        catch {
-            Write-Host "[ERROR] Не удалось остановить процесс PID $processId" -ForegroundColor Red
-        }
+$connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+
+if (-not $connections) {
+    Write-Host "[OK] Port $port is free." -ForegroundColor Green
+    exit 0
+}
+
+$pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+
+foreach ($processId in $pids) {
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    if (-not $process) {
+        continue
     }
 
-    Start-Sleep -Seconds 1
-    Write-Host ""
-    Write-Host "[OK] Порт 18000 освобожден!" -ForegroundColor Green
+    Write-Host "[WARN] Port owner: $($process.ProcessName) (PID: $processId)" -ForegroundColor Yellow
+    if (-not $allowKill) {
+        Write-Host "Refusing to stop PID $processId without -ForcePortOwner or CONFIRM_KILL_PORT_18000_OWNER=1" -ForegroundColor Red
+        continue
+    }
+
+    try {
+        Stop-Process -Id $processId -Force
+        Write-Host "[OK] Stopped PID $processId." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[ERROR] Failed to stop PID $processId." -ForegroundColor Red
+    }
 }
-else {
-    Write-Host "[OK] Порт 18000 свободен" -ForegroundColor Green
+
+Start-Sleep -Seconds 1
+$remaining = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+if ($remaining) {
+    Write-Host "[WARN] Port $port is still busy." -ForegroundColor Yellow
+    exit 1
 }
+
+Write-Host "[OK] Port $port is free." -ForegroundColor Green

@@ -4,17 +4,72 @@
 
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import psutil
-from sqlalchemy import create_engine, text
-
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
+
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        logger.error(
+            "Refusing SQLite DATABASE_URL for monitoring metrics without explicit legacy/test opt-in"
+        )
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for monitoring metrics. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
+def _get_database_url() -> str:
+    from app.core.config import settings
+
+    db_url = settings.DATABASE_URL
+    if not db_url:
+        raise ValueError("DATABASE_URL must be configured before monitoring metrics.")
+    url = str(db_url)
+    _validate_database_url(url)
+    return url
+
+
+def _sqlite_path_from_url(url: str) -> str:
+    db_file = url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
+    if not os.path.isabs(db_file):
+        db_file = os.path.join(os.getcwd(), db_file)
+    return db_file
+
+
+def _create_database_engine(db_url: str):
+    from sqlalchemy import create_engine
+
+    return create_engine(db_url)
+
+
+def _sql_text(statement: str):
+    from sqlalchemy import text
+
+    return text(statement)
+
+
+def _psutil():
+    import psutil
+
+    return psutil
 
 
 class MonitoringService:
@@ -41,6 +96,8 @@ class MonitoringService:
         """Получает текущие системные метрики"""
         try:
             # CPU метрики
+            psutil = _psutil()
+
             cpu_percent = psutil.cpu_percent(interval=1)
             cpu_count = psutil.cpu_count()
             cpu_freq = psutil.cpu_freq()
@@ -123,42 +180,43 @@ class MonitoringService:
     def _get_database_metrics(self) -> dict[str, Any]:
         """Получает метрики базы данных"""
         try:
-            engine = create_engine(settings.DATABASE_URL)
+            db_url = _get_database_url()
+            engine = _create_database_engine(db_url)
 
             with engine.connect() as conn:
                 # Количество активных соединений
-                if "sqlite" in settings.DATABASE_URL:
+                if _is_sqlite_url(db_url):
                     # Для SQLite соединения не актуальны
                     active_connections = 1
 
                     # Размер БД
-                    db_file = settings.DATABASE_URL.replace("sqlite:///", "")
+                    db_file = _sqlite_path_from_url(db_url)
                     db_size = (
                         Path(db_file).stat().st_size if Path(db_file).exists() else 0
                     )
 
                     # Количество таблиц
                     tables_result = conn.execute(
-                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+                        _sql_text("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
                     )
                     tables_count = tables_result.scalar()
 
                 else:
                     # Для PostgreSQL
                     conn_result = conn.execute(
-                        text("SELECT COUNT(*) FROM pg_stat_activity")
+                        _sql_text("SELECT COUNT(*) FROM pg_stat_activity")
                     )
                     active_connections = conn_result.scalar()
 
                     # Размер БД
                     size_result = conn.execute(
-                        text("SELECT pg_database_size(current_database())")
+                        _sql_text("SELECT pg_database_size(current_database())")
                     )
                     db_size = size_result.scalar()
 
                     # Количество таблиц
                     tables_result = conn.execute(
-                        text(
+                        _sql_text(
                             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
                         )
                     )
@@ -184,7 +242,7 @@ class MonitoringService:
                         continue
                     try:
                         # Безопасно: используем предопределенное имя таблицы из whitelist
-                        result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                        result = conn.execute(_sql_text(f"SELECT COUNT(*) FROM {table}"))
                         count = result.scalar()
                         records_count[table] = count
                         total_records += count
@@ -256,14 +314,17 @@ class MonitoringService:
             # Время отклика БД
             start_time = time.time()
             try:
-                engine = create_engine(settings.DATABASE_URL)
+                db_url = _get_database_url()
+                engine = _create_database_engine(db_url)
                 with engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
+                    conn.execute(_sql_text("SELECT 1"))
                 db_response_time = time.time() - start_time
             except:
                 db_response_time = -1
 
             # Загрузка системы
+            psutil = _psutil()
+
             load_avg = (
                 psutil.getloadavg() if hasattr(psutil, 'getloadavg') else [0, 0, 0]
             )

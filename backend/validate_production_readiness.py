@@ -14,23 +14,19 @@ from pathlib import Path
 # Add backend to sys.path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import sessionmaker
-
-from app.core.config import get_settings
-
 def get_db_url():
+    from app.core.config import get_settings
+
     try:
         settings = get_settings()
         db_url = str(settings.DATABASE_URL or "").strip()
     except Exception as exc:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to validate a fallback database"
         ) from exc
 
     if not db_url:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to validate a fallback database"
         )
 
@@ -44,19 +40,34 @@ def normalize_sync_db_url(db_url):
 
 
 def is_sqlite_url(db_url):
+    from sqlalchemy.engine import make_url
+
     return make_url(db_url).drivername.startswith("sqlite")
 
 
+def allow_sqlite_database_url():
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enforce_database_url_policy(db_url):
+    if is_sqlite_url(db_url) and not allow_sqlite_database_url():
+        raise SystemExit(
+            "SQLite DATABASE_URL is disabled for validate_production_readiness.py. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
 def display_db_url(db_url):
+    from sqlalchemy.engine import make_url
+
     return make_url(db_url).render_as_string(hide_password=True)
 
 
-DATABASE_URL = normalize_sync_db_url(get_db_url())
-
-print("=" * 80)
-print("PRODUCTION READINESS VALIDATION")
-print("=" * 80)
-print(f"Database URL: {display_db_url(DATABASE_URL)}\n")
+DATABASE_URL = ""
 
 class ValidationResult:
     def __init__(self):
@@ -112,6 +123,8 @@ class ValidationResult:
 
 def check_fk_enforcement(engine, result):
     """Check that FK enforcement is enabled"""
+    from sqlalchemy import text
+
     print("1. Checking FK Enforcement...")
     if not is_sqlite_url(DATABASE_URL):
         result.add_pass("Foreign key enforcement is managed by the database engine")
@@ -134,6 +147,9 @@ def check_fk_enforcement(engine, result):
 
 def check_orphaned_records(engine, result):
     """Check for orphaned records"""
+    from sqlalchemy import inspect, text
+    from sqlalchemy.orm import sessionmaker
+
     print("\n2. Checking for Orphaned Records...")
     
     inspector = inspect(engine)
@@ -230,6 +246,8 @@ def check_fk_policies(engine, result):
 
 def check_schema_integrity(engine, result):
     """Check database schema integrity"""
+    from sqlalchemy import inspect
+
     print("\n4. Checking Schema Integrity...")
     
     inspector = inspect(engine)
@@ -319,6 +337,18 @@ def check_environment_config(result):
         result.add_fail(f"Error checking environment configuration: {e}")
 
 def main():
+    from sqlalchemy import create_engine
+
+    global DATABASE_URL
+
+    DATABASE_URL = normalize_sync_db_url(get_db_url())
+    enforce_database_url_policy(DATABASE_URL)
+
+    print("=" * 80)
+    print("PRODUCTION READINESS VALIDATION")
+    print("=" * 80)
+    print(f"Database URL: {display_db_url(DATABASE_URL)}\n")
+
     engine = create_engine(DATABASE_URL, future=True)
     result = ValidationResult()
     

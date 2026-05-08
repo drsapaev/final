@@ -13,8 +13,8 @@
 ### 1. **Остановка конфликтующих процессов** ✅
 ```bash
 # Остановил все процессы на порту 5173
-taskkill /PID 17584 /F
-taskkill /PID 18184 /F
+powershell -ExecutionPolicy Bypass -File C:\final\frontend\kill_port_5173.ps1
+# Add -ForcePortOwner only after verifying the shown PID belongs to this dev server.
 ```
 
 ### 2. **Проверка освобождения порта** ✅

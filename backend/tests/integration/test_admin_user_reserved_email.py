@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.models.user import User
+from tests.auth_test_credentials import GENERIC_TEST_PASSWORD
 
 
 def test_admin_user_create_accepts_reserved_test_domain(
@@ -11,7 +12,7 @@ def test_admin_user_create_accepts_reserved_test_domain(
     payload = {
         "username": "qa_admin_reserved_api",
         "email": "QA_Admin_API@Test.Local",
-        "password": "Admin1234",
+        "password": GENERIC_TEST_PASSWORD,
         "role": "Admin",
         "is_active": True,
         "full_name": "QA Admin Reserved API",

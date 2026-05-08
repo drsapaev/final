@@ -19,10 +19,10 @@
 2. **Установка токена:**
    ```bash
    # В .env файле
-   TELEGRAM_BOT_TOKEN=your-bot-token-here
+   TELEGRAM_BOT_TOKEN=
    
    # Или в переменных окружения
-   export TELEGRAM_BOT_TOKEN="your-bot-token"
+   export TELEGRAM_BOT_TOKEN=""
    ```
 
 ### Функции бота
@@ -225,7 +225,7 @@ await registration.showNotification('Заголовок', {
 
 1. **Переменные окружения:**
    ```bash
-   TELEGRAM_BOT_TOKEN=your-bot-token
+   TELEGRAM_BOT_TOKEN=
    FRONTEND_URL=https://your-domain.com
    ```
 

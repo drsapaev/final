@@ -68,7 +68,7 @@ python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py
 - Treat `Stop conditions` as hard stops
 - If gate fails, stop and report instead of editing
 - If gate misroutes, retry once with `--known-root-cause`
-- Record evidence in `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`
+- Treat `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` as a historical log; do not append routine entries unless explicitly evaluating LightRAG/dev-brain quality.
 
 ## Canonical First Discipline
 
@@ -556,5 +556,5 @@ Use `handoff` as the default input contract for the next agent when a real code 
 - Database source of truth: PostgreSQL + Alembic (never SQLite)
 - **Execution discipline:** Follow AGENTS.md for canonical-first, safe patch slice, and stop conditions
 - **For risky tasks:** Use `agent_gate.py` before editing
-- **Record evidence:** Append to `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` for risky tasks
+- **LightRAG evidence:** Treat `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` as historical; do not append routine risky-task entries.
 - Recent work: Service management enhancements (audit log, batch ops, optimistic updates, change preview)

@@ -4,7 +4,7 @@
 - `ENV` — окружение: `dev|stage|prod`.
 - `APP_NAME` / `APP_VERSION` — метаданные приложения.
 - `API_V1_STR` — префикс API (по умолчанию `/api/v1`).
-- `CORS_ALLOW_ALL` — `1` чтобы разрешить все источники; иначе перечислите `CORS_ORIGINS` через запятую.
+- `CORS_ALLOW_ALL` - local diagnostics only. Keep it `0` in `stage|prod`; configure explicit origins with `CORS_ORIGINS`.
 - `CORS_ORIGINS` — CSV список источников (например, `http://localhost:5173,http://localhost:4173`).
 - `DATABASE_URL` — строка подключения к PostgreSQL (локальный пример: `postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb`).
 - `AUTH_SECRET` / `ACCESS_TOKEN_EXPIRE_MINUTES` / `AUTH_ALGORITHM` — параметры JWT.

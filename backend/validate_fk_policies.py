@@ -8,23 +8,20 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sqlalchemy import create_engine, inspect, text  # noqa: E402
-from sqlalchemy.engine import make_url  # noqa: E402
-
-from app.core.config import get_settings  # noqa: E402
-
 
 def get_db_url() -> str:
+    from app.core.config import get_settings
+
     try:
         settings = get_settings()
         db_url = str(settings.DATABASE_URL or "").strip()
     except Exception as exc:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to validate a fallback database"
         ) from exc
 
     if not db_url:
-        raise RuntimeError(
+        raise SystemExit(
             "DATABASE_URL is required; refusing to validate a fallback database"
         )
 
@@ -38,23 +35,40 @@ def normalize_sync_db_url(db_url: str) -> str:
 
 
 def is_sqlite_url(db_url: str) -> bool:
+    from sqlalchemy.engine import make_url
+
     return make_url(db_url).drivername.startswith("sqlite")
 
 
+def allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enforce_database_url_policy(db_url: str) -> None:
+    if is_sqlite_url(db_url) and not allow_sqlite_database_url():
+        raise SystemExit(
+            "SQLite DATABASE_URL is disabled for validate_fk_policies.py. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
+
+
 def display_db_url(db_url: str) -> str:
+    from sqlalchemy.engine import make_url
+
     return make_url(db_url).render_as_string(hide_password=True)
 
 
-DATABASE_URL = normalize_sync_db_url(get_db_url())
-
-print("=" * 80)
-print("FK POLICY VALIDATION")
-print("=" * 80)
-print(f"Database URL: {display_db_url(DATABASE_URL)}\n")
+DATABASE_URL = ""
 
 
 def check_fk_enforcement(engine) -> bool:
     """Check FK enforcement where the database exposes a runtime switch."""
+    from sqlalchemy import text
+
     print("Step 1: Checking FK enforcement...")
 
     if not is_sqlite_url(DATABASE_URL):
@@ -74,6 +88,8 @@ def check_fk_enforcement(engine) -> bool:
 
 def get_all_fk_constraints(engine) -> List[Dict[str, Any]]:
     """Get all FK constraints through SQLAlchemy inspector."""
+    from sqlalchemy import inspect
+
     print("Step 2: Analyzing FK constraints...")
     fk_constraints = []
 
@@ -119,6 +135,18 @@ def test_cascade_behavior(engine) -> bool:
 
 
 def main() -> int:
+    from sqlalchemy import create_engine
+
+    global DATABASE_URL
+
+    DATABASE_URL = normalize_sync_db_url(get_db_url())
+    enforce_database_url_policy(DATABASE_URL)
+
+    print("=" * 80)
+    print("FK POLICY VALIDATION")
+    print("=" * 80)
+    print(f"Database URL: {display_db_url(DATABASE_URL)}\n")
+
     engine = create_engine(DATABASE_URL, future=True)
 
     if not check_fk_enforcement(engine):

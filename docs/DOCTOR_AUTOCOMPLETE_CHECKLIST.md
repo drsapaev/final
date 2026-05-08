@@ -65,8 +65,8 @@
 
 ### Backend
 ```bash
-# 1. Проверить таблицу
-sqlite3 clinic.db "SELECT COUNT(*) FROM doctor_phrase_history;"
+# 1. Проверить таблицу в Postgres
+psql "$DATABASE_URL" -c "SELECT COUNT(*) FROM doctor_phrase_history;"
 
 # 2. Проверить API
 curl http://localhost:18000/api/v1/emr/readiness/123

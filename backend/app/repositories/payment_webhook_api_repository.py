@@ -14,7 +14,11 @@ from app.crud.payment_webhook import (
     get_webhook_by_id,
     update_provider,
 )
+from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+from app.models.user import User
+from app.models.visit import Visit
 from app.schemas.payment_webhook import PaymentProviderCreate, PaymentProviderUpdate
 from app.services.payment_webhook import payment_webhook_service
 
@@ -113,3 +117,33 @@ class PaymentWebhookApiRepository:
 
     def get_webhook(self, webhook_id: int):
         return get_webhook_by_id(self.db, webhook_id)
+
+    def get_latest_transaction_for_webhook(self, webhook_id: int | str | None):
+        return (
+            self.db.query(PaymentTransaction)
+            .filter(PaymentTransaction.webhook_id == webhook_id)
+            .order_by(PaymentTransaction.id.desc())
+            .first()
+        )
+
+    def get_payment(self, payment_id: int):
+        return self.db.query(Payment).filter(Payment.id == payment_id).first()
+
+    def get_visit(self, visit_id: int):
+        return self.db.query(Visit).filter(Visit.id == visit_id).first()
+
+    def get_patient(self, patient_id: int):
+        return self.db.query(Patient).filter(Patient.id == patient_id).first()
+
+    def get_active_user(self, user_id: int):
+        return (
+            self.db.query(User)
+            .filter(User.id == user_id, User.is_active.is_(True))
+            .first()
+        )
+
+    def commit(self) -> None:
+        self.db.commit()
+
+    def rollback(self) -> None:
+        self.db.rollback()

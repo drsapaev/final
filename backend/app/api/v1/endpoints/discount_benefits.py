@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.models.discount_benefits import BenefitType, DiscountType
 from app.models.user import User
-from app.services.discount_benefits_api_service import (
-    DiscountBenefitsApiDomainError,
-    DiscountBenefitsApiService,
+from app.services.discount_benefits_endpoint_service import (
+    DiscountBenefitsDomainError,
+    DiscountBenefitsEndpointService,
 )
 from app.services.discount_benefits_service import DiscountBenefitsService
 
@@ -182,7 +182,7 @@ async def get_discounts(
     current_user: User = Depends(get_current_user),
 ):
     """Получить список скидок"""
-    discounts = DiscountBenefitsApiService(db).get_discounts(
+    discounts = DiscountBenefitsEndpointService(db).get_discounts(
         active_only=active_only,
         service_ids=service_ids,
     )
@@ -218,13 +218,13 @@ async def update_discount(
     current_user: User = Depends(get_current_user),
 ):
     """Обновить скидку"""
-    service = DiscountBenefitsApiService(db)
+    service = DiscountBenefitsEndpointService(db)
     try:
         service.update_discount(
             discount_id=discount_id,
             update_data=discount_data.dict(exclude_unset=True),
         )
-    except DiscountBenefitsApiDomainError as exc:
+    except DiscountBenefitsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return {"success": True, "message": "Скидка обновлена успешно"}
@@ -237,10 +237,10 @@ async def delete_discount(
     current_user: User = Depends(get_current_user),
 ):
     """Удалить скидку"""
-    service = DiscountBenefitsApiService(db)
+    service = DiscountBenefitsEndpointService(db)
     try:
         service.delete_discount(discount_id=discount_id)
-    except DiscountBenefitsApiDomainError as exc:
+    except DiscountBenefitsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return {"success": True, "message": "Скидка деактивирована успешно"}
@@ -309,7 +309,7 @@ async def get_benefits(
     current_user: User = Depends(get_current_user),
 ):
     """Получить список льгот"""
-    benefits = DiscountBenefitsApiService(db).list_benefits(active_only=active_only)
+    benefits = DiscountBenefitsEndpointService(db).list_benefits(active_only=active_only)
 
     return {
         "success": True,
@@ -479,7 +479,7 @@ async def get_loyalty_programs(
     current_user: User = Depends(get_current_user),
 ):
     """Получить программы лояльности"""
-    programs = DiscountBenefitsApiService(db).list_loyalty_programs(
+    programs = DiscountBenefitsEndpointService(db).list_loyalty_programs(
         active_only=active_only
     )
 

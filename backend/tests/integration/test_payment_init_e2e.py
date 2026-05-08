@@ -7,7 +7,31 @@ from decimal import Decimal
 
 import pytest
 
+from app.core.config import settings
 from app.models.payment import Payment
+from app.services import payment_provider_manager_factory as payment_factory
+
+
+@pytest.fixture(autouse=True)
+def configured_payment_providers(monkeypatch):
+    provider_settings = {
+        "CLICK_ENABLED": True,
+        "CLICK_SERVICE_ID": "pytest-click-service",
+        "CLICK_MERCHANT_ID": "pytest-click-merchant",
+        "CLICK_SECRET_KEY": "pytest-click-secret",
+        "PAYME_ENABLED": True,
+        "PAYME_MERCHANT_ID": "pytest-payme-merchant",
+        "PAYME_SECRET_KEY": "pytest-payme-secret",
+        "KASPI_ENABLED": True,
+        "KASPI_MERCHANT_ID": "pytest-kaspi-merchant",
+        "KASPI_SECRET_KEY": "pytest-kaspi-secret",
+    }
+    for name, value in provider_settings.items():
+        monkeypatch.setattr(settings, name, value)
+
+    payment_factory.reset_payment_manager_for_tests()
+    yield
+    payment_factory.reset_payment_manager_for_tests()
 
 
 @pytest.mark.integration

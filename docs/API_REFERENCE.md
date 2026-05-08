@@ -17,14 +17,17 @@ Login and get access token.
 ```json
 {
   "username": "admin",
-  "password": "<set QA_ADMIN_PASSWORD>"
+  "password": "<admin_password_from_environment>"
 }
 ```
+
+Use the password configured for the target environment; the project does not
+document or rely on a default admin password.
 
 **Response:**
 ```json
 {
-  "access_token": "eyJhbGciOi...",
+  "access_token": "<access_token>",
   "token_type": "bearer",
   "expires_in": 43200
 }

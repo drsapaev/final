@@ -25,6 +25,7 @@ from app.services.lab_reporting_service import (
     LabReportingDomainError,
     LabReportingService,
 )
+from tests.auth_test_credentials import DUMMY_PASSWORD_HASH
 
 
 @pytest.mark.unit
@@ -760,7 +761,7 @@ class TestLabReportingService:
                 username="test_lab_user",
                 email="lab@test.com",
                 full_name="Test Lab",
-                hashed_password="hashed-password",
+                hashed_password=DUMMY_PASSWORD_HASH,
                 role="Lab",
                 is_active=True,
                 is_superuser=False,

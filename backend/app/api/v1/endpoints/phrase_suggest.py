@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.services.doctor_phrase_service import DoctorPhraseService, get_doctor_phrase_service
-from app.services.phrase_suggest_api_service import PhraseSuggestApiService
+from app.services.phrase_suggest_endpoint_service import PhraseSuggestService
 
 router = APIRouter()
 
@@ -145,7 +145,7 @@ async def get_phrase_stats(
     """
     Получить статистику фраз врача.
     """
-    return PhraseSuggestApiService(db).get_phrase_stats(doctor_id=doctor_id)
+    return PhraseSuggestService(db).get_phrase_stats(doctor_id=doctor_id)
 
 
 # ============================================
@@ -213,7 +213,7 @@ async def record_telemetry(
     Используется для расчёта acceptance_rate.
     """
     try:
-        result = PhraseSuggestApiService(db).record_telemetry(
+        result = PhraseSuggestService(db).record_telemetry(
             phrase_id=request.phraseId,
             event=request.event,
         )
@@ -250,7 +250,7 @@ async def get_telemetry_stats(
     Показывает acceptance rate и топ принятых фраз.
     """
     return TelemetryStatsResponse(
-        **PhraseSuggestApiService(db).get_telemetry_stats(doctor_id=doctor_id)
+        **PhraseSuggestService(db).get_telemetry_stats(doctor_id=doctor_id)
     )
 
 

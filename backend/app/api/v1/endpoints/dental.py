@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.user import User
-from app.services.dental_api_service import DentalApiDomainError, DentalApiService
+from app.services.dental_endpoint_service import DentalDomainError, DentalService
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ async def create_dental_price_override(
     """
     Стоматолог указывает цену после проведенного лечения
     """
-    service = DentalApiService(db)
+    service = DentalService(db)
     try:
         price_override = await service.create_dental_price_override(
             override_data=override_data,
@@ -195,7 +195,7 @@ async def create_dental_price_override(
             treatment_completed=override_data.treatment_completed,
             created_at=price_override.created_at,
         )
-    except DentalApiDomainError as exc:
+    except DentalDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
@@ -218,7 +218,7 @@ async def get_dental_price_overrides(
     Получить список изменений цен стоматолога
     """
     try:
-        overrides = DentalApiService(db).get_dental_price_overrides(
+        overrides = DentalService(db).get_dental_price_overrides(
             user_id=user.id,
             visit_id=visit_id,
             status=status,
@@ -239,7 +239,7 @@ async def get_dental_price_overrides(
             )
             for override in overrides
         ]
-    except DentalApiDomainError as exc:
+    except DentalDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         raise HTTPException(
@@ -265,14 +265,14 @@ async def approve_price_override(
     Одобрить или отклонить изменение цены стоматологом
     Доступно только для регистраторов и администраторов
     """
-    service = DentalApiService(db)
+    service = DentalService(db)
     try:
         return await service.approve_price_override(
             override_id=override_id,
             approval_data=approval_data,
             user=user,
         )
-    except DentalApiDomainError as exc:
+    except DentalDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
@@ -294,7 +294,7 @@ async def get_pending_price_overrides(
     Доступно только для регистраторов и администраторов
     """
     try:
-        return DentalApiService(db).get_pending_price_overrides(limit=limit)
+        return DentalService(db).get_pending_price_overrides(limit=limit)
     except Exception as e:
         raise HTTPException(
             status_code=500,

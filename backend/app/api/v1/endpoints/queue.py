@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.services.queue_api_service import QueueApiService
+from app.services.queue_endpoint_service import QueueEndpointService
 from app.services.queue_service import (
     get_queue_service,
     QueueConflictError,
@@ -98,13 +98,13 @@ def generate_qr_token(
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
-        queue_api_service = QueueApiService(db)
+        queue_endpoint_service = QueueEndpointService(db)
 
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-        specialist = queue_api_service.get_doctor_user(specialist_id)
+        specialist = queue_endpoint_service.get_doctor_user(specialist_id)
 
         if not specialist:
             raise HTTPException(status_code=404, detail="Специалист не найден")
@@ -266,7 +266,7 @@ def get_queue_statistics(
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
 
     # Получаем очередь
-    daily_queue = QueueApiService(db).get_daily_queue(
+    daily_queue = QueueEndpointService(db).get_daily_queue(
         day=day,
         specialist_id=specialist_id,
     )
@@ -324,14 +324,14 @@ def open_queue(
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
-        queue_api_service = QueueApiService(db)
+        queue_endpoint_service = QueueEndpointService(db)
 
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         # Получение или создание очереди
-        daily_queue = queue_api_service.get_or_create_daily_queue(
+        daily_queue = queue_endpoint_service.get_or_create_daily_queue(
             day=day,
             specialist_id=specialist_id,
         )
@@ -340,7 +340,7 @@ def open_queue(
             raise HTTPException(status_code=400, detail="Прием уже открыт")
 
         # Открытие приема
-        queue_api_service.open_daily_queue(daily_queue)
+        queue_endpoint_service.open_daily_queue(daily_queue)
 
         return {
             "success": True,
@@ -372,15 +372,15 @@ def get_today_queue(
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
 
     # Проверка существования специалиста
-    queue_api_service = QueueApiService(db)
-    specialist = queue_api_service.get_doctor(specialist_id)
+    queue_endpoint_service = QueueEndpointService(db)
+    specialist = queue_endpoint_service.get_doctor(specialist_id)
     if not specialist:
         raise HTTPException(status_code=404, detail="Специалист не найден")
 
     today = date.today()
 
     # Получение очереди
-    daily_queue = queue_api_service.get_daily_queue(
+    daily_queue = queue_endpoint_service.get_daily_queue(
         day=today,
         specialist_id=specialist_id,
     )
@@ -389,7 +389,7 @@ def get_today_queue(
         raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
 
     # Получение записей
-    entries = queue_api_service.list_queue_entries(queue_id=daily_queue.id)
+    entries = queue_endpoint_service.list_queue_entries(queue_id=daily_queue.id)
 
     waiting_count = sum(1 for entry in entries if entry.status == "waiting")
 
@@ -443,8 +443,8 @@ def call_patient(
     if current_user.role not in ["Admin", "Registrar", "Doctor"]:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
-    queue_api_service = QueueApiService(db)
-    entry = queue_api_service.get_queue_entry(entry_id)
+    queue_endpoint_service = QueueEndpointService(db)
+    entry = queue_endpoint_service.get_queue_entry(entry_id)
 
     if not entry:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -453,7 +453,7 @@ def call_patient(
         raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
 
     # Обновление статуса
-    queue_api_service.mark_entry_called(entry)
+    queue_endpoint_service.mark_entry_called(entry)
 
     # Отправка WebSocket события для табло
     try:

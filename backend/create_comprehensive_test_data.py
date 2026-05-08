@@ -10,23 +10,54 @@ from decimal import Decimal
 # Add backend to sys.path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from sqlalchemy import select
-from app.db.session import SessionLocal
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.clinic import Doctor
-from app.models.department import Department
-from app.models.service import Service
-from app.models.clinic import ServiceCategory
-from app.models.appointment import Appointment
-from app.models.visit import Visit
-from app.models.emr import EMR
-from app.models.payment import Payment
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.core.security import get_password_hash
+def require_comprehensive_test_data_confirmation():
+    if os.getenv("CONFIRM_CREATE_COMPREHENSIVE_TEST_DATA") != "1":
+        raise RuntimeError(
+            "Refusing to create comprehensive test data. "
+            "Set CONFIRM_CREATE_COMPREHENSIVE_TEST_DATA=1 only for an explicit local seed run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating comprehensive test data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError(
+            "create_comprehensive_test_data.py requires PostgreSQL; SQLite is not allowed."
+        )
+
+
+def required_test_user_password():
+    password = os.getenv("COMPREHENSIVE_TEST_DATA_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "Set COMPREHENSIVE_TEST_DATA_PASSWORD before creating test users."
+        )
+    return password
 
 def create_test_data():
     """Создание комплексных тестовых данных"""
+    require_comprehensive_test_data_confirmation()
+    require_postgres_database_url()
+
+    from sqlalchemy import select
+
+    from app.core.security import get_password_hash
+    from app.db.session import SessionLocal
+    from app.models.appointment import Appointment
+    from app.models.clinic import Doctor, ServiceCategory
+    from app.models.department import Department
+    from app.models.emr import EMR
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.patient import Patient
+    from app.models.payment import Payment
+    from app.models.service import Service
+    from app.models.user import User
+
+    test_user_password = required_test_user_password()
     db = SessionLocal()
     
     try:
@@ -55,7 +86,7 @@ def create_test_data():
                     full_name=user_data["full_name"],
                     role=user_data["role"],
                     is_active=True,
-                    hashed_password=get_password_hash("test123"),
+                    hashed_password=get_password_hash(test_user_password),
                 )
                 db.add(user)
                 db.flush()

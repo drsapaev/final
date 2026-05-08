@@ -1,31 +1,23 @@
-import sqlite3
+#!/usr/bin/env python3
+"""Retired root manual SQLite recent visits probe."""
 
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
+from __future__ import annotations
 
-# Ищем записи созданные после 09:18:00
-cursor.execute('SELECT COUNT(*) FROM visits WHERE created_at > "2025-10-01 09:18:00"')
-recent_count = cursor.fetchone()[0]
-print(f'Записей созданных после 09:18:00: {recent_count}')
+import sys
 
-if recent_count > 0:
-    cursor.execute('''
-        SELECT v.id,
-               (p.last_name || ' ' || p.first_name || ' ' || COALESCE(p.middle_name, '')) as fio,
-               v.visit_date,
-               v.created_at,
-               v.department,
-               v.status
-        FROM visits v
-        JOIN patients p ON v.patient_id = p.id
-        WHERE v.created_at > "2025-10-01 09:18:00"
-        ORDER BY v.created_at DESC
-    ''')
+MESSAGE = """
+check_recent_visits.py is retired.
 
-    rows = cursor.fetchall()
-    print('Новые записи:')
-    for row in rows:
-        print(f'ID: {row[0]} | {row[1]} | {row[2]} | {row[3]} | {row[4]} | {row[5]}')
+This root-level manual probe opened the legacy SQLite database file directly. PostgreSQL plus Alembic
+is the runtime schema source of truth; use backend/tests or explicit Postgres
+diagnostics instead.
+""".strip()
 
-conn.close()
 
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.queue_limits_api_service import QueueLimitsApiService
+from app.services.queue_limits_endpoint_service import QueueLimitsEndpointService
 
 router = APIRouter()
 
@@ -87,7 +87,7 @@ def get_queue_limits(
     Получить настройки лимитов очередей
     """
     try:
-        result = QueueLimitsApiService(db).get_queue_limits(specialty=specialty)
+        result = QueueLimitsEndpointService(db).get_queue_limits(specialty=specialty)
         return [QueueLimitResponse(**item) for item in result]
 
     except Exception as e:
@@ -110,7 +110,7 @@ def update_queue_limits(
     Обновить настройки лимитов очередей
     """
     try:
-        return QueueLimitsApiService(db).update_queue_limits(
+        return QueueLimitsEndpointService(db).update_queue_limits(
             limits=limits,
             current_user_id=current_user.id,
         )
@@ -139,7 +139,7 @@ def get_queue_status_with_limits(
         if day is None:
             day = date.today()
 
-        result = QueueLimitsApiService(db).get_queue_status_with_limits(
+        result = QueueLimitsEndpointService(db).get_queue_status_with_limits(
             day=day,
             specialty=specialty,
         )
@@ -165,7 +165,7 @@ def set_doctor_queue_limit(
     Установить индивидуальный лимит для врача на конкретный день
     """
     try:
-        return QueueLimitsApiService(db).set_doctor_queue_limit(limit_data=limit_data)
+        return QueueLimitsEndpointService(db).set_doctor_queue_limit(limit_data=limit_data)
     except ValueError as exc:
         if str(exc) == "DOCTOR_NOT_FOUND":
             raise HTTPException(
@@ -176,7 +176,7 @@ def set_doctor_queue_limit(
     except HTTPException:
         raise
     except Exception as e:
-        QueueLimitsApiService(db).rollback()
+        QueueLimitsEndpointService(db).rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка установки лимита: {str(e)}",
@@ -198,7 +198,7 @@ def reset_queue_limits(
     Сбросить лимиты очередей к значениям по умолчанию
     """
     try:
-        return QueueLimitsApiService(db).reset_queue_limits(
+        return QueueLimitsEndpointService(db).reset_queue_limits(
             specialty=specialty,
             current_user_id=current_user.id,
         )

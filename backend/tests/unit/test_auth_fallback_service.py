@@ -9,6 +9,7 @@ from app.services.auth_fallback_service import (
     AuthFallbackDomainError,
     AuthFallbackService,
 )
+from tests.auth_test_credentials import GENERIC_TEST_PASSWORD
 
 
 @pytest.mark.unit
@@ -20,7 +21,7 @@ class TestAuthFallbackService:
         with pytest.raises(AuthFallbackDomainError) as exc_info:
             service.login_with_sql_row(
                 username="missing",
-                password="pass",
+                password=GENERIC_TEST_PASSWORD,
                 remember_me=False,
             )
 
@@ -36,14 +37,14 @@ class TestAuthFallbackService:
                 role="Doctor",
                 is_active=True,
                 is_superuser=False,
-                hashed_password=get_password_hash("secret"),
+                hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
             )
         )
         service = AuthFallbackService(db=None, repository=repository)
 
         payload = service.login_with_user_model(
             username="doctor",
-            password="secret",
+            password=GENERIC_TEST_PASSWORD,
             remember_me=False,
         )
 

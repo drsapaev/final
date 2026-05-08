@@ -61,7 +61,7 @@ from app.services.user_management_service import (
     get_user_management_service,
     UserManagementService,
 )
-from app.services.user_management_api_service import UserManagementApiService
+from app.services.user_management_endpoint_service import UserManagementEndpointService
 
 router = APIRouter()
 
@@ -178,7 +178,7 @@ async def update_current_user_preferences(
     Принимает произвольный JSON с настройками.
     """
     try:
-        return UserManagementApiService(db).update_current_user_preferences(
+        return UserManagementEndpointService(db).update_current_user_preferences(
             current_user_id=current_user.id,
             preferences_data=preferences_data,
         )
@@ -459,7 +459,7 @@ async def update_user_profile(
 
         # Обновляем профиль
         update_data = profile_data.dict(exclude_unset=True)
-        profile = UserManagementApiService(db).apply_profile_update(
+        profile = UserManagementEndpointService(db).apply_profile_update(
             profile=profile,
             update_data=update_data,
         )
@@ -892,7 +892,7 @@ async def export_users(
     """Экспорт пользователей"""
     try:
         service = get_user_management_service()
-        users = UserManagementApiService(db).get_export_users(
+        users = UserManagementEndpointService(db).get_export_users(
             export_filters=export_data.filters
         )
 

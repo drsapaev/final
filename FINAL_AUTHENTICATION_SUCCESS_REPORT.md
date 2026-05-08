@@ -90,7 +90,7 @@
 ### ✅ Исправлены серверы:
 
 - **Backend:** Запущен из `C:\final\backend` на порту `18000` ✅
-- **Frontend:** Запущен на порту `5174` (5173 был занят) ✅
+- **Frontend:** Запущен на temporary non-canonical dev port (canonical frontend port is `5173`) ✅
 
 ---
 
@@ -110,7 +110,7 @@ python create_missing_users.py
 
 ### Frontend:
 - ✅ Сборка успешна: `npm run build`
-- ✅ Dev сервер запущен: `npm run dev --port 5174`
+- ✅ Dev сервер запущен on a temporary non-canonical dev port
 - ✅ Все API запросы идут на правильные endpoints
 
 ---
@@ -138,7 +138,7 @@ python create_missing_users.py
 
 ### 🚀 СИСТЕМА ПОЛНОСТЬЮ ФУНКЦИОНАЛЬНА:
 - ✅ **Backend сервер работает** на `localhost:18000`
-- ✅ **Frontend сервер работает** на `localhost:5174`
+- ✅ **Frontend сервер работает** on a temporary non-canonical dev port
 - ✅ **Все API endpoints корректны**
 - ✅ **Все пользователи созданы**
 - ✅ **Авторизация работает для всех ролей**

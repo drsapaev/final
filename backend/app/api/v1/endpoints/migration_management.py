@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.migration_management_api_service import MigrationManagementApiService
+from app.services.migration_management_endpoint_service import MigrationManagementEndpointService
 
 router = APIRouter()
 
@@ -102,7 +102,7 @@ def migrate_legacy_queue_data(
     Доступно только администраторам
     """
     try:
-        result = MigrationManagementApiService(db).migrate_legacy_queue_data()
+        result = MigrationManagementEndpointService(db).migrate_legacy_queue_data()
 
         return MigrationResult(
             success=result["success"],
@@ -130,7 +130,7 @@ def migrate_legacy_emr_cutover(
 ):
     """Запускает ledger-driven миграцию legacy EMR -> canonical EMR v2."""
     try:
-        result = MigrationManagementApiService(db).migrate_legacy_emr_data(
+        result = MigrationManagementEndpointService(db).migrate_legacy_emr_data(
             dry_run=dry_run,
             limit=limit,
         )
@@ -157,7 +157,7 @@ def verify_emr_cutover(
 ):
     """Проверяет инварианты hard-cutover для EMR v2."""
     try:
-        result = MigrationManagementApiService(db).verify_emr_cutover()
+        result = MigrationManagementEndpointService(db).verify_emr_cutover()
         return EMRCutoverVerificationResult(**result)
     except Exception as e:
         raise HTTPException(
@@ -178,7 +178,7 @@ def check_data_integrity(
     Доступно только администраторам
     """
     try:
-        result = MigrationManagementApiService(db).check_data_integrity()
+        result = MigrationManagementEndpointService(db).check_data_integrity()
 
         return IntegrityCheckResult(
             passed=result["passed"],
@@ -208,7 +208,7 @@ def backup_queue_data(
     Доступно только администраторам
     """
     try:
-        result = MigrationManagementApiService(db).backup_queue_data(target_date)
+        result = MigrationManagementEndpointService(db).backup_queue_data(target_date)
 
         return BackupResult(
             success=result["success"],
@@ -250,7 +250,7 @@ def restore_queue_data(
     Доступно только администраторам
     """
     try:
-        result = MigrationManagementApiService(db).restore_queue_data(backup_file)
+        result = MigrationManagementEndpointService(db).restore_queue_data(backup_file)
 
         if not result.get("success", False):
             raise HTTPException(
@@ -288,7 +288,7 @@ def cleanup_old_queue_data(
     Доступно только администраторам
     """
     try:
-        result = MigrationManagementApiService(db).cleanup_old_data(days_to_keep)
+        result = MigrationManagementEndpointService(db).cleanup_old_data(days_to_keep)
 
         return CleanupResult(
             success=result["success"],
@@ -317,7 +317,7 @@ def get_migration_stats(
     Доступно только администраторам
     """
     try:
-        return MigrationManagementApiService(db).get_migration_stats()
+        return MigrationManagementEndpointService(db).get_migration_stats()
 
     except Exception as e:
         raise HTTPException(
@@ -338,7 +338,7 @@ def check_migration_health(
     Доступно только администраторам
     """
     try:
-        return MigrationManagementApiService(db).check_migration_health()
+        return MigrationManagementEndpointService(db).check_migration_health()
 
     except Exception as e:
         raise HTTPException(

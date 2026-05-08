@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db
 from app.models.user import User
-from app.services.departments_api_service import (
-    DepartmentsApiDomainError,
-    DepartmentsApiService,
+from app.services.departments_endpoint_service import (
+    DepartmentsDomainError,
+    DepartmentsService,
 )
 
 router = APIRouter()
@@ -28,7 +28,7 @@ async def get_departments(
 
     Fetches departments from database with optional filtering by active status.
     """
-    return DepartmentsApiService(db).get_departments(active_only=active_only)
+    return DepartmentsService(db).get_departments(active_only=active_only)
 
 
 @router.get("/{department_id}")
@@ -38,8 +38,8 @@ async def get_department(
     current_user: User = Depends(get_current_active_user),
 ):
     """Get single department by ID"""
-    service = DepartmentsApiService(db)
+    service = DepartmentsService(db)
     try:
         return service.get_department(department_id=department_id)
-    except DepartmentsApiDomainError as exc:
+    except DepartmentsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

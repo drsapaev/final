@@ -35,7 +35,7 @@
 ### Шаг 2: Запустите backend заново
 ```powershell
 cd c:\final\backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 18000
 ```
 
 ### Шаг 3: Проверьте что все работает

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.engine import make_url
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +334,23 @@ def _resolve_target_url(explicit_target_url: str | None) -> str:
     return get_settings().DATABASE_URL
 
 
+def _mask_url_string(url: str) -> str:
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<unparseable target url>"
+
+
+def _require_live_migration_confirmation(*, dry_run: bool) -> None:
+    if dry_run:
+        return
+    if os.getenv("CONFIRM_USERS_SQLITE_TO_POSTGRES_MIGRATION") != "1":
+        raise SystemExit(
+            "Refusing to run live users SQLite to PostgreSQL migration without "
+            "CONFIRM_USERS_SQLITE_TO_POSTGRES_MIGRATION=1. Use --dry-run for a read-only plan."
+        )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Migrate users from legacy SQLite clinic.db into PostgreSQL users table.",
@@ -362,6 +381,7 @@ def main() -> int:
     )
     parser = _build_parser()
     args = parser.parse_args()
+    _require_live_migration_confirmation(dry_run=args.dry_run)
     source_path = args.source.resolve()
 
     if not source_path.exists():
@@ -373,7 +393,7 @@ def main() -> int:
     logger.info(
         "[FIX:USER-MIGRATION] Starting migration source=%s target=%s dry_run=%s",
         source_path,
-        target_url,
+        _mask_url_string(target_url),
         args.dry_run,
     )
     target_engine = create_engine(target_url)

@@ -19,9 +19,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.services.force_majeure_api_service import (
-    ForceMajeureApiDomainError,
-    ForceMajeureApiService,
+from app.services.force_majeure_endpoint_service import (
+    ForceMajeureDomainError,
+    ForceMajeureEndpointService,
 )
 
 router = APIRouter()
@@ -145,11 +145,11 @@ async def transfer_queue_to_tomorrow(
     Доступно: Admin, Registrar
     """
     try:
-        return ForceMajeureApiService(db).transfer_queue_to_tomorrow(
+        return ForceMajeureEndpointService(db).transfer_queue_to_tomorrow(
             request=request,
             current_user_id=current_user.id,
         )
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -168,11 +168,11 @@ async def cancel_queue_with_refund(
     Доступно: Admin, Registrar
     """
     try:
-        return ForceMajeureApiService(db).cancel_queue_with_refund(
+        return ForceMajeureEndpointService(db).cancel_queue_with_refund(
             request=request,
             current_user_id=current_user.id,
         )
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -190,7 +190,7 @@ async def get_pending_entries_for_force_majeure(
 
     Доступно: Admin, Registrar
     """
-    return ForceMajeureApiService(db).get_pending_entries(
+    return ForceMajeureEndpointService(db).get_pending_entries(
         specialist_id=specialist_id,
         target_date=target_date,
     )
@@ -213,7 +213,7 @@ async def get_refund_requests(
 
     Доступно: Admin, Cashier, Manager
     """
-    payload = ForceMajeureApiService(db).get_refund_requests(
+    payload = ForceMajeureEndpointService(db).get_refund_requests(
         status_filter=status_filter,
         patient_id=patient_id,
         limit=limit,
@@ -234,9 +234,9 @@ async def get_refund_request(
     Доступно: Admin, Cashier, Manager
     """
     try:
-        payload = ForceMajeureApiService(db).get_refund_request(request_id=request_id)
+        payload = ForceMajeureEndpointService(db).get_refund_request(request_id=request_id)
         return RefundRequestResponse(**payload)
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -257,7 +257,7 @@ async def process_refund_request(
 
     Доступно: Admin, Cashier, Manager
     """
-    service = ForceMajeureApiService(db)
+    service = ForceMajeureEndpointService(db)
     try:
         payload = service.process_refund_request(
             request_id=request_id,
@@ -265,7 +265,7 @@ async def process_refund_request(
             current_user=current_user,
         )
         return RefundRequestResponse(**payload)
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception:
         service.rollback()
@@ -289,7 +289,7 @@ async def get_deposits(
 
     Доступно: Admin, Cashier
     """
-    payload = ForceMajeureApiService(db).get_deposits(
+    payload = ForceMajeureEndpointService(db).get_deposits(
         active_only=active_only,
         min_balance=min_balance,
         limit=limit,
@@ -310,9 +310,9 @@ async def get_patient_deposit(
     Доступно: Admin, Cashier, Registrar
     """
     try:
-        payload = ForceMajeureApiService(db).get_patient_deposit(patient_id=patient_id)
+        payload = ForceMajeureEndpointService(db).get_patient_deposit(patient_id=patient_id)
         return DepositResponse(**payload)
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -329,7 +329,7 @@ async def get_deposit_transactions(
 
     Доступно: Admin, Cashier
     """
-    payload = ForceMajeureApiService(db).get_deposit_transactions(
+    payload = ForceMajeureEndpointService(db).get_deposit_transactions(
         deposit_id=deposit_id,
         limit=limit,
         offset=offset,
@@ -350,7 +350,7 @@ async def add_to_deposit(
 
     Доступно: Admin, Cashier
     """
-    service = ForceMajeureApiService(db)
+    service = ForceMajeureEndpointService(db)
     try:
         payload = service.add_to_deposit(request=request, current_user_id=current_user.id)
         return DepositResponse(**payload)
@@ -372,14 +372,14 @@ async def use_deposit_for_payment(
 
     Доступно: Admin, Cashier
     """
-    service = ForceMajeureApiService(db)
+    service = ForceMajeureEndpointService(db)
     try:
         payload = service.use_deposit_for_payment(
             request=request,
             current_user_id=current_user.id,
         )
         return DepositResponse(**payload)
-    except ForceMajeureApiDomainError as exc:
+    except ForceMajeureDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception:
         service.rollback()

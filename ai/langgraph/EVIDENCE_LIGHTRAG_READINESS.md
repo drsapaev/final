@@ -4257,3 +4257,160 @@ Continue the QA sweep by removing filled database passwords from sibling CI setu
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better graph context should connect duplicated CI setup docs so this can be planned as a bounded sibling-doc series.
+
+## 2026-05-04 PR #64 replacement gate under-scope
+- Task context: replace stale stacked PR #64 with current-main W2C-MS-003 cabinet read-boundary slice.
+- Gate result: initial gate without explicit paths stopped with no first-touch files; explicit allowlist plus known root returned gate ok but first-touch only ackend/app/api/v1/endpoints/queue_cabinet_management.py.
+- Observed gap: cohesive replacement required contract, repository, domain service, focused tests, and docs; gate under-scoped the multi-hop boundary even with explicit paths.
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/queue_cabinet_management.py
+- Follow-up: use exact PR allowlist and stale-parent guard for stacked replacement PRs when gate narrows below the contract-required cohesive slice.
+
+## 2026-05-04 PR #79 replacement canonical-owner shift
+- Task context: replace stale stacked PR #79 for registrar batch active duplicate handling.
+- Gate result: known-root gate resolved useful first-touch files including current queue batch repository/service/tests.
+- Observed compatibility finding: old PR #79 targeted stale egistrar_integration.py characterization/docs files, while current main canonical owner is QueueBatchService -> QueueBatchRepository.
+- gate_misroute: no
+- override_used: no
+- known_root_cause_file: backend/app/repositories/queue_batch_repository.py
+- Follow-up: for old stacked PRs, compare useful behavior against current canonical owner before cherry-picking stale files.
+
+## 2026-05-04 PR #80 replacement gate stale-checkout issue
+- Task context: replace stale stacked PR #80 for registrar batch queue-domain boundary dispatch.
+- Gate result: first gate under-scoped to QueueBatchService and frontend route files; retry with QueueDomainService failed because local C:\final checkout was stale and did not have current-main queue_domain_service.py.
+- Observed compatibility finding: old PR #80 targeted stale egistrar_integration.py, while current main canonical owner after #245 is QueueBatchService with QueueDomainService as compatibility boundary target.
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/services/queue_batch_service.py
+- Follow-up: gate should run against current temp/main context or refresh canonical anchors before deciding file existence for stale-stack replacement tasks.
+
+## 2026-05-05T00:19:03.1426801+05:00 - PR #85 replacement gate under-scope
+
+- Task: create a current-main replacement for stale PR #85 (efactor(queue): extract wizard allocator seam) while preserving only the useful 9-file registrar wizard allocator extraction slice.
+- Expected anchors: ackend/app/api/v1/endpoints/registrar_wizard.py, new ackend/app/services/registrar_wizard_queue_assignment_service.py, new ackend/tests/unit/test_wizard_allocator_extraction.py, and W2C wizard extraction docs/status files.
+- Observed gate result: gate ok, handoff required: yes, gate_misroute: no, override_used: no, but first-touch contained only ackend/app/api/v1/endpoints/registrar_wizard.py.
+- Gap: the gate could not represent the necessary new service/test/docs additions for the exact PR replacement, so following first-touch would make the replacement impossible or incomplete.
+- Outcome: stopped before editing or creating a replacement PR for #85; direct merge remains unsafe, and the next safe path is an explicit exact-allowlist narrow override.
+- known_root_cause_file: ackend/app/api/v1/endpoints/registrar_wizard.py
+- gate_misroute: no
+- override_used: no
+
+## 2026-05-05 - Gate under-scope on old PR #65 replacement review
+- Task: compatibility replacement review for old PR #65, Wave 2C Phase 1: move limits status read to queue domain.
+- Expected useful slice from PR metadata: queue limits endpoint, queue read repository, queue domain service, focused backend tests, W2C-MS-002 contract, and Wave 2C docs/status files.
+- Gate command used --known-root-cause backend/app/api/v1/endpoints/queue_limits.py with the explicit PR file list.
+- Observed result: gate ok, gate_misroute: no, override_used: no, but first-touch was only ackend/app/api/v1/endpoints/queue_limits.py.
+- Impact: full current-main replacement would need edits outside first-touch; repo stop condition prevented silent expansion.
+- Follow-up: either human-approved exact-allowlist narrow override for #65, or split #65 into smaller replacements that match gate first-touch boundaries.
+
+## 2026-05-05 - Gate under-scope on old PR #66 replacement review
+- Task: compatibility replacement review for old PR #66, Wave 2C: move queue metadata reads to queue domain.
+- Expected useful slice from PR metadata: services metadata endpoint, queue read repository, queue domain service, focused backend tests, W2C-MS-004 contract, and status docs.
+- Gate command used --known-root-cause backend/app/api/v1/endpoints/services.py with the explicit PR file list.
+- Observed result: gate ok, gate_misroute: no, override_used: no, but first-touch was only ackend/app/api/v1/endpoints/services.py.
+- Impact: full current-main replacement would need edits outside first-touch; repo stop condition prevented silent expansion.
+- Follow-up: either human-approved exact-allowlist narrow override for #66, or split #66 into smaller replacements that match gate first-touch boundaries.
+
+## 2026-05-05 - Gate miss on docs-only stale PR #67
+- Task: compatibility replacement for old PR #67 (`docs(queue): review numbering policy before ms-005`) after parent #66 was superseded by merged replacement #254.
+- Expected canonical first-touch files were available from `gh pr diff #67 --name-only`: eight docs/status queue numbering files.
+- Observed gap: `agent_gate.py` returned `stop` with `no first-touch files could be resolved`; retry with `--known-root-cause docs/architecture/W2C_QUEUE_NUMBERING_CONSISTENCY.md` also stopped because the docs file does not exist on current `main` yet.
+- gate_misroute: yes
+- override_used: yes, exact docs-only allowlist from PR diff.
+- known_root_cause_file: docs/architecture/W2C_QUEUE_NUMBERING_CONSISTENCY.md
+- Follow-up: gate/retrieval should handle PR-created docs that are absent from current main when PR diff provides exact first-touch paths.
+
+## 2026-05-05 - Gate miss on docs-only stale PR #68
+- Task: compatibility replacement for old PR #68 (`docs(queue): define allocation domain contract`) after parent #67 was superseded by merged replacement #255.
+- Expected canonical first-touch files were available from `gh pr diff #68 --name-only`: eight allocation contract docs under `docs/architecture/`.
+- Observed gap: `agent_gate.py` returned `stop` with `no first-touch files could be resolved`; all PR-created docs are absent from current `main` before replacement.
+- gate_misroute: yes
+- override_used: yes, exact docs-only allowlist from PR diff.
+- known_root_cause_file: docs/architecture/W2C_QUEUE_ALLOCATOR_INTERFACE.md
+- Follow-up: gate/retrieval should handle PR-created documentation files absent from current main when PR diff provides exact paths.
+
+## 2026-05-05 PR #70 gate under-scope / stale parent replacement
+
+- Task: compatibility replacement for old PR #70 (`refactor(queue): migrate safe callers to allocator boundary`) after parent #69 was superseded by merged replacement #257.
+- Expected canonical first-touch files from PR diff/current main: `backend/app/api/v1/endpoints/online_queue_new.py`, `backend/app/services/qr_queue_service.py`, focused safe-caller tests, and W2C Phase 2.1 docs.
+- Observed gate output: `gate ok`, but first-touch files were `backend/app/services/queue_service.py`, `backend/app/models/online_queue.py`, and `backend/tests/unit/test_queue_time_window.py`, which missed the actual safe-caller migration files.
+- gate_misroute: yes
+- override_used: yes, exact allowlist from PR #70 diff on current main
+- known_root_cause_file: none; multi-caller migration was identified from PR metadata/diff
+- Follow-up: improve retrieval/gate handling for "caller migration to existing compatibility boundary" so it anchors on changed callers and focused tests rather than lower-level queue_time internals.
+
+## 2026-05-05T17:00:13+05:00 PR #71/#72 stale-parent replacement gate evidence
+- Task context: continued old stacked PR cleanup after merged replacements #259/#260 for queue confirmation/high-risk docs/tests.
+- Observed gap: gent_gate.py could not resolve first-touch files for #71 and #72 because the useful files were PR-created docs/tests on stale parent branches absent from the local stale repo context.
+- gate_misroute: yes for this workflow shape; result was stop with no first-touch files, requiring exact PR diff allowlists instead of gate-discovered files.
+- override_used: yes, exact-allowlist replacement from GitHub PR diff on current main.
+- known_root_cause_file: none; docs/tests-only stale-parent replacement.
+- Follow-up: improve retrieval/gate handling for PR-created docs/tests in stacked replacement flows so it can use PR diff metadata as first-touch candidates.
+
+## 2026-05-05T17:37:22+05:00 PR #73 stale-parent docs replacement gate evidence
+- Task context: continued old stacked PR cleanup for #73 after #72 was closed as superseded by merged replacement #260.
+- Observed gap: gent_gate.py again returned stop / no first-touch files for PR-created docs on a stale parent branch.
+- gate_misroute: yes for this workflow shape; gate could not use PR diff metadata as first-touch candidates.
+- override_used: yes, exact 6-file docs allowlist from GitHub PR diff.
+- known_root_cause_file: none; docs-only stale-parent replacement.
+- Follow-up: teach gate to resolve first-touch files from PR diff/name-only when the target files are created by the PR and absent from current main.
+
+## 2026-05-05 PR #74 runtime replacement gate under-scope and encoding lesson
+- Task: compatibility replacement for old PR #74 (ix: reuse active queue entries on confirmation) after parent #73 was superseded by merged replacement #261.
+- Expected useful slice from PR diff: registrar confirmation bridge, visit confirmation repository/service, focused characterization/unit tests, and W2C confirmation docs.
+- Observed gate result: first run stopped; retry with --known-root-cause backend/app/services/visit_confirmation_service.py returned narrow_override but first-touch only the service file.
+- Impact: full current-main replacement required edits outside first-touch; exact allowlist override was needed to preserve the PR behavior without stale parent context.
+- gate_misroute: no for service anchor, but gate_under_scope: yes.
+- override_used: yes, exact allowlist from old PR #74 diff/current compatibility review.
+- known_root_cause_file: backend/app/services/visit_confirmation_service.py
+- Additional operational lesson: avoid PowerShell Get-Content/Set-Content rewrites on UTF-8 source files with non-ASCII literals; it caused mojibake in egistrar_wizard.py and was caught by unrelated backend tests. Use UTF-8-safe patching or restore/apply minimal changes.
+- Follow-up: gate/retrieval should support multi-file stale-stack replacement slices when PR diff provides the canonical first-touch set.
+
+## Entry: 2026-05-05 PR #75 replacement gate under-scope
+- Task context: Compatibility review and runtime replacement for old PR #75 `refactor(queue): migrate confirmation flow to allocation boundary` after parent #74 was superseded by merged replacement #262.
+- Observed gap: `agent_gate.py --known-root-cause backend/app/services/visit_confirmation_service.py` under-scoped first-touch to only `backend/app/services/visit_confirmation_service.py`, while the useful PR delta required the queue contract/facade allocation seam, service wiring, focused tests, and W2C docs.
+- gate_misroute: yes; the gate identified the root file but did not capture the full stale-stack replacement slice.
+- override_used: yes; exact-allowlist narrow_override was used for the known PR #75 useful delta on current main.
+- known_root_cause_file: `backend/app/services/visit_confirmation_service.py`.
+- Outcome: current-main replacement PR #263 passed fresh CI, was squash-merged, old #75 was closed as superseded, and #76 was unlocked for review.
+- Follow-up: for stale stacked queue PRs, prefer PR diff exact-allowlist plus known-root gate evidence when the gate narrows to only the entry service but the intended boundary migration necessarily spans contracts/facades/tests/docs.
+
+## Entry: 2026-05-05 PR #76 replacement gate no-first-touch
+- Task context: Compatibility review and tests/docs replacement for old PR #76 `test: characterize registrar batch allocator` after parent #75 was superseded by merged replacement #263.
+- Observed gap: `agent_gate.py` stopped with no first-touch files because the useful #76 delta consisted of PR-created characterization tests and W2C docs absent on current main.
+- gate_misroute: yes; the gate could not resolve PR-created files on a stale parent branch.
+- override_used: yes; exact PR diff allowlist was used for two tests and five docs/status files on current main.
+- known_root_cause_file: none; tests/docs-only replacement.
+- Outcome: current-main replacement PR #264 passed fresh CI after aligning stale tests/docs with current doctor-id and service queue_tag contracts, was squash-merged, and old #76 was closed as superseded.
+- Follow-up: for stale tests/docs-only PRs that create files, use exact PR diff allowlists and verify characterization assumptions against current mounted contracts before merge.
+
+## Gate retrieval note: 2026-05-06T06:20:57+05:00
+- Task: compatibility review and current-main runtime replacement for old PR #88 (Wave 2C: extract wizard create-branch handoff).
+- Expected canonical area: wizard/queue runtime files, especially ackend/app/services/morning_assignment.py and ackend/app/services/registrar_wizard_queue_assignment_service.py.
+- Observed gap: gent_gate.py --known-root-cause backend/app/services/morning_assignment.py returned a narrow override prompt that incorrectly included i/langgraph/scripts/agent_gate.py and i/langgraph/README.md as first-touch files.
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ackend/app/services/morning_assignment.py
+- Follow-up: keep using exact PR diff allowlists for stale stacked PR replacements when gate mixes dev-brain ownership into runtime tasks.
+## 2026-05-06 - Gate/local-main stale stop for old PR #90 replacement
+
+Task context: compatibility review and replacement for old PR #90 after parent #89 was superseded by merged replacement #268.
+Observed gap: local agent_gate could not use the current GitHub main shape from the stale C:\final checkout and stopped on the known-root execution path, even though the fresh temp clone from origin/main had the canonical runtime files needed for the safe slice.
+Outcome: used exact-allowlist narrow_override in a fresh temp clone. Replacement PR #269 merged successfully after local narrow proof, fresh PR CI, and post-merge main CI.
+Follow-up: for stale stacked GitHub PR cleanup, prefer fresh clone/worktree anchored to origin/main before relying on local gate output.
+## 2026-05-06 - Gate no-first-touch for old PR #91/#92 stale docs/tests replacements
+
+Task context: compatibility review and replacements for old PR #91 and #92 after parents #90/#91 were superseded by merged replacements #269/#270.
+Observed gap: agent_gate stopped with no first-touch files because the useful docs/tests were PR-created on stale parent branches and absent from the stale local checkout context.
+Outcome: used exact PR diff allowlists in fresh current-main clones. Replacement PR #270 and #271 merged successfully after local narrow proof, fresh PR CI, and post-merge main CI.
+Follow-up: for stale stacked PR cleanup where first-touch files are PR-created artifacts, prefer exact diff allowlists from GitHub PR metadata and fresh origin/main clones over local stale gate output.
+## 2026-05-06T10:59:48+05:00 - Gate under-scope on stale PR #93 replacement
+- Task context: compatibility review and current-main replacement for old PR #93 (ix: restore registrar batch create-action path) after parent #92 was superseded by merged replacement #271.
+- Expected useful slice: ackend/app/services/batch_patient_service.py, focused characterization/unit tests, and W2C status/architecture docs carried forward from the old PR diff.
+- Observed gap: gent_gate.py --known-root-cause backend/app/services/batch_patient_service.py produced a handoff with first-touch limited to the runtime service file only, omitting PR-created tests/docs required for a safe replacement proof.
+- Outcome: exact-allowlist narrow_override was used from the PR diff; replacement PR #272 was created, fresh CI passed, #272 was merged, old #93 was closed as superseded, and post-merge main CI passed.
+- gate_misroute: no, but gate_under_scoped: yes
+- override_used: exact-allowlist narrow_override
+- known_root_cause_file: backend/app/services/batch_patient_service.py
+- Follow-up: stale stacked PR replacements need gate support for PR-created tests/docs as proof artifacts, not only runtime first-touch files.

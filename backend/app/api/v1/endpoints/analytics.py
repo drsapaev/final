@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.services.analytics import AnalyticsService
-from app.services.analytics_simple_api_service import (
-    AnalyticsSimpleApiService,
+from app.services.analytics_simple_endpoint_service import (
+    AnalyticsSimpleService,
     AnalyticsSimpleDomainError,
 )
 
@@ -48,7 +48,7 @@ async def get_quick_stats(
     db: Session = Depends(get_db),
 ):
     """Получение быстрой статистики"""
-    service = AnalyticsSimpleApiService(db)
+    service = AnalyticsSimpleService(db)
     try:
         return service.get_quick_stats()
     except AnalyticsSimpleDomainError as exc:
@@ -61,7 +61,7 @@ async def get_dashboard_data(
     db: Session = Depends(get_db),
 ):
     """Получение данных для дашборда"""
-    service = AnalyticsSimpleApiService(db)
+    service = AnalyticsSimpleService(db)
     try:
         return service.get_dashboard_data()
     except AnalyticsSimpleDomainError as exc:

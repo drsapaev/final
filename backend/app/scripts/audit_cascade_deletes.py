@@ -59,7 +59,7 @@ def get_database_url() -> str:
     except Exception as exc:
         settings_error = exc
 
-    raise RuntimeError(
+    raise SystemExit(
         "DATABASE_URL is required; refusing to audit a fallback database"
     ) from settings_error
 
@@ -68,6 +68,26 @@ def normalize_sync_database_url(url: str) -> str:
     if url.startswith("sqlite+aiosqlite://"):
         return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
     return url
+
+
+def is_sqlite_database_url(url: str) -> bool:
+    return make_url(url).drivername.startswith("sqlite")
+
+
+def allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def enforce_database_url_policy(url: str) -> None:
+    if is_sqlite_database_url(url) and not allow_sqlite_database_url():
+        raise SystemExit(
+            "SQLite DATABASE_URL is disabled for audit_cascade_deletes.py. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
 
 
 def display_database_url(url: str) -> str:
@@ -169,6 +189,7 @@ def audit_cascade_strategies(conn) -> Dict[str, List[Dict]]:
 
 def main() -> int:
     url = normalize_sync_database_url(get_database_url())
+    enforce_database_url_policy(url)
     print(f"Database URL: {display_database_url(url)}")
 
     engine = sa.create_engine(url, future=True)

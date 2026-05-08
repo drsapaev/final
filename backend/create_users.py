@@ -5,11 +5,6 @@
 
 import os
 
-from app.core.security import get_password_hash
-from app.db.session import SessionLocal
-from app.models.user import User
-
-
 def _password_env_names(username: str) -> list[str]:
     names = [f"CREATE_USERS_{username.upper()}_PASSWORD"]
     if username == "admin":
@@ -26,8 +21,33 @@ def _required_password(username: str) -> str:
     raise RuntimeError(f"Set {expected} before creating user '{username}'.")
 
 
+def require_create_users_confirmation():
+    if os.getenv("CONFIRM_CREATE_USERS") != "1":
+        raise RuntimeError(
+            "Refusing to create users. "
+            "Set CONFIRM_CREATE_USERS=1 only for an explicit local bootstrap run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating users.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("create_users.py requires PostgreSQL; SQLite is not allowed.")
+
+
 def create_users():
     """Создание пользователей с разными ролями"""
+    require_create_users_confirmation()
+    require_postgres_database_url()
+
+    from app.core.security import get_password_hash
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
     db = SessionLocal()
     try:
         # Список пользователей для создания

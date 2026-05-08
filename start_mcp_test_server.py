@@ -8,7 +8,21 @@ import os
 import sys
 from pathlib import Path
 
+
+def require_mcp_test_server_confirmation():
+    if os.getenv("CONFIRM_START_MCP_TEST_SERVER") != "1":
+        raise RuntimeError(
+            "Refusing to start the MCP test HTTP server. "
+            "Set CONFIRM_START_MCP_TEST_SERVER=1 only for an explicit local test run."
+        )
+
+
+def allow_open_browser():
+    return os.getenv("CONFIRM_MCP_TEST_OPEN_BROWSER") == "1"
+
+
 def start_test_server():
+    require_mcp_test_server_confirmation()
     """Запуск простого HTTP сервера для тестирования MCP"""
     
     # Определяем порт
@@ -48,13 +62,16 @@ def start_test_server():
             print("📋 ИНСТРУКЦИИ ДЛЯ ТЕСТИРОВАНИЯ:")
             print("="*60)
             print("1. Откройте http://localhost:8080/mcp_test.html в браузере")
-            print("2. Получите токен авторизации (admin/admin)")
+            print("2. Получите токен авторизации (используйте локально созданные учетные данные)")
             print("3. Протестируйте все MCP endpoints")
             print("4. Проверьте результаты в консоли браузера")
             print("="*60)
             
             # Автоматически открываем браузер
-            webbrowser.open(f"http://localhost:{PORT}/mcp_test.html")
+            if allow_open_browser():
+                webbrowser.open(f"http://localhost:{PORT}/mcp_test.html")
+            else:
+                print("Browser auto-open skipped. Set CONFIRM_MCP_TEST_OPEN_BROWSER=1 to enable it.")
             
             print(f"\n⏳ Сервер работает... Нажмите Ctrl+C для остановки")
             httpd.serve_forever()

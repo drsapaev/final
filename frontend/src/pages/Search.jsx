@@ -104,12 +104,12 @@ export default function Search() {
   const goToPatient = (patient) => {
     // Open registrar panel with the patient pre-selected for new appointment
     const patientName = `${patient.last_name || ''} ${patient.first_name || ''} ${patient.middle_name || ''}`.trim();
-    navigate(`/registrar-panel?action=new&patientId=${patient.id}&patientName=${encodeURIComponent(patientName)}`);
+    navigate(`/registrar?action=new&patientId=${patient.id}&patientName=${encodeURIComponent(patientName)}`);
   };
 
   // Navigate to visit details in registrar panel
   const goToVisit = (visit) => {
-    navigate(`/registrar-panel?visitId=${visit.id}&patientId=${visit.patient_id}`);
+    navigate(`/registrar?visitId=${visit.id}&patientId=${visit.patient_id}`);
   };
   const handleActivationKeyDown = (event, onActivate) => {
     if (event.key === 'Enter' || event.key === ' ') {

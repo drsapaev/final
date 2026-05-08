@@ -5,6 +5,7 @@ import sys
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker as orm_sessionmaker
 
@@ -40,6 +41,33 @@ def _normalize_sqlite_to_sync(url: str) -> str:
     return url
 
 
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_runtime_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for runtime. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for tests or explicit legacy tools."
+        )
+
+
+def _safe_database_url_for_log(url: str) -> str:
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<invalid database url>"
+
+
 def _get_int_env(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
@@ -53,10 +81,14 @@ def _get_int_env(name: str, default: int) -> int:
 
 # Получаем URL
 DATABASE_URL = _get_db_url_from_env_or_settings()
+_validate_runtime_database_url(DATABASE_URL)
 DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
 
 # небольшая диагностика при импорте (в лог / stderr)
-print(f"[app.db.session] Using DATABASE_URL = {DATABASE_URL}", file=sys.stderr)
+print(
+    f"[app.db.session] Using DATABASE_URL = {_safe_database_url_for_log(DATABASE_URL)}",
+    file=sys.stderr,
+)
 
 # Создаём СИНХРОННЫЙ движок
 # ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener

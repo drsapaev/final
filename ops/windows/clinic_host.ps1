@@ -408,6 +408,11 @@ function Stop-Port {
     param([Parameter(Mandatory = $true)][int]$Port)
 
     $processIds = Get-ListeningPids -Port $Port
+    if ($processIds -and $env:CONFIRM_CLINIC_HOST_STOP_PORT_OWNERS -ne '1') {
+        Write-Step "Refusing to stop unmanaged owners of port $Port without CONFIRM_CLINIC_HOST_STOP_PORT_OWNERS=1: $($processIds -join ', ')"
+        return
+    }
+
     foreach ($processId in $processIds) {
         try {
             taskkill /PID $processId /T /F | Out-Null
@@ -628,6 +633,39 @@ function ConvertTo-DatabaseUrl {
     return "postgresql+psycopg://$Username`:$Password@$DbHost`:$Port/$Database"
 }
 
+function Redact-DatabaseUrl {
+    param([Parameter(Mandatory = $true)][string]$DatabaseUrl)
+
+    $normalized = $DatabaseUrl -replace '^postgresql\+psycopg2://', 'postgresql://' -replace '^postgresql\+psycopg://', 'postgresql://'
+    try {
+        $uri = [System.Uri]$normalized
+    } catch {
+        return '<invalid-url>'
+    }
+
+    if (-not $uri.UserInfo -or $uri.UserInfo -notmatch ':') {
+        return $DatabaseUrl
+    }
+
+    $username = [System.Uri]::UnescapeDataString($uri.UserInfo.Split(':', 2)[0])
+    $builder = [System.UriBuilder]::new($uri)
+    $builder.UserName = $username
+    $builder.Password = '***'
+    $builder.Host = $uri.Host
+    if ($uri.Port -gt 0) {
+        $builder.Port = $uri.Port
+    }
+
+    $redacted = $builder.Uri.AbsoluteUri
+    if ($DatabaseUrl -match '^postgresql\+psycopg2://') {
+        return $redacted -replace '^postgresql://', 'postgresql+psycopg2://'
+    }
+    if ($DatabaseUrl -match '^postgresql\+psycopg://') {
+        return $redacted -replace '^postgresql://', 'postgresql+psycopg://'
+    }
+    return $redacted
+}
+
 function Escape-SqlLiteral {
     param([Parameter(Mandatory = $true)][string]$Value)
     return $Value.Replace("'", "''")
@@ -845,7 +883,7 @@ function Invoke-RestoreRehearsal {
     }
 
     Write-Host "RESTORE_BACKUP_FILE=$backupFile"
-    Write-Host "RESTORE_DATABASE_URL=$restoreDatabaseUrl"
+    Write-Host "RESTORE_DATABASE_URL=$(Redact-DatabaseUrl -DatabaseUrl $restoreDatabaseUrl)"
     Write-Host "RESTORE_BACKEND_URL=$restoreBackendUrl"
     Write-Host "RESTORE_PUBLIC_URL=$restorePublicUrl"
     Write-Ok 'PASS: restore_rehearsal completed successfully'
@@ -859,10 +897,40 @@ function Get-GitHead {
     return $head.Trim()
 }
 
+function Test-GitTrackedChanges {
+    git -C $RepoRoot diff --quiet *> $null
+    $worktreeDirty = $LASTEXITCODE -ne 0
+    git -C $RepoRoot diff --cached --quiet *> $null
+    $indexDirty = $LASTEXITCODE -ne 0
+    return ($worktreeDirty -or $indexDirty)
+}
+
+function Assert-SafeForceCheckout {
+    param([Parameter(Mandatory = $true)][string]$Ref)
+
+    if ([string]::IsNullOrWhiteSpace($Ref) -or $Ref -match '\s') {
+        Write-Fail 'Refusing forced release checkout with an empty or whitespace-containing ref.'
+    }
+
+    git -C $RepoRoot rev-parse --verify --quiet "$Ref^{commit}" *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Refusing forced release checkout because ref does not resolve to a commit: $Ref"
+    }
+
+    if ($env:CONFIRM_FORCE_RELEASE_CHECKOUT -eq '1') {
+        return
+    }
+
+    if (Test-GitTrackedChanges) {
+        Write-Fail 'Refusing forced release checkout with tracked local changes. Commit/stash the changes, or set CONFIRM_FORCE_RELEASE_CHECKOUT=1 for an intentional release operation.'
+    }
+}
+
 function Switch-Release {
     param([Parameter(Mandatory = $true)][string]$Ref)
 
     Initialize-ClinicEnv
+    Assert-SafeForceCheckout -Ref $Ref
     git -C $RepoRoot checkout --force $Ref
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "Failed to checkout $Ref"

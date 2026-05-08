@@ -30,7 +30,7 @@
   - ✅ EmailSMSManager.jsx - Управление уведомлениями
 
 ### 🗄️ База данных - СУЩЕСТВУЕТ ✅
-- **Статус**: База данных clinic.db работает
+- **Status**: PostgreSQL is the runtime database source of truth; schema is managed by Alembic
 - **Размер**: 1,384,448 байт
 - **Таблицы**: 7/8 основных таблиц существуют
 - **Работающие таблицы**:

@@ -127,8 +127,8 @@ GET    /admin/providers/{id}/stats   # Статистика провайдера
   "code": "payme",
   "is_active": true,
   "webhook_url": "https://checkout.paycom.uz/webhook",
-  "api_key": "your_api_key",
-  "secret_key": "your_secret_key",
+  "api_key": "",
+  "secret_key": "",
   "commission_percent": 2,
   "min_amount": 1000,
   "max_amount": 10000000

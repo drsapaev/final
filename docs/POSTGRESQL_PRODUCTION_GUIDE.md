@@ -31,7 +31,7 @@ sudo systemctl enable postgresql
 docker run -d \
   --name clinic-postgres \
   -e POSTGRES_USER=clinic_user \
-  -e POSTGRES_PASSWORD=secure_password \
+  -e POSTGRES_PASSWORD=<set_POSTGRES_PASSWORD> \
   -e POSTGRES_DB=clinic_db \
   -p 5432:5432 \
   -v clinic_data:/var/lib/postgresql/data \
@@ -260,7 +260,7 @@ LIMIT 10;
 ```python
 from sqlalchemy import create_engine
 
-DATABASE_URL = "postgresql://clinic_user:password@localhost:5432/clinic_db"
+DATABASE_URL = "postgresql://clinic_user:<db_password>@localhost:5432/clinic_db"
 engine = create_engine(DATABASE_URL)
 
 with engine.connect() as conn:

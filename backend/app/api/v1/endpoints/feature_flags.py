@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.feature_flags import FeatureFlag, FeatureFlagHistory
 from app.models.user import User
-from app.services.feature_flags_api_service import (
-    FeatureFlagsApiDomainError,
-    FeatureFlagsApiService,
+from app.services.feature_flags_endpoint_service import (
+    FeatureFlagsDomainError,
+    FeatureFlagsService,
 )
 from app.services.feature_flags import FeatureFlagService, get_feature_flag_service
 
@@ -155,8 +155,8 @@ def get_feature_flag(
     Доступно только администраторам
     """
     try:
-        flag = FeatureFlagsApiService(db).get_flag_or_error(flag_key)
-    except FeatureFlagsApiDomainError as exc:
+        flag = FeatureFlagsService(db).get_flag_or_error(flag_key)
+    except FeatureFlagsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return FeatureFlagResponse(
@@ -185,7 +185,7 @@ def create_feature_flag(
     Создает новый фича-флаг
     Доступно только администраторам
     """
-    service = FeatureFlagsApiService(db)
+    service = FeatureFlagsService(db)
 
     try:
         flag = service.create_flag(
@@ -198,7 +198,7 @@ def create_feature_flag(
             environment=request.environment,
             user_id=current_user.username,
         )
-    except FeatureFlagsApiDomainError as exc:
+    except FeatureFlagsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         raise HTTPException(
@@ -234,7 +234,7 @@ def update_feature_flag(
     Обновляет фича-флаг
     Доступно только администраторам
     """
-    service = FeatureFlagsApiService(db)
+    service = FeatureFlagsService(db)
 
     try:
         flag = service.update_flag(
@@ -250,7 +250,7 @@ def update_feature_flag(
             ip_address=http_request.client.host if http_request.client else None,
             user_agent=http_request.headers.get("User-Agent"),
         )
-    except FeatureFlagsApiDomainError as exc:
+    except FeatureFlagsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()

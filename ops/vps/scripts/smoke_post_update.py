@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from clinic_lifecycle_common import (
     app_root,
@@ -14,6 +15,37 @@ from clinic_lifecycle_common import (
     pass_message,
     run_command,
 )
+
+
+SENSITIVE_KEYS = {
+    "access_token",
+    "activation_key",
+    "authorization",
+    "password",
+    "refresh_token",
+    "secret",
+    "token",
+}
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if str(key).lower() in SENSITIVE_KEYS:
+                redacted[key] = "***"
+            else:
+                redacted[key] = _redact_sensitive(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    return value
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return _redact_sensitive(value)
+    return value
 
 
 def _run_health_check(expected_initialized: bool) -> None:
@@ -67,9 +99,9 @@ def _maybe_login() -> None:
         payload={"username": username, "password": password, "remember_me": False},
     )
     if status != 200 or not isinstance(payload, dict):
-        fail(f"Login smoke failed: HTTP {status} {raw}")
+        fail(f"Login smoke failed: HTTP {status} {_safe_payload(payload or raw)}")
     if not payload.get("access_token"):
-        fail(f"Login smoke returned no access token: {payload}")
+        fail(f"Login smoke returned no access token: {_safe_payload(payload)}")
 
 
 def main() -> int:

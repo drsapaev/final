@@ -3,15 +3,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.dialects import sqlite as sqlite_dialect
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_ROOT.parent
@@ -23,7 +21,18 @@ JSON_PATH = REPORT_DIR / "UBUNTUPROOF_LATEST_GITHUB_COMPAT_AUDIT_PASS15.json"
 
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.db.base import Base
+
+def require_pass15_restore_audit_confirmation(*, apply: bool) -> None:
+    if os.getenv("ALLOW_PASS15_RESTORE_COMPAT_AUDIT") != "1":
+        raise SystemExit(
+            "Refusing to inspect/write PASS15 restore compatibility audit outputs. "
+            "Set ALLOW_PASS15_RESTORE_COMPAT_AUDIT=1 only for an explicit restore-audit run."
+        )
+    if apply and os.getenv("CONFIRM_PASS15_RESTORE_COMPAT_APPLY") != "1":
+        raise SystemExit(
+            "Refusing to apply PASS15 restore compatibility changes. "
+            "Set CONFIRM_PASS15_RESTORE_COMPAT_APPLY=1 only for an explicit local recovery run."
+        )
 
 
 def utc_now() -> str:
@@ -50,6 +59,8 @@ def sqlite_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
 
 
 def compile_add_column(table_name: str, column: Any) -> str:
+    from sqlalchemy.dialects import sqlite as sqlite_dialect
+
     # Recovery shims intentionally add columns as nullable. This avoids SQLite
     # table rebuilds and prevents NOT NULL failures on restored tables that
     # already contain rows. Application-level defaults still populate new rows.
@@ -121,6 +132,10 @@ def copy_missing_referenced_uploads(conn: sqlite3.Connection, *, apply: bool) ->
 
 
 def schema_audit_and_apply(*, apply: bool) -> dict[str, Any]:
+    from sqlalchemy import create_engine, inspect
+
+    from app.db.base import Base
+
     engine = create_engine(f"sqlite:///{DB_PATH.as_posix()}")
     inspector = inspect(engine)
     report: dict[str, Any] = {
@@ -268,6 +283,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
+    require_pass15_restore_audit_confirmation(apply=args.apply)
     report = schema_audit_and_apply(apply=args.apply)
     write_reports(report)
     print(json.dumps({

@@ -132,7 +132,7 @@ console.log('🔍 Фильтрация: X → Y записей');
 ### Шаг 1: Тестирование исправлений
 1. **Запустить тест создания записи**:
    ```bash
-   python test_registration_creation.py
+   # Retired root smoke script; use canonical backend tests or an explicit env-driven smoke script instead.
    ```
 
 2. **Зарегистрировать пациента в интерфейсе**

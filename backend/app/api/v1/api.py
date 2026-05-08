@@ -106,6 +106,7 @@ from app.api.v1.endpoints import (
     schedule,
     services,
     setup,
+    settings,
     simple_auth,
     sms_providers,
     specialized_panels,
@@ -133,9 +134,6 @@ from app.api.v1.endpoints import (
 )
 from app.api.v1.endpoints import (
     health as health_ep,
-)
-from app.api.v1.endpoints import (
-    reports as reports_ep,
 )
 from app.api.v1.endpoints.migration_management import (
     router as migration_management_router,
@@ -241,7 +239,6 @@ api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"]
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 api_router.include_router(audit.router, tags=["audit"])
-# api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
 api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(registrar_integration.router, tags=["registrar"])
 api_router.include_router(registrar_wizard.router, tags=["registrar-wizard"])
@@ -277,7 +274,6 @@ api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
 api_router.include_router(board_ep.router, tags=["board"])
-api_router.include_router(reports_ep.router, prefix="/reports", tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
@@ -287,6 +283,7 @@ api_router.include_router(
     clinic_management.router, prefix="/clinic", tags=["clinic-management"]
 )
 api_router.include_router(payment_settings.router, tags=["payment-settings"])
+api_router.include_router(settings.router, tags=["settings"])
 api_router.include_router(
     admin_departments.router, prefix="/admin/departments", tags=["admin-departments"]
 )

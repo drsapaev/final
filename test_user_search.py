@@ -1,65 +1,23 @@
-"""
-Тест поиска пользователя в базе данных
-"""
+#!/usr/bin/env python3
+"""Retired root manual user-search smoke script."""
+
+from __future__ import annotations
+
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-from backend.app.db.session import engine
-from sqlalchemy import text
+MESSAGE = """
+test_user_search.py is retired.
 
-def test_user_search():
-    """Тестируем поиск пользователя"""
-    print("🔍 Тестирование поиска пользователя...")
-    
-    try:
-        with engine.connect() as conn:
-            # Тестируем поиск по username
-            result = conn.execute(text("""
-                SELECT id, username, email, full_name, role, is_active, is_superuser
-                FROM users 
-                WHERE username = :username
-            """), {"username": "mcp_test"})
-            
-            user_row = result.fetchone()
-            
-            if user_row:
-                user_id, username, email, full_name, role, is_active, is_superuser = user_row
-                print(f"✅ Пользователь найден по username:")
-                print(f"   ID: {user_id}")
-                print(f"   Username: {username}")
-                print(f"   Email: {email}")
-                print(f"   Role: {role}")
-                print(f"   Is Active: {is_active}")
-                print(f"   Is Superuser: {is_superuser}")
-            else:
-                print("❌ Пользователь не найден по username")
-            
-            # Тестируем поиск по email
-            result = conn.execute(text("""
-                SELECT id, username, email, full_name, role, is_active, is_superuser
-                FROM users 
-                WHERE email = :email
-            """), {"email": "mcp_test@example.com"})
-            
-            user_row = result.fetchone()
-            
-            if user_row:
-                user_id, username, email, full_name, role, is_active, is_superuser = user_row
-                print(f"✅ Пользователь найден по email:")
-                print(f"   ID: {user_id}")
-                print(f"   Username: {username}")
-                print(f"   Email: {email}")
-                print(f"   Role: {role}")
-                print(f"   Is Active: {is_active}")
-                print(f"   Is Superuser: {is_superuser}")
-            else:
-                print("❌ Пользователь не найден по email")
-                
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        import traceback
-        traceback.print_exc()
+This root-level helper looked like a pytest module but inspected a specific
+local MCP test user. Use backend/tests pytest fixtures or an explicit,
+env-driven smoke check against the current runtime instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    test_user_search()
+    raise SystemExit(main())

@@ -2,27 +2,14 @@
 """
 Скрипт для перезапуска всех серверов с реальным Gemini AI
 """
-import os
-import sys
-import time
-import subprocess
-
 def main():
     print("=" * 60)
     print("🔄 ПЕРЕЗАПУСК СЕРВЕРОВ С GEMINI AI")
     print("=" * 60)
     
-    # 1. Останавливаем все процессы Python
-    print("\n⏳ Останавливаем текущие серверы...")
-    try:
-        subprocess.run("taskkill /F /IM python.exe /T", 
-                      shell=True, 
-                      stdout=subprocess.DEVNULL, 
-                      stderr=subprocess.DEVNULL)
-        time.sleep(2)
-        print("✅ Серверы остановлены")
-    except Exception as e:
-        print(f"⚠️  Ошибка остановки: {e}")
+    # 1. Manual stop guidance only; never kill every Python process on the machine.
+    print("\n⏳ Перед запуском остановите нужные серверы вручную...")
+    print("   Automatic taskkill is disabled; stop only the terminals you started.")
     
     # 2. Запускаем backend сервер
     print("\n⏳ Запускаем backend сервер...")
@@ -33,9 +20,9 @@ def main():
     print("\n📋 Откройте новый терминал и выполните:")
     print(f"   {backend_cmd}")
 
-    frontend_cmd = "cd frontend && npm run dev -- --host 0.0.0.0 --port 18080"
+    frontend_cmd = "cd frontend && npm run dev -- --host 0.0.0.0 --port 5173"
     print("\n⏳ Запускаем frontend сервер...")
-    print("   📍 http://localhost:18080")
+    print("   📍 http://localhost:5173")
     print(f"\n💡 Команда: {frontend_cmd}")
     print("\n📋 Откройте еще один терминал и выполните:")
     print(f"   {frontend_cmd}")
@@ -58,8 +45,8 @@ def main():
     print("3️⃣  Во втором терминале:")
     print(f"    {tester_cmd}")
     print("4️⃣  Откройте браузер:")
-    print("    http://localhost:18080")
-    print("5️⃣  Получите токен (mcp_test / test123)")
+    print("    http://localhost:5173")
+    print("5️⃣  Получите токен (используйте локально созданные учетные данные)")
     print("6️⃣  Тестируйте MCP функции с реальным Gemini AI!")
     print("\n" + "=" * 60)
     print("🎯 ТЕПЕРЬ СИСТЕМА ИСПОЛЬЗУЕТ GEMINI AI")

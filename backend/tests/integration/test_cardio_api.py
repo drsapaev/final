@@ -7,6 +7,7 @@ import pytest
 from app.core.security import get_password_hash
 from app.models.cardio_blood_test import CardioBloodTest
 from app.models.user import User
+from tests.auth_test_credentials import CARDIO_PASSWORD
 
 
 @pytest.mark.integration
@@ -97,7 +98,7 @@ class TestCardioApi:
             username="test_cardiologist",
             email="cardiologist@test.com",
             full_name="Test Cardiologist",
-            hashed_password=get_password_hash("cardiologist123"),
+            hashed_password=get_password_hash(CARDIO_PASSWORD),
             role="cardiologist",
             is_active=True,
             is_superuser=False,
@@ -110,7 +111,7 @@ class TestCardioApi:
             "/api/v1/authentication/login",
             json={
                 "username": cardiologist.username,
-                "password": "cardiologist123",
+                "password": CARDIO_PASSWORD,
             },
         )
         assert login_response.status_code == 200

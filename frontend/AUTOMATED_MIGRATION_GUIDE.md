@@ -564,9 +564,12 @@ git push origin main
 # If weeks 2-3 are broken:
 git revert <commit-range>
 
-# Or hard reset to before migration
-git reset --hard <pre-migration-commit>
-git push origin main --force
+# If revert cannot repair the branch, use a protected recovery branch instead:
+git switch -c recovery/pre-migration <pre-migration-commit>
+git push origin recovery/pre-migration
+
+# Destructive history rewrite is a last-resort maintainer action only.
+# Before considering it, confirm backups/stashes and require explicit approval.
 
 # Takes 10 minutes
 ```
@@ -576,7 +579,7 @@ git push origin main --force
 ```bash
 # If entire migration needs undoing:
 git log --all --oneline | grep "migration starts"
-git reset --hard <pre-migration-commit>
+git switch -c recovery/original-system <pre-migration-commit>
 
 # Restore original files
 git restore src/

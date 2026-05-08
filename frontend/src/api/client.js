@@ -330,7 +330,7 @@ async function me() {
 async function login(username, password) {
   const credentials = {
     username: username,
-    password: password,
+    password,
     remember_me: false
   };
 

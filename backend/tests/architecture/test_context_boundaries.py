@@ -15,7 +15,7 @@ _SCANNED_DIRS = ("services", "repositories")
 # Temporary migration allowlist for legacy direct service-to-service calls.
 # These edges must be moved to context facades/contracts in subsequent tasks.
 _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
-    ("app.services.appointment_flow_api_service", "app.services.emr_phrase_indexer"),
+    ("app.services.appointment_flow_endpoint_service", "app.services.emr_phrase_indexer"),
     ("app.services.billing_service", "app.services.queue_service"),
     ("app.services.morning_assignment", "app.services.queue_service"),
     ("app.services.payment_init_service", "app.services.queue_service"),

@@ -17,7 +17,7 @@ from app.schemas.role import (
     RoleResponse,
     RoleUpdate,
 )
-from app.services.roles_api_service import RolesApiDomainError, RolesApiService
+from app.services.roles_endpoint_service import RolesDomainError, RolesService
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ async def get_roles(
     Returns a list of all roles, optionally filtered by active/system status.
     """
     try:
-        roles = RolesApiService(db).list_roles(
+        roles = RolesService(db).list_roles(
             is_active=is_active,
             is_system=is_system,
         )
@@ -67,7 +67,7 @@ async def get_role_options(
     Used for role selection in forms and filters.
     """
     try:
-        roles = RolesApiService(db).list_active_roles()
+        roles = RolesService(db).list_active_roles()
         
         options = []
         
@@ -99,9 +99,9 @@ async def get_role(
 ):
     """Get a specific role by ID."""
     try:
-        role = RolesApiService(db).get_role_or_error(role_id)
+        role = RolesService(db).get_role_or_error(role_id)
         return RoleResponse.model_validate(role)
-    except RolesApiDomainError as exc:
+    except RolesDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -124,9 +124,9 @@ async def create_role(
         )
 
     try:
-        role = RolesApiService(db).create_role(role_data.model_dump())
+        role = RolesService(db).create_role(role_data.model_dump())
         return RoleResponse.model_validate(role)
-    except RolesApiDomainError as exc:
+    except RolesDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         logger.error(f"Error creating role: {e}")
@@ -157,12 +157,12 @@ async def update_role(
         )
 
     try:
-        role = RolesApiService(db).update_role(
+        role = RolesService(db).update_role(
             role_id=role_id,
             update_data=role_data.model_dump(exclude_unset=True),
         )
         return RoleResponse.model_validate(role)
-    except RolesApiDomainError as exc:
+    except RolesDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         logger.error(f"Error updating role: {e}")
@@ -192,8 +192,8 @@ async def delete_role(
         )
 
     try:
-        RolesApiService(db).delete_role(role_id=role_id)
-    except RolesApiDomainError as exc:
+        RolesService(db).delete_role(role_id=role_id)
+    except RolesDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         logger.error(f"Error deleting role: {e}")

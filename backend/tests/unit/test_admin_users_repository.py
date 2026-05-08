@@ -5,6 +5,7 @@ import pytest
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.repositories.admin_users_repository import AdminUsersRepository
+from tests.auth_test_credentials import GENERIC_TEST_PASSWORD
 
 
 @pytest.mark.unit
@@ -14,7 +15,7 @@ class TestAdminUsersRepository:
             User(
                 username="zeta_user",
                 email="zeta@example.com",
-                hashed_password=get_password_hash("secret"),
+                hashed_password=get_password_hash(GENERIC_TEST_PASSWORD),
                 role="Registrar",
             )
         )

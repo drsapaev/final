@@ -6,6 +6,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.audit import log_critical_change
+
 
 class FileSystemApiRepository:
     """Encapsulates DB primitives used by file_system endpoint wrappers."""
@@ -21,6 +23,30 @@ class FileSystemApiRepository:
 
     def rollback(self) -> None:
         self.db.rollback()
+
+    def log_critical_change(
+        self,
+        *,
+        user_id: int,
+        action: str,
+        table_name: str,
+        row_id: int,
+        old_data: dict | None,
+        new_data: dict | None,
+        request: Any,
+        description: str,
+    ) -> None:
+        log_critical_change(
+            db=self.db,
+            user_id=user_id,
+            action=action,
+            table_name=table_name,
+            row_id=row_id,
+            old_data=old_data,
+            new_data=new_data,
+            request=request,
+            description=description,
+        )
 
     def count_files(
         self,

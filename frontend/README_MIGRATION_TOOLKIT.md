@@ -215,8 +215,10 @@ npm run type-check
 # Rollback one batch
 git revert <commit-hash>
 
-# Rollback everything
-git reset --hard <pre-migration-commit>
+# Validate a full recovery branch before changing the original branch
+git switch -c recovery/full-migration <pre-migration-commit>
+
+# On the original branch, prefer reverting migration commits after validation.
 
 # Takes 5-30 minutes
 ```

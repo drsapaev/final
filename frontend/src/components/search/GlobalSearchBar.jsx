@@ -180,42 +180,42 @@ export default function GlobalSearchBar({ className = '' }) {
         // All panels now support ?patientId parameter
         if (role === 'registrar' || role === 'receptionist') {
           // Registrar, Receptionist -> Registrar panel with patient search
-          navigate(`/registrar-panel?patientId=${item.id}`);
+          navigate(`/registrar?patientId=${item.id}`);
         } else if (role === 'cardio') {
           // Cardiologist -> Cardiology panel with patient context
-          navigate(`/cardiologist?patientId=${item.id}`);
+          navigate(`/doctor/cardiology?patientId=${item.id}`);
         } else if (role === 'derma') {
           // Dermatologist -> Dermatology panel with patient context
-          navigate(`/dermatologist?patientId=${item.id}`);
+          navigate(`/doctor/dermatology?patientId=${item.id}`);
         } else if (role === 'dentist') {
           // Dentist -> Dentist panel with patient context
-          navigate(`/dentist?patientId=${item.id}`);
+          navigate(`/doctor/dentistry?patientId=${item.id}`);
         } else if (role === 'doctor') {
           // General doctor -> Doctor panel with patient context
-          navigate(`/doctor-panel?patientId=${item.id}`);
+          navigate(`/doctor?patientId=${item.id}`);
         } else if (role === 'lab') {
           // Lab -> Lab panel with patient context
-          navigate(`/lab-panel?patientId=${item.id}`);
+          navigate(`/lab?patientId=${item.id}`);
         } else if (role === 'cashier') {
           // Cashier -> Cashier panel with patient context
-          navigate(`/cashier-panel?patientId=${item.id}`);
+          navigate(`/cashier?patientId=${item.id}`);
         } else if (role === 'admin') {
           // Admin -> Admin panel with patient search
           navigate(`/admin?patientId=${item.id}`);
         } else {
           // Fallback for any other role
-          navigate(`/pickup/${item.id}`);
+          navigate(`/clinical/pickup/${item.id}`);
         }
         break;
       case 'visit':
         if (role === 'doctor') {
-          navigate(`/doctor-panel?visitId=${item.id}`);
+          navigate(`/doctor?visitId=${item.id}`);
         } else {
-          navigate(`/registrar-panel?visitId=${item.id}&patientId=${item.patient_id}`);
+          navigate(`/registrar?visitId=${item.id}&patientId=${item.patient_id}`);
         }
         break;
       case 'lab':
-        navigate(`/pickup/${item.patient_id}?tab=lab&orderId=${item.id}`);
+        navigate(`/clinical/pickup/${item.patient_id}?tab=lab&orderId=${item.id}`);
         break;
     }
   };

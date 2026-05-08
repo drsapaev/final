@@ -5,6 +5,7 @@ import pytest
 from app.models.user import User
 from app.schemas.user_management import UserUpdateRequest
 from app.services.user_management_service import UserManagementService
+from tests.auth_test_credentials import DUMMY_PASSWORD_HASH
 
 
 def _create_user(
@@ -20,7 +21,7 @@ def _create_user(
         username=username,
         email=email,
         full_name=username,
-        hashed_password="hashed",
+        hashed_password=DUMMY_PASSWORD_HASH,
         role=role,
         is_active=is_active,
         is_superuser=is_superuser,

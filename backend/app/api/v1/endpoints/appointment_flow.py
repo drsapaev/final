@@ -26,9 +26,9 @@ from app.schemas.emr import (
     PrescriptionCreate,
     PrescriptionUpdate,
 )
-from app.services.appointment_flow_api_service import (
-    AppointmentFlowApiDomainError,
-    AppointmentFlowApiService,
+from app.services.appointment_flow_endpoint_service import (
+    AppointmentFlowDomainError,
+    AppointmentFlowEndpointService,
 )
 from app.services.canonical_visit_service import CanonicalVisitResolutionError
 from app.services.emr_contract import (
@@ -92,30 +92,30 @@ def _resolve_appointment_and_visit(
     appointment_id: int,
     *,
     allow_visit_fallback: bool = True,
-) -> tuple[Any, int, AppointmentFlowApiService]:
-    appointment_flow_api_service = AppointmentFlowApiService(db)
+) -> tuple[Any, int, AppointmentFlowEndpointService]:
+    appointment_flow_endpoint_service = AppointmentFlowEndpointService(db)
     appointment = crud_appointment.get(db, id=appointment_id)
 
     if not appointment and allow_visit_fallback:
         try:
-            appointment, _visit = appointment_flow_api_service.resolve_appointment_from_visit(
+            appointment, _visit = appointment_flow_endpoint_service.resolve_appointment_from_visit(
                 appointment_id=appointment_id,
                 emr_data=SimpleNamespace(appointment_id=appointment_id),
             )
-        except AppointmentFlowApiDomainError as exc:
+        except AppointmentFlowDomainError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
     try:
-        visit_id = appointment_flow_api_service.resolve_canonical_visit(
+        visit_id = appointment_flow_endpoint_service.resolve_canonical_visit(
             appointment_id=appointment.id
         )
     except CanonicalVisitResolutionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    return appointment, visit_id, appointment_flow_api_service
+    return appointment, visit_id, appointment_flow_endpoint_service
 
 
 def _legacy_emr_response(canonical_emr: Any, *, appointment_id: int) -> EMR:
@@ -231,7 +231,7 @@ def create_or_update_emr(
             detail=f"Medical record validation errors: {'; '.join(errors)}",
         )
 
-    appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
+    appointment, visit_id, appointment_flow_endpoint_service = _resolve_appointment_and_visit(
         db,
         appointment_id,
     )
@@ -258,7 +258,7 @@ def create_or_update_emr(
         # Если статус не подходит, но это called/calling/paid/waiting/queued, обновляем статус на in_visit
         # Это позволяет начать сохранение EMR для вызванных или оплаченных пациентов
         if status_str in ['called', 'calling', 'paid', 'waiting', 'queued']:
-            appointment_flow_api_service.promote_appointment_to_in_visit(
+            appointment_flow_endpoint_service.promote_appointment_to_in_visit(
                 appointment=appointment
             )
             logger.info(
@@ -298,7 +298,7 @@ def create_or_update_emr(
                 saved_emr.id,
                 appointment.id,
             )
-            appointment_flow_api_service.finalize_emr_create_audit(
+            appointment_flow_endpoint_service.finalize_emr_create_audit(
                 request=request,
                 user_id=current_user.id,
                 appointment_id=appointment.id,
@@ -310,7 +310,7 @@ def create_or_update_emr(
                 saved_emr.id,
                 appointment.id,
             )
-            appointment_flow_api_service.finalize_emr_update_audit(
+            appointment_flow_endpoint_service.finalize_emr_update_audit(
                 request=request,
                 user_id=current_user.id,
                 appointment_id=appointment.id,
@@ -337,7 +337,7 @@ def save_emr(
     Также индексирует фразы для Doctor History Autocomplete.
     """
     _maybe_raise_legacy_write_freeze()
-    appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
+    appointment, visit_id, appointment_flow_endpoint_service = _resolve_appointment_and_visit(
         db,
         appointment_id,
     )
@@ -364,7 +364,7 @@ def save_emr(
         saved_emr.id,
         appointment.id,
     )
-    appointment_flow_api_service.finalize_emr_update_audit(
+    appointment_flow_endpoint_service.finalize_emr_update_audit(
         request=request,
         user_id=current_user.id,
         appointment_id=appointment.id,

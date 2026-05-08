@@ -25,9 +25,9 @@ from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.services.display_websocket import get_display_manager
-from app.services.display_websocket_api_service import (
-    DisplayWebSocketApiDomainError,
-    DisplayWebSocketApiService,
+from app.services.display_websocket_endpoint_service import (
+    DisplayWebSocketDomainError,
+    DisplayWebSocketEndpointService,
 )
 from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
 
@@ -131,11 +131,11 @@ async def call_patient_to_board(
                 detail="Не указан ID записи в очереди",
             )
 
-        return await DisplayWebSocketApiService(db).call_patient(
+        return await DisplayWebSocketEndpointService(db).call_patient(
             entry_id=entry_id,
             board_ids=board_ids,
         )
-    except DisplayWebSocketApiDomainError as exc:
+    except DisplayWebSocketDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
@@ -213,7 +213,7 @@ async def _send_department_queue_state(websocket: WebSocket, department: str):
     """Отправляет текущее состояние очереди отделения"""
     db = SessionLocal()
     try:
-        payload = DisplayWebSocketApiService(db).get_department_queue_state_payload(
+        payload = DisplayWebSocketEndpointService(db).get_department_queue_state_payload(
             department=department
         )
         await websocket.send_text(json.dumps(payload))
@@ -351,11 +351,11 @@ async def quick_call_next_patient(
     Быстрый вызов следующего пациента
     """
     try:
-        return await DisplayWebSocketApiService(db).quick_call_next(
+        return await DisplayWebSocketEndpointService(db).quick_call_next(
             specialty=specialty,
             board_id=board_id,
         )
-    except DisplayWebSocketApiDomainError as exc:
+    except DisplayWebSocketDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise

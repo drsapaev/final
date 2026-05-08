@@ -1,135 +1,84 @@
-#!/usr/bin/env python3
-"""
-Тестирование логики фронтенда для распределения процедур
-"""
+"""Parity checks for RegistrarPanel service-code category logic."""
 
-def test_frontend_logic():
-    """Тестируем логику фронтенда"""
-    print("🧪 ТЕСТИРОВАНИЕ ЛОГИКИ ФРОНТЕНДА")
-    print("=" * 50)
-    
-    # Симулируем функцию getServiceCategoryByCode из фронтенда
-    def getServiceCategoryByCode(serviceCode):
-        if not serviceCode:
-            return None
 
-        # ЭКГ - отдельная категория (только ЭКГ)
-        if serviceCode == 'ECG01' or serviceCode == 'CARD_ECG' or 'ECG' in serviceCode or 'ЭКГ' in serviceCode:
-            return 'ECG'
-
-        # ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
-        if serviceCode == 'K11' or serviceCode == 'CARD_ECHO' or 'ECHO' in serviceCode or 'ЭхоКГ' in serviceCode:
-            return 'ECHO'
-
-        # Физиотерапия (дерматологическая) - коды P01-P05
-        if serviceCode and serviceCode.startswith('P') and serviceCode[1:].isdigit():
-            return 'P'
-
-        # Дерматологические процедуры - коды D_PROC01-D_PROC04
-        if serviceCode and serviceCode.startswith('D_PROC') and serviceCode[6:].isdigit():
-            return 'D_PROC'
-
-        # Косметологические процедуры - коды C01-C12
-        if serviceCode and serviceCode.startswith('C') and serviceCode[1:].isdigit():
-            return 'C'
-
-        # Кардиология - коды K01, K11
-        if serviceCode and serviceCode.startswith('K') and serviceCode[1:].isdigit():
-            return 'K'
-
-        # Стоматология - коды S01, S10
-        if serviceCode and serviceCode.startswith('S') and serviceCode[1:].isdigit():
-            return 'S'
-
-        # Лаборатория - коды L01-L65
-        if serviceCode and serviceCode.startswith('L') and serviceCode[1:].isdigit():
-            return 'L'
-
-        # Дерматология - только консультации (D01)
-        if serviceCode == 'D01':
-            return 'D'
-
-        # Старый формат кодов (префиксы) - обновленный
-        if serviceCode.startswith('CONS_CARD'):
-            return 'K'  # Консультации кардиолога
-        if serviceCode.startswith('CONS_DERM') or serviceCode.startswith('DERMA_'):
-            return 'D'  # Дерматология-косметология
-        if serviceCode.startswith('CONS_DENT') or serviceCode.startswith('DENT_') or serviceCode.startswith('STOM_'):
-            return 'S'  # Стоматология
-        if serviceCode.startswith('LAB_'):
-            return 'L'  # Лаборатория
-        if serviceCode.startswith('COSM_'):
-            return 'C'  # Косметология
-        if serviceCode.startswith('PHYSIO_'):
-            return 'P'  # Физиотерапия
-        if serviceCode.startswith('DERM_PROC_'):
-            return 'D_PROC'  # Дерматологические процедуры
-
-        # Дополнительные паттерны для кардиологии
-        if serviceCode.startswith('CARD_') and 'ECG' not in serviceCode:
-            return 'K'
-
+def get_service_category_by_code(service_code: str | None) -> str | None:
+    """Mirror RegistrarPanel.getServiceCategoryByCode for critical code contracts."""
+    if not service_code:
         return None
 
-    # Тестируем новые коды
-    test_codes = [
-        # Физиотерапия
-        'P01', 'P02', 'P03', 'P04', 'P05',
-        # Косметология
-        'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08',
-        # Дерматологические процедуры
-        'D_PROC01', 'D_PROC02', 'D_PROC03',
-        # Дерматология (только консультации)
-        'D01',
-        # Старые коды (должны возвращать null или правильную категорию)
-        'D10', 'D11', 'D12', 'D13', 'D14', 'D20', 'D21', 'D22'
-    ]
-    
-    print("\n🔍 ТЕСТИРОВАНИЕ КОДОВ УСЛУГ:")
-    print("-" * 40)
-    
-    for code in test_codes:
-        category = getServiceCategoryByCode(code)
-        print(f"  {code:8} → {category if category else 'null':8}")
-    
-    # Проверяем распределение по вкладкам
-    print(f"\n📋 РАСПРЕДЕЛЕНИЕ ПО ВКЛАДКАМ:")
-    print("-" * 40)
-    
-    departmentCategoryMapping = {
-        'cardio': ['K', 'ECHO'],
-        'echokg': ['ECG'],
-        'derma': ['D'],
-        'dental': ['S'],
-        'lab': ['L'],
-        'procedures': ['P', 'C', 'D_PROC']
-    }
-    
-    for dept, categories in departmentCategoryMapping.items():
-        print(f"\n🏷️ Вкладка '{dept}':")
-        matching_codes = []
-        for code in test_codes:
-            category = getServiceCategoryByCode(code)
-            if category in categories:
-                matching_codes.append(code)
-        
-        if matching_codes:
-            for code in matching_codes:
-                print(f"  ✅ {code}")
-        else:
-            print(f"  (нет услуг)")
-    
-    print(f"\n🎯 ИТОГО для вкладки 'Процедуры':")
-    procedures_codes = []
-    for code in test_codes:
-        category = getServiceCategoryByCode(code)
-        if category in ['P', 'C', 'D_PROC']:
-            procedures_codes.append(code)
-    
-    print(f"  📋 Физиотерапия (P): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'P'])} услуг")
-    print(f"  💄 Косметология (C): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'C'])} услуг")
-    print(f"  🔬 Дерматологические процедуры (D_PROC): {len([c for c in procedures_codes if getServiceCategoryByCode(c) == 'D_PROC'])} услуг")
-    print(f"  🎯 ВСЕГО: {len(procedures_codes)} услуг")
+    normalized_code = str(service_code).upper()
 
-if __name__ == "__main__":
-    test_frontend_logic()
+    if normalized_code in {"K002", "ECG01"}:
+        return "ECG"
+    if normalized_code == "K11":
+        return "ECHO"
+    if (
+        normalized_code == "K10"
+        or normalized_code == "CARD_ECG"
+        or "ECG" in normalized_code
+        or "ЭКГ" in normalized_code
+    ):
+        return "ECG"
+    if normalized_code == "CARD_ECHO" or "ECHO" in normalized_code or "ЭХОКГ" in normalized_code:
+        return "ECHO"
+    if normalized_code.startswith("P") and normalized_code[1:].isdigit():
+        return "P"
+    if normalized_code.startswith("D_PROC") and normalized_code[6:].isdigit():
+        return "D_PROC"
+    if normalized_code.startswith("C") and normalized_code[1:].isdigit():
+        return "C"
+    if normalized_code.startswith("K") and normalized_code[1:].isdigit() and normalized_code != "K10":
+        return "K"
+    if normalized_code.startswith("S") and normalized_code[1:].isdigit():
+        return "S"
+    if normalized_code.startswith("L") and normalized_code[1:].isdigit():
+        return "L"
+    if normalized_code == "D01":
+        return "D"
+    if normalized_code.startswith("CONS_CARD"):
+        return "K"
+    if normalized_code.startswith("CONS_DERM") or normalized_code.startswith("DERMA_"):
+        return "D"
+    if (
+        normalized_code.startswith("CONS_DENT")
+        or normalized_code.startswith("DENT_")
+        or normalized_code.startswith("STOM_")
+    ):
+        return "S"
+    if normalized_code.startswith("LAB_"):
+        return "L"
+    if normalized_code.startswith("COSM_"):
+        return "C"
+    if normalized_code.startswith("PHYSIO_"):
+        return "P"
+    if normalized_code.startswith("DERM_PROC_"):
+        return "D_PROC"
+    if normalized_code.startswith("CARD_") and "ECG" not in normalized_code:
+        return "K"
+
+    return None
+
+
+def test_frontend_logic_keeps_ecg_canonical_and_legacy_aliases() -> None:
+    assert get_service_category_by_code("K10") == "ECG"
+    assert get_service_category_by_code("K002") == "ECG"
+    assert get_service_category_by_code("ECG01") == "ECG"
+    assert get_service_category_by_code("CARD_ECG") == "ECG"
+    assert get_service_category_by_code("legacy_ecg") == "ECG"
+
+
+def test_frontend_logic_keeps_echo_canonical_before_generic_k_codes() -> None:
+    assert get_service_category_by_code("K11") == "ECHO"
+    assert get_service_category_by_code("CARD_ECHO") == "ECHO"
+    assert get_service_category_by_code("legacy_echo") == "ECHO"
+    assert get_service_category_by_code("K01") == "K"
+
+
+def test_frontend_logic_keeps_other_department_categories() -> None:
+    assert get_service_category_by_code("P01") == "P"
+    assert get_service_category_by_code("C01") == "C"
+    assert get_service_category_by_code("D_PROC01") == "D_PROC"
+    assert get_service_category_by_code("D01") == "D"
+    assert get_service_category_by_code("S01") == "S"
+    assert get_service_category_by_code("L01") == "L"
+    assert get_service_category_by_code(None) is None

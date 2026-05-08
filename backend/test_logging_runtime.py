@@ -1,45 +1,21 @@
-#!/usr/bin/env python3
+"""Retired manual websocket logging diagnostic.
+
+This root script imported app.ws.queue_ws to inspect runtime logger state.
+Use backend/tests for supported websocket logging checks.
 """
-Тест логирования в runtime
-"""
-import os
+
+from __future__ import annotations
+
 import sys
 
-# Добавляем путь к приложению
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
 
-
-def test_logging_runtime():
-    """Тестируем логирование в runtime"""
-    print("🔔 Тестирую логирование в runtime...")
-
-    try:
-        print("🔔 Импортирую queue_ws...")
-        from app.ws import queue_ws
-
-        print("✅ queue_ws импортирован")
-
-        print("🔔 Проверяю logger...")
-        if hasattr(queue_ws, "log"):
-            print("✅ logger найден в queue_ws")
-            print(f"🔔 logger: {queue_ws.log}")
-            print(f"🔔 logger level: {queue_ws.log.level}")
-            print(f"🔔 logger handlers: {len(queue_ws.log.handlers)}")
-
-            # Тестируем логирование
-            print("🔔 Тестирую логирование...")
-            queue_ws.log.info("Test log message from runtime test")
-            print("✅ Логирование протестировано")
-
-        else:
-            print("❌ logger не найден в queue_ws")
-
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        import traceback
-
-        traceback.print_exc()
+def main() -> int:
+    print(
+        "backend/test_logging_runtime.py is retired. "
+        "Use backend/tests for supported websocket logging checks."
+    )
+    return 2
 
 
 if __name__ == "__main__":
-    test_logging_runtime()
+    sys.exit(main())

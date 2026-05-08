@@ -16,6 +16,7 @@ from app.models.appointment import Appointment
 from app.models.payment import Payment
 from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit
+from app.services import payment_provider_manager_factory as payment_factory
 
 
 from tests.auth_test_credentials import (
@@ -91,10 +92,16 @@ def _create_payme_auth_header(secret_key: str) -> str:
 
 
 @pytest.fixture
-def payme_secret_key():
+def payme_secret_key(monkeypatch):
     """Возвращает PayMe secret key для тестов из настроек, чтобы совпадал с провайдером"""
     settings = get_settings()
-    return getattr(settings, "PAYME_SECRET_KEY", "test_secret")
+    secret_key = "pytest-payme-secret"
+    monkeypatch.setattr(settings, "PAYME_ENABLED", True)
+    monkeypatch.setattr(settings, "PAYME_MERCHANT_ID", "pytest-payme-merchant")
+    monkeypatch.setattr(settings, "PAYME_SECRET_KEY", secret_key)
+    payment_factory.reset_payment_manager_for_tests()
+    yield secret_key
+    payment_factory.reset_payment_manager_for_tests()
 
 
 @pytest.mark.integration

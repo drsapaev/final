@@ -116,7 +116,7 @@ const password = formData.password || '<set QA_ADMIN_PASSWORD>';
 
 const credentials = {
   username: username,
-  password: password,
+  password,
   remember_me: rememberMe
 };
 ```

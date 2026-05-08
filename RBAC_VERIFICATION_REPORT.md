@@ -355,7 +355,7 @@ python -m pytest tests/integration/test_rbac_matrix.py -v
 
 2. **Проверить аудит-логи:**
    ```bash
-   sqlite3 backend/clinic.db "SELECT * FROM user_audit_logs WHERE action='ACCESS_DENIED' ORDER BY timestamp DESC LIMIT 10;"
+   psql "$DATABASE_URL" -c "SELECT * FROM user_audit_logs WHERE action='ACCESS_DENIED' ORDER BY timestamp DESC LIMIT 10;"
    ```
 
 3. **Доработать own-data изоляцию** (опционально, низкий приоритет)

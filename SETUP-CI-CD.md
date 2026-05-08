@@ -89,7 +89,7 @@
 DATABASE_URL=postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
 
 # CORS и WebSocket
-CORS_DISABLE=1
+CORS_DISABLE=0
 WS_DEV_ALLOW=1
 
 # Для продакшена (опционально)

@@ -7,7 +7,7 @@ import pytest
 
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.schemas.message import MessageCreate
-from app.services.messages_api_service import MessagesApiService
+from app.api.v1.endpoints.messages import send_message
 
 
 @pytest.mark.asyncio
@@ -25,12 +25,12 @@ async def test_send_message_creates_canonical_message_received_delivery(
     )
     monkeypatch.setattr("app.ws.chat_ws.chat_manager", fake_chat_manager)
 
-    service = MessagesApiService(db_session)
     payload = MessageCreate(recipient_id=registrar_user.id, content="Проверка inbox")
 
-    result = await service.send_message(
+    result = await send_message(
         request=None,
         message_data=payload,
+        db=db_session,
         current_user=admin_user,
     )
 

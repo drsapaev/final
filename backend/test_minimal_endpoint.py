@@ -1,28 +1,21 @@
-#!/usr/bin/env python3
+"""Retired manual endpoint server.
+
+This root script used to import the queue router and bind uvicorn on
+0.0.0.0:8001. Use backend/tests or a dedicated local dev server instead.
 """
-Минимальный тест endpoint
-"""
+
+from __future__ import annotations
+
 import sys
-import os
-sys.path.append(os.path.dirname(__file__))
 
-from fastapi import FastAPI
-from app.api.v1.endpoints.queue import router
-import uvicorn
 
-# Создаем минимальное приложение для тестирования
-app = FastAPI()
-app.include_router(router, prefix="/queue")
+def main() -> int:
+    print(
+        "backend/test_minimal_endpoint.py is retired. "
+        "Use backend/tests or the canonical backend dev server instead."
+    )
+    return 2
 
-@app.get("/test")
-def test_endpoint():
-    return {"status": "ok", "message": "Test endpoint works"}
 
 if __name__ == "__main__":
-    print("🚀 Запуск тестового сервера...")
-    print("Доступные endpoints:")
-    print("- GET  /test")
-    print("- POST /queue/join")
-    print("- POST /queue/qrcode")
-    
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    sys.exit(main())

@@ -142,6 +142,21 @@ Describe the change in 2-4 bullets.
         self.assertEqual(len(result.errors), 7)
         self.assertTrue(any("## Contract Impact" in error for error in result.errors))
 
+    def test_html_comments_do_not_count_as_section_answers(self):
+        body = VALID_DOCS_ONLY_BODY.replace(
+            "- Add docs-only PR review process gate.\n- No runtime behavior changed.",
+            "<!-- Author guidance only; this is not an answer. -->",
+        )
+
+        result = validate_pr_body(body)
+
+        self.assertTrue(any("## Summary" in error for error in result.errors))
+
+    def test_accepts_body_with_utf8_bom_prefix(self):
+        result = validate_pr_body("\ufeff" + VALID_DOCS_ONLY_BODY)
+
+        self.assertEqual(result.errors, [])
+
     def test_rejects_partially_filled_required_fields(self):
         body = """
 ## Summary

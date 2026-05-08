@@ -354,11 +354,18 @@ class VisitConfirmationService:
         print_tickets: list[dict[str, Any]] = []
 
         for queue_tag in unique_queue_tags:
+            daily_queue = self.repository.get_active_daily_queue_by_tag(
+                day=today,
+                queue_tag=queue_tag,
+            )
             specialist_doctor_id: int | None = None
             if visit.doctor_id:
                 visit_doctor = self.repository.get_doctor(visit.doctor_id)
                 if visit_doctor:
                     specialist_doctor_id = visit_doctor.id
+
+            if not specialist_doctor_id and daily_queue:
+                specialist_doctor_id = daily_queue.specialist_id
 
             if queue_tag == "ecg" and not specialist_doctor_id:
                 ecg_resource = self.repository.get_active_user_by_username("ecg_resource")
@@ -392,11 +399,12 @@ class VisitConfirmationService:
             if not specialist_doctor_id:
                 continue
 
-            daily_queue = self.repository.get_or_create_daily_queue(
-                day=today,
-                specialist_id=specialist_doctor_id,
-                queue_tag=queue_tag,
-            )
+            if not daily_queue:
+                daily_queue = self.repository.get_or_create_daily_queue(
+                    day=today,
+                    specialist_id=specialist_doctor_id,
+                    queue_tag=queue_tag,
+                )
 
             next_number = queue_service.get_next_queue_number(
                 self.repository.db,

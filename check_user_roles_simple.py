@@ -1,29 +1,22 @@
 #!/usr/bin/env python3
-import sqlite3
+"""Retired root manual SQLite user roles probe."""
 
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
+from __future__ import annotations
 
-print("📋 Содержимое таблицы user_roles:")
-cursor.execute('SELECT * FROM user_roles WHERE user_id = 19')
-rows = cursor.fetchall()
-if rows:
-    print("  Найденные записи:")
-    for row in rows:
-        print(f"    user_id: {row[0]}, role_id: {row[1]}")
+import sys
 
-    # Проверим роль
-    for row in rows:
-        cursor.execute('SELECT name FROM roles WHERE id = ?', (row[1],))
-        role = cursor.fetchone()
-        print(f"    Роль: {role[0] if role else 'Unknown'}")
-else:
-    print("  ❌ Нет записей для user_id = 19")
+MESSAGE = """
+check_user_roles_simple.py is retired.
 
-print("\n📋 Все роли в системе:")
-cursor.execute('SELECT id, name, description FROM roles')
-roles = cursor.fetchall()
-for role in roles:
-    print(f"  {role[0]}: {role[1]} - {role[2]}")
+This root-level manual probe opened the legacy SQLite database file directly to inspect role state.
+Use backend/tests or explicit Postgres diagnostics instead.
+""".strip()
 
-conn.close()
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

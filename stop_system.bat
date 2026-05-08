@@ -1,22 +1,35 @@
 @echo off
+setlocal
+
 echo ========================================
-echo    ОСТАНОВКА СИСТЕМЫ КЛИНИКИ
+echo    CLINIC SYSTEM STOP
 echo ========================================
+echo.
+
+echo Stopping canonical ports 5173 and 18000 through guarded helpers...
+echo To allow helper scripts to stop port owners automatically, set:
+echo   CONFIRM_KILL_PORT_5173_OWNER=1
+echo   CONFIRM_KILL_PORT_18000_OWNER=1
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0frontend\kill_port_5173.ps1"
+set FRONTEND_STATUS=%ERRORLEVEL%
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0backend\kill_port_18000.ps1"
+set BACKEND_STATUS=%ERRORLEVEL%
 
 echo.
-echo Остановка процессов на портах 18080 и 18000...
-
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :18080') do (
-    echo Остановка процесса %%a на порту 18080...
-    taskkill /PID %%a /F >nul 2>&1
+if not "%FRONTEND_STATUS%"=="0" (
+    echo Frontend port 5173 is still busy or was not stopped.
+)
+if not "%BACKEND_STATUS%"=="0" (
+    echo Backend port 18000 is still busy or was not stopped.
 )
 
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :18000') do (
-    echo Остановка процесса %%a на порту 18000...
-    taskkill /PID %%a /F >nul 2>&1
+if "%FRONTEND_STATUS%"=="0" if "%BACKEND_STATUS%"=="0" (
+    echo Clinic ports are free.
+    exit /b 0
 )
 
-echo.
-echo Все процессы остановлены!
-echo.
-pause
+echo Close the owning process manually or rerun with explicit CONFIRM_KILL_PORT_*_OWNER=1.
+exit /b 1

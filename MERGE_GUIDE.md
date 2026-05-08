@@ -141,11 +141,11 @@ jobs:
 ## 🆘 Если что-то пошло не так
 
 ```bash
-# Откат последнего merge
-git reset --hard HEAD~1
+# Безопасный откат merge-коммита
+git revert -m 1 <merge-commit-hash>
 
-# Или откат к конкретному коммиту
-git reset --hard <commit-hash>
+# Проверка старого состояния без переписывания текущей ветки
+git switch -c recovery/merge-check <commit-hash>
 
 # Создать backup перед merge
 git tag backup-$(date +%Y%m%d-%H%M%S)

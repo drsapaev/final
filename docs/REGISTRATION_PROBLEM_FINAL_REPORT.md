@@ -107,7 +107,7 @@ console.log('🔍 Фильтрация: X → Y записей');
 
 ### Тест 2: Проверка API
 ```bash
-python test_registration_endpoint.py
+# Retired root smoke script; use canonical backend tests or an explicit env-driven smoke script instead.
 ```
 
 ---
@@ -116,7 +116,7 @@ python test_registration_endpoint.py
 
 ### 1️⃣ **Запустить тест создания записи**
 ```bash
-python test_registration_endpoint.py
+# Retired root smoke script; use canonical backend tests or an explicit env-driven smoke script instead.
 ```
 
 ### 2️⃣ **Зарегистрировать пациента в интерфейсе**

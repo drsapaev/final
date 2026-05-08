@@ -111,6 +111,18 @@ It checks that reviewers get explicit answers for:
 
 The gate accepts `not applicable` with a short reason. This keeps docs-only and narrow surgical PRs fast while making risky omissions visible before review starts.
 
+Local equivalent:
+
+```powershell
+python scripts/run_pr_review_gate_checks.py --body-file path\to\pr-body.md
+```
+
+After applying the gate to a risky PR, record the adoption evidence when useful:
+
+```powershell
+python scripts/add_pr_review_adoption_entry.py --focus "PR #123" --track "Contract / RBAC" --evidence "PR body, diff, tests" --gate-result passed --gap "none" --prevention "targeted proof added" --next-action "watch next similar PR"
+```
+
 ## Checks That Are Important But Not PR Merge Blockers
 
 These checks remain part of the CI system, but they are not intended to block every PR into `main`:
@@ -192,7 +204,10 @@ This separation keeps PR feedback actionable and fast enough for daily work, whi
 
 - `docs/PLAN_CHECKLIST.md`
 - `docs/runbooks/PR_REVIEW_QUALITY_GATES.md`
+- `docs/runbooks/PR_REVIEW_ADOPTION_LOG.md`
 - `scripts/check_pr_review_template.py`
+- `scripts/run_pr_review_gate_checks.py`
+- `scripts/add_pr_review_adoption_entry.py`
 - `.github/workflows/pr-review-quality-gate.yml`
 - `.github/workflows/ci-cd-unified.yml`
 - `.github/workflows/role-system-check.yml`

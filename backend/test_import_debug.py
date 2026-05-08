@@ -1,43 +1,21 @@
-#!/usr/bin/env python3
+"""Retired manual endpoint import diagnostic.
+
+This root script imported the appointments endpoint module to inspect private
+runtime symbols. Use backend/tests for supported endpoint import checks.
 """
-Тест импорта _broadcast в appointments.py
-"""
-import os
+
+from __future__ import annotations
+
 import sys
 
-# Добавляем путь к приложению
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
 
-
-def test_import_broadcast():
-    """Тестируем импорт _broadcast"""
-    print("🔔 Тестирую импорт _broadcast...")
-
-    try:
-        print("🔔 Импортирую appointments...")
-        from app.api.v1.endpoints import appointments
-
-        print("✅ appointments импортирован")
-
-        print("🔔 Проверяю _broadcast...")
-        if hasattr(appointments, "_broadcast"):
-            print("✅ _broadcast найден в appointments")
-        else:
-            print("❌ _broadcast не найден в appointments")
-
-        # Проверяем, есть ли импорт в файле
-        print("🔔 Проверяю импорты в appointments...")
-        if hasattr(appointments, "load_stats"):
-            print("✅ load_stats найден в appointments")
-        else:
-            print("❌ load_stats не найден в appointments")
-
-    except Exception as e:
-        print(f"❌ Ошибка импорта: {e}")
-        import traceback
-
-        traceback.print_exc()
+def main() -> int:
+    print(
+        "backend/test_import_debug.py is retired. "
+        "Use backend/tests for supported endpoint import checks."
+    )
+    return 2
 
 
 if __name__ == "__main__":
-    test_import_broadcast()
+    sys.exit(main())

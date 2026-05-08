@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.morning_assignment_api_service import MorningAssignmentApiService
+from app.services.morning_assignment_endpoint_service import MorningAssignmentEndpointService
 
 router = APIRouter()
 
@@ -60,7 +60,7 @@ def run_morning_assignment_manual(
     Обрабатывает все подтвержденные визиты на указанную дату
     """
     try:
-        api_service = MorningAssignmentApiService(db)
+        api_service = MorningAssignmentEndpointService(db)
         parsed_date = api_service.parse_target_date(target_date)
         result = api_service.run_assignment_for_date(target_date=parsed_date)
 
@@ -93,7 +93,7 @@ def get_morning_assignment_stats(
     Показывает количество обработанных визитов и записей в очередях
     """
     try:
-        api_service = MorningAssignmentApiService(db)
+        api_service = MorningAssignmentEndpointService(db)
         parsed_date = api_service.parse_target_date(target_date)
         stats = api_service.get_stats_for_date(target_date=parsed_date)
 
@@ -123,7 +123,7 @@ def manual_assignment_for_visits(
     Ручное присвоение номеров для конкретных визитов
     Полезно для исправления ошибок или обработки отдельных случаев
     """
-    api_service = MorningAssignmentApiService(db)
+    api_service = MorningAssignmentEndpointService(db)
     try:
         return api_service.manual_assignment_for_visits(
             visit_ids=request.visit_ids,
@@ -154,7 +154,7 @@ def get_pending_visits(
     Получение списка визитов, ожидающих присвоения номеров
     """
     try:
-        api_service = MorningAssignmentApiService(db)
+        api_service = MorningAssignmentEndpointService(db)
         parsed_date = api_service.parse_target_date(target_date)
         return api_service.get_pending_visits_payload(target_date=parsed_date)
     except ValueError as exc:
@@ -183,7 +183,7 @@ def get_queue_summary(
     Получение сводки по очередям на указанную дату
     """
     try:
-        api_service = MorningAssignmentApiService(db)
+        api_service = MorningAssignmentEndpointService(db)
         parsed_date = api_service.parse_target_date(target_date)
         return api_service.get_queue_summary_payload(target_date=parsed_date)
     except ValueError as exc:

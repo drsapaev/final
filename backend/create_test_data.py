@@ -5,14 +5,37 @@
 
 from datetime import datetime
 
-from app.db.session import SessionLocal
-from app.models.patient import Patient
-from app.models.service import Service
-from app.models.user import User
+import os
+
+
+def require_test_data_confirmation():
+    if os.getenv("CONFIRM_CREATE_TEST_DATA") != "1":
+        raise RuntimeError(
+            "Refusing to create test data. "
+            "Set CONFIRM_CREATE_TEST_DATA=1 only for an explicit local seed run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating test data.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("create_test_data.py requires PostgreSQL; SQLite is not allowed.")
 
 
 def create_test_data():
     """Создание тестовых данных"""
+    require_test_data_confirmation()
+    require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.models.patient import Patient
+    from app.models.service import Service
+    from app.models.user import User
+
     db = SessionLocal()
     try:
         # Создаём тестовые услуги

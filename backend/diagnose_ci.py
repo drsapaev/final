@@ -8,19 +8,6 @@ from pathlib import Path
 
 sys.path.insert(0, ".")
 
-_DIAGNOSTIC_DB_DIR = tempfile.TemporaryDirectory(prefix="diagnose-ci-")
-_DIAGNOSTIC_DB_PATH = Path(_DIAGNOSTIC_DB_DIR.name) / "diagnose_ci.db"
-
-# This helper is intentionally isolated from runtime DB settings.
-os.environ["DATABASE_URL"] = f"sqlite:///{_DIAGNOSTIC_DB_PATH.as_posix()}"
-os.environ["CORS_DISABLE"] = "1"
-os.environ["WS_DEV_ALLOW"] = "1"
-
-from app.core.security import get_password_hash, verify_password  # noqa: E402
-from app.db.base import Base  # noqa: E402
-from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models.user import User  # noqa: E402
-
 
 ROLE_USERS = [
     ("admin", "Admin"),
@@ -42,9 +29,35 @@ def required_password(username: str) -> str:
     return password
 
 
+def require_temp_sqlite_confirmation() -> None:
+    if os.getenv("CONFIRM_DIAGNOSE_CI_TEMP_SQLITE") != "1":
+        raise RuntimeError(
+            "diagnose_ci.py creates schema with SQLAlchemy metadata in an isolated "
+            "temporary SQLite database. Set CONFIRM_DIAGNOSE_CI_TEMP_SQLITE=1 only "
+            "for an explicit diagnostic run."
+        )
+
+
 def main() -> None:
+    require_temp_sqlite_confirmation()
+
+    diagnostic_db_dir = tempfile.TemporaryDirectory(prefix="diagnose-ci-")
+    diagnostic_db_path = Path(diagnostic_db_dir.name) / "diagnose_ci.db"
+
+    # This helper is intentionally isolated from runtime DB settings.
+    os.environ["DATABASE_URL"] = f"sqlite:///{diagnostic_db_path.as_posix()}"
+    os.environ["ALLOW_SQLITE_DATABASE_URL"] = "1"
+    os.environ["CORS_DISABLE"] = "0"
+    os.environ["WS_DEV_ALLOW"] = "1"
+
     db = None
+    engine = None
     try:
+        from app.core.security import get_password_hash, verify_password
+        from app.db.base import Base
+        from app.db.session import SessionLocal, engine
+        from app.models.user import User
+
         users_data = [
             (username, required_password(username), role)
             for username, role in ROLE_USERS
@@ -99,8 +112,9 @@ def main() -> None:
     finally:
         if db is not None:
             db.close()
-        engine.dispose()
-        _DIAGNOSTIC_DB_DIR.cleanup()
+        if engine is not None:
+            engine.dispose()
+        diagnostic_db_dir.cleanup()
         print("\nTemporary diagnostic DB removed")
 
 

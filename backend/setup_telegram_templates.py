@@ -2,6 +2,31 @@
 Создание шаблонов сообщений Telegram
 Основа: passport.md стр. 2064-2570
 """
+import os
+
+
+def _require_setup_telegram_templates_confirmation() -> None:
+    if os.getenv("CONFIRM_SETUP_TELEGRAM_TEMPLATES") != "1":
+        raise SystemExit(
+            "Set CONFIRM_SETUP_TELEGRAM_TEMPLATES=1 before creating Telegram config/templates."
+        )
+
+
+def _require_postgres_database_url() -> None:
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before creating Telegram templates.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError(
+            "setup_telegram_templates.py requires PostgreSQL; SQLite is not allowed."
+        )
+
+
+_require_setup_telegram_templates_confirmation()
+_require_postgres_database_url()
+
 from app.db.session import SessionLocal
 from app.models.telegram_config import TelegramConfig, TelegramTemplate
 from app.crud import telegram_config as crud_telegram

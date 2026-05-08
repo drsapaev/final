@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.services.lab_notification_service import LabNotificationService
 from app.services.notifications import notification_sender_service
+from tests.auth_test_credentials import DUMMY_PASSWORD_HASH
 
 
 def _create_user(db_session, *, username: str, role: str, full_name: str) -> User:
@@ -22,7 +23,7 @@ def _create_user(db_session, *, username: str, role: str, full_name: str) -> Use
         username=username,
         email=f"{username}@test.com",
         full_name=full_name,
-        hashed_password="hashed-password",
+        hashed_password=DUMMY_PASSWORD_HASH,
         role=role,
         is_active=True,
         is_superuser=False,

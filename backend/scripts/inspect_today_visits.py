@@ -10,7 +10,16 @@ import sqlite3
 from datetime import date
 
 
+def require_diagnostic_db_read() -> None:
+  if os.getenv("ALLOW_LEGACY_SQLITE_DIAGNOSTIC_READ") != "1":
+    raise SystemExit(
+      "Refusing to read legacy SQLite diagnostic database. "
+      "Set ALLOW_LEGACY_SQLITE_DIAGNOSTIC_READ=1 only for an explicit local legacy SQLite diagnostic run."
+    )
+
+
 def main() -> None:
+  require_diagnostic_db_read()
   db_path = os.path.abspath("clinic.db")
   print(f"DB_PATH: {db_path}")
 

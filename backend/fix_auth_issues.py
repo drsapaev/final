@@ -5,15 +5,32 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.db.session import SessionLocal
-from app.models.user import User
-from app.models.role_permission import Role, user_roles_table
-from sqlalchemy import select
-from datetime import datetime, timedelta
-from jose import jwt
-from app.core.config import settings
+def _require_confirmation():
+    value = os.getenv("CONFIRM_FIX_AUTH_ISSUES", "").strip().lower()
+    if value not in {"1", "true", "yes", "on"}:
+        raise RuntimeError("Set CONFIRM_FIX_AUTH_ISSUES=1 before running this auth repair script.")
+
+
+def _require_postgres_database_url():
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before running fix_auth_issues.py.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("fix_auth_issues.py requires a PostgreSQL DATABASE_URL.")
+
 
 def fix_auth_issues():
+    _require_confirmation()
+    _require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.models.user import User
+    from app.models.role_permission import Role, user_roles_table
+    from sqlalchemy import select
+    from datetime import datetime, timedelta
+    from jose import jwt
+    from app.core.config import settings
+
     with SessionLocal() as db:
         print("🔧 Проверяем и исправляем проблемы с авторизацией...")
 
@@ -57,7 +74,7 @@ def fix_auth_issues():
         token = jwt.encode({**payload, 'exp': datetime.utcnow() + timedelta(hours=1)},
                           settings.SECRET_KEY,
                           algorithm=getattr(settings, 'ALGORITHM', 'HS256'))
-        print(f"✅ Токен создан: {token[:50]}...")
+        print("✅ Токен создан")
 
         # 4. Тестируем endpoints
         import requests

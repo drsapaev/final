@@ -439,7 +439,7 @@ device_config = {
         "base_url": "http://192.168.1.200:8080/api",
         "auth": {
             "username": "admin",
-            "password": "password"
+            "password": "<DEVICE_PASSWORD_FROM_ENV>"
         },
         "timeout": 30
     },

@@ -29,6 +29,7 @@ from app.models.visit import Visit
 from app.services.morning_assignment import MorningAssignmentService
 from app.services.qr_queue_service import QRQueueService
 from app.services.queue_service import queue_service
+from tests.auth_test_credentials import DUMMY_PASSWORD_HASH
 
 # ==================== FIXTURES ====================
 
@@ -44,7 +45,7 @@ def test_specialists_multi(db_session):
             username="scenario_cardio",
             email="scenario_cardio@test.com",
             full_name="Кардиолог Иванов",
-            hashed_password="hashed",
+            hashed_password=DUMMY_PASSWORD_HASH,
             role="cardio",
             is_active=True
         )
@@ -61,7 +62,7 @@ def test_specialists_multi(db_session):
             username="scenario_lab",
             email="scenario_lab@test.com",
             full_name="Лаборант Петрова",
-            hashed_password="hashed",
+            hashed_password=DUMMY_PASSWORD_HASH,
             role="Lab",
             is_active=True
         )
@@ -78,7 +79,7 @@ def test_specialists_multi(db_session):
             username="scenario_derma",
             email="scenario_derma@test.com",
             full_name="Дерматолог Сидорова",
-            hashed_password="hashed",
+            hashed_password=DUMMY_PASSWORD_HASH,
             role="derma",
             is_active=True
         )

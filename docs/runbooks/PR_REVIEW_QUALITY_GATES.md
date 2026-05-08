@@ -182,13 +182,26 @@ Before requesting review, the PR author confirms:
 
 The repository includes a soft PR-body gate for the template sections in `.github/pull_request_template.md`.
 
+Use `docs/runbooks/PR_REVIEW_SAMPLE_BODIES.md` for valid docs-only and runtime-contract examples.
+
 Local check:
 
 ```powershell
+python scripts/run_pr_review_gate_checks.py
+python scripts/run_pr_review_gate_checks.py --body-file path\to\pr-body.md
 python scripts/check_pr_review_template.py --body-file path\to\pr-body.md
+python scripts/check_pr_review_template.py --body-file docs\runbooks\pr-review-samples\docs-only-pr.md
+python scripts/check_pr_review_template.py --body-file docs\runbooks\pr-review-samples\runtime-contract-pr.md
 ```
 
 CI check:
 - `.github/workflows/pr-review-quality-gate.yml` runs on pull requests into `main`.
+- The workflow runs `python scripts/run_pr_review_gate_checks.py --body-env PR_BODY`.
+- The runner executes checker unit tests, validates documented sample PR bodies, and then validates the live PR body.
 - The check fails when required sections are missing or left as empty placeholders.
 - `not applicable` is accepted when paired with a short reason, so docs-only and surgical PRs can stay lightweight.
+
+After-review evidence:
+- For the weekly practice track, record live uses in `docs/runbooks/PR_REVIEW_ADOPTION_LOG.md`.
+- Generate a consistent entry with `scripts/add_pr_review_adoption_entry.py`.
+- Use `--write` only after reviewing the generated entry.

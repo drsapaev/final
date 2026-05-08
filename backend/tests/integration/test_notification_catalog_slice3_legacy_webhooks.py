@@ -77,7 +77,7 @@ def test_legacy_click_webhook_emits_canonical_payment_notification(
         return True, "Webhook processed successfully", fake_webhook
 
     monkeypatch.setattr(
-        "app.services.payment_webhook_api_service.PaymentWebhookApiRepository.process_click_webhook",
+        "app.services.payment_webhook_endpoint_service.PaymentWebhookApiRepository.process_click_webhook",
         _fake_process_click_webhook,
     )
 
@@ -125,7 +125,7 @@ def test_legacy_payme_webhook_emits_failed_payment_notification(
         return False, "provider failure", fake_webhook
 
     monkeypatch.setattr(
-        "app.services.payment_webhook_api_service.PaymentWebhookApiRepository.process_payme_webhook",
+        "app.services.payment_webhook_endpoint_service.PaymentWebhookApiRepository.process_payme_webhook",
         _fake_process_payme_webhook,
     )
 
@@ -179,7 +179,7 @@ def test_legacy_click_webhook_duplicate_callback_does_not_create_duplicate_deliv
         return False, "Webhook already processed", fake_webhook
 
     monkeypatch.setattr(
-        "app.services.payment_webhook_api_service.PaymentWebhookApiRepository.process_click_webhook",
+        "app.services.payment_webhook_endpoint_service.PaymentWebhookApiRepository.process_click_webhook",
         _fake_process_click_webhook,
     )
 
@@ -229,7 +229,7 @@ def test_legacy_payme_webhook_duplicate_callback_does_not_create_duplicate_deliv
         return False, "Webhook already processed", fake_webhook
 
     monkeypatch.setattr(
-        "app.services.payment_webhook_api_service.PaymentWebhookApiRepository.process_payme_webhook",
+        "app.services.payment_webhook_endpoint_service.PaymentWebhookApiRepository.process_payme_webhook",
         _fake_process_payme_webhook,
     )
 

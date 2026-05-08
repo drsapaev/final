@@ -8,7 +8,7 @@
 **Backend:** http://localhost:18000  
 **Frontend:** http://localhost:5173  
 
-**Live smoke note:** backend `18000` is up; authoritative AI/MCP smoke gate is `GET /api/v1/mcp/health` (returned `overall=healthy` on `2026-03-29`). `GET /api/v1/mcp/status` is informational and may still report `healthy=false` until the cached health state refreshes. Evidence: `output/playwright/ai-mcp-health-smoke-2026-03-29.json`. Browser proof on the same stack loaded `/admin/ai-settings` and `/admin/ai-analytics` under `admin@example.com / <set QA_ADMIN_PASSWORD>` with clean console/network evidence: `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, `output/playwright/ai-mcp-ai-analytics-console.log`
+**Live smoke note:** backend `18000` is up; authoritative AI/MCP smoke gate is `GET /api/v1/mcp/health` (returned `overall=healthy` on `2026-03-29`). `GET /api/v1/mcp/status` is informational and may still report `healthy=false` until the cached health state refreshes. Evidence: `output/playwright/ai-mcp-health-smoke-2026-03-29.json`. Browser proof on the same stack loaded `/admin/ai-settings` and `/admin/ai-analytics` under `admin@example.com` with the `QA_ADMIN_PASSWORD` environment value; network stayed 200-only and console had `0` errors / `0` warnings. Evidence: `output/playwright/ai-mcp-ai-analytics-final.png`, `output/playwright/ai-mcp-ai-analytics-network.log`, `output/playwright/ai-mcp-ai-analytics-console.log`
 
 ---
 
@@ -32,10 +32,10 @@
 
 ```
 Тестовые пользователи:
-- doctor / Test1234
-- cardio / Test1234
-- derma / Test1234
-- dentist / Test1234
+- doctor / `QA_DOCTOR_PASSWORD` env var
+- cardio / `QA_CARDIO_PASSWORD` env var
+- derma / `QA_DERMA_PASSWORD` env var
+- dentist / `QA_DENTIST_PASSWORD` env var
 
 Тестовые жалобы:
 - "Головная боль в течение 2 дней, усиливается при движении"
@@ -451,7 +451,7 @@ http://localhost:5173
 
 # 4. Логин как doctor
 username: doctor
-password: Test1234
+password: QA_DOCTOR_PASSWORD env var
 
 # 5. Создать запись → Оплатить → Открыть EMR
 

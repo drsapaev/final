@@ -3,16 +3,43 @@ Database Backup Service
 
 ✅ SECURITY: Automated database backup strategy for disaster recovery
 """
+from __future__ import annotations
+
 import logging
 import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.orm import Session
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _allow_sqlite_database_url() -> bool:
+    raw = os.getenv("ALLOW_SQLITE_DATABASE_URL", "")
+    if raw.strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_database_url(url: str) -> None:
+    if _is_sqlite_url(url) and not _allow_sqlite_database_url():
+        logger.error(
+            "Refusing SQLite DATABASE_URL for backup operation without explicit legacy/test opt-in"
+        )
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for backup operations. "
+            "Use PostgreSQL as the schema source of truth, or set "
+            "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
+        )
 
 
 def _get_database_url() -> str:
@@ -21,7 +48,16 @@ def _get_database_url() -> str:
     db_url = settings.DATABASE_URL
     if not db_url:
         raise ValueError("DATABASE_URL must be configured before backup operations.")
-    return str(db_url)
+    url = str(db_url)
+    _validate_database_url(url)
+    return url
+
+
+def _sqlite_path_from_url(url: str) -> str:
+    source_db = url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
+    if not os.path.isabs(source_db):
+        source_db = os.path.join(os.getcwd(), source_db)
+    return source_db
 
 
 class BackupService:
@@ -36,7 +72,7 @@ class BackupService:
         self.retention_days = int(os.getenv("BACKUP_RETENTION_DAYS", "30"))
         self.max_backups = int(os.getenv("MAX_BACKUPS", "100"))
 
-    def create_backup(self, backup_type: str = "manual") -> dict[str, any]:
+    def create_backup(self, backup_type: str = "manual") -> dict[str, Any]:
         """
         Create a database backup
 
@@ -56,9 +92,7 @@ class BackupService:
             # Create backup based on database type
             if db_url.startswith("sqlite"):
                 # SQLite backup
-                source_db = db_url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
-                if not os.path.isabs(source_db):
-                    source_db = os.path.join(os.getcwd(), source_db)
+                source_db = _sqlite_path_from_url(db_url)
 
                 # Use SQLite backup API for atomic copy
                 import sqlite3
@@ -175,7 +209,7 @@ class BackupService:
         except Exception as e:
             logger.error(f"Error cleaning up backups: {e}")
 
-    def list_backups(self) -> list[dict[str, any]]:
+    def list_backups(self) -> list[dict[str, Any]]:
         """List all available backups"""
         backups = []
 
@@ -196,13 +230,34 @@ class BackupService:
 
         return backups
 
-    def restore_backup(self, backup_filename: str) -> dict[str, any]:
+    def get_backup_info(self, backup_filename: str) -> dict[str, Any] | None:
+        """Return metadata for a backup file, or None when it does not exist."""
+        backup_path = self.backup_dir / backup_filename
+        if not backup_path.exists() or not backup_path.is_file():
+            return None
+
+        stat = backup_path.stat()
+        return {
+            "filename": backup_path.name,
+            "path": str(backup_path),
+            "size": stat.st_size,
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "compressed": backup_path.suffix == ".gz",
+        }
+
+    def restore_backup(
+        self, backup_filename: str, components: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Restore database from backup
 
         ⚠️ WARNING: This will overwrite the current database!
         """
         try:
+            if components and "database" not in components:
+                raise ValueError("BackupService only supports database restore.")
+
             backup_path = self.backup_dir / backup_filename
             if not backup_path.exists():
                 raise FileNotFoundError(f"Backup not found: {backup_filename}")
@@ -228,9 +283,7 @@ class BackupService:
 
             # Restore based on database type
             if db_url.startswith("sqlite"):
-                target_db = db_url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
-                if not os.path.isabs(target_db):
-                    target_db = os.path.join(os.getcwd(), target_db)
+                target_db = _sqlite_path_from_url(db_url)
 
                 # Close all connections first
                 self.db.close()
@@ -280,7 +333,24 @@ class BackupService:
             logger.error(f"❌ Restore failed: {e}")
             raise
 
-    def verify_backup(self, backup_filename: str) -> dict[str, any]:
+    def delete_backup(self, backup_filename: str) -> dict[str, Any]:
+        """Delete a backup file from the configured backup directory."""
+        backup_path = self.backup_dir / backup_filename
+        if not backup_path.exists() or not backup_path.is_file():
+            return {
+                "success": False,
+                "error": "Backup not found",
+                "backup_name": backup_filename,
+            }
+
+        backup_path.unlink()
+        return {
+            "success": True,
+            "backup_name": backup_filename,
+            "deleted_at": datetime.utcnow().isoformat(),
+        }
+
+    def verify_backup(self, backup_filename: str) -> dict[str, Any]:
         """Verify backup integrity"""
         try:
             backup_path = self.backup_dir / backup_filename

@@ -24,19 +24,12 @@
 ### Шаг 1: Проверить данные в базе
 ```bash
 # В терминале backend:
-python -c "
-import sqlite3
-conn = sqlite3.connect('clinic.db')
-cursor = conn.cursor()
-
-# Последние 5 записей
-cursor.execute('SELECT v.id, p.last_name || \" \" || p.first_name, v.created_at, v.department FROM visits v JOIN patients p ON v.patient_id = p.id ORDER BY v.created_at DESC LIMIT 5')
-rows = cursor.fetchall()
-print('Последние записи в базе:')
-for row in rows:
-    print(f'ID: {row[0]} | {row[1]} | {row[2]} | {row[3]}')
-
-conn.close()
+psql "$DATABASE_URL" -c "
+SELECT v.id, p.last_name || ' ' || p.first_name AS patient, v.created_at, v.department
+FROM visits v
+JOIN patients p ON v.patient_id = p.id
+ORDER BY v.created_at DESC
+LIMIT 5;
 "
 ```
 

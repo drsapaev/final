@@ -636,7 +636,7 @@ class QueueToken(Base):
 | Компонент | Путь | Описание |
 |-----------|------|----------|
 | `QueueJoin.jsx` | `/queue/join` | QR-регистрация |
-| `RegistrarPanel.jsx` | `/registrar-panel` | Панель регистратора |
+| `RegistrarPanel.jsx` | `/registrar` | Панель регистратора |
 | `ModernQueueManager.jsx` | — | Управление очередью |
 
 ### Компоненты

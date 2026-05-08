@@ -10,12 +10,18 @@ Usage:
 """
 import argparse
 import asyncio
+import os
 import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
 
 import aiohttp
+
+
+def require_load_test_confirmation() -> None:
+    if os.getenv("CONFIRM_LOAD_TEST") != "1":
+        raise SystemExit("Set CONFIRM_LOAD_TEST=1 before running load_test.py.")
 
 
 class LoadTester:
@@ -171,6 +177,8 @@ class LoadTester:
 
 async def main():
     """Main function"""
+    require_load_test_confirmation()
+
     parser = argparse.ArgumentParser(description="Load testing tool")
     parser.add_argument(
         "--url",

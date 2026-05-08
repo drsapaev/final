@@ -40,6 +40,11 @@ def main() -> int:
     args = _parse_args()
 
     if args.mode == "live":
+        if os.getenv("CONFIRM_EMR_CUTOVER_LIVE") != "1":
+            raise RuntimeError(
+                "Refusing to run live EMR cutover. "
+                "Set CONFIRM_EMR_CUTOVER_LIVE=1 only for an explicit cutover run."
+            )
         os.environ["EMR_LEGACY_WRITE_FREEZE"] = "1"
 
     _configure_path()

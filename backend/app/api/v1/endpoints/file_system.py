@@ -47,7 +47,7 @@ from app.schemas.file_system import (
     FileUploadRequest,
     FileUploadResponse,
 )
-from app.services.file_system_api_service import FileSystemApiService
+from app.services.file_system_endpoint_service import FileSystemEndpointService
 from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
 
@@ -111,7 +111,7 @@ async def upload_file(
 
         # Загружаем файл
         uploaded_file = service.upload_file(db, file, file_data, current_user.id)
-        FileSystemApiService(db).finalize_file_create_audit(
+        FileSystemEndpointService(db).finalize_file_create_audit(
             request=request,
             user_id=current_user.id,
             uploaded_file=uploaded_file,
@@ -323,7 +323,7 @@ async def get_files(
             owner_id=owner_id,
         )
 
-        total = FileSystemApiService(db).count_files(
+        total = FileSystemEndpointService(db).count_files(
             file_model=file.model,
             owner_id=owner_id,
             file_type=file_type,
@@ -405,7 +405,7 @@ async def update_file(
         
         # Обновляем файл
         updated_file = file.update(db, db_obj=db_file, obj_in=update_data)
-        FileSystemApiService(db).finalize_file_update_audit(
+        FileSystemEndpointService(db).finalize_file_update_audit(
             request=request,
             user_id=current_user.id,
             file_id=file_id,
@@ -447,7 +447,7 @@ async def replace_file_content(
         updated_file = service.replace_file_content(
             db, file_id, file, current_user.id, change_description
         )
-        FileSystemApiService(db).finalize_file_update_audit(
+        FileSystemEndpointService(db).finalize_file_update_audit(
             request=request,
             user_id=current_user.id,
             file_id=file_id,
@@ -503,7 +503,7 @@ async def delete_file(
                 detail="Файл не найден или нет прав для удаления",
             )
 
-        FileSystemApiService(db).finalize_file_delete_audit(
+        FileSystemEndpointService(db).finalize_file_delete_audit(
             request=request,
             user_id=current_user.id,
             file_id=file_id,

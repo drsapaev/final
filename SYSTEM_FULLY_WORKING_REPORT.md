@@ -24,8 +24,8 @@
 
 ### 3. **База данных** ✅
 - **Статус**: ✅ ПОДКЛЮЧЕНА
-- **Тип**: SQLite
-- **Расположение**: C:\final\clinic.db
+- **Тип**: PostgreSQL
+- **Источник правды**: `$DATABASE_URL` + Alembic migrations
 
 ---
 
@@ -128,7 +128,7 @@ npm run dev
 ### **Backend**
 - ✅ **Время отклика**: < 100ms
 - ✅ **Память**: Оптимизировано
-- ✅ **База данных**: SQLite (быстрая)
+- ✅ **База данных**: PostgreSQL
 
 ### **Frontend**
 - ✅ **Загрузка**: < 2 секунд
@@ -141,7 +141,7 @@ npm run dev
 
 ### **Backend Stack**
 - **Framework**: FastAPI
-- **Database**: SQLAlchemy 2 + SQLite
+- **Database**: SQLAlchemy 2 + PostgreSQL
 - **Authentication**: JWT (python-jose)
 - **Migrations**: Alembic
 - **WebSocket**: FastAPI WebSocket

@@ -7,13 +7,37 @@ import os
 sys.path.append('/c/final/backend')
 
 from datetime import date
-from app.db.session import SessionLocal
-from app.models.visit import Visit, VisitService
-from app.models.service import Service
-from app.models.user import User
-from app.services.morning_assignment import MorningAssignmentService
+
+
+def require_assignment_diagnostic_confirmation():
+    if os.getenv("CONFIRM_DIAGNOSE_ASSIGNMENT") != "1":
+        raise RuntimeError(
+            "Refusing to run queue assignment diagnostic. "
+            "It can create queue entries through MorningAssignmentService. "
+            "Set CONFIRM_DIAGNOSE_ASSIGNMENT=1 only for an explicit local diagnostic run."
+        )
+
+
+def require_postgres_database_url():
+    from app.core.config import settings
+
+    database_url = str(settings.DATABASE_URL).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set before running assignment diagnostics.")
+    if database_url.lower().startswith("sqlite"):
+        raise RuntimeError("diagnose_assignment.py requires PostgreSQL; SQLite is not allowed.")
+
 
 def diagnose_morning_assignment():
+    require_assignment_diagnostic_confirmation()
+    require_postgres_database_url()
+
+    from app.db.session import SessionLocal
+    from app.models.service import Service
+    from app.models.user import User
+    from app.models.visit import Visit, VisitService
+    from app.services.morning_assignment import MorningAssignmentService
+
     print("🔍 Диагностика MorningAssignmentService")
     
     db = SessionLocal()
