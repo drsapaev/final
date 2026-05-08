@@ -1,47 +1,24 @@
 #!/usr/bin/env python3
-"""
-Удаление исключенных лабораторных услуг (L02, L31, L50)
-"""
+"""Retired legacy destructive lab service helper."""
 
-import sqlite3
-import os
+from __future__ import annotations
 
-def remove_excluded_lab_services():
-    """Удаляем исключенные лабораторные услуги"""
+import sys
 
-    db_path = 'clinic.db'
 
-    if not os.path.exists(db_path):
-        print(f"❌ База данных '{db_path}' не найдена.")
-        return False
+MESSAGE = """
+remove_excluded_lab_services.py is retired.
 
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+This legacy helper deleted lab services from a local database directly. Lab
+catalog membership belongs in seed_services.py and the canonical lab seed data
+and Alembic migrations.
+""".strip()
 
-    try:
-        print("🔄 Удаляем исключенные лабораторные услуги...")
 
-        # Исключаемые услуги
-        excluded_services = ['L02', 'L31', 'L50']
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-        for service_code in excluded_services:
-            cursor.execute('DELETE FROM services WHERE service_code = ?', (service_code,))
-            if cursor.rowcount > 0:
-                print(f"✅ Удалена лабораторная услуга: {service_code}")
-            else:
-                print(f"⚠️ Услуга не найдена: {service_code}")
-
-        conn.commit()
-        print("✅ Удаление исключенных услуг завершено")
-
-        return True
-
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        conn.rollback()
-        return False
-    finally:
-        conn.close()
 
 if __name__ == "__main__":
-    remove_excluded_lab_services()
+    raise SystemExit(main())

@@ -36,7 +36,7 @@
 ### Быстрая проверка (перед каждым коммитом):
 ```bash
 cd backend
-python quick_check.py
+python -m pytest --no-cov tests/unit/test_user_bootstrap_and_two_factor_service.py tests/unit/test_user_management_endpoint_service.py tests/unit/test_user_management_service_guardrails.py
 ```
 
 ### Полная проверка (перед деплоем):
@@ -44,13 +44,13 @@ python quick_check.py
 cd backend
 python test_role_routing.py
 python test_user_management_system.py
-python check_system_integrity.py
+python -m compileall -q app
 ```
 
 ### Проверка системы управления пользователями:
 ```bash
 cd backend
-python create_user_management_tables.py  # Создание таблиц (если нужно)
+alembic upgrade head  # Схема управляется Alembic
 python test_user_management_system.py    # Тестирование системы
 ```
 
@@ -61,7 +61,7 @@ python test_user_management_system.py    # Тестирование систем
 
 ## 📋 Чек-лист перед коммитом
 
-- [ ] Запущена быстрая проверка: `python quick_check.py`
+- [ ] Запущена быстрая проверка: `python -m pytest --no-cov tests/unit/test_user_bootstrap_and_two_factor_service.py tests/unit/test_user_management_endpoint_service.py tests/unit/test_user_management_service_guardrails.py`
 - [ ] Запущены тесты системы управления: `python test_user_management_system.py`
 - [ ] Все тесты прошли успешно
 - [ ] Обновлена документация (если нужно)
@@ -77,8 +77,8 @@ python test_user_management_system.py    # Тестирование систем
 ### 1. Автоматические тесты
 - `test_role_routing.py` - тестирует логин и роли
 - `test_user_management_system.py` - НОВОЕ: тестирует систему управления пользователями
-- `check_system_integrity.py` - проверяет целостность
-- `quick_check.py` - быстрая проверка перед коммитом
+- `python -m compileall -q app` - проверяет импортируемость backend app
+- `python -m pytest --no-cov ...` - быстрая проверка перед коммитом
 
 ### 2. Валидация ролей
 - `role_validation.py` - валидация в runtime
@@ -147,7 +147,7 @@ python test_user_management_system.py    # Тестирование систем
 #### ✅ ОБЯЗАТЕЛЬНО:
 1. **Создать таблицы** перед первым использованием:
    ```bash
-   python create_user_management_tables.py
+   alembic upgrade head
    ```
 
 2. **Запустить тесты** после изменений:

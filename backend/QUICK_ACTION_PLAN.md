@@ -14,14 +14,14 @@
 cd C:\final\backend
 $env:PYTHONPATH="C:\final\backend"
 $env:PYTHONIOENCODING="utf-8"
-$env:DATABASE_URL="postgresql://user:password@localhost:5432/clinic"
+$env:DATABASE_URL="postgresql://<db_user>:<db_password>@localhost:5432/clinic"
 python -m uvicorn app.main:app --host 0.0.0.0 --port 18000 --reload
 ```
 
 ### **2. Проверить работоспособность всех компонентов**
 ```bash
 # Запустить проверку целостности
-python check_system_integrity.py
+python -m compileall -q app
 
 # Проверить API endpoints
 curl http://127.0.0.1:18000/api/v1/health

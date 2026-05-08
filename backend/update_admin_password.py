@@ -1,33 +1,28 @@
 #!/usr/bin/env python3
+"""Retired legacy admin password update helper."""
+
+from __future__ import annotations
+
 import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.core.security import get_password_hash
-import sqlite3
+MESSAGE = """
+update_admin_password.py is retired.
 
-def update_admin_password():
-    """Обновляет пароль пользователя admin на admin123"""
-    try:
-        # Подключаемся к базе данных напрямую
-        conn = sqlite3.connect('clinic.db')
-        cursor = conn.cursor()
-        
-        # Обновляем пароль пользователя admin
-        hashed_password = get_password_hash("admin123")
-        cursor.execute("""
-            UPDATE users 
-            SET hashed_password = ? 
-            WHERE username = ?
-        """, (hashed_password, "admin"))
-        
-        conn.commit()
-        conn.close()
-        
-        print("✅ Пароль пользователя admin обновлен на admin123")
-        
-    except Exception as e:
-        print(f"❌ Ошибка обновления пароля: {e}")
+This legacy helper updated the bootstrap admin credential through a local
+database path. Controlled admin password reset belongs to the canonical
+Postgres/Alembic path:
+
+  python -m app.scripts.ensure_admin
+
+Set ADMIN_PASSWORD, ADMIN_RESET_PASSWORD=1, and
+ENSURE_ADMIN_ALLOW_INITIALIZED=1 for controlled recovery.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
 
 if __name__ == "__main__":
-    update_admin_password()
+    raise SystemExit(main())

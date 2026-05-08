@@ -26,11 +26,11 @@
 - ✅ Создан скрипт быстрой проверки системы управления пользователями
 - ✅ Проверяет импорт всех компонентов
 - ✅ Включает проверку моделей, схем, сервисов, CRUD, API, middleware
-- ✅ Интегрирован в основной `quick_check.py`
+- ✅ Проверяется отдельными pytest smoke-тестами
 
-### 4. **`backend/quick_check.py` (ОБНОВЛЕН)**
-- ✅ Добавлена проверка системы управления пользователями
-- ✅ Обновлен заголовок и описание
+### 4. **pytest smoke checks (ОБНОВЛЕНО)**
+- ✅ Быстрая проверка выполняется через pytest targets
+- ✅ Retired `backend/quick_check.py` больше не используется как pre-commit команда
 - ✅ Интегрирована новая проверка в основной процесс
 
 ## 🔧 НОВЫЕ КОМПОНЕНТЫ В ДОКУМЕНТАЦИИ
@@ -57,7 +57,7 @@
 ### **Быстрая проверка (перед коммитом):**
 ```bash
 cd backend
-python quick_check.py
+python -m pytest --no-cov tests/unit/test_user_bootstrap_and_two_factor_service.py tests/unit/test_user_management_endpoint_service.py tests/unit/test_user_management_service_guardrails.py
 ```
 
 ### **Проверка системы управления пользователями:**
@@ -71,13 +71,13 @@ python quick_user_management_check.py
 cd backend
 python test_role_routing.py
 python test_user_management_system.py
-python check_system_integrity.py
+python -m compileall -q app
 ```
 
 ## 📋 ОБНОВЛЕННЫЕ ЧЕК-ЛИСТЫ
 
 ### **Перед коммитом:**
-- [ ] Запущена быстрая проверка: `python quick_check.py`
+- [ ] Запущена быстрая проверка: `python -m pytest --no-cov tests/unit/test_user_bootstrap_and_two_factor_service.py tests/unit/test_user_management_endpoint_service.py tests/unit/test_user_management_service_guardrails.py`
 - [ ] Запущены тесты системы управления: `python test_user_management_system.py`
 - [ ] Все тесты прошли успешно
 - [ ] Обновлена документация (если нужно)
@@ -111,7 +111,7 @@ python check_system_integrity.py
 | ROLES_AND_ROUTING.md | ✅ | +50 строк, 4 новых раздела |
 | ROLE_SYSTEM_PROTECTION.md | ✅ | +40 строк, 1 новый раздел |
 | quick_user_management_check.py | ✅ | Новый файл (80 строк) |
-| quick_check.py | ✅ | +1 проверка |
+| pytest smoke checks | ✅ | замена retired quick_check.py |
 | **ИТОГО** | ✅ | **+170 строк документации** |
 
 ## 🎯 РЕЗУЛЬТАТ

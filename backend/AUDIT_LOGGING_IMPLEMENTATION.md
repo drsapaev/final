@@ -48,7 +48,7 @@ def create_patient(
 ):
     # Создаем пациента
     patient = patient_crud.create(db=db, obj_in=patient_in)
-    
+
     # ✅ AUDIT LOG: Логируем создание
     _, new_data = extract_model_changes(None, patient)
     log_critical_change(
@@ -63,7 +63,7 @@ def create_patient(
         description=f"Создан пациент: {patient.last_name}",
     )
     db.commit()
-    
+
     return patient
 ```
 
@@ -95,9 +95,9 @@ def create_patient(
    python -m pytest tests/test_audit_logs.py -k audit -v
    ```
 
-4. **Проверить вручную:**
+4. **Manual Postgres check:**
    ```powershell
-   sqlite3 backend/clinic.db "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
+   psql "$env:DATABASE_URL" -c "SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT 5;"
    ```
 
 ## ⚠️ Важные замечания
