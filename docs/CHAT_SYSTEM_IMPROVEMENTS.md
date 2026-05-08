@@ -128,7 +128,8 @@ Added audit logging for:
 MESSAGE_ENCRYPTION_KEY=gAAAAABg...
 
 # JWT secret (already required)
-SECRET_KEY=your-secret-key-min-32-chars
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=
 ```
 
 ## Security Checklist
@@ -166,8 +167,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ```bash
 cd backend
 alembic upgrade head
-# Or manually if migration conflicts:
-python -c "import sqlite3; conn = sqlite3.connect('clinic.db'); conn.execute('ALTER TABLE messages ADD COLUMN patient_id INTEGER'); conn.commit()"
+# If migration conflicts, stop and fix the Alembic migration instead of patching SQLite manually.
 ```
 
 ### Run Retention Cleanup (Dry Run)
