@@ -14,7 +14,7 @@
 | Host OS | Windows |
 | Pilot browser URL | `http://192.168.1.5:18080` |
 | Backend URL | `http://127.0.0.1:18000` |
-| Database URL | `postgresql+psycopg://clinic:clinicpwd@127.0.0.1:5432/clinicdb` |
+| Database URL | `postgresql+psycopg://clinic:<redacted>@127.0.0.1:5432/clinicdb` |
 | Backup dir | `C:\clinic\output\backups` |
 | Latest successful pre-update backup | `C:\clinic\output\backups\clinicdb_20260405_165644.dump` |
 | Latest successful restore rehearsal backup | `C:\clinic\output\backups\clinicdb_20260405_181100.dump` |
@@ -34,7 +34,7 @@
 
 ## Restore Rehearsal Proof
 - `PASS: restore_rehearsal completed successfully`
-- Restore target database: `postgresql+psycopg://clinic:clinicpwd@127.0.0.1:55433/clinicdb_restore`
+- Restore target database: `postgresql+psycopg://clinic:<redacted>@127.0.0.1:55433/clinicdb_restore`
 - Restore backend URL: `http://127.0.0.1:18001`
 - Restore public URL: `http://127.0.0.1:18081`
 - Restore smoke result: `PASS: smoke_post_update completed successfully`
