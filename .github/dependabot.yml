@@ -19,6 +19,60 @@ updates:
       - "dependencies"
       - "python"
       
+  # Root npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "drsapaev"
+    assignees:
+      - "drsapaev"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "root"
+    groups:
+      root-npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Frontend npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "13:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "drsapaev"
+    assignees:
+      - "drsapaev"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "frontend"
+    groups:
+      frontend-npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
   # Обновление GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
