@@ -3005,7 +3005,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="success"
                           size="default"
-                          onClick={() => window.location.href = '/registrar-panel?status=queued'}
+                          onClick={() => window.location.href = '/registrar?status=queued'}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
@@ -3015,7 +3015,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="primary"
                           size="default"
-                          onClick={() => window.location.href = '/registrar-panel?status=paid_pending'}
+                          onClick={() => window.location.href = '/registrar?status=paid_pending'}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="creditcard" size="small" style={{ color: 'white' }} />
@@ -3025,7 +3025,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => window.location.href = '/registrar-panel'}
+                          onClick={() => window.location.href = '/registrar'}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="eye" size="small" />
@@ -3035,7 +3035,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => window.location.href = '/registrar-panel?view=queue'}
+                          onClick={() => window.location.href = '/registrar?view=queue'}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="bell" size="small" />
