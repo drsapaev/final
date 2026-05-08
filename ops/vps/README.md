@@ -69,10 +69,11 @@ cp ops/vps/backend.env.sample backend/.env.staging
 cp ops/vps/frontend.env.sample frontend/.env.staging
 cp ops/vps/clinic_lifecycle.env.sample .env.clinic-lifecycle
 
-# edit both env files first
-# edit .env.clinic-lifecycle for smoke and rehearsal commands
+# Generate a unique DB password, then put it into backend/.env.staging
+# and .env.clinic-lifecycle DATABASE_URL before deploy.
+DB_PASSWORD="$(openssl rand -base64 24)"
 
-sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_staging clinic_staging_pwd clinic_staging
+sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_staging "$DB_PASSWORD" clinic_staging
 
 sudo APP_ENV=staging \
   APP_HOST=staging.example.com \
@@ -111,9 +112,11 @@ cd /opt/clinic
 cp ops/vps/backend.env.sample backend/.env.production
 cp ops/vps/frontend.env.sample frontend/.env.production
 
-# edit both env files first
+# Generate a unique DB password, then put it into backend/.env.production
+# DATABASE_URL before deploy.
+DB_PASSWORD="$(openssl rand -base64 24)"
 
-sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_prod change-me clinic_prod
+sudo bash ops/vps/scripts/bootstrap_postgres.sh clinic_prod "$DB_PASSWORD" clinic_prod
 
 sudo APP_ENV=production \
   APP_HOST=clinic.example.com \
