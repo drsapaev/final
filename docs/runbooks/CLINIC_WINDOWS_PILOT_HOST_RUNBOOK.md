@@ -100,7 +100,7 @@ The wrapper will:
 
 Expected proof lines:
 - `RESTORE_BACKUP_FILE=...`
-- `RESTORE_DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@127.0.0.1:55433/clinicdb_restore`
+- `RESTORE_DATABASE_URL=postgresql+psycopg://clinic:<redacted>@127.0.0.1:55433/clinicdb_restore`
 - `RESTORE_BACKEND_URL=http://127.0.0.1:18001`
 - `RESTORE_PUBLIC_URL=http://127.0.0.1:18081`
 - `PASS: restore_rehearsal completed successfully`
