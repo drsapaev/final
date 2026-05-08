@@ -336,9 +336,9 @@ class CircuitBreaker:
 
 ```bash
 # Токены и ключи
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-JWT_SECRET_KEY=your_jwt_secret_key
-ENCRYPTION_KEY=your_encryption_key
+TELEGRAM_BOT_TOKEN=
+JWT_SECRET_KEY=
+ENCRYPTION_KEY=
 
 # Настройки безопасности
 RATE_LIMIT_ENABLED=true
