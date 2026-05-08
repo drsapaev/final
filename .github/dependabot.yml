@@ -26,7 +26,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "12:00"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     reviewers:
       - "drsapaev"
     assignees:
@@ -45,6 +45,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Frontend npm dependencies
   - package-ecosystem: "npm"
@@ -53,7 +56,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "13:00"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     reviewers:
       - "drsapaev"
     assignees:
@@ -72,6 +75,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Обновление GitHub Actions
   - package-ecosystem: "github-actions"
