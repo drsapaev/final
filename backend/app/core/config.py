@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Resolve the backend root so config can load backend/.env consistently.
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> backend/
 _DEFAULT_ENV_FILE = _BACKEND_DIR / ".env"
-_DEFAULT_DATABASE_URL = "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb"
+_DEFAULT_DATABASE_URL = ""
 
 
 class _CompatibleCorsEnvSettingsSource(EnvSettingsSource):
@@ -50,22 +50,22 @@ class Settings(BaseSettings):
     DATABASE_URL: str = _DEFAULT_DATABASE_URL
 
     # --- Auth / JWT ---
-    # SECURITY WARNING: Р В РІР‚в„ў Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В РўвЂР В Р’В°Р В РЎвЂќР РЋРІвЂљВ¬Р В Р’ВµР В Р вЂ¦Р В Р’Вµ Р В РЎвЂєР В РІР‚ВР В Р вЂЎР В РІР‚вЂќР В РЎвЂ™Р В РЎС›Р В РІР‚СћР В РІР‚С”Р В Р’В¬Р В РЎСљР В РЎвЂє Р РЋРЎвЂњР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В Р’Вµ SECRET_KEY Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋРЎвЂњР РЋР вЂ№ Р В РЎвЂўР В РЎвЂќР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ!
-    # Р В Р’ВР РЋР С“Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р РЋРЎвЂњР В РІвЂћвЂ“Р РЋРІР‚С™Р В Р’Вµ: python -c "import secrets; print(secrets.token_urlsafe(32))" Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂ Р В Р’В±Р В Р’ВµР В Р’В·Р В РЎвЂўР В РЎвЂ”Р В Р’В°Р РЋР С“Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋР В Р’В°
+    # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите SECRET_KEY через переменную окружения!
+    # Используйте: python -c "import secrets; print(secrets.token_urlsafe(32))" для генерации безопасного ключа
     SECRET_KEY: str = Field(
         ...,
         min_length=32,
         description="JWT secret key - MUST be set via environment variable in production (min 32 chars)"
-    )  # Р Р†РЎв„ўР’В Р С—РЎвЂР РЏ REQUIRED: No default value for security
+    )  # ⚠️ REQUIRED: No default value for security
     ALGORITHM: str = "HS256"
     AUTH_SECRET: str | None = Field(
         default=None,
         description="Legacy JWT helper secret. Defaults to SECRET_KEY when unset.",
     )
     AUTH_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 Р В РўвЂР В Р вЂ¦Р В Р’ВµР В РІвЂћвЂ“
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
-    # --- CORS (Р В РЎвЂ”Р РЋР вЂљР В РЎвЂ Р В Р вЂ¦Р В Р’ВµР В РЎвЂўР В Р’В±Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂ) ---
+    # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
@@ -94,24 +94,43 @@ class Settings(BaseSettings):
     CORS_DISABLE: bool = False
     CORS_ALLOW_ALL: bool = Field(default=False, description="Allow all CORS origins (dev only)")
 
-    # --- Frontend URL Р В РўвЂР В Р’В»Р РЋР РЏ QR Р В РЎвЂќР В РЎвЂўР В РўвЂР В РЎвЂўР В Р вЂ  Р В РЎвЂ Р РЋР С“Р РЋР С“Р РЋРІР‚в„–Р В Р’В»Р В РЎвЂўР В РЎвЂќ ---
-    # Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В Р’В»Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР РЋРІР‚С™Р В РЎвЂ (WiFi): Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р РЋР Р‰Р РЋРІР‚С™Р В Р’Вµ Р В Р’В·Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В РЎвЂ”Р В РЎвЂў Р РЋРЎвЂњР В РЎВР В РЎвЂўР В Р’В»Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋР вЂ№ Р В РЎвЂР В Р’В»Р В РЎвЂ Р В Р’В»Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ IP
-    # Р В РІР‚СњР В Р’В»Р РЋР РЏ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”Р В Р’В° Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В РЎвЂР В Р вЂ¦Р РЋРІР‚С™Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р В Р’ВµР РЋРІР‚С™ (Р В РЎВР В РЎвЂўР В Р’В±Р В РЎвЂР В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ): Р В Р’В·Р В Р’В°Р В РўвЂР В Р’В°Р В РІвЂћвЂ“Р РЋРІР‚С™Р В Р’Вµ Р В РЎвЂ”Р РЋРЎвЂњР В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р В РўвЂР В РЎвЂўР В РЎВР В Р’ВµР В Р вЂ¦/IP
-    # Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎВР В Р’ВµР РЋР вЂљР РЋРІР‚в„–:
-    #   - Р В РІР‚С”Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В Р’В°Р РЋР РЏ Р РЋР С“Р В Р’ВµР РЋРІР‚С™Р РЋР Р‰: "http://192.168.1.9:5173" (Р В Р’В°Р В Р вЂ Р РЋРІР‚С™Р В РЎвЂўР В РЎВР В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋРІР‚РЋР В Р’ВµР РЋР С“Р В РЎвЂќР В РЎвЂ Р В РЎвЂўР В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В Р’ВµР В Р’В»Р В РЎвЂР РЋРІР‚С™Р РЋР С“Р РЋР РЏ)
-    #   - Р В РЎСџР РЋРЎвЂњР В Р’В±Р В Р’В»Р В РЎвЂР РЋРІР‚РЋР В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р В РўвЂР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р РЋРЎвЂњР В РЎвЂ”: "https://clinic.example.com" Р В РЎвЂР В Р’В»Р В РЎвЂ "http://123.45.67.89:5173"
-    #   - Р В РЎС›Р РЋРЎвЂњР В Р вЂ¦Р В Р вЂ¦Р В Р’ВµР В Р’В»Р РЋР Р‰ (ngrok): "https://abc123.ngrok.io"
-    # Р В Р в‚¬Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В Р’Вµ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋРЎвЂњР РЋР вЂ№ Р В РЎвЂўР В РЎвЂќР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ: FRONTEND_URL=https://your-domain.com
+    # --- Frontend URL для QR кодов и ссылок ---
+    # Для локальной сети (WiFi): оставьте значение по умолчанию или локальный IP
+    # Для доступа через интернет (мобильные данные): задайте публичный домен/IP
+    # Примеры:
+    #   - Локальная сеть: "http://192.168.1.9:5173" (автоматически определится)
+    #   - Публичный доступ: "https://clinic.example.com" или "http://123.45.67.89:5173"
+    #   - Туннель (ngrok): "https://abc123.ngrok.io"
+    # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
     FRONTEND_URL: str = Field(default="http://192.168.1.9:5173")
 
     # --- Queue / Time ---
     TIMEZONE: str = "Asia/Tashkent"
-    QUEUE_START_HOUR: int = 7  # Р В Р’В»Р В РЎвЂўР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р В Р вЂ Р РЋР вЂљР В Р’ВµР В РЎВР РЋР РЏ, Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р В РЎвЂў Р РЋРЎвЂњР РЋРІР‚С™Р РЋР вЂљР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В Р’ВµР В РЎвЂ“Р В РЎвЂў Р В РЎвЂўР В РЎвЂќР В Р вЂ¦Р В Р’В°
-    ONLINE_MAX_PER_DAY: int = 15  # Р В Р’В»Р В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚С™ Р В РЎвЂўР В Р вЂ¦Р В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦-Р РЋРІР‚С™Р В Р’В°Р В Р’В»Р В РЎвЂўР В Р вЂ¦Р В РЎвЂўР В Р вЂ  Р В Р вЂ¦Р В Р’В° Р В РЎвЂўР РЋРІР‚С™Р В РўвЂР В Р’ВµР В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ/Р В РўвЂР В Р’ВµР В Р вЂ¦Р РЋР Р‰
+    QUEUE_START_HOUR: int = 7  # локальное время, начало утреннего окна
+    ONLINE_MAX_PER_DAY: int = 15  # лимит онлайн-талонов на отделение/день
 
     # --- Celery ---
     CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
     CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0")
+
+    # --- Payment Providers ---
+    CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
+    CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")
+    CLICK_MERCHANT_ID: str | None = Field(default=None, description="Click merchant id")
+    CLICK_SECRET_KEY: str | None = Field(default=None, description="Click secret key")
+    CLICK_BASE_URL: str = Field(default="https://api.click.uz/v2")
+
+    PAYME_ENABLED: bool = Field(default=False, description="Enable PayMe payments")
+    PAYME_MERCHANT_ID: str | None = Field(default=None, description="PayMe merchant id")
+    PAYME_SECRET_KEY: str | None = Field(default=None, description="PayMe secret key")
+    PAYME_BASE_URL: str = Field(default="https://checkout.paycom.uz")
+    PAYME_API_URL: str = Field(default="https://api.paycom.uz")
+
+    KASPI_ENABLED: bool = Field(default=False, description="Enable Kaspi payments")
+    KASPI_MERCHANT_ID: str | None = Field(default=None, description="Kaspi merchant id")
+    KASPI_SECRET_KEY: str | None = Field(default=None, description="Kaspi secret key")
+    KASPI_BASE_URL: str = Field(default="https://kaspi.kz/pay")
+    KASPI_API_URL: str = Field(default="https://api.kaspi.kz/pay/v1")
 
     # --- App meta ---
     APP_NAME: str = "Clinic Manager"
@@ -137,8 +156,8 @@ class Settings(BaseSettings):
     )
 
     # --- Message Encryption ---
-    # SECURITY: Р В РІР‚в„ў production Р В РЎвЂєР В РІР‚ВР В Р вЂЎР В РІР‚вЂќР В РЎвЂ™Р В РЎС›Р В РІР‚СћР В РІР‚С”Р В Р’В¬Р В РЎСљР В РЎвЂє Р РЋРЎвЂњР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р В Р’Вµ Р РЋРІР‚РЋР В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’ВµР В РЎВР В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р РЋРЎвЂњР РЋР вЂ№ Р В РЎвЂўР В РЎвЂќР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР РЋР РЏ!
-    # Р В Р Р‹Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р В Р’ВµР РЋР вЂљР В РЎвЂР РЋР вЂљР РЋРЎвЂњР В РІвЂћвЂ“Р РЋРІР‚С™Р В Р’Вµ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋ: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # SECURITY: В production ОБЯЗАТЕЛЬНО установите через переменную окружения!
+    # Сгенерируйте ключ: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     MESSAGE_ENCRYPTION_KEY: str | None = Field(
         default=None,
         description="Fernet encryption key for message at-rest encryption. Required in production."
@@ -195,20 +214,20 @@ class Settings(BaseSettings):
     MCP_LOG_REQUESTS: bool = True
     MCP_FALLBACK_TO_DIRECT: bool = True
 
-    # Р Р†РЎв„ўР’В Р С—РЎвЂР РЏ TIMEOUT LAYERING (Р В РІР‚в„ўР В РЎвЂ™Р В РІР‚вЂњР В РЎСљР В РЎвЂє Р В РўвЂР В Р’В»Р РЋР РЏ AI-Р В РЎвЂ”Р В Р’В°Р В РІвЂћвЂ“Р В РЎвЂ”Р В Р’В»Р В Р’В°Р В РІвЂћвЂ“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ ):
-    # MCP_REQUEST_TIMEOUT >= AI_PROVIDER_TIMEOUT, Р В РЎвЂР В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’Вµ Р В Р вЂ Р В Р’ВµР РЋР вЂљР РЋРІР‚В¦Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“ Р РЋРЎвЂњР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋР Р‰ Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’ВµР В Р’В¶Р В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В РЎвЂР В Р’В¶Р В Р вЂ¦Р В РЎвЂР В РІвЂћвЂ“!
-    # Р В Р в‚¬Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂ:
-    #   1. MCP (orchestrator)  Р Р†РІР‚В РІР‚в„ў MCP_REQUEST_TIMEOUT      Р Р†РІР‚В РІР‚в„ў Р В РЎвЂ“Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р В Р’В»Р В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚С™ asyncio.wait_for
-    #   2. Provider (HTTP/SDK) Р Р†РІР‚В РІР‚в„ў AI_PROVIDER_TIMEOUT      Р Р†РІР‚В РІР‚в„ў httpx/openai client timeout
-    #   3. Frontend (UX)       Р Р†РІР‚В РІР‚в„ў axios timeout Р В Р вЂ  mcpClient.js (120s)
+    # ⚠️ TIMEOUT LAYERING (ВАЖНО для AI-пайплайнов):
+    # MCP_REQUEST_TIMEOUT >= AI_PROVIDER_TIMEOUT, иначе верхний уровень обрежет нижний!
+    # Уровни:
+    #   1. MCP (orchestrator)  → MCP_REQUEST_TIMEOUT      → глобальный лимит asyncio.wait_for
+    #   2. Provider (HTTP/SDK) → AI_PROVIDER_TIMEOUT      → httpx/openai client timeout
+    #   3. Frontend (UX)       → axios timeout в mcpClient.js (120s)
     MCP_REQUEST_TIMEOUT: int = Field(
-        default=180,  # Р РЋР С“Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР В Р вЂ¦Р В РўвЂР РЋРІР‚в„– - Р В РЎвЂєР В РІР‚ВР В Р вЂЎР В РІР‚вЂќР В РЎвЂ™Р В РЎС›Р В РІР‚СћР В РІР‚С”Р В Р’В¬Р В РЎСљР В РЎвЂє >= AI_PROVIDER_TIMEOUT!
+        default=180,  # секунды - ОБЯЗАТЕЛЬНО >= AI_PROVIDER_TIMEOUT!
         ge=30,
         le=600,
         description="Global MCP orchestrator timeout. Must be >= AI_PROVIDER_TIMEOUT!"
     )
     AI_PROVIDER_TIMEOUT: int = Field(
-        default=180,  # Р РЋР С“Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР В Р вЂ¦Р В РўвЂР РЋРІР‚в„– - Р РЋРІР‚С™Р В Р’В°Р В РІвЂћвЂ“Р В РЎВР В Р’В°Р РЋРЎвЂњР РЋРІР‚С™ HTTP-Р В Р’В·Р В Р’В°Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР РЋР С“Р В РЎвЂўР В Р вЂ  Р В РЎвЂќ AI Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР РЋР вЂљР В Р’В°Р В РЎВ
+        default=180,  # секунды - таймаут HTTP-запросов к AI провайдерам
         ge=30,
         le=600,
         description="HTTP timeout for AI provider API calls (DeepSeek, OpenAI, Gemini)"
@@ -276,15 +295,15 @@ class Settings(BaseSettings):
     PRINTER_TYPE: str | None = None  # none|network|usb
 
     # --- SMS Providers ---
-    # Eskiz SMS (Р В Р в‚¬Р В Р’В·Р В Р’В±Р В Р’ВµР В РЎвЂќР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦)
+    # Eskiz SMS (Узбекистан)
     ESKIZ_EMAIL: str | None = None
     ESKIZ_PASSWORD: str | None = None
 
-    # PlayMobile SMS (Р В Р в‚¬Р В Р’В·Р В Р’В±Р В Р’ВµР В РЎвЂќР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ¦)
+    # PlayMobile SMS (Узбекистан)
     PLAYMOBILE_API_KEY: str | None = None
     PLAYMOBILE_API_SECRET: str | None = None
 
-    # SMS Р В РЎвЂўР В Р’В±Р РЋРІР‚В°Р В РЎвЂР В Р’Вµ Р В Р вЂ¦Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В РІвЂћвЂ“Р В РЎвЂќР В РЎвЂ
+    # SMS общие настройки
     SMS_SENDER: str = "Clinic"
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
 
@@ -307,7 +326,7 @@ class Settings(BaseSettings):
     MICROSOFT_PRINT_CLIENT_ID: str | None = None
     MICROSOFT_PRINT_CLIENT_SECRET: str | None = None
 
-    # Cloud Printing Р В РЎвЂўР В Р’В±Р РЋРІР‚В°Р В РЎвЂР В Р’Вµ Р В Р вЂ¦Р В Р’В°Р РЋР С“Р РЋРІР‚С™Р РЋР вЂљР В РЎвЂўР В РІвЂћвЂ“Р В РЎвЂќР В РЎвЂ
+    # Cloud Printing общие настройки
     CLOUD_PRINTING_ENABLED: bool = True
     CLOUD_PRINTING_DEFAULT_PROVIDER: str = "mock"  # microsoft, mock
     PRINTER_NET_HOST: str | None = None
@@ -347,28 +366,28 @@ class Settings(BaseSettings):
         return value
 
 
-# Default SECRET_KEY for development only (will be validated on startup)
-_DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-production"
+# Runtime-only sentinel for missing dev SECRET_KEY; never a stable credential.
+_DEFAULT_SECRET_KEY = secrets.token_urlsafe(32)
 
 
 @lru_cache(1)
 def get_settings() -> Settings:
     """Get application settings with validation"""
     secret_key_from_process_env = os.getenv("SECRET_KEY")
-    # Р В РІР‚вЂќР В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’В°Р В Р’ВµР В РЎВ backend/.env Р В Р вЂ  os.environ Р В РўвЂР В РЎвЂў os.getenv("SECRET_KEY"), Р В РЎвЂР В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’Вµ Р В РЎвЂќР В Р’В»Р РЋР вЂ№Р РЋРІР‚РЋ Р В РЎвЂР В Р’В· Р РЋРІР‚С›Р В Р’В°Р В РІвЂћвЂ“Р В Р’В»Р В Р’В° Р В РЎвЂР В РЎвЂ“Р В Р вЂ¦Р В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР вЂљР РЋРЎвЂњР В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ.
+    # Загружаем backend/.env в os.environ до os.getenv("SECRET_KEY"), иначе ключ из файла игнорируется.
     if _DEFAULT_ENV_FILE.is_file():
         from dotenv import load_dotenv
 
         load_dotenv(_DEFAULT_ENV_FILE, override=False)
 
-    # Р Р†РЎС™РІР‚В¦ Р В Р’ВР В Р Р‹Р В РЎСџР В Р’В Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљР В РЎвЂє: Р В Р Р‹Р В Р вЂ¦Р В Р’В°Р РЋРІР‚РЋР В Р’В°Р В Р’В»Р В Р’В° Р В РЎвЂ”Р РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР РЋР РЏР В Р’ВµР В РЎВ env var, Р В Р’В·Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР В РЎВ Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р’ВµР В РЎВ Settings Р РЋР С“ Р В Р’В°Р РЋР вЂљР В РЎвЂ“Р РЋРЎвЂњР В РЎВР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р В РЎВР В РЎвЂ
+    # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
     secret_key = os.getenv("SECRET_KEY")
 
-    # Р В РІР‚СћР РЋР С“Р В Р’В»Р В РЎвЂ SECRET_KEY Р В Р вЂ  env - Р В РЎвЂР РЋР С“Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р РЋРЎвЂњР В Р’ВµР В РЎВ Р В Р’ВµР В РЎвЂ“Р В РЎвЂў
+    # Если SECRET_KEY в env - используем его
     if secret_key:
         s = Settings(SECRET_KEY=secret_key)
     else:
-        # Fallback Р В РўвЂР В Р’В»Р РЋР РЏ dev mode - Р В РЎвЂР РЋР С“Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р РЋРЎвЂњР В Р’ВµР В РЎВ default Р В РЎвЂР В Р’В»Р В РЎвЂ persistent key
+        # Fallback для dev mode - используем default или persistent key
         s = Settings(SECRET_KEY=_DEFAULT_SECRET_KEY)
     env = (s.ENV or os.getenv("ENV", "dev")).lower()
 
@@ -386,7 +405,7 @@ def get_settings() -> Settings:
                 "SECRET_KEY must be set via environment variable in production. "
                 "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
             )
-        # Р Р†РЎС™РІР‚В¦ BUGFIX: In dev, use persistent key from file or generate once and save
+        # ✅ BUGFIX: In dev, use persistent key from file or generate once and save
         if s.SECRET_KEY == _DEFAULT_SECRET_KEY:
             import pathlib
             import warnings
@@ -460,7 +479,7 @@ def get_settings() -> Settings:
     if os.getenv("CORS_ORIGINS") and not os.getenv("BACKEND_CORS_ORIGINS"):
         logger.info("[FIX:CORS] Using legacy CORS_ORIGINS env variable for backend CORS config")
 
-    # Р Р†РЎС™РІР‚В¦ SECURITY: Production-specific validations
+    # ✅ SECURITY: Production-specific validations
     if env in ("prod", "production"):
         errors = []
         warnings_list = []
@@ -481,14 +500,18 @@ def get_settings() -> Settings:
                 "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
             )
 
-        # 3. DATABASE_URL Р В РўвЂР В РЎвЂўР В Р’В»Р В Р’В¶Р В Р’ВµР В Р вЂ¦ Р В Р’В±Р РЋРІР‚в„–Р РЋРІР‚С™Р РЋР Р‰ PostgreSQL
-        if "sqlite" in s.DATABASE_URL.lower():
+        # 3. DATABASE_URL должен быть явно настроен и использовать PostgreSQL
+        if not s.DATABASE_URL.strip():
+            errors.append(
+                "DATABASE_URL must be set via environment variable in production."
+            )
+        elif "sqlite" in s.DATABASE_URL.lower():
             errors.append(
                 "SQLite is not recommended for production. "
                 "Set DATABASE_URL to PostgreSQL: postgresql://user:pass@host:5432/dbname"
             )
 
-        # 4. FRONTEND_URL Р В РўвЂР В РЎвЂўР В Р’В»Р В Р’В¶Р В Р’ВµР В Р вЂ¦ Р В Р’В±Р РЋРІР‚в„–Р РЋРІР‚С™Р РЋР Р‰ HTTPS Р В РЎвЂР В Р’В»Р В РЎвЂ localhost
+        # 4. FRONTEND_URL должен быть HTTPS или localhost
         if s.FRONTEND_URL and not (
             s.FRONTEND_URL.startswith("https://") or
             "localhost" in s.FRONTEND_URL or
@@ -498,7 +521,7 @@ def get_settings() -> Settings:
                 f"FRONTEND_URL ({s.FRONTEND_URL}) should use HTTPS in production."
             )
 
-        # 5. BACKEND_CORS_ORIGINS Р В РўвЂР В РЎвЂўР В Р’В»Р В Р’В¶Р В Р’ВµР В Р вЂ¦ Р РЋР С“Р В РЎвЂўР В РўвЂР В Р’ВµР РЋР вЂљР В Р’В¶Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰ Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў HTTPS origins
+        # 5. BACKEND_CORS_ORIGINS должен содержать только HTTPS origins
         for origin in s.BACKEND_CORS_ORIGINS:
             if not origin.startswith("https://") and "localhost" not in origin and "127.0.0.1" not in origin:
                 warnings_list.append(
@@ -507,7 +530,7 @@ def get_settings() -> Settings:
 
         # === OUTPUT WARNINGS ===
         for warning in warnings_list:
-            logger.warning(f"Р Р†РЎв„ўР’В Р С—РЎвЂР РЏ PRODUCTION WARNING: {warning}")
+            logger.warning(f"⚠️ PRODUCTION WARNING: {warning}")
 
         # === RAISE ERRORS ===
         if errors:
@@ -517,5 +540,5 @@ def get_settings() -> Settings:
     return s
 
 
-# --- backward-compat Р В РўвЂР В Р’В»Р РЋР РЏ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚в„–Р РЋРІР‚В¦ Р В РЎвЂР В РЎВР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™Р В РЎвЂўР В Р вЂ  ---
+# --- backward-compat для старых импортов ---
 settings = get_settings()
