@@ -21,9 +21,16 @@ from pathlib import Path
 MODEL_ALIASES = {
     "chatgpt 5.5": "gpt-5.5",
     "chatgpt-5.5": "gpt-5.5",
+    "chatgpt 5.5 pro": "gpt-5.5",
+    "chatgpt-5.5-pro": "gpt-5.5",
+    "chatgpt-5.5 pro": "gpt-5.5",
     "gpt 5.5": "gpt-5.5",
+    "gpt 5.5 pro": "gpt-5.5",
     "gpt5.5": "gpt-5.5",
+    "gpt5.5 pro": "gpt-5.5",
     "gpt-5.5": "gpt-5.5",
+    "gpt-5.5-pro": "gpt-5.5",
+    "gpt-5.5 pro": "gpt-5.5",
 }
 
 
@@ -87,7 +94,7 @@ RULES: tuple[Rule, ...] = (
         "frontend runtime-origin and doctor queue contract ownership",
     ),
     Rule(
-        r"\b(npm audit|audit|vulnerabilit|dependency|dependencies|axios|jspdf|dompurify|vite|vitest|react-router)\b",
+        r"\b(npm audit|dependency audit|security audit|vulnerabilit|dependency|dependencies|axios|jspdf|dompurify|vite|vitest|react-router)\b",
         (
             "frontend/package.json",
             "frontend/package-lock.json",
