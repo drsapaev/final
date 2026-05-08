@@ -22,10 +22,13 @@ MCP_HEALTH_CHECK_INTERVAL=60
 MCP_MAX_BATCH_SIZE=10
 
 # Database
-DATABASE_URL=sqlite:///./clinic.db
+# Required. PostgreSQL only; do not use SQLite for runtime.
+# Example: postgresql+psycopg://clinic:<db_password>@localhost:55432/clinicdb
+DATABASE_URL=
 
 # Auth
-SECRET_KEY=dev-secret-key-for-clinic-management-system-change-in-production
+# Required. Generate with: python -c "import secrets; print(secrets.token_urlsafe(48))"
+SECRET_KEY=
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
