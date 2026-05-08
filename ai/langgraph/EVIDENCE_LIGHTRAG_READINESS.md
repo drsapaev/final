@@ -3341,3 +3341,13 @@ Continue recovery through `/aif-implement @.ai-factory/PLAN.md`, Task 25: prove 
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should connect Alembic proof tasks to `backend/alembic/env.py`, migration revision files, testing/deployment docs, and local contour blockers.
+
+## 2026-05-08T21:53:22+05:00 - GPT-5.5 dev-brain compatibility audit
+
+- Task context: checked local dev-brain compatibility with GPT-5.5 model naming and gate behavior after the AI Factory update.
+- Observed gap: `agent_gate.py --model "ChatGPT 5.5"` normalized to `gpt-5.5`, but `"GPT 5.5 Pro"` remained an unnormalized display label; task text `dev brain compatibility audit` also pulled dependency package files because the dependency rule matched bare `audit`.
+- gate_misroute: yes, partial over-route to dependency ownership for a dev-brain audit task.
+- override_used: no.
+- known_root_cause_file: ai/langgraph/scripts/agent_gate.py
+- Outcome: normalized GPT-5.5 Pro display aliases to `gpt-5.5` and narrowed the dependency rule to explicit dependency/security audit wording.
+- Follow-up: keep dev-brain smoke checks around model alias normalization and broad ownership keywords before relying on gate output for first-touch files.

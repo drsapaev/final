@@ -11,7 +11,8 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Frontend: React 18, Vite, React Router, JavaScript/JSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
-- Dev-brain tools live outside runtime in `ai/llamaindex`, `ai/langgraph`, and `ai/lightrag`.
+- Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
+- `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
 
 ## LightRAG Status
 
@@ -231,12 +232,12 @@ From `C:\final\ai\langgraph`:
 
 ```powershell
 python scripts\agent_gate.py "<task>"
-python scripts\dev_brain.py plan "<task>"
-python scripts\dev_brain.py dossier "<task>"
-python scripts\dev_brain.py handoff "<task>"
-python scripts\planner_smoke.py
-python scripts\dossier_smoke.py
-python scripts\handoff_smoke.py
+python scripts\agent_gate.py "<task>" --known-root-cause "<relative/path.py>"
 ```
 
-Use handoff as the default input contract for the next agent when a real code change is risky or multi-file.
+Current checkout note:
+
+- `scripts\agent_gate.py` is the only verified local dev-brain command.
+- Do not run historical `scripts\dev_brain.py`, `scripts\planner_smoke.py`, `scripts\dossier_smoke.py`, or `scripts\handoff_smoke.py` unless those files are restored and verified in the current checkout.
+- For `plan`, `dossier`, or `handoff` modes, produce the artifact directly from repo-grounded evidence and use `agent_gate.py` only when an execution boundary is needed.
+- Use handoff as the default input contract for the next agent when a real code change is risky or multi-file.
