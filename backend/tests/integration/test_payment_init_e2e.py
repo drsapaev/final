@@ -10,6 +10,27 @@ import pytest
 from app.models.payment import Payment
 
 
+@pytest.fixture(autouse=True)
+def configured_payment_providers(monkeypatch):
+    from app.core.config import get_settings
+    from app.services.payment_provider_manager_factory import reset_payment_manager_for_tests
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "CLICK_ENABLED", True)
+    monkeypatch.setattr(settings, "CLICK_SERVICE_ID", "test_service")
+    monkeypatch.setattr(settings, "CLICK_MERCHANT_ID", "test_merchant")
+    monkeypatch.setattr(settings, "CLICK_SECRET_KEY", "test_secret")
+    monkeypatch.setattr(settings, "PAYME_ENABLED", True)
+    monkeypatch.setattr(settings, "PAYME_MERCHANT_ID", "test_merchant")
+    monkeypatch.setattr(settings, "PAYME_SECRET_KEY", "test_secret")
+    monkeypatch.setattr(settings, "KASPI_ENABLED", True)
+    monkeypatch.setattr(settings, "KASPI_MERCHANT_ID", "test_merchant")
+    monkeypatch.setattr(settings, "KASPI_SECRET_KEY", "test_secret")
+    reset_payment_manager_for_tests()
+    yield
+    reset_payment_manager_for_tests()
+
+
 @pytest.mark.integration
 @pytest.mark.e2e
 class TestPaymentInitE2E:

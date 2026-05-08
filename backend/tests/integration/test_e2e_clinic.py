@@ -86,10 +86,18 @@ def _create_payme_auth_header(secret_key: str) -> str:
 
 
 @pytest.fixture
-def payme_secret_key():
+def payme_secret_key(monkeypatch):
     """Возвращает PayMe secret key для тестов из настроек, чтобы совпадал с провайдером"""
+    from app.services.payment_provider_manager_factory import reset_payment_manager_for_tests
+
+    test_secret_key = "test_secret"
     settings = get_settings()
-    return getattr(settings, "PAYME_SECRET_KEY", "test_secret")
+    monkeypatch.setattr(settings, "PAYME_ENABLED", True)
+    monkeypatch.setattr(settings, "PAYME_MERCHANT_ID", "test_merchant")
+    monkeypatch.setattr(settings, "PAYME_SECRET_KEY", test_secret_key)
+    reset_payment_manager_for_tests()
+    yield test_secret_key
+    reset_payment_manager_for_tests()
 
 
 @pytest.mark.integration
