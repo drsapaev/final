@@ -1377,3 +1377,43 @@ Validation run:
   - result: 16 passed, 1 warning
 - `rg -n "print\(|Error getting transactions:|Error getting summary:" backend\app\api\v1\endpoints\payment_webhook.py`
   - result: no matches
+
+## Task 23 Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`
+- reason: payment/billing service logging and public error detail hardening
+- risky domain: yes
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 23 audit remaining payment service logging and public error leakage in backend payment webhook service while preserving reconciliation and notification semantics" --known-root-cause "backend/app/services/payment_webhook.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/services/payment_webhook.py`
+- first-touch files: `backend/app/services/payment_webhook.py`
+- validation target: compile plus targeted payment webhook/payment service tests
+- stop condition watched first: any required behavior/schema/repository edit outside service logging/error detail cleanup
+
+Changed behavior:
+
+- Removed raw `print(...)` diagnostics from the Payme/Click payment webhook service integration path.
+- Replaced public result messages that included raw exception text with generic `Error processing webhook` messages.
+- Replaced summary error payload `str(exc)` with a generic summary error string.
+- Added structured logger metadata with provider, webhook record id, target type, and exception class only.
+- Preserved webhook persistence, status mapping, duplicate handling, and visit/payment integration flow.
+
+Validation run:
+
+- `python -m py_compile backend\app\services\payment_webhook.py`
+  - result: passed
+- `python -m pytest backend\tests\unit\test_payment_webhook_service.py backend\tests\unit\test_payment_webhook_api_service.py backend\tests\unit\test_payment_webhook_api_repository.py backend\tests\unit\test_provider_webhook_service.py backend\tests\unit\test_payment_reconciliation_service.py backend\tests\integration\test_notification_catalog_slice3_legacy_webhooks.py backend\tests\integration\test_payment_init_e2e.py backend\tests\integration\test_e2e_payment_flow.py -q --tb=short --disable-warnings`
+  - result: 35 passed, 1 warning
+- `rg -n 'print\(' backend\app\services\payment_webhook.py`
+  - result: no matches
+- `rg -n 'Error processing webhook:|return \{"error": str\(|str\(e\)|str\(exc\)' backend\app\services\payment_webhook.py`
+  - result: no matches
+
+LightRAG evidence note:
+
+- No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.

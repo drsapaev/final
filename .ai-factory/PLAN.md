@@ -412,7 +412,7 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
   Files: `backend/app/api/v1/endpoints/payment_webhook.py`, payment webhook API/service/repository tests as validation only unless a test update is proven necessary
   LOGGING REQUIREMENTS: log endpoint name, provider/status/visit filters only as metadata classes where safe, and exception class; do not print raw exception text, provider secrets, payloads, credentials, or patient/payment sensitive details.
 
-- [ ] Task 23: Audit remaining payment service logging and public error leakage.
+- [x] Task 23: Audit remaining payment service logging and public error leakage.
   After Task 22, inspect `backend/app/services/payment_webhook.py` and adjacent payment services for remaining raw `print(...)`, raw exception text in public HTTP responses, or logs that could expose payment/provider details. Use a new gate slice before edits and commit/push separately.
   Files: `backend/app/services/payment_webhook.py`, payment service tests selected by evidence
   LOGGING REQUIREMENTS: keep logs structured and non-sensitive; preserve reconciliation/audit evidence needed for financial operations.
