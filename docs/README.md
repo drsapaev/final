@@ -18,6 +18,9 @@
 ### Core Systems
 | Document | Description |
 |----------|-------------|
+| [PROJECT_AUDIT.md](./PROJECT_AUDIT.md) | Current recovery audit with verified risks and status |
+| [RECOVERY_PLAN.md](./RECOVERY_PLAN.md) | Recovery phases, completed work, and production-ready criteria |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Recovery-oriented architecture map and boundaries |
 | [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md) | Role-based access control |
 | [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Current queue SSOT aligned to current `main` |
 | [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
@@ -60,6 +63,7 @@
 ### AI Integration
 | Document | Description |
 |----------|-------------|
+| [AI_MODULE.md](./AI_MODULE.md) | AI safety posture, draft-only boundaries, and residual risks |
 | [AI_ARCHITECTURE_RULE.md](./AI_ARCHITECTURE_RULE.md) | AI architecture rules |
 | [AI_INTEGRATION_GUIDE.md](./AI_INTEGRATION_GUIDE.md) | AI integration |
 | [architecture/AI_LANDING_FACTORY_ARCHITECTURE.md](./architecture/AI_LANDING_FACTORY_ARCHITECTURE.md) | AI-first landing page factory blueprint |
@@ -73,6 +77,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [API.md](./API.md) | Recovery-oriented API surface map and safety notes |
 | [API_REFERENCE.md](./API_REFERENCE.md) | General API reference |
 | [QUEUE_API_REFERENCE.md](./QUEUE_API_REFERENCE.md) | Queue API endpoints |
 | [QUEUE_BATCH_API_USAGE_GUIDE.md](./QUEUE_BATCH_API_USAGE_GUIDE.md) | Batch API guide |
@@ -84,6 +89,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Current deployment gates and verified runtime defaults |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Full deployment guide |
 | [BACKUP_RESTORE_PROCEDURES.md](./BACKUP_RESTORE_PROCEDURES.md) | Backup & restore |
 | [PRODUCTION_SECURITY.md](./PRODUCTION_SECURITY.md) | Security in production |
@@ -107,11 +113,14 @@
 
 | Document | Description |
 |----------|-------------|
+| [TESTING.md](./TESTING.md) | Current testing commands, gaps, and critical flow coverage targets |
+| [SECURITY_CHECKLIST.md](./SECURITY_CHECKLIST.md) | Privacy/security readiness checklist from the recovery audit |
 | [AI_MCP_QA_CHECKLIST.md](./AI_MCP_QA_CHECKLIST.md) | AI/MCP QA checklist |
 | [DOCTOR_AUTOCOMPLETE_CHECKLIST.md](./DOCTOR_AUTOCOMPLETE_CHECKLIST.md) | Autocomplete checklist |
 | [reports/PRINT_PANEL_AUDIT_REPORT.md](./reports/PRINT_PANEL_AUDIT_REPORT.md) | Unified print audit across registrar, specialists, lab, and admin panels |
 | [runbooks/MESSAGING_CONTRACT.md](./runbooks/MESSAGING_CONTRACT.md) | Historical messaging contract and rollout evidence |
 | [runbooks/MESSAGING_QA_CHECKLIST.md](./runbooks/MESSAGING_QA_CHECKLIST.md) | Historical messaging QA evidence |
+| [runbooks/PR_REVIEW_SKILL_PROGRESSION_MAP.md](./runbooks/PR_REVIEW_SKILL_PROGRESSION_MAP.md) | Four-week review skill plan grounded in recent PR evidence |
 | [PANEL_QA_CHECKLIST.md](./PANEL_QA_CHECKLIST.md) | SSOT runbook for panel verification with step-by-step progress tracking |
 | [ADM-06_BROWSER_SMOKE.md](./ADM-06_BROWSER_SMOKE.md) | Compact manual smoke for the service-catalog prefix guardrail |
 

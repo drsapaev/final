@@ -11,13 +11,22 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user
+from ....core.rbac import AIPermission, require_any_ai_permission
 from ....models.user import User
 from ....services.ai import ai_manager, AIProviderType
 from ....services.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+LEGACY_AI_ACCESS = require_any_ai_permission(
+    AIPermission.ADMIN_AI,
+    AIPermission.DIAGNOSE,
+    AIPermission.ANALYZE_IMAGE,
+    AIPermission.ANALYZE_DOCUMENT,
+    AIPermission.SUGGEST_ICD10,
+)
+
+router = APIRouter(dependencies=[Depends(LEGACY_AI_ACCESS)])
 
 
 class ComplaintAnalysisRequest(BaseModel):

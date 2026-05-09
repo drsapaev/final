@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { MacOSButton, MacOSCard } from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
 import logger from '../utils/logger';
@@ -22,6 +22,41 @@ const initialForm = {
   adminEmail: '',
   activationKey: ''
 };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const REQUIRED_FIELDS = [
+  {
+    key: 'clinicName',
+    label: 'Название клиники',
+    isComplete: (form) => Boolean(form.clinicName.trim())
+  },
+  {
+    key: 'branchName',
+    label: 'Название филиала',
+    isComplete: (form) => Boolean(form.branchName.trim())
+  },
+  {
+    key: 'adminUsername',
+    label: 'Username администратора',
+    isComplete: (form) => form.adminUsername.trim().length >= 3
+  },
+  {
+    key: 'adminFullName',
+    label: 'Полное имя администратора',
+    isComplete: (form) => Boolean(form.adminFullName.trim())
+  },
+  {
+    key: 'adminEmail',
+    label: 'Email администратора',
+    isComplete: (form) => EMAIL_PATTERN.test(form.adminEmail.trim())
+  },
+  {
+    key: 'adminPassword',
+    label: 'Пароль администратора, минимум 8 символов',
+    isComplete: (form) => form.adminPassword.length >= 8
+  }
+];
 
 function buildPayload(form) {
   return {
@@ -52,6 +87,7 @@ function buildPayload(form) {
 }
 
 export default function Setup() {
+  const requiredFieldRefs = useRef({});
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState({
     loading: false,
@@ -59,15 +95,48 @@ export default function Setup() {
     success: ''
   });
 
+  const missingRequiredFields = useMemo(() => {
+    return REQUIRED_FIELDS
+      .filter((field) => !field.isComplete(form));
+  }, [form]);
+
+  const missingRequiredLabels = useMemo(() => {
+    return missingRequiredFields.map((field) => field.label);
+  }, [missingRequiredFields]);
+
+  const missingRequiredKeys = useMemo(() => {
+    return new Set(missingRequiredFields.map((field) => field.key));
+  }, [missingRequiredFields]);
+
   const isSubmitDisabled = useMemo(() => {
-    return !form.clinicName.trim()
-      || !form.branchName.trim()
-      || !form.adminUsername.trim()
-      || !form.adminPassword
-      || !form.adminFullName.trim()
-      || !form.adminEmail.trim()
-      || status.loading;
-  }, [form, status.loading]);
+    return missingRequiredFields.length > 0 || status.loading;
+  }, [missingRequiredFields.length, status.loading]);
+
+  const submitTitle = useMemo(() => {
+    if (status.loading || missingRequiredFields.length === 0) {
+      return undefined;
+    }
+    return `Заполните: ${missingRequiredLabels.join(', ')}`;
+  }, [missingRequiredFields.length, missingRequiredLabels, status.loading]);
+
+  const setRequiredFieldRef = (key) => (node) => {
+    if (node) {
+      requiredFieldRefs.current[key] = node;
+    }
+  };
+
+  const focusFirstMissingField = () => {
+    const firstMissing = missingRequiredFields[0];
+    if (!firstMissing) {
+      return;
+    }
+
+    const node = requiredFieldRefs.current[firstMissing.key];
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      node.focus({ preventScroll: true });
+    }
+  };
 
   const updateField = (key) => (event) => {
     const value = event.target.value;
@@ -118,8 +187,16 @@ export default function Setup() {
             <h2 style={sectionTitleStyle}>Клиника</h2>
             <div style={gridStyle}>
               <label style={labelStyle}>
-                Название клиники
-                <input style={inputStyle} value={form.clinicName} onChange={updateField('clinicName')} />
+                <span>Название клиники <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('clinicName')}
+                  style={missingRequiredKeys.has('clinicName') ? requiredInputStyle : inputStyle}
+                  name="clinicName"
+                  required
+                  aria-invalid={missingRequiredKeys.has('clinicName')}
+                  value={form.clinicName}
+                  onChange={updateField('clinicName')}
+                />
               </label>
               <label style={labelStyle}>
                 Телефон
@@ -148,8 +225,16 @@ export default function Setup() {
             <h2 style={sectionTitleStyle}>Первый филиал</h2>
             <div style={gridStyle}>
               <label style={labelStyle}>
-                Название филиала
-                <input style={inputStyle} value={form.branchName} onChange={updateField('branchName')} />
+                <span>Название филиала <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('branchName')}
+                  style={missingRequiredKeys.has('branchName') ? requiredInputStyle : inputStyle}
+                  name="branchName"
+                  required
+                  aria-invalid={missingRequiredKeys.has('branchName')}
+                  value={form.branchName}
+                  onChange={updateField('branchName')}
+                />
               </label>
               <label style={labelStyle}>
                 Код филиала
@@ -178,20 +263,57 @@ export default function Setup() {
             <h2 style={sectionTitleStyle}>Главный администратор</h2>
             <div style={gridStyle}>
               <label style={labelStyle}>
-                Username
-                <input style={inputStyle} value={form.adminUsername} onChange={updateField('adminUsername')} />
+                <span>Username <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('adminUsername')}
+                  style={missingRequiredKeys.has('adminUsername') ? requiredInputStyle : inputStyle}
+                  name="adminUsername"
+                  required
+                  minLength={3}
+                  aria-invalid={missingRequiredKeys.has('adminUsername')}
+                  value={form.adminUsername}
+                  onChange={updateField('adminUsername')}
+                />
               </label>
               <label style={labelStyle}>
-                Полное имя
-                <input style={inputStyle} value={form.adminFullName} onChange={updateField('adminFullName')} />
+                <span>Полное имя <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('adminFullName')}
+                  style={missingRequiredKeys.has('adminFullName') ? requiredInputStyle : inputStyle}
+                  name="adminFullName"
+                  required
+                  aria-invalid={missingRequiredKeys.has('adminFullName')}
+                  value={form.adminFullName}
+                  onChange={updateField('adminFullName')}
+                />
               </label>
               <label style={labelStyle}>
-                Email
-                <input style={inputStyle} type="email" value={form.adminEmail} onChange={updateField('adminEmail')} />
+                <span>Email <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('adminEmail')}
+                  style={missingRequiredKeys.has('adminEmail') ? requiredInputStyle : inputStyle}
+                  type="email"
+                  name="adminEmail"
+                  required
+                  aria-invalid={missingRequiredKeys.has('adminEmail')}
+                  value={form.adminEmail}
+                  onChange={updateField('adminEmail')}
+                />
               </label>
               <label style={labelStyle}>
-                Пароль
-                <input style={inputStyle} type="password" value={form.adminPassword} onChange={updateField('adminPassword')} />
+                <span>Пароль <span style={requiredMarkerStyle}>*</span></span>
+                <input
+                  ref={setRequiredFieldRef('adminPassword')}
+                  style={missingRequiredKeys.has('adminPassword') ? requiredInputStyle : inputStyle}
+                  type="password"
+                  name="adminPassword"
+                  required
+                  minLength={8}
+                  aria-invalid={missingRequiredKeys.has('adminPassword')}
+                  autoComplete="new-password"
+                  value={form.adminPassword}
+                  onChange={updateField('adminPassword')}
+                />
               </label>
               <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
                 Ключ активации
@@ -204,7 +326,16 @@ export default function Setup() {
           {status.success ? <div style={successStyle}>{status.success}</div> : null}
 
           <div style={actionsStyle}>
-            <MacOSButton type="submit" variant="primary" disabled={isSubmitDisabled}>
+            {missingRequiredFields.length > 0 && !status.loading ? (
+              <div style={requiredHintStyle} role="status">
+                Заполните обязательные поля: {missingRequiredLabels.join(', ')}.
+                {' '}
+                <button type="button" style={hintActionStyle} onClick={focusFirstMissingField}>
+                  Показать первое поле
+                </button>
+              </div>
+            ) : null}
+            <MacOSButton type="submit" variant="primary" disabled={isSubmitDisabled} title={submitTitle}>
               {status.loading ? 'Сохраняем...' : 'Завершить настройку'}
             </MacOSButton>
           </div>
@@ -217,7 +348,7 @@ export default function Setup() {
 const wrapStyle = {
   minHeight: '100vh',
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'center',
   padding: '32px 16px',
   background: 'linear-gradient(180deg, rgba(12,74,110,0.08), rgba(15,23,42,0.03))'
@@ -285,6 +416,11 @@ const labelStyle = {
   fontWeight: 600
 };
 
+const requiredMarkerStyle = {
+  color: '#dc2626',
+  fontWeight: 700
+};
+
 const baseFieldStyle = {
   border: '1px solid rgba(148, 163, 184, 0.35)',
   borderRadius: '14px',
@@ -297,6 +433,12 @@ const inputStyle = {
   ...baseFieldStyle
 };
 
+const requiredInputStyle = {
+  ...baseFieldStyle,
+  border: '1px solid rgba(220, 38, 38, 0.65)',
+  boxShadow: '0 0 0 3px rgba(220, 38, 38, 0.10)'
+};
+
 const textareaStyle = {
   ...baseFieldStyle,
   minHeight: '88px',
@@ -305,7 +447,29 @@ const textareaStyle = {
 
 const actionsStyle = {
   display: 'flex',
-  justifyContent: 'flex-end'
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '16px',
+  flexWrap: 'wrap'
+};
+
+const requiredHintStyle = {
+  flex: '1 1 280px',
+  color: '#b45309',
+  fontSize: '13px',
+  lineHeight: 1.5
+};
+
+const hintActionStyle = {
+  border: 0,
+  background: 'transparent',
+  color: '#2563eb',
+  cursor: 'pointer',
+  font: 'inherit',
+  fontWeight: 700,
+  marginLeft: '8px',
+  padding: 0,
+  textDecoration: 'underline'
 };
 
 const messageStyle = {

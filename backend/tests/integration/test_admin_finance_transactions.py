@@ -17,7 +17,7 @@ def _login_admin(client, admin_user):
 
 def _login_registrar(client, registrar_user):
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert response.status_code == 200, response.text

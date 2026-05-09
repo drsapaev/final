@@ -92,6 +92,8 @@
    npm run dev
    ```
 
+   Internal demo/test routes are hidden by default, including legacy aliases such as `/payment/test`, `/css-test`, and `/buttons`. For a local debug session only, copy `frontend/.env.example` and set `VITE_ENABLE_INTERNAL_DEMO=1`; do not enable it in production-like environments.
+
 ### Docker
 
 ```bash
