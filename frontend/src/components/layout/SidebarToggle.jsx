@@ -12,6 +12,7 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
     <button
       onClick={onToggle}
       className={`sidebar-toggle ${className}`}
+      aria-label={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
       style={{
         display: 'flex',
         alignItems: 'center',
