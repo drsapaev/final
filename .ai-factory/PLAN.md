@@ -422,9 +422,35 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
   Files: first-touch frontend role-screen file selected by evidence only
   LOGGING REQUIREMENTS: log role, workflow step, visible before/after behavior, and validation evidence.
 
+### Phase 5: Next Recovery Slice (added by /aif-improve on 2026-05-10)
+
+- [ ] Task 25: Prove clean PostgreSQL Alembic upgrade for the recovery branch.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` because this touches persistence, deployment readiness, and the PostgreSQL source of truth. Resolve whether a disposable PostgreSQL target is available on the local contour (`55432`) or through an existing compose/runbook path. Verify the Alembic revision chain and execute `alembic upgrade head` against a disposable database, or document the exact blocker and add the smallest CI/runbook follow-up instead of claiming production readiness.
+  Files: `backend/alembic/*`, `backend/alembic/versions/*`, `backend/alembic.ini`, `backend/app/db/*`, `ops/compose.staging.yml`, deployment/testing docs only if evidence requires
+  Validation target: migration graph inspection plus a real disposable PostgreSQL `alembic upgrade head` proof, or a clearly documented blocker with a concrete next validation path.
+  LOGGING REQUIREMENTS: log DB target class, command class, migration head, success/failure, and cleanup status; do not log database passwords, connection URLs, or patient data.
+
+- [ ] Task 26: Audit remaining backend raw print/public error leakage outside payment webhook.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` for the audit and switch to `gate_known_root_cause` only after evidence selects exactly one highest-risk runtime file for the first fix slice. Search committed backend runtime code for `print(...)`, raw `str(exc)`/`str(e)` in public responses, and logs that may expose patient, payment, provider, token, filename, or credential data. Do not sweep unrelated files in one patch.
+  Files: backend runtime file selected by evidence, targeted tests selected by evidence
+  Validation target: targeted unit/API test or static assertion proving the selected public/logging leakage is removed without changing business behavior.
+  LOGGING REQUIREMENTS: preserve audit/reconciliation evidence, convert only confirmed leakage to structured non-sensitive logs, and do not log PHI, tokens, payloads, raw filenames, credentials, or provider secrets.
+
+- [ ] Task 27: Remove visible default-credential/login friction from canonical login surfaces.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate_known_root_cause` with `frontend/src/pages/Login.jsx` unless the gate shows a different canonical login owner. Verify whether `/login` still exposes `admin/admin`-style guidance, a prefilled password, read-only username selection, or role preset behavior in the current canonical path. Fix only the confirmed visible issue and preserve the 2FA-aware login contract.
+  Files: `frontend/src/pages/Login.jsx`, `frontend/src/components/auth/LoginFormStyled.jsx`, `frontend/src/api/client.js`, auth tests as validation only unless evidence requires edits
+  Validation target: targeted login UI test or browser/static smoke showing no visible default credentials and no regression of the canonical 2FA-aware login endpoint.
+  LOGGING REQUIREMENTS: log visible before/after behavior and auth endpoint contract; do not log credentials, passwords, tokens, or entered usernames.
+
+- [ ] Task 28: Define and execute a historical credential-artifact cleanup policy.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` because destructive history rewrite, rotation, and secret scanning are policy-sensitive. Audit tracked/untracked credential-like artifacts and repo history exposure after removal of unsafe auth fixtures. Decide whether rotation-only, git history rewrite, or documented accepted risk is appropriate. Stop before any destructive history rewrite unless explicitly approved.
+  Files: `docs/SECURITY_CHECKLIST.md`, `docs/RECOVERY_PLAN.md`, secret scan config/runbook files, no runtime code unless evidence requires
+  Validation target: secret-scan evidence and documented rotation/history decision without printing secret values.
+  LOGGING REQUIREMENTS: log filenames and classification only; never print credential values, tokens, database URLs, passwords, or patient data.
+
 ## Verification Plan
 
-- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-5 remain completed, and Task 6 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
+- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-24 remain completed, and Task 25 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
 - Auth P0: route map plus 2FA tests proving no production login path issues `access_token` before required 2FA.
 - Payment P0: webhook tests prove retryable failures do not return successful HTTP status and duplicate callback ownership is explicit.
 - Upload P0: simple upload endpoint is either disabled outside explicit dev/test mode or covered by filename, size, MIME, storage, and logging tests.
