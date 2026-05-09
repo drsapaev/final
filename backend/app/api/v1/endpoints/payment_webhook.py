@@ -306,12 +306,21 @@ def list_transactions(
             status=status,
             visit_id=visit_id,
         )
-    except Exception as e:
-        print(f"❌ Ошибка в list_transactions: {e}")
+    except Exception as exc:
+        logger.exception(
+            "Payment webhook transaction listing failed",
+            extra={
+                "classification": "payment_admin_query_error",
+                "endpoint": "list_transactions",
+                "provider_filter_set": provider is not None,
+                "status_filter_set": status is not None,
+                "visit_filter_set": visit_id is not None,
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting transactions: {str(e)}",
-        )
+            detail="Error getting transactions",
+        ) from exc
 
 
 @router.get("/payment/summary", name="webhook_summary")
@@ -324,12 +333,19 @@ def get_webhook_summary(
     service = PaymentWebhookApiService(db)
     try:
         return service.get_webhook_summary(provider=provider)
-    except Exception as e:
-        print(f"❌ Ошибка в get_webhook_summary: {e}")
+    except Exception as exc:
+        logger.exception(
+            "Payment webhook summary retrieval failed",
+            extra={
+                "classification": "payment_admin_query_error",
+                "endpoint": "get_webhook_summary",
+                "provider_filter_set": provider is not None,
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting summary: {str(e)}",
-        )
+            detail="Error getting summary",
+        ) from exc
 
 
 @router.get(

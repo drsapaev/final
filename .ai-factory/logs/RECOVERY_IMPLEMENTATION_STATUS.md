@@ -1344,3 +1344,36 @@ PR metadata:
 - PR body was updated to satisfy the local PR review quality gate template.
 - `python scripts\run_pr_review_gate_checks.py --body-env PR_BODY`
   - result: passed locally before updating PR #377.
+
+## Task 22 Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`
+- reason: payment/billing endpoint logging and public error detail hardening
+- risky domain: yes
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 22 remove legacy payment webhook endpoint print and raw error leakage from admin/registrar list_transactions and webhook_summary endpoints while preserving role guards and webhook semantics" --known-root-cause "backend/app/api/v1/endpoints/payment_webhook.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/api/v1/endpoints/payment_webhook.py`
+- first-touch files: `backend/app/api/v1/endpoints/payment_webhook.py`
+- validation target: compile plus targeted payment webhook API/repository/service and legacy notification tests
+- stop condition watched first: any required edit outside endpoint logging/error detail
+
+Changed behavior:
+
+- Removed legacy `print(...)` diagnostics from `list_transactions` and `get_webhook_summary`.
+- Replaced raw exception text in public HTTP 500 details with generic messages.
+- Added structured `logger.exception(...)` metadata using endpoint name and filter-presence booleans only.
+- Preserved role guards and payment webhook processing semantics.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\payment_webhook.py`
+  - result: passed
+- `python -m pytest backend\tests\unit\test_payment_webhook_api_service.py backend\tests\unit\test_payment_webhook_api_repository.py backend\tests\unit\test_payment_webhook_service.py backend\tests\integration\test_notification_catalog_slice3_legacy_webhooks.py -q --tb=short --disable-warnings`
+  - result: 16 passed, 1 warning
+- `rg -n "print\(|Error getting transactions:|Error getting summary:" backend\app\api\v1\endpoints\payment_webhook.py`
+  - result: no matches

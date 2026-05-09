@@ -3268,3 +3268,39 @@ Keep every pushed recovery step CI-ready after PR #377 exposed a backend CI fail
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should connect payment webhook endpoint hardening to legacy notification catalog tests and provider domain-result semantics.
+
+## Task 92 - Payment webhook endpoint print/error leakage
+
+### User task
+Continue recovery after PR #377 with commit-and-push per step; implement Task 22 from `.ai-factory/PLAN.md`.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/payment_webhook.py
+
+### What handoff solved well
+- It constrained the logging cleanup to one payment endpoint file.
+- It prevented accidental edits to payment services or repository behavior during a logging/error-detail hardening slice.
+
+### Missing relationship mapping
+- The gate did not identify validation tests, so the payment API/repository/service and legacy notification tests were selected manually.
+
+### Manual reconstruction needed
+- Manually searched the endpoint for remaining `print(...)` and raw public error detail patterns.
+- Manually verified the two affected endpoints still use the existing Admin/Registrar role guards.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes for this narrow slice
+- would LightRAG likely help here: low
+- Better retrieval would be useful mainly for automatically selecting targeted validation tests.

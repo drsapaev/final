@@ -405,6 +405,23 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
   Files: `docs/*`, `README.md`, `.env.example`, `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`
   LOGGING REQUIREMENTS: log source evidence for each documentation claim and mark anything unverified as unverified.
 
+### Phase 4: CI-Ready Follow-Up Slices
+
+- [x] Task 22: Remove legacy payment webhook endpoint print/error leakage.
+  Continue through `/aif-implement @.ai-factory/PLAN.md` only. Replace remaining `print(...)` diagnostics in `backend/app/api/v1/endpoints/payment_webhook.py` admin/registrar endpoints with structured logger calls and generic HTTP error details. Preserve existing role guards and payment webhook semantics, including accepted failed-payment domain results with a saved webhook record. Commit and push this task as its own CI-ready slice.
+  Files: `backend/app/api/v1/endpoints/payment_webhook.py`, payment webhook API/service/repository tests as validation only unless a test update is proven necessary
+  LOGGING REQUIREMENTS: log endpoint name, provider/status/visit filters only as metadata classes where safe, and exception class; do not print raw exception text, provider secrets, payloads, credentials, or patient/payment sensitive details.
+
+- [ ] Task 23: Audit remaining payment service logging and public error leakage.
+  After Task 22, inspect `backend/app/services/payment_webhook.py` and adjacent payment services for remaining raw `print(...)`, raw exception text in public HTTP responses, or logs that could expose payment/provider details. Use a new gate slice before edits and commit/push separately.
+  Files: `backend/app/services/payment_webhook.py`, payment service tests selected by evidence
+  LOGGING REQUIREMENTS: keep logs structured and non-sensitive; preserve reconciliation/audit evidence needed for financial operations.
+
+- [ ] Task 24: Fix next verified user-visible role-screen friction.
+  Select exactly one high-confidence user-visible defect from the prior UX audit, preferably a broken/no-op primary action or misleading empty/error state in a role screen. Use static proof and browser smoke when available before editing. Commit/push separately after targeted validation.
+  Files: first-touch frontend role-screen file selected by evidence only
+  LOGGING REQUIREMENTS: log role, workflow step, visible before/after behavior, and validation evidence.
+
 ## Verification Plan
 
 - Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-5 remain completed, and Task 6 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
