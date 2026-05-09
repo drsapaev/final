@@ -200,7 +200,7 @@ jobs:
             record "backend pip install" "skipped" "0" "backend/requirements.txt not found"
           fi
 
-          python -m pip install pip-audit pytest > maintenance-reports/backend-pip-tools.log 2>&1
+          python -m pip install pip-audit pytest pytest-asyncio httpx > maintenance-reports/backend-pip-tools.log 2>&1
           code=$?
           [ "$code" -eq 0 ] && status="ok" || status="failed"
           record "backend maintenance tools" "$status" "$code" "see backend-pip-tools.log"
