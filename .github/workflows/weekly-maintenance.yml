@@ -167,6 +167,7 @@ jobs:
         shell: bash
         env:
           DATABASE_URL: sqlite:///./maintenance-health.sqlite3
+          ALLOW_SQLITE_DATABASE_URL: '1'
           CORS_DISABLE: '1'
           WS_DEV_ALLOW: '1'
         run: |
