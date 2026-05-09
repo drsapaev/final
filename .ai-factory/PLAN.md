@@ -417,7 +417,7 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
   Files: `backend/app/services/payment_webhook.py`, payment service tests selected by evidence
   LOGGING REQUIREMENTS: keep logs structured and non-sensitive; preserve reconciliation/audit evidence needed for financial operations.
 
-- [ ] Task 24: Fix next verified user-visible role-screen friction.
+- [x] Task 24: Fix next verified user-visible role-screen friction.
   Select exactly one high-confidence user-visible defect from the prior UX audit, preferably a broken/no-op primary action or misleading empty/error state in a role screen. Use static proof and browser smoke when available before editing. Commit/push separately after targeted validation.
   Files: first-touch frontend role-screen file selected by evidence only
   LOGGING REQUIREMENTS: log role, workflow step, visible before/after behavior, and validation evidence.

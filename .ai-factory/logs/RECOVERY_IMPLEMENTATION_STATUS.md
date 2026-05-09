@@ -1417,3 +1417,40 @@ Validation run:
 LightRAG evidence note:
 
 - No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
+
+## Task 24 Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`
+- reason: patient-facing role screen displayed mock appointment and lab-result data as real patient data
+- risky domain: yes
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 24 fix one verified user-visible role-screen friction: PatientPanel shows mock appointments and lab results as real patient data; replace with honest empty state without inventing backend API" --known-root-cause "frontend/src/pages/PatientPanel.jsx"`
+
+Initial boundaries:
+
+- canonical anchor: `frontend/src/pages/PatientPanel.jsx`
+- first-touch files: `frontend/src/pages/PatientPanel.jsx`
+- validation target: frontend production build plus static proof that mock patient data was removed
+- stop condition watched first: any required backend/API contract or route ownership change
+
+Changed behavior:
+
+- Removed fake `/patient` appointment and lab-result arrays from `PatientPanel`.
+- Removed the fake loading delay used only to make mock data look like an API response.
+- Replaced false patient data with honest empty states for appointments and results.
+- Disabled the patient-panel appointment action until real patient data/workflow is connected, so it no longer presents as a working primary action.
+- Did not invent a new backend API contract.
+
+Validation run:
+
+- `npm.cmd run build` from `frontend/`
+  - result: passed
+  - warnings: existing dynamic/static `errorHandler.js` import warning and large chunk warnings
+- `rg -n "Кардиолог|Дерматолог|Анализ крови|ЭКГ|2025-09|2025-08|setTimeout|setAppointments|setResults|Skeleton" frontend\src\pages\PatientPanel.jsx`
+  - result: no matches
+
+LightRAG evidence note:
+
+- No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
