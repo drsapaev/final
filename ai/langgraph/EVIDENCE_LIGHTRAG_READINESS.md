@@ -3232,3 +3232,39 @@ Continue `/aif-verify --strict` after completing `/aif-implement @.ai-factory/PL
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should connect auth hardening changes to stale test fixtures and inline endpoint calls across the backend test suite.
+
+## Task 91 - CI legacy Payme webhook domain result
+
+### User task
+Keep every pushed recovery step CI-ready after PR #377 exposed a backend CI failure in the legacy Payme webhook notification test.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/payment_webhook.py
+
+### What handoff solved well
+- It constrained the CI fix to the payment webhook endpoint finalization logic.
+- It preserved the non-200 behavior for retryable processing errors while allowing recorded failed-payment domain results to be acknowledged.
+
+### Missing relationship mapping
+- The first recovery payment tests did not include `test_notification_catalog_slice3_legacy_webhooks.py`, so CI found a compatibility notification contract gap.
+
+### Manual reconstruction needed
+- Manually read the CI failure log and matched it to the legacy Payme notification test.
+- Manually distinguished a processing error without a webhook record from a failed payment domain event with a saved webhook record.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect payment webhook endpoint hardening to legacy notification catalog tests and provider domain-result semantics.

@@ -1319,3 +1319,28 @@ Residual risks:
 - Some legacy backend paths still contain `print(...)` error logging outside the first recovery slice; no new sensitive prints were introduced in this diff.
 - Repo-wide historical files still contain test/API-key-like words; they were not introduced by this recovery diff and need a separate secrets-history cleanup policy.
 - Alembic clean upgrade on disposable PostgreSQL remains unverified locally.
+
+## PR #377 CI Follow-Up Evidence
+
+Issue:
+
+- GitHub backend CI failed on `tests/integration/test_notification_catalog_slice3_legacy_webhooks.py::test_legacy_payme_webhook_emits_failed_payment_notification`.
+- The recovery payment hardening returned HTTP 422 for `ok: false` results even when a webhook record existed and the failed-payment notification was emitted.
+
+Fix:
+
+- `backend/app/api/v1/endpoints/payment_webhook.py` now treats `ok: false` plus a saved `webhook_id` as an accepted domain result.
+- Retryable processing failures without a webhook record still return non-200 errors.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\payment_webhook.py`
+  - result: passed
+- `python -m pytest backend\tests\integration\test_notification_catalog_slice3_legacy_webhooks.py::test_legacy_payme_webhook_emits_failed_payment_notification backend\tests\integration\test_notification_catalog_slice3_legacy_webhooks.py::test_legacy_payme_webhook_duplicate_callback_does_not_create_duplicate_delivery backend\tests\unit\test_payment_webhook_service.py backend\tests\unit\test_payment_webhook_api_service.py backend\tests\unit\test_provider_webhook_service.py backend\tests\unit\test_payment_reconciliation_service.py backend\tests\integration\test_payment_init_e2e.py backend\tests\integration\test_e2e_payment_flow.py -q --tb=short --disable-warnings`
+  - result: 30 passed, 1 warning
+
+PR metadata:
+
+- PR body was updated to satisfy the local PR review quality gate template.
+- `python scripts\run_pr_review_gate_checks.py --body-env PR_BODY`
+  - result: passed locally before updating PR #377.

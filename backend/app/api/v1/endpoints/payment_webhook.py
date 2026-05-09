@@ -92,6 +92,18 @@ def _finalize_public_webhook_result(
             detail="Payment webhook processing failed",
         )
 
+    if webhook_record_id:
+        logger.info(
+            "Payment webhook domain result accepted",
+            extra={
+                "provider": provider,
+                "webhook_record_id": webhook_record_id,
+                "classification": "accepted_domain_result",
+                "ok": False,
+            },
+        )
+        return result
+
     logger.warning(
         "Payment webhook rejected",
         extra={
