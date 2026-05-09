@@ -5,7 +5,9 @@ from datetime import date
 from app.services.visits_api_service import VisitsApiService
 
 
-def test_list_visits_endpoint_delegates_to_service(client, monkeypatch) -> None:
+def test_list_visits_endpoint_delegates_to_service(
+    client, monkeypatch, auth_headers
+) -> None:
     captured = {}
 
     def fake_list_visits(
@@ -55,6 +57,7 @@ def test_list_visits_endpoint_delegates_to_service(client, monkeypatch) -> None:
             "limit": 5,
             "offset": 2,
         },
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -71,7 +74,9 @@ def test_list_visits_endpoint_delegates_to_service(client, monkeypatch) -> None:
     }
 
 
-def test_get_visit_endpoint_delegates_to_service(client, monkeypatch) -> None:
+def test_get_visit_endpoint_delegates_to_service(
+    client, monkeypatch, auth_headers
+) -> None:
     captured = {}
 
     def fake_get_visit(self, *, visit_id: int):
@@ -101,7 +106,7 @@ def test_get_visit_endpoint_delegates_to_service(client, monkeypatch) -> None:
 
     monkeypatch.setattr(VisitsApiService, "get_visit", fake_get_visit)
 
-    response = client.get("/api/v1/visits/visits/42")
+    response = client.get("/api/v1/visits/visits/42", headers=auth_headers)
 
     assert response.status_code == 200
     payload = response.json()
@@ -109,6 +114,28 @@ def test_get_visit_endpoint_delegates_to_service(client, monkeypatch) -> None:
     assert payload["visit"]["notes"] == "visit card"
     assert payload["services"][0]["name"] == "Consultation"
     assert captured["visit_id"] == 42
+
+
+def test_list_visits_endpoint_requires_auth(client, monkeypatch) -> None:
+    def fake_list_visits(self, **_kwargs):
+        raise AssertionError("list_visits should not run without auth")
+
+    monkeypatch.setattr(VisitsApiService, "list_visits", fake_list_visits)
+
+    response = client.get("/api/v1/visits/visits")
+
+    assert response.status_code == 401
+
+
+def test_get_visit_endpoint_requires_auth(client, monkeypatch) -> None:
+    def fake_get_visit(self, **_kwargs):
+        raise AssertionError("get_visit should not run without auth")
+
+    monkeypatch.setattr(VisitsApiService, "get_visit", fake_get_visit)
+
+    response = client.get("/api/v1/visits/visits/42")
+
+    assert response.status_code == 401
 
 
 def test_create_visit_endpoint_delegates_to_service(

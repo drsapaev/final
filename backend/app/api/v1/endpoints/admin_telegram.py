@@ -3,18 +3,24 @@ API endpoints для управления Telegram в админ панели
 """
 
 import asyncio
+import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.crud import clinic as crud_clinic
+from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.user import User
 
 router = APIRouter()
+
+
+class TelegramWebhookRequest(BaseModel):
+    webhook_url: Optional[str] = None
 
 # ===================== НАСТРОЙКИ TELEGRAM =====================
 
@@ -152,12 +158,20 @@ def test_telegram_bot(
 
 @router.post("/telegram/set-webhook")
 def set_telegram_webhook(
-    webhook_url: str,
+    payload: Optional[TelegramWebhookRequest] = Body(default=None),
+    webhook_url: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Установить webhook для Telegram бота"""
     try:
+        selected_webhook_url = (payload.webhook_url if payload else None) or webhook_url
+        if not selected_webhook_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="webhook_url is required",
+            )
+
         # Получаем токен бота
         bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
         if not bot_token_setting or not bot_token_setting.value:
@@ -166,11 +180,12 @@ def set_telegram_webhook(
             )
 
         bot_token = bot_token_setting.value
+        secret_token = secrets.token_urlsafe(32)
 
         # Устанавливаем webhook
         response = requests.post(
             f"https://api.telegram.org/bot{bot_token}/setWebhook",
-            json={"url": webhook_url},
+            json={"url": selected_webhook_url, "secret_token": secret_token},
             timeout=10,
         )
 
@@ -179,13 +194,24 @@ def set_telegram_webhook(
             if result.get("ok"):
                 # Сохраняем URL webhook
                 crud_clinic.update_setting(
-                    db, "webhook_url", {"value": webhook_url}, current_user.id
+                    db, "webhook_url", {"value": selected_webhook_url}, current_user.id
                 )
+                config_payload = {
+                    "bot_token": bot_token,
+                    "webhook_url": selected_webhook_url,
+                    "webhook_secret": secret_token,
+                    "active": True,
+                }
+                if crud_telegram.get_telegram_config(db):
+                    crud_telegram.update_telegram_config(db, config_payload)
+                else:
+                    crud_telegram.create_telegram_config(db, config_payload)
 
                 return {
                     "success": True,
                     "message": "Webhook установлен успешно",
-                    "webhook_url": webhook_url,
+                    "webhook_url": selected_webhook_url,
+                    "webhook_secret_configured": True,
                 }
             else:
                 raise Exception(

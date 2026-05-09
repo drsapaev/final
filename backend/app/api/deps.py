@@ -47,8 +47,8 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-# Correct tokenUrl to point to our /auth/login
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/minimal-login")
+# Document the 2FA-aware canonical login endpoint in OpenAPI.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/authentication/login")
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:

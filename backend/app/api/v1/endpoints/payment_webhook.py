@@ -1,5 +1,6 @@
 # app/api/v1/endpoints/payment_webhook.py
-from typing import List
+import logging
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -18,6 +19,90 @@ from app.services.payment_webhook_api_service import (
 )
 
 router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
+logger = logging.getLogger(__name__)
+
+
+def _finalize_public_webhook_result(
+    *, provider: str, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Convert legacy service failures into explicit HTTP outcomes."""
+    message = str(result.get("message") or "")
+    webhook_record_id = result.get("webhook_id")
+
+    if result.get("ok"):
+        logger.info(
+            "Payment webhook accepted",
+            extra={
+                "provider": provider,
+                "webhook_record_id": webhook_record_id,
+                "classification": "accepted",
+            },
+        )
+        return result
+
+    if message == "Webhook already processed" and webhook_record_id:
+        logger.info(
+            "Payment webhook duplicate accepted idempotently",
+            extra={
+                "provider": provider,
+                "webhook_record_id": webhook_record_id,
+                "classification": "duplicate",
+            },
+        )
+        idempotent_result = dict(result)
+        idempotent_result["ok"] = True
+        return idempotent_result
+
+    if message == "Invalid signature":
+        logger.warning(
+            "Payment webhook rejected by signature validation",
+            extra={
+                "provider": provider,
+                "classification": "non_retryable_validation_error",
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment webhook signature",
+        )
+
+    if message == "Provider not found":
+        logger.error(
+            "Payment webhook provider configuration missing",
+            extra={
+                "provider": provider,
+                "classification": "retryable_configuration_error",
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment provider is not configured",
+        )
+
+    if message.startswith("Error processing webhook"):
+        logger.error(
+            "Payment webhook processing failed",
+            extra={
+                "provider": provider,
+                "classification": "retryable_processing_error",
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payment webhook processing failed",
+        )
+
+    logger.warning(
+        "Payment webhook rejected",
+        extra={
+            "provider": provider,
+            "classification": "non_retryable_validation_error",
+        },
+    )
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail="Payment webhook rejected",
+    )
 
 
 # --- Webhook endpoints (публичные, без аутентификации) ---
@@ -39,12 +124,22 @@ async def payme_webhook(request: Request, db: Session = Depends(get_db)):
                 detail="Missing X-Payme-Signature header",
             )
 
-        return service.process_payme_webhook(data=data, signature=signature)
+        return _finalize_public_webhook_result(
+            provider="payme",
+            result=service.process_payme_webhook(data=data, signature=signature),
+        )
 
-    except Exception as e:
-        # Логируем ошибку, но возвращаем 200 OK
-        print(f"❌ Payme webhook error: {e}")
-        return {"ok": False, "message": f"Error processing webhook: {str(e)}"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Payme webhook failed before service processing",
+            extra={"provider": "payme", "classification": "retryable_endpoint_error"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payment webhook processing failed",
+        ) from exc
 
 
 @router.post("/payment/click", name="click_webhook")
@@ -55,12 +150,22 @@ async def click_webhook(request: Request, db: Session = Depends(get_db)):
         # Получаем данные из формы
         form_data = await request.form()
         data = dict(form_data)
-        return service.process_click_webhook(data=data)
+        return _finalize_public_webhook_result(
+            provider="click",
+            result=service.process_click_webhook(data=data),
+        )
 
-    except Exception as e:
-        # Логируем ошибку, но возвращаем 200 OK
-        print(f"❌ Click webhook error: {e}")
-        return {"ok": False, "message": f"Error processing webhook: {str(e)}"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Click webhook failed before service processing",
+            extra={"provider": "click", "classification": "retryable_endpoint_error"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payment webhook processing failed",
+        ) from exc
 
 
 # --- Payment Providers management (Admin only) ---

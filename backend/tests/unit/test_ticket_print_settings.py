@@ -49,7 +49,7 @@ def test_ticket_print_settings_schema_rejects_unknown_keys():
 
 def test_ticket_print_settings_get_is_available_to_active_staff(client, registrar_user):
     login_response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert login_response.status_code == 200
@@ -68,7 +68,7 @@ def test_ticket_print_settings_get_is_available_to_active_staff(client, registra
 
 def test_ticket_print_settings_put_remains_admin_only(client, registrar_user):
     login_response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert login_response.status_code == 200
@@ -85,7 +85,7 @@ def test_ticket_print_settings_put_remains_admin_only(client, registrar_user):
 
 def test_clinic_settings_list_is_available_to_active_staff(client, registrar_user):
     login_response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert login_response.status_code == 200

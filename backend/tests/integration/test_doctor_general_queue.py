@@ -237,7 +237,7 @@ class TestDoctorGeneralQueue:
         db_session.refresh(entry)
 
         login_response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": cardiologist_user.username, "password": "cardiologist123"},
         )
         assert login_response.status_code == 200

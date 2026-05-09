@@ -60,7 +60,7 @@ docker compose --env-file ops/staging.env -f ops/compose.staging.yml up -d --bui
 
 - Frontend: `http://<STAGING_PUBLIC_HOST>:18080`
 - Backend docs: `http://<STAGING_PUBLIC_HOST>:18000/docs`
-- Postgres: `127.0.0.1:15432`
+- Postgres: `127.0.0.1:55432`
 
 После старта стека прогоните EMR cutover уже на staging:
 

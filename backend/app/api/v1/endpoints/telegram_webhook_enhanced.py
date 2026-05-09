@@ -16,15 +16,20 @@ from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
     if not expected_secret:
-        return
+        logger.error("Enhanced Telegram webhook rejected because webhook secret is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram webhook secret is not configured",
+        )
 
-    received_secret = request.headers.get("x-telegram-bot-api-secret-token")
+    received_secret = request.headers.get(WEBHOOK_SECRET_HEADER)
     if received_secret != expected_secret:
         logger.warning("Enhanced Telegram webhook rejected due to invalid secret token")
         raise HTTPException(
