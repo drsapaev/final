@@ -321,7 +321,7 @@ def test_daily_queue(db_session, cardio_user):
 def registrar_token(client: TestClient, registrar_user: User) -> str:
     """Токен регистратора"""
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert response.status_code == 200
@@ -347,7 +347,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
         db_session.refresh(patient_user)
 
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": patient_user.username, "password": "patient123"},
     )
     assert response.status_code == 200

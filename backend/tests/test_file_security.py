@@ -42,7 +42,7 @@ class TestFileSecurity:
 
         # Получаем токен
         login_response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": doctor_user.username, "password": "doctor123"},
         )
         assert login_response.status_code == 200
@@ -98,7 +98,7 @@ class TestFileSecurity:
 
         # Получаем токен
         login_response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": doctor_user.username, "password": "doctor123"},
         )
         assert login_response.status_code == 200
@@ -201,7 +201,7 @@ class TestFileSecurity:
 
         # Получаем токен
         login_response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": doctor_user.username, "password": "doctor123"},
         )
         assert login_response.status_code == 200
@@ -260,7 +260,7 @@ class TestFileSecurity:
 
         # Получаем токен
         login_response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": doctor_user.username, "password": "doctor123"},
         )
         assert login_response.status_code == 200
