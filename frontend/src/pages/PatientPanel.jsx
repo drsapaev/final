@@ -1,51 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, Button, Badge, Icon } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText } from 'lucide-react';
 import PropTypes from 'prop-types';
 
-// Simple Skeleton component
-const Skeleton = ({ className = '' }) =>
-<div
-  className={className}
-  style={{
-    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-    backgroundSize: '200% 100%',
-    animation: 'shimmer 1.5s infinite',
-    borderRadius: '8px',
-    minHeight: '96px'
-  }} />;
+const PanelEmptyState = ({ icon: EmptyIcon, title, description }) =>
+  <div className="p-6 border border-dashed border-gray-300 rounded-lg text-center bg-white/60">
+    <EmptyIcon className="w-8 h-8 mx-auto mb-3 text-gray-400" aria-hidden="true" />
+    <div className="font-medium text-gray-900">{title}</div>
+    <p className="mt-1 text-sm text-gray-500">{description}</p>
+  </div>;
+
+PanelEmptyState.propTypes = {
+  icon: PropTypes.elementType.isRequired,
+  title: PropTypes.string.isRequired,
+  description: PropTypes.string.isRequired,
+};
 
 
-  Skeleton.propTypes = {
-    ...(Skeleton.propTypes || {}),
-    className: PropTypes.any,
-  };
-
-
-const PatientPanel = () => {void
+const PatientPanel = () => {
   useBreakpoint();
-  const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [appointments, setAppointments] = useState([]);
-  const [results, setResults] = useState([]);
-
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      await new Promise((r) => setTimeout(r, 700));
-      setAppointments([
-      { id: 1, date: '2025-09-02', time: '09:30', doctor: 'Кардиолог', status: 'scheduled' },
-      { id: 2, date: '2025-09-10', time: '10:00', doctor: 'Дерматолог', status: 'completed' }]
-      );
-      setResults([
-      { id: 1, title: 'Анализ крови', date: '2025-08-15' },
-      { id: 2, title: 'ЭКГ', date: '2025-08-20' }]
-      );
-      setIsLoading(false);
-    };
-    load();
-  }, []);
+  const appointments = [];
+  const results = [];
+  const hasPatientData = appointments.length > 0 || results.length > 0;
 
   return (
     <div style={{
@@ -84,6 +62,7 @@ const PatientPanel = () => {void
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                disabled={!hasPatientData}
                 style={{
                   width: '100%',
                   padding: '12px 12px 12px 40px',
@@ -94,16 +73,20 @@ const PatientPanel = () => {void
                   fontSize: 'var(--mac-font-size-base)',
                   fontFamily: 'inherit',
                   outline: 'none',
-                  transition: 'border-color var(--mac-duration-normal) var(--mac-ease)'
+                  transition: 'border-color var(--mac-duration-normal) var(--mac-ease)',
+                  opacity: hasPatientData ? 1 : 0.65
                 }}
-                placeholder="Search by doctor, service or result"
+                placeholder={hasPatientData ? 'Поиск по врачу, услуге или результату' : 'Данные пациента пока не подключены'}
                 onFocus={(e) => e.target.style.borderColor = 'var(--mac-accent-blue)'}
                 onBlur={(e) => e.target.style.borderColor = 'var(--mac-border)'} />
 
             </div>
-            <Button variant="primary">
+            <Button
+              variant="secondary"
+              disabled
+              title="Запись из кабинета пациента будет доступна после подключения реальных данных">
               <Icon name="plus" size="small" />
-              New Appointment
+              Запись через кабинет
             </Button>
           </div>
         </Card>
@@ -116,12 +99,10 @@ const PatientPanel = () => {void
               <h3 className="font-medium text-gray-900">Мои записи</h3>
             </div>
             <div className="p-4">
-              {isLoading ?
-              <Skeleton className="h-24" /> :
-
-              <div className="space-y-4">
+              {appointments.length > 0 ?
+                <div className="space-y-4">
                   {appointments.map((a) =>
-                <div key={a.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <div key={a.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{a.doctor}</div>
                         <div className="text-sm text-gray-500">{a.date} • {a.time}</div>
@@ -130,8 +111,13 @@ const PatientPanel = () => {void
                         {a.status === 'scheduled' ? 'Запланировано' : 'Завершено'}
                       </Badge>
                     </div>
-                )}
+                  )}
                 </div>
+                :
+                <PanelEmptyState
+                  icon={Calendar}
+                  title="Записей пока нет"
+                  description="Здесь появятся только подтвержденные записи пациента после подключения личного кабинета к данным клиники." />
               }
             </div>
           </Card>
@@ -142,20 +128,26 @@ const PatientPanel = () => {void
               <h3 className="font-medium text-gray-900">Результаты</h3>
             </div>
             <div className="p-4">
-              {isLoading ?
-              <Skeleton className="h-24" /> :
-
-              <div className="space-y-4">
+              {results.length > 0 ?
+                <div className="space-y-4">
                   {results.map((r) =>
-                <div key={r.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <div key={r.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{r.title}</div>
                         <div className="text-sm text-gray-500">{r.date}</div>
                       </div>
-                      <Button variant="outline" size="sm"><FileText className="w-4 h-4 mr-2" />Открыть</Button>
+                      <Button variant="outline" size="sm">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Открыть
+                      </Button>
                     </div>
-                )}
+                  )}
                 </div>
+                :
+                <PanelEmptyState
+                  icon={FileText}
+                  title="Результаты пока не загружены"
+                  description="Система не показывает демонстрационные анализы. Реальные результаты появятся после интеграции с данными пациента." />
               }
             </div>
           </Card>

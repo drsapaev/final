@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.two_factor_auth import TwoFactorAuth, TwoFactorBackupCode
 from app.models.user import User
@@ -148,6 +149,55 @@ def cashier_user_with_2fa(db_session: Session, cashier_user_without_2fa: User) -
 
 class Test2FAEnforcement:
     """Тесты принудительного 2FA для критичных ролей"""
+
+    def test_fallback_login_paths_are_disabled_by_default(self, client: TestClient):
+        """Legacy/fallback login routes must not issue tokens in default settings."""
+        assert settings.ENABLE_FALLBACK_AUTH is False
+
+        checks = [
+            (
+                "/api/v1/auth/minimal-login",
+                {"json": {"username": "unused_user", "password": "unused_password"}},
+            ),
+            (
+                "/api/v1/auth/simple-login",
+                {"json": {"username": "unused_user", "password": "unused_password"}},
+            ),
+            (
+                "/api/v1/auth/json-login",
+                {"json": {"username": "unused_user", "password": "unused_password"}},
+            ),
+            (
+                "/api/v1/auth/login",
+                {"data": {"username": "unused_user", "password": "unused_password"}},
+            ),
+        ]
+
+        for path, kwargs in checks:
+            response = client.post(path, **kwargs)
+            assert response.status_code == 404
+            assert "access_token" not in response.text
+
+    def test_canonical_login_does_not_issue_access_token_before_otp(
+        self, client: TestClient, admin_user_with_2fa: tuple[User, str]
+    ):
+        """The 2FA-aware login step returns only a pending 2FA token before OTP."""
+        admin_user, _secret = admin_user_with_2fa
+
+        response = client.post(
+            "/api/v1/authentication/login",
+            json={
+                "username": admin_user.username,
+                "password": "admin123",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("requires_2fa") is True
+        assert data.get("pending_2fa_token")
+        assert data.get("access_token") is None
+        assert data.get("refresh_token") is None
 
     def test_admin_cannot_login_without_2fa(
         self, client: TestClient, admin_user_without_2fa: User
