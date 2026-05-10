@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import logging
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -11,6 +12,8 @@ from app.models.online import (
     OnlineDay,  # type: ignore[attr-defined]  # DEPRECATED: use DailyQueue instead
 )
 from app.models.setting import Setting  # type: ignore[attr-defined]
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # DEPRECATED SERVICE: Legacy department-based queue system
@@ -191,28 +194,34 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
         },
     }
     # room format должен совпадать с ws/queue_ws.py
-    print(f"🔔 Broadcasting to room: {dep}::{d}")
-    print(f"🔔 Payload: {payload}")
+    logger.info(
+        "Queue broadcast requested department=%s date=%s waiting=%s serving=%s done=%s",
+        dep,
+        d,
+        stats.waiting,
+        stats.serving,
+        stats.done,
+    )
 
     mgr = _ws_manager()
     if mgr:
         try:
-            print(f"🔔 WSManager получен: {type(mgr)}")
-            print(f"🔔 Комнаты в WSManager: {list(mgr.rooms.keys())}")
-            print(f"🔔 Целевая комната: {dep}::{d}")
+            room_count = len(getattr(mgr, "rooms", {}) or {})
+            logger.debug("Queue WS manager available room_count=%s", room_count)
 
             # broadcast - синхронная функция, не нужно create_task
             mgr.broadcast(f"{dep}::{d}", payload)
-            print("🔔 Broadcast sent successfully")
+            logger.debug("Queue broadcast sent")
         except Exception as e:
-            print(f"❌ Broadcast error: {e}")
-            import traceback
-
-            traceback.print_exc()
+            logger.warning(
+                "Queue broadcast failed (%s)",
+                type(e).__name__,
+                exc_info=True,
+            )
             # не роняем транзакции/запрос, если рассылка не удалась
             pass
     else:
-        print("⚠️ WSManager not available for broadcast")
+        logger.debug("Queue WS manager unavailable; broadcast skipped")
 
 
 def issue_next_ticket(
