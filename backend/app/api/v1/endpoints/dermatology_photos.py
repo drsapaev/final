@@ -3,6 +3,7 @@ API endpoints для работы с фото в дерматологии
 Основа: passport.md стр. 1789-2063
 """
 
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -19,6 +20,7 @@ from app.models.dermatology_photos import DermatologyPhoto
 from app.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Настройки для загрузки фото
 UPLOAD_DIR = "uploads/dermatology"
@@ -83,8 +85,11 @@ async def upload_photos(
                 with Image.open(file_path) as img:
                     img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
                     img.save(thumbnail_path, "JPEG", quality=85)
-            except Exception as e:
-                print(f"Ошибка создания миниатюры: {e}")
+            except Exception as exc:
+                logger.warning(
+                    "Dermatology photo thumbnail generation failed error_type=%s",
+                    type(exc).__name__,
+                )
                 thumbnail_path = None
 
             # Сохраняем в БД
