@@ -1,11 +1,21 @@
 import { test, expect } from '@playwright/test';
 
+const DOCTOR_USERNAME = process.env.QA_DOCTOR_USERNAME || 'doctor@clinic.com';
+
+function requiredDoctorPassword() {
+  const password = process.env.QA_DOCTOR_PASSWORD;
+  if (!password) {
+    throw new Error('Set QA_DOCTOR_PASSWORD to run print system e2e tests.');
+  }
+  return password;
+}
+
 test.describe('Print System Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Логинимся как врач
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'doctor@clinic.com');
-    await page.fill('input[type="password"]', 'doctor123');
+    await page.fill('input[type="text"]', DOCTOR_USERNAME);
+    await page.fill('input[type="password"]', requiredDoctorPassword());
     await page.click('button[type="submit"]');
     
     // Ждем загрузки панели врача
