@@ -1,6 +1,7 @@
 """
 Упрощенный endpoint авторизации без сложных зависимостей
 """
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.repositories.simple_auth_api_repository import SimpleAuthApiRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 
@@ -45,7 +47,15 @@ async def simple_login(
     Упрощенный вход в систему без сложных зависимостей
     """
     try:
-        print(f"DEBUG: Simple login called with username={request_data.username}")
+        logger.debug(
+            "Simple fallback login requested",
+            extra={
+                "login_identifier_kind": (
+                    "email" if "@" in request_data.username else "username"
+                ),
+                "remember_me": bool(request_data.remember_me),
+            },
+        )
 
         # Ищем пользователя по username или email
         user = _repo(db).query(User).filter(
@@ -54,27 +64,37 @@ async def simple_login(
         ).first()
 
         if not user:
-            print(f"DEBUG: User not found for username={request_data.username}")
+            logger.info(
+                "Simple fallback login rejected",
+                extra={"reason": "user_not_found"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные"
             )
 
-        print(f"DEBUG: User found: ID={user.id}, Username={user.username}, IsActive={user.is_active}")
+        logger.debug(
+            "Simple fallback login user loaded",
+            extra={"is_active": bool(user.is_active), "role": user.role},
+        )
 
         if not user.is_active:
-            print(f"DEBUG: User is inactive")
+            logger.info(
+                "Simple fallback login rejected",
+                extra={"reason": "inactive_user", "role": user.role},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Пользователь деактивирован"
             )
 
-        print(f"DEBUG: Verifying password...")
         password_valid = verify_password(request_data.password, user.hashed_password)
-        print(f"DEBUG: Password verification result: {password_valid}")
 
         if not password_valid:
-            print(f"DEBUG: Invalid password")
+            logger.info(
+                "Simple fallback login rejected",
+                extra={"reason": "invalid_password", "role": user.role},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные"
@@ -89,7 +109,10 @@ async def simple_login(
 
         expires_in = int(expires_delta.total_seconds())
 
-        print(f"DEBUG: Token created successfully, expires in {expires_in} seconds")
+        logger.info(
+            "Simple fallback login succeeded",
+            extra={"role": user.role, "expires_in": expires_in},
+        )
 
         # Формируем данные пользователя
         user_data = {
@@ -102,8 +125,6 @@ async def simple_login(
             "is_superuser": user.is_superuser
         }
 
-        print(f"DEBUG: Successful authentication for user {user.username}")
-
         return SimpleLoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -114,12 +135,14 @@ async def simple_login(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"DEBUG: Exception in simple login: {e}")
-        import traceback
-        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        logger.error(
+            "Simple fallback login failed",
+            extra={"exception_type": type(e).__name__},
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}"
+            detail="Ошибка входа"
         )
 
 
