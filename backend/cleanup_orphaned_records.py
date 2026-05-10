@@ -5,6 +5,7 @@
 import os
 import sys
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 # Add backend to sys.path
@@ -12,21 +13,43 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app.core.config import get_settings
 
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.lower().startswith(("sqlite://", "sqlite+"))
+
+
+def _safe_database_url_for_log(url: str) -> str:
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<invalid database url>"
+
+
 def get_db_url():
     try:
         settings = get_settings()
-        return settings.DATABASE_URL
-    except Exception:
-        return "sqlite:///./clinic.db"
+    except Exception as exc:
+        raise RuntimeError(
+            "DATABASE_URL must be configured before orphan cleanup."
+        ) from exc
+
+    db_url = str(getattr(settings, "DATABASE_URL", "") or "").strip()
+    if not db_url:
+        raise RuntimeError("DATABASE_URL must be configured before orphan cleanup.")
+    if _is_sqlite_url(db_url):
+        raise RuntimeError(
+            "SQLite DATABASE_URL is disabled for orphan cleanup. "
+            "Use PostgreSQL as the database source of truth; use explicit "
+            "legacy migration/recovery tools for SQLite snapshots."
+        )
+    return db_url
 
 DATABASE_URL = get_db_url()
-if DATABASE_URL.startswith("sqlite+aiosqlite://"):
-    DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
 print("=" * 80)
 print("CLEANUP ORPHANED RECORDS")
 print("=" * 80)
-print(f"Database URL: {DATABASE_URL}\n")
+print(f"Database URL: {_safe_database_url_for_log(DATABASE_URL)}\n")
 
 # Orphaned records cleanup strategies
 CLEANUP_STRATEGIES = {
@@ -235,12 +258,7 @@ def verify_cleanup(engine):
 
 def main():
     engine = create_engine(DATABASE_URL, future=True)
-    
-    # Ensure FK enforcement is enabled
-    with engine.connect() as conn:
-        conn.execute(text("PRAGMA foreign_keys=ON"))
-        conn.commit()
-    
+
     # Cleanup orphaned records
     cleanup_orphaned_records(engine)
     

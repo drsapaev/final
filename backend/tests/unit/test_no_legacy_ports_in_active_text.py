@@ -391,3 +391,16 @@ def test_diagnose_ci_uses_only_isolated_temporary_sqlite():
     assert "ALLOW_SQLITE_DATABASE_URL" in content
     assert "CONFIRM_DIAGNOSE_CI_TEMP_SQLITE" in content
     assert "clinic.db" not in content
+
+
+def test_orphan_cleanup_requires_postgres_without_sqlite_fallback():
+    repo_root = Path(__file__).resolve().parents[3]
+    content = (repo_root / "backend/cleanup_orphaned_records.py").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+
+    assert "DATABASE_URL must be configured before orphan cleanup." in content
+    assert "SQLite DATABASE_URL is disabled for orphan cleanup." in content
+    assert "sqlite:///./clinic.db" not in content
+    assert "clinic.db" not in content
+    assert "PRAGMA foreign_keys=ON" not in content
