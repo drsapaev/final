@@ -9,6 +9,7 @@ import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
+import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
@@ -142,7 +143,7 @@ function AppShell({ children }) {
   return (
     <div className="app-shell" style={macOSWrapStyle} data-route-id={chrome.route?.id || 'unknown'}>
       {!chrome.hideHeader && (
-        <div style={{ padding: '12px', backgroundColor: 'transparent', width: '100vw' }}>
+        <div style={{ padding: '12px', backgroundColor: 'transparent', width: '100%', maxWidth: '100%' }}>
           <HeaderNew />
         </div>
       )}
@@ -155,7 +156,8 @@ function AppShell({ children }) {
           gap: '16px',
           flex: 1,
           minHeight: 0,
-          width: '100vw',
+          width: '100%',
+          maxWidth: '100%',
           overflowX: 'hidden',
           overflowY: 'auto',
           padding: chrome.hideHeader ? '0' : '0 0 16px 0',
