@@ -60,13 +60,13 @@
 // Строки 35-36, 66-67
 const [formData, setFormData] = useState({
   username: 'admin@example.com',  // ❌ КРИТИЧНО
-  password: 'admin123',             // ❌ КРИТИЧНО
+  password: '<hardcoded-password>',  // ❌ КРИТИЧНО
   loginType: 'username'
 });
 
 // Строки 66-67 - используются как fallback
 const username = formData.username || 'admin@example.com';  // ❌
-const password = formData.password || 'admin123';            // ❌
+const password = formData.password || '<hardcoded-password>'; // ❌
 ```
 
 #### Решение
@@ -87,7 +87,7 @@ const [formData, setFormData] = useState({
 ```javascript
 // ❌ УДАЛИТЬ строки 66-67
 // const username = formData.username || 'admin@example.com';
-// const password = formData.password || 'admin123';
+// const password = formData.password || '<hardcoded-password>';
 
 // ✅ ЗАМЕНИТЬ на
 const username = formData.username;
@@ -106,7 +106,7 @@ if (!username || !password) {
 ```javascript
 // .env.development (НЕ коммитить!)
 VITE_DEV_USERNAME=admin@example.com
-VITE_DEV_PASSWORD=admin123
+VITE_DEV_PASSWORD=<set-locally>
 
 // В коде (только для разработки)
 const [formData, setFormData] = useState({

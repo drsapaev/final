@@ -133,7 +133,7 @@ const [username, setUsername] = useState('admin@example.com');
 ```python
 # Созданы пользователи для всех ролей:
 users_to_create = [
-    {"email": "admin@example.com", "password": "admin123", "role": "Admin"},
+    {"email": "admin@example.com", "password": "<redacted-demo-password>", "role": "Admin"},
     {"email": "registrar@example.com", "password": "registrar123", "role": "Registrar"},
     {"email": "lab@example.com", "password": "lab123", "role": "Lab"},
     {"email": "doctor@example.com", "password": "doctor123", "role": "Doctor"},
@@ -149,7 +149,7 @@ users_to_create = [
 ## ✅ РЕЗУЛЬТАТЫ ИСПРАВЛЕНИЯ
 
 ### Тестовые пользователи созданы для всех ролей:
-- **Admin:** `admin@example.com` / `admin123`
+- **Admin:** `admin@example.com` / `[redacted demo password]`
 - **Registrar:** `registrar@example.com` / `registrar123`
 - **Lab:** `lab@example.com` / `lab123`
 - **Doctor:** `doctor@example.com` / `doctor123`

@@ -26,7 +26,7 @@
 
 ### 3. **Аутентификация Admin** ✅ РЕШЕНО (ранее)
 - **Проблема**: Admin не мог войти в систему
-- **Решение**: Обновил пароль на `admin123`
+- **Решение**: Обновил пароль на redacted demo password
 - **Результат**: Admin успешно аутентифицируется
 
 ---
@@ -57,7 +57,7 @@
 ### **Admin пользователь** ✅ РАБОТАЕТ
 ```bash
 # Логин работает
-curl -X POST -d "username=admin&password=admin123&grant_type=password" \
+curl -X POST -d "username=admin&password=<redacted-demo-password>&grant_type=password" \
   http://localhost:18000/api/v1/auth/login
 
 # Возвращает JWT токен
@@ -102,7 +102,7 @@ npm run dev
 
 ### **4. Вход**
 - **Логин**: admin
-- **Пароль**: admin123
+- **Пароль**: [redacted demo password]
 
 ---
 

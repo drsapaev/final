@@ -78,7 +78,7 @@
 
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
-| **Admin** | `admin@example.com` | `admin123` | ✅ Создан |
+| **Admin** | `admin@example.com` | `[redacted demo password]` | ✅ Создан |
 | **Registrar** | `registrar@example.com` | `registrar123` | ✅ Создан |
 | **Lab** | `lab@example.com` | `lab123` | ✅ Создан |
 | **Doctor** | `doctor@example.com` | `doctor123` | ✅ Создан |

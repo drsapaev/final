@@ -94,7 +94,7 @@ npm run dev
 
 ### **Вход в систему:**
 - **Логин**: admin
-- **Пароль**: admin123
+- **Пароль**: [redacted demo password]
 
 ---
 

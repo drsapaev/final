@@ -112,7 +112,7 @@ if (err?.response?.data?.detail) {
 ```javascript
 // ✅ Добавлено:
 const username = formData.username || 'admin@example.com';
-const password = formData.password || 'admin123';
+const password = formData.password || '<redacted-demo-password>';
 
 const credentials = {
   username: username,
@@ -127,7 +127,7 @@ const credentials = {
 
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
-| **Admin** | `admin@example.com` | `admin123` | ✅ |
+| **Admin** | `admin@example.com` | `[redacted demo password]` | ✅ |
 | **Registrar** | `registrar@example.com` | `registrar123` | ✅ |
 | **Lab** | `lab@example.com` | `lab123` | ✅ |
 | **Doctor** | `doctor@example.com` | `doctor123` | ✅ |
