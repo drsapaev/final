@@ -2,6 +2,7 @@
 Минимальный endpoint авторизации без зависимостей от сложных моделей
 """
 
+import logging
 from datetime import timedelta
 from typing import Any
 
@@ -16,6 +17,7 @@ from app.db.session import get_db
 from app.repositories.minimal_auth_api_repository import MinimalAuthApiRepository
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 
@@ -53,7 +55,15 @@ async def minimal_login(
     Минимальный вход в систему без зависимостей от сложных моделей
     """
     try:
-        print(f"DEBUG: Minimal login called with username={request_data.username}")
+        logger.debug(
+            "Minimal fallback login requested",
+            extra={
+                "login_identifier_kind": (
+                    "email" if "@" in request_data.username else "username"
+                ),
+                "remember_me": bool(request_data.remember_me),
+            },
+        )
 
         # Используем прямой SQL запрос для избежания проблем с моделями
         result = _repo(db).execute(
@@ -70,7 +80,10 @@ async def minimal_login(
         user_row = result.fetchone()
 
         if not user_row:
-            print(f"DEBUG: User not found for username={request_data.username}")
+            logger.info(
+                "Minimal fallback login rejected",
+                extra={"reason": "user_not_found"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
@@ -87,23 +100,28 @@ async def minimal_login(
             hashed_password,
         ) = user_row
 
-        print(
-            f"DEBUG: User found: ID={user_id}, Username={username}, IsActive={is_active}"
+        logger.debug(
+            "Minimal fallback login user row loaded",
+            extra={"is_active": bool(is_active), "role": role},
         )
 
         if not is_active:
-            print("DEBUG: User is inactive")
+            logger.info(
+                "Minimal fallback login rejected",
+                extra={"reason": "inactive_user", "role": role},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Пользователь деактивирован",
             )
 
-        print("DEBUG: Verifying password...")
         password_valid = verify_password(request_data.password, hashed_password)
-        print(f"DEBUG: Password verification result: {password_valid}")
 
         if not password_valid:
-            print("DEBUG: Invalid password")
+            logger.info(
+                "Minimal fallback login rejected",
+                extra={"reason": "invalid_password", "role": role},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
@@ -118,7 +136,10 @@ async def minimal_login(
 
         expires_in = int(expires_delta.total_seconds())
 
-        print(f"DEBUG: Token created successfully, expires in {expires_in} seconds")
+        logger.info(
+            "Minimal fallback login succeeded",
+            extra={"role": role, "expires_in": expires_in},
+        )
 
         # Формируем данные пользователя
         user_data = {
@@ -131,8 +152,6 @@ async def minimal_login(
             "is_superuser": is_superuser,
         }
 
-        print(f"DEBUG: Successful authentication for user {username}")
-
         return MinimalLoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -143,11 +162,12 @@ async def minimal_login(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"DEBUG: Exception in minimal login: {e}")
-        import traceback
-
-        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        logger.error(
+            "Minimal fallback login failed",
+            extra={"exception_type": type(e).__name__},
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}",
+            detail="Ошибка входа",
         )
