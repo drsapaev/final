@@ -1,101 +1,94 @@
+import os
+import sys
+
 import requests
-import json
 
-# Токен из логов фронтенда
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc1OTMzMzY1OH0.kSlNwHRz0LzXZ6u4AXfLeY41zuJHXhIFqWtXEd_FLMg"
 
-# Тестовые данные - используем существующего пациента и услугу
-test_data = {
-    "patient_id": 1,  # Существующий пациент
+TOKEN_ENV = "REGISTRAR_API_TOKEN"
+CART_URL = "http://localhost:18000/api/v1/registrar/cart"
+TODAY_QUEUES_URL = "http://localhost:18000/api/v1/registrar/queues/today"
+
+
+TEST_DATA = {
+    "patient_id": 1,
     "visits": [
         {
             "doctor_id": None,
             "services": [
                 {
-                    "service_id": 1,  # Предполагаемая услуга кардиологии
-                    "quantity": 1
+                    "service_id": 1,
+                    "quantity": 1,
                 }
             ],
             "visit_date": "2025-10-01",
             "visit_time": "14:00",
             "department": "cardiology",
-            "notes": None
+            "notes": None,
         }
     ],
     "discount_mode": "none",
     "payment_method": "cash",
     "all_free": False,
-    "notes": None
+    "notes": None,
 }
 
-print("🧪 ТЕСТИРОВАНИЕ СОЗДАНИЯ ЗАПИСИ")
-print("=" * 50)
 
-try:
-    print("📤 Отправляем запрос на создание записи...")
+def _auth_headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
 
-    response = requests.post(
-        'http://localhost:18000/api/v1/registrar/cart',
-        headers={
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        },
-        json=test_data,
-        timeout=10
-    )
 
-    print(f"📊 Статус ответа: {response.status_code}")
-    print(f"⏱️ Время ответа: {response.elapsed.total_seconds():.2f} сек")
+def main() -> int:
+    token = os.environ.get(TOKEN_ENV, "").strip()
+    if not token:
+        print(f"Set {TOKEN_ENV} to a locally generated bearer token before running this smoke script.")
+        return 2
 
-    if response.status_code == 200:
-        data = response.json()
-        print("✅ Запись создана успешно!"        print(f"   Visit IDs: {data.get('visit_ids', [])}")
-        print(f"   Invoice ID: {data.get('invoice_id')}")
-        print(f"   Total amount: {data.get('total_amount')}")
-        print(f"   Message: {data.get('message')}")
-
-        # Проверим, появилась ли запись в API
-        print("\n🔍 Проверяем API после создания...")
-        api_response = requests.get(
-            'http://localhost:18000/api/v1/registrar/queues/today',
-            headers={'Authorization': f'Bearer {token}'},
-            timeout=5
+    try:
+        response = requests.post(
+            CART_URL,
+            headers=_auth_headers(token),
+            json=TEST_DATA,
+            timeout=10,
         )
+    except requests.RequestException as exc:
+        print(f"Cart request failed: {exc}")
+        return 1
 
-        if api_response.status_code == 200:
-            api_data = api_response.json()
-            total_entries = sum(len(q.get('entries', [])) for q in api_data.get('queues', []))
-            print(f"📋 Всего записей в API: {total_entries}")
-            print(f"📋 Очередей: {len(api_data.get('queues', []))}")
+    print(f"Cart response: {response.status_code}")
+    if response.status_code != 200:
+        print(response.text)
+        return 1
 
-            if total_entries > 6:
-                print("✅ НОВАЯ ЗАПИСЬ ПОЯВИЛАСЬ В API!")
-            else:
-                print("❌ Новая запись НЕ появилась в API")
+    data = response.json()
+    print(f"Visit IDs: {data.get('visit_ids', [])}")
+    print(f"Invoice ID: {data.get('invoice_id')}")
+    print(f"Total amount: {data.get('total_amount')}")
 
-        else:
-            print(f"❌ Ошибка проверки API: {api_response.status_code}")
+    try:
+        queues_response = requests.get(
+            TODAY_QUEUES_URL,
+            headers=_auth_headers(token),
+            timeout=5,
+        )
+    except requests.RequestException as exc:
+        print(f"Queue verification request failed: {exc}")
+        return 1
 
-    elif response.status_code == 400:
-        error_data = response.json()
-        print("❌ Ошибка валидации:"        print(f"   Детали: {error_data.get('detail', 'Неизвестная ошибка')}")
+    print(f"Queues response: {queues_response.status_code}")
+    if queues_response.status_code != 200:
+        print(queues_response.text)
+        return 1
 
-    elif response.status_code == 404:
-        print("❌ Ресурс не найден (пациент или услуга)")
+    queues_data = queues_response.json()
+    queues = queues_data.get("queues", [])
+    total_entries = sum(len(queue.get("entries", [])) for queue in queues)
+    print(f"Queues: {len(queues)}")
+    print(f"Total entries: {total_entries}")
+    return 0
 
-    elif response.status_code == 500:
-        print("❌ Внутренняя ошибка сервера")
-        print("Текст ответа:", response.text)
 
-    else:
-        print(f"❌ Неизвестная ошибка: {response.status_code}")
-        print("Текст ответа:", response.text)
-
-except requests.exceptions.Timeout:
-    print("❌ Таймаут запроса (сервер не отвечает)")
-
-except requests.exceptions.ConnectionError:
-    print("❌ Ошибка подключения (сервер недоступен)")
-
-except Exception as e:
-    print(f"❌ Критическая ошибка: {e}")
+if __name__ == "__main__":
+    sys.exit(main())
