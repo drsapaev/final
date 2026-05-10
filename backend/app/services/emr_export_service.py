@@ -4,9 +4,12 @@
 
 import io
 import json
+import logging
 import zipfile
 from datetime import datetime
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class EMRExportService:
@@ -177,8 +180,10 @@ class EMRExportService:
             if 'metadata' in data:
                 format_version = data['metadata'].get('format_version', '1.0')
                 if format_version != '1.0':
-                    print(
-                        f"Предупреждение: Неподдерживаемая версия формата {format_version}"
+                    logger.warning(
+                        "Unsupported EMR import format version encountered "
+                        "format_version_type=%s",
+                        type(format_version).__name__,
                     )
 
             return emr_data
