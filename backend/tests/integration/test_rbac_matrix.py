@@ -23,11 +23,11 @@ from app.core.security import get_password_hash
 # ===================== FIXTURES =====================
 
 @pytest.fixture
-def admin_token(client: TestClient, admin_user: User) -> str:
+def admin_token(client: TestClient, admin_user: User, admin_password: str) -> str:
     """Токен администратора"""
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert response.status_code == 200
     return response.json()["access_token"]
@@ -403,7 +403,13 @@ class TestAuditLog403:
 class TestRegressionRBAC:
     """Smoke-тесты для проверки регрессий"""
 
-    def test_superadmin_bypasses_all_checks(self, client: TestClient, admin_user: User, db_session: Session):
+    def test_superadmin_bypasses_all_checks(
+        self,
+        client: TestClient,
+        admin_user: User,
+        db_session: Session,
+        admin_password: str,
+    ):
         """SuperAdmin обходит все проверки (is_superuser=True)"""
         # Устанавливаем is_superuser=True
         admin_user.is_superuser = True
@@ -412,7 +418,7 @@ class TestRegressionRBAC:
         # Получаем токен
         response = client.post(
             "/api/v1/authentication/login",
-            json={"username": admin_user.username, "password": "admin123"},
+            json={"username": admin_user.username, "password": admin_password},
         )
         assert response.status_code == 200
         token = response.json()["access_token"]

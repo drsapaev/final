@@ -6,10 +6,10 @@ from app.models.clinic import Doctor
 from app.models.patient import Patient
 
 
-def _login_admin(client, admin_user):
+def _login_admin(client, admin_user, admin_password):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -30,6 +30,7 @@ def test_admin_finance_transactions_crud_roundtrip(
     db_session,
     admin_user,
     test_doctor_user,
+    admin_password,
 ):
     patient = Patient(
         first_name="Тест",
@@ -51,7 +52,7 @@ def test_admin_finance_transactions_crud_roundtrip(
     db_session.refresh(patient)
     db_session.refresh(doctor)
 
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
 
     create_response = client.post(
         "/api/v1/admin/finance/transactions",

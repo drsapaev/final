@@ -8,10 +8,10 @@ from app.models.dynamic_pricing import PricingRule, PricingRuleService, ServiceP
 from app.models.service import Service
 
 
-def _login_admin(client, admin_user):
+def _login_admin(client, admin_user, admin_password):
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert login_response.status_code == 200, login_response.text
     return {"Authorization": f"Bearer {login_response.json()['access_token']}"}
@@ -22,6 +22,7 @@ def test_dynamic_pricing_rule_delete_cleans_linked_rows(
     client,
     db_session,
     admin_user,
+    admin_password,
 ):
     service = Service(
         code="DP-DEL-001",
@@ -35,7 +36,7 @@ def test_dynamic_pricing_rule_delete_cleans_linked_rows(
     db_session.commit()
     db_session.refresh(service)
 
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
     create_response = client.post(
         "/api/v1/dynamic-pricing/pricing-rules",
         json={

@@ -25,7 +25,7 @@ def enforce_2fa_requirement(monkeypatch):
 
 
 @pytest.fixture
-def admin_user_without_2fa(db_session: Session) -> User:
+def admin_user_without_2fa(db_session: Session, admin_password: str) -> User:
     """Создает тестового админа БЕЗ настроенной 2FA"""
     # Проверяем, не существует ли уже пользователь
     existing = db_session.query(User).filter(User.username == "test_admin_2fa").first()
@@ -42,7 +42,7 @@ def admin_user_without_2fa(db_session: Session) -> User:
         username="test_admin_2fa",
         email="admin2fa@test.com",
         full_name="Test Admin 2FA",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=get_password_hash(admin_password),
         role="Admin",
         is_active=True,
         is_superuser=False,
@@ -179,7 +179,7 @@ class Test2FAEnforcement:
             assert "access_token" not in response.text
 
     def test_canonical_login_does_not_issue_access_token_before_otp(
-        self, client: TestClient, admin_user_with_2fa: tuple[User, str]
+        self, client: TestClient, admin_user_with_2fa: tuple[User, str], admin_password: str
     ):
         """The 2FA-aware login step returns only a pending 2FA token before OTP."""
         admin_user, _secret = admin_user_with_2fa
@@ -188,7 +188,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user.username,
-                "password": "admin123",
+                "password": admin_password,
             },
         )
 
@@ -200,14 +200,14 @@ class Test2FAEnforcement:
         assert data.get("refresh_token") is None
 
     def test_admin_cannot_login_without_2fa(
-        self, client: TestClient, admin_user_without_2fa: User
+        self, client: TestClient, admin_user_without_2fa: User, admin_password: str
     ):
         """Admin НЕ может войти без настройки 2FA"""
         response = client.post(
             "/api/v1/authentication/login",
             json={
                 "username": admin_user_without_2fa.username,
-                "password": "admin123",
+                "password": admin_password,
             },
         )
 
@@ -240,7 +240,7 @@ class Test2FAEnforcement:
             f"Message should mention 2FA setup requirement. Detail: {detail}"
 
     def test_admin_can_login_with_correct_otp(
-        self, client: TestClient, admin_user_with_2fa: tuple[User, str]
+        self, client: TestClient, admin_user_with_2fa: tuple[User, str], admin_password: str
     ):
         """Admin может войти с правильным OTP после настройки 2FA"""
         admin_user, secret = admin_user_with_2fa
@@ -254,7 +254,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user.username,
-                "password": "admin123",
+                "password": admin_password,
             },
         )
         assert login_response.status_code == 200
@@ -280,7 +280,7 @@ class Test2FAEnforcement:
         assert "access_token" in verify_data, "access_token should be returned after 2FA verification"
 
     def test_admin_cannot_login_with_incorrect_otp(
-        self, client: TestClient, admin_user_with_2fa: tuple[User, str]
+        self, client: TestClient, admin_user_with_2fa: tuple[User, str], admin_password: str
     ):
         """Admin НЕ может войти с неправильным OTP"""
         admin_user, secret = admin_user_with_2fa
@@ -290,7 +290,7 @@ class Test2FAEnforcement:
             "/api/v1/authentication/login",
             json={
                 "username": admin_user.username,
-                "password": "admin123",
+                "password": admin_password,
             },
         )
         assert login_response.status_code == 200

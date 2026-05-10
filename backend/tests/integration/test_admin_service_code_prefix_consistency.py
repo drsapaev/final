@@ -4,10 +4,10 @@ from app.models.clinic import ServiceCategory
 from app.models.service import Service
 
 
-def _login_admin(client, admin_user):
+def _login_admin(client, admin_user, admin_password):
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert login_response.status_code == 200, login_response.text
     return {"Authorization": f"Bearer {login_response.json()['access_token']}"}
@@ -18,6 +18,7 @@ def test_service_create_rejects_prefix_mismatch_for_selected_category(
     client,
     db_session,
     admin_user,
+    admin_password,
 ):
     lab_category = ServiceCategory(
         code="adm-06-lab-prefix",
@@ -29,7 +30,7 @@ def test_service_create_rejects_prefix_mismatch_for_selected_category(
     db_session.commit()
     db_session.refresh(lab_category)
 
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
     response = client.post(
         "/api/v1/services",
         json={
@@ -58,6 +59,7 @@ def test_service_create_accepts_allowed_prefixes_for_procedures(
     client,
     db_session,
     admin_user,
+    admin_password,
 ):
     procedures_category = ServiceCategory(
         code="adm-06-proc-prefix",
@@ -69,7 +71,7 @@ def test_service_create_accepts_allowed_prefixes_for_procedures(
     db_session.commit()
     db_session.refresh(procedures_category)
 
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
     response = client.post(
         "/api/v1/services",
         json={
