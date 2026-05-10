@@ -3,13 +3,21 @@
 """
 import requests
 import json
+import os
 
 BASE_URL = "http://localhost:18000"
 
+
+def required_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Set {name} to run backend cart debug helper scripts.")
+    return value
+
 # Получаем токен
 login_data = {
-    "username": "registrar@example.com",
-    "password": "registrar123"
+    "username": os.getenv("QA_REGISTRAR_USERNAME", "registrar@example.com"),
+    "password": required_env("QA_REGISTRAR_PASSWORD")
 }
 
 print("🔐 Авторизация...")

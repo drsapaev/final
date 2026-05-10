@@ -7,9 +7,17 @@
 import asyncio
 import aiohttp
 import json
+import os
 import time
 from datetime import datetime
 from typing import Dict, Any, List
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Set {name} to run backend integration helper scripts.")
+    return value
 
 class APIIntegrationTester:
     def __init__(self, base_url: str = "http://localhost:18000"):
@@ -87,8 +95,8 @@ class APIIntegrationTester:
         
         # Пробуем создать тестового пользователя
         test_user = {
-            "email": "test@example.com",
-            "password": "testpassword123",
+            "email": os.getenv("QA_INTEGRATION_TEST_EMAIL", "test@example.com"),
+            "password": required_env("QA_INTEGRATION_TEST_PASSWORD"),
             "full_name": "Test User"
         }
         

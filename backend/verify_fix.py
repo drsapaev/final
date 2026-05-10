@@ -3,9 +3,17 @@ Comprehensive verification script
 """
 import requests
 import json
+import os
 import sys
 
 BASE_URL = "http://localhost:18000"
+
+
+def required_registrar_password():
+    password = os.getenv("QA_REGISTRAR_PASSWORD")
+    if not password:
+        raise RuntimeError("Set QA_REGISTRAR_PASSWORD to run backend verification helper scripts.")
+    return password
 
 def check_backend_restart():
     print("🔍 Checking if backend was restarted...")
@@ -28,7 +36,10 @@ def test_cart_creation():
         # Login
         response = requests.post(
             f"{BASE_URL}/api/v1/auth/login",
-            data={"username": "registrar@example.com", "password": "registrar123"}
+            data={
+                "username": os.getenv("QA_REGISTRAR_USERNAME", "registrar@example.com"),
+                "password": required_registrar_password()
+            }
         )
         if response.status_code != 200:
             print(f"❌ Login failed: {response.status_code}")
