@@ -4,6 +4,7 @@ Endpoint для загрузки файлов через JSON
 
 import base64
 import hashlib
+import logging
 import os
 from datetime import datetime
 
@@ -16,6 +17,7 @@ from app.db.session import get_db
 from app.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class FileUploadRequest(BaseModel):
@@ -33,19 +35,27 @@ async def upload_file_json(
 ):
     """Загрузка файла через JSON (base64)"""
     try:
-        print(f"📁 Получен файл: {request.filename}")
-        print(f"👤 Пользователь: {current_user.username}")
+        logger.info(
+            "JSON file upload requested role=%s has_title=%s has_description=%s",
+            getattr(current_user, "role", None),
+            bool(request.title),
+            bool(request.description),
+        )
 
         # Декодируем содержимое файла
         try:
             content = base64.b64decode(request.content)
         except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Ошибка декодирования base64: {e}"
+            logger.warning(
+                "JSON file upload rejected during base64 decode (%s)",
+                type(e).__name__,
             )
+            raise HTTPException(
+                status_code=400, detail="Ошибка декодирования base64"
+            ) from e
 
         file_size = len(content)
-        print(f"📊 Размер файла: {file_size} байт")
+        logger.info("JSON file upload decoded size_bytes=%s", file_size)
 
         # Создаем хеш файла
         file_hash = hashlib.sha256(content).hexdigest()
@@ -61,7 +71,10 @@ async def upload_file_json(
         with open(file_path, "wb") as f:
             f.write(content)
 
-        print(f"✅ Файл сохранен: {file_path}")
+        logger.info(
+            "JSON file upload saved storage=local_uploads size_bytes=%s",
+            file_size,
+        )
 
         return {
             "success": True,
@@ -78,5 +91,9 @@ async def upload_file_json(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Ошибка загрузки: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки файла: {str(e)}")
+        logger.error(
+            "JSON file upload failed (%s)",
+            type(e).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Ошибка загрузки файла") from e
