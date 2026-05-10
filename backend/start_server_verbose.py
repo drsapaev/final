@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import uvicorn
+from sqlalchemy.engine import make_url
 
 # Настраиваем логирование ДО импорта приложения
 logging.basicConfig(
@@ -27,24 +28,38 @@ for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error", "fastapi", "cl
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Устанавливаем правильные переменные окружения
-os.environ["DATABASE_URL"] = "sqlite:///./clinic.db"
 os.environ["PYTHONPATH"] = current_dir
 
 # Добавляем путь к проекту
 sys.path.insert(0, current_dir)
 
+
+def require_database_url() -> str:
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is required; refusing to start the backend with a fallback database"
+        )
+    return database_url
+
+
+def display_database_url(database_url: str) -> str:
+    return make_url(database_url).render_as_string(hide_password=True)
+
+
 if __name__ == "__main__":
     PORT = int(os.environ.get("BACKEND_PORT", "18000"))
+    DATABASE_URL = require_database_url()
 
     print("=" * 80)
     print("🚀 ЗАПУСК СЕРВЕРА С ПОЛНЫМ ЛОГИРОВАНИЕМ")
     print("=" * 80)
     print(f"📁 Рабочая директория: {os.getcwd()}")
-    print(f"🗄️ База данных: {os.environ['DATABASE_URL']}")
+    print(f"🗄️ База данных: {display_database_url(DATABASE_URL)}")
     print(f"🐍 Python path: {os.environ['PYTHONPATH']}")
     print(f"🌐 Порт: {PORT}")
     print("=" * 80)
-    
+
     # Конфигурация uvicorn с МАКСИМАЛЬНЫМ логированием
     uvicorn.run(
         "app.main:app",
