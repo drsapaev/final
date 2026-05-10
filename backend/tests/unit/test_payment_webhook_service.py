@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -66,3 +66,74 @@ class TestPaymentWebhookService:
         assert summary["transactions"]["total"] == 20
         assert summary["transactions"]["successful"] == 2
         assert summary["transactions"]["failed"] == 1
+
+    @pytest.mark.parametrize(
+        ("account", "expected_appointment_id", "expected_visit_id"),
+        [
+            ({"appointment_id": "123"}, 123, None),
+            ({"order_id": "456"}, 456, None),
+            ({"visit_id": "789"}, None, 789),
+        ],
+    )
+    def test_payme_webhook_extracts_dict_account_targets(
+        self,
+        db_session,
+        account,
+        expected_appointment_id,
+        expected_visit_id,
+    ):
+        webhook = SimpleNamespace(id=99)
+        repository = SimpleNamespace(
+            get_provider_by_code=Mock(return_value=SimpleNamespace(secret_key="secret")),
+            get_webhook_by_webhook_id=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            create_transaction=Mock(return_value=SimpleNamespace(id=100)),
+            update_webhook=Mock(return_value=webhook),
+        )
+        data = {
+            "id": "payme-tx-1",
+            "state": 2,
+            "amount": 250000,
+            "account": account,
+        }
+
+        with (
+            patch(
+                "app.services.payment_webhook.PaymentWebhookProcessingRepository",
+                return_value=repository,
+            ),
+            patch.object(
+                PaymentWebhookService, "verify_payme_signature", return_value=True
+            ),
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_appointment",
+                return_value=(True, "appointment paid"),
+            ) as process_appointment,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_existing_visit",
+                return_value=(True, "visit paid"),
+            ) as process_visit,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.create_appointment_from_payment",
+                return_value=(True, "created", 501),
+            ) as create_appointment,
+        ):
+            success, message, result_webhook = PaymentWebhookService.process_payme_webhook(
+                db_session, data, "signature"
+            )
+
+        assert success is True
+        assert message == "Webhook processed successfully"
+        assert result_webhook is webhook
+        create_appointment.assert_not_called()
+
+        if expected_appointment_id is not None:
+            process_appointment.assert_called_once_with(
+                db_session, expected_appointment_id, webhook
+            )
+            process_visit.assert_not_called()
+        else:
+            process_visit.assert_called_once_with(
+                db_session, expected_visit_id, webhook
+            )
+            process_appointment.assert_not_called()
