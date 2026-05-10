@@ -1,8 +1,12 @@
+import os
+import sys
 import requests
 import json
 
-# Токен из логов
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc1OTMzMzY1OH0.kSlNwHRz0LzXZ6u4AXfLeY41zuJHXhIFqWtXEd_FLMg"
+token = os.environ.get("REGISTRAR_API_TOKEN")
+if not token:
+    print("Set REGISTRAR_API_TOKEN to a locally generated bearer token before running this smoke script.")
+    sys.exit(2)
 
 # Тестовые данные для создания записи
 test_data = {
@@ -44,11 +48,13 @@ try:
 
     if response.status_code == 200:
         data = response.json()
-        print("✅ Запись создана успешно!"        print(f"   Visit IDs: {data.get('visit_ids', [])}")
+        print("✅ Запись создана успешно!")
+        print(f"   Visit IDs: {data.get('visit_ids', [])}")
         print(f"   Invoice ID: {data.get('invoice_id')}")
         print(f"   Total amount: {data.get('total_amount')}")
     else:
-        print("❌ Ошибка создания записи:"        print(f"   Статус: {response.status_code}")
+        print("❌ Ошибка создания записи:")
+        print(f"   Статус: {response.status_code}")
         try:
             error_data = response.json()
             print(f"   Детали: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
