@@ -1,8 +1,11 @@
-import requests
-import json
+import os
+import sys
 
-# Токен из логов
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc1OTMzMzY1OH0.kSlNwHRz0LzXZ6u4AXfLeY41zuJHXhIFqWtXEd_FLMg"
+import requests
+token = os.environ.get("REGISTRAR_API_TOKEN")
+if not token:
+    print("Set REGISTRAR_API_TOKEN to a locally generated bearer token before running this smoke script.")
+    sys.exit(2)
 
 try:
     response = requests.get(
