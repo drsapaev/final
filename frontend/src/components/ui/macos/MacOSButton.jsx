@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import PropTypes from 'prop-types';
+
 const MacOSButton = ({
   children,
   variant = 'default',
@@ -9,11 +11,15 @@ const MacOSButton = ({
   type = 'button',
   className = '',
   style = {},
-  startIcon, // Destructure to prevent passing to DOM (not implemented yet)
-  endIcon,   // Destructure to prevent passing to DOM (not implemented yet)
+  startIcon,
+  endIcon,
   ...props
 }) => {
-  // Размеры кнопок
+  const [isHovered, setIsHovered] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Button sizes
   const sizeStyles = {
     sm: {
       padding: '6px 12px',
@@ -35,17 +41,17 @@ const MacOSButton = ({
     }
   };
 
-  // Варианты кнопок
+  // Button variants
   const variantStyles = {
     default: {
       backgroundColor: 'var(--mac-bg-secondary)',
       color: 'var(--mac-text-primary)',
       border: '1px solid var(--mac-border)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-bg-tertiary)',
         borderColor: 'var(--mac-border-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-bg-quaternary)',
         transform: 'translateY(1px)'
       }
@@ -54,11 +60,11 @@ const MacOSButton = ({
       backgroundColor: 'var(--mac-accent-blue)',
       color: 'var(--mac-text-on-accent)',
       border: '1px solid var(--mac-accent-blue)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-accent-blue-hover)',
         borderColor: 'var(--mac-accent-blue-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-accent-blue-active)',
         transform: 'translateY(1px)'
       }
@@ -67,11 +73,11 @@ const MacOSButton = ({
       backgroundColor: 'var(--mac-bg-primary)',
       color: 'var(--mac-text-primary)',
       border: '1px solid var(--mac-border)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-bg-secondary)',
         borderColor: 'var(--mac-border-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-bg-tertiary)',
         transform: 'translateY(1px)'
       }
@@ -80,11 +86,11 @@ const MacOSButton = ({
       backgroundColor: 'transparent',
       color: 'var(--mac-text-primary)',
       border: '1px solid var(--mac-border)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-bg-secondary)',
         borderColor: 'var(--mac-border-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-bg-tertiary)',
         transform: 'translateY(1px)'
       }
@@ -93,10 +99,10 @@ const MacOSButton = ({
       backgroundColor: 'transparent',
       color: 'var(--mac-text-primary)',
       border: 'none',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-bg-secondary)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-bg-tertiary)',
         transform: 'translateY(1px)'
       }
@@ -105,11 +111,11 @@ const MacOSButton = ({
       backgroundColor: 'var(--mac-error)',
       color: 'var(--mac-text-on-error)',
       border: '1px solid var(--mac-error)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-error-hover)',
         borderColor: 'var(--mac-error-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-error-active)',
         transform: 'translateY(1px)'
       }
@@ -118,16 +124,19 @@ const MacOSButton = ({
       backgroundColor: 'var(--mac-success)',
       color: 'var(--mac-text-on-success)',
       border: '1px solid var(--mac-success)',
-      '&:hover': {
+      hover: {
         backgroundColor: 'var(--mac-success-hover)',
         borderColor: 'var(--mac-success-hover)'
       },
-      '&:active': {
+      active: {
         backgroundColor: 'var(--mac-success-active)',
         transform: 'translateY(1px)'
       }
     }
   };
+
+  const currentVariant = variantStyles[variant] || variantStyles.default;
+  const currentSize = sizeStyles[size] || sizeStyles.md;
 
   const baseStyles = {
     display: 'inline-flex',
@@ -142,9 +151,28 @@ const MacOSButton = ({
     opacity: disabled ? 0.6 : 1,
     position: 'relative',
     overflow: 'hidden',
-    ...sizeStyles[size],
-    ...variantStyles[variant]
+    backgroundColor: currentVariant.backgroundColor,
+    color: currentVariant.color,
+    border: currentVariant.border,
+    ...currentSize
   };
+
+  let dynamicStyles = { ...baseStyles };
+
+  if (!disabled && !loading) {
+    if (isActive) {
+      dynamicStyles = { ...dynamicStyles, ...currentVariant.active };
+    } else if (isHovered) {
+      dynamicStyles = { ...dynamicStyles, ...currentVariant.hover };
+    }
+
+    if (isFocused) {
+      dynamicStyles.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.3)';
+      if (!isHovered && !isActive && currentVariant.hover) {
+        dynamicStyles = { ...dynamicStyles, ...currentVariant.hover };
+      }
+    }
+  }
 
   const handleClick = (e) => {
     if (disabled || loading) {
@@ -152,50 +180,31 @@ const MacOSButton = ({
       e.stopPropagation();
       return;
     }
-    // Для кнопок типа submit не вызываем onClick, чтобы форма могла обработать submit
     if (onClick && type !== 'submit') {
       onClick(e);
     }
   };
 
-  const handleMouseEnter = (e) => {
-    if (disabled || loading) return;
-    const hoverStyles = variantStyles[variant]['&:hover'];
-    if (hoverStyles) {
-      Object.keys(hoverStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = hoverStyles[key];
-      });
+  const handleMouseEnter = () => !disabled && !loading && setIsHovered(true);
+  const handleMouseLeave = () => {
+    if (!disabled && !loading) {
+      setIsHovered(false);
+      setIsActive(false);
     }
   };
-
-  const handleMouseLeave = (e) => {
-    if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
-    Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
-    });
-  };
-
-  const handleMouseDown = (e) => {
-    if (disabled || loading) return;
-    const activeStyles = variantStyles[variant]['&:active'];
-    if (activeStyles) {
-      Object.keys(activeStyles).forEach(key => {
-        if (key.startsWith('&:')) return;
-        e.target.style[key] = activeStyles[key];
-      });
+  const handleMouseDown = () => !disabled && !loading && setIsActive(true);
+  const handleMouseUp = () => !disabled && !loading && setIsActive(false);
+  const handleFocus = (e) => {
+    if (!disabled && !loading) {
+      setIsFocused(true);
+      if (props.onFocus) props.onFocus(e);
     }
   };
-
-  const handleMouseUp = (e) => {
-    if (disabled || loading) return;
-    const baseVariantStyles = variantStyles[variant];
-    Object.keys(baseVariantStyles).forEach(key => {
-      if (key.startsWith('&:')) return;
-      e.target.style[key] = baseVariantStyles[key];
-    });
+  const handleBlur = (e) => {
+    if (!disabled && !loading) {
+      setIsFocused(false);
+      if (props.onBlur) props.onBlur(e);
+    }
   };
 
   return (
@@ -203,17 +212,19 @@ const MacOSButton = ({
       type={type}
       className={className}
       style={{
-        ...baseStyles,
+        ...dynamicStyles,
         ...style
       }}
+      {...props}
       disabled={disabled || loading}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       aria-busy={loading}
-      {...props}
     >
       {loading && (
         <div
@@ -240,7 +251,6 @@ const MacOSButton = ({
   );
 };
 
-
 MacOSButton.propTypes = {
   ...(MacOSButton.propTypes || {}),
   children: PropTypes.any,
@@ -254,6 +264,8 @@ MacOSButton.propTypes = {
   style: PropTypes.any,
   type: PropTypes.any,
   variant: PropTypes.any,
+  onFocus: PropTypes.any,
+  onBlur: PropTypes.any,
 };
 
 export default MacOSButton;
