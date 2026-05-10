@@ -1,4 +1,5 @@
 # app/services/visit_payment_integration.py
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,8 @@ from app.repositories.visit_payment_integration_repository import (
     VisitPaymentIntegrationRepository,
 )
 from app.schemas.payment_webhook import PaymentWebhookOut
+
+logger = logging.getLogger(__name__)
 
 
 class VisitPaymentIntegrationService:
@@ -70,7 +73,13 @@ class VisitPaymentIntegrationService:
 
         except Exception as e:
             db.rollback()
-            return False, f"Ошибка создания визита: {str(e)}", None
+            logger.warning(
+                "Visit creation from payment failed webhook_id=%s provider=%s error_type=%s",
+                getattr(webhook, "id", None),
+                getattr(webhook, "provider", None),
+                type(e).__name__,
+            )
+            return False, "Ошибка создания визита", None
 
     @staticmethod
     def update_visit_payment_status(
@@ -135,7 +144,13 @@ class VisitPaymentIntegrationService:
 
         except Exception as e:
             db.rollback()
-            return False, f"Ошибка обновления статуса платежа: {str(e)}"
+            logger.warning(
+                "Visit payment status update failed visit_id=%s payment_status=%s error_type=%s",
+                visit_id,
+                payment_status,
+                type(e).__name__,
+            )
+            return False, "Ошибка обновления статуса платежа"
 
     @staticmethod
     def get_visit_payment_info(
@@ -171,7 +186,12 @@ class VisitPaymentIntegrationService:
             return True, "Информация о платеже получена", payment_info
 
         except Exception as e:
-            return False, f"Ошибка получения информации о платеже: {str(e)}", None
+            logger.warning(
+                "Visit payment info lookup failed visit_id=%s error_type=%s",
+                visit_id,
+                type(e).__name__,
+            )
+            return False, "Ошибка получения информации о платеже", None
 
     @staticmethod
     def process_payment_for_existing_visit(
@@ -209,7 +229,11 @@ class VisitPaymentIntegrationService:
             )
 
             if appointment_updated:
-                print(f"✅ Статус записи обновлён на 'paid' для визита {visit_id}")
+                logger.info(
+                    "Related appointment status updated after visit payment visit_id=%s status=%s",
+                    visit_id,
+                    AppointmentStatus.PAID.value,
+                )
 
             # Обновляем статус вебхука
             repo.update_webhook_status(webhook_id=webhook.id, status="visit_updated")
@@ -217,7 +241,13 @@ class VisitPaymentIntegrationService:
             return True, f"Платёж для визита {visit_id} обработан успешно"
 
         except Exception as e:
-            return False, f"Ошибка обработки платежа: {str(e)}"
+            logger.warning(
+                "Existing visit payment processing failed visit_id=%s webhook_id=%s error_type=%s",
+                visit_id,
+                getattr(webhook, "id", None),
+                type(e).__name__,
+            )
+            return False, "Ошибка обработки платежа"
 
     @staticmethod
     def get_visits_by_payment_status(
@@ -255,7 +285,12 @@ class VisitPaymentIntegrationService:
             )
 
         except Exception as e:
-            return False, f"Ошибка получения визитов: {str(e)}", []
+            logger.warning(
+                "Visit payment status listing failed payment_status=%s error_type=%s",
+                payment_status,
+                type(e).__name__,
+            )
+            return False, "Ошибка получения визитов", []
 
     @staticmethod
     def update_related_appointment_status(
@@ -286,7 +321,11 @@ class VisitPaymentIntegrationService:
             return False
 
         except Exception as e:
-            print(f"⚠️ Ошибка обновления статуса записи: {e}")
+            logger.warning(
+                "Related appointment status update failed visit_id=%s error_type=%s",
+                visit_id,
+                type(e).__name__,
+            )
             return False
 
     @staticmethod
@@ -346,7 +385,13 @@ class VisitPaymentIntegrationService:
 
         except Exception as e:
             db.rollback()
-            return False, f"Ошибка создания записи: {str(e)}", None
+            logger.warning(
+                "Appointment creation from payment failed webhook_id=%s provider=%s error_type=%s",
+                getattr(webhook, "id", None),
+                getattr(webhook, "provider", None),
+                type(e).__name__,
+            )
+            return False, "Ошибка создания записи", None
 
     @staticmethod
     def process_payment_for_appointment(
@@ -400,4 +445,10 @@ class VisitPaymentIntegrationService:
             return True, f"Платёж для записи {appointment_id} обработан успешно"
 
         except Exception as e:
-            return False, f"Ошибка обработки платежа для записи: {str(e)}"
+            logger.warning(
+                "Appointment payment processing failed appointment_id=%s webhook_id=%s error_type=%s",
+                appointment_id,
+                getattr(webhook, "id", None),
+                type(e).__name__,
+            )
+            return False, "Ошибка обработки платежа для записи"
