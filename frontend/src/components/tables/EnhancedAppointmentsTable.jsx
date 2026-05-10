@@ -2094,7 +2094,8 @@ const EnhancedAppointmentsTable = ({
                           cursor: 'pointer',
                           pointerEvents: 'auto'
                         }}
-                        title="Печать">
+                        title="Печать"
+                        aria-label="Печать">
 
                             <FileText size={14} />
                           </button>
@@ -2169,7 +2170,8 @@ const EnhancedAppointmentsTable = ({
                           position: 'relative',
                           zIndex: 101
                         }}
-                        title="Просмотр">
+                        title="Просмотр"
+                        aria-label="Просмотр">
 
                           <Eye size={14} />
                         </button>
@@ -2198,7 +2200,8 @@ const EnhancedAppointmentsTable = ({
                           position: 'relative',
                           zIndex: 101
                         }}
-                        title="Редактировать">
+                        title="Редактировать"
+                        aria-label="Редактировать">
 
                           <Edit size={14} />
                         </button>
@@ -2226,7 +2229,8 @@ const EnhancedAppointmentsTable = ({
                           cursor: 'pointer',
                           pointerEvents: 'auto'
                         }}
-                        title="Просмотр EMR">
+                        title="Просмотр EMR"
+                        aria-label="Просмотр EMR">
 
                               <FileText size={14} />
                             </button>
@@ -2253,7 +2257,8 @@ const EnhancedAppointmentsTable = ({
                           cursor: 'pointer',
                           pointerEvents: 'auto'
                         }}
-                        title="Еще">
+                        title="Еще"
+                        aria-label="Еще">
 
                           <MoreHorizontal size={14} />
                         </button>
