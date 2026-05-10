@@ -2,6 +2,7 @@
 CRUD операции для Telegram системы
 """
 
+import logging
 from typing import Any
 
 from sqlalchemy import and_
@@ -13,6 +14,8 @@ from app.models.telegram_config import (
     TelegramTemplate,
     TelegramUser,
 )
+
+logger = logging.getLogger(__name__)
 
 # ===================== КОНФИГУРАЦИЯ =====================
 
@@ -258,5 +261,8 @@ def find_patient_by_phone(db: Session, phone: str) -> dict[str, Any] | None:
         return None
 
     except Exception as e:
-        print(f"Ошибка поиска пациента: {e}")
+        logger.warning(
+            "Telegram patient lookup failed error_type=%s",
+            type(e).__name__,
+        )
         return None
