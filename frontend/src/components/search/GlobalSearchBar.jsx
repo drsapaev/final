@@ -221,6 +221,16 @@ export default function GlobalSearchBar({ className = '' }) {
   };
 
   const hasResults = results.patients.length > 0 || results.visits.length > 0 || results.labResults.length > 0;
+  const listboxId = 'global-search-results';
+  const activeOptionId = selectedIndex >= 0 ? `global-search-option-${selectedIndex}` : undefined;
+  const searchStatus = isLoading
+    ? 'Поиск...'
+    : query.length < 2
+      ? 'Начните ввод, минимум 2 символа'
+      : hasResults
+        ? 'Результаты поиска доступны'
+        : 'Ничего не найдено';
+
   const handleResultItemKeyDown = (event, onActivate) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -340,6 +350,17 @@ export default function GlobalSearchBar({ className = '' }) {
       padding: '20px',
       textAlign: 'center',
       color: 'var(--mac-text-tertiary, #64748b)'
+    },
+    srOnly: {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      padding: 0,
+      margin: '-1px',
+      overflow: 'hidden',
+      clip: 'rect(0, 0, 0, 0)',
+      whiteSpace: 'nowrap',
+      border: 0
     }
   };
 
@@ -357,13 +378,25 @@ export default function GlobalSearchBar({ className = '' }) {
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Поиск пациентов, визитов..."
+          aria-label="Глобальный поиск пациентов, визитов и анализов"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-activedescendant={activeOptionId}
           style={styles.input} />
-        
+
                 <span style={styles.shortcut}>⌘K</span>
+                <span style={styles.srOnly} role="status" aria-live="polite">{searchStatus}</span>
             </div>
 
             {isOpen && ReactDOM.createPortal(
-        <div style={styles.dropdown} ref={dropdownRef}>
+        <div
+          id={listboxId}
+          role="listbox"
+          aria-label="Результаты глобального поиска"
+          style={styles.dropdown}
+          ref={dropdownRef}>
                     {isLoading &&
           <div style={styles.loading}>Поиск...</div>
           }
@@ -384,16 +417,19 @@ export default function GlobalSearchBar({ className = '' }) {
                                     <div style={styles.sectionTitle}>Пациенты</div>
                                     {results.patients.map((p) => {
                 flatIndex++;
-                const isSelected = flatIndex === selectedIndex;
+                const itemIndex = flatIndex;
+                const isSelected = itemIndex === selectedIndex;
                 return (
                   <div
                     key={`patient-${p.id}`}
-                    role="button"
+                    id={`global-search-option-${itemIndex}`}
+                    role="option"
+                    aria-selected={isSelected}
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
                     onClick={() => handleItemClick('patient', p)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('patient', p))}
-                    onMouseEnter={() => setSelectedIndex(flatIndex)}>
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon}>👤</span>
                                                 <div style={styles.itemContent}>
@@ -416,16 +452,19 @@ export default function GlobalSearchBar({ className = '' }) {
                                     <div style={styles.sectionTitle}>Визиты</div>
                                     {results.visits.map((v) => {
                 flatIndex++;
-                const isSelected = flatIndex === selectedIndex;
+                const itemIndex = flatIndex;
+                const isSelected = itemIndex === selectedIndex;
                 return (
                   <div
                     key={`visit-${v.id}`}
-                    role="button"
+                    id={`global-search-option-${itemIndex}`}
+                    role="option"
+                    aria-selected={isSelected}
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
                     onClick={() => handleItemClick('visit', v)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('visit', v))}
-                    onMouseEnter={() => setSelectedIndex(flatIndex)}>
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon}>📋</span>
                                                 <div style={styles.itemContent}>
@@ -448,17 +487,20 @@ export default function GlobalSearchBar({ className = '' }) {
                                     <div style={styles.sectionTitle}>Анализы</div>
                                     {results.labResults.map((l) => {
                 flatIndex++;
-                const isSelected = flatIndex === selectedIndex;
+                const itemIndex = flatIndex;
+                const isSelected = itemIndex === selectedIndex;
                 const statusIcon = l.status === 'done' ? '🟢' : l.status === 'in_progress' ? '🟡' : '⚪';
                 return (
                   <div
                     key={`lab-${l.id}`}
-                    role="button"
+                    id={`global-search-option-${itemIndex}`}
+                    role="option"
+                    aria-selected={isSelected}
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
                     onClick={() => handleItemClick('lab', l)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('lab', l))}
-                    onMouseEnter={() => setSelectedIndex(flatIndex)}>
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon}>{statusIcon}</span>
                                                 <div style={styles.itemContent}>
