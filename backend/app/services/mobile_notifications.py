@@ -2,6 +2,7 @@
 Сервис для мобильных уведомлений
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -11,6 +12,16 @@ from app.crud import notification as crud_notification
 from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.fcm_service import get_fcm_service
+
+logger = logging.getLogger(__name__)
+
+
+def _log_notification_failure(action: str, exc: Exception) -> None:
+    logger.warning(
+        "Mobile notification action failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
 
 
 class MobileNotificationService:
@@ -64,7 +75,7 @@ class MobileNotificationService:
             return True
 
         except Exception as e:
-            print(f"Ошибка отправки push-уведомления: {e}")
+            _log_notification_failure("send_push_notification", e)
             return False
 
     async def send_appointment_reminder(
@@ -108,7 +119,7 @@ class MobileNotificationService:
             )
 
         except Exception as e:
-            print(f"Ошибка отправки напоминания о записи: {e}")
+            _log_notification_failure("send_appointment_reminder", e)
             return False
 
     async def send_queue_update(
@@ -128,7 +139,7 @@ class MobileNotificationService:
             return await self.send_push_notification(patient_id, title, message, data)
 
         except Exception as e:
-            print(f"Ошибка отправки обновления очереди: {e}")
+            _log_notification_failure("send_queue_update", e)
             return False
 
     async def send_lab_results(
@@ -148,7 +159,7 @@ class MobileNotificationService:
             return await self.send_push_notification(patient_id, title, message, data)
 
         except Exception as e:
-            print(f"Ошибка отправки результатов анализов: {e}")
+            _log_notification_failure("send_lab_results", e)
             return False
 
     async def send_payment_notification(
@@ -175,7 +186,7 @@ class MobileNotificationService:
             return await self.send_push_notification(patient_id, title, message, data)
 
         except Exception as e:
-            print(f"Ошибка отправки уведомления об оплате: {e}")
+            _log_notification_failure("send_payment_notification", e)
             return False
 
     async def send_appointment_confirmation(self, appointment_id: int) -> bool:
@@ -203,7 +214,7 @@ class MobileNotificationService:
             )
 
         except Exception as e:
-            print(f"Ошибка отправки подтверждения записи: {e}")
+            _log_notification_failure("send_appointment_confirmation", e)
             return False
 
     async def send_appointment_cancellation(
@@ -237,7 +248,7 @@ class MobileNotificationService:
             )
 
         except Exception as e:
-            print(f"Ошибка отправки уведомления об отмене: {e}")
+            _log_notification_failure("send_appointment_cancellation", e)
             return False
 
     async def _send_fcm_notification(
@@ -249,7 +260,10 @@ class MobileNotificationService:
     ) -> bool:
         """Отправка уведомления через FCM (заглушка)"""
         # TODO: Реальная интеграция с Firebase Cloud Messaging
-        print(f"FCM уведомление для {device_token}: {title} - {message}")
+        logger.info(
+            "FCM notification stub invoked has_data=%s",
+            bool(data),
+        )
         return True
 
     async def get_notification_history(
@@ -275,7 +289,7 @@ class MobileNotificationService:
             ]
 
         except Exception as e:
-            print(f"Ошибка получения истории уведомлений: {e}")
+            _log_notification_failure("get_notification_history", e)
             return []
 
     async def mark_notification_read(self, notification_id: int, user_id: int) -> bool:
@@ -294,7 +308,7 @@ class MobileNotificationService:
             return True
 
         except Exception as e:
-            print(f"Ошибка отметки уведомления как прочитанного: {e}")
+            _log_notification_failure("mark_notification_read", e)
             return False
 
 
