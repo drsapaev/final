@@ -1418,6 +1418,43 @@ LightRAG evidence note:
 
 - No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
 
+## Task 26 Slice A Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause`
+- reason: backend runtime logging/public error leakage audit outside payment webhook
+- risky domain: yes, auth/login endpoint
+- root cause known: selected after repository search found raw debug prints in the canonical authentication login endpoint
+- command: `python scripts\agent_gate.py "Task 26 remove raw print and public-sensitive debug logging from canonical authentication login endpoint while preserving 2FA behavior" --known-root-cause "backend/app/api/v1/endpoints/authentication.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/api/v1/endpoints/authentication.py`
+- first-touch files: `backend/app/api/v1/endpoints/authentication.py`
+- validation target: compile, 2FA enforcement tests, static search for removed login debug prints
+- stop condition watched first: any required change outside the canonical login endpoint
+
+Changed behavior:
+
+- Removed raw `print(...)` diagnostics from the canonical `/api/v1/authentication/login` endpoint.
+- Stopped logging username, raw IP/User-Agent values, auth service object, full login result payload, and traceback text through print statements.
+- Replaced the login endpoint public HTTP 500 detail that included raw exception text with a generic login failure message.
+- Preserved the 2FA response contract and token behavior.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\authentication.py`
+  - result: passed
+- `python -m pytest backend\tests\test_2fa_enforcement.py -q --tb=short --disable-warnings`
+  - result: 7 passed, 1 warning
+- static search for removed login debug strings and `print(...)` in `authentication.py`
+  - result: no matches
+
+Scope note:
+
+- Task 26 remains pending because this was the first selected high-risk slice, not a repo-wide cleanup of every remaining raw public error detail.
+
 ## Task 25 Evidence
 
 Execution mode:
