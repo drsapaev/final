@@ -3,6 +3,7 @@
 """
 
 import hashlib
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -18,6 +19,8 @@ from app.schemas.ai_tracking import (
     AIRequestTracking,
     AIResponseWithTracking,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AITrackingService:
@@ -132,7 +135,11 @@ class AITrackingService:
             self.db.commit()
 
         except Exception as e:
-            print(f"Ошибка сохранения лога AI: {e}")
+            logger.warning(
+                "AI usage log persistence failed request_id=%s error_type=%s",
+                tracking.request_id,
+                type(e).__name__,
+            )
             self.db.rollback()
 
     def get_model_stats(
