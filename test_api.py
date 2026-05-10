@@ -1,37 +1,52 @@
+import os
+import sys
+
 import requests
-import json
 
-# Токен из логов
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMCIsInVzZXJfaWQiOjIwLCJ1c2VybmFtZSI6InJlZ2lzdHJhckBleGFtcGxlLmNvbSIsImV4cCI6MTc1OTMzMzY1OH0.kSlNwHRz0LzXZ6u4AXfLeY41zuJHXhIFqWtXEd_FLMg"
 
-try:
-    response = requests.get(
-        'http://localhost:18000/api/v1/registrar/queues/today',
-        headers={'Authorization': f'Bearer {token}'}
-    )
+API_URL = "http://localhost:18000/api/v1/registrar/queues/today"
+TOKEN_ENV = "REGISTRAR_API_TOKEN"
 
-    if response.status_code == 200:
-        data = response.json()
-        print(f"✅ API вернул данные: {response.status_code}")
-        print(f"📊 Очередей: {len(data.get('queues', []))}")
 
-        total_entries = 0
-        for queue in data.get('queues', []):
-            entries = len(queue.get('entries', []))
-            total_entries += entries
-            print(f"  {queue['specialty']}: {entries} записей")
+def main() -> int:
+    token = os.environ.get(TOKEN_ENV, "").strip()
+    if not token:
+        print(f"Set {TOKEN_ENV} to a locally generated bearer token before running this smoke script.")
+        return 2
 
-        print(f"📋 Всего записей: {total_entries}")
+    try:
+        response = requests.get(
+            API_URL,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        print(f"Request failed: {exc}")
+        return 1
 
-        if total_entries > 6:
-            print("✅ НОВАЯ ЗАПИСЬ ОБНАРУЖЕНА!")
-        else:
-            print("❌ Новая запись НЕ найдена")
-
-    else:
-        print(f"❌ Ошибка API: {response.status_code}")
+    if response.status_code != 200:
+        print(f"API failed: {response.status_code}")
         print(response.text)
+        return 1
 
-except Exception as e:
-    print(f"❌ Ошибка запроса: {e}")
+    data = response.json()
+    queues = data.get("queues", [])
+    print(f"API returned data: {response.status_code}")
+    print(f"Queues: {len(queues)}")
 
+    total_entries = 0
+    for queue in queues:
+        entries = len(queue.get("entries", []))
+        total_entries += entries
+        print(f"  {queue['specialty']}: {entries} entries")
+
+    print(f"Total entries: {total_entries}")
+    if total_entries > 6:
+        print("New entry detected")
+    else:
+        print("New entry not found")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
