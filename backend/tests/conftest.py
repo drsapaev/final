@@ -3,6 +3,7 @@
 """
 
 import os
+import secrets
 import tempfile
 from datetime import date, datetime
 
@@ -21,6 +22,8 @@ from app.db.base_class import Base
 
 # Ensure app boots in test mode before importing app.main.
 os.environ.setdefault("TESTING", "1")
+
+TEST_ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or secrets.token_urlsafe(24)
 
 from app.main import app
 
@@ -139,7 +142,7 @@ def client(db_session):
 
 
 @pytest.fixture(scope="function")
-def admin_user(db_session):
+def admin_user(db_session, admin_password):
     """Создает тестового администратора"""
     # Переиспользуем пользователя, если он уже создан (из-за уникального username)
     user = db_session.query(User).filter(User.username == "test_admin").first()
@@ -150,7 +153,7 @@ def admin_user(db_session):
         username="test_admin",
         email="admin@test.com",
         full_name="Test Admin",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=get_password_hash(admin_password),
         role="Admin",
         is_active=True,
         is_superuser=True,
@@ -159,6 +162,11 @@ def admin_user(db_session):
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture(scope="session")
+def admin_password():
+    return TEST_ADMIN_PASSWORD
 
 
 @pytest.fixture(scope="function")
@@ -375,11 +383,11 @@ def test_queue_entry(db_session, test_daily_queue, test_patient, test_visit):
 
 
 @pytest.fixture(scope="function")
-def auth_headers(client, admin_user):
+def auth_headers(client, admin_user, admin_password):
     """Создает заголовки авторизации для администратора"""
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]

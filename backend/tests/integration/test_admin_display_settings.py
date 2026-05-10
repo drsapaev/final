@@ -3,18 +3,18 @@ from __future__ import annotations
 import pytest
 
 
-def _login_admin(client, admin_user):
+def _login_admin(client, admin_user, admin_password):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 @pytest.mark.integration
-def test_admin_display_settings_roundtrip(client, admin_user):
-    headers = _login_admin(client, admin_user)
+def test_admin_display_settings_roundtrip(client, admin_user, admin_password):
+    headers = _login_admin(client, admin_user, admin_password)
 
     boards_response = client.get("/api/v1/admin/display/boards", headers=headers)
     assert boards_response.status_code == 200, boards_response.text

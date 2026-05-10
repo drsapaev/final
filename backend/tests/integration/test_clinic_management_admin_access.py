@@ -1,10 +1,10 @@
 import pytest
 
 
-def _login_admin(client, admin_user):
+def _login_admin(client, admin_user, admin_password):
     response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -14,8 +14,9 @@ def _login_admin(client, admin_user):
 def test_clinic_management_stats_and_health_are_admin_accessible(
     client,
     admin_user,
+    admin_password,
 ):
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
 
     stats_response = client.get("/api/v1/clinic/stats", headers=headers)
     assert stats_response.status_code == 200, stats_response.text
@@ -33,6 +34,7 @@ def test_clinic_management_stats_and_health_are_admin_accessible(
 def test_clinic_management_stats_and_health_do_not_use_request_state_auth_chain(
     client,
     admin_user,
+    admin_password,
     monkeypatch,
 ):
     import app.api.deps as deps_module
@@ -45,7 +47,7 @@ def test_clinic_management_stats_and_health_do_not_use_request_state_auth_chain(
     monkeypatch.setattr(deps_module, "require_authentication", _legacy_auth_chain_called)
     monkeypatch.setattr(deps_module, "get_current_user_from_request", _legacy_auth_chain_called)
 
-    headers = _login_admin(client, admin_user)
+    headers = _login_admin(client, admin_user, admin_password)
 
     stats_response = client.get("/api/v1/clinic/stats", headers=headers)
     assert stats_response.status_code == 200, stats_response.text

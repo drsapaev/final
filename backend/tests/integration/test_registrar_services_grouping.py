@@ -11,6 +11,7 @@ def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
     client,
     db_session,
     admin_user,
+    admin_password,
 ):
     lab_category = ServiceCategory(
         code="lab-adm-06",
@@ -41,7 +42,7 @@ def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
 
     login_response = client.post(
         "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": "admin123"},
+        json={"username": admin_user.username, "password": admin_password},
     )
     assert login_response.status_code == 200, login_response.text
 
