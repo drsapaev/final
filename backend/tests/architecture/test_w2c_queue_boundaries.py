@@ -93,3 +93,69 @@ def test_service_queue_metadata_handlers_use_queue_domain_service() -> None:
         assert "QueueDomainService(db)" in block
         assert "ServicesApiService(db)" not in block
         assert "db.query(" not in block
+
+
+def test_queue_route_surface_is_explicitly_classified() -> None:
+    api_path = Path(__file__).resolve().parents[2] / "app" / "api" / "v1" / "api.py"
+    text = api_path.read_text(encoding="utf-8")
+
+    assert (
+        'api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])'
+        in text
+    )
+    assert (
+        'api_router.include_router(queues.router, prefix="/queues", tags=["queues"])'
+        in text
+    )
+    assert (
+        'api_router.include_router(online_queue_new.router, tags=["online-queue-new"])'
+        in text
+    )
+    assert (
+        'api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-legacy"])'
+        in text
+    )
+    assert re.search(
+        r"queue_reorder\.router,\s*prefix=\"/queue/reorder\"",
+        text,
+        flags=re.DOTALL,
+    )
+    assert re.search(
+        r"queue_position\.router,\s*prefix=\"/queue/position\"",
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def test_queue_groups_resolve_explicit_tags_and_tabs() -> None:
+    from app.services.service_mapping import QUEUE_GROUPS, resolve_queue_group_key
+
+    service_mapping_path = (
+        Path(__file__).resolve().parents[2] / "app" / "services" / "service_mapping.py"
+    )
+    assert service_mapping_path.exists()
+
+    expected_groups = {
+        "cardiology",
+        "ecg",
+        "dermatology",
+        "dental",
+        "laboratory",
+        "procedures",
+    }
+    assert expected_groups.issubset(set(QUEUE_GROUPS))
+
+    tab_keys: list[str] = []
+    queue_tags: list[str] = []
+    for group_key, group_data in QUEUE_GROUPS.items():
+        tab_key = group_data["tab_key"]
+        queue_tag = group_data["queue_tag"]
+        tab_keys.append(tab_key)
+        queue_tags.append(queue_tag)
+
+        assert resolve_queue_group_key(department_key=group_key) == group_key
+        assert resolve_queue_group_key(department_key=tab_key) == group_key
+        assert resolve_queue_group_key(queue_tag=queue_tag) == group_key
+
+    assert len(tab_keys) == len(set(tab_keys))
+    assert len(queue_tags) == len(set(queue_tags))

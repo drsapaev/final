@@ -26,7 +26,7 @@ from app.core.security import get_password_hash
 def admin_token(client: TestClient, admin_user: User) -> str:
     """Токен администратора"""
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": admin_user.username, "password": "admin123"},
     )
     assert response.status_code == 200
@@ -37,7 +37,7 @@ def admin_token(client: TestClient, admin_user: User) -> str:
 def registrar_token(client: TestClient, registrar_user: User) -> str:
     """Токен регистратора"""
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert response.status_code == 200
@@ -48,7 +48,7 @@ def registrar_token(client: TestClient, registrar_user: User) -> str:
 def doctor_token(client: TestClient, test_doctor_user: User) -> str:
     """Токен врача"""
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": test_doctor_user.username, "password": "doctor123"},
     )
     assert response.status_code == 200
@@ -76,7 +76,7 @@ def cashier_token(client: TestClient, db_session: Session) -> str:
         db_session.refresh(cashier)
 
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": cashier.username, "password": "cashier123"},
     )
     assert response.status_code == 200
@@ -104,7 +104,7 @@ def patient_token(client: TestClient, db_session: Session) -> str:
         db_session.refresh(patient_user)
 
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": patient_user.username, "password": "patient123"},
     )
     assert response.status_code == 200
@@ -411,7 +411,7 @@ class TestRegressionRBAC:
 
         # Получаем токен
         response = client.post(
-            "/api/v1/auth/minimal-login",
+            "/api/v1/authentication/login",
             json={"username": admin_user.username, "password": "admin123"},
         )
         assert response.status_code == 200

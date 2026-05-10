@@ -62,8 +62,7 @@ python app/scripts/ensure_admin.py
 # Создать тестовых пациентов
 python create_test_data.py
 
-# Создать медицинские записи
-python create_medical_records_table.py
+# Медицинские записи: схема через Alembic, тестовые данные через утвержденные fixtures/seed paths
 ```
 
 ### 2. Проверка всех флоу

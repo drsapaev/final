@@ -74,6 +74,7 @@ const DoctorPanel = () => {
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
   const patientModal = useModal();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
@@ -162,81 +163,13 @@ const DoctorPanel = () => {
   // Загрузка данных
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      // Симуляция загрузки данных
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Тестовые данные
-      const mockPatients = [
-      {
-        id: 1,
-        name: 'Ахмедов Алишер',
-        age: 45,
-        gender: 'М',
-        phone: '+998 90 123 45 67',
-        diagnosis: 'Гипертония',
-        status: 'active',
-        lastVisit: '2024-01-15',
-        nextAppointment: '2024-01-20'
-      },
-      {
-        id: 2,
-        name: 'Каримова Зухра',
-        age: 32,
-        gender: 'Ж',
-        phone: '+998 91 234 56 78',
-        diagnosis: 'Диабет 2 типа',
-        status: 'active',
-        lastVisit: '2024-01-14',
-        nextAppointment: '2024-01-18'
-      },
-      {
-        id: 3,
-        name: 'Тошматов Бахтиёр',
-        age: 28,
-        gender: 'М',
-        phone: '+998 93 345 67 89',
-        diagnosis: 'Астма',
-        status: 'recovery',
-        lastVisit: '2024-01-12',
-        nextAppointment: '2024-01-25'
-      }];
-
-
-      const mockAppointments = [
-      {
-        id: 1,
-        patientId: 1,
-        patientName: 'Ахмедов Алишер',
-        time: '09:00',
-        type: 'Консультация',
-        status: 'scheduled',
-        notes: 'Плановый осмотр'
-      },
-      {
-        id: 2,
-        patientId: 2,
-        patientName: 'Каримова Зухра',
-        time: '10:30',
-        type: 'Повторный прием',
-        status: 'in_progress',
-        notes: 'Контроль сахара'
-      },
-      {
-        id: 3,
-        patientId: 3,
-        patientName: 'Тошматов Бахтиёр',
-        time: '14:00',
-        type: 'Экстренный',
-        status: 'completed',
-        notes: 'Обострение астмы'
-      }];
-
-
-      setPatients(mockPatients);
-      setAppointments(mockAppointments);
+      setPatients([]);
+      setAppointments([]);
     } catch (error) {
-      logger.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных врача:', error);
+      setLoadError('Не удалось загрузить пациентов и записи врача. Повторите попытку или откройте очередь.');
     } finally {
       setLoading(false);
     }
@@ -555,20 +488,45 @@ const DoctorPanel = () => {
     return statusMap[status] || status;
   };
 
+  const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
+    const color = tone === 'error' ? dangerColor : getColor('secondary', 500);
+    return (
+      <div style={{ padding: getSpacing('xl'), textAlign: 'center', color }}>
+        <Icon size={48} style={{ opacity: 0.55, marginBottom: getSpacing('md') }} />
+        <div style={{ fontSize: getFontSize('md'), fontWeight: 600, marginBottom: getSpacing('xs') }}>
+          {title}
+        </div>
+        {description &&
+        <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 500), maxWidth: 520, margin: '0 auto' }}>
+            {description}
+          </div>
+        }
+        {action &&
+        <div style={{ marginTop: getSpacing('md') }}>
+            {action}
+          </div>
+        }
+      </div>
+    );
+  };
+
   // ✅ УЛУЧШЕНИЕ: Обработчик с универсальным хуком
   const handlePatientClick = (patient) => {
     patientModal.openModal(patient);
   };
 
   const filteredPatients = patients.filter((patient) => {
-    const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    patient.phone.includes(searchQuery);
+    const patientName = String(patient.name || '');
+    const patientPhone = String(patient.phone || '');
+    const matchesSearch = patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patientPhone.includes(searchQuery);
     const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
   const filteredAppointments = appointments.filter((appointment) => {
-    const matchesSearch = appointment.patientName.toLowerCase().includes(searchQuery.toLowerCase());
+    const patientName = String(appointment.patientName || '');
+    const matchesSearch = patientName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterStatus === 'all' || appointment.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -908,6 +866,22 @@ const DoctorPanel = () => {
               <CardContent style={{ padding: 0 }}>
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
+              loadError ?
+              renderEmptyState({
+                icon: AlertCircle,
+                title: 'Данные врача не загружены',
+                description: loadError,
+                tone: 'error',
+                action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
+              }) :
+              filteredPatients.length === 0 ?
+              renderEmptyState({
+                icon: Users,
+                title: 'Пациенты не найдены',
+                description: searchQuery || filterStatus !== 'all'
+                  ? 'По текущему поиску или фильтру нет пациентов.'
+                  : 'Пациенты не подставляются тестовыми данными. Используйте очередь или регистрацию, чтобы открыть реальную карту пациента.'
+              }) :
 
               <table style={tableStyle}>
                     <thead>
@@ -950,11 +924,11 @@ const DoctorPanel = () => {
                           fontSize: getFontSize('sm'),
                           fontWeight: '700'
                         }}>
-                                {patient.name.split(' ').map((n) => n[0]).join('')}
+                                {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
                                 <div style={{ fontWeight: '500', color: getColor('secondary', 800) }}>
-                                  {patient.name}
+                                  {patient.name || 'Пациент'}
                                 </div>
                                 <div style={{ fontSize: getFontSize('xs'), color: getColor('secondary', 500) }}>
                                   {patient.gender}
@@ -962,9 +936,9 @@ const DoctorPanel = () => {
                               </div>
                             </div>
                           </td>
-                          <td style={tdStyle}>{patient.age} лет</td>
-                          <td style={tdStyle}>{patient.phone}</td>
-                          <td style={tdStyle}>{patient.diagnosis}</td>
+                          <td style={tdStyle}>{patient.age ? `${patient.age} лет` : '—'}</td>
+                          <td style={tdStyle}>{patient.phone || '—'}</td>
+                          <td style={tdStyle}>{patient.diagnosis || '—'}</td>
                           <td style={tdStyle}>
                             <Badge variant={getStatusVariant(patient.status)} size="md">
                               {getStatusText(patient.status)}
@@ -1070,6 +1044,22 @@ const DoctorPanel = () => {
               <CardContent style={{ padding: 0 }}>
                 {loading ?
               <Skeleton.Table rows={5} columns={6} /> :
+              loadError ?
+              renderEmptyState({
+                icon: AlertCircle,
+                title: 'Записи врача не загружены',
+                description: loadError,
+                tone: 'error',
+                action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
+              }) :
+              filteredAppointments.length === 0 ?
+              renderEmptyState({
+                icon: Calendar,
+                title: 'Записи не найдены',
+                description: searchQuery || filterStatus !== 'all'
+                  ? 'По текущему поиску или фильтру нет записей.'
+                  : 'Нет реальных записей для отображения. Создайте визит через регистратуру, очередь или кнопку назначения следующего визита.'
+              }) :
 
               <table style={tableStyle}>
                     <thead>
@@ -1103,14 +1093,14 @@ const DoctorPanel = () => {
                               {appointment.time}
                             </div>
                           </td>
-                          <td style={tdStyle}>{appointment.patientName}</td>
-                          <td style={tdStyle}>{appointment.type}</td>
+                          <td style={tdStyle}>{appointment.patientName || 'Пациент'}</td>
+                          <td style={tdStyle}>{appointment.type || '—'}</td>
                           <td style={tdStyle}>
                             <Badge variant={getStatusVariant(appointment.status)} size="md">
                               {getStatusText(appointment.status)}
                             </Badge>
                           </td>
-                          <td style={tdStyle}>{appointment.notes}</td>
+                          <td style={tdStyle}>{appointment.notes || '—'}</td>
                           <td style={tdStyle}>
                             <button
                         style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}

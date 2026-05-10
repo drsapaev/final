@@ -1,7 +1,7 @@
 fastapi>=0.121,<0.136
 uvicorn[standard]>=0.29,<0.43
 pydantic>=2.7,<2.13
-pydantic-settings>=2.14.0,<2.15
+pydantic-settings>=2.14.1,<2.15
 SQLAlchemy>=2.0,<2.1
 psycopg[binary]>=3.1,<4.0
 redis>=5.0,<8.0
@@ -26,7 +26,7 @@ python-telegram-bot>=22.7,<23.0
 openai>=2.33.0,<3.0.0
 google-generativeai>=0.8.0,<1.0.0
 google-api-core>=2.0.0,<3.0.0
-google-auth>=2.50.0,<3.0.0
+google-auth>=2.52.0,<3.0.0
 grpcio>=1.50.0,<2.0.0
 proto-plus>=1.28.0,<2.0.0
 protobuf>=5.29.6,<6.0.0

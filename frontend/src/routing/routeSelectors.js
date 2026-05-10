@@ -217,7 +217,7 @@ export function getRouteDocsSnapshot() {
 }
 
 export function isInternalDemoEnabled() {
-  return Boolean(import.meta.env.DEV || import.meta.env.VITE_ENABLE_INTERNAL_DEMO === '1');
+  return import.meta.env.VITE_ENABLE_INTERNAL_DEMO === '1';
 }
 
 export function getRouteChromeState(pathname, search = '', profile = null) {

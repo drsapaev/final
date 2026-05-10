@@ -2974,3 +2974,333 @@ Recommendation:
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should have connected the state-shape leak in the context object to the canonical type-normalization path faster, reducing retry churn.
+
+## Task 84 - Auth router precedence and 2FA bypass gate
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with the P0 auth router precedence and 2FA-bypass audit.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with known-root-cause override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/api.py
+
+### What handoff solved well
+- It restored a hard stop before auth edits and included the confirmed backend API router root-cause file.
+- It prevented ad hoc changes to auth, payment, or upload code before the P0 audit slice.
+
+### Missing relationship mapping
+- The rule matched the word `router` as frontend routing ownership and incorrectly added frontend route registry files.
+- The gate did not know auth-specific ownership, so it did not list `minimal_auth.py`, `simple_auth.py`, `auth.py`, `authentication.py`, `deps.py`, or the 2FA tests.
+
+### Manual reconstruction needed
+- Manually traced mounted auth routers in `backend/app/api/v1/api.py`.
+- Manually traced token issuance in `auth_api_service.py`, `auth_fallback_service.py`, and `authentication_service.py`.
+- Manually confirmed frontend login uses `/auth/minimal-login` while existing 2FA tests target `/authentication/login`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should map auth route mounts to endpoint/service/test ownership and avoid treating backend router audits as frontend routing changes.
+
+## Task 85 - Visits read RBAC test-slice gate
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with Task 15 registrar patient and visit creation verification.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/tests/unit/test_visits_router_service_wiring.py
+
+### What handoff solved well
+- It kept the runtime RBAC fix anchored to `backend/app/api/v1/endpoints/visits.py`.
+- It included the confirmed test file when the follow-up test update was gated.
+
+### Missing relationship mapping
+- The test-slice gate also listed unrelated frontend routing files because the task mentioned router tests.
+- The gate did not distinguish backend API router/service-wiring tests from frontend route-registry ownership.
+
+### Manual reconstruction needed
+- Manually limited the override to `backend/tests/unit/test_visits_router_service_wiring.py`.
+- Updated positive visits read tests to pass auth headers and added unauthenticated 401 checks.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should map `backend/tests/unit/test_*router*_service_wiring.py` to backend endpoint ownership and avoid frontend routing files when the known root cause is a backend test file.
+
+## Task 86 - Telegram webhook security test-slice gate
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with Task 16 Telegram webhook and notification safety verification.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/tests/unit/test_telegram_webhook_security.py
+
+### What handoff solved well
+- It kept the main Telegram security slice anchored to backend webhook/admin endpoint files.
+- It included the confirmed backend unit test file for the follow-up fail-closed and log-safety tests.
+
+### Missing relationship mapping
+- The test-slice gate again listed unrelated frontend/runtime files even though the known root cause was a backend unit test.
+- The initial Telegram gate did not include all mounted webhook endpoints, so `telegram_bot.py` and `telegram_webhook_enhanced.py` required a second explicit gate.
+
+### Manual reconstruction needed
+- Manually traced Telegram mounts in `backend/app/api/v1/api.py`.
+- Manually identified three webhook surfaces: `/telegram/webhook`, `/telegram/webhook/enhanced`, and `/telegram/bot/webhook`.
+- Manually limited the test override to `backend/tests/unit/test_telegram_webhook_security.py`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect Telegram mount points, endpoint variants, and targeted backend tests so a webhook security task surfaces all production-mounted webhook handlers in one pass.
+
+## Task 87 - Staging Postgres port docs gate
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with Task 17 Alembic and PostgreSQL upgrade safety verification.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ops/README.md
+
+### What handoff solved well
+- It kept the runtime compose change anchored to deployment files.
+- The follow-up gate acknowledged the specific README file for the stale staging Postgres port.
+
+### Missing relationship mapping
+- The first staging-port gate did not include `ops/README.md` even though the task explicitly included operator docs and the README was the only remaining `15432` drift after the compose fix.
+
+### Manual reconstruction needed
+- Manually compared `AGENTS.md`, `.ai-factory` skill context, `ops/compose.staging.yml`, `ops/docker-compose.yml`, `ops/README.md`, and the local staging runbook.
+- Limited the override to the single stale staging Postgres port line in `ops/README.md`.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect runtime port defaults in repo rules, compose files, and operator README/runbook lines in one ownership set.
+
+## Task 88 - AI assistant visible fallback frontend slice
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with Task 18 AI module safety and visible fallback verification.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: frontend/src/components/ai/AIAssistant.jsx
+
+### What handoff solved well
+- It kept the frontend visible-warning patch limited to the confirmed AI assistant component.
+- It prevented opportunistic edits across other AI widgets and doctor/specialist panels during the first patch slice.
+
+### Missing relationship mapping
+- The backend AI safety gate and frontend visible-fallback gate had to be run separately to connect endpoint safety metadata with user-visible warnings.
+- Other visible AI surfaces such as `AIChatWidget`, EMR v2 AI popovers, and admin AI panels remain outside this first-touch slice.
+
+### Manual reconstruction needed
+- Manually inspected `backend/app/services/ai/ai_manager.py` to confirm mock-provider fallback behavior.
+- Manually connected doctor/specialist panel imports to `frontend/src/components/ai/AIAssistant.jsx` before requesting the frontend gate.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect AI provider initialization, mounted AI endpoints, and all visible AI UI entry points in one Task 18 context set.
+
+## Task 89 - DoctorPanel fake visible data removal
+
+### User task
+Continue `/aif-implement @.ai-factory/PLAN.md` with Task 19 top workflow friction in visible role screens.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: frontend/src/pages/DoctorPanel.jsx
+
+### What handoff solved well
+- It constrained the first visible UX patch to the confirmed doctor role screen.
+- It prevented broad edits across specialist panels before one concrete user-visible defect was fixed and verified.
+
+### Missing relationship mapping
+- The gate did not connect the generic role-screen UX task to all other fake-data or no-op button surfaces, so Task 19 was intentionally limited to the strongest confirmed defect.
+
+### Manual reconstruction needed
+- Manually searched visible role screens for mock/fake/demo data.
+- Manually selected `DoctorPanel.jsx` because it generated fake patients, phone numbers, diagnoses, and appointments in the visible doctor screen.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should map user-visible role tabs to fake-data generation, no-op primary actions, and available validation targets for each screen.
+
+## Task 90 - Strict verify stale file auth tests
+
+### User task
+Continue `/aif-verify --strict` after completing `/aif-implement @.ai-factory/PLAN.md`; fix the verification failure through `/aif-fix`.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/tests/conftest.py, backend/tests/test_file_security.py, backend/tests/integration/test_rbac_matrix.py, backend/tests/integration/test_analytics_contracts.py, backend/tests/integration/test_doctor_general_queue.py, backend/tests/integration/test_admin_finance_transactions.py, backend/tests/integration/test_activation_api.py, backend/tests/unit/test_ticket_print_settings.py
+
+### What handoff solved well
+- It constrained the stale-auth-fixture fix to test files and avoided re-enabling runtime fallback authentication.
+- It separated shared fixtures from inline file-security test login calls, keeping the first patch slices small.
+
+### Missing relationship mapping
+- The first gate pass only returned `backend/tests/conftest.py`; strict verification then exposed additional inline stale login calls in file-security, RBAC, analytics, queue, activation, finance, and ticket-print tests.
+
+### Manual reconstruction needed
+- Manually matched pytest failures to inline `/api/v1/auth/minimal-login` calls and shared auth fixtures.
+- Manually confirmed the canonical login path from the 2FA enforcement tests before editing.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect auth hardening changes to stale test fixtures and inline endpoint calls across the backend test suite.
+
+## Task 91 - CI legacy Payme webhook domain result
+
+### User task
+Keep every pushed recovery step CI-ready after PR #377 exposed a backend CI failure in the legacy Payme webhook notification test.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/payment_webhook.py
+
+### What handoff solved well
+- It constrained the CI fix to the payment webhook endpoint finalization logic.
+- It preserved the non-200 behavior for retryable processing errors while allowing recorded failed-payment domain results to be acknowledged.
+
+### Missing relationship mapping
+- The first recovery payment tests did not include `test_notification_catalog_slice3_legacy_webhooks.py`, so CI found a compatibility notification contract gap.
+
+### Manual reconstruction needed
+- Manually read the CI failure log and matched it to the legacy Payme notification test.
+- Manually distinguished a processing error without a webhook record from a failed payment domain event with a saved webhook record.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect payment webhook endpoint hardening to legacy notification catalog tests and provider domain-result semantics.
+
+## Task 92 - Payment webhook endpoint print/error leakage
+
+### User task
+Continue recovery after PR #377 with commit-and-push per step; implement Task 22 from `.ai-factory/PLAN.md`.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: no
+- override_used: yes
+- known_root_cause_file: backend/app/api/v1/endpoints/payment_webhook.py
+
+### What handoff solved well
+- It constrained the logging cleanup to one payment endpoint file.
+- It prevented accidental edits to payment services or repository behavior during a logging/error-detail hardening slice.
+
+### Missing relationship mapping
+- The gate did not identify validation tests, so the payment API/repository/service and legacy notification tests were selected manually.
+
+### Manual reconstruction needed
+- Manually searched the endpoint for remaining `print(...)` and raw public error detail patterns.
+- Manually verified the two affected endpoints still use the existing Admin/Registrar role guards.
+
+### Signals observed
+- multi-hop gap: no
+- ownership ambiguity: no
+- manual graph reconstruction: yes
+- gate_misroute: no
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: yes for this narrow slice
+- would LightRAG likely help here: low
+- Better retrieval would be useful mainly for automatically selecting targeted validation tests.

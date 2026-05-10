@@ -488,6 +488,7 @@ export default function Header() {
           <button
             onClick={toggleTheme}
             className="interactive-element hover-lift ripple-effect focus-ring"
+            aria-label="Переключить тему"
             style={{
               width: '40px',
               height: '40px',

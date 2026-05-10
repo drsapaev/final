@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 # helpers from deps
 from app.api.deps import get_current_user
+from app.core.config import settings
 
 # Import your project's DB session factory / dependency
 # get_db should be a dependency that yields either an AsyncSession or sync Session
@@ -30,6 +31,14 @@ from app.services.auth_api_service import AuthApiDomainError, AuthApiService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _ensure_legacy_login_enabled() -> None:
+    if not settings.ENABLE_FALLBACK_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Legacy auth login endpoint is disabled. Use /api/v1/authentication/login.",
+        )
 
 
 @router.post("/login")
@@ -48,7 +57,8 @@ async def login(
 
     Works with both async and sync SQLAlchemy sessions returned by get_db().
     """
-    logger.info(f"Login attempt for username: {form_data.username}")
+    _ensure_legacy_login_enabled()
+    logger.info("Legacy OAuth login endpoint used")
     try:
         return await AuthApiService(db).login_oauth_payload(
             username=form_data.username,
@@ -131,8 +141,9 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
     Returns:
       {"access_token": "<jwt>", "token_type": "bearer", "user": {...}}
     """
+    _ensure_legacy_login_enabled()
     try:
-        logger.info(f"JSON login called with username={request_data.username}")
+        logger.info("Legacy JSON login endpoint used")
         payload = await AuthApiService(db).json_login_payload(
             username=request_data.username,
             password=request_data.password,
