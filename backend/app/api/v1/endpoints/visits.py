@@ -15,6 +15,7 @@ from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+VISIT_READ_ROLES = ("Admin", "Registrar", "Doctor", "Cashier", "Lab", "Nurse")
 
 
 # Pydantic fallbacks (если полноценные схемы уже есть в app.schemas, в следующих шагах заменим)
@@ -74,6 +75,7 @@ def list_visits(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
     rows = VisitsApiService(db).list_visits(
         patient_id=patient_id,
@@ -110,7 +112,11 @@ def create_visit(
 @router.get(
     "/visits/{visit_id}", response_model=VisitWithServices, summary="Карточка визита"
 )
-def get_visit(visit_id: int, db: Session = Depends(get_db)):
+def get_visit(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles(*VISIT_READ_ROLES)),
+):
     payload = VisitsApiService(db).get_visit(visit_id=visit_id)
     return VisitWithServices(
         visit=VisitOut(**payload["visit"]),

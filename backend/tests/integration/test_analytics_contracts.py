@@ -11,7 +11,7 @@ from app.models.user import User
 @pytest.fixture
 def admin_token(client: TestClient, admin_user: User) -> str:
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": admin_user.username, "password": "admin123"},
     )
     assert response.status_code == 200

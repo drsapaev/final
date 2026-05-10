@@ -16,15 +16,32 @@ from app.services.telegram_bot import get_telegram_bot_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
+
+
+def _telegram_update_summary(update: Dict[str, Any]) -> Dict[str, Any]:
+    message = update.get("message") or update.get("edited_message") or {}
+    callback_query = update.get("callback_query") or {}
+    return {
+        "update_id": update.get("update_id"),
+        "message_id": message.get("message_id"),
+        "callback_query_id": callback_query.get("id"),
+        "has_message": bool(message),
+        "has_callback_query": bool(callback_query),
+    }
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
     if not expected_secret:
-        return
+        logger.error("Telegram webhook rejected because webhook secret is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram webhook secret is not configured",
+        )
 
-    received_secret = request.headers.get("x-telegram-bot-api-secret-token")
+    received_secret = request.headers.get(WEBHOOK_SECRET_HEADER)
     if received_secret != expected_secret:
         logger.warning("Telegram webhook rejected due to invalid secret token")
         raise HTTPException(
@@ -41,10 +58,11 @@ async def telegram_webhook(
     Webhook endpoint для получения обновлений от Telegram
     """
     try:
-        # Логируем входящее обновление
-        logger.info(f"Получено обновление от Telegram: {update}")
-
         _validate_webhook_secret(request, db)
+        logger.info(
+            "Telegram webhook update accepted",
+            extra=_telegram_update_summary(update),
+        )
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()

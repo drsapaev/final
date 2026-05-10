@@ -16,6 +16,17 @@ from app.services.emr_ai_enhanced import emr_ai_enhanced
 router = APIRouter()
 
 
+def ai_safety_meta() -> Dict[str, Any]:
+    return {
+        "decision_boundary": "suggestion_only",
+        "requires_doctor_confirmation": True,
+        "ai_notice": (
+            "AI output is a draft suggestion. A doctor or admin must confirm it "
+            "before it becomes part of the medical record."
+        ),
+    }
+
+
 @router.post("/generate-smart-template")
 async def generate_smart_template(
     specialty: str = Query(..., description="Специализация врача"),
@@ -39,6 +50,7 @@ async def generate_smart_template(
             "template": template,
             "specialty": specialty,
             "generated_at": "2024-01-01T00:00:00Z",
+            **ai_safety_meta(),
         }
 
     except Exception as e:
@@ -68,6 +80,7 @@ async def get_smart_suggestions(
             "field_name": field_name,
             "suggestions": suggestions,
             "count": len(suggestions),
+            **ai_safety_meta(),
         }
 
     except Exception as e:
@@ -96,6 +109,7 @@ async def auto_fill_emr_fields(
             "filled_data": filled_data,
             "filled_fields": list(filled_data.keys()),
             "count": len(filled_data),
+            **ai_safety_meta(),
         }
 
     except Exception as e:
@@ -115,7 +129,9 @@ async def validate_emr_data(
             emr_data=emr_data, specialty=specialty
         )
 
-        return validation_result
+        if isinstance(validation_result, dict):
+            return {**validation_result, **ai_safety_meta()}
+        return {"result": validation_result, **ai_safety_meta()}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка валидации: {str(e)}")
@@ -138,6 +154,7 @@ async def get_icd10_suggestions(
             "diagnosis_text": diagnosis_text,
             "suggestions": suggestions,
             "count": len(suggestions),
+            **ai_safety_meta(),
         }
 
     except Exception as e:
@@ -163,6 +180,7 @@ async def analyze_patient_data(
             "recommendations": await emr_ai_enhanced._generate_improvement_suggestions(
                 patient_data, "general"
             ),
+            **ai_safety_meta(),
         }
 
     except Exception as e:
@@ -256,6 +274,7 @@ async def enhance_emr_with_ai(
             "enhancement_type": enhancement_type,
             "result": result,
             "enhanced_at": "2024-01-01T00:00:00Z",
+            **ai_safety_meta(),
         }
 
     except HTTPException:

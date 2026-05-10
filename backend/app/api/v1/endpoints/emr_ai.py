@@ -7,11 +7,30 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.core.rbac import AIPermission, require_any_ai_permission
+from app.models.user import User
 from app.services.emr_ai_service import EMRService, get_emr_ai_service
 
 router = APIRouter()
+
+EMR_AI_ACCESS = require_any_ai_permission(
+    AIPermission.ADMIN_AI,
+    AIPermission.DIAGNOSE,
+    AIPermission.SUGGEST_ICD10,
+    AIPermission.ANALYZE_DOCUMENT,
+)
+
+
+def ai_safety_meta() -> Dict[str, Any]:
+    return {
+        "decision_boundary": "suggestion_only",
+        "requires_doctor_confirmation": True,
+        "ai_notice": (
+            "AI output is a draft suggestion. A doctor or admin must confirm it "
+            "before it becomes part of the medical record."
+        ),
+    }
 
 
 @router.post("/suggestions/diagnosis")
@@ -19,7 +38,7 @@ async def get_diagnosis_suggestions(
     symptoms: List[str],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Получить предложения диагнозов на основе симптомов"""
     try:
@@ -30,6 +49,7 @@ async def get_diagnosis_suggestions(
             "suggestions": suggestions,
             "count": len(suggestions),
             "specialty": specialty,
+            **ai_safety_meta(),
         }
     except Exception as e:
         raise HTTPException(
@@ -42,7 +62,7 @@ async def get_treatment_suggestions(
     diagnosis: str,
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Получить предложения лечения на основе диагноза"""
     try:
@@ -54,6 +74,7 @@ async def get_treatment_suggestions(
             "count": len(suggestions),
             "diagnosis": diagnosis,
             "specialty": specialty,
+            **ai_safety_meta(),
         }
     except Exception as e:
         raise HTTPException(
@@ -65,7 +86,7 @@ async def get_treatment_suggestions(
 async def get_icd10_suggestions(
     diagnosis_text: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Получить предложения кодов МКБ-10"""
     try:
@@ -76,6 +97,7 @@ async def get_icd10_suggestions(
             "suggestions": suggestions,
             "count": len(suggestions),
             "diagnosis_text": diagnosis_text,
+            **ai_safety_meta(),
         }
     except Exception as e:
         raise HTTPException(
@@ -89,7 +111,7 @@ async def auto_fill_emr_fields(
     patient_data: Dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Автозаполнение полей EMR на основе данных пациента"""
     try:
@@ -102,6 +124,7 @@ async def auto_fill_emr_fields(
             "filled_data": filled_data,
             "template_structure": template_structure,
             "specialty": specialty,
+            **ai_safety_meta(),
         }
     except Exception as e:
         raise HTTPException(
@@ -114,7 +137,7 @@ async def validate_emr_data(
     emr_data: Dict[str, Any],
     template_structure: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Валидация данных EMR"""
     try:
@@ -123,7 +146,9 @@ async def validate_emr_data(
             emr_data, template_structure
         )
 
-        return validation_result
+        if isinstance(validation_result, dict):
+            return {**validation_result, **ai_safety_meta()}
+        return {"result": validation_result, **ai_safety_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка валидации EMR: {str(e)}")
 
@@ -133,7 +158,7 @@ async def get_ai_suggestions(
     emr_data: Dict[str, Any],
     specialty: str = Query("general", description="Специализация врача"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """Получить общие AI предложения для EMR"""
     try:
@@ -144,6 +169,7 @@ async def get_ai_suggestions(
             "suggestions": suggestions,
             "specialty": specialty,
             "timestamp": "2024-01-01T00:00:00Z",  # Заглушка для времени
+            **ai_safety_meta(),
         }
     except Exception as e:
         raise HTTPException(
@@ -152,7 +178,7 @@ async def get_ai_suggestions(
 
 
 @router.get("/suggestions/health")
-async def ai_health_check():
+async def ai_health_check(current_user: User = Depends(EMR_AI_ACCESS)):
     """Проверка здоровья AI сервиса"""
     return {
         "status": "ok",
@@ -186,6 +212,7 @@ class AISuggestionV2(BaseModel):
     source: str = "AI"
     explanation: Optional[str] = None
     model: str = "mock"
+    requiresDoctorConfirmation: bool = True
 
 
 class DoctorContextEntry(BaseModel):
@@ -218,6 +245,8 @@ class SuggestResponseV2(BaseModel):
     model: str = "mock"
     specialty: str
     used_doctor_context: bool = False
+    requires_doctor_confirmation: bool = True
+    decision_boundary: str = "suggestion_only"
 
 
 def generate_v2_suggestions(
@@ -307,7 +336,7 @@ def generate_v2_suggestions(
 async def suggest_v2(
     request: SuggestRequestV2,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(EMR_AI_ACCESS),
 ):
     """
     EMR v2 compatible AI suggestions endpoint.
