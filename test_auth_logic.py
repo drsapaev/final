@@ -13,8 +13,11 @@ def test_auth_logic():
     """Тестируем логику авторизации"""
     print("🔍 Тестирование логики авторизации...")
     
-    username = "mcp_test"
-    password = "test123"
+    username = os.getenv("QA_MCP_USERNAME", "mcp_test")
+    password = os.getenv("QA_MCP_PASSWORD")
+    if not password:
+        print("Set QA_MCP_PASSWORD before running this legacy auth logic smoke script.")
+        return False
     
     try:
         # Используем get_db как в сервере

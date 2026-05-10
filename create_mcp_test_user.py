@@ -13,6 +13,11 @@ def create_test_user():
     """Создаем тестового пользователя с известным паролем"""
     print("🔧 Создание тестового пользователя для MCP...")
     
+    password = os.getenv("QA_MCP_PASSWORD")
+    if not password:
+        print("Set QA_MCP_PASSWORD before running this legacy MCP test user helper.")
+        return
+
     try:
         with engine.connect() as conn:
             # Проверяем, есть ли уже тестовый пользователь
@@ -25,7 +30,7 @@ def create_test_user():
             if existing_user:
                 print("✅ Тестовый пользователь уже существует")
                 # Обновляем пароль
-                password_hash = get_password_hash("test123")
+                password_hash = get_password_hash(password)
                 conn.execute(text("""
                     UPDATE users 
                     SET hashed_password = :password_hash, is_active = 1
@@ -35,7 +40,7 @@ def create_test_user():
                 print("✅ Пароль обновлен")
             else:
                 # Создаем нового пользователя
-                password_hash = get_password_hash("test123")
+                password_hash = get_password_hash(password)
                 conn.execute(text("""
                     INSERT INTO users (username, email, full_name, role, is_active, is_superuser, hashed_password)
                     VALUES ('mcp_test', 'mcp_test@example.com', 'MCP Test User', 'Admin', 1, 1, :password_hash)
@@ -45,7 +50,7 @@ def create_test_user():
             
             print("\n📋 Учетные данные для тестирования:")
             print("  Username: mcp_test")
-            print("  Password: test123")
+            print("  Password: <QA_MCP_PASSWORD>")
             print("  Role: Admin")
             print("  Email: mcp_test@example.com")
             

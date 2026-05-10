@@ -4,13 +4,18 @@
 """
 import requests
 import json
+import os
 
 def test_simple_login():
     """Тест простого login endpoint"""
     try:
+        admin_password = os.getenv("QA_ADMIN_PASSWORD")
+        if not admin_password:
+            print("Set QA_ADMIN_PASSWORD before running this legacy auth smoke script.")
+            return False
         data = {
-            "username": "admin@example.com",
-            "password": "admin123",
+            "username": os.getenv("QA_ADMIN_USERNAME", "admin@example.com"),
+            "password": admin_password,
             "remember_me": False
         }
         
@@ -18,7 +23,7 @@ def test_simple_login():
             "Content-Type": "application/json"
         }
         
-        print(f"Sending simple login request with data: {data}")
+        print(f"Sending simple login request with data: {dict(data, password='<redacted>')}")
         
         response = requests.post(
             "http://localhost:18000/api/v1/auth/simple-login",

@@ -282,7 +282,7 @@ if __name__ == "__main__":
     if success:
         print("\n🎯 РЕКОМЕНДАЦИИ:")
         print("1. Откройте http://localhost:5173/queue/join?token=test для тестирования")
-        print("2. Войдите как admin/admin123 в http://localhost:5173/login")
+        print("2. Войдите как admin/<QA_ADMIN_PASSWORD> в http://localhost:5173/login")
         print("3. Перейдите в панель регистратора для управления очередью")
         print("4. Протестируйте генерацию QR кодов и запись пациентов")
     else:

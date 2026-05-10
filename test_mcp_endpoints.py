@@ -3,12 +3,17 @@
 """
 import requests
 import json
+import os
 
 def test_mcp_endpoints():
     """Тестируем MCP endpoints"""
     print("🔍 Тестирование MCP endpoints...")
     
     base_url = "http://localhost:18000/api/v1"
+    mcp_password = os.getenv("QA_MCP_PASSWORD")
+    if not mcp_password:
+        print("Set QA_MCP_PASSWORD before running this legacy MCP smoke script.")
+        return
     
     # Сначала получаем токен
     print("🔐 Получение токена авторизации...")
@@ -16,7 +21,7 @@ def test_mcp_endpoints():
     try:
         auth_response = requests.post(
             f"{base_url}/auth/minimal-login",
-            json={"username": "mcp_test", "password": "test123"},
+            json={"username": os.getenv("QA_MCP_USERNAME", "mcp_test"), "password": mcp_password},
             headers={"Content-Type": "application/json"}
         )
         

@@ -35,7 +35,17 @@ def test_password_verification():
             print(f"   Хеш пароля: {hashed_password[:50]}...")
             
             # Тестируем разные пароли
-            test_passwords = ["test123", "admin", "password", "mcp_test"]
+            test_passwords = [
+                value
+                for value in (
+                    os.getenv("QA_MCP_PASSWORD"),
+                    os.getenv("QA_ADMIN_PASSWORD"),
+                )
+                if value
+            ]
+            if not test_passwords:
+                print("Set QA_MCP_PASSWORD or QA_ADMIN_PASSWORD before running this legacy password verification smoke script.")
+                return
             
             for password in test_passwords:
                 try:

@@ -13,7 +13,19 @@ def check_passwords():
     """Проверяем пароли пользователей"""
     print("🔍 Проверка паролей пользователей...")
     
-    test_passwords = ["admin", "test123", "registrar", "doctor"]
+    test_passwords = [
+        value
+        for value in (
+            os.getenv("QA_ADMIN_PASSWORD"),
+            os.getenv("QA_MCP_PASSWORD"),
+            os.getenv("QA_REGISTRAR_PASSWORD"),
+            os.getenv("QA_DOCTOR_PASSWORD"),
+        )
+        if value
+    ]
+    if not test_passwords:
+        print("Set QA_ADMIN_PASSWORD, QA_MCP_PASSWORD, QA_REGISTRAR_PASSWORD, or QA_DOCTOR_PASSWORD before running this legacy password check.")
+        return
     
     try:
         with engine.connect() as conn:
@@ -35,8 +47,10 @@ def check_passwords():
                     print(f"   Пароль '{test_password}': {'✅' if is_valid else '❌'}")
                 
                 # Попробуем создать новый хеш для тестирования
-                new_hash = get_password_hash("test123")
-                print(f"   Новый хеш для 'test123': {new_hash[:50]}...")
+                sample_password = os.getenv("QA_MCP_PASSWORD")
+                if sample_password:
+                    new_hash = get_password_hash(sample_password)
+                    print(f"   Новый хеш для QA_MCP_PASSWORD: {new_hash[:50]}...")
                 
     except Exception as e:
         print(f"❌ Ошибка: {e}")

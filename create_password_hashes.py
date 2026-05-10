@@ -15,15 +15,20 @@ def update_passwords():
     
     # Создаем хеши для паролей
     passwords = {
-        'admin@example.com': 'admin123',
-        'doctor@example.com': 'doctor123', 
-        'registrar@example.com': 'registrar123',
-        'cardio@example.com': 'cardio123',
-        'derma@example.com': 'derma123',
-        'dentist@example.com': 'dentist123',
-        'lab@example.com': 'lab123',
-        'cashier@example.com': 'cashier123'
+        'admin@example.com': os.getenv('QA_ADMIN_PASSWORD'),
+        'doctor@example.com': os.getenv('QA_DOCTOR_PASSWORD'),
+        'registrar@example.com': os.getenv('QA_REGISTRAR_PASSWORD'),
+        'cardio@example.com': os.getenv('QA_CARDIO_PASSWORD'),
+        'derma@example.com': os.getenv('QA_DERMA_PASSWORD'),
+        'dentist@example.com': os.getenv('QA_DENTIST_PASSWORD'),
+        'lab@example.com': os.getenv('QA_LAB_PASSWORD'),
+        'cashier@example.com': os.getenv('QA_CASHIER_PASSWORD')
     }
+    missing = [email for email, password in passwords.items() if not password]
+    if missing:
+        print("Set role-specific QA_*_PASSWORD environment variables before running this legacy password update helper.")
+        print(f"Missing passwords for: {', '.join(missing)}")
+        return
     
     print("🔐 Создаем хеши паролей...")
     
@@ -31,7 +36,7 @@ def update_passwords():
     try:
         for email, password in passwords.items():
             password_hash = get_password_hash(password)
-            print(f"📧 {email}: {password} -> {password_hash[:30]}...")
+            print(f"📧 {email}: <env password> -> {password_hash[:30]}...")
             
             # Обновляем пароль в БД
             db.execute(text("UPDATE users SET hashed_password = :hash WHERE email = :email"), {

@@ -5,6 +5,7 @@
 
 import httpx
 import time
+import os
 
 def test_frontend():
     """Тестируем фронтенд"""
@@ -56,9 +57,13 @@ def test_login():
     try:
         with httpx.Client() as client:
             # Тестируем логин
+            admin_password = os.getenv("QA_ADMIN_PASSWORD")
+            if not admin_password:
+                print("Set QA_ADMIN_PASSWORD before running this legacy frontend login smoke script.")
+                return
             data = {
-                "username": "admin",
-                "password": "admin123",
+                "username": os.getenv("QA_ADMIN_USERNAME", "admin"),
+                "password": admin_password,
                 "grant_type": "password"
             }
             
