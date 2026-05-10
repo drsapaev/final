@@ -128,13 +128,13 @@ const credentials = {
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
 | **Admin** | `admin@example.com` | `[redacted demo password]` | ✅ |
-| **Registrar** | `registrar@example.com` | `registrar123` | ✅ |
-| **Lab** | `lab@example.com` | `lab123` | ✅ |
-| **Doctor** | `doctor@example.com` | `doctor123` | ✅ |
-| **Cashier** | `cashier@example.com` | `cashier123` | ✅ |
-| **Cardiologist** | `cardio@example.com` | `cardio123` | ✅ |
-| **Dermatologist** | `derma@example.com` | `derma123` | ✅ |
-| **Dentist** | `dentist@example.com` | `dentist123` | ✅ |
+| **Registrar** | `registrar@example.com` | `<set-locally>` | ✅ |
+| **Lab** | `lab@example.com` | `<set-locally>` | ✅ |
+| **Doctor** | `doctor@example.com` | `<set-locally>` | ✅ |
+| **Cashier** | `cashier@example.com` | `<set-locally>` | ✅ |
+| **Cardiologist** | `cardio@example.com` | `<set-locally>` | ✅ |
+| **Dermatologist** | `derma@example.com` | `<set-locally>` | ✅ |
+| **Dentist** | `dentist@example.com` | `<set-locally>` | ✅ |
 
 ---
 
