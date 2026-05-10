@@ -1,4 +1,0 @@
-{
-  "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('tbody tr').first().getByRole('button', { name: 'Изменить' })\u001b[22m\n\n    at [stdin]:96:60",
-  "at": "2026-03-26T12:28:09.920Z"
-}

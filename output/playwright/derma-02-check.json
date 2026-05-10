@@ -1,8 +1,0 @@
-{
-  "frontend_url": "http://localhost:8080",
-  "backend_url": "http://localhost:18003",
-  "exam_id": 4,
-  "diagnosis": "Чувствительная комбинированная кожа",
-  "history_visible": true,
-  "skin_reopen_visible": true
-}
