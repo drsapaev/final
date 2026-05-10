@@ -32,10 +32,10 @@
 
 ```
 Тестовые пользователи:
-- doctor / Test1234
-- cardio / Test1234
-- derma / Test1234
-- dentist / Test1234
+- doctor / <set-locally>
+- cardio / <set-locally>
+- derma / <set-locally>
+- dentist / <set-locally>
 
 Тестовые жалобы:
 - "Головная боль в течение 2 дней, усиливается при движении"
@@ -451,7 +451,7 @@ http://localhost:5173
 
 # 4. Логин как doctor
 username: doctor
-password: Test1234
+password: <set-locally>
 
 # 5. Создать запись → Оплатить → Открыть EMR
 
