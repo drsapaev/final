@@ -79,7 +79,11 @@ class ConfirmationSecurityService:
             # 1. Проверяем существование и валидность токена
             visit = self._get_visit_by_token(token)
             if not visit:
-                print(f"DEBUG: Visit not found for token {token}")
+                logger.debug(
+                    "Confirmation token lookup returned no visit token_hash=%s channel=%s",
+                    self._hash_token(token),
+                    channel,
+                )
                 self._log_security_event(
                     "invalid_token",
                     {
@@ -93,14 +97,19 @@ class ConfirmationSecurityService:
                     allowed=False, reason="Недействительный токен подтверждения"
                 )
 
-            print(f"DEBUG: Visit found: ID={visit.id}, Status={visit.status}, Expires={visit.confirmation_expires_at}, Now={datetime.utcnow()}")
+            logger.debug(
+                "Confirmation token lookup matched visit visit_id=%s status=%s has_expiration=%s",
+                visit.id,
+                visit.status,
+                bool(visit.confirmation_expires_at),
+            )
 
             # 2. Проверяем срок действия токена
             if (
                 visit.confirmation_expires_at
                 and visit.confirmation_expires_at < datetime.utcnow()
             ):
-                print("DEBUG: Token expired")
+                logger.debug("Confirmation token expired visit_id=%s", visit.id)
                 self._log_security_event(
                     "expired_token",
                     {
@@ -117,7 +126,11 @@ class ConfirmationSecurityService:
 
             # 3. Проверяем статус визита
             if visit.status not in ["pending_confirmation"]:
-                print(f"DEBUG: Invalid status {visit.status}")
+                logger.debug(
+                    "Confirmation token rejected by visit status visit_id=%s status=%s",
+                    visit.id,
+                    visit.status,
+                )
                 return SecurityCheckResult(
                     allowed=False, reason=f"Визит уже имеет статус: {visit.status}"
                 )
