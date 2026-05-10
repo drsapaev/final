@@ -3,12 +3,17 @@
 Проверка данных записей из API
 """
 
-import requests
 import json
+import os
+
+import requests
 
 BASE_URL = "http://localhost:18000/api/v1"
 USERNAME = "registrar"
-PASSWORD = "registrar123"
+PASSWORD_ENV = "QA_REGISTRAR_PASSWORD"
+PASSWORD = os.environ.get(PASSWORD_ENV, "").strip()
+if not PASSWORD:
+    raise SystemExit(f"Set {PASSWORD_ENV} before running this smoke script.")
 
 def get_auth_token():
     """Получаем токен аутентификации"""
