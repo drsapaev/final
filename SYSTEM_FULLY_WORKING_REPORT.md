@@ -33,7 +33,7 @@
 
 ### **Admin пользователь** ✅
 - **Логин**: admin
-- **Пароль**: admin123
+- **Пароль**: [redacted demo password]
 - **Роль**: Admin
 - **Статус**: ✅ АКТИВЕН
 - **JWT токен**: Генерируется корректно
@@ -41,7 +41,7 @@
 ### **API тестирование** ✅
 ```bash
 # Логин работает
-curl -X POST -d "username=admin&password=admin123&grant_type=password" \
+curl -X POST -d "username=admin&password=<redacted-demo-password>&grant_type=password" \
   http://localhost:18000/api/v1/auth/login
 # Возвращает: {"access_token":"...", "token_type":"bearer"}
 
@@ -59,7 +59,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 - **Проблема**: Admin не мог войти в систему
 - **Причина**: Неправильный хеш пароля
 - **Решение**: Пересоздан пароль с помощью Argon2
-- **Результат**: Admin успешно входит с паролем admin123
+- **Результат**: Admin успешно входит с redacted demo password
 
 ### 2. **Backend сервер** ✅ РАБОТАЕТ
 - **Проблема**: Возможные ошибки запуска
@@ -118,7 +118,7 @@ npm run dev
 
 ### **4. Вход в систему**
 - **Логин**: admin
-- **Пароль**: admin123
+- **Пароль**: [redacted demo password]
 - **Роль**: Admin (полный доступ)
 
 ---

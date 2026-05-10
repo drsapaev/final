@@ -19,7 +19,7 @@
 ## 🎯 Выполненные задачи
 
 ### ✅ Task 1.1: Remove hardcoded credentials
-**Проблема:** Хардкод admin@example.com/admin123 в LoginFormStyled.jsx
+**Проблема:** Хардкод admin@example.com/[redacted demo password] в LoginFormStyled.jsx
 **Решение:**
 - Удалены дефолтные значения username/password из initial state
 - Добавлена валидация на пустые поля
