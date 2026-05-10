@@ -23,7 +23,7 @@ def test_simple_server():
             "Content-Type": "application/json"
         }
         
-        print(f"Sending request to simple auth server with data: {dict(data, password='<redacted>')}")
+        print("Sending request to simple auth server with redacted credentials")
         
         response = requests.post(
             "http://localhost:8001/api/v1/auth/simple",

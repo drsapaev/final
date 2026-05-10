@@ -23,7 +23,7 @@ def test_json_login():
             "Content-Type": "application/json"
         }
         
-        print(f"Sending JSON login request with data: {dict(data, password='<redacted>')}")
+        print("Sending JSON login request with redacted credentials")
         
         response = requests.post(
             "http://localhost:18000/api/v1/auth/json-login",

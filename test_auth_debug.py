@@ -24,7 +24,7 @@ def test_auth_debug():
     }
     
     print(f"URL: {url}")
-    print(f"Data: {json.dumps({**data, 'password': '<redacted>'}, indent=2)}")
+    print("Data: <redacted credentials>")
     print(f"Headers: {json.dumps(headers, indent=2)}")
     
     try:

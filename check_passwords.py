@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 from backend.app.db.session import engine
-from backend.app.core.security import verify_password, get_password_hash
+from backend.app.core.security import verify_password
 from sqlalchemy import text
 
 def check_passwords():
@@ -40,17 +40,11 @@ def check_passwords():
             for user_id, username, email, hashed_password in users:
                 print(f"\n👤 Пользователь: {username} (ID: {user_id})")
                 print(f"   Email: {email}")
-                print(f"   Хеш пароля: {hashed_password[:50]}...")
+                print("   Хеш пароля: <stored>")
                 
-                for test_password in test_passwords:
+                for index, test_password in enumerate(test_passwords, start=1):
                     is_valid = verify_password(test_password, hashed_password)
-                    print(f"   Пароль '{test_password}': {'✅' if is_valid else '❌'}")
-                
-                # Попробуем создать новый хеш для тестирования
-                sample_password = os.getenv("QA_MCP_PASSWORD")
-                if sample_password:
-                    new_hash = get_password_hash(sample_password)
-                    print(f"   Новый хеш для QA_MCP_PASSWORD: {new_hash[:50]}...")
+                    print(f"   QA password #{index}: {'✅' if is_valid else '❌'}")
                 
     except Exception as e:
         print(f"❌ Ошибка: {e}")

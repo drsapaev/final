@@ -34,7 +34,7 @@ def test_login():
             "Content-Type": "application/json"
         }
         
-        print(f"Sending login request with data: {dict(data, password='<redacted>')}")
+        print("Sending login request with redacted credentials")
         
         response = requests.post(
             "http://localhost:18000/api/v1/auth/login",
