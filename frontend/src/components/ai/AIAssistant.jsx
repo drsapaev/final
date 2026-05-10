@@ -32,6 +32,65 @@ function sanitizeAIResponse(obj) {
   return obj;
 }
 
+const AI_DRAFT_NOTICE = 'AI формирует только черновик. Финальное медицинское решение должен подтвердить врач или администратор.';
+const AI_PROVIDER_UNAVAILABLE_NOTICE = 'AI-провайдер не настроен или временно недоступен. Используйте ручной клинический workflow и повторите запрос после настройки провайдера.';
+
+function getAIResponseError(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  if (typeof payload.error === 'string' && payload.error.trim()) {
+    return payload.error;
+  }
+
+  if (typeof payload.detail === 'string' && payload.detail.trim()) {
+    return payload.detail;
+  }
+
+  return null;
+}
+
+function normalizeAIErrorMessage(message) {
+  const rawMessage = String(message || '').trim();
+  if (!rawMessage) {
+    return AI_PROVIDER_UNAVAILABLE_NOTICE;
+  }
+
+  const lower = rawMessage.toLowerCase();
+  if (
+    lower.includes('no ai provider') ||
+    lower.includes('provider available') ||
+    lower.includes('api key') ||
+    lower.includes('not configured')
+  ) {
+    return AI_PROVIDER_UNAVAILABLE_NOTICE;
+  }
+
+  return rawMessage;
+}
+
+function getResultProvider(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const provider = getResultProvider(item);
+      if (provider) return provider;
+    }
+    return null;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  return value.provider || value.provider_used || value.model || value.source || null;
+}
+
+function isFallbackProvider(providerName) {
+  const normalized = String(providerName || '').toLowerCase();
+  return normalized === 'mock' || normalized === 'none' || normalized.includes('mock');
+}
+
 const AIAssistant = ({
   analysisType,
   data,
@@ -176,6 +235,11 @@ const AIAssistant = ({
       }
 
       // Санитизируем AI-generated контент перед отображением (XSS защита)
+      const responseError = getAIResponseError(response?.data);
+      if (responseError) {
+        throw new Error(responseError);
+      }
+
       const sanitizedData = sanitizeAIResponse(response.data);
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
@@ -183,7 +247,9 @@ const AIAssistant = ({
       logger.log('AI response sanitized and validated');
       setRetryCount(0);
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message;
+      const errorMsg = normalizeAIErrorMessage(
+        err.response?.data?.detail || err.response?.data?.error || err.message
+      );
       setError(errorMsg);
       enqueueSnackbar(`Ошибка AI анализа: ${errorMsg}`, { variant: 'error' });
       setRetryCount((prev) => prev + 1);
@@ -460,6 +526,10 @@ const AIAssistant = ({
     }
   };
 
+  const resultProvider = getResultProvider(result);
+  const usesFallbackProvider = isFallbackProvider(resultProvider);
+  const usesServerDefaultProvider = provider === 'default';
+
   return (
     <Card>
       <CardContent>
@@ -486,6 +556,28 @@ const AIAssistant = ({
             </Button>
           </div>
         </div>
+
+        {isOpen &&
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            <Alert severity="warning">
+              <Typography variant="body2">{AI_DRAFT_NOTICE}</Typography>
+            </Alert>
+            {usesServerDefaultProvider && !usesFallbackProvider &&
+            <Alert severity="info">
+                <Typography variant="body2">
+                  Используется серверный AI-провайдер по умолчанию. Если внешний провайдер не настроен, система покажет понятную ошибку и не создаст финальное медицинское решение.
+                </Typography>
+              </Alert>
+            }
+            {usesFallbackProvider &&
+            <Alert severity="info">
+                <Typography variant="body2">
+                  Ответ получен через резервный AI-провайдер {String(resultProvider).toUpperCase()}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.
+                </Typography>
+              </Alert>
+            }
+          </div>
+        }
 
         {loading ?
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>

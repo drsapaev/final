@@ -65,7 +65,7 @@ def test_activation_issue_list_revoke_roundtrip(client, admin_user):
 @pytest.mark.integration
 def test_activation_list_rejects_non_admin_access(client, registrar_user):
     response = client.post(
-        "/api/v1/auth/minimal-login",
+        "/api/v1/authentication/login",
         json={"username": registrar_user.username, "password": "registrar123"},
     )
     assert response.status_code == 200, response.text

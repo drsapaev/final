@@ -1,6 +1,7 @@
 # app/services/payment_webhook.py
 import hashlib
 import hmac
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,9 @@ from app.schemas.payment_webhook import (
     PaymeWebhookData,
 )
 from app.services.visit_payment_integration import VisitPaymentIntegrationService
+
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentWebhookService:
@@ -155,12 +159,22 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Платёж для записи {appointment_id} обработан: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "appointment",
+                                },
                             )
                         else:
-                            print(
-                                f"⚠️ Ошибка обработки платежа для записи {appointment_id}: {message}"
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "appointment",
+                                },
                             )
                     elif visit_id:
                         # Обновляем существующий визит
@@ -170,12 +184,22 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Платёж для визита {visit_id} обработан: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "visit",
+                                },
                             )
                         else:
-                            print(
-                                f"⚠️ Ошибка обработки платежа для визита {visit_id}: {message}"
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "visit",
+                                },
                             )
                     else:
                         # Создаём новую запись на основе платежа
@@ -185,20 +209,46 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Создана новая запись {new_appointment_id} на основе платежа: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "new_appointment",
+                                },
                             )
                         else:
-                            print(f"⚠️ Ошибка создания записи: {message}")
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "payme",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "new_appointment",
+                                },
+                            )
 
-                except Exception as e:
-                    print(f"⚠️ Ошибка интеграции с записями/визитами: {e}")
+                except Exception as exc:
+                    logger.error(
+                        "payment_webhook_visit_integration_exception",
+                        extra={
+                            "payment_provider": "payme",
+                            "webhook_record_id": webhook.id,
+                            "exception_type": type(exc).__name__,
+                        },
+                    )
                     # Не прерываем обработку вебхука из-за ошибки интеграции
 
             return True, "Webhook processed successfully", webhook
 
-        except Exception as e:
-            return False, f"Error processing webhook: {str(e)}", None
+        except Exception as exc:
+            logger.error(
+                "payment_webhook_processing_exception",
+                extra={
+                    "payment_provider": "payme",
+                    "exception_type": type(exc).__name__,
+                },
+            )
+            return False, "Error processing webhook", None
 
     @staticmethod
     def process_click_webhook(
@@ -288,12 +338,22 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Платёж для записи {appointment_id} обработан: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "appointment",
+                                },
                             )
                         else:
-                            print(
-                                f"⚠️ Ошибка обработки платежа для записи {appointment_id}: {message}"
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "appointment",
+                                },
                             )
                     elif visit_id:
                         # Обновляем существующий визит
@@ -303,12 +363,22 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Платёж для визита {visit_id} обработан: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "visit",
+                                },
                             )
                         else:
-                            print(
-                                f"⚠️ Ошибка обработки платежа для визита {visit_id}: {message}"
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "visit",
+                                },
                             )
                     else:
                         # Создаём новую запись на основе платежа
@@ -318,20 +388,46 @@ class PaymentWebhookService:
                             )
                         )
                         if success:
-                            print(
-                                f"✅ Создана новая запись {new_appointment_id} на основе платежа: {message}"
+                            logger.info(
+                                "payment_webhook_visit_integration_succeeded",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "new_appointment",
+                                },
                             )
                         else:
-                            print(f"⚠️ Ошибка создания записи: {message}")
+                            logger.warning(
+                                "payment_webhook_visit_integration_failed",
+                                extra={
+                                    "payment_provider": "click",
+                                    "webhook_record_id": webhook.id,
+                                    "target_type": "new_appointment",
+                                },
+                            )
 
-                except Exception as e:
-                    print(f"⚠️ Ошибка интеграции с записями/визитами: {e}")
+                except Exception as exc:
+                    logger.error(
+                        "payment_webhook_visit_integration_exception",
+                        extra={
+                            "payment_provider": "click",
+                            "webhook_record_id": webhook.id,
+                            "exception_type": type(exc).__name__,
+                        },
+                    )
                     # Не прерываем обработку вебхука из-за ошибки интеграции
 
             return True, "Webhook processed successfully", webhook
 
-        except Exception as e:
-            return False, f"Error processing webhook: {str(e)}", None
+        except Exception as exc:
+            logger.error(
+                "payment_webhook_processing_exception",
+                extra={
+                    "payment_provider": "click",
+                    "exception_type": type(exc).__name__,
+                },
+            )
+            return False, "Error processing webhook", None
 
     @staticmethod
     def get_webhook_summary(
@@ -364,9 +460,15 @@ class PaymentWebhookService:
                     "failed": failed_transactions,
                 },
             }
-        except Exception as e:
-            print(f"❌ Ошибка в get_webhook_summary: {e}")
-            return {"error": str(e)}
+        except Exception as exc:
+            logger.error(
+                "payment_webhook_summary_exception",
+                extra={
+                    "provider_filter_set": provider is not None,
+                    "exception_type": type(exc).__name__,
+                },
+            )
+            return {"error": "Unable to build webhook summary"}
 
 
 # Создаём экземпляр сервиса

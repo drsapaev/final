@@ -146,3 +146,18 @@ Any thin launcher is optional convenience only and not a required second install
 - Current local-first execution checklist is maintained in `docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`.
 - VPS rollout is one supported isolated-deployment path after local acceptance and is documented in `ops/vps/README.md` and `docs/runbooks/VPS_HOST_ROLLOUT_RUNBOOK.md`.
 - The same deployment contract is intended to support clinic-host / on-prem installs with the same post-deploy `/setup` flow.
+
+## Active Recovery Context (2026-05-09)
+
+- Active recovery plan: `.ai-factory/PLAN.md`.
+- Resume log and verification evidence: `.ai-factory/logs/RECOVERY_IMPLEMENTATION_STATUS.md`.
+- Recovery docs added for current audit, plan, architecture, API, security, AI, testing, and deployment:
+  - `docs/PROJECT_AUDIT.md`
+  - `docs/RECOVERY_PLAN.md`
+  - `docs/ARCHITECTURE.md`
+  - `docs/API.md`
+  - `docs/SECURITY_CHECKLIST.md`
+  - `docs/AI_MODULE.md`
+  - `docs/TESTING.md`
+  - `docs/DEPLOYMENT.md`
+- Do not treat the project as production-ready until `/aif-verify --strict`, `/aif-security-checklist`, and the documented disposable PostgreSQL migration proof are complete.

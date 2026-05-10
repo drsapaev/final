@@ -3,7 +3,13 @@ import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';
 import auth from '../stores/auth.js';
 import logger from '../utils/logger';
-import { getEffectiveRouteByPath, getLegacyRedirectTarget, getProfileRoles, isInternalDemoEnabled, normalizeRole } from './routeSelectors.js';
+import {
+  getEffectiveRouteByPath,
+  getLegacyRedirectTarget,
+  getProfileRoles,
+  isInternalDemoEnabled,
+  normalizeRole,
+} from './routeSelectors.js';
 
 function isSameAuthState(prev, next) {
   return prev.token === next.token &&
@@ -195,8 +201,8 @@ export function UnauthorizedPage() {
   return (
     <SystemRoutePage
       code="401"
-      title="Authentication Required"
-      description="Sign in to continue to this screen."
+      title="Требуется вход"
+      description="Войдите в систему, чтобы открыть этот раздел."
     />
   );
 }
@@ -205,8 +211,8 @@ export function ForbiddenPage() {
   return (
     <SystemRoutePage
       code="403"
-      title="Access Denied"
-      description="Your account does not have permission to open this route."
+      title="Доступ запрещён"
+      description="У вашей учётной записи нет прав для этого раздела."
     />
   );
 }
@@ -215,8 +221,8 @@ export function NotFoundPage() {
   return (
     <SystemRoutePage
       code="404"
-      title="Page Not Found"
-      description="The requested route is not part of the clinic application contract."
+      title="Страница не найдена"
+      description="Запрошенный маршрут не входит в контракт приложения клиники."
     />
   );
 }

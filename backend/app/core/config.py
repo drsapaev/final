@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     )
     AUTH_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
+    ENABLE_FALLBACK_AUTH: bool = Field(
+        default=False,
+        description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",
+    )
 
     # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
