@@ -1,32 +1,30 @@
-"""Update ЭКГ service code from ECG01 to K10"""
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+#!/usr/bin/env python3
+"""Retired legacy ECG service-code helper.
 
-from sqlalchemy import create_engine, text
+Service catalog changes are owned by migrations, seed data, or supported admin
+flows. This root helper no longer mutates a local SQLite database directly.
+"""
 
-# Connect to database
-db_path = os.path.join(os.path.dirname(__file__), 'app', 'clinic.db')
-engine = create_engine(f'sqlite:///{db_path}')
+from __future__ import annotations
 
-with engine.connect() as conn:
-    # Update ЭКГ service code
-    result = conn.execute(text("""
-        UPDATE services 
-        SET service_code='K10', category_code='K' 
-        WHERE name='ЭКГ' OR service_code='ECG01'
-    """))
-    conn.commit()
-    print(f"Updated {result.rowcount} rows")
-    
-    # Show result
-    result = conn.execute(text("""
-        SELECT id, name, code, service_code, category_code 
-        FROM services 
-        WHERE name LIKE '%ЭКГ%' OR name LIKE '%ЭхоКГ%'
-    """))
-    print("\nServices with ЭКГ/ЭхоКГ:")
-    for row in result:
-        print(f"  ID={row[0]}, name={row[1]}, code={row[2]}, service_code={row[3]}, category_code={row[4]}")
 
-print("\nDone!")
+MESSAGE = """
+backend/fix_ecg_code.py is retired.
+
+Do not update ECG service codes through a direct SQLite UPDATE. Apply catalog
+changes through the canonical migration, seed, or admin-service path instead.
+
+For schema changes:
+
+  cd backend
+  alembic upgrade head
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
