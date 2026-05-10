@@ -16,8 +16,8 @@ test.use({
 });
 
 const LIVE_CREDENTIALS = {
-  doctor: { username: 'doctor@example.com', password: 'doctor123', route: /\/doctor-panel(\?.*)?$/ },
-  admin: { username: 'admin', password: 'admin123', route: /\/admin(\?.*)?$/ },
+  doctor: { username: 'doctor@example.com', route: /\/doctor-panel(\?.*)?$/ },
+  admin: { username: 'admin', route: /\/admin(\?.*)?$/ },
 };
 
 function ensureArtifactsDir() {
