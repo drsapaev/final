@@ -1,8 +1,14 @@
+import os
 import requests
 import json
 
+CARDIO_PASSWORD_ENV = "QA_CARDIO_PASSWORD"
+CARDIO_PASSWORD = os.environ.get(CARDIO_PASSWORD_ENV, "").strip()
+if not CARDIO_PASSWORD:
+    raise SystemExit(f"Set {CARDIO_PASSWORD_ENV} before running this smoke script.")
+
 # Тест аутентификации
-login_data = {'username': 'cardio@example.com', 'password': 'cardio123'}
+login_data = {'username': 'cardio@example.com', 'password': CARDIO_PASSWORD}
 response = requests.post('http://localhost:18000/api/v1/auth/minimal-login', json=login_data)
 
 if response.status_code == 200:

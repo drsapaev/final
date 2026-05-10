@@ -1,5 +1,11 @@
+import os
 import requests
 import sqlite3
+
+CARDIO_PASSWORD_ENV = "QA_CARDIO_PASSWORD"
+CARDIO_PASSWORD = os.environ.get(CARDIO_PASSWORD_ENV, "").strip()
+if not CARDIO_PASSWORD:
+    raise SystemExit(f"Set {CARDIO_PASSWORD_ENV} before running this smoke script.")
 
 # 1. Проверяем роли в базе данных
 print("=== Роли пользователей в БД ===")
@@ -14,7 +20,7 @@ conn.close()
 print("\n=== Тест аутентификации cardio ===")
 login_response = requests.post(
     'http://localhost:18000/api/v1/auth/minimal-login',
-    json={'username': 'cardio@example.com', 'password': 'cardio123'}
+    json={'username': 'cardio@example.com', 'password': CARDIO_PASSWORD}
 )
 print(f'Login status: {login_response.status_code}')
 

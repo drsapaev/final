@@ -3,8 +3,15 @@
 Тестовый скрипт для диагностики проблем фронтенда
 """
 
-import requests
 import json
+import os
+
+import requests
+
+REGISTRAR_PASSWORD_ENV = "QA_REGISTRAR_PASSWORD"
+REGISTRAR_PASSWORD = os.environ.get(REGISTRAR_PASSWORD_ENV, "").strip()
+if not REGISTRAR_PASSWORD:
+    raise SystemExit(f"Set {REGISTRAR_PASSWORD_ENV} before running this smoke script.")
 
 def test_api_endpoints():
     """Тестируем все API эндпоинты, которые использует фронтенд"""
@@ -17,7 +24,11 @@ def test_api_endpoints():
     try:
         response = requests.post(
             f"{base_url}/api/v1/auth/minimal-login",
-            json={"username": "registrar@example.com", "password": "registrar123", "remember_me": False},
+            json={
+                "username": "registrar@example.com",
+                "password": REGISTRAR_PASSWORD,
+                "remember_me": False,
+            },
             timeout=5
         )
         if response.status_code == 200:
