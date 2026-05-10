@@ -17,7 +17,7 @@ Login and get access token.
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "REPLACE_WITH_ADMIN_PASSWORD"
 }
 ```
 
