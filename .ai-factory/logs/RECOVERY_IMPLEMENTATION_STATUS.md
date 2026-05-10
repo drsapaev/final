@@ -1418,6 +1418,85 @@ LightRAG evidence note:
 
 - No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
 
+## Task 26 Slice A Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause`
+- reason: backend runtime logging/public error leakage audit outside payment webhook
+- risky domain: yes, auth/login endpoint
+- root cause known: selected after repository search found raw debug prints in the canonical authentication login endpoint
+- command: `python scripts\agent_gate.py "Task 26 remove raw print and public-sensitive debug logging from canonical authentication login endpoint while preserving 2FA behavior" --known-root-cause "backend/app/api/v1/endpoints/authentication.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/api/v1/endpoints/authentication.py`
+- first-touch files: `backend/app/api/v1/endpoints/authentication.py`
+- validation target: compile, 2FA enforcement tests, static search for removed login debug prints
+- stop condition watched first: any required change outside the canonical login endpoint
+
+Changed behavior:
+
+- Removed raw `print(...)` diagnostics from the canonical `/api/v1/authentication/login` endpoint.
+- Stopped logging username, raw IP/User-Agent values, auth service object, full login result payload, and traceback text through print statements.
+- Replaced the login endpoint public HTTP 500 detail that included raw exception text with a generic login failure message.
+- Preserved the 2FA response contract and token behavior.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\authentication.py`
+  - result: passed
+- `python -m pytest backend\tests\test_2fa_enforcement.py -q --tb=short --disable-warnings`
+  - result: 7 passed, 1 warning
+- static search for removed login debug strings and `print(...)` in `authentication.py`
+  - result: no matches
+
+Scope note:
+
+- Task 26 remains pending because this was the first selected high-risk slice, not a repo-wide cleanup of every remaining raw public error detail.
+
+## Task 25 Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause` retry with `backend/alembic/env.py`
+- reason: PostgreSQL/Alembic deployment readiness and database source-of-truth proof
+- risky domain: yes
+- root cause known: initially no; Alembic env became the confirmed anchor after the first gate missed it
+
+Gate result:
+
+- Initial gate failed before Task 25 because `ai/langgraph/scripts/agent_gate.py` was missing from `main`.
+- Restored `agent_gate.py` from existing git history in a separate dev-brain commit.
+- First Task 25 gate selected only ops packaging files.
+- Retry with `--known-root-cause backend/alembic/env.py` returned `gate_misroute: yes` and `override_used: yes`.
+- Narrow override was used only for plan/status/testing/deployment docs because the plan explicitly allowed deployment/testing docs when the disposable PostgreSQL proof was blocked.
+
+Validation run:
+
+- `python -m py_compile backend\alembic\env.py`
+  - result: passed
+- `python -m alembic heads --verbose`
+  - result: passed; single head `0022_service_audit_log`
+- `python -m alembic branches --verbose`
+  - result: passed; no branch split reported
+- `python -m alembic history -r base:head`
+  - result: passed; linear chain from `0001_baseline` to `0022_service_audit_log`
+- `Test-NetConnection localhost -Port 55432`
+  - result: failed; staging PostgreSQL port closed
+- Docker/Compose availability check
+  - result: failed; Docker command unavailable
+- `psql` availability check
+  - result: failed; `psql` command unavailable
+- Disposable database proof on reachable local PostgreSQL `5432`
+  - result: blocked before migrations; configured role lacks `CREATEDB`, no throwaway database was created
+
+Task result:
+
+- Alembic revision graph is verified as linear with a single current head.
+- Clean online `alembic upgrade head` is still not proven in this local environment.
+- The blocker is now documented in testing/deployment/security docs without claiming production readiness.
+
 ## Task 24 Evidence
 
 Execution mode:

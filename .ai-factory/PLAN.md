@@ -424,7 +424,7 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
 
 ### Phase 5: Next Recovery Slice (added by /aif-improve on 2026-05-10)
 
-- [ ] Task 25: Prove clean PostgreSQL Alembic upgrade for the recovery branch.
+- [x] Task 25: Prove clean PostgreSQL Alembic upgrade for the recovery branch.
   Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` because this touches persistence, deployment readiness, and the PostgreSQL source of truth. Resolve whether a disposable PostgreSQL target is available on the local contour (`55432`) or through an existing compose/runbook path. Verify the Alembic revision chain and execute `alembic upgrade head` against a disposable database, or document the exact blocker and add the smallest CI/runbook follow-up instead of claiming production readiness.
   Files: `backend/alembic/*`, `backend/alembic/versions/*`, `backend/alembic.ini`, `backend/app/db/*`, `ops/compose.staging.yml`, deployment/testing docs only if evidence requires
   Validation target: migration graph inspection plus a real disposable PostgreSQL `alembic upgrade head` proof, or a clearly documented blocker with a concrete next validation path.
@@ -450,7 +450,7 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
 
 ## Verification Plan
 
-- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-24 remain completed, and Task 25 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
+- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-25 remain completed, and Task 26 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
 - Auth P0: route map plus 2FA tests proving no production login path issues `access_token` before required 2FA.
 - Payment P0: webhook tests prove retryable failures do not return successful HTTP status and duplicate callback ownership is explicit.
 - Upload P0: simple upload endpoint is either disabled outside explicit dev/test mode or covered by filename, size, MIME, storage, and logging tests.

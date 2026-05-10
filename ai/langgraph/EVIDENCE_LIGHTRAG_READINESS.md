@@ -3304,3 +3304,40 @@ Continue recovery after PR #377 with commit-and-push per step; implement Task 22
 - current stack sufficient: yes for this narrow slice
 - would LightRAG likely help here: low
 - Better retrieval would be useful mainly for automatically selecting targeted validation tests.
+
+## Task 93 - Alembic clean-upgrade proof gate misroute
+
+### User task
+Continue recovery through `/aif-implement @.ai-factory/PLAN.md`, Task 25: prove clean PostgreSQL Alembic upgrade for the recovery branch.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/alembic/env.py
+
+### What handoff solved well
+- It preserved the rule that PostgreSQL + Alembic are the database source of truth.
+- It stopped runtime edits and kept the task focused on migration proof instead of broad deployment changes.
+
+### Missing relationship mapping
+- The first gate mapped `alembic/postgresql` to ops packaging files only and missed the active Alembic anchor.
+- Even after the known-root-cause retry, the gate did not include the plan-approved testing/deployment docs needed to record the blocked disposable PostgreSQL proof.
+
+### Manual reconstruction needed
+- Manually read `.ai-factory/PLAN.md`, `backend/alembic/env.py`, `backend/alembic.ini`, migration revisions, and current testing/deployment docs.
+- Manually selected docs/status files for the blocked-proof evidence because the gate first-touch list did not include them.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: partial
+- would LightRAG likely help here: yes
+- Better retrieval should connect Alembic proof tasks to `backend/alembic/env.py`, migration revision files, testing/deployment docs, and local contour blockers.

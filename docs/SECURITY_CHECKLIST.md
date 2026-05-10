@@ -16,7 +16,7 @@ This checklist describes privacy/security readiness gaps. It does not claim HIPA
 | Uploads | Improved | Simple upload disabled unless explicitly enabled and has basic metadata gates. |
 | Telegram | Improved but incomplete | Patched webhook routes fail closed without secret; retry/outbox and PHI minimization need follow-up. |
 | AI | Improved but incomplete | Draft-only boundary added to EMR AI and visible assistant; mock-provider policy still unresolved. |
-| Database | Partially verified | Alembic chain linear; clean online upgrade blocked locally without disposable PostgreSQL. |
+| Database | Partially verified | Alembic chain linear with head `0022_service_audit_log`; clean online upgrade blocked locally because no disposable PostgreSQL target with create/drop permission was available. |
 | Logging | Mixed | Some sensitive logging was reduced; additional screens/services need review. |
 
 ## Required Before Production
