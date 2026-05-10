@@ -3,10 +3,16 @@
 Проверка API услуг без аутентификации
 """
 
-import requests
 import json
+import os
+
+import requests
 
 BASE_URL = "http://localhost:18000/api/v1"
+REGISTRAR_PASSWORD_ENV = "QA_REGISTRAR_PASSWORD"
+REGISTRAR_PASSWORD = os.environ.get(REGISTRAR_PASSWORD_ENV, "").strip()
+if not REGISTRAR_PASSWORD:
+    raise SystemExit(f"Set {REGISTRAR_PASSWORD_ENV} before running this smoke script.")
 
 def check_services_without_auth():
     """Проверяем API услуг без аутентификации"""
@@ -48,7 +54,7 @@ def check_minimal_login():
     
     credentials = {
         "username": "registrar",
-        "password": "registrar123"
+        "password": REGISTRAR_PASSWORD
     }
     
     try:

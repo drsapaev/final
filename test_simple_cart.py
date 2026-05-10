@@ -27,6 +27,10 @@ from datetime import date, datetime
 # Configuration
 API_BASE = "http://localhost:18000"
 AUTH_TOKEN = None
+REGISTRAR_PASSWORD_ENV = "QA_REGISTRAR_PASSWORD"
+REGISTRAR_PASSWORD = os.environ.get(REGISTRAR_PASSWORD_ENV, "").strip()
+if not REGISTRAR_PASSWORD:
+    raise SystemExit(f"Set {REGISTRAR_PASSWORD_ENV} before running this smoke script.")
 
 def login_as_registrar():
     """Login as registrar user"""
@@ -35,7 +39,7 @@ def login_as_registrar():
         f"{API_BASE}/api/v1/auth/minimal-login",
         json={
             "username": "registrar",
-            "password": "registrar123"
+            "password": REGISTRAR_PASSWORD
         }
     )
 

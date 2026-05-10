@@ -1,9 +1,15 @@
 """
 Тест проверки данных для бейджей вкладок (иконка часов)
 """
-import requests
 import json
+import os
+import requests
 from datetime import date
+
+REGISTRAR_PASSWORD_ENV = "QA_REGISTRAR_PASSWORD"
+REGISTRAR_PASSWORD = os.environ.get(REGISTRAR_PASSWORD_ENV, "").strip()
+if not REGISTRAR_PASSWORD:
+    raise SystemExit(f"Set {REGISTRAR_PASSWORD_ENV} before running this smoke script.")
 
 print("=" * 60)
 print("ТЕСТ БЕЙДЖЕЙ ВКЛАДОК (ИКОНКА ЧАСОВ)")
@@ -13,7 +19,7 @@ print("=" * 60)
 print("\n🔐 Вход в систему...")
 login_response = requests.post(
     "http://localhost:18000/api/v1/authentication/login",
-    json={"username": "registrar", "password": "registrar123"}
+    json={"username": "registrar", "password": REGISTRAR_PASSWORD}
 )
 
 if login_response.status_code != 200:
