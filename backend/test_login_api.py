@@ -1,30 +1,23 @@
 #!/usr/bin/env python3
-import requests
-import json
+"""Retired root manual auth smoke script."""
 
-# Тестируем логин API
-url = "http://localhost:18000/api/v1/auth/login"
-data = {
-    "username": "admin",
-    "password": "admin123"
-}
+from __future__ import annotations
 
-print("Тестируем логин API...")
-print(f"URL: {url}")
-print(f"Data: {data}")
+import sys
 
-try:
-    response = requests.post(url, data=data)
-    print(f"Status Code: {response.status_code}")
-    print(f"Response Headers: {dict(response.headers)}")
-    print(f"Response Text: {response.text}")
-    
-    if response.status_code == 200:
-        print("✅ Логин успешен!")
-        result = response.json()
-        print(f"Access Token: {result.get('access_token', 'N/A')[:20]}...")
-    else:
-        print("❌ Ошибка логина")
-        
-except Exception as e:
-    print(f"❌ Ошибка запроса: {e}")
+MESSAGE = """
+test_login_api.py is retired.
+
+This root-level manual script used built-in credentials and is outside the
+backend pytest suite. Use backend/tests pytest fixtures or an env-driven smoke
+check against the current runtime instead.
+""".strip()
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
