@@ -51,6 +51,14 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/authentication/login")
 
 
+def _token_subject_kind(value: object) -> str:
+    if isinstance(value, int):
+        return "numeric"
+    if isinstance(value, str):
+        return "numeric" if value.isdigit() else "text"
+    return "missing"
+
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
     Create a JWT token with `sub` claim taken from data (if provided).
@@ -102,7 +110,10 @@ def _username_from_token(token: str) -> str | None:
 
         return None
     except JWTError as e:
-        logger.warning("_username_from_token: JWT decode error: %s", e)
+        logger.warning(
+            "_username_from_token: JWT decode error (%s)",
+            type(e).__name__,
+        )
         return None
 
 
@@ -115,7 +126,7 @@ async def _get_user_by_username(db, username: str) -> User | None:
 
     Attempts to return a mapped User instance or None.
     """
-    logger.debug(f"_get_user_by_username: looking for username={username}")
+    logger.debug("_get_user_by_username: looking for text subject")
     if db is None:
         logger.debug("_get_user_by_username: db is None")
         return None
@@ -155,15 +166,13 @@ async def _get_user_by_id(db, user_id: int) -> User | None:
     """
     Получить пользователя по числовому ID, поддерживая как AsyncSession, так и sync Session.
     """
-    logger.debug(f"_get_user_by_id: looking for user_id={user_id}")
+    logger.debug("_get_user_by_id: looking for numeric subject")
     if db is None:
         logger.debug("_get_user_by_id: db is None")
         return None
 
     execute_callable = getattr(db, "execute", None)
-    logger.debug(f"_get_user_by_id: execute_callable type={type(execute_callable)}")
     stmt = select(User).where(User.id == user_id)
-    logger.debug(f"_get_user_by_id: stmt={stmt}")
 
     if inspect.iscoroutinefunction(execute_callable):
         logger.debug("_get_user_by_id: using async execute")
@@ -174,18 +183,19 @@ async def _get_user_by_id(db, user_id: int) -> User | None:
 
     try:
         user = result.scalar_one_or_none()
-        logger.debug(f"_get_user_by_id: found user={user.username if user else 'None'}")
+        logger.debug("_get_user_by_id: found_user=%s", user is not None)
         return user
     except Exception as e:
-        logger.debug(f"_get_user_by_id: scalar_one_or_none error: {e}")
+        logger.debug(
+            "_get_user_by_id: scalar_one_or_none error (%s)",
+            type(e).__name__,
+        )
         try:
             user = result.scalars().first()
-            logger.debug(
-                f"_get_user_by_id: found with scalars: {user.username if user else 'None'}"
-            )
+            logger.debug("_get_user_by_id: found_with_scalars=%s", user is not None)
             return user
         except Exception as e2:
-            logger.debug(f"_get_user_by_id: scalars error: {e2}")
+            logger.debug("_get_user_by_id: scalars error (%s)", type(e2).__name__)
             return None
 
 
@@ -205,21 +215,19 @@ async def get_current_user(
     try:
         if username:
             logger.debug(
-                f"get_current_user: trying to find user by username={username}"
+                "get_current_user: trying primary subject lookup (%s)",
+                _token_subject_kind(username),
             )
             # Если username содержит только цифры, то это ID
             if username.isdigit():
-                logger.debug(
-                    f"get_current_user: username is digit, trying ID {int(username)}"
-                )
+                logger.debug("get_current_user: primary subject is numeric")
                 user = await _get_user_by_id(db, int(username))
             else:
-                logger.debug(
-                    f"get_current_user: username is not digit, trying username {username}"
-                )
+                logger.debug("get_current_user: primary subject is text")
                 user = await _get_user_by_username(db, username)
             logger.debug(
-                f"get_current_user: user found={user.username if user else 'None'}"
+                "get_current_user: primary lookup found_user=%s",
+                user is not None,
             )
         else:
             logger.debug("get_current_user: no username, trying payload fallback")
@@ -230,33 +238,34 @@ async def get_current_user(
                     settings.SECRET_KEY,
                     algorithms=[getattr(settings, "ALGORITHM", "HS256")],
                 )
-                logger.debug(f"get_current_user: payload={payload}")
                 sub = payload.get("sub")
-                logger.debug(f"get_current_user: sub={sub}, type={type(sub)}")
+                logger.debug(
+                    "get_current_user: fallback sub kind=%s",
+                    _token_subject_kind(sub),
+                )
                 if isinstance(sub, str) and sub.isdigit():
-                    logger.debug(
-                        f"get_current_user: sub is digit string, trying ID {int(sub)}"
-                    )
+                    logger.debug("get_current_user: fallback sub is numeric")
                     user = await _get_user_by_id(db, int(sub))
                 elif isinstance(sub, int):
-                    logger.debug(f"get_current_user: sub is int, trying ID {sub}")
+                    logger.debug("get_current_user: fallback sub is numeric")
                     user = await _get_user_by_id(db, sub)
                 elif isinstance(sub, str):
-                    logger.debug(
-                        f"get_current_user: sub is string, trying username {sub}"
-                    )
+                    logger.debug("get_current_user: fallback sub is text")
                     user = await _get_user_by_username(db, sub)
                 logger.debug(
-                    f"get_current_user: user found by fallback={user.username if user else 'None'}"
+                    "get_current_user: fallback lookup found_user=%s",
+                    user is not None,
                 )
-            except JWTError:
-                logger.debug("get_current_user: JWT decode error")
+            except JWTError as jwt_error:
+                logger.debug(
+                    "get_current_user: JWT decode error (%s)",
+                    type(jwt_error).__name__,
+                )
                 user = None
     except Exception as e:
         logger.warning(
-            "get_current_user: validation failed: %s (%s)",
+            "get_current_user: validation failed (%s)",
             type(e).__name__,
-            str(e),
             exc_info=False,
         )
         raise HTTPException(
@@ -272,12 +281,11 @@ async def get_current_user(
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    try:
-        logger.debug(
-            f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}"
-        )
-    except Exception:
-        pass
+    logger.debug(
+        "[deps.get_current_user] authenticated user resolved role=%s active=%s",
+        getattr(user, "role", None),
+        getattr(user, "is_active", None),
+    )
     return user
 
 
