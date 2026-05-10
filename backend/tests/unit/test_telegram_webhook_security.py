@@ -19,6 +19,25 @@ class FakeTelegramBotService:
 
 @pytest.mark.unit
 class TestTelegramWebhookSecurity:
+    def test_webhook_rejects_missing_secret_configuration(
+        self, client, monkeypatch
+    ):
+        fake_service = FakeTelegramBotService(active=True)
+        monkeypatch.setattr(
+            telegram_webhook,
+            "get_telegram_bot_service",
+            AsyncMock(return_value=fake_service),
+        )
+
+        response = client.post(
+            "/api/v1/telegram/webhook",
+            json={"update_id": 10},
+        )
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Telegram webhook secret is not configured"
+        assert fake_service.process_webhook_update.await_count == 0
+
     def test_webhook_rejects_invalid_secret(self, client, db_session, monkeypatch):
         db_session.add(
             TelegramConfig(
@@ -74,6 +93,42 @@ class TestTelegramWebhookSecurity:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
         fake_service.process_webhook_update.assert_awaited_once()
+
+    def test_webhook_does_not_log_full_payload(
+        self, client, db_session, monkeypatch, caplog
+    ):
+        db_session.add(
+            TelegramConfig(
+                bot_token="bot-token",
+                webhook_secret="topsecret",
+                active=True,
+            )
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService(active=True)
+        monkeypatch.setattr(
+            telegram_webhook,
+            "get_telegram_bot_service",
+            AsyncMock(return_value=fake_service),
+        )
+
+        caplog.set_level("INFO", logger="app.api.v1.endpoints.telegram_webhook")
+        response = client.post(
+            "/api/v1/telegram/webhook",
+            json={
+                "update_id": 3,
+                "message": {
+                    "message_id": 12,
+                    "text": "Sensitive Patient Diagnosis",
+                },
+            },
+            headers={"x-telegram-bot-api-secret-token": "topsecret"},
+        )
+
+        assert response.status_code == 200
+        assert "Telegram webhook update accepted" in caplog.text
+        assert "Sensitive Patient Diagnosis" not in caplog.text
 
     def test_send_message_requires_admin_auth(self, client):
         response = client.post(

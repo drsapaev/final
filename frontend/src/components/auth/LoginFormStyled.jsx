@@ -109,11 +109,13 @@ const LoginFormStyled = () => {void
         remember_me: rememberMe
       };
 
-      logger.log('🔍 Отправляемые данные:', credentials);
-      logger.log('📝 formData:', formData);
+      logger.log('[AUTH] Login submit', {
+        loginType: formData.loginType,
+        rememberMe,
+      });
 
-      // Используем текущий API origin, чтобы login smoke не зависел от старых портов
-      const response = await fetch(buildApiUrl('/auth/minimal-login'), {
+      // 2FA-aware canonical login endpoint; keep current-origin API resolution for smoke stability.
+      const response = await fetch(buildApiUrl('/authentication/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -147,6 +149,7 @@ const LoginFormStyled = () => {void
       if (data.requires_2fa && data.pending_2fa_token) {
         setRequires2FA(true);
         setPending2FAToken(data.pending_2fa_token);
+        setTwoFactorMethod(data.two_factor_method || 'totp');
         setLoading(false);
         return;
       }
@@ -221,8 +224,8 @@ const LoginFormStyled = () => {void
 
       if (rawMessage && /failed to fetch/i.test(rawMessage)) {
         logger.warn('[FIX:LOGIN] Network login failure normalized', {
-          username: formData.username,
           loginType: formData.loginType,
+          hasIdentifier: Boolean(formData.username),
           rawMessage,
           normalizedMessage: LOGIN_ERROR_MESSAGES.NETWORK,
           timestamp: new Date().toISOString(),
@@ -234,8 +237,8 @@ const LoginFormStyled = () => {void
         error: errorMessage,
         rawMessage,
         timestamp: new Date().toISOString(),
-        username: formData.username,
-        loginType: formData.loginType
+        loginType: formData.loginType,
+        hasIdentifier: Boolean(formData.username)
       });
 
       setError(errorMessage);

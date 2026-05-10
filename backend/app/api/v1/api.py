@@ -5,6 +5,7 @@ import logging
 
 from fastapi import APIRouter
 
+from app.core.config import settings
 from app.api.v1.endpoints import (
     activation as activation_ep,
 )
@@ -159,9 +160,14 @@ api_router = APIRouter()
 # Auth (/login, /me и т.д.)
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
-api_router.include_router(simple_auth.router, prefix="/auth", tags=["simple-auth"])
-
-api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-auth"])
+if settings.ENABLE_FALLBACK_AUTH:
+    logger.warning(
+        "ENABLE_FALLBACK_AUTH is enabled; legacy simple/minimal auth endpoints are mounted."
+    )
+    api_router.include_router(simple_auth.router, prefix="/auth", tags=["simple-auth"])
+    api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-auth"])
+else:
+    logger.info("Legacy simple/minimal auth endpoints are disabled by configuration.")
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")

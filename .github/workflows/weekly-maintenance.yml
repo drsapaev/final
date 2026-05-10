@@ -1,0 +1,274 @@
+name: Weekly Maintenance Report
+
+on:
+  schedule:
+    # Weekly Monday 03:30 Asia/Tashkent (Sunday 22:30 UTC).
+    - cron: '30 22 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance-report:
+    name: Maintenance health report
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11.10'
+
+      - name: Prepare report files
+        shell: bash
+        run: |
+          mkdir -p maintenance-reports
+          printf "check\tstatus\texit_code\tdetails\n" > maintenance-reports/checks.tsv
+          {
+            echo "# Weekly Maintenance Report"
+            echo ""
+            echo "Manual report-only run. Failures are recorded below and in artifacts."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Root npm health
+        shell: bash
+        run: |
+          set +e
+
+          record() {
+            local check="$1"
+            local status="$2"
+            local exit_code="$3"
+            local details="$4"
+            printf "%s\t%s\t%s\t%s\n" "$check" "$status" "$exit_code" "$details" >> maintenance-reports/checks.tsv
+          }
+
+          has_script() {
+            local script_name="$1"
+            node -e "const pkg = require('./package.json'); process.exit(pkg.scripts && pkg.scripts['${script_name}'] ? 0 : 1)"
+          }
+
+          if [ ! -f package.json ]; then
+            record "root package.json" "skipped" "0" "package.json not found"
+            exit 0
+          fi
+
+          if [ -f package-lock.json ]; then
+            npm ci > maintenance-reports/root-npm-ci.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "root npm ci" "$status" "$code" "see root-npm-ci.log"
+
+            npm audit --audit-level=moderate --json > maintenance-reports/root-npm-audit.json 2> maintenance-reports/root-npm-audit.log
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="reported"
+            record "root npm audit" "$status" "$code" "see root-npm-audit.json"
+          else
+            record "root npm ci" "skipped" "0" "package-lock.json not found"
+            record "root npm audit" "skipped" "0" "package-lock.json not found"
+          fi
+
+          if (has_script test || has_script build) && node -e "const scripts = require('./package.json').scripts || {}; process.exit(Object.values(scripts).some((script) => script.includes('frontend')) ? 0 : 1)"; then
+            if [ -f frontend/package-lock.json ] && [ ! -d frontend/node_modules ]; then
+              npm --prefix frontend ci > maintenance-reports/root-delegated-frontend-npm-ci.log 2>&1
+              code=$?
+              [ "$code" -eq 0 ] && status="ok" || status="failed"
+              record "root delegated frontend npm ci" "$status" "$code" "see root-delegated-frontend-npm-ci.log"
+            fi
+          fi
+
+          if has_script test; then
+            timeout 10m npm run test > maintenance-reports/root-npm-test.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "root npm test" "$status" "$code" "see root-npm-test.log"
+          else
+            record "root npm test" "skipped" "0" "package script test not found"
+          fi
+
+          if has_script build; then
+            timeout 10m npm run build > maintenance-reports/root-npm-build.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "root npm build" "$status" "$code" "see root-npm-build.log"
+          else
+            record "root npm build" "skipped" "0" "package script build not found"
+          fi
+
+          exit 0
+
+      - name: Frontend npm health
+        shell: bash
+        run: |
+          set +e
+
+          record() {
+            local check="$1"
+            local status="$2"
+            local exit_code="$3"
+            local details="$4"
+            printf "%s\t%s\t%s\t%s\n" "$check" "$status" "$exit_code" "$details" >> maintenance-reports/checks.tsv
+          }
+
+          has_frontend_script() {
+            local script_name="$1"
+            node -e "const pkg = require('./frontend/package.json'); process.exit(pkg.scripts && pkg.scripts['${script_name}'] ? 0 : 1)"
+          }
+
+          if [ ! -f frontend/package.json ]; then
+            record "frontend package.json" "skipped" "0" "frontend/package.json not found"
+            exit 0
+          fi
+
+          if [ -f frontend/package-lock.json ]; then
+            npm --prefix frontend ci > maintenance-reports/frontend-npm-ci.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "frontend npm ci" "$status" "$code" "see frontend-npm-ci.log"
+
+            npm --prefix frontend audit --audit-level=moderate --json > maintenance-reports/frontend-npm-audit.json 2> maintenance-reports/frontend-npm-audit.log
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="reported"
+            record "frontend npm audit" "$status" "$code" "see frontend-npm-audit.json"
+          else
+            record "frontend npm ci" "skipped" "0" "frontend/package-lock.json not found"
+            record "frontend npm audit" "skipped" "0" "frontend/package-lock.json not found"
+          fi
+
+          if has_frontend_script test; then
+            timeout 10m npm --prefix frontend run test -- --run > maintenance-reports/frontend-npm-test.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "frontend npm test" "$status" "$code" "see frontend-npm-test.log"
+          else
+            record "frontend npm test" "skipped" "0" "frontend package script test not found"
+          fi
+
+          if has_frontend_script build; then
+            timeout 10m npm --prefix frontend run build > maintenance-reports/frontend-npm-build.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "frontend npm build" "$status" "$code" "see frontend-npm-build.log"
+          else
+            record "frontend npm build" "skipped" "0" "frontend package script build not found"
+          fi
+
+          exit 0
+
+      - name: Backend Python health
+        shell: bash
+        env:
+          DATABASE_URL: sqlite:///./maintenance-health.sqlite3
+          ALLOW_SQLITE_DATABASE_URL: '1'
+          CORS_DISABLE: '1'
+          WS_DEV_ALLOW: '1'
+        run: |
+          set +e
+
+          record() {
+            local check="$1"
+            local status="$2"
+            local exit_code="$3"
+            local details="$4"
+            printf "%s\t%s\t%s\t%s\n" "$check" "$status" "$exit_code" "$details" >> maintenance-reports/checks.tsv
+          }
+
+          if [ ! -d backend ]; then
+            record "backend" "skipped" "0" "backend directory not found"
+            exit 0
+          fi
+
+          python -m pip install --upgrade pip > maintenance-reports/backend-pip-upgrade.log 2>&1
+          code=$?
+          [ "$code" -eq 0 ] && status="ok" || status="failed"
+          record "backend pip upgrade" "$status" "$code" "see backend-pip-upgrade.log"
+
+          if [ -f backend/requirements.txt ]; then
+            python -m pip install -r backend/requirements.txt > maintenance-reports/backend-pip-install.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "backend pip install" "$status" "$code" "see backend-pip-install.log"
+          else
+            record "backend pip install" "skipped" "0" "backend/requirements.txt not found"
+          fi
+
+          python -m pip install pip-audit pytest pytest-asyncio httpx > maintenance-reports/backend-pip-tools.log 2>&1
+          code=$?
+          [ "$code" -eq 0 ] && status="ok" || status="failed"
+          record "backend maintenance tools" "$status" "$code" "see backend-pip-tools.log"
+
+          if [ -f backend/requirements.txt ]; then
+            python -m pip_audit -r backend/requirements.txt --format json --output maintenance-reports/backend-pip-audit.json > maintenance-reports/backend-pip-audit.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="reported"
+            record "backend pip-audit" "$status" "$code" "see backend-pip-audit.json"
+          else
+            record "backend pip-audit" "skipped" "0" "backend/requirements.txt not found"
+          fi
+
+          if [ -d backend/tests/architecture ]; then
+            (cd backend && PYTHONPATH="$PWD" timeout 8m python -m pytest tests/architecture -q) > maintenance-reports/backend-pytest-architecture.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "backend architecture pytest" "$status" "$code" "see backend-pytest-architecture.log"
+          else
+            record "backend architecture pytest" "skipped" "0" "backend/tests/architecture not found"
+          fi
+
+          if [ -d backend/tests/unit ]; then
+            (cd backend && PYTHONPATH="$PWD" timeout 8m python -m pytest tests/unit -q -m "unit and not integration and not e2e and not slow" --maxfail=1) > maintenance-reports/backend-pytest-unit.log 2>&1
+            code=$?
+            [ "$code" -eq 0 ] && status="ok" || status="failed"
+            record "backend unit pytest" "$status" "$code" "see backend-pytest-unit.log"
+          else
+            record "backend unit pytest" "skipped" "0" "backend/tests/unit not found"
+          fi
+
+          (cd backend && PYTHONPATH="$PWD" python - <<'PY'
+          import importlib
+
+          importlib.import_module("app.main")
+          print("app.main import ok")
+          PY
+          ) > maintenance-reports/backend-import-health.log 2>&1
+          code=$?
+          [ "$code" -eq 0 ] && status="ok" || status="failed"
+          record "backend import health" "$status" "$code" "see backend-import-health.log"
+
+          exit 0
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Check Results"
+            echo ""
+            echo "| Check | Status | Exit code | Details |"
+            echo "| --- | --- | --- | --- |"
+            tail -n +2 maintenance-reports/checks.tsv | while IFS=$'\t' read -r check status exit_code details; do
+              echo "| ${check} | ${status} | ${exit_code} | ${details} |"
+            done
+            echo ""
+            echo "Artifacts contain command logs and machine-readable audit output."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload maintenance artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: weekly-maintenance-report
+          path: maintenance-reports/
+          if-no-files-found: warn
+          retention-days: 14

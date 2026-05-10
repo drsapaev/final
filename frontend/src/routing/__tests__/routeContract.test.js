@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { renderRouteDocsMarkdown } from '../routeDocsSnapshot.js';
 import { resolveSetupRedirect } from '../routeGuards.jsx';
 import { ROUTE_REGISTRY } from '../routeRegistry.js';
-import { getCompatibilityRedirects, getInternalDemoRoutes, getLegacyRedirectTarget, getRoleHomeRoute, getRouteDocsSnapshot } from '../routeSelectors.js';
+import {
+  getCompatibilityRedirects,
+  getInternalDemoRoutes,
+  getLegacyRedirectTarget,
+  getRoleHomeRoute,
+  getRouteDocsSnapshot,
+  isInternalDemoEnabled,
+  isRouteAccessibleToProfile,
+} from '../routeSelectors.js';
 
 const PRODUCTION_ROLE_HOMES = {
   admin: '/admin',
@@ -39,6 +47,14 @@ describe('route contract invariants', () => {
     getInternalDemoRoutes().forEach((route) => {
       expect(route.nav).toBe(false);
     });
+  });
+
+  it('keeps internal demo routes disabled unless explicitly enabled', () => {
+    const demoRoute = getInternalDemoRoutes()[0];
+
+    expect(isInternalDemoEnabled()).toBe(false);
+    expect(isRouteAccessibleToProfile(demoRoute, { role: 'Admin' }, { internalDemoEnabled: false })).toBe(false);
+    expect(isRouteAccessibleToProfile(demoRoute, { role: 'Admin' }, { internalDemoEnabled: true })).toBe(true);
   });
 
   it('does not assign roles to public routes', () => {

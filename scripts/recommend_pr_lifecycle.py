@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -29,8 +30,11 @@ KNOWN_LIFECYCLE_LABELS = [
     "decision:needs-review",
     "decision:needs-tests",
     "decision:merge-after-parent",
+    "decision:possible-duplicate",
     "decision:stale-or-superseded",
     "decision:should-close-candidate",
+    "source:ai",
+    "source:dependabot",
     "risk:runtime",
     "risk:docs-only",
     "risk:tests-only",
@@ -55,6 +59,7 @@ class PullRequestContext:
     html_url: str
     is_draft: bool
     mergeable: str | None
+    author_login: str
     files: tuple[str, ...]
 
 
@@ -63,6 +68,7 @@ class Recommendation:
     decisions: tuple[str, ...]
     risk_labels: tuple[str, ...]
     domain_labels: tuple[str, ...]
+    source_labels: tuple[str, ...]
     gate_passed: bool
     gate_errors: tuple[str, ...]
     reasons: tuple[str, ...]
@@ -72,7 +78,13 @@ class Recommendation:
     def labels(self) -> tuple[str, ...]:
         gate_label = "pr-gate:passed" if self.gate_passed else "pr-gate:failed"
         decision_labels = tuple(f"decision:{decision}" for decision in self.decisions)
-        return (gate_label, *decision_labels, *self.risk_labels, *self.domain_labels)
+        return (
+            gate_label,
+            *decision_labels,
+            *self.source_labels,
+            *self.risk_labels,
+            *self.domain_labels,
+        )
 
 
 def _read_json(path: str | None) -> dict:
@@ -96,6 +108,7 @@ def _event_to_context(event: dict, files: tuple[str, ...]) -> PullRequestContext
     pr = event.get("pull_request") or event
     base = pr.get("base") or {}
     head = pr.get("head") or {}
+    user = pr.get("user") or pr.get("author") or {}
     return PullRequestContext(
         number=pr.get("number"),
         title=pr.get("title") or "",
@@ -105,6 +118,7 @@ def _event_to_context(event: dict, files: tuple[str, ...]) -> PullRequestContext
         html_url=pr.get("html_url") or pr.get("url") or "",
         is_draft=bool(pr.get("draft")),
         mergeable=pr.get("mergeable"),
+        author_login=user.get("login") or user.get("name") or "",
         files=files,
     )
 
@@ -130,6 +144,44 @@ def _contains_any(haystack: str, needles: tuple[str, ...]) -> bool:
     return any(needle in value for needle in needles)
 
 
+def _is_dependabot_pr(ctx: PullRequestContext) -> bool:
+    author = ctx.author_login.strip().lower()
+    return author in {"app/dependabot", "dependabot[bot]"} or ctx.head_ref.startswith(
+        "dependabot/"
+    )
+
+
+def _is_ai_pr(ctx: PullRequestContext) -> bool:
+    text = " ".join((ctx.title, ctx.body, ctx.head_ref)).lower()
+    markers = ("ai-generated", "jules", "codex", "claude")
+    return any(marker in text for marker in markers) or bool(re.search(r"\bv0\b", text))
+
+
+def _is_possible_duplicate(ctx: PullRequestContext) -> bool:
+    text = " ".join((ctx.title, ctx.body, ctx.head_ref)).lower()
+    return _contains_any(
+        text,
+        (
+            "duplicate",
+            "possible duplicate",
+            "supersedes",
+            "superseded by",
+            "replaces #",
+            "same as #",
+        ),
+    )
+
+
+def _has_explicit_validation_proof(ctx: PullRequestContext) -> bool:
+    validation = validate_pr_body(ctx.body)
+    if validation.errors:
+        return False
+
+    body = ctx.body.lower()
+    proof_terms = ("pytest", "npm test", "npm run test", "smoke", "build", "passed", "green")
+    return "## validation" in body and any(term in body for term in proof_terms)
+
+
 def classify_risk(ctx: PullRequestContext) -> tuple[tuple[str, ...], tuple[str, ...]]:
     files = ctx.files
     text = " ".join((ctx.title, ctx.body, " ".join(files))).lower()
@@ -140,19 +192,23 @@ def classify_risk(ctx: PullRequestContext) -> tuple[tuple[str, ...], tuple[str, 
         ("test", "tests/", "backend/tests/", "frontend/src/__tests__/"),
         (".md", ".mdx"),
     )
-    deps = _contains_any(ctx.title, ("deps(", "dependency", "lockfile")) or _any_file(
-        files,
-        tuple(),
-        (
-            "package.json",
-            "package-lock.json",
-            "pnpm-lock.yaml",
-            "yarn.lock",
-            "requirements.txt",
-            "requirements-dev.txt",
-            "pyproject.toml",
-            "poetry.lock",
-        ),
+    deps = (
+        _is_dependabot_pr(ctx)
+        or _contains_any(ctx.title, ("deps(", "dependency", "lockfile"))
+        or _any_file(
+            files,
+            tuple(),
+            (
+                "package.json",
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "yarn.lock",
+                "requirements.txt",
+                "requirements-dev.txt",
+                "pyproject.toml",
+                "poetry.lock",
+            ),
+        )
     )
     runtime = _any_file(
         files,
@@ -191,12 +247,27 @@ def classify_risk(ctx: PullRequestContext) -> tuple[tuple[str, ...], tuple[str, 
     return tuple(dict.fromkeys(risk_labels)), domain_labels
 
 
+def classify_source(ctx: PullRequestContext) -> tuple[str, ...]:
+    source_labels: list[str] = []
+    if _is_ai_pr(ctx):
+        source_labels.append("source:ai")
+    if _is_dependabot_pr(ctx):
+        source_labels.append("source:dependabot")
+    return tuple(dict.fromkeys(source_labels))
+
+
 def recommend(ctx: PullRequestContext) -> Recommendation:
     validation = validate_pr_body(ctx.body)
     gate_passed = not validation.errors
     risk_labels, domain_labels = classify_risk(ctx)
+    source_labels = classify_source(ctx)
     base_is_main = ctx.base_ref in DEFAULT_MAIN_BRANCHES
     runtime_or_deps = "risk:runtime" in risk_labels or "risk:deps" in risk_labels
+    ai_runtime_without_validation = (
+        "source:ai" in source_labels
+        and "risk:runtime" in risk_labels
+        and not _has_explicit_validation_proof(ctx)
+    )
     docs_or_tests_only = "risk:docs-only" in risk_labels or "risk:tests-only" in risk_labels
 
     decisions: list[str] = []
@@ -213,6 +284,11 @@ def recommend(ctx: PullRequestContext) -> Recommendation:
         reasons.append("PR is draft, so it should not be considered merge-ready yet.")
         next_actions.append("Mark ready for review only after the author confirms the scope.")
 
+    if _is_possible_duplicate(ctx):
+        decisions.append("possible-duplicate")
+        reasons.append("PR text indicates it may duplicate or supersede another PR.")
+        next_actions.append("Apply label/comment only; close manually after reviewer confirmation.")
+
     if not gate_passed:
         decisions.append("needs-review")
         reasons.append("PR body does not satisfy the review quality gate.")
@@ -222,6 +298,12 @@ def recommend(ctx: PullRequestContext) -> Recommendation:
         decisions.append("needs-tests")
         reasons.append("Runtime/dependency change lacks complete validation proof in the PR body.")
         next_actions.append("Add targeted test, smoke, or explicit not-run rationale.")
+
+    if ai_runtime_without_validation:
+        decisions.append("needs-review")
+        decisions.append("needs-tests")
+        reasons.append("AI-authored runtime change lacks explicit validation proof.")
+        next_actions.append("Add concrete runtime validation before any merge decision.")
 
     if not decisions and runtime_or_deps:
         decisions.append("needs-review")
@@ -242,6 +324,7 @@ def recommend(ctx: PullRequestContext) -> Recommendation:
         decisions=tuple(dict.fromkeys(decisions)),
         risk_labels=risk_labels,
         domain_labels=domain_labels,
+        source_labels=source_labels,
         gate_passed=gate_passed,
         gate_errors=tuple(validation.errors),
         reasons=tuple(dict.fromkeys(reasons)),
@@ -252,6 +335,10 @@ def recommend(ctx: PullRequestContext) -> Recommendation:
 def render_comment(ctx: PullRequestContext, rec: Recommendation) -> str:
     decision_text = ", ".join(rec.decisions)
     risk_text = ", ".join(label.removeprefix("risk:") for label in rec.risk_labels)
+    source_text = (
+        ", ".join(label.removeprefix("source:") for label in rec.source_labels)
+        or "none detected"
+    )
     domain_text = ", ".join(label.removeprefix("domain:") for label in rec.domain_labels) or "none detected"
     gate_text = "passed" if rec.gate_passed else "failed"
     pr_label = f"PR #{ctx.number}" if ctx.number else "PR"
@@ -262,6 +349,7 @@ def render_comment(ctx: PullRequestContext, rec: Recommendation) -> str:
         "",
         f"- PR: {pr_label}",
         f"- Decision: `{decision_text}`",
+        f"- Source: `{source_text}`",
         f"- Risk lane: `{risk_text}`",
         f"- Domains: `{domain_text}`",
         f"- Body gate: `{gate_text}`",
