@@ -1,34 +1,25 @@
-import requests
-import json
+#!/usr/bin/env python3
+"""Retired root manual doctor profile smoke script.
 
-login_data = {
-    'username': 'doctor',
-    'password': 'doctor123',
-    'grant_type': 'password'
-}
+This root-level script used built-in demo credentials and is intentionally kept
+outside the canonical pytest suite. Use backend/tests fixtures or env-driven
+smoke checks instead.
+"""
 
-print('Тестируем логин с doctor...')
-response = requests.post('http://localhost:18000/api/v1/authentication/login', json=login_data)
-print(f'Статус логина: {response.status_code}')
+from __future__ import annotations
 
-if response.status_code == 200:
-    data = response.json()
-    token = data.get('access_token') or (data.get('tokens', {}).get('access_token'))
-    
-    if token:
-        print('Токен получен, проверяем профиль...')
-        headers = {'Authorization': f'Bearer {token}'}
-        profile_response = requests.get('http://localhost:18000/api/v1/authentication/profile', headers=headers)
-        print(f'Статус профиля: {profile_response.status_code}')
-        
-        if profile_response.status_code == 200:
-            profile = profile_response.json()
-            print(f'Профиль пользователя: {profile}')
-            print(f'Роль: {profile.get("role")}')
-            print(f'is_superuser: {profile.get("is_superuser")}')
-        else:
-            print(f'Ошибка профиля: {profile_response.text}')
-    else:
-        print('Токен не получен')
-else:
-    print(f'Ошибка логина: {response.text}')
+import sys
+
+MESSAGE = (
+    "Retired root manual doctor profile smoke script. "
+    "Use backend/tests fixtures or env-driven smoke checks instead."
+)
+
+
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
