@@ -19,7 +19,7 @@
 
 - Full backend suite was not proven in this recovery session.
 - `backend/tests/unit/test_ai_chat_api_service.py` is blocked by `@pytest.mark.asyncio` while `backend/pytest.ini` uses `--strict-markers` without declaring `asyncio`.
-- Clean online `alembic upgrade head` is blocked locally until an explicitly disposable PostgreSQL target is available.
+- Clean online `alembic upgrade head` remains blocked locally until an explicitly disposable PostgreSQL target is available. Task 25 verified a single linear Alembic head (`0022_service_audit_log`) and attempted to create a throwaway database on the reachable local PostgreSQL server, but the configured role does not have `CREATEDB`; staging `55432`, Docker/Compose, and `psql` were unavailable.
 - Browser role-flow smoke still needs real safe credentials and a controlled test database.
 
 ## Minimum Critical Flow Tests
