@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import logging
 import os
-import sys
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker as orm_sessionmaker
+
+logger = logging.getLogger(__name__)
 
 
 def _get_db_url_from_env_or_settings() -> str:
@@ -84,10 +86,10 @@ DATABASE_URL = _get_db_url_from_env_or_settings()
 _validate_runtime_database_url(DATABASE_URL)
 DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
 
-# небольшая диагностика при импорте (в лог / stderr)
-print(
-    f"[app.db.session] Using DATABASE_URL = {_safe_database_url_for_log(DATABASE_URL)}",
-    file=sys.stderr,
+# небольшая диагностика при импорте
+logger.info(
+    "Using database URL database_url=%s",
+    _safe_database_url_for_log(DATABASE_URL),
 )
 
 # Создаём СИНХРОННЫЙ движок
@@ -106,12 +108,18 @@ def _enable_sqlite_fk(dbapi_conn, connection_record):
             cursor.execute("PRAGMA foreign_keys")
             fk_status = cursor.fetchone()
             if fk_status and fk_status[0] == 1:
-                print(f"[app.db.session] ✅ Foreign keys enabled on connection (verified: {fk_status[0]})", file=sys.stderr)
+                logger.info("SQLite foreign keys enabled on connection")
             else:
-                print(f"[app.db.session] ⚠️  WARNING: Foreign keys NOT enabled on connection (status: {fk_status})", file=sys.stderr)
+                logger.warning(
+                    "SQLite foreign keys not enabled on connection status=%s",
+                    fk_status,
+                )
             cursor.close()
-        except Exception as e:
-            print(f"[app.db.session] ❌ ERROR enabling foreign keys: {e}", file=sys.stderr)
+        except Exception as exc:
+            logger.error(
+                "SQLite foreign key setup failed error_type=%s",
+                type(exc).__name__,
+            )
             raise
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
@@ -139,7 +147,7 @@ engine = create_engine(
 # ✅ SECURITY: Register event listener for SQLite FK enforcement
 if _is_sqlite:
     event.listen(engine, "connect", _enable_sqlite_fk)
-    print("[app.db.session] Foreign key enforcement enabled for SQLite via event listener", file=sys.stderr)
+    logger.info("SQLite foreign key enforcement registered via event listener")
 
 # sync session factory
 SessionLocal = orm_sessionmaker(
