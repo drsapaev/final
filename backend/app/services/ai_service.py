@@ -4,6 +4,7 @@
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.crud import ai_config as crud_ai
 from app.models.ai_config import AIPromptTemplate, AIProvider
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -437,7 +440,12 @@ class AIService:
             crud_ai.create_usage_log(self.db, log_data)
 
         except Exception as e:
-            print(f"Ошибка логирования AI: {e}")
+            logger.warning(
+                "AI usage logging failed provider_id=%s task_type=%s error_type=%s",
+                provider_id,
+                task_type,
+                type(e).__name__,
+            )
 
 
 # Глобальные функции для использования в API
