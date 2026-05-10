@@ -3,15 +3,20 @@
 """
 import requests
 import json
+import os
 
 def test_auth():
     """Тест авторизации"""
     print("🔍 Тестирование авторизации...")
     
     try:
+        mcp_password = os.getenv("QA_MCP_PASSWORD")
+        if not mcp_password:
+            print("Set QA_MCP_PASSWORD before running this legacy auth smoke script.")
+            return None
         response = requests.post(
             "http://localhost:18000/api/v1/auth/minimal-login",
-            json={"username": "mcp_test", "password": "test123"},
+            json={"username": os.getenv("QA_MCP_USERNAME", "mcp_test"), "password": mcp_password},
             headers={
                 "Content-Type": "application/json",
                 "Origin": "http://localhost:8080"

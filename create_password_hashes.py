@@ -15,23 +15,27 @@ def update_passwords():
     
     # Создаем хеши для паролей
     passwords = {
-        'admin@example.com': 'admin123',
-        'doctor@example.com': 'doctor123', 
-        'registrar@example.com': 'registrar123',
-        'cardio@example.com': 'cardio123',
-        'derma@example.com': 'derma123',
-        'dentist@example.com': 'dentist123',
-        'lab@example.com': 'lab123',
-        'cashier@example.com': 'cashier123'
+        'admin@example.com': os.getenv('QA_ADMIN_PASSWORD'),
+        'doctor@example.com': os.getenv('QA_DOCTOR_PASSWORD'),
+        'registrar@example.com': os.getenv('QA_REGISTRAR_PASSWORD'),
+        'cardio@example.com': os.getenv('QA_CARDIO_PASSWORD'),
+        'derma@example.com': os.getenv('QA_DERMA_PASSWORD'),
+        'dentist@example.com': os.getenv('QA_DENTIST_PASSWORD'),
+        'lab@example.com': os.getenv('QA_LAB_PASSWORD'),
+        'cashier@example.com': os.getenv('QA_CASHIER_PASSWORD')
     }
+    missing = [email for email, env_password in passwords.items() if not env_password]
+    if missing:
+        print("Set role-specific QA_*_PASSWORD environment variables before running this legacy password update helper.")
+        print(f"Missing env values for {len(missing)} account(s).")
+        return
     
     print("🔐 Создаем хеши паролей...")
     
     db = SessionLocal()
     try:
-        for email, password in passwords.items():
-            password_hash = get_password_hash(password)
-            print(f"📧 {email}: {password} -> {password_hash[:30]}...")
+        for email, env_password in passwords.items():
+            password_hash = get_password_hash(env_password)
             
             # Обновляем пароль в БД
             db.execute(text("UPDATE users SET hashed_password = :hash WHERE email = :email"), {
@@ -47,7 +51,7 @@ def update_passwords():
         users = result.fetchall()
         print("\n👥 Пользователи с обновленными паролями:")
         for user in users:
-            print(f"  - {user[0]}: {user[1][:30]}...")
+            print(f"  - {user[0]}: stored hash present")
             
     except Exception as e:
         print(f"❌ Ошибка при обновлении паролей: {e}")

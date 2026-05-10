@@ -4,13 +4,18 @@
 """
 import requests
 import json
+import os
 
 def test_json_login():
     """Тест JSON login endpoint"""
     try:
+        admin_password = os.getenv("QA_ADMIN_PASSWORD")
+        if not admin_password:
+            print("Set QA_ADMIN_PASSWORD before running this legacy auth smoke script.")
+            return False
         data = {
-            "username": "admin@example.com",
-            "password": "admin123",
+            "username": os.getenv("QA_ADMIN_USERNAME", "admin@example.com"),
+            "password": admin_password,
             "remember_me": False
         }
         
@@ -18,7 +23,7 @@ def test_json_login():
             "Content-Type": "application/json"
         }
         
-        print(f"Sending JSON login request with data: {data}")
+        print("Sending JSON login request with redacted credentials")
         
         response = requests.post(
             "http://localhost:18000/api/v1/auth/json-login",

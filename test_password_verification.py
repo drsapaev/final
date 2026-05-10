@@ -32,17 +32,27 @@ def test_password_verification():
             
             print(f"👤 Пользователь: {username} (ID: {user_id})")
             print(f"   Email: {email}")
-            print(f"   Хеш пароля: {hashed_password[:50]}...")
+            print("   Хеш пароля: <stored>")
             
             # Тестируем разные пароли
-            test_passwords = ["test123", "admin", "password", "mcp_test"]
+            test_passwords = [
+                value
+                for value in (
+                    os.getenv("QA_MCP_PASSWORD"),
+                    os.getenv("QA_ADMIN_PASSWORD"),
+                )
+                if value
+            ]
+            if not test_passwords:
+                print("Set QA_MCP_PASSWORD or QA_ADMIN_PASSWORD before running this legacy password verification smoke script.")
+                return
             
-            for password in test_passwords:
+            for index, password in enumerate(test_passwords, start=1):
                 try:
                     is_valid = verify_password(password, hashed_password)
-                    print(f"   Пароль '{password}': {'✅' if is_valid else '❌'}")
+                    print(f"   QA password #{index}: {'✅' if is_valid else '❌'}")
                 except Exception as e:
-                    print(f"   Пароль '{password}': ❌ Ошибка: {e}")
+                    print(f"   QA password #{index}: ❌ Ошибка: {e}")
             
             # Тестируем с пустым паролем
             try:

@@ -4,6 +4,7 @@
 """
 import requests
 import json
+import os
 from datetime import datetime
 
 BASE_URL = "http://localhost:18000/api/v1"
@@ -117,9 +118,13 @@ def test_auth_endpoint():
     
     try:
         # Пробуем правильный endpoint
+        admin_password = os.getenv("QA_ADMIN_PASSWORD")
+        if not admin_password:
+            print("Set QA_ADMIN_PASSWORD before running this legacy payment auth smoke script.")
+            return None
         response = requests.post(f"{BASE_URL}/auth/login", data={
-            "username": "admin",
-            "password": "admin123"
+            "username": os.getenv("QA_ADMIN_USERNAME", "admin"),
+            "password": admin_password
         })
         
         if response.status_code == 200:
