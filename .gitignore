@@ -46,8 +46,9 @@ nul
 # Quality reports (игнорируем файлы отчетов, но не директорию и README)
 backend/quality-reports/*.txt
 backend/quality-reports/*.md
+backend/quality-reports/*.json
 !backend/quality-reports/README.md
-!backend/quality-reports/.gitkeep.secret_key
+!backend/quality-reports/.gitkeep
 backend/.secret_key
 .secret_key
 *.db.backup*
