@@ -79,13 +79,13 @@
 | Роль | Email | Пароль | Статус |
 |------|-------|--------|--------|
 | **Admin** | `admin@example.com` | `[redacted demo password]` | ✅ Создан |
-| **Registrar** | `registrar@example.com` | `registrar123` | ✅ Создан |
-| **Lab** | `lab@example.com` | `lab123` | ✅ Создан |
-| **Doctor** | `doctor@example.com` | `doctor123` | ✅ Создан |
-| **Cashier** | `cashier@example.com` | `cashier123` | ✅ Создан |
-| **Cardiologist** | `cardio@example.com` | `cardio123` | ✅ Создан |
-| **Dermatologist** | `derma@example.com` | `derma123` | ✅ Создан |
-| **Dentist** | `dentist@example.com` | `dentist123` | ✅ Создан |
+| **Registrar** | `registrar@example.com` | `<set-locally>` | ✅ Создан |
+| **Lab** | `lab@example.com` | `<set-locally>` | ✅ Создан |
+| **Doctor** | `doctor@example.com` | `<set-locally>` | ✅ Создан |
+| **Cashier** | `cashier@example.com` | `<set-locally>` | ✅ Создан |
+| **Cardiologist** | `cardio@example.com` | `<set-locally>` | ✅ Создан |
+| **Dermatologist** | `derma@example.com` | `<set-locally>` | ✅ Создан |
+| **Dentist** | `dentist@example.com` | `<set-locally>` | ✅ Создан |
 
 ### ✅ Исправлены серверы:
 

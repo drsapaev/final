@@ -134,13 +134,13 @@ const [username, setUsername] = useState('admin@example.com');
 # Созданы пользователи для всех ролей:
 users_to_create = [
     {"email": "admin@example.com", "password": "<redacted-demo-password>", "role": "Admin"},
-    {"email": "registrar@example.com", "password": "registrar123", "role": "Registrar"},
-    {"email": "lab@example.com", "password": "lab123", "role": "Lab"},
-    {"email": "doctor@example.com", "password": "doctor123", "role": "Doctor"},
-    {"email": "cashier@example.com", "password": "cashier123", "role": "Cashier"},
-    {"email": "cardio@example.com", "password": "cardio123", "role": "cardio"},
-    {"email": "derma@example.com", "password": "derma123", "role": "derma"},
-    {"email": "dentist@example.com", "password": "dentist123", "role": "dentist"},
+    {"email": "registrar@example.com", "password": "<set-locally>", "role": "Registrar"},
+    {"email": "lab@example.com", "password": "<set-locally>", "role": "Lab"},
+    {"email": "doctor@example.com", "password": "<set-locally>", "role": "Doctor"},
+    {"email": "cashier@example.com", "password": "<set-locally>", "role": "Cashier"},
+    {"email": "cardio@example.com", "password": "<set-locally>", "role": "cardio"},
+    {"email": "derma@example.com", "password": "<set-locally>", "role": "derma"},
+    {"email": "dentist@example.com", "password": "<set-locally>", "role": "dentist"},
 ]
 ```
 
@@ -150,13 +150,13 @@ users_to_create = [
 
 ### Тестовые пользователи созданы для всех ролей:
 - **Admin:** `admin@example.com` / `[redacted demo password]`
-- **Registrar:** `registrar@example.com` / `registrar123`
-- **Lab:** `lab@example.com` / `lab123`
-- **Doctor:** `doctor@example.com` / `doctor123`
-- **Cashier:** `cashier@example.com` / `cashier123`
-- **Cardiologist:** `cardio@example.com` / `cardio123`
-- **Dermatologist:** `derma@example.com` / `derma123`
-- **Dentist:** `dentist@example.com` / `dentist123`
+- **Registrar:** `registrar@example.com` / `<set-locally>`
+- **Lab:** `lab@example.com` / `<set-locally>`
+- **Doctor:** `doctor@example.com` / `<set-locally>`
+- **Cashier:** `cashier@example.com` / `<set-locally>`
+- **Cardiologist:** `cardio@example.com` / `<set-locally>`
+- **Dermatologist:** `derma@example.com` / `<set-locally>`
+- **Dentist:** `dentist@example.com` / `<set-locally>`
 
 ### Все API endpoints исправлены:
 - ✅ `client.js` - основной API клиент
