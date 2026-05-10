@@ -4,12 +4,19 @@
 """
 import requests
 import json
+import os
 from datetime import date
 
 # Конфигурация
 BASE_URL = "http://localhost:18000"
-REGISTRAR_USERNAME = "registrar@example.com"
-REGISTRAR_PASSWORD = "registrar123"
+REGISTRAR_USERNAME = os.getenv("QA_REGISTRAR_USERNAME", "registrar@example.com")
+
+
+def required_registrar_password():
+    password = os.getenv("QA_REGISTRAR_PASSWORD")
+    if not password:
+        raise RuntimeError("Set QA_REGISTRAR_PASSWORD to run registration creation helper scripts.")
+    return password
 
 def get_auth_token():
     """Получить токен авторизации для регистратора"""
@@ -17,7 +24,7 @@ def get_auth_token():
     
     login_data = {
         "username": REGISTRAR_USERNAME,
-        "password": REGISTRAR_PASSWORD
+        "password": required_registrar_password()
     }
     
     response = requests.post(f"{BASE_URL}/api/v1/auth/login", data=login_data)
