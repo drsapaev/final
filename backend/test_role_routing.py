@@ -3,11 +3,55 @@
 Запускать после каждого изменения в системе авторизации
 """
 
+import os
 import sys
 
 import requests
 
 BASE_URL = "http://127.0.0.1:18000"
+
+ROLE_PASSWORD_ENV_VARS = [
+    ("admin", "QA_ADMIN_PASSWORD", "Admin"),
+    ("registrar", "QA_REGISTRAR_PASSWORD", "Registrar"),
+    ("lab", "QA_LAB_PASSWORD", "Lab"),
+    ("doctor", "QA_DOCTOR_PASSWORD", "Doctor"),
+    ("cashier", "QA_CASHIER_PASSWORD", "Cashier"),
+    ("cardio", "QA_CARDIO_PASSWORD", "cardio"),
+    ("derma", "QA_DERMA_PASSWORD", "derma"),
+    ("dentist", "QA_DENTIST_PASSWORD", "dentist"),
+]
+
+
+def load_role_credentials():
+    credentials = []
+    missing = []
+
+    for username, env_name, expected_role in ROLE_PASSWORD_ENV_VARS:
+        password = os.getenv(env_name)
+        if password:
+            credentials.append((username, password, expected_role))
+        else:
+            missing.append(env_name)
+
+    if missing:
+        print(
+            "ERROR: set required QA role password env vars before running this "
+            f"manual smoke: {', '.join(missing)}",
+            file=sys.stderr,
+        )
+        return None
+
+    return credentials
+
+
+def load_admin_password():
+    password = os.getenv("QA_ADMIN_PASSWORD")
+    if not password:
+        print(
+            "ERROR: set QA_ADMIN_PASSWORD before running admin API access smoke.",
+            file=sys.stderr,
+        )
+    return password
 
 
 def test_user_login_and_role(username, password, expected_role, expected_redirect=None):
@@ -75,16 +119,9 @@ def test_all_critical_users():
     print("=" * 60)
 
     # Критические пользователи и их ожидаемые роли
-    critical_users = [
-        ("admin", "admin123", "Admin"),
-        ("registrar", "registrar123", "Registrar"),
-        ("lab", "lab123", "Lab"),
-        ("doctor", "doctor123", "Doctor"),
-        ("cashier", "cashier123", "Cashier"),
-        ("cardio", "cardio123", "cardio"),
-        ("derma", "derma123", "derma"),
-        ("dentist", "dentist123", "dentist"),
-    ]
+    critical_users = load_role_credentials()
+    if critical_users is None:
+        return False
 
     results = []
     for username, password, expected_role in critical_users:
@@ -118,7 +155,11 @@ def test_api_endpoints_access():
     print("=" * 60)
 
     # Получаем токен админа
-    login_data = {"username": "admin", "password": "admin123", "grant_type": "password"}
+    admin_password = load_admin_password()
+    if not admin_password:
+        return False
+
+    login_data = {"username": "admin", "password": admin_password, "grant_type": "password"}
     response = requests.post(f"{BASE_URL}/api/v1/authentication/login", json=login_data)
     if response.status_code != 200:
         print("ОШИБКА: Не удалось получить токен админа")
