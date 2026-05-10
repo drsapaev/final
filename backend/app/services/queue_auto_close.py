@@ -195,11 +195,13 @@ def run_auto_close_check():
         result = service.check_and_close_expired_queues()
 
         if result["closed_count"] > 0:
-            print(
-                f"✅ Auto-closed {result['closed_count']} queues at {result['check_time']}"
+            logger.info(
+                "Auto-closed queues closed_count=%s check_time=%s",
+                result["closed_count"],
+                result["check_time"],
             )
         else:
-            print(f"ℹ️ No queues to close at {result['check_time']}")
+            logger.info("No queues to close check_time=%s", result["check_time"])
 
         return result
     finally:
