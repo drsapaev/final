@@ -158,13 +158,18 @@ def require_roles(*roles: Any):
         if "registrar" in allowed_roles_lower and "receptionist" not in allowed_roles_lower:
             allowed_roles_lower.append("receptionist")
 
-        # ✅ DEBUG LOG: Explicitly log the mismatch
-        print(f"DEBUG: Checking roles for user {current_user.id} ({current_user.username})")
-        print(f"DEBUG: User Role: '{role_label}', Normalized: '{role_normalized}'")
-        print(f"DEBUG: Required Roles: {normalized_roles}, Normalized: {allowed_roles_lower}")
+        logger.debug(
+            "RBAC role check evaluated",
+            extra={
+                "required_role_count": len(normalized_roles),
+                "allowed_role_count": len(allowed_roles_lower),
+                "user_role": role_label or None,
+                "normalized_user_role": role_normalized or None,
+                "request_available": request is not None,
+            },
+        )
 
         if role_normalized not in allowed_roles_lower and role_lower not in allowed_roles_lower:
-            print(f"DEBUG: ACCESS DENIED for user {current_user.username}")
             # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
             from app.core.audit import log_critical_change
 
@@ -187,16 +192,27 @@ def require_roles(*roles: Any):
                 # ✅ FIX: Если request недоступен, логируем с предупреждением
                 audit_logger = logging.getLogger(__name__)
                 audit_logger.warning(
-                    f"SECURITY: require_roles: request context unavailable for user_id={current_user.id}, "
-                    f"roles={roles}, user_role={role}. Audit log may be incomplete."
+                    "ACCESS_DENIED audit request context unavailable",
+                    extra={
+                        "required_role_count": len(normalized_roles),
+                        "user_role": role_label or None,
+                    },
                 )
 
-            # ✅ DEBUG LOG: Explicitly log the mismatch
+            # Keep operational security logs non-identifying; the audit log below
+            # stores actor/resource context through the dedicated audit channel.
             audit_logger = logging.getLogger(__name__)
             audit_logger.error(
-                f"ACCESS DENIED DEBUG: User={current_user.username} (ID={current_user.id}), "
-                f"RoleInDB='{role}' (normalized='{role_lower}'), "
-                f"Required='{roles}' (normalized='{allowed_roles_lower}')"
+                "RBAC role check denied",
+                extra={
+                    "required_roles": list(normalized_roles),
+                    "allowed_roles": allowed_roles_lower,
+                    "user_role": role_label or None,
+                    "normalized_user_role": role_normalized or None,
+                    "resource_type": resource_type or "unknown",
+                    "resource_id_present": resource_id is not None,
+                    "request_available": request is not None,
+                },
             )
 
             # ✅ FIX: Всегда логируем 403, даже если request недоступен (для безопасности)
@@ -220,7 +236,11 @@ def require_roles(*roles: Any):
             except Exception as e:
                 # ✅ FIX: Если логирование не удалось, все равно выбрасываем 403
                 audit_logger = logging.getLogger(__name__)
-                audit_logger.error(f"Failed to log ACCESS_DENIED audit: {e}", exc_info=True)
+                audit_logger.error(
+                    "Failed to log ACCESS_DENIED audit",
+                    extra={"exception_type": type(e).__name__},
+                    exc_info=True,
+                )
 
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
