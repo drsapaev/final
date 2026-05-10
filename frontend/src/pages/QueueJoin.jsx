@@ -94,6 +94,8 @@ const formatSpecialistLabel = (specialist) => {
     .join(' • ');
 };
 
+const MISSING_QUEUE_TOKEN_MESSAGE = 'QR-код не найден. Откройте ссылку из клиники или отсканируйте QR-код заново.';
+
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
@@ -203,8 +205,12 @@ const QueueJoin = () => {
   }, []);
 
   useEffect(() => {
+    if (!token) {
+      setIsSpecialistsLoading(false);
+      return;
+    }
     loadSpecialists();
-  }, [loadSpecialists]);
+  }, [loadSpecialists, token]);
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
@@ -228,6 +234,12 @@ const QueueJoin = () => {
   }, [getApiErrorMessage, token]);
 
   const loadTokenInfo = useCallback(async () => {
+    if (!token) {
+      setError(MISSING_QUEUE_TOKEN_MESSAGE);
+      setStep('error');
+      return;
+    }
+
     try {
       setStep('loading');
       const tokenInfo = await fetchQrTokenInfo(token);
@@ -271,14 +283,20 @@ const QueueJoin = () => {
 
   // Загрузка информации о токене при монтировании
   useEffect(() => {
-    if (token) {
-      // ✅ Пытаемся восстановить session_token из localStorage
-      const savedSessionToken = localStorage.getItem(`queue_session_${token}`);
-      if (savedSessionToken) {
-        setSessionToken(savedSessionToken);
-      }
-      loadTokenInfo();
+    if (!token) {
+      setSessionToken(null);
+      setQueueInfo(null);
+      setError(MISSING_QUEUE_TOKEN_MESSAGE);
+      setStep('error');
+      return;
     }
+
+    // ✅ Пытаемся восстановить session_token из localStorage
+    const savedSessionToken = localStorage.getItem(`queue_session_${token}`);
+    if (savedSessionToken) {
+      setSessionToken(savedSessionToken);
+    }
+    loadTokenInfo();
   }, [token, loadTokenInfo]);
 
   // Обратный отсчет до открытия очереди

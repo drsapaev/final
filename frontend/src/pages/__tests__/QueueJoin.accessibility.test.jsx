@@ -59,6 +59,16 @@ function renderQueueJoin(token = 'test-token') {
   );
 }
 
+function renderBareQueueJoin() {
+  return render(
+    <MemoryRouter initialEntries={['/queue/join']}>
+      <Routes>
+        <Route path="/queue/join" element={<QueueJoin />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe('QueueJoin Accessibility & UX', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,6 +85,16 @@ describe('QueueJoin Accessibility & UX', () => {
     window.localStorage.clear = vi.fn(() => {
       storage.clear();
     });
+  });
+
+  it('shows a missing token error for the bare join route without calling queue APIs', async () => {
+    renderBareQueueJoin();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/QR-код не найден/i);
+    expect(queueApiMocks.fetchQrTokenInfo).not.toHaveBeenCalled();
+    expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+    expect(queueApiMocks.fetchPublicQueueProfiles).not.toHaveBeenCalled();
+    expect(queueApiMocks.fetchAvailableSpecialists).not.toHaveBeenCalled();
   });
 
   it('exposes labeled required fields and announces validation errors', async () => {
