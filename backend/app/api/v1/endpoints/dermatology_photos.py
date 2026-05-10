@@ -87,10 +87,7 @@ async def upload_photos(
                     img.save(thumbnail_path, "JPEG", quality=85)
             except Exception as exc:
                 logger.warning(
-                    "Dermatology photo thumbnail generation failed "
-                    "patient_id=%s user_id=%s error_type=%s",
-                    patient_id,
-                    getattr(current_user, "id", None),
+                    "Dermatology photo thumbnail generation failed error_type=%s",
                     type(exc).__name__,
                 )
                 thumbnail_path = None
