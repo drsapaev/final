@@ -1,10 +1,10 @@
 {
   "dependencies": {
-    "@babel/parser": "^7.29.0",
-    "@mui/material": "^7.3.8",
+    "@babel/parser": "^7.29.3",
+    "@mui/material": "^7.3.11",
     "@vitejs/plugin-react": "^4.7.0",
     "glob": "^13.0.6",
-    "lucide-react": "^0.543.0",
+    "lucide-react": "^0.577.0",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
