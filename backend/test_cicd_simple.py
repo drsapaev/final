@@ -5,6 +5,7 @@
 """
 
 import json
+import os
 import time
 import urllib.parse
 import urllib.request
@@ -12,6 +13,8 @@ from datetime import datetime
 
 # Конфигурация
 BASE_URL = "http://127.0.0.1:18000"
+AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("QA_ADMIN_PASSWORD", "invalid-qa-admin-password")
 
 
 def test_health_endpoint():
@@ -111,7 +114,7 @@ def test_auth_endpoint():
     try:
         # Тестовые данные для входа
         auth_data = urllib.parse.urlencode(
-            {"username": "admin", "password": "admin123"}
+            {"username": AUTH_USERNAME, "password": AUTH_PASSWORD}
         ).encode("utf-8")
 
         req = urllib.request.Request(
