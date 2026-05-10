@@ -59,7 +59,7 @@ def main():
     print(f"    {tester_cmd}")
     print("4️⃣  Откройте браузер:")
     print("    http://localhost:18080")
-    print("5️⃣  Получите токен (mcp_test / test123)")
+    print("5️⃣  Получите токен (mcp_test / <set-locally>)")
     print("6️⃣  Тестируйте MCP функции с реальным Gemini AI!")
     print("\n" + "=" * 60)
     print("🎯 ТЕПЕРЬ СИСТЕМА ИСПОЛЬЗУЕТ GEMINI AI")
