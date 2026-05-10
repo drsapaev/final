@@ -3,6 +3,7 @@
 """
 
 import hashlib
+import logging
 import os
 from datetime import datetime
 
@@ -14,6 +15,7 @@ from app.db.session import get_db
 from app.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/upload-simple")
@@ -25,14 +27,13 @@ async def upload_file_simple(
 ):
     """Упрощенная загрузка файла"""
     try:
-        print(f"📁 Получен файл: {file.filename}")
-        print(f"👤 Пользователь: {current_user.username}")
+        logger.info("Simple file upload started")
 
         # Читаем содержимое файла
         content = await file.read()
         file_size = len(content)
 
-        print(f"📊 Размер файла: {file_size} байт")
+        logger.info("Simple file upload content read")
 
         # Создаем хеш файла
         file_hash = hashlib.sha256(content).hexdigest()
@@ -49,7 +50,7 @@ async def upload_file_simple(
         with open(file_path, "wb") as f:
             f.write(content)
 
-        print(f"✅ Файл сохранен: {file_path}")
+        logger.info("Simple file upload saved")
 
         return {
             "success": True,
@@ -61,6 +62,6 @@ async def upload_file_simple(
             "file_path": file_path,
         }
 
-    except Exception as e:
-        print(f"❌ Ошибка загрузки: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки файла: {str(e)}")
+    except Exception as exc:
+        logger.error("Simple file upload failed error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Ошибка загрузки файла") from None
