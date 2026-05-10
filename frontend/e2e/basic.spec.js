@@ -1,6 +1,16 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
+const ADMIN_USERNAME = process.env.QA_ADMIN_USERNAME || 'admin';
+
+function requiredAdminPassword() {
+  const password = process.env.QA_ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error('Set QA_ADMIN_PASSWORD to run admin login e2e tests.');
+  }
+  return password;
+}
+
 test.describe('Базовая функциональность клиники', () => {
   test('главная страница загружается', async ({ page }) => {
     await page.goto('/');
@@ -22,8 +32,8 @@ test.describe('Базовая функциональность клиники', 
     await page.goto('/login');
     
     // Заполняем форму логина
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', ADMIN_USERNAME);
+    await page.fill('input[type="password"]', requiredAdminPassword());
     
     // Нажимаем кнопку входа
     await page.click('button[type="submit"]');
@@ -35,8 +45,8 @@ test.describe('Базовая функциональность клиники', 
   test('панель администратора доступна после входа', async ({ page }) => {
     // Логинимся
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', ADMIN_USERNAME);
+    await page.fill('input[type="password"]', requiredAdminPassword());
     await page.click('button[type="submit"]');
     
     // Ждем загрузки панели
@@ -49,8 +59,8 @@ test.describe('Базовая функциональность клиники', 
   test('навигация работает', async ({ page }) => {
     // Логинимся
     await page.goto('/login');
-    await page.fill('input[type="text"]', 'admin');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="text"]', ADMIN_USERNAME);
+    await page.fill('input[type="password"]', requiredAdminPassword());
     await page.click('button[type="submit"]');
     
     await page.waitForURL('**/dashboard', { timeout: 10000 });

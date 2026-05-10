@@ -1,57 +1,28 @@
 #!/usr/bin/env python3
-"""
-Скрипт для исправления пароля пользователя admin
-"""
+"""Retired legacy admin password repair helper."""
 
-import os
+from __future__ import annotations
+
 import sys
-from pathlib import Path
 
-# Добавляем путь к проекту
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+MESSAGE = """
+fix_admin_password.py is retired.
 
-from sqlalchemy import create_engine, text
-from app.core.config import settings
-from passlib.context import CryptContext
+This legacy helper repaired the bootstrap admin credential through a direct SQL
+path outside the canonical initialized-instance guard. Controlled admin
+password reset belongs to:
 
-# Создаем движок базы данных
-engine = create_engine(settings.DATABASE_URL, echo=False)
+  python -m app.scripts.ensure_admin
 
-# Создаем контекст для хеширования паролей (используем argon2 как в системе)
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+Set ADMIN_PASSWORD, ADMIN_RESET_PASSWORD=1, ENSURE_ADMIN_ALLOW_INITIALIZED=1,
+and ENSURE_ADMIN_CONFIRM_INITIALIZED_OVERRIDE=1 for controlled recovery.
+""".strip()
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
 
-print("🔧 Исправление пароля пользователя admin...")
+def main() -> int:
+    print(MESSAGE, file=sys.stderr)
+    return 2
 
-try:
-    with engine.connect() as conn:
-        # Обновляем пароль для admin
-        new_password_hash = get_password_hash("admin123")
-        
-        result = conn.execute(text("""
-            UPDATE users 
-            SET hashed_password = :password_hash 
-            WHERE username = 'admin'
-        """), {"password_hash": new_password_hash})
-        
-        conn.commit()
-        
-        if result.rowcount > 0:
-            print("✅ Пароль пользователя admin обновлен на 'admin123'")
-        else:
-            print("❌ Пользователь admin не найден")
-            
-        # Проверяем результат
-        result = conn.execute(text("SELECT username, email, role FROM users WHERE username = 'admin'"))
-        user = result.fetchone()
-        
-        if user:
-            print(f"👤 Пользователь: {user[0]} ({user[1]}) - {user[2]}")
-            
-except Exception as e:
-    print(f"❌ Ошибка при обновлении пароля: {e}")
 
-print("\n🎉 Исправление завершено!")
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -3,9 +3,23 @@
 Скрипт для создания пользователей с разными ролями
 """
 
-from app.core.security import get_password_hash
-from app.db.session import SessionLocal
-from app.models.user import User
+import os
+
+
+def _password_env_names(username: str) -> list[str]:
+    names = [f"CREATE_USERS_{username.upper()}_PASSWORD"]
+    if username == "admin":
+        names.insert(0, "ADMIN_PASSWORD")
+    return names
+
+
+def _required_password(username: str) -> str:
+    for env_name in _password_env_names(username):
+        password = os.getenv(env_name, "").strip()
+        if password:
+            return password
+    expected = " or ".join(_password_env_names(username))
+    raise RuntimeError(f"Set {expected} before creating user '{username}'.")
 
 
 def require_create_users_confirmation():
@@ -31,55 +45,51 @@ def create_users():
     require_create_users_confirmation()
     require_postgres_database_url()
 
+    from app.core.security import get_password_hash
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
     db = SessionLocal()
     try:
         # Список пользователей для создания
         users_data = [
             {
                 "username": "admin",
-                "password": "admin123",
                 "role": "Admin",
                 "full_name": "Administrator",
             },
             {
                 "username": "registrar",
-                "password": "registrar123",
                 "role": "Registrar",
                 "full_name": "Регистратор",
             },
             {
                 "username": "doctor",
-                "password": "doctor123",
                 "role": "Doctor",
                 "full_name": "Врач",
             },
             {
                 "username": "cashier",
-                "password": "cashier123",
                 "role": "Cashier",
                 "full_name": "Кассир",
             },
             {
                 "username": "lab",
-                "password": "lab123",
                 "role": "Lab",
                 "full_name": "Лаборант",
             },
             {
                 "username": "cardio",
-                "password": "cardio123",
                 "role": "Doctor",
                 "full_name": "Кардиолог",
             },
             {
                 "username": "derma",
-                "password": "derma123",
                 "role": "Doctor",
                 "full_name": "Дерматолог",
             },
             {
                 "username": "dentist",
-                "password": "dentist123",
                 "role": "Doctor",
                 "full_name": "Стоматолог",
             },
@@ -99,15 +109,15 @@ def create_users():
                 username=user_data["username"],
                 full_name=user_data["full_name"],
                 email=f"{user_data['username']}@clinic.local",
-                hashed_password=get_password_hash(user_data["password"]),
+                hashed_password=get_password_hash(
+                    _required_password(user_data["username"])
+                ),
                 role=user_data["role"],
                 is_active=True,
             )
 
             db.add(user)
-            print(
-                f"✅ Создан пользователь {user_data['username']} с паролем {user_data['password']}"
-            )
+            print(f"✅ Создан пользователь {user_data['username']}")
 
         db.commit()
         print("\n✅ Все пользователи успешно созданы!")
@@ -115,6 +125,7 @@ def create_users():
     except Exception as e:
         print(f"❌ Ошибка при создании пользователей: {e}")
         db.rollback()
+        raise
     finally:
         db.close()
 
