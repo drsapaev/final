@@ -24,7 +24,38 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentWebhookService:
-    """Сервис для обработки вебхуков оплат"""
+    """Payment webhook processing service."""
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        if value in (None, ""):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _account_value(account: Any, key: str) -> Any:
+        if isinstance(account, dict):
+            return account.get(key)
+        return getattr(account, key, None)
+
+    @staticmethod
+    def _extract_payme_account_targets(
+        account: Any,
+    ) -> tuple[int | None, int | None]:
+        appointment_id = PaymentWebhookService._optional_int(
+            PaymentWebhookService._account_value(account, "appointment_id")
+        )
+        visit_id = PaymentWebhookService._optional_int(
+            PaymentWebhookService._account_value(account, "visit_id")
+        )
+        if appointment_id is None:
+            appointment_id = PaymentWebhookService._optional_int(
+                PaymentWebhookService._account_value(account, "order_id")
+            )
+        return appointment_id, visit_id
 
     @staticmethod
     def verify_payme_signature(
@@ -138,17 +169,20 @@ class PaymentWebhookService:
                     visit_id = None
 
                     if hasattr(webhook_data, "account") and webhook_data.account:
-                        # Пытаемся найти appointment_id или visit_id в account данных
-                        if hasattr(webhook_data.account, "appointment_id"):
-                            appointment_id = int(webhook_data.account.appointment_id)
-                        elif hasattr(webhook_data.account, "visit_id"):
-                            visit_id = int(webhook_data.account.visit_id)
-                        elif hasattr(webhook_data.account, "order_id"):
-                            # Если есть order_id, пытаемся интерпретировать как appointment_id
-                            try:
-                                appointment_id = int(webhook_data.account.order_id)
-                            except (ValueError, TypeError):
-                                pass
+                        appointment_id, visit_id = (
+                            PaymentWebhookService._extract_payme_account_targets(
+                                webhook_data.account
+                            )
+                        )
+                        logger.info(
+                            "payment_webhook_payme_account_targets_extracted",
+                            extra={
+                                "payment_provider": "payme",
+                                "webhook_record_id": webhook.id,
+                                "has_appointment_target": appointment_id is not None,
+                                "has_visit_target": visit_id is not None,
+                            },
+                        )
 
                     # Приоритет: сначала ищем appointment_id, потом visit_id
                     if appointment_id:
