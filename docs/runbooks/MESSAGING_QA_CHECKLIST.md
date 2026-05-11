@@ -29,7 +29,7 @@ Use this runbook to verify the full messaging stack after backend, frontend, or 
 - Confirm Telegram webhook operations are Admin-only and reject requests without the configured secret token.
 - Open notification preferences and confirm save + reload persistence.
 - Open notification system status and confirm provider cards render from the notification-status API response.
-- Use the chromium clean-session proof under `output/playwright/messaging-rollout-proof/` as the canonical release-grade evidence set for this run.
+- Generate the chromium clean-session proof under ignored `output/playwright/messaging-rollout-proof/` when rerunning this historical smoke; do not require those artifacts as committed files.
 
 ## Regression Path
 
@@ -52,4 +52,4 @@ Use this runbook to verify the full messaging stack after backend, frontend, or 
 - Attach screenshots for the conversation list, active chat, AI chat, Telegram settings, and notification preferences.
 - Attach browser console and network logs for any failed websocket, upload, or receipt-sync path.
 - Record the exact user, route, and message ID when a flow fails.
-- For rollout proof, keep the latest chat, console, network, attachment, and voice artifacts in `output/playwright/messaging-rollout-proof/`.
+- For rollout proof, generate the latest chat, console, network, attachment, and voice artifacts locally under ignored `output/playwright/messaging-rollout-proof/`.

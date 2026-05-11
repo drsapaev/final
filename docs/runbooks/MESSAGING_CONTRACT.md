@@ -89,7 +89,7 @@ This document is the historical operational contract for the messaging stack.
 
 ## Operational Guardrails
 
-- Treat `output/playwright/messaging-rollout-proof/` as the canonical clean-session rollout proof set for this cycle.
+- Generate clean-session rollout proof artifacts locally under ignored `output/playwright/messaging-rollout-proof/` for this historical cycle; do not require those artifacts as committed files.
 - Re-run the chromium two-user smoke after any transport, composer, attachment, voice, or reconnect change.
 - Treat recurring websocket auth failures, unread drift, duplicate delivery, or attachment scope leaks as release blockers.
 - Treat Telegram delivery regressions and AI stream interruptions as rollout-review items before widening exposure.
