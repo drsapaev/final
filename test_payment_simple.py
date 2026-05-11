@@ -130,7 +130,11 @@ def test_auth_endpoint():
         if response.status_code == 200:
             data = response.json()
             token = data.get("access_token")
-            print(f"   ✅ Авторизация успешна: {token[:20] if token else 'No token'}...")
+            token_length = len(token or "")
+            print(
+                "   ✅ Авторизация успешна: "
+                f"token_present={bool(token)}, token_length={token_length}"
+            )
             return token
         else:
             print(f"   ❌ Авторизация не удалась: {response.status_code}")
