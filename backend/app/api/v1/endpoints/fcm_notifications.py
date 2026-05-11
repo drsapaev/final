@@ -404,9 +404,8 @@ async def get_user_fcm_tokens(
                     "user_id": user.id,
                     "username": user.username,
                     "full_name": user.full_name,
-                    "fcm_token": (
-                        user.fcm_token[:20] + "..." if user.fcm_token else None
-                    ),
+                    "fcm_token": "[redacted]" if user.fcm_token else None,
+                    "fcm_token_length": len(user.fcm_token or ""),
                     "device_type": user.device_type,
                     "push_enabled": user.push_notifications_enabled,
                     "last_login": (
