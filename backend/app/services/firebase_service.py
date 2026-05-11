@@ -132,7 +132,11 @@ class FirebaseService:
             result = response.json()
 
             if result.get("success") == 1:
-                logger.info(f"✅ FCM notification sent to {device_token[:20]}...")
+                logger.info(
+                    "✅ FCM notification sent device_token_present=%s, device_token_length=%d",
+                    bool(device_token),
+                    len(device_token or ""),
+                )
                 return {
                     "success": True,
                     "message_id": result.get("message_id"),
@@ -199,7 +203,11 @@ class FirebaseService:
             response.raise_for_status()
             result = response.json()
 
-            logger.info(f"✅ FCM v1 notification sent to {device_token[:20]}...")
+            logger.info(
+                "✅ FCM v1 notification sent device_token_present=%s, device_token_length=%d",
+                bool(device_token),
+                len(device_token or ""),
+            )
             return {
                 "success": True,
                 "name": result.get("name"),
@@ -250,7 +258,8 @@ class FirebaseService:
             else:
                 results["failure_count"] += 1
                 results["errors"].append({
-                    "token": token[:20] + "...",
+                    "token": "[redacted]" if token else None,
+                    "token_length": len(token or ""),
                     "error": result.get("error"),
                 })
 
