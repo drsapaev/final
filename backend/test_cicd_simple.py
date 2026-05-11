@@ -13,7 +13,7 @@ from datetime import datetime
 
 # Конфигурация
 BASE_URL = "http://127.0.0.1:18000"
-AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "qa-smoke-user")
 AUTH_PASSWORD = os.getenv("QA_ADMIN_PASSWORD", "invalid-qa-admin-password")
 
 

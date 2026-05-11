@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 BASE_URL = os.getenv("QA_BACKEND_BASE_URL", "http://localhost:18000")
-AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+AUTH_USERNAME_ENV = "QA_ADMIN_USERNAME"
 
 
 def required_env(name):
@@ -26,7 +26,7 @@ def test_time_restrictions():
     
     # Получаем токен авторизации
     login_data = {
-        "username": AUTH_USERNAME,
+        "username": required_env(AUTH_USERNAME_ENV),
         "password": required_env("QA_ADMIN_PASSWORD"),
     }
     login_response = requests.post(f"{BASE_URL}/api/v1/authentication/login", data=login_data)
