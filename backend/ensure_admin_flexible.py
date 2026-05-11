@@ -31,7 +31,21 @@ def required_admin_password():
     return password
 
 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+def required_admin_username():
+    username = os.getenv("ADMIN_USERNAME", "").strip()
+    if not username:
+        raise RuntimeError(
+            "ADMIN_USERNAME must be set before creating or resetting admin credentials."
+        )
+    return username
+
+
+try:
+    ADMIN_USERNAME = required_admin_username()
+except RuntimeError as exc:
+    print(f"ensure_admin_flexible: FATAL: {exc}", file=sys.stderr)
+    sys.exit(2)
+
 try:
     ADMIN_PASSWORD = required_admin_password()
 except RuntimeError as exc:
