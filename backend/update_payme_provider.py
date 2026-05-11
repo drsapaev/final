@@ -13,6 +13,15 @@ from app.db.session import get_db
 from app.schemas.payment_webhook import PaymentProviderUpdate
 
 
+def _get_required_payme_secret_key():
+    secret_key = os.getenv("PAYME_PROVIDER_SECRET_KEY") or os.getenv("PAYME_SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError(
+            "Set PAYME_PROVIDER_SECRET_KEY or PAYME_SECRET_KEY before running this script."
+        )
+    return secret_key
+
+
 def update_payme_provider():
     """Обновляем провайдера Payme"""
     print("🔧 Обновление провайдера Payme")
@@ -30,16 +39,18 @@ def update_payme_provider():
             return
 
         print(f"📋 Найден провайдер: {provider.name} (ID: {provider.id})")
-        print(f"🔑 Текущий секретный ключ: {provider.secret_key or 'Не установлен'}")
+        print(
+            f"🔑 Текущий секретный ключ: {'Установлен' if provider.secret_key else 'Не установлен'}"
+        )
 
-        # Обновляем секретный ключ на тестовый
-        new_secret_key = "test_secret_key_12345"
+        # Обновляем секретный ключ из локального env
+        new_secret_key = _get_required_payme_secret_key()
         update_data = PaymentProviderUpdate(secret_key=new_secret_key)
 
         updated_provider = update_provider(db, provider.id, update_data)
         if updated_provider:
             print("✅ Провайдер обновлён!")
-            print(f"🔑 Новый секретный ключ: {updated_provider.secret_key}")
+            print("🔑 Новый секретный ключ: установлен из env")
         else:
             print("❌ Не удалось обновить провайдера")
 

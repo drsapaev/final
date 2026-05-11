@@ -3,6 +3,7 @@
 Тест админ-панели провайдеров оплаты
 """
 import os
+import secrets
 import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -38,7 +39,7 @@ def test_providers_crud():
             code=f"test_payme_{timestamp}",
             description="Тестовый провайдер Payme",
             is_active=True,
-            secret_key="test_secret_key_123",
+            secret_key=secrets.token_urlsafe(32),
             webhook_url="https://example.com/webhook",
             api_url="https://api.payme.uz",
         )
