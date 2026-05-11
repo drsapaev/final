@@ -287,7 +287,9 @@ class QRQueueService:
             from app.crud import clinic as crud_clinic
 
             logger.debug(
-                f"[QRQueueService.get_qr_token_info] Запрос информации о токене: {token[:20]}..."
+                "[QRQueueService.get_qr_token_info] Запрос информации о токене: token_present=%s, token_length=%d",
+                bool(token),
+                len(token or ""),
             )
 
             # Получаем timezone для правильного сравнения
@@ -621,7 +623,9 @@ class QRQueueService:
             Данные сессии
         """
         logger.debug(
-            f"[QRQueueService.start_join_session] Начало сессии для токена: {token[:20]}..."
+            "[QRQueueService.start_join_session] Начало сессии для токена: token_present=%s, token_length=%d",
+            bool(token),
+            len(token or ""),
         )
 
         try:
