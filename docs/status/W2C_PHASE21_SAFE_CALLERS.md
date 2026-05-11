@@ -27,7 +27,7 @@ Mode: behavior-preserving execution
   direct SQL allocator branches
 - `backend/app/services/force_majeure_service.py`:
   exceptional transfer allocator with its own numbering semantics
-- `backend/app/services/online_queue.py`, `backend/app/api/v1/endpoints/online_queue.py`, `backend/app/services/online_queue_api_service.py`, `backend/app/crud/queue.py`:
+- `backend/app/services/online_queue.py`, `backend/app/api/v1/endpoints/online_queue.py`, `backend/app/crud/queue.py`:
   `OnlineDay` / legacy counter world
 - `backend/app/services/online_queue_new_api_service.py`:
   unmounted duplicate router-like module; not safe to refactor blindly while `backend/app/api/v1/endpoints/online_queue_new.py` remains the runtime path

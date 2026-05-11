@@ -17,7 +17,6 @@ Mode: behavior-preserving execution
 | `backend/app/services/force_majeure_service.py` | `_get_next_queue_number()`, `transfer_entries_to_tomorrow()` | Own transfer allocator with separate status and numbering assumptions | Exceptional flow / numbering semantics | Dedicated force-majeure review |
 | `backend/app/services/online_queue.py` | `issue_next_ticket()` | `OnlineDay` legacy counter | Legacy/OnlineDay | Legacy migration track |
 | `backend/app/api/v1/endpoints/online_queue.py` | legacy online queue endpoints | Delegates to `OnlineDay` counter semantics | Legacy/OnlineDay | Legacy migration track |
-| `backend/app/services/online_queue_api_service.py` | legacy online queue endpoints | Delegates to `OnlineDay` counter semantics | Legacy/OnlineDay | Legacy migration track |
 | `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Stale legacy ticket path | Legacy/stale allocator | Legacy cleanup track |
 | `backend/app/services/online_queue_new_api_service.py` | `join_queue()` and related router-like handlers | Duplicate unmounted module; unsafe to refactor blindly while mounted runtime path lives elsewhere | Shadow/dead-path ambiguity | Human review / cleanup track |
 

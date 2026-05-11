@@ -39,7 +39,6 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/schedule.py`
 - Owned services:
 - `backend/app/services/appointments_api_service.py`
-- `backend/app/services/schedule_api_service.py`
 - `backend/app/services/appointment_flow_api_service.py`
 - Owned repositories:
 - `backend/app/repositories/appointments_api_repository.py`
@@ -53,7 +52,6 @@ Goal: keep the modular monolith stable by preventing direct internal coupling be
 - `backend/app/models/display_config.py`
 - Owned services:
 - `backend/app/services/queue_api_service.py`
-- `backend/app/services/online_queue_api_service.py`
 - `backend/app/services/qr_queue_api_service.py`
 - `backend/app/services/display_websocket.py`
 - Owned repositories:
