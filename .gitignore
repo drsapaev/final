@@ -110,6 +110,7 @@ frontend/output/
 ops/meta/
 backend/uploads/
 static/uploads/
+frontend/ticket.pdf
 output/**/.playwright-cli/
 backend/storage/files/
 storage/files/
