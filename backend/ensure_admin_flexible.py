@@ -49,10 +49,11 @@ try:
         schemes=["bcrypt", "sha256_crypt", "pbkdf2_sha256"], deprecated="auto"
     )
 except Exception:
-    pwdctx = None
     print(
-        "Warning: passlib not available. Install with: pip install 'passlib[bcrypt]'."
+        "ensure_admin_flexible: FATAL: passlib is required for admin password hashing.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 candidates_session = [
     "app.db.session.get_async_session",
@@ -85,12 +86,7 @@ def try_import(path):
 
 
 def make_hash(pwd):
-    if pwdctx:
-        return pwdctx.hash(pwd)
-    else:
-        import hashlib
-
-        return "plain$" + hashlib.sha256(pwd.encode("utf8")).hexdigest()
+    return pwdctx.hash(pwd)
 
 
 # SYNC helper
