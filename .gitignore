@@ -108,6 +108,8 @@ wf_page*.html
 output/
 frontend/output/
 ops/meta/
+backend/uploads/
+static/uploads/
 output/**/.playwright-cli/
 backend/storage/files/
 storage/files/
