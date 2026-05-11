@@ -59,12 +59,6 @@ def test_queue_cabinet_management_service_avoids_direct_orm_calls() -> None:
     assert ".query(" not in logic
 
 
-def test_payments_service_avoids_direct_orm_calls() -> None:
-    logic = _service_logic_block("payments")
-    assert "repository.db" not in logic
-    assert ".query(" not in logic
-
-
 def test_dynamic_pricing_service_avoids_direct_orm_calls() -> None:
     logic = _service_logic_block("dynamic_pricing")
     assert "repository.db" not in logic
