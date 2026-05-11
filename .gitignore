@@ -132,7 +132,9 @@ frontend/lint_report*.txt
 frontend/temp_*.js
 temp_token.json
 temp_old.jsx
+debug_test.py
 test_auth.json
+test_payload.json
 tree_F.txt
 mcp_test_report.json
 mcp_test_results_complaint.json
