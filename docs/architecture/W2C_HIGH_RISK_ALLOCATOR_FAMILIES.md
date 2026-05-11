@@ -50,7 +50,6 @@ Wave 2C Phase 2.1 and are not safe for broad migration yet.
 |---|---|---|---|---|---|---|
 | `backend/app/services/online_queue.py` | `issue_next_ticket()` | Legacy `last_ticket` counter stored in key-value settings, incremented and committed immediately | Identity remembered separately by phone or Telegram mapping | Own commit per ticket issue | Updates stats, writes identity mapping, broadcasts stats | Entirely coupled to `OnlineDay` semantics and morning window rules |
 | `backend/app/api/v1/endpoints/online_queue.py` | legacy online queue endpoints | Delegates to `issue_next_ticket()` | Delegates to legacy identity mapping | Uses legacy service transaction | Returns legacy ticket and stats payloads | Full `OnlineDay` dependency |
-| `backend/app/services/online_queue_api_service.py` | legacy online queue endpoints | Delegates to `issue_next_ticket()` | Delegates to legacy identity mapping | Same as router mirror | Same as router mirror | Full `OnlineDay` dependency |
 | `backend/app/services/queues_api_service.py` | queue dashboard legacy issue path | Delegates to `issue_next_ticket()` | Delegates to legacy identity mapping | Same as legacy service | Returns day stats for old queue board flow | Full `OnlineDay` dependency |
 | `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Updates `last_ticket` on legacy table and inserts legacy queue row in one function | None beyond caller logic | Own commit inside helper | Persists `ticket_number` directly | Stale legacy allocator family |
 

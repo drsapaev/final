@@ -34,7 +34,6 @@ current numbering algorithm or duplicate policy.
 | `backend/app/services/force_majeure_service.py` | `_get_next_queue_number()` and `transfer_entries_to_tomorrow()` | Separate transfer allocator ignoring `cancelled` rows | High | P4 |
 | `backend/app/services/online_queue.py` | `issue_next_ticket()` | Legacy `OnlineDay` / `last_ticket` counter | Very High | P5 |
 | `backend/app/api/v1/endpoints/online_queue.py` | legacy queue endpoints | Delegates to `issue_next_ticket()` | Very High | P5 |
-| `backend/app/services/online_queue_api_service.py` | legacy service-layer endpoints | Delegates to `issue_next_ticket()` | Very High | P5 |
 | `backend/app/crud/queue.py` | `next_ticket_and_insert_entry()` | Stale legacy ticket counter path | Very High | P5 |
 
 ## Migration Priority Legend
