@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.models.clinic import Branch, ClinicSettings
 
 
@@ -52,3 +54,12 @@ def test_ensure_admin_skips_initialized_instance_without_override(
 
     assert result["skipped"] is True
     assert "explicit_ops_override" in result["reason"]
+
+
+def test_ensure_admin_requires_explicit_admin_username(monkeypatch):
+    from app.scripts import ensure_admin as ensure_admin_module
+
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+
+    with pytest.raises(RuntimeError, match="ADMIN_USERNAME must be set"):
+        ensure_admin_module._required_admin_username()
