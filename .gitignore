@@ -63,6 +63,7 @@ pytest_*.txt
 backend/routes.json
 backend/cascade_audit_*.txt
 backend/fk_audit_*.txt
+backend/app/scripts/out/
 *.db
 *.sqlite
 clinic.db
