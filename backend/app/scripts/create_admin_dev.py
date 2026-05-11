@@ -31,6 +31,15 @@ def _required_admin_password() -> str:
     return password
 
 
+def _required_admin_username() -> str:
+    username = (os.getenv("DEV_ADMIN_USERNAME") or os.getenv("ADMIN_USERNAME") or "").strip()
+    if not username:
+        raise SystemExit(
+            "Set DEV_ADMIN_USERNAME or ADMIN_USERNAME before creating a dev admin."
+        )
+    return username
+
+
 def _password_value(column_name: str) -> str:
     password = _required_admin_password()
     if column_name == "hashed_password":
@@ -42,6 +51,7 @@ def _password_value(column_name: str) -> str:
 
 _require_create_admin_dev_confirmation()
 DATABASE_URL = _required_database_url()
+ADMIN_USERNAME = _required_admin_username()
 
 from sqlalchemy import MetaData, Table, create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -68,7 +78,7 @@ def find_users_table(meta: MetaData) -> Optional[Table]:
 
 
 def upsert_admin() -> None:
-    admin_username = os.getenv("DEV_ADMIN_USERNAME") or os.getenv("ADMIN_USERNAME", "admin")
+    admin_username = ADMIN_USERNAME
     admin_email = os.getenv("DEV_ADMIN_EMAIL") or os.getenv("ADMIN_EMAIL", "admin@example.com")
     admin_full_name = os.getenv("DEV_ADMIN_FULL_NAME") or os.getenv(
         "ADMIN_FULL_NAME", "Administrator"
