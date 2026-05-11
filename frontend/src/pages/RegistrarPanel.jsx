@@ -834,7 +834,7 @@ const RegistrarPanel = () => {
       // Загружаем врачей, услуги и настройки очередей из админ панели
       try {
         const token = tokenManager.getAccessToken();
-        logger.info('🔍 RegistrarPanel: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
+        logger.info('🔍 RegistrarPanel: token present:', Boolean(token));
 
         // ✅ ОПТИМИЗАЦИЯ: Загружаем все данные параллельно с Promise.allSettled
         logger.info('🚀 Загружаем данные параллельно...');
