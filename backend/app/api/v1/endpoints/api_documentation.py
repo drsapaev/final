@@ -31,7 +31,7 @@ async def get_detailed_endpoints_documentation(
                             "username": {
                                 "type": "string",
                                 "required": True,
-                                "example": "admin",
+                                "example": "YOUR_ADMIN_USERNAME",
                             },
                             "password": {
                                 "type": "string",
@@ -99,8 +99,8 @@ async def get_detailed_endpoints_documentation(
                             "example": [
                                 {
                                     "id": 1,
-                                    "username": "admin",
-                                    "email": "admin@clinic.com",
+                                    "username": "YOUR_ADMIN_USERNAME",
+                                    "email": "operator@example.com",
                                     "role": "Admin",
                                     "is_active": True,
                                     "created_at": "2025-01-29T10:00:00Z",
@@ -117,8 +117,8 @@ async def get_detailed_endpoints_documentation(
                             "description": "Информация о пользователе",
                             "example": {
                                 "id": 1,
-                                "username": "admin",
-                                "email": "admin@clinic.com",
+                                "username": "YOUR_ADMIN_USERNAME",
+                                "email": "operator@example.com",
                                 "role": "Admin",
                                 "is_active": True,
                             },
