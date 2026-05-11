@@ -28,6 +28,7 @@ from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
 )
 from app.services.notifications import notification_sender_service
+from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import get_service_code, normalize_service_code
@@ -505,6 +506,9 @@ class InvoicePaymentResponse(BaseModel):
     error_message: Optional[str] = None
 
 
+SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click", "payme"}
+
+
 @router.post("/registrar/invoice/init-payment", response_model=InvoicePaymentResponse)
 def init_invoice_payment(
     payment_req: InvoicePaymentRequest,
@@ -530,40 +534,16 @@ def init_invoice_payment(
             )
 
         # Инициализируем провайдер платежей
-        if payment_req.provider == "click":
-            from app.services.payment_providers.click import ClickProvider
-
-            # Конфигурация Click (в реальном проекте из настроек)
-            provider_config = {
-                "service_id": "test_service",
-                "merchant_id": "test_merchant",
-                "secret_key": "test_secret",
-                "base_url": "https://api.click.uz/v2",
-            }
-
-            provider = ClickProvider(provider_config)
-
-        elif payment_req.provider == "payme":
-            from app.services.payment_providers.payme import PayMeProvider
-
-            # Конфигурация PayMe (в реальном проекте из настроек)
-            provider_config = {
-                "merchant_id": "test_merchant_payme",
-                "secret_key": "test_secret_payme",
-                "base_url": "https://checkout.paycom.uz",
-                "api_url": "https://api.paycom.uz",
-            }
-
-            provider = PayMeProvider(provider_config)
-
-        else:
+        provider_name = payment_req.provider.lower()
+        if provider_name not in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
             return InvoicePaymentResponse(
                 success=False,
                 error_message=f"Провайдер {payment_req.provider} не поддерживается",
             )
 
         # Создаём платёж
-        result = provider.create_payment(
+        result = get_payment_manager().create_payment(
+            provider_name=provider_name,
             amount=invoice.total_amount,
             currency=invoice.currency,
             order_id=f"invoice_{invoice.id}",
@@ -575,8 +555,8 @@ def init_invoice_payment(
         if result.success:
             # Обновляем invoice
             invoice.provider_payment_id = result.payment_id
-            invoice.payment_method = payment_req.provider
-            invoice.provider = payment_req.provider
+            invoice.payment_method = provider_name
+            invoice.provider = provider_name
             invoice.status = "processing"
             invoice.provider_data = result.provider_data
             db.commit()
@@ -627,34 +607,12 @@ def check_invoice_status(
 
         # Проверяем статус у провайдера
         if invoice.provider_payment_id and invoice.provider:
-            provider = None
+            provider_name = invoice.provider.lower()
 
-            if invoice.provider == "click":
-                from app.services.payment_providers.click import ClickProvider
-
-                provider_config = {
-                    "service_id": "test_service",
-                    "merchant_id": "test_merchant",
-                    "secret_key": "test_secret",
-                    "base_url": "https://api.click.uz/v2",
-                }
-
-                provider = ClickProvider(provider_config)
-
-            elif invoice.provider == "payme":
-                from app.services.payment_providers.payme import PayMeProvider
-
-                provider_config = {
-                    "merchant_id": "test_merchant_payme",
-                    "secret_key": "test_secret_payme",
-                    "base_url": "https://checkout.paycom.uz",
-                    "api_url": "https://api.paycom.uz",
-                }
-
-                provider = PayMeProvider(provider_config)
-
-            if provider:
-                result = provider.check_payment_status(invoice.provider_payment_id)
+            if provider_name in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
+                result = get_payment_manager().check_payment_status(
+                    provider_name, invoice.provider_payment_id
+                )
 
                 if result.success:
                     # Обновляем статус invoice
