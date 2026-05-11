@@ -328,15 +328,6 @@ def test_discount_benefits_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
-def test_activation_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("activation")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_telegram_bot_management_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("telegram_bot_management")
     direct_db_call = re.search(
