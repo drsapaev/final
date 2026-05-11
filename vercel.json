@@ -3,7 +3,7 @@
   "installCommand": "npm --prefix frontend ci",
   "framework": "vite",
   "outputDirectory": "frontend/dist",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- frontend vercel.json .vercelignore",
+  "ignoreCommand": "test -d .git && git diff --quiet HEAD^ HEAD -- frontend vercel.json .vercelignore",
   "rewrites": [
     {
       "source": "/(.*)",
