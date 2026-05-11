@@ -51,7 +51,7 @@ class PaymentWebhookService:
         visit_id = PaymentWebhookService._optional_int(
             PaymentWebhookService._account_value(account, "visit_id")
         )
-        if appointment_id is None:
+        if appointment_id is None and visit_id is None:
             appointment_id = PaymentWebhookService._optional_int(
                 PaymentWebhookService._account_value(account, "order_id")
             )
