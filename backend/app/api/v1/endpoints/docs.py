@@ -43,7 +43,7 @@ async def get_api_docs():
             <div class="description">Вход в систему</div>
             <div class="example">
                 {
-                    "username": "admin",
+                    "username": "YOUR_ADMIN_USERNAME",
                     "password": "REPLACE_WITH_ADMIN_PASSWORD"
                 }
             </div>
@@ -234,7 +234,7 @@ async def get_api_schema():
             "title": "Clinic Management System API",
             "description": "API для системы управления клиникой",
             "version": "1.0.0",
-            "contact": {"name": "Clinic Management Team", "email": "admin@clinic.com"},
+            "contact": {"name": "Clinic Management Team", "email": "support@example.com"},
         },
         "servers": [
             {"url": "http://localhost:18000", "description": "Development server"}

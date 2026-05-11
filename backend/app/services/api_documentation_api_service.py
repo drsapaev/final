@@ -99,7 +99,7 @@ async def get_detailed_endpoints_documentation(
                                 {
                                     "id": 1,
                                     "username": "YOUR_ADMIN_USERNAME",
-                                    "email": "admin@clinic.com",
+                                    "email": "operator@example.com",
                                     "role": "Admin",
                                     "is_active": True,
                                     "created_at": "2025-01-29T10:00:00Z",
@@ -117,7 +117,7 @@ async def get_detailed_endpoints_documentation(
                             "example": {
                                 "id": 1,
                                 "username": "YOUR_ADMIN_USERNAME",
-                                "email": "admin@clinic.com",
+                                "email": "operator@example.com",
                                 "role": "Admin",
                                 "is_active": True,
                             },
