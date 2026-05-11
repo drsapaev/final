@@ -169,8 +169,8 @@ const PaymentWidget = ({
         endpoint,
         isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
-        authHeader: apiClient.defaults.headers.common['Authorization'] ?
-        apiClient.defaults.headers.common['Authorization'].substring(0, 30) + '...' : 'none',
+        authHeader: apiClient.defaults.headers.common['Authorization'] ? '[redacted]' : 'none',
+        authHeaderLength: apiClient.defaults.headers.common['Authorization']?.length || 0,
         paymentRequest
       });
 
