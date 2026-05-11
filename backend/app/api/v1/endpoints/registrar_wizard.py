@@ -15,6 +15,7 @@ from sqlalchemy import String, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.config import settings as app_settings
 from app.crud import clinic as crud_clinic, online_queue as crud_queue
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
@@ -531,30 +532,54 @@ def init_invoice_payment(
 
         # Инициализируем провайдер платежей
         if payment_req.provider == "click":
+            if not app_settings.CLICK_ENABLED:
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message="Payment provider click is not configured",
+                )
+
             from app.services.payment_providers.click import ClickProvider
 
             # Конфигурация Click (в реальном проекте из настроек)
             provider_config = {
-                "service_id": "test_service",
-                "merchant_id": "test_merchant",
-                "secret_key": "test_secret",
-                "base_url": "https://api.click.uz/v2",
+                "service_id": app_settings.CLICK_SERVICE_ID,
+                "merchant_id": app_settings.CLICK_MERCHANT_ID,
+                "secret_key": app_settings.CLICK_SECRET_KEY,
+                "base_url": app_settings.CLICK_BASE_URL,
             }
 
-            provider = ClickProvider(provider_config)
+            try:
+                provider = ClickProvider(provider_config)
+            except ValueError:
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message="Payment provider click is not configured",
+                )
 
         elif payment_req.provider == "payme":
+            if not app_settings.PAYME_ENABLED:
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message="Payment provider payme is not configured",
+                )
+
             from app.services.payment_providers.payme import PayMeProvider
 
             # Конфигурация PayMe (в реальном проекте из настроек)
             provider_config = {
-                "merchant_id": "test_merchant_payme",
-                "secret_key": "test_secret_payme",
-                "base_url": "https://checkout.paycom.uz",
-                "api_url": "https://api.paycom.uz",
+                "merchant_id": app_settings.PAYME_MERCHANT_ID,
+                "secret_key": app_settings.PAYME_SECRET_KEY,
+                "base_url": app_settings.PAYME_BASE_URL,
+                "api_url": app_settings.PAYME_API_URL,
             }
 
-            provider = PayMeProvider(provider_config)
+            try:
+                provider = PayMeProvider(provider_config)
+            except ValueError:
+                return InvoicePaymentResponse(
+                    success=False,
+                    error_message="Payment provider payme is not configured",
+                )
 
         else:
             return InvoicePaymentResponse(
@@ -629,29 +654,35 @@ def check_invoice_status(
         if invoice.provider_payment_id and invoice.provider:
             provider = None
 
-            if invoice.provider == "click":
+            if invoice.provider == "click" and app_settings.CLICK_ENABLED:
                 from app.services.payment_providers.click import ClickProvider
 
                 provider_config = {
-                    "service_id": "test_service",
-                    "merchant_id": "test_merchant",
-                    "secret_key": "test_secret",
-                    "base_url": "https://api.click.uz/v2",
+                    "service_id": app_settings.CLICK_SERVICE_ID,
+                    "merchant_id": app_settings.CLICK_MERCHANT_ID,
+                    "secret_key": app_settings.CLICK_SECRET_KEY,
+                    "base_url": app_settings.CLICK_BASE_URL,
                 }
 
-                provider = ClickProvider(provider_config)
+                try:
+                    provider = ClickProvider(provider_config)
+                except ValueError:
+                    provider = None
 
-            elif invoice.provider == "payme":
+            elif invoice.provider == "payme" and app_settings.PAYME_ENABLED:
                 from app.services.payment_providers.payme import PayMeProvider
 
                 provider_config = {
-                    "merchant_id": "test_merchant_payme",
-                    "secret_key": "test_secret_payme",
-                    "base_url": "https://checkout.paycom.uz",
-                    "api_url": "https://api.paycom.uz",
+                    "merchant_id": app_settings.PAYME_MERCHANT_ID,
+                    "secret_key": app_settings.PAYME_SECRET_KEY,
+                    "base_url": app_settings.PAYME_BASE_URL,
+                    "api_url": app_settings.PAYME_API_URL,
                 }
 
-                provider = PayMeProvider(provider_config)
+                try:
+                    provider = PayMeProvider(provider_config)
+                except ValueError:
+                    provider = None
 
             if provider:
                 result = provider.check_payment_status(invoice.provider_payment_id)
