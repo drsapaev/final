@@ -29,7 +29,7 @@ try:
     )
     if response.status_code == 200:
         token = response.json()["access_token"]
-        print(f"✅ Токен получен: {token[:20]}...")
+        print("✅ Токен получен; значение не печатается")
     else:
         print(f"❌ Ошибка авторизации: {response.status_code}")
         print(response.text)

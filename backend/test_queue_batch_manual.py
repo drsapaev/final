@@ -10,14 +10,22 @@ Requirements:
     - В БД должны быть пользователи: admin или registrar
     - В БД должны быть пациенты, услуги, специалисты
 """
-import requests
 import json
+import os
 from datetime import date
 
+import requests
+
 # Configuration
-API_BASE = "http://localhost:18000/api/v1"
-USERNAME = "admin"  # Или "registrar"
-PASSWORD = "admin"  # Замените на реальный пароль
+API_BASE = os.getenv("QA_BACKEND_API_BASE_URL", "http://localhost:18000/api/v1")
+USERNAME = os.getenv("QA_QUEUE_BATCH_USERNAME", "admin")
+
+
+def required_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Set {name} to run the queue batch manual helper.")
+    return value
 
 
 class Colors:
@@ -58,13 +66,13 @@ def login():
 
     response = requests.post(
         f"{API_BASE}/authentication/login",
-        json={"username": USERNAME, "password": PASSWORD}
+        json={"username": USERNAME, "password": required_env("QA_QUEUE_BATCH_PASSWORD")}
     )
 
     if response.status_code == 200:
         data = response.json()
         token = data.get("access_token")
-        print_success(f"Авторизация успешна! Token: {token[:20]}...")
+        print_success("Авторизация успешна! Token value is not printed")
         return token
     else:
         print_error(f"Ошибка авторизации: {response.status_code}")
