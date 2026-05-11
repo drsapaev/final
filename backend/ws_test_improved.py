@@ -13,7 +13,7 @@ import websockets
 
 BASE_URL = os.getenv("QA_BACKEND_BASE_URL", "http://127.0.0.1:18000")
 WS_BASE_URL = os.getenv("QA_BACKEND_WS_URL", "ws://127.0.0.1:18000")
-AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+AUTH_USERNAME_ENV = "QA_ADMIN_USERNAME"
 
 
 def required_env(name: str) -> str:
@@ -28,7 +28,7 @@ async def get_auth_token():
     try:
         data = urllib.parse.urlencode(
             {
-                "username": AUTH_USERNAME,
+                "username": required_env(AUTH_USERNAME_ENV),
                 "password": required_env("QA_ADMIN_PASSWORD"),
             }
         ).encode()
