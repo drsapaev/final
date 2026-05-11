@@ -137,3 +137,5 @@ tree_F.txt
 mcp_test_report.json
 mcp_test_results_complaint.json
 test_queue.json
+artifacts/load/
+artifacts/non_shim_endpoints.txt
