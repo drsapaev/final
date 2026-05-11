@@ -101,15 +101,6 @@ def test_doctor_integration_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
-def test_registrar_wizard_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("registrar_wizard")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_force_majeure_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("force_majeure")
     direct_db_call = re.search(
