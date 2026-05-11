@@ -28,7 +28,6 @@ Wave 2C Phase 2.1 and are not safe for broad migration yet.
 | File | Function or entry point | Current allocator mechanism | Duplicate check mechanism | Transaction boundary | Side effects | Legacy dependencies |
 |---|---|---|---|---|---|---|
 | `backend/app/api/v1/endpoints/visit_confirmation.py` | `confirm_visit_by_telegram()`, `confirm_visit_by_pwa()`, registrar confirm endpoint | Delegates to service; allocator lives below | None at router level | Router delegates to service transaction | Returns printable ticket payloads and updated visit status | None directly |
-| `backend/app/services/visit_confirmation_api_service.py` | `confirm_visit_by_telegram()`, `confirm_visit_by_pwa()`, registrar confirm endpoint | Delegates to `VisitConfirmationService` | None at API-service level | Shared with domain service | Same observable API payloads | None directly |
 | `backend/app/services/visit_confirmation_service.py` | `_assign_queue_numbers_on_confirmation()` | Split flow: `queue_service.get_next_queue_number()` followed by `queue_service.create_queue_entry(number=next_number, source="confirmation")` | No explicit duplicate guard before allocation | Confirmation updates `visit.confirmed_at`, `visit.status`, queue inserts, then commits once | Emits queue numbers and printable ticket payloads; flips same-day visits from `confirmed` to `open` | Handles `visit.doctor_id` as either `doctor.id` or legacy `user.id` depending on persisted data |
 
 ### 3. `qr_queue.py` direct SQL allocator branches
