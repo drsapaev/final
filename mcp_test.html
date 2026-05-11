@@ -208,7 +208,7 @@
                     authToken = data.access_token;
                     resultDiv.className = 'result success';
                     resultDiv.style.display = 'block';
-                    resultDiv.textContent = `✅ Токен получен успешно!\n\nТокен: ${authToken.substring(0, 50)}...\n\nТеперь вы можете тестировать MCP endpoints.`;
+                    resultDiv.textContent = '✅ Токен получен успешно; значение не отображается.\n\nТеперь вы можете тестировать MCP endpoints.';
                 } else {
                     resultDiv.className = 'result error';
                     resultDiv.style.display = 'block';
