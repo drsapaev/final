@@ -1,10 +1,18 @@
+import DOMPurify from 'dompurify';
+
+export const sanitizePrintableHtml = (html) => DOMPurify.sanitize(String(html ?? ''), {
+  WHOLE_DOCUMENT: true,
+  ADD_TAGS: ['html', 'head', 'body', 'style'],
+  ADD_ATTR: ['style', 'class', 'id', 'role', 'aria-label', 'colspan', 'rowspan']
+});
+
 export const finalizePrintableWindow = (printWindow, html, logger) => {
   if (!printWindow) {
     return false;
   }
 
   printWindow.document.open();
-  printWindow.document.write(html);
+  printWindow.document.write(sanitizePrintableHtml(html));
   printWindow.document.close();
 
   let finalized = false;
