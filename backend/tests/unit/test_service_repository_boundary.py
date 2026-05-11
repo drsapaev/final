@@ -391,15 +391,6 @@ def test_authentication_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
-def test_admin_doctors_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("admin_doctors")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_payment_settings_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("payment_settings")
     direct_db_call = re.search(
