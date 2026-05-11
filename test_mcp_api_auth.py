@@ -1,18 +1,32 @@
 """
 Тестирование MCP API с авторизацией
 """
-import requests
-import json
+import os
+import sys
 
-BASE_URL = "http://localhost:18000/api/v1"
+import requests
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+BASE_URL = os.getenv("QA_BACKEND_API_BASE_URL", "http://localhost:18000/api/v1")
+AUTH_USERNAME = os.getenv("QA_MCP_USERNAME", "mcp_test")
+__test__ = False
 
 def get_auth_token():
     """Получить токен авторизации"""
+    password = os.getenv("QA_MCP_PASSWORD")
+    if not password:
+        print("Set QA_MCP_PASSWORD before running this legacy MCP auth smoke script.")
+        return None
+
     try:
         # Попробуем получить токен через простую авторизацию
         response = requests.post(
             f"{BASE_URL}/auth/minimal-login",
-            json={"username": "admin", "password": "admin"},
+            json={"username": AUTH_USERNAME, "password": password},
             timeout=10
         )
         
@@ -214,8 +228,9 @@ def main():
         print("🔧 MCP endpoints: http://localhost:18000/api/v1/mcp/*")
     else:
         print(f"⚠️ {total_count - success_count} тестов завершились с ошибками")
-    
+
     print("=" * 60)
+    return 0 if success_count == total_count else 1
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
