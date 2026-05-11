@@ -27,6 +27,13 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
+const formatFcmTokenStatus = (user) => {
+  const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
+  const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;
+
+  return tokenLength > 0 ? `скрыт (${tokenLength} символов)` : 'не зарегистрирован';
+};
+
 const FCMManager = () => {
   const [loading, setLoading] = useState(false);
   const [fcmStatus, setFcmStatus] = useState(null);
@@ -546,7 +553,7 @@ const FCMManager = () => {
                 color: 'var(--mac-text-secondary)',
                 margin: '0 0 4px 0'
               }}>
-                    Токен: {user.fcm_token}
+                    FCM токен: {formatFcmTokenStatus(user)}
                   </p>
                   {user.last_login &&
               <p style={{
