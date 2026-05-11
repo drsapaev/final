@@ -14,27 +14,25 @@ _payment_manager_lock = Lock()
 def _build_provider_config() -> dict[str, dict[str, object]]:
     return {
         "click": {
-            "enabled": getattr(settings, "CLICK_ENABLED", True),
-            "service_id": getattr(settings, "CLICK_SERVICE_ID", "test_service"),
-            "merchant_id": getattr(settings, "CLICK_MERCHANT_ID", "test_merchant"),
-            "secret_key": getattr(settings, "CLICK_SECRET_KEY", "test_secret"),
-            "base_url": getattr(settings, "CLICK_BASE_URL", "https://api.click.uz/v2"),
+            "enabled": settings.CLICK_ENABLED,
+            "service_id": settings.CLICK_SERVICE_ID,
+            "merchant_id": settings.CLICK_MERCHANT_ID,
+            "secret_key": settings.CLICK_SECRET_KEY,
+            "base_url": settings.CLICK_BASE_URL,
         },
         "payme": {
-            "enabled": getattr(settings, "PAYME_ENABLED", True),
-            "merchant_id": getattr(settings, "PAYME_MERCHANT_ID", "test_merchant"),
-            "secret_key": getattr(settings, "PAYME_SECRET_KEY", "test_secret"),
-            "base_url": getattr(
-                settings, "PAYME_BASE_URL", "https://checkout.paycom.uz"
-            ),
-            "api_url": getattr(settings, "PAYME_API_URL", "https://api.paycom.uz"),
+            "enabled": settings.PAYME_ENABLED,
+            "merchant_id": settings.PAYME_MERCHANT_ID,
+            "secret_key": settings.PAYME_SECRET_KEY,
+            "base_url": settings.PAYME_BASE_URL,
+            "api_url": settings.PAYME_API_URL,
         },
         "kaspi": {
-            "enabled": getattr(settings, "KASPI_ENABLED", True),
-            "merchant_id": getattr(settings, "KASPI_MERCHANT_ID", "test_merchant"),
-            "secret_key": getattr(settings, "KASPI_SECRET_KEY", "test_secret"),
-            "base_url": getattr(settings, "KASPI_BASE_URL", "https://kaspi.kz/pay"),
-            "api_url": getattr(settings, "KASPI_API_URL", "https://api.kaspi.kz/pay/v1"),
+            "enabled": settings.KASPI_ENABLED,
+            "merchant_id": settings.KASPI_MERCHANT_ID,
+            "secret_key": settings.KASPI_SECRET_KEY,
+            "base_url": settings.KASPI_BASE_URL,
+            "api_url": settings.KASPI_API_URL,
         },
     }
 
