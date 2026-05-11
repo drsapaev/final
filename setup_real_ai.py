@@ -37,7 +37,7 @@ def setup_gemini_api():
                 if line.startswith("GEMINI_API_KEY="):
                     key = line.split("=")[1].strip()
                     if key and key != "":
-                        print(f"   Текущий ключ: {key[:20]}...")
+                        print("   Текущий ключ: настроен (значение не выводится)")
                         
                         update = input("\n🔄 Обновить ключ? (y/n): ").strip().lower()
                         if update != 'y':
@@ -91,7 +91,7 @@ def setup_gemini_api():
     print("✅ НАСТРОЙКА ЗАВЕРШЕНА")
     print("=" * 60)
     print(f"📁 Файл: {env_path}")
-    print(f"🔑 Ключ: {api_key[:20]}...")
+    print("🔑 Ключ: сохранен (значение не выводится)")
     print("\n📋 СЛЕДУЮЩИЕ ШАГИ:")
     print("1. Перезапустите backend сервер")
     print("2. Система автоматически переключится на Gemini AI")

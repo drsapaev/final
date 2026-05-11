@@ -24,17 +24,11 @@ def test_ai_providers_from_backend():
     print(f"  - GEMINI_API_KEY: {'есть' if settings.GEMINI_API_KEY else 'нет'}")
     print(f"  - DEEPSEEK_API_KEY: {'есть' if settings.DEEPSEEK_API_KEY else 'нет'}")
     
-    if settings.GEMINI_API_KEY:
-        print(f"  - GEMINI_API_KEY: {settings.GEMINI_API_KEY[:10]}...")
-    
     # Проверяем переменные окружения
     print(f"\n🔑 Переменные окружения:")
     print(f"  - OPENAI_API_KEY: {'есть' if os.getenv('OPENAI_API_KEY') else 'нет'}")
     print(f"  - GEMINI_API_KEY: {'есть' if os.getenv('GEMINI_API_KEY') else 'нет'}")
     print(f"  - DEEPSEEK_API_KEY: {'есть' if os.getenv('DEEPSEEK_API_KEY') else 'нет'}")
-    
-    if os.getenv('GEMINI_API_KEY'):
-        print(f"  - GEMINI_API_KEY: {os.getenv('GEMINI_API_KEY')[:10]}...")
     
     # Проверяем AI менеджер
     ai_manager = get_ai_manager()
