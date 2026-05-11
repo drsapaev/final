@@ -7,7 +7,7 @@ Use it when you only need to verify the service-prefix guardrail without running
 the full panel runbook.
 
 Status: verified in live admin smoke on 2026-03-29.
-Evidence: [adm-06-live-admin-service-4195.png](../output/playwright/adm-06-live-admin-service-4195.png), [adm-06-live-verify-4195.json](../output/playwright/adm-06-live-verify-4195.json)
+Evidence artifacts are generated locally under ignored `output/playwright/` when the smoke is rerun; they are not required as committed files.
 
 ## Preconditions
 

@@ -12,9 +12,8 @@
 - Clinic-like initialized dataset proof
 
 ## Evidence Files
-- `output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_FRESH_INSTALL_LINUX.md`
-- `output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_BACKUP_RESTORE_LINUX.md`
-- `output/operational-proof/20260404_controlled_pilot_gate/EVIDENCE_UPDATE_REHEARSAL_LINUX.md`
+- Historical proof artifacts were generated under ignored `output/operational-proof/20260404_controlled_pilot_gate/` during the 2026-04-04 run.
+- The committed audit record is this runbook summary; regenerate local `output/` artifacts only when re-running the operational proof.
 
 ## Gate Summary
 - Fresh install on Linux/VPS transport: PASS
