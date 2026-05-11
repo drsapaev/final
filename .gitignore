@@ -138,4 +138,6 @@ mcp_test_report.json
 mcp_test_results_complaint.json
 test_queue.json
 artifacts/load/
+artifacts/*_preview*.pdf
+artifacts/*_preview*.png
 artifacts/non_shim_endpoints.txt
