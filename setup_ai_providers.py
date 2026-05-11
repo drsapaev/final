@@ -27,7 +27,7 @@ def setup_ai_providers():
     
     for key_name, key_value in env_keys.items():
         if key_value and key_value != "your_openai_api_key_here":
-            print(f"  ✅ {key_name}: {'*' * 8}...{key_value[-4:]}")
+            print(f"  ✅ {key_name}: настроен (значение не выводится)")
         else:
             print(f"  ❌ {key_name}: не настроен")
     

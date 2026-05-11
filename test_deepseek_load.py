@@ -25,13 +25,13 @@ deepseek_key = os.getenv("DEEPSEEK_API_KEY")
 gemini_key = os.getenv("GEMINI_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
-print(f"  DEEPSEEK_API_KEY: {'✅ ' + deepseek_key[:20] + '...' if deepseek_key else '❌ Не установлен'}")
-print(f"  GEMINI_API_KEY: {'✅ ' + gemini_key[:20] + '...' if gemini_key else '❌ Не установлен'}")
-print(f"  OPENAI_API_KEY: {'✅ ' + openai_key[:20] + '...' if openai_key else '❌ Не установлен'}")
+print(f"  DEEPSEEK_API_KEY: {'✅ Установлен' if deepseek_key else '❌ Не установлен'}")
+print(f"  GEMINI_API_KEY: {'✅ Установлен' if gemini_key else '❌ Не установлен'}")
+print(f"  OPENAI_API_KEY: {'✅ Установлен' if openai_key else '❌ Не установлен'}")
 
 if deepseek_key:
     print("\n🎉 DeepSeek API ключ успешно загружен!")
-    print(f"   Ключ: {deepseek_key[:20]}...")
+    print("   Ключ загружен; значение не выводится.")
     
     # Проверяем инициализацию AI Manager
     print("\n📋 Проверка AI Manager:")

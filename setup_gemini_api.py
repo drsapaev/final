@@ -32,14 +32,14 @@ def setup_gemini_api():
     print(f"\n🔍 Проверка переменных окружения:")
     gemini_key = os.getenv("GEMINI_API_KEY")
     if gemini_key and gemini_key != "ваш_ключ_здесь":
-        print(f"✅ GEMINI_API_KEY: {'*' * 8}...{gemini_key[-4:]}")
+        print("✅ GEMINI_API_KEY: настроен (значение не выводится)")
     else:
         print("❌ GEMINI_API_KEY: не настроен")
     
     print(f"\n📋 Инструкция:")
     print(f"1. Получите API ключ: https://makersuite.google.com/app/apikey")
     print(f"2. Создайте файл backend/.env")
-    print(f"3. Добавьте строку: GEMINI_API_KEY=AIza...")
+    print(f"3. Добавьте строку: GEMINI_API_KEY=<your-gemini-api-key>")
     print(f"4. Перезапустите backend сервер")
     
     # Предлагаем создать файл .env
