@@ -52,8 +52,11 @@ const MEDICAL_CONFIG = {
 const STRICT_CONFIG = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
+  SAFE_FOR_TEMPLATES: true,
   KEEP_CONTENT: true
 };
+
+const BLOCKED_TEXT_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
  * Конфигурация для AI-сгенерированного контента
@@ -258,15 +261,10 @@ export function sanitizeInput(input, options = {}) {
     logger.warn('Input обрезан до максимальной длины:', maxLength);
   }
 
-  // Удаляем опасные HTML теги
-  sanitized = sanitized.replace(/<script[^>]*>.*?<\/script>/gi, '');
-  sanitized = sanitized.replace(/<iframe[^>]*>.*?<\/iframe>/gi, '');
-  sanitized = sanitized.replace(/<object[^>]*>.*?<\/object>/gi, '');
-  sanitized = sanitized.replace(/<embed[^>]*>/gi, '');
-
-  // Удаляем javascript: и data: протоколы
-  sanitized = sanitized.replace(/javascript:/gi, '');
-  sanitized = sanitized.replace(/data:text\/html/gi, '');
+  sanitized = sanitizeHTML(sanitized, STRICT_CONFIG);
+  sanitized = sanitized.replace(/[a-z][a-z0-9+.-]*:/gi, (protocol) =>
+    BLOCKED_TEXT_PROTOCOLS.has(protocol.toLowerCase()) ? '' : protocol
+  );
 
   return sanitized.trim();
 }
