@@ -43,7 +43,7 @@ async def get_detailed_endpoints_documentation(
                         "200": {
                             "description": "Успешная аутентификация",
                             "example": {
-                                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                                "access_token": "<jwt-access-token>",
                                 "token_type": "bearer",
                             },
                         },
@@ -65,7 +65,7 @@ async def get_detailed_endpoints_documentation(
                         "200": {
                             "description": "Токен обновлен",
                             "example": {
-                                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                                "access_token": "<jwt-access-token>",
                                 "token_type": "bearer",
                             },
                         }
@@ -749,7 +749,7 @@ async def get_authentication_documentation():
         },
         "token_format": {
             "header": "Authorization: Bearer <access_token>",
-            "example": "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+            "example": "Authorization: Bearer <jwt-access-token>",
         },
         "token_expiration": {"access_token": "24 часа", "refresh_token": "7 дней"},
         "roles": {

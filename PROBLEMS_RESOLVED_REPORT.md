@@ -61,7 +61,7 @@ curl -X POST -d "username=admin&password=<redacted-demo-password>&grant_type=pas
   http://localhost:18000/api/v1/auth/login
 
 # Возвращает JWT токен
-{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
+{"access_token":"<jwt-access-token>","token_type":"bearer"}
 ```
 
 ---
