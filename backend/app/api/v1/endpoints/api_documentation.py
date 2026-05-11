@@ -569,13 +569,13 @@ async def get_api_examples(
     examples = {
         "authentication_examples": {
             "login": {
-                "curl": "curl -X POST 'http://localhost:18000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=admin&password=REPLACE_WITH_ADMIN_PASSWORD'",
+                "curl": "curl -X POST 'http://localhost:18000/api/v1/auth/login' -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=YOUR_ADMIN_USERNAME&password=REPLACE_WITH_ADMIN_PASSWORD'",
                 "python": """
 import requests
 
 response = requests.post(
     'http://localhost:18000/api/v1/auth/login',
-    data={'username': 'admin', 'password': 'REPLACE_WITH_ADMIN_PASSWORD'}
+    data={'username': 'YOUR_ADMIN_USERNAME', 'password': 'REPLACE_WITH_ADMIN_PASSWORD'}
 )
 token = response.json()['access_token']
                 """,
@@ -585,7 +585,7 @@ const response = await fetch('http://localhost:18000/api/v1/auth/login', {
     headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: 'username=admin&password=REPLACE_WITH_ADMIN_PASSWORD'
+    body: 'username=YOUR_ADMIN_USERNAME&password=REPLACE_WITH_ADMIN_PASSWORD'
 });
 const data = await response.json();
 const token = data.access_token;
