@@ -66,7 +66,8 @@ async def upload_file_json(
         file_hash = hashlib.sha256(content).hexdigest()
 
         # Создаем имя файла
-        safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{request.filename}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        safe_filename = f"{timestamp}_{file_hash[:16]}"
 
         # Сохраняем файл
         upload_dir = "uploads"
