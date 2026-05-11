@@ -50,26 +50,8 @@ def setup_gemini_api():
         
         if api_key and api_key.startswith("AIza"):
             env_content = f"""# AI Provider API Keys
+# Runtime settings such as DATABASE_URL and SECRET_KEY must come from the real deployment env.
 GEMINI_API_KEY={api_key}
-
-# MCP Settings
-MCP_ENABLED=true
-MCP_LOG_REQUESTS=true
-MCP_FALLBACK_TO_DIRECT=true
-MCP_REQUEST_TIMEOUT=30
-MCP_HEALTH_CHECK_INTERVAL=60
-MCP_MAX_BATCH_SIZE=10
-
-# Database
-DATABASE_URL=sqlite:///./clinic.db
-
-# Auth
-SECRET_KEY=dev-secret-key-for-clinic-management-system-change-in-production
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=10080
-
-# CORS
-BACKEND_CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8080","http://127.0.0.1:8080"]
 """
             
             with open(env_file, 'w', encoding='utf-8') as f:
