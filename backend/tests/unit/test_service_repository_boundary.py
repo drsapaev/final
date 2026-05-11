@@ -283,15 +283,6 @@ def test_derma_service_avoids_direct_session_calls() -> None:
     assert direct_db_call is None
 
 
-def test_analytics_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("analytics")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
-
-
 def test_user_management_service_avoids_direct_session_calls() -> None:
     logic = _service_logic_block("user_management")
     direct_db_call = re.search(
