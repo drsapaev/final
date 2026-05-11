@@ -4,21 +4,42 @@
 """
 import asyncio
 import json
+import os
+import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime
 
 import websockets
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+BASE_URL = os.getenv("QA_BACKEND_BASE_URL", "http://127.0.0.1:18000")
+WS_BASE_URL = os.getenv("QA_BACKEND_WS_URL", "ws://127.0.0.1:18000")
+AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Set {name} to run backend websocket smoke scripts.")
+    return value
+
 
 async def get_auth_token():
     """Получаем JWT токен для аутентификации"""
     try:
         data = urllib.parse.urlencode(
-            {"username": "admin", "password": "admin"}
+            {
+                "username": AUTH_USERNAME,
+                "password": required_env("QA_ADMIN_PASSWORD"),
+            }
         ).encode()
         req = urllib.request.Request(
-"http://127.0.0.1:18000/api/v1/login",
+            f"{BASE_URL}/api/v1/login",
             data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
@@ -30,6 +51,8 @@ async def get_auth_token():
             else:
                 print(f"❌ Ошибка получения токена: {response.status}")
                 return None
+    except RuntimeError:
+        raise
     except Exception as e:
         print(f"❌ Ошибка запроса токена: {e}")
         return None
@@ -39,9 +62,7 @@ async def test_ws_queue_auth(token):
     """Тест WebSocket очереди с аутентификацией"""
     print("\n🔌 Тестирую /ws/queue с аутентификацией...")
     try:
-        uri = (
-"ws://127.0.0.1:18000/ws/queue?department=ENT&date=2025-08-28&token=" + token
-        )
+        uri = f"{WS_BASE_URL}/ws/queue?department=ENT&date=2025-08-28&token={token}"
         headers = {"Origin": "http://localhost:5173"}
         async with websockets.connect(uri, additional_headers=headers) as ws:
             # Получаем приветственное сообщение
@@ -70,7 +91,7 @@ async def test_ws_queue_auth(token):
                 print(f"⚠️ Неожиданный тип сообщения: {data}")
 
     except Exception as e:
-        print(f"❌ Ошибка подключения: {e}")
+        print(f"Connection error: {type(e).__name__}")
 
 
 async def test_broadcast_trigger():
@@ -88,7 +109,7 @@ async def test_broadcast_trigger():
         # Открываем день (должно вызвать broadcast)
         print("📅 Открываю день для ENT...")
         req = urllib.request.Request(
-"http://127.0.0.1:18000/api/v1/appointments/open?department=ENT&date=2025-08-28&start_number=1",
+            f"{BASE_URL}/api/v1/appointments/open?department=ENT&date=2025-08-28&start_number=1",
             headers=headers,
             method="POST",
         )
@@ -107,7 +128,7 @@ async def test_broadcast_trigger():
         # Выдаём следующий талон (должно вызвать broadcast)
         print("🎫 Выдаю следующий талон...")
         req = urllib.request.Request(
-"http://127.0.0.1:18000/api/v1/next-ticket?department=ENT&date=2025-08-28",
+            f"{BASE_URL}/api/v1/next-ticket?department=ENT&date=2025-08-28",
             headers=headers,
             method="POST",
         )
@@ -127,12 +148,16 @@ async def main():
     print("=" * 60)
 
     # Получаем токен
-    token = await get_auth_token()
+    try:
+        token = await get_auth_token()
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        return 2
     if not token:
         print("❌ Не удалось получить токен аутентификации")
-        return
+        return 1
 
-    print(f"🔑 Токен получен: {token[:20]}...")
+    print("🔑 Токен получен; значение не печатается")
 
     # Тестируем WebSocket с аутентификацией
     await test_ws_queue_auth(token)
@@ -142,7 +167,8 @@ async def main():
 
     print("\n" + "=" * 60)
     print("✅ WebSocket тестирование с аутентификацией завершено")
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))
