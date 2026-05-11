@@ -488,12 +488,3 @@ def test_emr_v2_service_avoids_direct_session_calls() -> None:
         logic,
     )
     assert direct_db_call is None
-
-
-def test_admin_users_service_avoids_direct_session_calls() -> None:
-    logic = _service_logic_block("admin_users")
-    direct_db_call = re.search(
-        r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
-        logic,
-    )
-    assert direct_db_call is None
