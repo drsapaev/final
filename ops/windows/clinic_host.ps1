@@ -820,8 +820,11 @@ function Invoke-RestoreRehearsal {
         -Database $RestoreDatabaseName
     $restoreBackendUrl = "http://127.0.0.1:$RestoreBackendPort"
     $restorePublicUrl = "http://127.0.0.1:$RestoreFrontendPort"
-    $smokeLoginUsername = if ($env:SMOKE_LOGIN_USERNAME) { $env:SMOKE_LOGIN_USERNAME } elseif ($env:SETUP_ADMIN_USERNAME) { $env:SETUP_ADMIN_USERNAME } else { 'admin' }
+    $smokeLoginUsername = if ($env:SMOKE_LOGIN_USERNAME) { $env:SMOKE_LOGIN_USERNAME } elseif ($env:SETUP_ADMIN_USERNAME) { $env:SETUP_ADMIN_USERNAME } else { $null }
     $smokeLoginPassword = if ($env:SMOKE_LOGIN_PASSWORD) { $env:SMOKE_LOGIN_PASSWORD } elseif ($env:SETUP_ADMIN_PASSWORD) { $env:SETUP_ADMIN_PASSWORD } else { $null }
+    if (-not $smokeLoginUsername) {
+        Write-Fail 'Set SMOKE_LOGIN_USERNAME or SETUP_ADMIN_USERNAME before restore smoke admin seeding.'
+    }
     if (-not $smokeLoginPassword) {
         Write-Fail 'Set SMOKE_LOGIN_PASSWORD or SETUP_ADMIN_PASSWORD before restore smoke admin seeding.'
     }
