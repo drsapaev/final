@@ -52,7 +52,8 @@ def get_telegram_settings(
 
         # Скрываем токен бота в ответе
         if result["bot_token"]:
-            result["bot_token_masked"] = result["bot_token"][:10] + "***скрыт***"
+            result["bot_token_masked"] = "***скрыт***"
+            result["bot_token_length"] = len(result["bot_token"])
             result["bot_token"] = "***скрыт***"
 
         return result
