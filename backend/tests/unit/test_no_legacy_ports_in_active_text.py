@@ -259,6 +259,36 @@ def test_no_default_database_passwords_in_active_docs():
     )
 
 
+def test_no_default_database_passwords_in_active_workflows():
+    repo_root = Path(__file__).resolve().parents[3]
+    workflow_root = repo_root / ".github" / "workflows"
+    matches: list[str] = []
+
+    workflow_files = sorted(
+        list(workflow_root.glob("*.yml")) + list(workflow_root.glob("*.yaml"))
+    )
+    for path in workflow_files:
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        for pattern in DEFAULT_DB_CREDENTIAL_DOC_PATTERNS:
+            for match in pattern.finditer(content):
+                line_number = content.count("\n", 0, match.start()) + 1
+                line_start = content.rfind("\n", 0, match.start()) + 1
+                line_end = content.find("\n", match.start())
+                if line_end == -1:
+                    line_end = len(content)
+                line = content[line_start:line_end].strip()
+                matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+
+    assert not matches, (
+        "Default database passwords still exist in active workflows:\n"
+        + "\n".join(matches[:50])
+    )
+
+
 def test_no_retired_backend_helper_commands_in_active_docs():
     repo_root = Path(__file__).resolve().parents[3]
     matches: list[str] = []
