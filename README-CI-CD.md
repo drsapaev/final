@@ -88,7 +88,7 @@
 
 ```bash
 # Основные настройки
-DATABASE_URL=postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb
+DATABASE_URL=postgresql+psycopg://clinic:<db_password>@localhost:5432/clinicdb
 CORS_DISABLE=1
 WS_DEV_ALLOW=1
 
