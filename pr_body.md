@@ -20,23 +20,19 @@ Significantly improves assistive tech support (NVDA, VoiceOver) by explicitly si
 
 ## Contract Impact
 
-not applicable - No API, websocket, event, or frontend consumer contract changed.
+not applicable because no API, websocket, event, or frontend consumer contract changed.
 
 ## RBAC / Permissions
 
-not applicable - No route, endpoint, guard, role helper, or auth-sensitive behavior changed.
+not applicable because no route, endpoint, guard, role helper, or auth-sensitive behavior changed.
 
 ## Notification / Realtime
 
-not applicable - No notification, websocket, chat, or realtime behavior changed.
+not applicable because no notification, websocket, chat, or realtime behavior changed.
 
 ## Frontend Resilience
 
-- Empty data proof: Visual change only
-- Partial data proof: Visual change only
-- Forbidden secondary path behavior: Visual change only
-- Missing draft/resource behavior: Visual change only
-- Stale route/deep-link behavior: Visual change only
+not applicable because only visual accessibility added, no frontend data flow changed.
 
 ## Scope Gate
 
