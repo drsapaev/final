@@ -111,6 +111,7 @@ ops/meta/
 backend/uploads/
 static/uploads/
 frontend/ticket.pdf
+archives/clinic_project_*.zip
 output/**/.playwright-cli/
 backend/storage/files/
 storage/files/
