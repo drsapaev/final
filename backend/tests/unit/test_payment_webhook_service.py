@@ -73,6 +73,7 @@ class TestPaymentWebhookService:
             ({"appointment_id": "123"}, 123, None),
             ({"order_id": "456"}, 456, None),
             ({"visit_id": "789"}, None, 789),
+            ({"visit_id": "789", "order_id": "456"}, None, 789),
         ],
     )
     def test_payme_webhook_extracts_dict_account_targets(
