@@ -48,7 +48,7 @@ def start_test_server():
             print("📋 ИНСТРУКЦИИ ДЛЯ ТЕСТИРОВАНИЯ:")
             print("="*60)
             print("1. Откройте http://localhost:8080/mcp_test.html в браузере")
-            print("2. Получите токен авторизации (admin/admin)")
+            print("2. Получите токен авторизации с явным тестовым паролем, например mcp_test / <QA_MCP_PASSWORD>")
             print("3. Протестируйте все MCP endpoints")
             print("4. Проверьте результаты в консоли браузера")
             print("="*60)
