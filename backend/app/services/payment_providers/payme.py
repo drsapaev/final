@@ -295,7 +295,17 @@ class PayMeProvider(BasePaymentProvider):
 
             # Проверяем формат Basic Auth
             if not auth_header.startswith("Basic "):
-                self.log_error("validate_webhook_signature", "Invalid Authorization header format", {"header": auth_header[:20]})
+                self.log_error(
+                    "validate_webhook_signature",
+                    "Invalid Authorization header format",
+                    {
+                        "header_present": bool(auth_header),
+                        "header_scheme": (
+                            auth_header.split(" ", 1)[0] if auth_header else None
+                        ),
+                        "header_length": len(auth_header or ""),
+                    },
+                )
                 return False
 
             # Декодируем base64
@@ -304,7 +314,14 @@ class PayMeProvider(BasePaymentProvider):
 
             # Проверяем формат "Paycom:secret_key"
             if not decoded.startswith("Paycom:"):
-                self.log_error("validate_webhook_signature", "Invalid Basic Auth format", {"decoded": decoded[:20]})
+                self.log_error(
+                    "validate_webhook_signature",
+                    "Invalid Basic Auth format",
+                    {
+                        "decoded_present": bool(decoded),
+                        "decoded_length": len(decoded or ""),
+                    },
+                )
                 return False
 
             # Извлекаем secret_key из заголовка
@@ -319,7 +336,14 @@ class PayMeProvider(BasePaymentProvider):
             return True
 
         except Exception as e:
-            self.log_error("validate_webhook_signature", str(e), {"auth_header": auth_header[:20] if auth_header else None})
+            self.log_error(
+                "validate_webhook_signature",
+                str(e),
+                {
+                    "auth_header_present": bool(auth_header),
+                    "auth_header_length": len(auth_header or ""),
+                },
+            )
             return False
 
     def _generate_auth_header(self) -> str:
