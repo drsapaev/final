@@ -19,7 +19,8 @@ canonical queue tests and runtime API checks against the configured backend
 instead:
 
   cd backend
-  python -m pytest tests/integration/test_online_queue.py
+  python -m pytest tests/integration/test_online_queue_scenarios.py
+  python -m pytest tests/integration/test_queue_batch_api.py
   python -m pytest tests/unit/test_service_repository_boundary.py
 """.strip()
 
