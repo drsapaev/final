@@ -501,8 +501,9 @@ def start_join_session(
             raise ValueError(str(exc)) from exc
 
         logger.info(
-            "[start_join_session] Запрос на начало сессии с токеном: %s...",
-            request.token[:20],
+            "[start_join_session] Запрос на начало сессии: token_present=%s, token_length=%d",
+            bool(request.token),
+            len(request.token or ""),
         )
         result = service.start_join_session(
             token=request.token,
@@ -511,17 +512,19 @@ def start_join_session(
         )
         
         logger.info(
-            "[start_join_session] Сессия успешно создана: %s...",
-            result.get('session_token', '')[:20],
+            "[start_join_session] Сессия успешно создана: session_token_present=%s, session_token_length=%d",
+            bool(result.get("session_token")),
+            len(result.get("session_token") or ""),
         )
         return JoinSessionStartResponse(**result)
         
     except ValueError as e:
         error_msg = str(e)
         logger.warning(
-            "[start_join_session] ValueError: %s, Токен: %s...",
+            "[start_join_session] ValueError: %s, token_present=%s, token_length=%d",
             error_msg,
-            request.token[:20],
+            bool(request.token),
+            len(request.token or ""),
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
     except Exception as e:
@@ -548,11 +551,12 @@ def complete_join_session(
 
     try:
         logger.info(
-            "[complete_join_session] Начало обработки запроса: session_token=%s, patient_name=%s, phone=%s, specialist_ids=%s",
-            request.session_token,
-            request.patient_name,
-            request.phone,
-            request.specialist_ids,
+            "[complete_join_session] Начало обработки запроса: session_token_present=%s, session_token_length=%d, patient_name_present=%s, phone_present=%s, specialist_count=%d",
+            bool(request.session_token),
+            len(request.session_token or ""),
+            bool(request.patient_name),
+            bool(request.phone),
+            len(request.specialist_ids or []),
         )
 
         # Если передан список specialist_ids - множественное присоединение
