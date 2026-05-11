@@ -41,8 +41,17 @@ def _required_admin_password() -> str:
     return password
 
 
+def _required_admin_username() -> str:
+    username = os.getenv("ADMIN_USERNAME", "").strip()
+    if not username:
+        raise RuntimeError(
+            "ADMIN_USERNAME must be set before creating or resetting the bootstrap admin user."
+        )
+    return username
+
+
 def ensure_admin() -> dict:
-    username = os.getenv("ADMIN_USERNAME", "admin").strip()
+    username = _required_admin_username()
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
     allow_initialized = os.getenv(INITIALIZED_OVERRIDE_ENV, "").strip().lower() in {
