@@ -57,14 +57,11 @@ try:
 
     print("[ensure_admin_auto] using passlib for password hashing")
 except Exception:
-    import hashlib
-
-    def make_hash(p):
-        return "plain$" + hashlib.sha256(p.encode("utf-8")).hexdigest()
-
     print(
-        "[ensure_admin_auto] passlib not available; falling back to sha256 (may be incompatible)"
+        "[ensure_admin_auto][FATAL] passlib is required for admin password hashing.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 # --- попробовать импортировать User модель ---
 UserModel = None
