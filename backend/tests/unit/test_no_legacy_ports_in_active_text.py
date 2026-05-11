@@ -42,6 +42,10 @@ SQLITE_FIRST_DOC_PATTERNS = [
     re.compile(r"clinic\.db\s+работает", re.IGNORECASE),
 ]
 
+DEFAULT_DB_CREDENTIAL_DOC_PATTERNS = [
+    re.compile(r"postgresql\+psycopg://clinic:clinicpwd@", re.IGNORECASE),
+]
+
 RETIRED_DOC_COMMAND_PATTERNS = [
     re.compile(r"\bpython\s+quick_check\.py\b", re.IGNORECASE),
     re.compile(r"\bpython\s+check_system_integrity\.py\b", re.IGNORECASE),
@@ -197,6 +201,62 @@ def test_no_sqlite_first_claims_in_active_docs():
                     matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
 
     assert not matches, "SQLite-first doc claims still exist:\n" + "\n".join(matches[:50])
+
+
+def test_no_default_database_passwords_in_active_docs():
+    repo_root = Path(__file__).resolve().parents[3]
+    matches: list[str] = []
+
+    scan_roots = [
+        repo_root / "backend",
+        repo_root / "docs",
+    ]
+
+    seen: set[Path] = set()
+    for scan_root in scan_roots:
+        if not scan_root.exists():
+            continue
+        for path in _collect_active_text_files(scan_root):
+            if path in seen or path.suffix.lower() != ".md":
+                continue
+            seen.add(path)
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            for pattern in DEFAULT_DB_CREDENTIAL_DOC_PATTERNS:
+                for match in pattern.finditer(content):
+                    line_number = content.count("\n", 0, match.start()) + 1
+                    line_start = content.rfind("\n", 0, match.start()) + 1
+                    line_end = content.find("\n", match.start())
+                    if line_end == -1:
+                        line_end = len(content)
+                    line = content[line_start:line_end].strip()
+                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+
+    for path in repo_root.glob("*.md"):
+        if _is_excluded(path):
+            continue
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        for pattern in DEFAULT_DB_CREDENTIAL_DOC_PATTERNS:
+            for match in pattern.finditer(content):
+                line_number = content.count("\n", 0, match.start()) + 1
+                line_start = content.rfind("\n", 0, match.start()) + 1
+                line_end = content.find("\n", match.start())
+                if line_end == -1:
+                    line_end = len(content)
+                line = content[line_start:line_end].strip()
+                matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+
+    assert not matches, (
+        "Default database passwords still exist in active docs:\n"
+        + "\n".join(matches[:50])
+    )
 
 
 def test_no_retired_backend_helper_commands_in_active_docs():

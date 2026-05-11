@@ -445,7 +445,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 ## Environment Variables
 
 **Backend Key Variables:**
-- `DATABASE_URL` - Database connection (default: PostgreSQL via `postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinicdb`)
+- `DATABASE_URL` - Database connection (example: PostgreSQL via `postgresql+psycopg://clinic:<db_password>@localhost:5432/clinicdb`)
 - `SECRET_KEY` - JWT secret
 - `API_V1_STR` - API prefix (default: `/api/v1`)
 - `CORS_ORIGINS` - Allowed CORS origins
