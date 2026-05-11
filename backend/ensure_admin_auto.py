@@ -1,5 +1,6 @@
 # ensure_admin_auto.py
-# Универсальный сид/сброс пароля admin/admin для FastAPI + SQLAlchemy.
+# Universal admin seed/password reset helper for FastAPI + SQLAlchemy.
+# Requires ADMIN_PASSWORD; it must not fall back to default credentials.
 # Поддерживает sync и async пути. Игнорирует неподготовленный app.db.session.sessionmaker.
 # Запуск:
 #   .venv\Scripts\python.exe ensure_admin_auto.py
@@ -11,8 +12,34 @@ import types
 
 from sqlalchemy import select
 
+WEAK_ADMIN_PASSWORDS = {
+    "admin",
+    "admin" + "123",
+    "password",
+    "change" + "-me",
+    "change" + "me",
+}
+
+
+def required_admin_password():
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting admin credentials."
+        )
+    if password.lower() in WEAK_ADMIN_PASSWORDS:
+        raise RuntimeError(
+            "ADMIN_PASSWORD is too weak for admin bootstrap/reset operations."
+        )
+    return password
+
+
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
+try:
+    ADMIN_PASSWORD = required_admin_password()
+except RuntimeError as exc:
+    print(f"[ensure_admin_auto][FATAL] {exc}", file=sys.stderr)
+    sys.exit(2)
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
 
 print(f"[ensure_admin_auto] target user: {ADMIN_USERNAME}")
@@ -30,14 +57,11 @@ try:
 
     print("[ensure_admin_auto] using passlib for password hashing")
 except Exception:
-    import hashlib
-
-    def make_hash(p):
-        return "plain$" + hashlib.sha256(p.encode("utf-8")).hexdigest()
-
     print(
-        "[ensure_admin_auto] passlib not available; falling back to sha256 (may be incompatible)"
+        "[ensure_admin_auto][FATAL] passlib is required for admin password hashing.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 # --- попробовать импортировать User модель ---
 UserModel = None
