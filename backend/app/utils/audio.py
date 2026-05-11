@@ -101,12 +101,17 @@ async def get_audio_duration(content: bytes, format_name: str) -> int:
         estimated_duration = len(content) // 18000
         return min(estimated_duration, MAX_AUDIO_DURATION)
 
-    except Exception as e:
-        logger.error(f"Failed to get audio duration: {e}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning(
+            "Failed to get audio duration error_type=%s",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=400,
-            detail=f"Не удалось обработать аудио файл: {str(e)}"
-        )
+            detail="Не удалось обработать аудио файл"
+        ) from None
 
 
 async def compress_audio_if_needed(content: bytes, format_name: str) -> bytes:
@@ -141,13 +146,16 @@ async def compress_audio_if_needed(content: bytes, format_name: str) -> bytes:
 
         compressed = output.getvalue()
 
-        logger.info(f"Compressed audio from {len(content)} to {len(compressed)} bytes")
+        logger.info("Compressed audio successfully")
         return compressed
 
     except ImportError:
         logger.warning("pydub not installed, cannot compress audio")
         return content
 
-    except Exception as e:
-        logger.warning(f"Failed to compress audio: {e}, using original")
+    except Exception as exc:
+        logger.warning(
+            "Failed to compress audio error_type=%s; using original",
+            type(exc).__name__,
+        )
         return content
