@@ -1,5 +1,6 @@
 # ensure_admin_flexible.py
-# Универсальный сид для создания/сброса admin/admin
+# Universal admin seed/password reset helper.
+# Requires ADMIN_PASSWORD; it must not fall back to default credentials.
 # Запуск: .venv\Scripts\python.exe ensure_admin_flexible.py
 # Поддерживает как async, так и sync фабрики сессий.
 
@@ -8,8 +9,34 @@ import os
 import sys
 import traceback
 
+WEAK_ADMIN_PASSWORDS = {
+    "admin",
+    "admin" + "123",
+    "password",
+    "change" + "-me",
+    "change" + "me",
+}
+
+
+def required_admin_password():
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be set before creating or resetting admin credentials."
+        )
+    if password.lower() in WEAK_ADMIN_PASSWORDS:
+        raise RuntimeError(
+            "ADMIN_PASSWORD is too weak for admin bootstrap/reset operations."
+        )
+    return password
+
+
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
+try:
+    ADMIN_PASSWORD = required_admin_password()
+except RuntimeError as exc:
+    print(f"ensure_admin_flexible: FATAL: {exc}", file=sys.stderr)
+    sys.exit(2)
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
 
 print("ensure_admin_flexible: username=%s" % ADMIN_USERNAME)
