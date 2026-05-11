@@ -5,9 +5,18 @@
 
 import requests
 import json
+import os
 from datetime import datetime
 
-BASE_URL = "http://localhost:18000"
+BASE_URL = os.getenv("QA_BACKEND_BASE_URL", "http://localhost:18000")
+AUTH_USERNAME = os.getenv("QA_ADMIN_USERNAME", "admin")
+
+
+def required_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Set {name} to run the QR time restrictions helper.")
+    return value
 
 def test_time_restrictions():
     """Тестирует временные ограничения QR системы"""
@@ -16,7 +25,10 @@ def test_time_restrictions():
     print("=" * 60)
     
     # Получаем токен авторизации
-    login_data = {"username": "admin", "password": "admin"}
+    login_data = {
+        "username": AUTH_USERNAME,
+        "password": required_env("QA_ADMIN_PASSWORD"),
+    }
     login_response = requests.post(f"{BASE_URL}/api/v1/authentication/login", data=login_data)
     
     if login_response.status_code != 200:
@@ -47,7 +59,7 @@ def test_time_restrictions():
         return
     
     qr_token = qr_response.json()["token"]
-    print(f"✅ QR токен сгенерирован: {qr_token}")
+    print("✅ QR токен сгенерирован; значение не печатается")
     
     # Проверяем информацию о токене
     token_info_response = requests.get(f"{BASE_URL}/api/v1/qr-tokens/{qr_token}/info")
@@ -82,7 +94,7 @@ def test_time_restrictions():
     if session_response.status_code == 200:
         session_data = session_response.json()
         print(f"✅ Сессия присоединения начата:")
-        print(f"   - Токен сессии: {session_data['session_token'][:20]}...")
+        print("   - Токен сессии: значение не печатается")
         print(f"   - Истекает: {session_data['expires_at']}")
         
         # Пытаемся завершить присоединение

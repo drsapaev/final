@@ -31,7 +31,7 @@ def get_auth_token():
     
     if response.status_code == 200:
         token_data = response.json()
-        print(f"✅ Токен получен: {token_data['access_token'][:50]}...")
+        print("✅ Токен получен; значение не печатается")
         return token_data['access_token']
     else:
         print(f"❌ Ошибка получения токена: {response.status_code}")

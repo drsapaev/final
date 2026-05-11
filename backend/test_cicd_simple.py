@@ -131,7 +131,7 @@ def test_auth_endpoint():
             print(f"✅ /api/v1/auth/login работает (код: {response.getcode()})")
             if response.getcode() == 200:
                 data = json.loads(response.read().decode())
-                print(f"   Токен получен: {data.get('access_token', 'N/A')[:20]}...")
+                print("   Токен получен; значение не печатается")
             else:
                 print("   Неправильные данные для входа (ожидаемо)")
             return True
