@@ -5,11 +5,17 @@
 import asyncio
 import json
 import os
+import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime
 
 import websockets
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 BASE_URL = os.getenv("QA_BACKEND_BASE_URL", "http://127.0.0.1:18000")
 WS_BASE_URL = os.getenv("QA_BACKEND_WS_URL", "ws://127.0.0.1:18000")
@@ -45,6 +51,8 @@ async def get_auth_token():
             else:
                 print(f"❌ Ошибка получения токена: {response.status}")
                 return None
+    except RuntimeError:
+        raise
     except Exception as e:
         print(f"❌ Ошибка запроса токена: {e}")
         return None
@@ -83,7 +91,7 @@ async def test_ws_queue_auth(token):
                 print(f"⚠️ Неожиданный тип сообщения: {data}")
 
     except Exception as e:
-        print(f"❌ Ошибка подключения: {e}")
+        print(f"Connection error: {type(e).__name__}")
 
 
 async def test_broadcast_trigger():
@@ -140,10 +148,14 @@ async def main():
     print("=" * 60)
 
     # Получаем токен
-    token = await get_auth_token()
+    try:
+        token = await get_auth_token()
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        return 2
     if not token:
         print("❌ Не удалось получить токен аутентификации")
-        return
+        return 1
 
     print("🔑 Токен получен; значение не печатается")
 
@@ -155,7 +167,8 @@ async def main():
 
     print("\n" + "=" * 60)
     print("✅ WebSocket тестирование с аутентификацией завершено")
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))
