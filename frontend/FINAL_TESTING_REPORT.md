@@ -147,8 +147,8 @@ npm run dev
 
 #### **3. Проверка работоспособности**
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://127.0.0.1:8000/api/v1/health
-- **API Docs**: http://127.0.0.1:8000/docs
+- **Backend API**: http://127.0.0.1:18000/api/v1/health
+- **API Docs**: http://127.0.0.1:18000/docs
 
 ### 📋 **Следующие шаги**
 
