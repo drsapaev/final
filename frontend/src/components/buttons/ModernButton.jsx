@@ -226,6 +226,7 @@ const ModernButton = ({
       style={buttonStyles}
       onClick={handleClick}
       disabled={disabled || loading}
+      aria-busy={loading}
       {...props}>
       
       {/* Иконка слева */}
