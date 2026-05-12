@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AppProviders } from './providers/AppProviders';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './styles/theme.css';
@@ -295,6 +296,7 @@ export default function App() {
             draggable
             theme="colored"
           />
+          <SpeedInsights />
         </AppProviders>
       </ThemeProvider>
     </MacOSThemeProvider>
