@@ -713,11 +713,13 @@ async def call_next_patient(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        import traceback
-        logger.error(f"Error calling next patient: {e}\n{traceback.format_exc()}")
+        logger.error(
+            "Error calling next patient",
+            extra={"error_class": e.__class__.__name__},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка вызова пациента: {str(e)}",
+            detail="Ошибка вызова пациента",
         )
 
 
