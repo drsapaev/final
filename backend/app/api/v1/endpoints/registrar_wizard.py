@@ -1112,13 +1112,14 @@ def create_cart_appointments(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("REGISTRATION: Ошибка создания корзины: %s", str(e), exc_info=True)
-        import traceback
-
+        logger.exception(
+            "REGISTRATION: cart creation failed",
+            extra={"error_class": e.__class__.__name__},
+        )
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания корзины: {str(e)}\nTRACE: {traceback.format_exc()}",
+            detail="Ошибка создания корзины",
         )
 
 
