@@ -1418,6 +1418,53 @@ LightRAG evidence note:
 
 - No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
 
+## Task 26 Current Slice Evidence (2026-05-12 - EMR AI endpoint)
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`
+- reason: narrow Task 26 runtime leak fix in the canonical EMR AI endpoint without changing draft-only clinical behavior
+- risky domain: yes
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 26 sanitize emr_ai endpoint public raw exception leakage without changing AI draft-only behavior route prefixes auth guards or success response shapes" --known-root-cause "backend/app/api/v1/endpoints/emr_ai.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/api/v1/endpoints/emr_ai.py`
+- first-touch files: `backend/app/api/v1/endpoints/emr_ai.py`
+- validation target: compile, static no-match for public `str(e)` leakage, and direct endpoint smoke proving generic 500 redaction
+- stop condition watched first: any needed change outside `emr_ai.py` or any change to AI approval semantics, route/auth behavior, or success response shapes
+
+Gate result:
+
+- The gate response misrouted the first-touch set toward unrelated frontend routing files even with the confirmed root-cause file supplied.
+- Per `AGENTS.md`, execution continued as a narrow override limited to `backend/app/api/v1/endpoints/emr_ai.py`.
+
+Changed behavior:
+
+- Added a structured EMR AI endpoint helper that logs only the operation name and exception class for internal failures.
+- Replaced raw public HTTP 500 details that included exception text across the EMR AI suggestion/validation handlers with a generic `Internal server error` response.
+- Preserved AI draft/suggestion posture, existing `requires_doctor_confirmation` behavior, route prefixes, auth guards, and success payload shapes.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\emr_ai.py`
+  - result: passed
+- `rg -n "detail=f.*str\(e\)|detail=str\(|logger\.error\(f|logger\.exception\(f|\{str\(e\)\}" backend\app\api\v1\endpoints\emr_ai.py`
+  - result: no matches
+- direct async endpoint smoke with a monkeypatched EMR AI service raising a marker exception
+  - result: passed; HTTP 500 returned `Internal server error` and the marker text did not leak
+- `git diff --check`
+  - result: passed
+
+Scope note:
+
+- Task 26 remains open. This slice only hardens one confirmed EMR AI runtime surface and does not claim the broader backend leak audit is finished.
+
+LightRAG evidence note:
+
+- A new LightRAG readiness entry was not appended for this slice; the gate misroute was handled locally under the existing narrow-override rule and did not require a separate retrieval-quality evidence update.
+
 ## Task 26 Slice A Evidence
 
 Execution mode:
