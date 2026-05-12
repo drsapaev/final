@@ -4,7 +4,7 @@ API endpoints для облачной печати
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +24,21 @@ from app.services.cloud_printing_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def log_cloud_printing_error(action: str, exc: Exception) -> None:
+    logger.warning(
+        "Cloud printing endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+
+
+def raise_cloud_printing_error(
+    action: str, public_detail: str, exc: Exception
+) -> NoReturn:
+    log_cloud_printing_error(action, exc)
+    raise HTTPException(status_code=500, detail=public_detail)
 
 
 # Pydantic Models for Requests and Responses
@@ -115,8 +130,11 @@ async def get_all_printers(
             "providers": list(all_printers.keys()),
         }
     except Exception as e:
-        logger.error(f"Ошибка получения принтеров: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "printers-list",
+            "Ошибка получения принтеров",
+            e,
+        )
 
 
 @router.get("/printers/{provider_name}")
@@ -160,8 +178,11 @@ async def get_printers_by_provider(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения принтеров провайдера {provider_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "printers-by-provider",
+            "Ошибка получения принтеров провайдера",
+            e,
+        )
 
 
 @router.get("/printers/{provider_name}/{printer_id}")
@@ -195,8 +216,11 @@ async def get_printer_info(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения информации о принтере {printer_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "printer-info",
+            "Ошибка получения информации о принтере",
+            e,
+        )
 
 
 # ===================== ПЕЧАТЬ =====================
@@ -238,7 +262,9 @@ async def print_document(
 
         if job_id:
             logger.info(
-                f"Пользователь {current_user.email} отправил документ '{request.title}' на печать"
+                "Cloud print job queued action=print-document user_id=%s job_id_present=%s",
+                current_user.id,
+                bool(job_id),
             )
             return PrintJobResponse(
                 success=True, job_id=job_id, message="Документ отправлен на печать"
@@ -250,8 +276,12 @@ async def print_document(
                 error="Ошибка при создании задания печати",
             )
     except Exception as e:
-        logger.error(f"Ошибка печати документа: {e}")
-        return PrintJobResponse(success=False, message="Ошибка печати", error=str(e))
+        log_cloud_printing_error("print-document", e)
+        return PrintJobResponse(
+            success=False,
+            message="Ошибка печати",
+            error="Ошибка печати документа",
+        )
 
 
 @router.post("/print/medical", response_model=PrintJobResponse)
@@ -287,7 +317,10 @@ async def print_medical_document(
 
         if job_id:
             logger.info(
-                f"Пользователь {current_user.email} отправил медицинский документ '{request.document_type}' на печать"
+                "Cloud print job queued action=print-medical-document user_id=%s document_type=%s job_id_present=%s",
+                current_user.id,
+                request.document_type,
+                bool(job_id),
             )
             return PrintJobResponse(
                 success=True,
@@ -301,9 +334,11 @@ async def print_medical_document(
                 error="Ошибка при создании задания печати",
             )
     except Exception as e:
-        logger.error(f"Ошибка печати медицинского документа: {e}")
+        log_cloud_printing_error("print-medical-document", e)
         return PrintJobResponse(
-            success=False, message="Ошибка печати медицинского документа", error=str(e)
+            success=False,
+            message="Ошибка печати медицинского документа",
+            error="Ошибка печати медицинского документа",
         )
 
 
@@ -332,8 +367,11 @@ async def get_job_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения статуса задания {job_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "job-status",
+            "Ошибка получения статуса задания",
+            e,
+        )
 
 
 @router.post("/jobs/{provider_name}/{job_id}/cancel")
@@ -351,7 +389,9 @@ async def cancel_job(
 
         if success:
             logger.info(
-                f"Пользователь {current_user.email} отменил задание печати {job_id}"
+                "Cloud print job cancelled user_id=%s job_id_present=%s",
+                current_user.id,
+                bool(job_id),
             )
             return {
                 "success": True,
@@ -365,8 +405,11 @@ async def cancel_job(
                 "job_id": job_id,
             }
     except Exception as e:
-        logger.error(f"Ошибка отмены задания {job_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "job-cancel",
+            "Ошибка отмены задания",
+            e,
+        )
 
 
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
@@ -412,8 +455,11 @@ async def quick_print_prescription(
         else:
             return {"success": False, "message": "Не удалось напечатать рецепт"}
     except Exception as e:
-        logger.error(f"Ошибка быстрой печати рецепта: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "quick-print-prescription",
+            "Ошибка быстрой печати рецепта",
+            e,
+        )
 
 
 @router.post("/quick-print/ticket")
@@ -456,8 +502,11 @@ async def quick_print_ticket(
         else:
             return {"success": False, "message": "Не удалось напечатать талон"}
     except Exception as e:
-        logger.error(f"Ошибка быстрой печати талона: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "quick-print-ticket",
+            "Ошибка быстрой печати талона",
+            e,
+        )
 
 
 # ===================== ТЕСТИРОВАНИЕ =====================
@@ -510,8 +559,11 @@ async def test_printer(
         else:
             return {"success": False, "message": "Не удалось выполнить тестовую печать"}
     except Exception as e:
-        logger.error(f"Ошибка тестовой печати: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "test-print",
+            "Ошибка тестовой печати",
+            e,
+        )
 
 
 # ===================== СТАТИСТИКА =====================
@@ -551,5 +603,8 @@ async def get_printing_statistics(
             },
         }
     except Exception as e:
-        logger.error(f"Ошибка получения статистики печати: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_cloud_printing_error(
+            "statistics",
+            "Ошибка получения статистики печати",
+            e,
+        )
