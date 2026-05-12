@@ -3,6 +3,45 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Button, Card, Icon } from '../ui/macos';
 import PropTypes from 'prop-types';
 
+const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;
+
+const shiftDate = (dateString, days) => {
+  const date = new Date(`${dateString}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+};
+
+const toNumber = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const getPercentChange = (current, previous) => {
+  if (previous === 0) {
+    return current > 0 ? 100 : 0;
+  }
+  return Math.round(Math.abs((current - previous) / previous) * 100);
+};
+
+const getTrendDirection = (current, previous, goodWhenDown = false) => {
+  if (current === previous) {
+    return goodWhenDown ? 'down' : 'up';
+  }
+  return current > previous ? 'up' : 'down';
+};
+
+const getAverageWaitTime = (appointments) => {
+  const waitTimes = appointments.
+  map((apt) => toNumber(apt.wait_time_minutes ?? apt.wait_minutes ?? apt.queue_wait_minutes ?? apt.wait_time)).
+  filter((minutes) => minutes > 0);
+
+  if (waitTimes.length === 0) {
+    return 0;
+  }
+
+  return Math.round(waitTimes.reduce((sum, minutes) => sum + minutes, 0) / waitTimes.length);
+};
+
 const ModernStatistics = ({
   appointments = [],
   language = 'ru',
@@ -47,10 +86,9 @@ const ModernStatistics = ({
   // Вычисление статистики
   const statistics = useMemo(() => {
     const targetDate = selectedDate || new Date().toISOString().split('T')[0];
-    const dayAppointments = appointments.filter((apt) => {
-      const aptDate = apt.date || apt.appointment_date;
-      return aptDate === targetDate;
-    });
+    const previousDate = shiftDate(targetDate, -1);
+    const dayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === targetDate);
+    const previousDayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === previousDate);
 
     // Завершенные визиты за выбранный день
     const completedToday = dayAppointments.filter((apt) =>
@@ -61,31 +99,41 @@ const ModernStatistics = ({
     const pendingPayments = dayAppointments.filter((apt) =>
     apt.status === 'paid_pending' || apt.payment_status === 'pending'
     );
+    const previousPendingPayments = previousDayAppointments.filter((apt) =>
+    apt.status === 'paid_pending' || apt.payment_status === 'pending'
+    );
 
     // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
     const totalRevenue = dayAppointments.
     filter((apt) => apt.payment_status === 'paid').
-    reduce((sum, apt) => sum + (apt.payment_amount || apt.cost || 0), 0);
+    reduce((sum, apt) => sum + toNumber(apt.payment_amount || apt.cost), 0);
+    const previousRevenue = previousDayAppointments.
+    filter((apt) => apt.payment_status === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt.payment_amount || apt.cost), 0);
 
     // Уникальные пациенты
     const uniquePatients = new Set(dayAppointments.map((apt) => apt.patient_id)).size;
+    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt.patient_id)).size;
 
-    // Среднее время ожидания (мок)
-    const averageWaitTime = Math.floor(Math.random() * 30) + 10;
+    // Среднее время ожидания
+    const averageWaitTime = getAverageWaitTime(dayAppointments);
+    const previousAverageWaitTime = getAverageWaitTime(previousDayAppointments);
 
-    // Тенденции (мок данных)
+    // Тенденции по сравнению с предыдущим днём
     const trends = {
-      appointments: Math.random() > 0.5 ? 'up' : 'down',
-      revenue: Math.random() > 0.5 ? 'up' : 'down',
-      patients: Math.random() > 0.5 ? 'up' : 'down',
-      waitTime: Math.random() > 0.5 ? 'down' : 'up' // для времени ожидания down - это хорошо
+      appointments: getTrendDirection(dayAppointments.length, previousDayAppointments.length),
+      revenue: getTrendDirection(totalRevenue, previousRevenue),
+      patients: getTrendDirection(uniquePatients, previousUniquePatients),
+      waitTime: getTrendDirection(averageWaitTime, previousAverageWaitTime, true),
+      pendingPayments: getTrendDirection(pendingPayments.length, previousPendingPayments.length, true)
     };
 
     const trendValues = {
-      appointments: Math.floor(Math.random() * 20) + 5,
-      revenue: Math.floor(Math.random() * 15) + 3,
-      patients: Math.floor(Math.random() * 25) + 8,
-      waitTime: Math.floor(Math.random() * 10) + 2
+      appointments: getPercentChange(dayAppointments.length, previousDayAppointments.length),
+      revenue: getPercentChange(totalRevenue, previousRevenue),
+      patients: getPercentChange(uniquePatients, previousUniquePatients),
+      waitTime: getPercentChange(averageWaitTime, previousAverageWaitTime),
+      pendingPayments: getPercentChange(pendingPayments.length, previousPendingPayments.length)
     };
 
     return {
@@ -177,8 +225,8 @@ const ModernStatistics = ({
     value: animatedValues.pendingPayments || 0,
     iconName: 'creditcard',
     color: '#ff9500',
-    trend: 'down',
-    trendValue: Math.floor(Math.random() * 5) + 1,
+    trend: statistics.trends.pendingPayments,
+    trendValue: statistics.trendValues.pendingPayments,
     suffix: ''
   },
   {
