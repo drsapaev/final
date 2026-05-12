@@ -2,7 +2,8 @@
 API endpoints для управления SMS провайдерами
 """
 
-from typing import List, Optional
+import logging
+from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -14,6 +15,22 @@ from app.models.user import User
 from app.services.sms_providers import get_sms_manager, SMSMessage, SMSProviderType
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+SMS_PROVIDER_PUBLIC_ERROR = "SMS provider request failed"
+SMS_PROVIDER_UNAVAILABLE_ERROR = "Provider request failed"
+
+
+def _raise_sms_provider_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "SMS providers endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=SMS_PROVIDER_PUBLIC_ERROR,
+    ) from exc
 
 
 class SMSTestRequest(BaseModel):
@@ -32,6 +49,31 @@ class SMSProviderInfo(BaseModel):
     balance: Optional[float] = None
     currency: Optional[str] = None
     error: Optional[str] = None
+
+
+def _unavailable_provider_info(provider_name: str, exc: Exception) -> SMSProviderInfo:
+    logger.warning(
+        "SMS provider lookup failed provider=%s error_type=%s",
+        provider_name,
+        type(exc).__name__,
+    )
+    return SMSProviderInfo(
+        name=provider_name,
+        available=False,
+        error=SMS_PROVIDER_UNAVAILABLE_ERROR,
+    )
+
+
+def _sanitize_sms_provider_result(result: dict) -> dict:
+    if result.get("success") is False and result.get("error"):
+        return {**result, "error": SMS_PROVIDER_UNAVAILABLE_ERROR}
+    return result
+
+
+def _sanitize_sms_response_error(success: bool, error: Optional[str]) -> Optional[str]:
+    if not success and error:
+        return SMS_PROVIDER_UNAVAILABLE_ERROR
+    return error
 
 
 @router.get("/providers", response_model=List[SMSProviderInfo])
@@ -55,17 +97,16 @@ async def get_sms_providers(current_user: User = Depends(require_roles(["Admin"]
                             balance=balance_info.get("balance"),
                             currency=balance_info.get("currency"),
                             error=(
-                                balance_info.get("error")
+                                SMS_PROVIDER_UNAVAILABLE_ERROR
                                 if not balance_info.get("success")
+                                and balance_info.get("error")
                                 else None
                             ),
                         )
                     )
-                except Exception as e:
+                except Exception as exc:
                     providers.append(
-                        SMSProviderInfo(
-                            name=provider_type.value, available=False, error=str(e)
-                        )
+                        _unavailable_provider_info(provider_type.value, exc)
                     )
             else:
                 providers.append(
@@ -78,11 +119,8 @@ async def get_sms_providers(current_user: User = Depends(require_roles(["Admin"]
 
         return providers
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting SMS providers: {str(e)}",
-        )
+    except Exception as exc:
+        _raise_sms_provider_internal_error("get_sms_providers", exc)
 
 
 @router.get("/balance/{provider}")
@@ -103,15 +141,12 @@ async def get_provider_balance(
         sms_manager = get_sms_manager()
         balance_info = await sms_manager.get_balance(provider_type)
 
-        return balance_info
+        return _sanitize_sms_provider_result(balance_info)
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting balance: {str(e)}",
-        )
+    except Exception as exc:
+        _raise_sms_provider_internal_error("get_provider_balance", exc)
 
 
 @router.post("/test")
@@ -142,17 +177,14 @@ async def test_sms_sending(
             "success": result.success,
             "message_id": result.message_id,
             "provider": result.provider,
-            "error": result.error,
+            "error": _sanitize_sms_response_error(result.success, result.error),
             "status": result.status,
         }
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error sending test SMS: {str(e)}",
-        )
+    except Exception as exc:
+        _raise_sms_provider_internal_error("test_sms_sending", exc)
 
 
 @router.post("/send-2fa-code")
@@ -186,17 +218,14 @@ async def send_2fa_code(
             "success": result.success,
             "message_id": result.message_id,
             "provider": result.provider,
-            "error": result.error,
+            "error": _sanitize_sms_response_error(result.success, result.error),
             "status": result.status,
         }
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error sending 2FA code: {str(e)}",
-        )
+    except Exception as exc:
+        _raise_sms_provider_internal_error("send_2fa_code", exc)
 
 
 @router.get("/status/{message_id}")
@@ -227,12 +256,9 @@ async def get_message_status(
 
         status_info = await provider_instance.get_message_status(message_id)
 
-        return status_info
+        return _sanitize_sms_provider_result(status_info)
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting message status: {str(e)}",
-        )
+    except Exception as exc:
+        _raise_sms_provider_internal_error("get_message_status", exc)
