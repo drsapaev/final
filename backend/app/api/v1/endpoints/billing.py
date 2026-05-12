@@ -2,6 +2,7 @@
 API endpoints для автоматического выставления счетов
 """
 
+import logging
 from datetime import date, datetime
 from typing import List, Optional
 
@@ -16,6 +17,18 @@ from app.services.billing_api_service import BillingApiDomainError, BillingApiSe
 from app.services.billing_service import BillingService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+BILLING_PUBLIC_ERROR = "Internal server error"
+
+
+def _billing_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "Billing endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(status_code=500, detail=BILLING_PUBLIC_ERROR)
 
 
 # === Pydantic схемы ===
@@ -302,7 +315,7 @@ def get_invoice_html(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _billing_http_error(e, "get_invoice_html") from e
 
 
 @router.post("/invoices/{invoice_id}/send")
