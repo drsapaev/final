@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, UploadFile
@@ -21,6 +23,38 @@ from app.models.user import User
 from app.repositories.messages_api_repository import MessagesApiRepository
 from app.schemas.message import ConversationOut, MessageCreate, MessageOut
 from app.services.notifications import notification_sender_service
+
+CHAT_UPLOAD_DIR = Path("uploads/chat")
+CHAT_STORAGE_FILENAME_RE = re.compile(r"^\d{8}_\d{6}_.+$")
+
+
+def _safe_chat_storage_filename(filename: str) -> str:
+    if not filename or filename != filename.strip():
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    if "/" in filename or "\\" in filename or os.path.basename(filename) != filename:
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    if any(ord(char) < 32 for char in filename):
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    if not CHAT_STORAGE_FILENAME_RE.fullmatch(filename):
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    return filename
+
+
+def _find_chat_upload_file(filename: str) -> Path:
+    safe_filename = _safe_chat_storage_filename(filename)
+    upload_root = CHAT_UPLOAD_DIR.resolve()
+
+    if not upload_root.exists():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    for upload_path in upload_root.iterdir():
+        resolved_path = upload_path.resolve()
+        if resolved_path.parent != upload_root or not resolved_path.is_file():
+            continue
+        if upload_path.name == safe_filename:
+            return resolved_path
+
+    raise HTTPException(status_code=404, detail="Файл не найден")
 
 
 class MessagesApiService:
@@ -745,11 +779,7 @@ async def download_chat_file(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    filename = os.path.basename(filename)
-    file_path = os.path.join("uploads/chat", filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Файл не найден")
-
+    filename = _safe_chat_storage_filename(filename)
     file_record = db.query(FileModel).filter(FileModel.filename == filename).first()
     if file_record:
         message = db.query(Message).filter(Message.file_id == file_record.id).first()
@@ -766,6 +796,7 @@ async def download_chat_file(
     ):
         raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
 
-    return FileResponse(path=file_path, filename=name or filename)
+    file_path = _find_chat_upload_file(filename)
+    return FileResponse(path=str(file_path), filename=name or file_path.name)
 
 
