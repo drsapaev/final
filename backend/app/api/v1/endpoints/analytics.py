@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,9 @@ from app.services.analytics_simple_api_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ANALYTICS_PUBLIC_ERROR = "Internal server error"
 
 
 def _build_payment_provider_payload(
@@ -82,8 +86,13 @@ async def get_trends_analytics(
         # Используем SSOT для получения трендов
         return AnalyticsService.get_trends(db, days)
     except Exception as e:
+        logger.warning(
+            "Analytics trends endpoint failed error_type=%s",
+            type(e).__name__,
+        )
         raise HTTPException(
-            status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
+            status_code=500,
+            detail=ANALYTICS_PUBLIC_ERROR,
         ) from e
 
 
