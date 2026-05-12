@@ -336,6 +336,10 @@ def get_system_info(current_user: User = Depends(require_roles("Admin"))):
             },
         }
     except Exception as e:
+        logger.warning(
+            "Admin clinic system info endpoint failed error_type=%s",
+            type(e).__name__,
+        )
         return {
             "error": ADMIN_CLINIC_PUBLIC_ERROR,
             "basic_info": {
