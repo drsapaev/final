@@ -5,7 +5,8 @@ API endpoints для SMS/Email двухфакторной аутентифика
 import random
 import string
 from datetime import datetime, timedelta
-from typing import Optional
+import logging
+from typing import NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -18,6 +19,25 @@ from app.services.sms_providers import get_sms_manager, SMSProviderType
 from app.services.two_factor_service import get_two_factor_service, TwoFactorService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def get_safe_two_factor_method(method: str) -> str:
+    return method if method in {"sms", "email"} else "unknown"
+
+
+def raise_two_factor_sms_internal_error(
+    action: str, public_detail: str, exc: Exception
+) -> NoReturn:
+    logger.warning(
+        "2FA SMS/email endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=public_detail,
+    )
 
 
 @router.post("/send-code")
@@ -63,9 +83,14 @@ async def send_verification_code(
         )
 
         if not result["success"]:
+            safe_method = get_safe_two_factor_method(method)
+            logger.warning(
+                "2FA SMS/email provider send failed method=%s",
+                safe_method,
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка отправки {method.upper()}: {result.get('error', 'Unknown error')}",
+                detail=f"Ошибка отправки {safe_method.upper()}",
             )
 
         return {
@@ -78,10 +103,7 @@ async def send_verification_code(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки кода: {str(e)}",
-        )
+        raise_two_factor_sms_internal_error("send-code", "Ошибка отправки кода", e)
 
 
 @router.post("/verify-code")
@@ -123,10 +145,7 @@ async def verify_verification_code(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки кода: {str(e)}",
-        )
+        raise_two_factor_sms_internal_error("verify-code", "Ошибка проверки кода", e)
 
 
 @router.get("/verification-status")
@@ -146,9 +165,8 @@ async def get_verification_status(
         return status
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса: {str(e)}",
+        raise_two_factor_sms_internal_error(
+            "verification-status", "Ошибка получения статуса", e
         )
 
 
@@ -223,9 +241,8 @@ async def resend_verification_code(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка повторной отправки: {str(e)}",
+        raise_two_factor_sms_internal_error(
+            "resend-code", "Ошибка повторной отправки", e
         )
 
 
@@ -277,9 +294,8 @@ async def get_security_logs(
         return {"logs": logs, "total": len(logs), "limit": limit, "offset": offset}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения журнала: {str(e)}",
+        raise_two_factor_sms_internal_error(
+            "security-logs", "Ошибка получения журнала", e
         )
 
 
@@ -296,7 +312,6 @@ async def get_recovery_methods(
         return {"methods": methods}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения методов восстановления: {str(e)}",
+        raise_two_factor_sms_internal_error(
+            "recovery-methods", "Ошибка получения методов восстановления", e
         )
