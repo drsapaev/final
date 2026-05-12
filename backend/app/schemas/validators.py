@@ -4,6 +4,7 @@
 Этот модуль содержит переиспользуемые валидаторы для обеспечения
 бизнес-логики на уровне данных.
 """
+import html
 import re
 from datetime import date, datetime, timedelta
 
@@ -216,11 +217,5 @@ def sanitize_html(v: str | None) -> str | None:
         Очищенная строка
     """
     if v is not None:
-        # Удаляем script и style теги с их содержимым
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r'<style[^>]*>.*?</style>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        # Удаляем on* атрибуты (onclick, onload, etc.)
-        v = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', v, flags=re.IGNORECASE)
-        # Удаляем javascript: URLs
-        v = re.sub(r'javascript:', '', v, flags=re.IGNORECASE)
+        v = html.escape(v, quote=True)
     return v
