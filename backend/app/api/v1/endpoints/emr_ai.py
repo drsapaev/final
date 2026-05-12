@@ -2,7 +2,8 @@
 API endpoints для AI функций EMR
 """
 
-from typing import Any, Dict, List, Optional
+import logging
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.models.user import User
 from app.services.emr_ai_service import EMRService, get_emr_ai_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 EMR_AI_ACCESS = require_any_ai_permission(
     AIPermission.ADMIN_AI,
@@ -20,6 +22,17 @@ EMR_AI_ACCESS = require_any_ai_permission(
     AIPermission.SUGGEST_ICD10,
     AIPermission.ANALYZE_DOCUMENT,
 )
+
+EMR_AI_PUBLIC_ERROR = "Internal server error"
+
+
+def _raise_emr_ai_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "EMR AI endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=EMR_AI_PUBLIC_ERROR) from exc
 
 
 def ai_safety_meta() -> Dict[str, Any]:
@@ -52,9 +65,7 @@ async def get_diagnosis_suggestions(
             **ai_safety_meta(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения предложений диагнозов: {str(e)}"
-        )
+        _raise_emr_ai_internal_error("get_diagnosis_suggestions", e)
 
 
 @router.post("/suggestions/treatment")
@@ -77,9 +88,7 @@ async def get_treatment_suggestions(
             **ai_safety_meta(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения предложений лечения: {str(e)}"
-        )
+        _raise_emr_ai_internal_error("get_treatment_suggestions", e)
 
 
 @router.post("/suggestions/icd10")
@@ -100,9 +109,7 @@ async def get_icd10_suggestions(
             **ai_safety_meta(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения кодов МКБ-10: {str(e)}"
-        )
+        _raise_emr_ai_internal_error("get_icd10_suggestions", e)
 
 
 @router.post("/auto-fill")
@@ -127,9 +134,7 @@ async def auto_fill_emr_fields(
             **ai_safety_meta(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка автозаполнения EMR: {str(e)}"
-        )
+        _raise_emr_ai_internal_error("auto_fill_emr_fields", e)
 
 
 @router.post("/validate")
@@ -150,7 +155,7 @@ async def validate_emr_data(
             return {**validation_result, **ai_safety_meta()}
         return {"result": validation_result, **ai_safety_meta()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка валидации EMR: {str(e)}")
+        _raise_emr_ai_internal_error("validate_emr_data", e)
 
 
 @router.post("/suggestions/ai")
@@ -172,9 +177,7 @@ async def get_ai_suggestions(
             **ai_safety_meta(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения AI предложений: {str(e)}"
-        )
+        _raise_emr_ai_internal_error("get_ai_suggestions", e)
 
 
 @router.get("/suggestions/health")
