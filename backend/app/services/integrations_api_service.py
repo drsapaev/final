@@ -78,7 +78,7 @@ def _map_gateway_error(error: Exception) -> HTTPException:
         )
         return HTTPException(status_code=503, detail=detail)
 
-    return HTTPException(status_code=500, detail=str(error))
+    return HTTPException(status_code=500, detail="Internal server error")
 
 
 # ===================== ОБЩИЕ =====================

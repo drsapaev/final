@@ -65,7 +65,7 @@ def test_map_gateway_error_for_unknown_capability_uses_fallback_message() -> Non
 
 
 def test_map_gateway_error_for_generic_error_returns_500() -> None:
-    mapped = _map_gateway_error(RuntimeError("boom"))
+    mapped = _map_gateway_error(RuntimeError("boom secret-token=abc123"))
 
     assert mapped.status_code == 500
-    assert mapped.detail == "boom"
+    assert mapped.detail == "Internal server error"
