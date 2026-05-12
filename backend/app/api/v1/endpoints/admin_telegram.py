@@ -3,9 +3,10 @@ API endpoints для управления Telegram в админ панели
 """
 
 import asyncio
+import logging
 import secrets
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 import requests
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -17,6 +18,33 @@ from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def raise_admin_telegram_error(
+    action: str,
+    public_detail: str,
+    exc: Exception,
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+) -> NoReturn:
+    logger.warning(
+        "Admin Telegram endpoint failed action=%s status_code=%s error_type=%s",
+        action,
+        status_code,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=status_code, detail=public_detail)
+
+
+def webhook_info_error_response(
+    action: str, public_error: str, exc: Exception
+) -> Dict[str, Any]:
+    logger.warning(
+        "Admin Telegram webhook info failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    return {"webhook_set": False, "error": public_error}
 
 
 class TelegramWebhookRequest(BaseModel):
@@ -58,9 +86,10 @@ def get_telegram_settings(
 
         return result
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек Telegram: {str(e)}",
+        raise_admin_telegram_error(
+            "settings-read",
+            "Ошибка получения настроек Telegram",
+            e,
         )
 
 
@@ -83,9 +112,10 @@ def update_telegram_settings(
             "updated_count": len(updated_settings),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек Telegram: {str(e)}",
+        raise_admin_telegram_error(
+            "settings-update",
+            "Ошибка обновления настроек Telegram",
+            e,
         )
 
 
@@ -144,16 +174,19 @@ def test_telegram_bot(
             raise Exception(f"HTTP {response.status_code}: {response.text}")
 
     except requests.RequestException as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка подключения к Telegram API: {str(e)}",
+        raise_admin_telegram_error(
+            "test-bot-request",
+            "Ошибка подключения к Telegram API",
+            e,
+            status.HTTP_400_BAD_REQUEST,
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования бота: {str(e)}",
+        raise_admin_telegram_error(
+            "test-bot",
+            "Ошибка тестирования бота",
+            e,
         )
 
 
@@ -222,16 +255,19 @@ def set_telegram_webhook(
             raise Exception(f"HTTP {response.status_code}: {response.text}")
 
     except requests.RequestException as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка установки webhook: {str(e)}",
+        raise_admin_telegram_error(
+            "set-webhook-request",
+            "Ошибка установки webhook",
+            e,
+            status.HTTP_400_BAD_REQUEST,
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка установки webhook: {str(e)}",
+        raise_admin_telegram_error(
+            "set-webhook",
+            "Ошибка установки webhook",
+            e,
         )
 
 
@@ -267,9 +303,17 @@ def get_telegram_webhook_info(
             raise Exception(f"HTTP {response.status_code}")
 
     except requests.RequestException as e:
-        return {"webhook_set": False, "error": f"Ошибка подключения: {str(e)}"}
+        return webhook_info_error_response(
+            "webhook-info-request",
+            "Ошибка подключения",
+            e,
+        )
     except Exception as e:
-        return {"webhook_set": False, "error": str(e)}
+        return webhook_info_error_response(
+            "webhook-info",
+            "Ошибка получения информации о webhook",
+            e,
+        )
 
 
 # ===================== ШАБЛОНЫ СООБЩЕНИЙ =====================
@@ -366,9 +410,10 @@ def get_telegram_templates(
         return result
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения шаблонов: {str(e)}",
+        raise_admin_telegram_error(
+            "templates",
+            "Ошибка получения шаблонов",
+            e,
         )
 
 
@@ -415,16 +460,19 @@ def send_test_message(
             raise Exception(f"HTTP {response.status_code}: {response.text}")
 
     except requests.RequestException as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка отправки сообщения: {str(e)}",
+        raise_admin_telegram_error(
+            "send-test-message-request",
+            "Ошибка отправки сообщения",
+            e,
+            status.HTTP_400_BAD_REQUEST,
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки тестового сообщения: {str(e)}",
+        raise_admin_telegram_error(
+            "send-test-message",
+            "Ошибка отправки тестового сообщения",
+            e,
         )
 
 
@@ -451,9 +499,10 @@ def get_telegram_stats(
             "period_end": datetime.utcnow(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики Telegram: {str(e)}",
+        raise_admin_telegram_error(
+            "stats",
+            "Ошибка получения статистики Telegram",
+            e,
         )
 
 
@@ -473,9 +522,10 @@ def get_telegram_users(
         # Пока возвращаем заглушку
         return []
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения пользователей Telegram: {str(e)}",
+        raise_admin_telegram_error(
+            "users",
+            "Ошибка получения пользователей Telegram",
+            e,
         )
 
 
@@ -512,7 +562,8 @@ def send_broadcast_message(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки сообщения: {str(e)}",
+        raise_admin_telegram_error(
+            "broadcast",
+            "Ошибка отправки сообщения",
+            e,
         )
