@@ -15,8 +15,7 @@ import logger from './logger';
  * Suspicious patterns that might indicate prompt injection or malicious content
  */
 const SUSPICIOUS_PATTERNS = [
-// Script injection
-/<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+// Script tags are handled by sanitizeAIContent/DOMPurify instead of regex parsing.
 /javascript:/gi,
 /on\w+\s*=/gi, // onclick, onerror, etc.
 
