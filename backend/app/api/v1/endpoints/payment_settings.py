@@ -22,6 +22,8 @@ from app.services.payment_settings_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+PAYMENT_SETTINGS_PUBLIC_ERROR = "Внутренняя ошибка сервера"
+PAYMENT_PROVIDER_TEST_PUBLIC_ERROR = "Внутренняя ошибка тестирования провайдера"
 
 # ===================== API ENDPOINTS =====================
 
@@ -53,8 +55,11 @@ def update_payment_provider_settings(
     except PaymentSettingsDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except Exception as e:
-        logger.error(f"Ошибка сохранения настроек платежных провайдеров: {e}")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        logger.warning(
+            "Payment provider settings save failed error_type=%s",
+            type(e).__name__,
+        )
+        raise HTTPException(status_code=500, detail=PAYMENT_SETTINGS_PUBLIC_ERROR)
 
 
 @router.post("/admin/test-payment-provider", response_model=TestProviderResponse)
@@ -74,9 +79,14 @@ def test_payment_provider(
         )
         return TestProviderResponse(**result)
     except Exception as e:
-        logger.error(f"Ошибка тестирования провайдера {test_request.provider}: {e}")
+        logger.warning(
+            "Payment provider test failed provider=%s error_type=%s",
+            test_request.provider,
+            type(e).__name__,
+        )
         return TestProviderResponse(
-            success=False, message=f"Внутренняя ошибка: {str(e)}"
+            success=False,
+            message=PAYMENT_PROVIDER_TEST_PUBLIC_ERROR,
         )
 
 
