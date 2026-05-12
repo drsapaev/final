@@ -1,5 +1,6 @@
 """API endpoints для управления врачами в админ панели."""
 
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,11 +24,26 @@ from app.schemas.clinic import (
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ADMIN_DOCTORS_PUBLIC_ERROR = "Internal server error"
 
 DOCTOR_ROLE_VALUES = {
     str(role.value) if hasattr(role, "value") else str(role)
     for role in DOCTOR_ROLES
 }
+
+
+def _admin_doctors_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "Admin doctors endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ADMIN_DOCTORS_PUBLIC_ERROR,
+    )
 
 
 def _validate_doctor_user(db: Session, user_id: int) -> User:
@@ -107,10 +123,7 @@ def get_doctors(
             doctors = [d for d in doctors if d.specialty == specialty]
         return [_serialize_doctor(db, doctor) for doctor in doctors]
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка врачей: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "get_doctors") from exc
 
 
 @router.get("/doctors/available-users", response_model=List[DoctorUserOption])
@@ -198,10 +211,7 @@ def create_doctor(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания врача: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "create_doctor") from exc
 
 
 @router.put("/doctors/{doctor_id}", response_model=DoctorOut)
@@ -240,10 +250,7 @@ def update_doctor(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления врача: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "update_doctor") from exc
 
 
 @router.delete("/doctors/{doctor_id}")
@@ -264,10 +271,7 @@ def delete_doctor(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления врача: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "delete_doctor") from exc
 
 
 @router.get("/doctors/{doctor_id}/schedule", response_model=List[ScheduleOut])
@@ -306,10 +310,7 @@ def update_doctor_schedule(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления расписания: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "update_doctor_schedule") from exc
 
 
 @router.post("/doctors/{doctor_id}/schedule", response_model=ScheduleOut)
@@ -332,10 +333,7 @@ def create_schedule(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания расписания: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "create_schedule") from exc
 
 
 @router.get("/specialties")
@@ -347,10 +345,7 @@ def get_specialties(
     try:
         return AdminDoctorsStatsService(db).get_specialties()
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения специальностей: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "get_specialties") from exc
 
 
 @router.get("/doctors/stats")
@@ -362,7 +357,4 @@ def get_doctors_stats(
     try:
         return AdminDoctorsStatsService(db).get_doctors_stats()
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики врачей: {exc}",
-        ) from exc
+        raise _admin_doctors_http_error(exc, "get_doctors_stats") from exc
