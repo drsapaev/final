@@ -1,6 +1,7 @@
 # app/api/v1/endpoints/admin_providers.py
 from __future__ import annotations
 
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -22,6 +23,21 @@ from app.schemas.payment_webhook import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ADMIN_PROVIDERS_PUBLIC_ERROR = "Internal server error"
+ADMIN_PROVIDERS_BULK_ITEM_ERROR = "Provider update failed"
+
+
+def _admin_providers_http_error(exc: Exception) -> HTTPException:
+    logger.warning(
+        "Admin providers endpoint failed error_type=%s",
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ADMIN_PROVIDERS_PUBLIC_ERROR,
+    )
 
 
 @router.get(
@@ -40,10 +56,7 @@ def list_providers(
         providers = get_all_providers(db, skip=offset, limit=limit)
         return providers
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения провайдеров: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.get(
@@ -68,10 +81,7 @@ def get_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения провайдера: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.post(
@@ -101,10 +111,7 @@ def create_new_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания провайдера: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.put(
@@ -144,10 +151,7 @@ def update_existing_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления провайдера: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.delete("/admin/providers/{provider_id}", summary="Удаление провайдера")
@@ -180,10 +184,7 @@ def delete_existing_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления провайдера: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.get(
@@ -220,10 +221,7 @@ def test_provider_connection(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования провайдера: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.get("/admin/providers/{provider_id}/stats", summary="Статистика провайдера")
@@ -261,10 +259,7 @@ def get_provider_stats(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
 
 
 @router.post("/admin/providers/bulk-update", summary="Массовое обновление провайдеров")
@@ -314,7 +309,18 @@ def bulk_update_providers(
                 )
 
             except Exception as e:
-                results.append({"id": provider_id, "success": False, "error": str(e)})
+                logger.warning(
+                    "Admin providers bulk update item failed provider_id=%s error_type=%s",
+                    provider_id,
+                    type(e).__name__,
+                )
+                results.append(
+                    {
+                        "id": provider_id,
+                        "success": False,
+                        "error": ADMIN_PROVIDERS_BULK_ITEM_ERROR,
+                    }
+                )
 
         return {
             "success": True,
@@ -323,7 +329,4 @@ def bulk_update_providers(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массового обновления: {str(e)}",
-        )
+        raise _admin_providers_http_error(e) from e
