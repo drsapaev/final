@@ -3,7 +3,8 @@ API endpoints для двухфакторной аутентификации (2F
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional
+import logging
+from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Request, status
 from sqlalchemy.orm import Session
@@ -38,6 +39,19 @@ from app.services.two_factor_service import get_two_factor_service, TwoFactorSer
 from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def raise_two_factor_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "2FA endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Error {action}",
+    )
 
 
 def get_client_info(request: Request) -> tuple[str, str]:
@@ -57,10 +71,7 @@ async def get_two_factor_status(
         status_data = service.get_two_factor_status(db, current_user.id)
         return TwoFactorStatusResponse(**status_data)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting 2FA status: {str(e)}",
-        )
+        raise_two_factor_internal_error("getting 2FA status", e)
 
 
 @router.post("/setup", response_model=TwoFactorSetupResponse)
@@ -94,10 +105,7 @@ async def setup_two_factor_auth(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error setting up 2FA: {str(e)}",
-        )
+        raise_two_factor_internal_error("setting up 2FA", e)
 
 
 @router.post("/verify-setup", response_model=TwoFactorVerifyResponse)
@@ -128,10 +136,7 @@ async def verify_totp_setup(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verifying TOTP setup: {str(e)}",
-        )
+        raise_two_factor_internal_error("verifying TOTP setup", e)
 
 
 @router.post("/verify", response_model=TwoFactorVerifyResponse)
@@ -241,10 +246,7 @@ async def verify_two_factor(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verifying 2FA: {str(e)}",
-        )
+        raise_two_factor_internal_error("verifying 2FA", e)
 
 
 @router.post("/disable", response_model=TwoFactorSuccessResponse)
@@ -278,10 +280,7 @@ async def disable_two_factor_auth(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error disabling 2FA: {str(e)}",
-        )
+        raise_two_factor_internal_error("disabling 2FA", e)
 
 
 @router.post("/recovery/request", response_model=TwoFactorRecoveryResponse)
@@ -337,10 +336,7 @@ async def request_two_factor_recovery(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error requesting 2FA recovery: {str(e)}",
-        )
+        raise_two_factor_internal_error("requesting 2FA recovery", e)
 
 
 @router.post("/recovery/verify", response_model=TwoFactorVerifyResponse)
@@ -375,10 +371,7 @@ async def verify_two_factor_recovery(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verifying 2FA recovery: {str(e)}",
-        )
+        raise_two_factor_internal_error("verifying 2FA recovery", e)
 
 
 @router.get("/backup-codes", response_model=TwoFactorBackupCodesResponse)
@@ -408,10 +401,7 @@ async def get_backup_codes(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting backup codes: {str(e)}",
-        )
+        raise_two_factor_internal_error("getting backup codes", e)
 
 
 @router.post("/backup-codes/regenerate", response_model=TwoFactorBackupCodesResponse)
@@ -442,10 +432,7 @@ async def regenerate_backup_codes(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error regenerating backup codes: {str(e)}",
-        )
+        raise_two_factor_internal_error("regenerating backup codes", e)
 
 
 @router.get("/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False)
@@ -458,10 +445,7 @@ async def get_trusted_devices(
         return TwoFactorDeviceListResponse(devices=devices, total=len(devices))
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting trusted devices: {str(e)}",
-        )
+        raise_two_factor_internal_error("getting trusted devices", e)
 
 
 @router.delete("/devices/{device_id}")
@@ -493,10 +477,7 @@ async def untrust_device(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error untrusting device: {str(e)}",
-        )
+        raise_two_factor_internal_error("untrusting device", e)
 
 
 @router.get("/health")
