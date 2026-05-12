@@ -2,6 +2,7 @@
 API endpoints для экспорта аналитических отчетов
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -21,6 +22,9 @@ from app.services.analytics_export_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ANALYTICS_EXPORT_PUBLIC_ERROR = "Internal server error"
 
 
 @router.get("/formats")
@@ -34,9 +38,14 @@ async def get_export_formats(
 
         return {"formats": formats, "count": len(formats)}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения форматов экспорта: {str(e)}"
+        logger.warning(
+            "Analytics export formats lookup failed error_type=%s",
+            type(e).__name__,
         )
+        raise HTTPException(
+            status_code=500,
+            detail=ANALYTICS_EXPORT_PUBLIC_ERROR,
+        ) from e
 
 
 @router.get("/kpi/export/{format}")
