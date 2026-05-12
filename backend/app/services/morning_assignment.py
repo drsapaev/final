@@ -409,10 +409,9 @@ class MorningAssignmentService:
 
         service_codes_for_entry = create_handoff.create_entry_kwargs.get("service_codes", [])
         logger.info(
-            "Assigned number %s in queue %s for patient %s through SSOT, services: %s",
+            "Assigned number %s in queue %s through SSOT, services: %s",
             queue_entry.number,
             queue_tag,
-            visit.patient_id,
             service_codes_for_entry,
         )
 
@@ -539,7 +538,10 @@ class MorningAssignmentService:
             )
 
         if existing_entry:
-            logger.info(f"Patient {visit.patient_id} already has active queue entry for {queue_tag}")
+            logger.info(
+                "Active queue entry already exists for queue %s",
+                queue_tag,
+            )
             return MorningAssignmentPreparedQueueAssignment(
                 assignment={
                     "queue_tag": queue_tag,
@@ -664,7 +666,7 @@ class MorningAssignmentService:
         if len(active_entries) > 1:
             raise MorningAssignmentClaimError(
                 "Ambiguous active queue entry for "
-                f"queue_tag={queue_tag} and patient_id={patient_id}"
+                f"queue_tag={queue_tag}"
             )
 
         if len(active_entries) == 1:
@@ -673,14 +675,14 @@ class MorningAssignmentService:
             if matched_queue is None:
                 raise MorningAssignmentClaimError(
                     "Could not safely match active queue entry for "
-                    f"queue_tag={queue_tag} and patient_id={patient_id}"
+                    f"queue_tag={queue_tag}"
                 )
             return matched_queue, active_entries[0]
 
         if len(active_queues) > 1:
             raise MorningAssignmentClaimError(
                 "Ambiguous active queue for "
-                f"queue_tag={queue_tag} and patient_id={patient_id}"
+                f"queue_tag={queue_tag}"
             )
 
         return active_queues[0], None
