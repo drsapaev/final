@@ -446,9 +446,8 @@ class VisitPaymentIntegrationService:
 
         except Exception as e:
             logger.warning(
-                "Appointment payment processing failed appointment_id=%s webhook_id=%s error_type=%s",
-                appointment_id,
-                getattr(webhook, "id", None),
+                "Appointment payment processing failed has_webhook=%s error_type=%s",
+                webhook is not None,
                 type(e).__name__,
             )
             return False, "Ошибка обработки платежа для записи"
