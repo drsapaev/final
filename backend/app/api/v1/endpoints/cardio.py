@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc
@@ -17,6 +17,16 @@ router = APIRouter(prefix="/cardio", tags=["cardio"])
 logger = logging.getLogger(__name__)
 
 CARDIO_ROLES = ("Admin", "Doctor", "cardio", "cardiology", "cardiologist", "Cardiologist")
+CARDIO_PUBLIC_ERROR = "Internal server error"
+
+
+def _raise_cardio_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "[cardio] endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=CARDIO_PUBLIC_ERROR) from exc
 
 
 @router.get("/ecg", summary="ЭКГ исследования")
@@ -32,7 +42,7 @@ async def get_ecg_results(
     try:
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения ЭКГ: {str(e)}")
+        _raise_cardio_internal_error("get_ecg_results", e)
 
 
 @router.post("/ecg", summary="Создать ЭКГ исследование")
@@ -47,7 +57,7 @@ async def create_ecg(
     try:
         return {"message": "ЭКГ исследование создано", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания ЭКГ: {str(e)}")
+        _raise_cardio_internal_error("create_ecg", e)
 
 
 @router.get(
@@ -86,14 +96,7 @@ async def get_blood_tests(
         )
         return tests
     except SQLAlchemyError as e:
-        logger.exception(
-            "[cardio.blood-tests] failed to list tests user_id=%s patient_id=%s",
-            getattr(user, "id", None),
-            patient_id,
-        )
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения анализов крови: {str(e)}"
-        )
+        _raise_cardio_internal_error("get_blood_tests", e)
 
 
 @router.post(
@@ -155,15 +158,7 @@ async def create_blood_test(
         raise
     except SQLAlchemyError as e:
         db.rollback()
-        logger.exception(
-            "[cardio.blood-tests] failed to create test user_id=%s patient_id=%s visit_id=%s",
-            getattr(user, "id", None),
-            blood_test_data.patient_id,
-            blood_test_data.visit_id,
-        )
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка создания анализа крови: {str(e)}"
-        )
+        _raise_cardio_internal_error("create_blood_test", e)
 
 
 @router.get("/risk-assessment", summary="Оценка рисков")
@@ -178,6 +173,4 @@ async def get_risk_assessment(
     try:
         return {"message": "Модуль оценки рисков будет доступен в следующей версии"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения оценки рисков: {str(e)}"
-        )
+        _raise_cardio_internal_error("get_risk_assessment", e)
