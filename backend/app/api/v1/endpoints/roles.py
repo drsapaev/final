@@ -2,7 +2,7 @@
 API endpoints for Role management
 """
 import logging
-from typing import Optional
+from typing import NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -22,6 +22,19 @@ from app.services.roles_api_service import RolesApiDomainError, RolesApiService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+ROLES_PUBLIC_ERROR = "Internal server error"
+
+
+def _raise_roles_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "Roles endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ROLES_PUBLIC_ERROR,
+    ) from exc
 
 
 @router.get("/", response_model=RoleListResponse)
@@ -47,11 +60,7 @@ async def get_roles(
             total=len(roles)
         )
     except Exception as e:
-        logger.error(f"Error fetching roles: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка ролей: {str(e)}"
-        )
+        _raise_roles_internal_error("get_roles", e)
 
 
 @router.get("/options", response_model=RoleOptionsListResponse)
@@ -84,11 +93,7 @@ async def get_role_options(
         
         return RoleOptionsListResponse(options=options)
     except Exception as e:
-        logger.error(f"Error fetching role options: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка ролей: {str(e)}"
-        )
+        _raise_roles_internal_error("get_role_options", e)
 
 
 @router.get("/{role_id}", response_model=RoleResponse)
@@ -129,11 +134,7 @@ async def create_role(
     except RolesApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        logger.error(f"Error creating role: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания роли: {str(e)}"
-        )
+        _raise_roles_internal_error("create_role", e)
 
 
 @router.put("/{role_id}", response_model=RoleResponse)
@@ -165,11 +166,7 @@ async def update_role(
     except RolesApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        logger.error(f"Error updating role: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления роли: {str(e)}"
-        )
+        _raise_roles_internal_error("update_role", e)
 
 
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -196,8 +193,4 @@ async def delete_role(
     except RolesApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
-        logger.error(f"Error deleting role: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления роли: {str(e)}"
-        )
+        _raise_roles_internal_error("delete_role", e)
