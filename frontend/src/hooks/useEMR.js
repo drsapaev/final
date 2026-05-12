@@ -14,9 +14,27 @@ import { apiClient } from '../api/client';
 import logger from '../utils/logger';
 import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
 
+let fallbackSessionCounter = 0;
+
 // Generate client session ID for smart conflict resolution
 const generateSessionId = () => {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const browserCrypto = globalThis.crypto;
+
+    if (browserCrypto?.randomUUID) {
+        return browserCrypto.randomUUID();
+    }
+
+    if (browserCrypto?.getRandomValues) {
+        const randomBytes = new Uint8Array(16);
+        browserCrypto.getRandomValues(randomBytes);
+        randomBytes[6] = randomBytes[6] & 0x0f | 0x40;
+        randomBytes[8] = randomBytes[8] & 0x3f | 0x80;
+        const hex = Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+
+    fallbackSessionCounter += 1;
+    return `${Date.now().toString(36)}-${fallbackSessionCounter.toString(36)}`;
 };
 
 const emrCache = new Map();
