@@ -89,9 +89,9 @@ async def get_blood_tests(
             .all()
         )
         logger.info(
-            "[cardio.blood-tests] listed tests user_id=%s patient_id=%s count=%s",
+            "[cardio.blood-tests] listed tests user_id=%s filtered_by_patient=%s count=%s",
             getattr(user, "id", None),
-            patient_id,
+            patient_id is not None,
             len(tests),
         )
         return tests
@@ -146,9 +146,8 @@ async def create_blood_test(
         db.commit()
         db.refresh(blood_test)
         logger.info(
-            "[cardio.blood-tests] created test_id=%s patient_id=%s visit_id=%s user_id=%s",
+            "[cardio.blood-tests] created test_id=%s visit_id=%s user_id=%s",
             blood_test.id,
-            blood_test.patient_id,
             blood_test.visit_id,
             getattr(user, "id", None),
         )
