@@ -3,7 +3,9 @@ API endpoints для управления пользователями
 """
 
 import json
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import (
@@ -64,6 +66,64 @@ from app.services.user_management_service import (
 from app.services.user_management_api_service import UserManagementApiService
 
 router = APIRouter()
+
+USER_EXPORT_DIR = Path("exports/users")
+USER_EXPORT_FILENAME_RE = re.compile(
+    r"^users_export_\d{8}_\d{6}\.(csv|json|xlsx|pdf|txt)$"
+)
+
+
+def _safe_user_export_filename(filename: str) -> str:
+    if not filename or filename != filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Недопустимое имя файла"
+        )
+
+    if "/" in filename or "\\" in filename or Path(filename).name != filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Недопустимое имя файла"
+        )
+
+    if not USER_EXPORT_FILENAME_RE.fullmatch(filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Недопустимое имя файла"
+        )
+
+    return filename
+
+
+def _find_user_export_file(filename: str) -> Path:
+    safe_filename = _safe_user_export_filename(filename)
+    export_root = USER_EXPORT_DIR.resolve()
+
+    if not export_root.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
+        )
+
+    for export_path in export_root.iterdir():
+        resolved_path = export_path.resolve()
+        if resolved_path.parent != export_root or not resolved_path.is_file():
+            continue
+        if export_path.name == safe_filename:
+            return resolved_path
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден")
+
+
+def _user_export_mime_type(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".csv":
+        return "text/csv"
+    if suffix == ".json":
+        return "application/json"
+    if suffix == ".xlsx":
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    if suffix == ".pdf":
+        return "application/pdf"
+    if suffix == ".txt":
+        return "text/plain"
+    return "application/octet-stream"
 
 
 def _normalize_theme(theme: str | None) -> str:
@@ -923,27 +983,29 @@ async def export_users(
 async def list_export_files(current_user: User = Depends(require_roles("Admin"))):
     """Получить список файлов экспорта"""
     try:
-        import os
-        from pathlib import Path
-
-        export_dir = Path("exports/users")
+        export_dir = USER_EXPORT_DIR
         if not export_dir.exists():
             return {"success": True, "message": "Нет файлов экспорта", "files": []}
 
+        export_root = export_dir.resolve()
         files = []
         for file_path in export_dir.iterdir():
-            if file_path.is_file():
-                stat = file_path.stat()
-                files.append(
-                    {
-                        "filename": file_path.name,
-                        "size": stat.st_size,
-                        "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                        "modified_at": datetime.fromtimestamp(
-                            stat.st_mtime
-                        ).isoformat(),
-                    }
-                )
+            resolved_path = file_path.resolve()
+            if resolved_path.parent != export_root or not resolved_path.is_file():
+                continue
+            try:
+                _safe_user_export_filename(file_path.name)
+            except HTTPException:
+                continue
+            stat = resolved_path.stat()
+            files.append(
+                {
+                    "filename": file_path.name,
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                }
+            )
 
         # Сортируем по дате создания (новые первыми)
         files.sort(key=lambda x: x["created_at"], reverse=True)
@@ -967,42 +1029,13 @@ async def download_export_file(
 ):
     """Скачать файл экспорта"""
     try:
-        import os
-        from pathlib import Path
-
         from fastapi.responses import FileResponse
 
-        # Проверяем безопасность пути
-        if ".." in filename or "/" in filename or "\\" in filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Недопустимое имя файла"
-            )
-
-        export_dir = Path("exports/users")
-        file_path = export_dir / filename
-
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
-            )
-
-        # Определяем MIME тип
-        mime_type = "application/octet-stream"
-        if filename.endswith('.csv'):
-            mime_type = "text/csv"
-        elif filename.endswith('.json'):
-            mime_type = "application/json"
-        elif filename.endswith('.xlsx'):
-            mime_type = (
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        elif filename.endswith('.pdf'):
-            mime_type = "application/pdf"
-        elif filename.endswith('.txt'):
-            mime_type = "text/plain"
+        file_path = _find_user_export_file(filename)
+        mime_type = _user_export_mime_type(file_path.name)
 
         return FileResponse(
-            path=str(file_path), filename=filename, media_type=mime_type
+            path=str(file_path), filename=file_path.name, media_type=mime_type
         )
 
     except HTTPException:
@@ -1020,25 +1053,14 @@ async def delete_export_file(
 ):
     """Удалить файл экспорта"""
     try:
-        from pathlib import Path
-
-        # Проверяем безопасность пути
-        if ".." in filename or "/" in filename or "\\" in filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Недопустимое имя файла"
-            )
-
-        export_dir = Path("exports/users")
-        file_path = export_dir / filename
-
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
-            )
+        file_path = _find_user_export_file(filename)
 
         file_path.unlink()
 
-        return {"success": True, "message": f"Файл {filename} успешно удален"}
+        return {
+            "success": True,
+            "message": f"Файл {file_path.name} успешно удален",
+        }
 
     except HTTPException:
         raise
