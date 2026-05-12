@@ -6,8 +6,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, HttpUrl, field_validator
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
+
+from app.utils.url_security import validate_public_http_url
 
 # ===================== БАЗОВЫЕ СХЕМЫ =====================
 
@@ -123,7 +124,10 @@ class WebhookBase(BaseModel):
 class WebhookCreate(WebhookBase):
     """Схема для создания webhook'а"""
 
-    pass
+    @field_validator('url', mode='before')
+    @classmethod
+    def validate_url(cls, v: Any) -> str:
+        return validate_public_http_url(str(v))
 
 
 class WebhookUpdate(BaseModel):
@@ -141,6 +145,13 @@ class WebhookUpdate(BaseModel):
     filters: dict[str, Any] | None = None
     status: WebhookStatusEnum | None = None
     is_active: bool | None = None
+
+    @field_validator('url', mode='before')
+    @classmethod
+    def validate_url(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        return validate_public_http_url(str(v))
 
 
 class WebhookInDB(WebhookBase):
