@@ -280,7 +280,7 @@ async def validate_upload_file(
                     "category": category,
                 }
             else:
-                logger.warning(f"[File Validator] Unknown file type for {upload_file.filename}")
+                logger.warning("[File Validator] Unknown file type")
                 return False, "Unknown or unsupported file type", None
 
         category = file_info['category']
@@ -313,13 +313,16 @@ async def validate_upload_file(
             pass
 
         # All validations passed
-        logger.info(f"[File Validator] File validated: {upload_file.filename} ({category}, {file_size} bytes)")
+        logger.info("[File Validator] File validated")
 
         return True, "", file_info
 
-    except Exception as e:
-        logger.error(f"[File Validator] Validation error: {str(e)}")
-        return False, f"Validation error: {str(e)}", None
+    except Exception as exc:
+        logger.warning(
+            "[File Validator] Validation failed error_type=%s",
+            type(exc).__name__,
+        )
+        return False, "Validation error", None
 
 
 async def validate_upload_file_strict(
