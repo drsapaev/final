@@ -2,6 +2,7 @@
 CRUD endpoints для управления отделениями в админ-панели
 """
 
+import logging
 from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -32,6 +33,9 @@ from app.schemas.department import (
 from app.services.service_mapping import get_service_code, normalize_service_code
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ADMIN_DEPARTMENTS_PUBLIC_ERROR = "Internal server error"
 
 
 # Pydantic schemas
@@ -1062,9 +1066,15 @@ def initialize_department(
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка инициализации отделения: {str(e)}"
+        logger.warning(
+            "Admin department initialization failed department_id=%s error_type=%s",
+            department_id,
+            type(e).__name__,
         )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ADMIN_DEPARTMENTS_PUBLIC_ERROR,
+        ) from e
 
 
 # ============================================================
