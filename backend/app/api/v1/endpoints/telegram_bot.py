@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
+INTERNAL_ERROR_DETAIL = "Internal server error"
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
@@ -65,8 +66,14 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Telegram webhook error: {str(e)}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+        logger.exception(
+            "Telegram webhook error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        return JSONResponse(
+            {"status": "error", "message": INTERNAL_ERROR_DETAIL},
+            status_code=500,
+        )
 
 
 @router.post("/set-webhook")
@@ -112,8 +119,11 @@ async def set_telegram_webhook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Set webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Set Telegram webhook error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.delete("/webhook")
@@ -145,8 +155,11 @@ async def remove_telegram_webhook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Remove webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Remove Telegram webhook error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.get("/info")
@@ -187,8 +200,11 @@ async def get_bot_info(current_user: User = Depends(require_roles("Admin"))):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Get bot info error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Get Telegram bot info error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.post("/send-notification")
@@ -219,8 +235,11 @@ async def send_telegram_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Send notification error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Send Telegram notification error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.post("/send-appointment-reminder")
@@ -248,8 +267,11 @@ async def send_appointment_reminder(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Send reminder error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Send Telegram reminder error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.post("/send-lab-notification")
@@ -277,8 +299,11 @@ async def send_lab_results_notification(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Send lab notification error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Send Telegram lab notification error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
 
 
 @router.get("/stats")
@@ -304,5 +329,8 @@ async def get_telegram_stats(current_user: User = Depends(require_roles("Admin")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Get telegram stats error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(
+            "Get Telegram stats error",
+            extra={"error_class": e.__class__.__name__},
+        )
+        raise HTTPException(status_code=500, detail=INTERNAL_ERROR_DETAIL)
