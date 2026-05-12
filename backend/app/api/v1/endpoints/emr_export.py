@@ -3,7 +3,8 @@ API endpoints для экспорта и импорта EMR данных
 """
 
 import io
-from typing import List, Optional
+import logging
+from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,18 @@ from app.schemas.emr import EMRBase, EMRUpdate
 from app.services.emr_export_service import EMRExportService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+EMR_EXPORT_PUBLIC_ERROR = "Internal server error"
+
+
+def _raise_emr_export_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "EMR export endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=EMR_EXPORT_PUBLIC_ERROR) from exc
 
 
 @router.get("/formats")
@@ -30,9 +43,7 @@ async def get_export_formats(current_user: User = Depends(get_current_user)):
             "message": "Список форматов экспорта получен",
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения форматов: {str(e)}"
-        )
+        _raise_emr_export_internal_error("get_export_formats", e)
 
 
 @router.get("/formats/import")
@@ -48,9 +59,7 @@ async def get_import_formats(current_user: User = Depends(get_current_user)):
             "message": "Список форматов импорта получен",
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения форматов: {str(e)}"
-        )
+        _raise_emr_export_internal_error("get_import_formats", e)
 
 
 @router.post("/export/json")
@@ -78,7 +87,7 @@ async def export_emr_to_json(
             "message": "EMR успешно экспортирован в JSON",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка экспорта в JSON: {str(e)}")
+        _raise_emr_export_internal_error("export_emr_to_json", e)
 
 
 @router.post("/export/xml")
@@ -101,7 +110,7 @@ async def export_emr_to_xml(
             headers={"Content-Disposition": "attachment; filename=emr_export.xml"},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка экспорта в XML: {str(e)}")
+        _raise_emr_export_internal_error("export_emr_to_xml", e)
 
 
 @router.post("/export/csv")
@@ -124,7 +133,7 @@ async def export_emr_to_csv(
             headers={"Content-Disposition": "attachment; filename=emr_export.csv"},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка экспорта в CSV: {str(e)}")
+        _raise_emr_export_internal_error("export_emr_to_csv", e)
 
 
 @router.post("/export/zip")
@@ -147,7 +156,7 @@ async def export_emr_to_zip(
             headers={"Content-Disposition": "attachment; filename=emr_export.zip"},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка экспорта в ZIP: {str(e)}")
+        _raise_emr_export_internal_error("export_emr_to_zip", e)
 
 
 @router.post("/import/json")
@@ -166,7 +175,7 @@ async def import_emr_from_json(
             "message": "EMR успешно импортирован из JSON",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка импорта из JSON: {str(e)}")
+        _raise_emr_export_internal_error("import_emr_from_json", e)
 
 
 @router.post("/import/xml")
@@ -185,7 +194,7 @@ async def import_emr_from_xml(
             "message": "EMR успешно импортирован из XML",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка импорта из XML: {str(e)}")
+        _raise_emr_export_internal_error("import_emr_from_xml", e)
 
 
 @router.post("/import/zip")
@@ -204,7 +213,7 @@ async def import_emr_from_zip(
             "message": "EMR успешно импортирован из ZIP",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка импорта из ZIP: {str(e)}")
+        _raise_emr_export_internal_error("import_emr_from_zip", e)
 
 
 @router.post("/validate")
@@ -227,7 +236,7 @@ async def validate_import_data(
             "message": "Валидация данных выполнена",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка валидации: {str(e)}")
+        _raise_emr_export_internal_error("validate_import_data", e)
 
 
 @router.post("/estimate-size")
@@ -250,7 +259,7 @@ async def estimate_export_size(
             "message": "Размер экспорта оценен",
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка оценки размера: {str(e)}")
+        _raise_emr_export_internal_error("estimate_export_size", e)
 
 
 @router.get("/templates/export")
@@ -302,9 +311,7 @@ async def get_export_templates(current_user: User = Depends(get_current_user)):
             "message": "Шаблоны экспорта получены",
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}"
-        )
+        _raise_emr_export_internal_error("get_export_templates", e)
 
 
 @router.get("/statistics")
@@ -327,6 +334,4 @@ async def get_export_statistics(current_user: User = Depends(get_current_user)):
             "message": "Статистика экспорта/импорта получена",
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
-        )
+        _raise_emr_export_internal_error("get_export_statistics", e)
