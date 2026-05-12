@@ -26,6 +26,19 @@ from app.schemas.display_config import DisplayBoardUpdate
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+ADMIN_DISPLAY_PUBLIC_ERROR = "Internal server error"
+
+
+def _admin_display_http_error(exc: Exception) -> HTTPException:
+    logger.warning(
+        "Admin display endpoint failed error_type=%s",
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ADMIN_DISPLAY_PUBLIC_ERROR,
+    )
+
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
@@ -130,10 +143,7 @@ def get_display_boards(
         )
         return [_serialize_board(board) for board in boards]
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка табло: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 @router.get("/display/boards/{board_id}")
@@ -156,10 +166,7 @@ def get_display_board(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения табло: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 @router.put("/display/boards/{board_id}")
@@ -190,11 +197,10 @@ def update_display_board(
             "board_id": board_id,
             "board": _serialize_board(updated_board),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления табло: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 # ===================== БАННЕРЫ =====================
@@ -212,10 +218,7 @@ def get_display_banners(
         # Пока возвращаем заглушку
         return []
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения баннеров: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 @router.post("/display/boards/{board_id}/banners")
@@ -230,10 +233,7 @@ def create_display_banner(
         # Здесь будет реальная логика создания баннера
         return {"success": True, "message": "Баннер создан", "banner_id": 1}
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания баннера: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 @router.post("/display/upload-banner")
@@ -282,10 +282,7 @@ def upload_banner_image(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка загрузки баннера: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 # ===================== ТЕМЫ =====================
@@ -308,10 +305,7 @@ def get_display_themes(
         return [_serialize_theme(theme) for theme in themes]
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения тем: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 # ===================== ТЕСТИРОВАНИЕ ТАБЛО =====================
@@ -356,10 +350,7 @@ def test_display_board(
             return {"success": True, "message": f"Тест типа {test_type} выполнен"}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования табло: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
 
 
 # ===================== СТАТИСТИКА ТАБЛО =====================
@@ -400,7 +391,4 @@ def get_display_stats(
             "by_board": by_board,
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики табло: {str(e)}",
-        )
+        raise _admin_display_http_error(e) from e
