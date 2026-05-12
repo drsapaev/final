@@ -5,7 +5,7 @@ Salary History API Endpoints
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -20,6 +20,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/salary", tags=["salary"])
+
+SALARY_PUBLIC_ERROR = "Salary operation failed"
+
+
+def _raise_salary_internal_error(operation: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "Salary endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=SALARY_PUBLIC_ERROR) from exc
 
 
 # ===================== СХЕМЫ =====================
@@ -67,9 +78,8 @@ async def get_salary_history(
     """
     try:
         return SalaryApiService(db).get_salary_history(user_id=user_id, limit=limit)
-    except Exception as e:
-        logger.error(f"Error getting salary history: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения истории: {str(e)}")
+    except Exception as exc:
+        _raise_salary_internal_error("get_salary_history", exc)
 
 
 @router.post("/change", summary="Изменить зарплату")
@@ -87,10 +97,9 @@ async def create_salary_change(
             payload=_model_to_dict(data),
             changed_by_id=user.id,
         )
-    except Exception as e:
-        logger.error(f"Error creating salary change: {e}")
+    except Exception as exc:
         service.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка записи изменения: {str(e)}")
+        _raise_salary_internal_error("create_salary_change", exc)
 
 
 @router.put("/change/{record_id}/confirm", summary="Подтвердить изменение")
@@ -107,10 +116,9 @@ async def confirm_salary_change(
         return service.confirm_salary_change(record_id=record_id, confirmed_by_id=user.id)
     except SalaryApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
-        logger.error(f"Error confirming salary change: {e}")
+    except Exception as exc:
         service.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка подтверждения: {str(e)}")
+        _raise_salary_internal_error("confirm_salary_change", exc)
 
 
 # ===================== ВЫПЛАТЫ =====================
@@ -133,9 +141,8 @@ async def get_salary_payments(
             year=year,
             limit=limit,
         )
-    except Exception as e:
-        logger.error(f"Error getting salary payments: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения выплат: {str(e)}")
+    except Exception as exc:
+        _raise_salary_internal_error("get_salary_payments", exc)
 
 
 @router.post("/payment", summary="Создать запись о выплате")
@@ -150,10 +157,9 @@ async def create_salary_payment(
     service = SalaryApiService(db)
     try:
         return service.create_salary_payment(payload=_model_to_dict(data))
-    except Exception as e:
-        logger.error(f"Error creating salary payment: {e}")
+    except Exception as exc:
         service.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка создания выплаты: {str(e)}")
+        _raise_salary_internal_error("create_salary_payment", exc)
 
 
 @router.put("/payment/{payment_id}/status", summary="Обновить статус выплаты")
@@ -178,10 +184,9 @@ async def update_payment_status(
         )
     except SalaryApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
-        logger.error(f"Error updating payment status: {e}")
+    except Exception as exc:
         service.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка обновления: {str(e)}")
+        _raise_salary_internal_error("update_payment_status", exc)
 
 
 @router.get("/summary/{user_id}", summary="Сводка по зарплате")
@@ -196,6 +201,5 @@ async def get_salary_summary(
     """
     try:
         return SalaryApiService(db).get_salary_summary(user_id=user_id, year=year)
-    except Exception as e:
-        logger.error(f"Error getting salary summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения сводки: {str(e)}")
+    except Exception as exc:
+        _raise_salary_internal_error("get_salary_summary", exc)
