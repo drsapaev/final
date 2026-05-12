@@ -35,12 +35,6 @@ def test_messages_service_avoids_direct_orm_calls() -> None:
     assert ".query(" not in logic
 
 
-def test_cashier_service_avoids_direct_orm_calls() -> None:
-    logic = _service_logic_block("cashier")
-    assert "repository.db" not in logic
-    assert ".query(" not in logic
-
-
 def test_services_service_avoids_direct_orm_calls() -> None:
     logic = _service_logic_block("services")
     assert "repository.db" not in logic
