@@ -19,6 +19,20 @@ from app.services.monitoring_service import get_monitoring_service, MonitoringSe
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+SYSTEM_MANAGEMENT_PUBLIC_ERROR = "Internal server error"
+
+
+def _log_system_management_error(operation: str, exc: Exception) -> None:
+    logger.warning(
+        "System management endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+
+
+def _system_management_http_error(operation: str, exc: Exception) -> HTTPException:
+    _log_system_management_error(operation, exc)
+    return HTTPException(status_code=500, detail=SYSTEM_MANAGEMENT_PUBLIC_ERROR)
 
 
 # ===================== PYDANTIC MODELS =====================
@@ -103,8 +117,7 @@ async def create_backup(
             raise HTTPException(status_code=400, detail="Неподдерживаемый тип бэкапа")
 
     except Exception as e:
-        logger.error(f"Ошибка создания бэкапа: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("create_backup", e) from e
 
 
 async def _create_full_backup_task(backup_service: BackupService, include_files: bool):
@@ -115,7 +128,7 @@ async def _create_full_backup_task(backup_service: BackupService, include_files:
         result = backup_service.create_backup(backup_type="full")
         logger.info(f"Полный бэкап завершен: {result.get('filename', 'unknown')}")
     except Exception as e:
-        logger.error(f"Ошибка создания полного бэкапа: {e}")
+        _log_system_management_error("create_full_backup_task", e)
 
 
 @router.get("/backup/list")
@@ -132,8 +145,7 @@ async def list_backups(
         return {"success": True, "backups": backups, "total_count": len(backups)}
 
     except Exception as e:
-        logger.error(f"Ошибка получения списка бэкапов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("list_backups", e) from e
 
 
 @router.get("/backup/{backup_name}")
@@ -156,8 +168,7 @@ async def get_backup_info(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения информации о бэкапе: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_backup_info", e) from e
 
 
 @router.post("/backup/{backup_name}/restore")
@@ -192,8 +203,7 @@ async def restore_backup(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка восстановления бэкапа: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("restore_backup", e) from e
 
 
 @router.delete("/backup/{backup_name}")
@@ -211,8 +221,7 @@ async def delete_backup(
         return result
 
     except Exception as e:
-        logger.error(f"Ошибка удаления бэкапа: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("delete_backup", e) from e
 
 
 # ===================== МОНИТОРИНГ =====================
@@ -231,8 +240,7 @@ async def get_system_health(
         return health
 
     except Exception as e:
-        logger.error(f"Ошибка проверки состояния системы: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_system_health", e) from e
 
 
 @router.get("/monitoring/metrics/system")
@@ -248,8 +256,7 @@ async def get_system_metrics(
         return {"success": True, "metrics": metrics}
 
     except Exception as e:
-        logger.error(f"Ошибка получения системных метрик: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_system_metrics", e) from e
 
 
 @router.get("/monitoring/metrics/application")
@@ -265,8 +272,7 @@ async def get_application_metrics(
         return {"success": True, "metrics": metrics}
 
     except Exception as e:
-        logger.error(f"Ошибка получения метрик приложения: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_application_metrics", e) from e
 
 
 @router.get("/monitoring/metrics/history")
@@ -288,8 +294,7 @@ async def get_metrics_history(
         }
 
     except Exception as e:
-        logger.error(f"Ошибка получения истории метрик: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_metrics_history", e) from e
 
 
 @router.get("/monitoring/metrics/summary")
@@ -306,8 +311,7 @@ async def get_metrics_summary(
         return {"success": True, "summary": summary}
 
     except Exception as e:
-        logger.error(f"Ошибка получения сводки метрик: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_metrics_summary", e) from e
 
 
 @router.get("/monitoring/alerts")
@@ -330,8 +334,7 @@ async def get_alerts(
         }
 
     except Exception as e:
-        logger.error(f"Ошибка получения алертов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_alerts", e) from e
 
 
 @router.get("/monitoring/thresholds")
@@ -347,8 +350,7 @@ async def get_monitoring_thresholds(
         return {"success": True, "thresholds": thresholds}
 
     except Exception as e:
-        logger.error(f"Ошибка получения порогов мониторинга: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("get_monitoring_thresholds", e) from e
 
 
 @router.put("/monitoring/thresholds")
@@ -369,8 +371,7 @@ async def update_monitoring_thresholds(
         return result
 
     except Exception as e:
-        logger.error(f"Ошибка обновления порогов мониторинга: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("update_monitoring_thresholds", e) from e
 
 
 # ===================== УТИЛИТЫ =====================
@@ -393,8 +394,7 @@ async def collect_metrics_now(
         }
 
     except Exception as e:
-        logger.error(f"Ошибка сбора метрик: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _system_management_http_error("collect_metrics_now", e) from e
 
 
 @router.get("/system/status")
@@ -421,9 +421,9 @@ async def get_system_status(current_user: User = Depends(get_current_user)):
         }
 
     except Exception as e:
-        logger.error(f"Ошибка получения статуса системы: {e}")
+        _log_system_management_error("get_system_status", e)
         return {
             "status": "error",
             "timestamp": datetime.now().isoformat(),
-            "error": str(e),
+            "error": SYSTEM_MANAGEMENT_PUBLIC_ERROR,
         }
