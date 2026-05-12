@@ -18,9 +18,9 @@ class TestSettingApiService:
 
         assert result == expected
 
-    def test_get_settings_wraps_repository_error(self):
+    def test_get_settings_wraps_repository_error_without_leaking_detail(self):
         def _boom(category: str):
-            raise RuntimeError("db broken")
+            raise RuntimeError("db broken internal diagnostic")
 
         repository = SimpleNamespace(list_by_category=_boom)
         service = SettingApiService(db=None, repository=repository)
@@ -29,5 +29,5 @@ class TestSettingApiService:
             service.get_settings(category="printer")
 
         assert exc_info.value.status_code == 500
-        assert "db broken" in exc_info.value.detail
+        assert exc_info.value.detail == "Internal server error"
 
