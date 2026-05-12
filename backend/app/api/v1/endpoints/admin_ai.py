@@ -2,6 +2,7 @@
 API endpoints для управления AI в админ панели
 """
 
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -26,6 +27,22 @@ from app.schemas.ai_config import (
 from app.services.admin_ai_service import AdminAIService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ADMIN_AI_PUBLIC_ERROR = "Internal server error"
+ADMIN_AI_PROVIDER_TEST_ERROR = "AI provider test failed"
+
+
+def _admin_ai_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "Admin AI endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ADMIN_AI_PUBLIC_ERROR,
+    )
 
 # ===================== AI ПРОВАЙДЕРЫ =====================
 
@@ -47,10 +64,7 @@ def get_ai_providers(
 
         return providers
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения AI провайдеров: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "list_ai_providers") from e
 
 
 @router.get("/ai/providers/{provider_id}", response_model=AIProviderOut)
@@ -100,10 +114,7 @@ def create_ai_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания AI провайдера: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "create_ai_provider") from e
 
 
 @router.put("/ai/providers/{provider_id}", response_model=AIProviderOut)
@@ -130,10 +141,7 @@ def update_ai_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления AI провайдера: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "update_ai_provider") from e
 
 
 @router.delete("/ai/providers/{provider_id}")
@@ -155,10 +163,7 @@ def delete_ai_provider(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления AI провайдера: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "delete_ai_provider") from e
 
 
 @router.post("/ai/providers/{provider_id}/test", response_model=AITestResult)
@@ -226,19 +231,23 @@ def test_ai_provider(
         raise
     except Exception as e:
         # Логируем ошибку
-        crud_ai.create_ai_usage_log(
-            db=db,
-            user_id=current_user.id,
-            provider_id=provider_id,
-            task_type="test",
-            success=False,
-            error_message=str(e),
-        )
+        try:
+            crud_ai.create_ai_usage_log(
+                db=db,
+                user_id=current_user.id,
+                provider_id=provider_id,
+                task_type="test",
+                success=False,
+                error_message=ADMIN_AI_PROVIDER_TEST_ERROR,
+            )
+        except Exception as log_exc:
+            logger.warning(
+                "Admin AI provider test failure log failed provider_id=%s error_type=%s",
+                provider_id,
+                type(log_exc).__name__,
+            )
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования AI провайдера: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "test_ai_provider") from e
 
 
 # ===================== СИСТЕМНЫЕ НАСТРОЙКИ =====================
@@ -253,10 +262,7 @@ def get_ai_settings(
         settings = crud_ai.get_ai_system_settings(db)
         return settings
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек AI: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "get_ai_settings") from e
 
 
 @router.put("/ai/settings")
@@ -276,10 +282,7 @@ def update_ai_settings(
             "settings": updated_settings,
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек AI: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "update_ai_settings") from e
 
 
 # ===================== СТАТИСТИКА =====================
@@ -300,10 +303,7 @@ def get_ai_stats(
         )
         return AIStatsResponse(**stats)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики AI: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "get_ai_stats") from e
 
 
 @router.get("/ai/usage-logs", response_model=List[AIUsageLogOut])
@@ -327,7 +327,4 @@ def get_ai_usage_logs(
         )
         return logs
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения логов AI: {str(e)}",
-        )
+        raise _admin_ai_http_error(e, "get_ai_usage_logs") from e
