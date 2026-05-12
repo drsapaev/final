@@ -2,6 +2,7 @@
 API endpoints для управления настройками клиники в админ панели
 """
 
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -28,6 +29,20 @@ from app.schemas.clinic import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+ADMIN_CLINIC_PUBLIC_ERROR = "Internal server error"
+
+
+def _admin_clinic_http_error(exc: Exception) -> HTTPException:
+    logger.warning(
+        "Admin clinic endpoint failed error_type=%s",
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=ADMIN_CLINIC_PUBLIC_ERROR,
+    )
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -48,10 +63,7 @@ def get_clinic_settings(
         settings = crud_clinic.get_settings_by_category(db, category)
         return settings
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.get("/clinic/settings/{key}", response_model=ClinicSettingsOut)
@@ -83,10 +95,7 @@ def update_clinic_settings_batch(
         )
         return updated_settings
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.put("/clinic/settings/{key}", response_model=ClinicSettingsOut)
@@ -127,10 +136,7 @@ def create_clinic_setting(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания настройки: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.get("/clinic/ticket-print-settings", response_model=TicketPrintSettingsOut)
@@ -147,10 +153,7 @@ def get_ticket_print_settings(
     try:
         return crud_clinic.get_ticket_print_settings(db)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек печати талонов: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.put("/clinic/ticket-print-settings", response_model=TicketPrintSettingsOut)
@@ -167,10 +170,7 @@ def update_ticket_print_settings(
             current_user.id,
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек печати талонов: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 # ===================== ЗАГРУЗКА ЛОГОТИПА =====================
@@ -223,10 +223,7 @@ def upload_clinic_logo(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка загрузки логотипа: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 # ===================== НАСТРОЙКИ ОЧЕРЕДЕЙ =====================
@@ -241,10 +238,7 @@ def get_queue_settings(
         settings = crud_clinic.get_queue_settings(db)
         return settings
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек очередей: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.put("/queue/settings")
@@ -264,10 +258,7 @@ def update_queue_settings(
             "settings": updated_settings,
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек очередей: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 @router.post("/queue/test")
@@ -314,10 +305,7 @@ def test_queue_generation(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования очереди: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
 
 
 # ===================== ИНФОРМАЦИЯ О СИСТЕМЕ =====================
@@ -349,8 +337,12 @@ def get_system_info(current_user: User = Depends(require_roles("Admin"))):
             },
         }
     except Exception as e:
+        logger.warning(
+            "Admin clinic system info endpoint failed error_type=%s",
+            type(e).__name__,
+        )
         return {
-            "error": f"Не удалось получить информацию о системе: {str(e)}",
+            "error": ADMIN_CLINIC_PUBLIC_ERROR,
             "basic_info": {
                 "environment": os.getenv("ENVIRONMENT", "development"),
                 "timezone": os.getenv("TIMEZONE", "Asia/Tashkent"),
@@ -375,7 +367,4 @@ def get_service_categories(
         )
         return categories
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения категорий: {str(e)}",
-        )
+        raise _admin_clinic_http_error(e) from e
