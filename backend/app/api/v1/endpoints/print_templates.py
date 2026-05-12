@@ -29,6 +29,67 @@ router = APIRouter()
 # Путь к шаблонам
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "print"
 
+
+def _safe_template_type(value: str) -> str:
+    if value == "ticket":
+        return "ticket"
+    if value == "prescription":
+        return "prescription"
+    if value == "medical_certificate":
+        return "medical_certificate"
+    if value == "payment_receipt":
+        return "payment_receipt"
+    if value == "lab_results":
+        return "lab_results"
+    if value == "appointment_reminder":
+        return "appointment_reminder"
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid template_type",
+    )
+
+
+def _safe_template_language(value: str) -> str:
+    if value == "ru":
+        return "ru"
+    if value == "uz":
+        return "uz"
+    if value == "en":
+        return "en"
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid language",
+    )
+
+
+def _template_filename(template_type: str, language: str | None = None) -> str:
+    safe_template_type = _safe_template_type(template_type)
+    if language is None:
+        return f"{safe_template_type}.j2"
+
+    safe_language = _safe_template_language(language)
+    return f"{safe_template_type}_{safe_language}.j2"
+
+
+def _template_path(filename: str) -> Path:
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid template path",
+        )
+
+    root = TEMPLATES_DIR.resolve()
+    candidate = (TEMPLATES_DIR / safe_filename).resolve()
+    if candidate.parent != root:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid template path",
+        )
+    return candidate
+
 # ===================== УПРАВЛЕНИЕ ШАБЛОНАМИ =====================
 
 
@@ -207,8 +268,8 @@ def upload_template_file(
         TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
         # Формируем имя файла
-        filename = f"{template_type}_{language}.j2"
-        file_path = TEMPLATES_DIR / filename
+        filename = _template_filename(template_type, language)
+        file_path = _template_path(filename)
 
         # Сохраняем файл
         content = file.file.read()
@@ -300,13 +361,13 @@ def get_default_template(
     Получить стандартный шаблон по типу
     """
     try:
-        filename = f"{template_type}_{language}.j2"
-        file_path = TEMPLATES_DIR / filename
+        filename = _template_filename(template_type, language)
+        file_path = _template_path(filename)
 
         # Если файл не найден, пробуем базовый шаблон
         if not file_path.exists():
-            filename = f"{template_type}.j2"
-            file_path = TEMPLATES_DIR / filename
+            filename = _template_filename(template_type)
+            file_path = _template_path(filename)
 
         if not file_path.exists():
             raise HTTPException(
