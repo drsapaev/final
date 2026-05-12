@@ -35,7 +35,7 @@ Store the project context (tech stack, framework, architecture) for use in later
 
 **Read `.ai-factory/skill-context/aif-build-automation/SKILL.md`** — MANDATORY if the file exists.
 
-This file contains project-specific rules accumulated by `/aif-evolve` from patches,
+This file contains project-specific rules accumulated by `$aif-evolve` from patches,
 codebase conventions, and tech-stack analysis. These rules are tailored to the current project.
 
 **How to apply skill-context rules:**
@@ -498,3 +498,9 @@ After writing the build file, integrate quick commands into project docs.
 For detailed integration procedures (README, AGENTS.md, existing markdown) → read `references/DOC-INTEGRATION.md`
 
 Brief: scan for existing command sections, update or append quick reference, suggest AGENTS.md creation if missing.
+
+## Artifact Ownership and Config Policy
+
+- Primary ownership: generated or enhanced build automation files (`Makefile`, `Taskfile.yml`, `justfile`, `magefile.go`).
+- Allowed companion updates: quick command snippets in existing docs or `AGENTS.md` when directly tied to the generated build workflow.
+- Config policy: config-agnostic by design. This skill uses repository detection and fixed AI Factory context files rather than `config.yaml`.
