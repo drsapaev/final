@@ -15,6 +15,20 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+SMS_PROVIDER_AUTH_ERROR = "SMS provider authentication failed"
+SMS_PROVIDER_SEND_ERROR = "SMS provider send failed"
+SMS_PROVIDER_BALANCE_ERROR = "SMS provider balance failed"
+SMS_PROVIDER_STATUS_ERROR = "SMS provider status lookup failed"
+
+
+def _log_provider_failure(provider: str, operation: str, exc: Exception) -> None:
+    logger.warning(
+        "SMS provider operation failed provider=%s operation=%s error_type=%s",
+        provider,
+        operation,
+        type(exc).__name__,
+    )
+
 
 class SMSProviderType(str, Enum):
     """Типы SMS провайдеров"""
@@ -105,11 +119,10 @@ class EskizSMSProvider(BaseSMSProvider):
                     # Токен действует 30 дней
                     self.token_expires = datetime.now() + timedelta(days=29)
                     return self.auth_token
-                else:
-                    error_text = response.text
-                    raise Exception(f"Eskiz auth failed: {error_text}")
-            except Exception as e:
-                raise Exception(f"Eskiz auth request failed: {str(e)}")
+                raise RuntimeError(SMS_PROVIDER_AUTH_ERROR)
+            except Exception as exc:
+                _log_provider_failure("eskiz", "auth", exc)
+                raise RuntimeError(SMS_PROVIDER_AUTH_ERROR) from exc
 
     async def send_sms(self, message: SMSMessage) -> SMSResponse:
         """Отправить SMS через Eskiz"""
@@ -151,13 +164,15 @@ class EskizSMSProvider(BaseSMSProvider):
                 else:
                     return SMSResponse(
                         success=False,
-                        error=data.get("message", "Unknown error"),
+                        error=SMS_PROVIDER_SEND_ERROR,
                         provider="eskiz",
                     )
 
-        except Exception as e:
-            logger.error(f"Eskiz SMS error: {str(e)}")
-            return SMSResponse(success=False, error=str(e), provider="eskiz")
+        except Exception as exc:
+            _log_provider_failure("eskiz", "send_sms", exc)
+            return SMSResponse(
+                success=False, error=SMS_PROVIDER_SEND_ERROR, provider="eskiz"
+            )
 
     async def get_balance(self) -> dict[str, Any]:
         """Получить баланс Eskiz"""
@@ -189,8 +204,13 @@ class EskizSMSProvider(BaseSMSProvider):
                         "provider": "eskiz",
                     }
 
-        except Exception as e:
-            return {"success": False, "error": str(e), "provider": "eskiz"}
+        except Exception as exc:
+            _log_provider_failure("eskiz", "get_balance", exc)
+            return {
+                "success": False,
+                "error": SMS_PROVIDER_BALANCE_ERROR,
+                "provider": "eskiz",
+            }
 
     async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Получить статус сообщения Eskiz"""
@@ -221,8 +241,13 @@ class EskizSMSProvider(BaseSMSProvider):
                         "provider": "eskiz",
                     }
 
-        except Exception as e:
-            return {"success": False, "error": str(e), "provider": "eskiz"}
+        except Exception as exc:
+            _log_provider_failure("eskiz", "get_message_status", exc)
+            return {
+                "success": False,
+                "error": SMS_PROVIDER_STATUS_ERROR,
+                "provider": "eskiz",
+            }
 
 
 class PlayMobileSMSProvider(BaseSMSProvider):
@@ -278,13 +303,15 @@ class PlayMobileSMSProvider(BaseSMSProvider):
 
                 return SMSResponse(
                     success=False,
-                    error=data.get("error", "Unknown error"),
+                    error=SMS_PROVIDER_SEND_ERROR,
                     provider="playmobile",
                 )
 
-        except Exception as e:
-            logger.error(f"PlayMobile SMS error: {str(e)}")
-            return SMSResponse(success=False, error=str(e), provider="playmobile")
+        except Exception as exc:
+            _log_provider_failure("playmobile", "send_sms", exc)
+            return SMSResponse(
+                success=False, error=SMS_PROVIDER_SEND_ERROR, provider="playmobile"
+            )
 
     async def get_balance(self) -> dict[str, Any]:
         """Получить баланс PlayMobile"""
@@ -315,8 +342,13 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                         "provider": "playmobile",
                     }
 
-        except Exception as e:
-            return {"success": False, "error": str(e), "provider": "playmobile"}
+        except Exception as exc:
+            _log_provider_failure("playmobile", "get_balance", exc)
+            return {
+                "success": False,
+                "error": SMS_PROVIDER_BALANCE_ERROR,
+                "provider": "playmobile",
+            }
 
     async def get_message_status(self, message_id: str) -> dict[str, Any]:
         """Получить статус сообщения PlayMobile"""
@@ -351,8 +383,13 @@ class PlayMobileSMSProvider(BaseSMSProvider):
                         "provider": "playmobile",
                     }
 
-        except Exception as e:
-            return {"success": False, "error": str(e), "provider": "playmobile"}
+        except Exception as exc:
+            _log_provider_failure("playmobile", "get_message_status", exc)
+            return {
+                "success": False,
+                "error": SMS_PROVIDER_STATUS_ERROR,
+                "provider": "playmobile",
+            }
 
 
 class MockSMSProvider(BaseSMSProvider):
@@ -405,8 +442,8 @@ class SMSManager:
                 if not self.default_provider:
                     self.default_provider = SMSProviderType.ESKIZ
                 logger.info("Initialized Eskiz SMS provider")
-            except Exception as e:
-                logger.error(f"Failed to initialize Eskiz provider: {str(e)}")
+            except Exception as exc:
+                _log_provider_failure("eskiz", "initialize", exc)
 
         # PlayMobile провайдер
         playmobile_key = getattr(settings, "PLAYMOBILE_API_KEY", None)
@@ -421,8 +458,8 @@ class SMSManager:
                 if not self.default_provider:
                     self.default_provider = SMSProviderType.PLAYMOBILE
                 logger.info("Initialized PlayMobile SMS provider")
-            except Exception as e:
-                logger.error(f"Failed to initialize PlayMobile provider: {str(e)}")
+            except Exception as exc:
+                _log_provider_failure("playmobile", "initialize", exc)
 
         # Mock провайдер (всегда доступен для тестирования)
         self.providers[SMSProviderType.MOCK] = MockSMSProvider()
