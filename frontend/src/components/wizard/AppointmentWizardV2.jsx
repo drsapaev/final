@@ -42,6 +42,7 @@ import './AppointmentWizardV2.css';
 const API_BASE = '/api/v1';
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
+const LEGACY_DRAFT_KEY = 'appointment_wizard_draft';
 
 const normalizeServiceSelectionValue = (serviceValue) => {
   if (serviceValue == null) return '';
@@ -181,12 +182,11 @@ const AppointmentWizardV2 = ({
 
   // ===================== ИНИЦИАЛИЗАЦИЯ (EDIT MODE vs DRAFT) =====================
 
-  const DRAFT_KEY = 'appointment_wizard_draft';
-  const DRAFT_TTL = 48 * 60 * 60 * 1000; // 48 часов
-
   // Эффект для инициализации данных при открытии
   useEffect(() => {
     if (isOpen) {
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
+
       // ✅ ИСПРАВЛЕНО: Строгая проверка editMode перед загрузкой данных
       if (editMode === true && initialData !== null && initialData !== undefined) {
         // 📝 РЕЖИМ РЕДАКТИРОВАНИЯ: Загружаем данные из initialData
@@ -251,38 +251,10 @@ const AppointmentWizardV2 = ({
         }
 
       } else {
-        // 🆕 НОВАЯ ЗАПИСЬ: Режим создания - игнорируем initialData даже если он есть
-        // Проверяем только draft
-        const savedDraft = localStorage.getItem(DRAFT_KEY);
-        if (savedDraft) {
-          try {
-            const draft = JSON.parse(savedDraft);
-            const now = Date.now();
-
-            if (draft.timestamp && now - draft.timestamp < DRAFT_TTL) {
-              // Черновик актуален
-              logger.log('📂 AppointmentWizardV2: Loaded DRAFT');
-              setWizardData((prev) => ({
-                ...prev,
-                ...draft.data
-              }));
-              // Восстанавливаем отформатированную дату
-              if (draft.data.patient.birth_date) {
-                setFormattedBirthDate(convertDateFromISO(draft.data.patient.birth_date));
-              }
-              toast.success('Загружен сохранённый черновик');
-            } else {
-              // Черновик устарел
-              localStorage.removeItem(DRAFT_KEY);
-            }
-          } catch (e) {
-            logger.warn('Ошибка загрузки черновика:', e);
-            localStorage.removeItem(DRAFT_KEY);
-          }
-        }
+        // New appointment mode intentionally avoids persistent draft storage for patient PHI.
       }
     }
-  }, [isOpen, editMode, initialData, DRAFT_KEY, DRAFT_TTL]);
+  }, [isOpen, editMode, initialData]);
 
   // ✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии
   useEffect(() => {
@@ -399,25 +371,12 @@ const AppointmentWizardV2 = ({
 
 
 
-  // Загрузка черновика перемещена в основной эффект инициализации
+  // Persistent draft loading is disabled to keep patient PHI out of browser storage.
 
-
-  // Автосохранение черновика (ТОЛЬКО ЕСЛИ НЕ РЕДАКТИРОВАНИЕ)
-  useEffect(() => {
-    if (editMode) return; // 🚫 Не сохраняем черновик в режиме редактирования
-
-    if (isOpen && (wizardData.patient.fio || wizardData.cart.items.length > 0)) {
-      const draft = {
-        timestamp: Date.now(),
-        data: wizardData
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    }
-  }, [wizardData, isOpen, editMode]);
 
   // Очистка черновика
   const clearDraft = () => {
-    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(LEGACY_DRAFT_KEY);
     setWizardData({
       patient: { id: null, fio: '', birth_date: '', phone: '', address: '', gender: '' },
       cart: { items: [], discount_mode: 'none', all_free: false, notes: '' },
@@ -1732,7 +1691,7 @@ const AppointmentWizardV2 = ({
 
             // Завершаем без создания новых записей
             if (!editMode) {
-              localStorage.removeItem(DRAFT_KEY);
+              localStorage.removeItem(LEGACY_DRAFT_KEY);
             }
             onComplete?.(updateResult);
             onClose();
@@ -2083,7 +2042,7 @@ const AppointmentWizardV2 = ({
                   }
 
                   if (!editMode) {
-                    localStorage.removeItem(DRAFT_KEY);
+                    localStorage.removeItem(LEGACY_DRAFT_KEY);
                   }
                   onComplete?.(batchResult);
                   onClose();
@@ -2181,7 +2140,7 @@ const AppointmentWizardV2 = ({
           if (patientResponse.ok) {
             logger.log('✅ Данные пациента успешно обновлены');
             // ✅ ИСПРАВЛЕНО: Очищаем draft после успешного обновления
-            localStorage.removeItem(DRAFT_KEY);
+            localStorage.removeItem(LEGACY_DRAFT_KEY);
             toast.success('Данные пациента обновлены');
 
             // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
@@ -2256,7 +2215,7 @@ const AppointmentWizardV2 = ({
         // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
         // Очищаем черновик только если это не редактирование (хотя clearDraft безопасен)
         if (!editMode) {
-          localStorage.removeItem(DRAFT_KEY);
+          localStorage.removeItem(LEGACY_DRAFT_KEY);
         }
 
         toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
