@@ -18,6 +18,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+AI_ANALYTICS_PUBLIC_ERROR = "Internal server error"
+
+
+def _ai_analytics_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "AI analytics endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=AI_ANALYTICS_PUBLIC_ERROR,
+    )
+
+
 # ===================== PYDANTIC СХЕМЫ =====================
 
 
@@ -119,11 +134,7 @@ async def track_ai_usage(
         return result
 
     except Exception as e:
-        logger.error(f"Ошибка отслеживания AI использования: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отслеживания: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "track_ai_usage") from e
 
 
 @router.get("/usage-analytics", response_model=AIUsageAnalyticsResponse)
@@ -168,11 +179,7 @@ async def get_ai_usage_analytics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения аналитики AI использования: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения аналитики: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "get_ai_usage_analytics") from e
 
 
 @router.get("/learning-insights", response_model=AILearningInsightsResponse)
@@ -208,11 +215,7 @@ async def get_ai_learning_insights(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения инсайтов для обучения AI: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения инсайтов: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "get_ai_learning_insights") from e
 
 
 @router.post("/optimize-models", response_model=AIOptimizationResponse)
@@ -231,7 +234,10 @@ async def optimize_ai_models(
                 result = service.optimize_ai_models()
                 logger.info(f"AI оптимизация завершена: {result}")
             except Exception as e:
-                logger.error(f"Ошибка в фоновой оптимизации AI: {e}")
+                logger.warning(
+                    "AI analytics background optimization failed error_type=%s",
+                    type(e).__name__,
+                )
 
         background_tasks.add_task(run_optimization)
 
@@ -241,11 +247,7 @@ async def optimize_ai_models(
         return AIOptimizationResponse(**optimization_result)
 
     except Exception as e:
-        logger.error(f"Ошибка оптимизации AI моделей: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка оптимизации: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "optimize_ai_models") from e
 
 
 @router.post("/generate-training-dataset", response_model=TrainingDatasetResponse)
@@ -297,9 +299,12 @@ async def generate_training_dataset(
         )
 
         if "error" in dataset_info:
+            logger.warning(
+                "AI analytics training dataset generation returned service error"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=dataset_info["error"],
+                detail=AI_ANALYTICS_PUBLIC_ERROR,
             )
 
         return TrainingDatasetResponse(**dataset_info)
@@ -307,11 +312,7 @@ async def generate_training_dataset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка генерации обучающего датасета: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации датасета: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "generate_training_dataset") from e
 
 
 @router.get("/usage-summary")
@@ -355,11 +356,7 @@ async def get_ai_usage_summary(
         return summary
 
     except Exception as e:
-        logger.error(f"Ошибка получения сводки AI использования: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "get_ai_usage_summary") from e
 
 
 @router.get("/function-performance/{function_name}")
@@ -409,13 +406,7 @@ async def get_function_performance(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            f"Ошибка получения производительности функции {function_name}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения данных: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "get_function_performance") from e
 
 
 @router.get("/cost-analysis")
@@ -487,11 +478,7 @@ async def get_ai_cost_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка анализа затрат на AI: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка анализа затрат: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "get_ai_cost_analysis") from e
 
 
 @router.get("/model-comparison")
@@ -554,11 +541,7 @@ async def compare_ai_models(
         return comparison_data
 
     except Exception as e:
-        logger.error(f"Ошибка сравнения AI моделей: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка сравнения моделей: {str(e)}",
-        )
+        raise _ai_analytics_http_error(e, "compare_ai_models") from e
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
