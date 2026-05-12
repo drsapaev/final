@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import os
 import re
 from datetime import datetime
@@ -26,6 +27,7 @@ from app.services.notifications import notification_sender_service
 
 CHAT_UPLOAD_DIR = Path("uploads/chat")
 CHAT_STORAGE_FILENAME_RE = re.compile(r"^\d{8}_\d{6}_.+$")
+logger = logging.getLogger(__name__)
 
 
 def _safe_chat_storage_filename(filename: str) -> str:
@@ -769,7 +771,11 @@ async def upload_file_message(
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.warning(
+            "Chat file upload endpoint failed error_type=%s",
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @router.get("/download/{filename}")
