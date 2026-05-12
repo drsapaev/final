@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import zipfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
@@ -54,6 +54,13 @@ class FileSystemService:
         self.base_storage_path = os.getenv("FILE_STORAGE_PATH", "storage/files")
         self.temp_storage_path = os.getenv("TEMP_STORAGE_PATH", "storage/temp")
         self.max_file_size = int(os.getenv("MAX_FILE_SIZE", 100 * 1024 * 1024))  # 100MB
+        self.max_import_archive_size = int(
+            os.getenv("MAX_IMPORT_ARCHIVE_SIZE", self.max_file_size)
+        )
+        self.max_import_uncompressed_size = int(
+            os.getenv("MAX_IMPORT_UNCOMPRESSED_SIZE", self.max_file_size * 5)
+        )
+        self.max_import_files = int(os.getenv("MAX_IMPORT_FILES", 1000))
         self.allowed_extensions = {
             FileType.DOCUMENT: ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt'],
             FileType.IMAGE: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'],
@@ -107,6 +114,85 @@ class FileSystemService:
     def _generate_file_hash(self, file_content: bytes) -> str:
         """Генерировать SHA-256 хеш файла"""
         return hashlib.sha256(file_content).hexdigest()
+
+    @staticmethod
+    def _share_is_not_expired(share: Any) -> bool:
+        expires_at = getattr(share, "expires_at", None)
+        if expires_at is None:
+            return True
+        now = (
+            datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+        )
+        return expires_at > now
+
+    @staticmethod
+    def _zip_info_is_symlink(info: zipfile.ZipInfo) -> bool:
+        return ((info.external_attr >> 16) & 0o170000) == 0o120000
+
+    @staticmethod
+    def _safe_zip_member_parts(member_name: str) -> tuple[str, ...]:
+        normalized_name = member_name.replace("\\", "/")
+        member_path = PurePosixPath(normalized_name)
+        if (
+            member_path.is_absolute()
+            or not member_path.parts
+            or any(part in {"", ".", ".."} for part in member_path.parts)
+            or any(":" in part for part in member_path.parts)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Archive contains an unsafe file path",
+            )
+        return member_path.parts
+
+    def _safe_extract_zip(self, zipf: zipfile.ZipFile, extracted_path: str) -> None:
+        root_path = Path(extracted_path).resolve()
+        root_path.mkdir(parents=True, exist_ok=True)
+
+        total_uncompressed_size = 0
+        extracted_files = 0
+
+        for info in zipf.infolist():
+            member_parts = self._safe_zip_member_parts(info.filename)
+            target_path = root_path.joinpath(*member_parts).resolve()
+            if not target_path.is_relative_to(root_path):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Archive contains an unsafe file path",
+                )
+
+            if self._zip_info_is_symlink(info):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Archive contains a symbolic link",
+                )
+
+            if info.is_dir():
+                target_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            extracted_files += 1
+            if extracted_files > self.max_import_files:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Archive contains too many files",
+                )
+            if info.file_size > self.max_file_size:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Archive member is too large",
+                )
+
+            total_uncompressed_size += info.file_size
+            if total_uncompressed_size > self.max_import_uncompressed_size:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Archive uncompressed size is too large",
+                )
+
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            with zipf.open(info) as source, target_path.open("wb") as target:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
 
     def _generate_file_path(self, filename: str, file_hash: str) -> str:
         """Генерировать путь для сохранения файла"""
@@ -175,10 +261,16 @@ class FileSystemService:
 
             # ✅ CERTIFICATION: Всегда генерируем file_path для нового файла
             # Используем существующий путь только если файл физически существует
-            if existing_file and existing_file.file_path and os.path.exists(existing_file.file_path):
+            if (
+                existing_file
+                and existing_file.file_path
+                and os.path.exists(existing_file.file_path)
+            ):
                 # Дедупликация: используем существующий файл
                 file_path = existing_file.file_path
-                logger.info(f"Используется существующий файл по хешу: {file_hash[:8]}... (путь: {file_path})")
+                logger.info(
+                    f"Используется существующий файл по хешу: {file_hash[:8]}... (путь: {file_path})"
+                )
             else:
                 # Генерируем путь для нового файла
                 file_path = self._generate_file_path(upload_file.filename, file_hash)
@@ -192,7 +284,9 @@ class FileSystemService:
                 logger.info(f"Создан новый файл: {file_path}")
 
             # ✅ CERTIFICATION: file_path всегда установлен перед созданием FileCreate
-            assert file_path is not None and file_path != "", "file_path должен быть установлен"
+            assert (
+                file_path is not None and file_path != ""
+            ), "file_path должен быть установлен"
 
             # Преобразуем file_type из FileType (модель) в FileTypeEnum (схема), если нужно
             file_type_value = file_data.file_type
@@ -290,10 +384,8 @@ class FileSystemService:
         # Проверяем совместное использование
         shares = file_share.get_file_shares(db, file_id=file_obj.id)
         for share in shares:
-            if share.shared_with_user_id == user_id or (
-                share.access_token
-                and share.expires_at
-                and share.expires_at > datetime.utcnow()
+            if share.shared_with_user_id == user_id and self._share_is_not_expired(
+                share
             ):
                 return True
 
@@ -407,15 +499,19 @@ class FileSystemService:
         old_version_data = {
             "file_path": db_file.file_path,
             "file_size": db_file.file_size,
-            "file_hash": db_file.file_hash or "",  # ✅ Обязательный хеш для версии (может быть пустым для старых файлов)
-            "change_description": change_description or "Автоматическая версия перед заменой содержимого",
+            "file_hash": db_file.file_hash
+            or "",  # ✅ Обязательный хеш для версии (может быть пустым для старых файлов)
+            "change_description": change_description
+            or "Автоматическая версия перед заменой содержимого",
         }
         file_version.create(
             db, file_id=file_id, version_data=old_version_data, created_by=user_id
         )
 
         # Генерируем путь для нового файла
-        new_file_path = self._generate_file_path(new_file.filename or db_file.filename, new_hash)
+        new_file_path = self._generate_file_path(
+            new_file.filename or db_file.filename, new_hash
+        )
 
         # Создаем директорию если нужно
         os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
@@ -440,7 +536,9 @@ class FileSystemService:
 
         # Обновляем квоту (разница в размере)
         size_delta = new_size - old_size
-        file_quota.update_usage(db, user_id=user_id, size_delta=size_delta, files_delta=0)
+        file_quota.update_usage(
+            db, user_id=user_id, size_delta=size_delta, files_delta=0
+        )
 
         # Логируем замену
         file_access_log.create(
@@ -562,8 +660,19 @@ class FileSystemService:
 
         try:
             # Извлекаем архив
+            if import_request.format != "zip":
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail="Only ZIP imports are supported",
+                )
+            if len(import_request.import_data) > self.max_import_archive_size:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Import archive is too large",
+                )
+
             with zipfile.ZipFile(io.BytesIO(import_request.import_data), 'r') as zipf:
-                zipf.extractall(extracted_path)
+                self._safe_extract_zip(zipf, extracted_path)
 
             processed_files = 0
             errors = []
@@ -615,6 +724,13 @@ class FileSystemService:
                 "success": len(errors) == 0,
             }
 
+        except HTTPException:
+            raise
+        except zipfile.BadZipFile as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid ZIP archive",
+            ) from e
         except Exception as e:
             logger.error(f"Ошибка импорта файлов: {e}")
             raise HTTPException(

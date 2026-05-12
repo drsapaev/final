@@ -23,6 +23,7 @@ from app.models.webhook import (
     WebhookEventType,
     WebhookStatus,
 )
+from app.utils.url_security import validate_public_http_url
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,11 @@ class WebhookService:
     ) -> Webhook:
         """Создает новый webhook"""
         try:
+            safe_url = validate_public_http_url(url)
             webhook = Webhook(
                 name=name,
                 description=description,
-                url=url,
+                url=safe_url,
                 events=events,
                 headers=headers or {},
                 secret=secret,
@@ -290,8 +292,9 @@ class WebhookService:
             call.status = WebhookCallStatus.PENDING
 
             # Выполняем HTTP запрос
+            safe_url = validate_public_http_url(webhook.url)
             async with httpx.AsyncClient(timeout=webhook.timeout) as client:
-                response = await client.post(webhook.url, json=payload, headers=headers)
+                response = await client.post(safe_url, json=payload, headers=headers)
 
             # Рассчитываем время выполнения
             duration_ms = int((time.time() - start_time) * 1000)

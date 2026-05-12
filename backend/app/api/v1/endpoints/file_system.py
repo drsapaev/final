@@ -53,6 +53,34 @@ from app.utils.file_validator import validate_upload_file
 
 router = APIRouter()
 
+IMPORT_ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
+
+
+async def _read_limited_import_archive(file: UploadFile, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    while True:
+        chunk = await file.read(IMPORT_ARCHIVE_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Import archive is too large",
+            )
+        chunks.append(chunk)
+
+    if total_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Import archive is empty",
+        )
+
+    return b"".join(chunks)
+
 
 @router.post("/upload", response_model=FileOut)
 async def upload_file(
@@ -82,7 +110,7 @@ async def upload_file(
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File validation failed: {error_msg}"
+                detail=f"File validation failed: {error_msg}",
             )
 
         # Парсим теги
@@ -402,7 +430,7 @@ async def update_file(
 
         # ✅ AUDIT LOG: Сохраняем старые данные перед обновлением
         old_data, _ = extract_model_changes(db_file, None)
-        
+
         # Обновляем файл
         updated_file = file.update(db, db_obj=db_file, obj_in=update_data)
         FileSystemApiService(db).finalize_file_update_audit(
@@ -442,7 +470,7 @@ async def replace_file_content(
     """
     try:
         service = get_file_system_service()
-        
+
         # Заменяем содержимое файла (создает версию автоматически)
         updated_file = service.replace_file_content(
             db, file_id, file, current_user.id, change_description
@@ -458,9 +486,9 @@ async def replace_file_content(
                 f"(хеш: {updated_file.file_hash[:8]}...)"
             ),
         )
-        
+
         return FileOut.from_orm(updated_file)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -483,16 +511,17 @@ async def delete_file(
     try:
         # ✅ Получаем файл перед удалением для логирования
         from app.crud.file_system import file as file_crud
+
         db_file = file_crud.get(db, id=file_id)
         if not db_file:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
             )
-        
+
         # Сохраняем данные для аудита перед удалением
         old_data, _ = extract_model_changes(db_file, None)
         filename = db_file.filename
-        
+
         # ✅ FIX: Выполняем удаление ПЕРЕД логированием аудита
         service = get_file_system_service()
         success = service.delete_file(db, file_id, current_user.id)
@@ -634,7 +663,10 @@ async def import_files(
     """Импортировать файлы из архива"""
     try:
         # Читаем содержимое файла
-        file_content = await file.read()
+        service = get_file_system_service()
+        file_content = await _read_limited_import_archive(
+            file, service.max_import_archive_size
+        )
 
         # Определяем формат архива
         file_format = "zip"  # По умолчанию ZIP
@@ -644,6 +676,12 @@ async def import_files(
             elif file.filename.endswith('.tar'):
                 file_format = "tar"
 
+        if file_format != "zip":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Only ZIP imports are supported",
+            )
+
         # Создаем запрос на импорт
         import_request = FileImportRequest(
             import_data=file_content,
@@ -652,7 +690,6 @@ async def import_files(
             overwrite_existing=overwrite_existing,
         )
 
-        service = get_file_system_service()
         result = await service.import_files(db, import_request, current_user.id)
 
         return FileImportResponse(**result)
