@@ -4,7 +4,7 @@ API endpoints для системы отчетов
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -18,6 +18,21 @@ from app.services.reporting_service import get_reporting_service, ReportingServi
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def raise_report_internal_error(
+    action: str, public_detail: str, exc: Exception
+) -> NoReturn:
+    logger.warning(
+        "Report endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=public_detail)
+
+
+def log_report_service_error(report_type: str) -> None:
+    logger.warning("Report service returned error report_type=%s", report_type)
 
 
 # ===================== PYDANTIC MODELS =====================
@@ -112,12 +127,13 @@ async def generate_patient_report(
         )
 
         if "error" in result:
+            log_report_service_error("patient_report")
             return ReportResponse(
                 success=False,
                 report_type="patient_report",
                 generated_at=datetime.now().isoformat(),
                 format=request.format,
-                error=result["error"],
+                error="Ошибка генерации отчета по пациентам",
             )
 
         return ReportResponse(
@@ -132,8 +148,9 @@ async def generate_patient_report(
         )
 
     except Exception as e:
-        logger.error(f"Ошибка генерации отчета по пациентам: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "patient-report", "Ошибка генерации отчета по пациентам", e
+        )
 
 
 @router.post("/appointments", response_model=ReportResponse)
@@ -156,12 +173,13 @@ async def generate_appointments_report(
         )
 
         if "error" in result:
+            log_report_service_error("appointments_report")
             return ReportResponse(
                 success=False,
                 report_type="appointments_report",
                 generated_at=datetime.now().isoformat(),
                 format=request.format,
-                error=result["error"],
+                error="Ошибка генерации отчета по записям",
             )
 
         return ReportResponse(
@@ -176,8 +194,9 @@ async def generate_appointments_report(
         )
 
     except Exception as e:
-        logger.error(f"Ошибка генерации отчета по записям: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "appointments-report", "Ошибка генерации отчета по записям", e
+        )
 
 
 @router.post("/financial", response_model=ReportResponse)
@@ -199,12 +218,13 @@ async def generate_financial_report(
         )
 
         if "error" in result:
+            log_report_service_error("financial_report")
             return ReportResponse(
                 success=False,
                 report_type="financial_report",
                 generated_at=datetime.now().isoformat(),
                 format=request.format,
-                error=result["error"],
+                error="Ошибка генерации финансового отчета",
             )
 
         return ReportResponse(
@@ -219,8 +239,9 @@ async def generate_financial_report(
         )
 
     except Exception as e:
-        logger.error(f"Ошибка генерации финансового отчета: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "financial-report", "Ошибка генерации финансового отчета", e
+        )
 
 
 @router.get("/daily-summary")
@@ -238,13 +259,19 @@ async def get_daily_summary(
         result = reporting_service.generate_daily_summary(target_date)
 
         if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
+            log_report_service_error("daily_summary")
+            raise HTTPException(
+                status_code=500, detail="Ошибка получения ежедневной сводки"
+            )
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Ошибка получения ежедневной сводки: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "daily-summary", "Ошибка получения ежедневной сводки", e
+        )
 
 
 @router.get("/available-reports")
@@ -262,8 +289,9 @@ async def get_available_reports(
         return {"success": True, "reports": reporting_service.get_available_reports()}
 
     except Exception as e:
-        logger.error(f"Ошибка получения списка отчетов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "available-reports", "Ошибка получения списка отчетов", e
+        )
 
 
 @router.post("/cleanup")
@@ -287,8 +315,7 @@ async def cleanup_old_reports(
         }
 
     except Exception as e:
-        logger.error(f"Ошибка очистки старых отчетов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error("cleanup", "Ошибка очистки старых отчетов", e)
 
 
 @router.get("/files")
@@ -328,5 +355,6 @@ async def list_report_files(
         return {"success": True, "files": files, "total_count": len(files)}
 
     except Exception as e:
-        logger.error(f"Ошибка получения списка файлов отчетов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_report_internal_error(
+            "report-files", "Ошибка получения списка файлов отчетов", e
+        )
