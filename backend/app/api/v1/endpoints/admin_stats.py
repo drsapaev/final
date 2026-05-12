@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, desc, func
@@ -15,6 +16,16 @@ from app.models.user import User
 from app.models.visit import Visit
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def raise_admin_stats_error(action: str, public_detail: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "Admin stats endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail=public_detail)
 
 
 @router.get("/stats", summary="Общая статистика для админ-панели")
@@ -109,7 +120,11 @@ def get_admin_stats(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {e}")
+        raise_admin_stats_error(
+            "stats",
+            "Ошибка получения статистики",
+            e,
+        )
 
 
 @router.get("/quick-stats", summary="Быстрая статистика для дашборда")
@@ -163,8 +178,10 @@ def get_quick_stats(
             "generatedAt": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения быстрой статистики: {e}"
+        raise_admin_stats_error(
+            "quick-stats",
+            "Ошибка получения быстрой статистики",
+            e,
         )
 
 
@@ -360,8 +377,10 @@ def get_recent_activities(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения последних действий: {e}"
+        raise_admin_stats_error(
+            "recent-activities",
+            "Ошибка получения последних действий",
+            e,
         )
 
 
@@ -451,8 +470,10 @@ def get_activity_chart(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения данных графика: {e}"
+        raise_admin_stats_error(
+            "dashboard-chart",
+            "Ошибка получения данных графика",
+            e,
         )
 
 
@@ -611,7 +632,11 @@ def get_analytics_overview(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения аналитики: {e}")
+        raise_admin_stats_error(
+            "analytics",
+            "Ошибка получения аналитики",
+            e,
+        )
 
 
 @router.get("/analytics/charts", summary="Данные для графиков аналитики")
@@ -703,6 +728,8 @@ def get_analytics_charts(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения данных графиков: {e}"
+        raise_admin_stats_error(
+            "analytics-charts",
+            "Ошибка получения данных графиков",
+            e,
         )
