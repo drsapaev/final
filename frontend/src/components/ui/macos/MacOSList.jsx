@@ -168,7 +168,7 @@ const MacOSList = ({
 
   if (loading) {
     return (
-      <div className={className} style={listStyle}>
+      <div className={className} style={listStyle} aria-busy="true">
         {renderLoadingState()}
       </div>);
 
@@ -176,14 +176,14 @@ const MacOSList = ({
 
   if (!items || items.length === 0) {
     return (
-      <div className={className} style={listStyle}>
+      <div className={className} style={listStyle} aria-busy={loading}>
         {renderEmptyState()}
       </div>);
 
   }
 
   return (
-    <div className={className} style={listStyle}>
+    <div className={className} style={listStyle} aria-busy={loading}>
       {items.map((item, index) => {
         const isSelected = selectedIndex === index;
         const isInteractive = selectable || Boolean(onItemClick);

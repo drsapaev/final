@@ -200,7 +200,7 @@ const MacOSMetricCard = ({
   };
 
   const renderLoading = () =>
-  <div style={cardStyle}>
+  <div style={cardStyle} aria-busy="true">
       <div style={headerStyle}>
         <div style={{
         width: '60%',
@@ -261,7 +261,8 @@ const MacOSMetricCard = ({
         onMouseLeave={handleMouseLeave}
         onKeyDown={handleKeyDown}
         role="button"
-        tabIndex={0}>
+        tabIndex={0}
+        aria-busy={loading}>
         
         {content}
       </div>);
@@ -269,7 +270,7 @@ const MacOSMetricCard = ({
   }
 
   return (
-    <div className={className} style={cardStyle}>
+    <div className={className} style={cardStyle} aria-busy={loading}>
       {content}
     </div>);
 
