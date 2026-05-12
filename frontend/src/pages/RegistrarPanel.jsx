@@ -19,6 +19,7 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_BASE = getApiOrigin();
+const APPOINTMENT_OVERRIDE_TTL_MS = 10 * 60 * 1000;
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -720,6 +721,7 @@ const RegistrarPanel = () => {
     }));
   }, []);
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  const appointmentOverridesRef = useRef({});
   const translations = { ru: { // Основные
       welcome: 'Добро пожаловать', start_work: 'Начать работу', quick_start: 'Быстрый старт', loading: 'Загрузка', error: 'Ошибка', success: 'Успешно', warning: 'Предупреждение', // Вкладки
       tabs_welcome: 'Главная', tabs_appointments: 'Все записи', tabs_cardio: 'Кардиолог', tabs_echokg: 'ЭКГ', tabs_derma: 'Дерматолог', tabs_dental: 'Стоматолог', tabs_lab: 'Лаборатория', tabs_procedures: 'Процедуры', tabs_queue: 'Онлайн-очередь', // Действия
@@ -1034,27 +1036,18 @@ const RegistrarPanel = () => {
       }
 
       // Применяем локальные оверрайды (например, после оплаты), чтобы не было отката
-      try {
-        const overridesRaw = localStorage.getItem('appointments_local_overrides');
-        if (overridesRaw) {
-          const overrides = JSON.parse(overridesRaw);
-          const ov = overrides[String(enrichedApt.id)];
-          if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-            // ✅ ИСПРАВЛЕНО: Применяем только определенные поля из оверрайда, сохраняя queue_numbers
-            enrichedApt = {
-              ...enrichedApt,
-              status: ov.status !== undefined ? ov.status : enrichedApt.status,
-              payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status
-              // queue_numbers остается из enrichedApt (из API)
-            };
-          }
-        }
-      } catch {
-
-
-
-
-        // Игнорируем ошибки парсинга JSON
+      const overrideKey = String(enrichedApt.id);
+      const ov = appointmentOverridesRef.current[overrideKey];
+      if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
+        // ✅ ИСПРАВЛЕНО: Применяем только определенные поля из оверрайда, сохраняя queue_numbers
+        enrichedApt = {
+          ...enrichedApt,
+          status: ov.status !== undefined ? ov.status : enrichedApt.status,
+          payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status
+          // queue_numbers остается из enrichedApt (из API)
+        };
+      } else if (ov) {
+        delete appointmentOverridesRef.current[overrideKey];
       }
       enrichedApt = {
         ...enrichedApt,
@@ -1879,24 +1872,13 @@ const RegistrarPanel = () => {
             _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
           };
 
-          // Сохраняем локальный оверрайд для каждой записи
-          try {
-            const overridesRaw = localStorage.getItem('appointments_local_overrides');
-            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-            overrides[String(record.id)] = {
-              status: recordWithQueuedStatus.status,
-              payment_status: recordWithQueuedStatus.payment_status,
-              // TTL 10 минут
-              expiresAt: Date.now() + 10 * 60 * 1000
-            };
-            localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-          } catch {
-
-
-
-
-            // Игнорируем ошибки парсинга JSON
-          } // Обновляем состояние для каждой записи
+          // Сохраняем локальный оверрайд для каждой записи только в памяти текущей страницы
+          appointmentOverridesRef.current[String(record.id)] = {
+            status: recordWithQueuedStatus.status,
+            payment_status: recordWithQueuedStatus.payment_status,
+            // TTL 10 минут
+            expiresAt: Date.now() + APPOINTMENT_OVERRIDE_TTL_MS
+          }; // Обновляем состояние для каждой записи
           setAppointments((prev) => prev.map((apt) => apt.id === record.id ? recordWithQueuedStatus : apt));
         });
 
