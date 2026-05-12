@@ -3,7 +3,7 @@
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 router = APIRouter()
 logger = logging.getLogger(__name__)
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
+TELEGRAM_ENHANCED_PUBLIC_ERROR = "Internal server error"
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
@@ -36,6 +37,32 @@ def _validate_webhook_secret(request: Request, db: Session) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid Telegram webhook secret",
         )
+
+
+def _raise_telegram_enhanced_internal_error(
+    operation: str, exc: Exception
+) -> NoReturn:
+    logger.warning(
+        "Enhanced Telegram webhook endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=TELEGRAM_ENHANCED_PUBLIC_ERROR,
+    ) from exc
+
+
+def _telegram_enhanced_test_failure(exc: Exception) -> Dict[str, Any]:
+    logger.warning(
+        "Enhanced Telegram webhook endpoint failed operation=test_webhook error_type=%s",
+        type(exc).__name__,
+    )
+    return {
+        "status": "error",
+        "message": TELEGRAM_ENHANCED_PUBLIC_ERROR,
+        "processed_data": None,
+    }
 
 
 @router.post("/webhook/enhanced")
@@ -61,8 +88,7 @@ async def telegram_webhook_enhanced(request: Request, db: Session = Depends(get_
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка обработки webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        _raise_telegram_enhanced_internal_error("telegram_webhook_enhanced", e)
 
 
 @router.get("/webhook/info")
@@ -93,8 +119,7 @@ async def webhook_info(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения информации о webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        _raise_telegram_enhanced_internal_error("webhook_info", e)
 
 
 @router.post("/webhook/test")
@@ -122,5 +147,4 @@ async def test_webhook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка тестирования webhook: {e}")
-        return {"status": "error", "message": str(e), "processed_data": test_data}
+        return _telegram_enhanced_test_failure(e)
