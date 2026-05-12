@@ -24,6 +24,16 @@ from app.services.medical_equipment_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+MEDICAL_EQUIPMENT_PUBLIC_ERROR = "Internal server error"
+
+
+def _medical_equipment_http_error(operation: str, exc: Exception) -> HTTPException:
+    logger.warning(
+        "Medical equipment endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(status_code=500, detail=MEDICAL_EQUIPMENT_PUBLIC_ERROR)
 
 
 # Pydantic Models for Requests and Responses
@@ -135,8 +145,7 @@ async def get_all_devices(
             "total_count": len(devices_response),
         }
     except Exception as e:
-        logger.error(f"Ошибка получения устройств: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_all_devices", e) from e
 
 
 @router.get("/devices/{device_id}")
@@ -176,8 +185,7 @@ async def get_device(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_device", e) from e
 
 
 @router.get("/devices/type/{device_type}")
@@ -231,8 +239,7 @@ async def get_devices_by_type(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения устройств типа {device_type}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_devices_by_type", e) from e
 
 
 # ===================== ПОДКЛЮЧЕНИЕ И УПРАВЛЕНИЕ =====================
@@ -266,8 +273,7 @@ async def connect_device(
                 "device_id": device_id,
             }
     except Exception as e:
-        logger.error(f"Ошибка подключения к устройству {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("connect_device", e) from e
 
 
 @router.post("/devices/{device_id}/disconnect")
@@ -298,8 +304,7 @@ async def disconnect_device(
                 "device_id": device_id,
             }
     except Exception as e:
-        logger.error(f"Ошибка отключения от устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("disconnect_device", e) from e
 
 
 @router.get("/devices/{device_id}/status")
@@ -326,8 +331,7 @@ async def get_device_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения статуса устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_device_status", e) from e
 
 
 # ===================== ИЗМЕРЕНИЯ =====================
@@ -368,8 +372,7 @@ async def take_measurement(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка выполнения измерения: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("take_measurement", e) from e
 
 
 @router.get("/measurements")
@@ -445,8 +448,7 @@ async def get_measurements(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения измерений: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_measurements", e) from e
 
 
 # ===================== КАЛИБРОВКА И ДИАГНОСТИКА =====================
@@ -481,8 +483,7 @@ async def calibrate_device(
                 "device_id": device_id,
             }
     except Exception as e:
-        logger.error(f"Ошибка калибровки устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("calibrate_device", e) from e
 
 
 @router.post("/devices/{device_id}/diagnostics", response_model=DiagnosticsResponse)
@@ -509,8 +510,7 @@ async def run_device_diagnostics(
             error=results.get("error"),
         )
     except Exception as e:
-        logger.error(f"Ошибка диагностики устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("run_device_diagnostics", e) from e
 
 
 # ===================== КОНФИГУРАЦИЯ =====================
@@ -557,8 +557,7 @@ async def update_device_config(
                 "device_id": device_id,
             }
     except Exception as e:
-        logger.error(f"Ошибка обновления конфигурации устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("update_device_config", e) from e
 
 
 # ===================== СТАТИСТИКА =====================
@@ -584,8 +583,7 @@ async def get_device_statistics(
             measurements_this_week=stats["measurements_this_week"],
         )
     except Exception as e:
-        logger.error(f"Ошибка получения статистики устройства {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_device_statistics", e) from e
 
 
 @router.get("/statistics/overview")
@@ -635,8 +633,7 @@ async def get_equipment_overview(
             },
         }
     except Exception as e:
-        logger.error(f"Ошибка получения общей статистики оборудования: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("get_equipment_overview", e) from e
 
 
 # ===================== ЭКСПОРТ =====================
@@ -694,8 +691,7 @@ async def export_measurements(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка экспорта измерений: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("export_measurements", e) from e
 
 
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
@@ -771,8 +767,7 @@ async def quick_measurement(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка быстрого измерения: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _medical_equipment_http_error("quick_measurement", e) from e
 
 
 # ===================== ИНФОРМАЦИЯ О СИСТЕМЕ =====================
