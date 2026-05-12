@@ -2,6 +2,7 @@
 API endpoints для трекинга AI моделей
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -18,6 +19,18 @@ from app.services.ai_tracking_api_service import AITrackingApiService
 from app.services.ai_tracking_service import get_ai_tracking_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+AI_TRACKING_PUBLIC_ERROR = "Internal server error"
+
+
+def _ai_tracking_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "AI tracking endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(status_code=500, detail=AI_TRACKING_PUBLIC_ERROR)
 
 
 @router.get("/models/stats", response_model=List[AIModelStats])
@@ -45,9 +58,7 @@ async def get_ai_model_stats(
         )
         return stats
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_ai_model_stats") from e
 
 
 @router.get("/providers/stats", response_model=List[AIProviderStats])
@@ -70,9 +81,7 @@ async def get_ai_provider_stats(
         stats = tracking_service.get_provider_stats(days_back=days_back)
         return stats
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_ai_provider_stats") from e
 
 
 @router.get("/models/current")
@@ -112,9 +121,7 @@ async def get_current_ai_models(db: Session = Depends(get_db)):
             "timestamp": datetime.utcnow(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения моделей: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_current_ai_models") from e
 
 
 @router.get("/requests/recent")
@@ -134,9 +141,7 @@ async def get_recent_ai_requests(
     try:
         return AITrackingApiService(db).get_recent_requests(limit=limit)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения запросов: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_recent_ai_requests") from e
 
 
 @router.get("/models/performance")
@@ -236,9 +241,7 @@ async def get_ai_models_performance(
             "timestamp": datetime.utcnow(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения производительности: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_ai_models_performance") from e
 
 
 @router.get("/models/usage-trends")
@@ -257,6 +260,4 @@ async def get_ai_usage_trends(
     try:
         return AITrackingApiService(db).get_usage_trends(days_back=days_back)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
-        )
+        raise _ai_tracking_http_error(e, "get_ai_usage_trends") from e
