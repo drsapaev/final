@@ -2,18 +2,17 @@
 AI API endpoints
 """
 
-import base64
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from ....api.deps import get_current_user
 from ....core.rbac import AIPermission, require_any_ai_permission
 from ....models.user import User
-from ....services.ai import ai_manager, AIProviderType
+from ....services.ai import AIProviderType, ai_manager
 from ....services.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
@@ -27,6 +26,15 @@ LEGACY_AI_ACCESS = require_any_ai_permission(
 )
 
 router = APIRouter(dependencies=[Depends(LEGACY_AI_ACCESS)])
+
+
+def _raise_ai_internal_error(exc: Exception) -> NoReturn:
+    if isinstance(exc, HTTPException):
+        raise exc
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
 
 
 class ComplaintAnalysisRequest(BaseModel):
@@ -136,7 +144,7 @@ async def analyze_complaint(
 
     except Exception as e:
         logger.error(f"Error analyzing complaint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/icd-suggest")
@@ -159,7 +167,7 @@ async def suggest_icd10_codes(
 
     except Exception as e:
         logger.error(f"Error suggesting ICD-10: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/lab-interpret")
@@ -188,7 +196,7 @@ async def interpret_lab_results(
 
     except Exception as e:
         logger.error(f"Error interpreting lab results: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/skin-analyze")
@@ -227,7 +235,7 @@ async def analyze_skin(
 
     except Exception as e:
         logger.error(f"Error analyzing skin: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/ecg-interpret")
@@ -261,7 +269,7 @@ async def interpret_ecg(
 
     except Exception as e:
         logger.error(f"Error interpreting ECG: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class DifferentialDiagnosisRequest(BaseModel):
@@ -302,7 +310,7 @@ async def differential_diagnosis(
         return result
     except Exception as e:
         logger.error(f"Ошибка дифференциальной диагностики: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/symptom-analysis")
@@ -319,7 +327,7 @@ async def symptom_analysis(
         return result
     except Exception as e:
         logger.error(f"Ошибка анализа симптомов: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/clinical-decision-support")
@@ -334,7 +342,7 @@ async def clinical_decision_support(
         return result
     except Exception as e:
         logger.error(f"Ошибка поддержки клинических решений: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class MedicalImageAnalysisRequest(BaseModel):
@@ -376,7 +384,7 @@ async def analyze_xray_image(
 
     except Exception as e:
         logger.error(f"Ошибка анализа рентгеновского снимка: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/analyze-ultrasound")
@@ -410,7 +418,7 @@ async def analyze_ultrasound_image(
 
     except Exception as e:
         logger.error(f"Ошибка анализа УЗИ изображения: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/analyze-dermatoscopy")
@@ -444,7 +452,7 @@ async def analyze_dermatoscopy_image(
 
     except Exception as e:
         logger.error(f"Ошибка анализа дерматоскопического изображения: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/analyze-medical-image")
@@ -482,7 +490,7 @@ async def analyze_medical_image_generic(
 
     except Exception as e:
         logger.error(f"Ошибка анализа медицинского изображения: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class TreatmentPlanRequest(BaseModel):
@@ -534,7 +542,7 @@ async def generate_treatment_plan(
         return result
     except Exception as e:
         logger.error(f"Ошибка генерации плана лечения: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/optimize-medication")
@@ -553,7 +561,7 @@ async def optimize_medication_regimen(
         return result
     except Exception as e:
         logger.error(f"Ошибка оптимизации медикаментозной терапии: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/assess-treatment-effectiveness")
@@ -571,7 +579,7 @@ async def assess_treatment_effectiveness(
         return result
     except Exception as e:
         logger.error(f"Ошибка оценки эффективности лечения: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/suggest-lifestyle-modifications")
@@ -589,7 +597,7 @@ async def suggest_lifestyle_modifications(
         return result
     except Exception as e:
         logger.error(f"Ошибка генерации рекомендаций по образу жизни: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class DrugInteractionRequest(BaseModel):
@@ -641,7 +649,7 @@ async def check_drug_interactions(
         return result
     except Exception as e:
         logger.error(f"Ошибка проверки лекарственных взаимодействий: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/analyze-drug-safety")
@@ -659,7 +667,7 @@ async def analyze_drug_safety(
         return result
     except Exception as e:
         logger.error(f"Ошибка анализа безопасности препарата: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/suggest-drug-alternatives")
@@ -677,7 +685,7 @@ async def suggest_drug_alternatives(
         return result
     except Exception as e:
         logger.error(f"Ошибка предложения альтернативных препаратов: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/calculate-drug-dosage")
@@ -695,7 +703,7 @@ async def calculate_drug_dosage(
         return result
     except Exception as e:
         logger.error(f"Ошибка расчета дозировки препарата: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class RiskAssessmentRequest(BaseModel):
@@ -758,7 +766,7 @@ async def assess_patient_risk(
         return result
     except Exception as e:
         logger.error(f"Ошибка оценки рисков пациента: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/predict-complications")
@@ -777,7 +785,7 @@ async def predict_complications(
         return result
     except Exception as e:
         logger.error(f"Ошибка прогнозирования осложнений: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/calculate-mortality-risk")
@@ -795,7 +803,7 @@ async def calculate_mortality_risk(
         return result
     except Exception as e:
         logger.error(f"Ошибка расчета риска смертности: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/assess-surgical-risk")
@@ -813,7 +821,7 @@ async def assess_surgical_risk(
         return result
     except Exception as e:
         logger.error(f"Ошибка оценки хирургических рисков: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/predict-readmission-risk")
@@ -831,7 +839,7 @@ async def predict_readmission_risk(
         return result
     except Exception as e:
         logger.error(f"Ошибка прогнозирования риска повторной госпитализации: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class AudioTranscriptionRequest(BaseModel):
@@ -902,7 +910,7 @@ async def transcribe_audio(
         return result
     except Exception as e:
         logger.error(f"Ошибка транскрипции аудио: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/structure-medical-text")
@@ -919,7 +927,7 @@ async def structure_medical_text(
         return result
     except Exception as e:
         logger.error(f"Ошибка структурирования текста: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/extract-medical-entities")
@@ -934,7 +942,7 @@ async def extract_medical_entities(
         return result
     except Exception as e:
         logger.error(f"Ошибка извлечения медицинских сущностей: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/generate-medical-summary")
@@ -951,7 +959,7 @@ async def generate_medical_summary(
         return result
     except Exception as e:
         logger.error(f"Ошибка генерации медицинского резюме: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/validate-medical-record")
@@ -966,7 +974,7 @@ async def validate_medical_record(
         return result
     except Exception as e:
         logger.error(f"Ошибка валидации медицинской записи: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class ScheduleOptimizationRequest(BaseModel):
@@ -1024,7 +1032,7 @@ async def optimize_doctor_schedule(
         return result
     except Exception as e:
         logger.error(f"Ошибка оптимизации расписания врача: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/predict-appointment-duration")
@@ -1041,7 +1049,7 @@ async def predict_appointment_duration(
         return result
     except Exception as e:
         logger.error(f"Ошибка прогнозирования длительности приема: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/suggest-optimal-slots")
@@ -1059,7 +1067,7 @@ async def suggest_optimal_slots(
         return result
     except Exception as e:
         logger.error(f"Ошибка предложения оптимальных слотов: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/analyze-workload-distribution")
@@ -1076,7 +1084,7 @@ async def analyze_workload_distribution(
         return result
     except Exception as e:
         logger.error(f"Ошибка анализа распределения нагрузки: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/generate-shift-recommendations")
@@ -1093,7 +1101,7 @@ async def generate_shift_recommendations(
         return result
     except Exception as e:
         logger.error(f"Ошибка генерации рекомендаций по сменам: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class DocumentationQualityRequest(BaseModel):
@@ -1151,7 +1159,7 @@ async def analyze_documentation_quality(
         return result
     except Exception as e:
         logger.error(f"Ошибка анализа качества документации: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/detect-documentation-gaps")
@@ -1168,7 +1176,7 @@ async def detect_documentation_gaps(
         return result
     except Exception as e:
         logger.error(f"Ошибка выявления пробелов в документации: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/suggest-documentation-improvements")
@@ -1186,7 +1194,7 @@ async def suggest_documentation_improvements(
         return result
     except Exception as e:
         logger.error(f"Ошибка предложения улучшений документации: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/validate-clinical-consistency")
@@ -1204,7 +1212,7 @@ async def validate_clinical_consistency(
         return result
     except Exception as e:
         logger.error(f"Ошибка валидации клинической согласованности: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/audit-prescription-safety")
@@ -1221,7 +1229,7 @@ async def audit_prescription_safety(
         return result
     except Exception as e:
         logger.error(f"Ошибка аудита безопасности назначений: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 class MedicalTrendsRequest(BaseModel):
@@ -1280,7 +1288,7 @@ async def analyze_medical_trends(
         return result
     except Exception as e:
         logger.error(f"Ошибка анализа медицинских трендов: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/detect-anomalies")
@@ -1297,7 +1305,7 @@ async def detect_anomalies(
         return result
     except Exception as e:
         logger.error(f"Ошибка выявления аномалий: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/predict-outcomes")
@@ -1314,7 +1322,7 @@ async def predict_outcomes(
         return result
     except Exception as e:
         logger.error(f"Ошибка прогнозирования исходов: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/generate-insights-report")
@@ -1331,7 +1339,7 @@ async def generate_insights_report(
         return result
     except Exception as e:
         logger.error(f"Ошибка генерации отчета с инсайтами: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
 
 
 @router.post("/identify-risk-patterns")
@@ -1348,4 +1356,4 @@ async def identify_risk_patterns(
         return result
     except Exception as e:
         logger.error(f"Ошибка выявления паттернов рисков: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_ai_internal_error(e)
