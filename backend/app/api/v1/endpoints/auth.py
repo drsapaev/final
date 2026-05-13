@@ -6,11 +6,12 @@ This implementation is defensive: it supports get_db() returning either an
 AsyncSession (async DB) or a sync Session/sessionmaker. The DB calls are
 dispatched either by awaiting (async) or via run_in_threadpool (sync).
 """
+
 from __future__ import annotations
 
 import logging
 import secrets
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -99,7 +100,7 @@ class JSONLoginResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 class CSRFTokenResponse(BaseModel):
