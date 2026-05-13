@@ -50,4 +50,19 @@ describe('Speed Insights privacy sanitizer', () => {
 
     expect(event.url).toBe('/unknown/patient/[redacted]/token/[redacted]/raw/[redacted]');
   });
+
+  it('fully redacts malformed URLs instead of throwing', () => {
+    const event = sanitizeSpeedInsightsEvent(
+      {
+        url: 'not a url',
+        name: 'CLS',
+      },
+      ROUTE_REGISTRY
+    );
+
+    expect(event).toEqual({
+      url: '[redacted]',
+      name: 'CLS',
+    });
+  });
 });

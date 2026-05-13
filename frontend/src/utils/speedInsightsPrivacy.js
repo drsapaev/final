@@ -1,5 +1,23 @@
 const SENSITIVE_ROUTE_SEGMENT = '[redacted]';
 const UUID_SEGMENT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/i;
+
+const getPathnameFromUrl = (url) => {
+  const normalized = url.trim();
+  if (!normalized) return null;
+
+  const pathWithoutQuery = normalized.split('#')[0].split('?')[0];
+  if (pathWithoutQuery.startsWith('/')) {
+    return pathWithoutQuery || '/';
+  }
+
+  const absoluteMatch = pathWithoutQuery.match(ABSOLUTE_URL_PATTERN);
+  if (absoluteMatch) {
+    return absoluteMatch[1] || '/';
+  }
+
+  return null;
+};
 
 const isDynamicRouteMatch = (routePath, pathname) => {
   const routeParts = routePath.split('/').filter(Boolean);
@@ -32,20 +50,24 @@ export function sanitizeSpeedInsightsEvent(event, routes) {
     return event;
   }
 
-  try {
-    const parsed = new URL(event.url, 'https://clinic.local');
-    const matchedRoute = (routes || []).find((route) => isDynamicRouteMatch(route.path, parsed.pathname));
-    const safeUrl = matchedRoute?.path || redactUnmatchedPath(parsed.pathname);
+  const pathname = getPathnameFromUrl(event.url);
 
-    return {
-      ...event,
-      url: safeUrl,
-      route: matchedRoute?.path || event.route,
-    };
-  } catch {
+  if (!pathname) {
     return {
       ...event,
       url: SENSITIVE_ROUTE_SEGMENT,
     };
   }
+
+  const routeList = Array.isArray(routes) ? routes : [];
+  const matchedRoute = routeList.find(
+    (route) => typeof route?.path === 'string' && isDynamicRouteMatch(route.path, pathname)
+  );
+  const safeUrl = matchedRoute?.path || redactUnmatchedPath(pathname);
+
+  return {
+    ...event,
+    url: safeUrl,
+    route: matchedRoute?.path || event.route,
+  };
 }
