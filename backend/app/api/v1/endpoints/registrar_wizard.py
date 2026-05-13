@@ -15,7 +15,6 @@ from sqlalchemy import String, func, literal
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.core.config import settings as app_settings
 from app.crud import clinic as crud_clinic, online_queue as crud_queue
 from app.models.clinic import ClinicSettings, Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
@@ -29,6 +28,7 @@ from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
 )
 from app.services.notifications import notification_sender_service
+from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import get_service_code, normalize_service_code
@@ -506,6 +506,9 @@ class InvoicePaymentResponse(BaseModel):
     error_message: Optional[str] = None
 
 
+SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click", "payme"}
+
+
 @router.post("/registrar/invoice/init-payment", response_model=InvoicePaymentResponse)
 def init_invoice_payment(
     payment_req: InvoicePaymentRequest,
@@ -531,64 +534,16 @@ def init_invoice_payment(
             )
 
         # Инициализируем провайдер платежей
-        if payment_req.provider == "click":
-            if not app_settings.CLICK_ENABLED:
-                return InvoicePaymentResponse(
-                    success=False,
-                    error_message="Payment provider click is not configured",
-                )
-
-            from app.services.payment_providers.click import ClickProvider
-
-            # Конфигурация Click (в реальном проекте из настроек)
-            provider_config = {
-                "service_id": app_settings.CLICK_SERVICE_ID,
-                "merchant_id": app_settings.CLICK_MERCHANT_ID,
-                "secret_key": app_settings.CLICK_SECRET_KEY,
-                "base_url": app_settings.CLICK_BASE_URL,
-            }
-
-            try:
-                provider = ClickProvider(provider_config)
-            except ValueError:
-                return InvoicePaymentResponse(
-                    success=False,
-                    error_message="Payment provider click is not configured",
-                )
-
-        elif payment_req.provider == "payme":
-            if not app_settings.PAYME_ENABLED:
-                return InvoicePaymentResponse(
-                    success=False,
-                    error_message="Payment provider payme is not configured",
-                )
-
-            from app.services.payment_providers.payme import PayMeProvider
-
-            # Конфигурация PayMe (в реальном проекте из настроек)
-            provider_config = {
-                "merchant_id": app_settings.PAYME_MERCHANT_ID,
-                "secret_key": app_settings.PAYME_SECRET_KEY,
-                "base_url": app_settings.PAYME_BASE_URL,
-                "api_url": app_settings.PAYME_API_URL,
-            }
-
-            try:
-                provider = PayMeProvider(provider_config)
-            except ValueError:
-                return InvoicePaymentResponse(
-                    success=False,
-                    error_message="Payment provider payme is not configured",
-                )
-
-        else:
+        provider_name = payment_req.provider.lower()
+        if provider_name not in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
             return InvoicePaymentResponse(
                 success=False,
                 error_message=f"Провайдер {payment_req.provider} не поддерживается",
             )
 
         # Создаём платёж
-        result = provider.create_payment(
+        result = get_payment_manager().create_payment(
+            provider_name=provider_name,
             amount=invoice.total_amount,
             currency=invoice.currency,
             order_id=f"invoice_{invoice.id}",
@@ -600,8 +555,8 @@ def init_invoice_payment(
         if result.success:
             # Обновляем invoice
             invoice.provider_payment_id = result.payment_id
-            invoice.payment_method = payment_req.provider
-            invoice.provider = payment_req.provider
+            invoice.payment_method = provider_name
+            invoice.provider = provider_name
             invoice.status = "processing"
             invoice.provider_data = result.provider_data
             db.commit()
@@ -652,40 +607,12 @@ def check_invoice_status(
 
         # Проверяем статус у провайдера
         if invoice.provider_payment_id and invoice.provider:
-            provider = None
+            provider_name = invoice.provider.lower()
 
-            if invoice.provider == "click" and app_settings.CLICK_ENABLED:
-                from app.services.payment_providers.click import ClickProvider
-
-                provider_config = {
-                    "service_id": app_settings.CLICK_SERVICE_ID,
-                    "merchant_id": app_settings.CLICK_MERCHANT_ID,
-                    "secret_key": app_settings.CLICK_SECRET_KEY,
-                    "base_url": app_settings.CLICK_BASE_URL,
-                }
-
-                try:
-                    provider = ClickProvider(provider_config)
-                except ValueError:
-                    provider = None
-
-            elif invoice.provider == "payme" and app_settings.PAYME_ENABLED:
-                from app.services.payment_providers.payme import PayMeProvider
-
-                provider_config = {
-                    "merchant_id": app_settings.PAYME_MERCHANT_ID,
-                    "secret_key": app_settings.PAYME_SECRET_KEY,
-                    "base_url": app_settings.PAYME_BASE_URL,
-                    "api_url": app_settings.PAYME_API_URL,
-                }
-
-                try:
-                    provider = PayMeProvider(provider_config)
-                except ValueError:
-                    provider = None
-
-            if provider:
-                result = provider.check_payment_status(invoice.provider_payment_id)
+            if provider_name in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
+                result = get_payment_manager().check_payment_status(
+                    provider_name, invoice.provider_payment_id
+                )
 
                 if result.success:
                     # Обновляем статус invoice
