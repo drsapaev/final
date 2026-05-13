@@ -10,6 +10,13 @@ on:
     - cron: '0 2 * * *'  # Ежедневно в 2:00
   workflow_dispatch:  # Ручной запуск
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
 env:
   PYTHON_VERSION: '3.11.10'
   NODE_VERSION: '20'
@@ -449,6 +456,7 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
     
     - name: 📦 Установка зависимостей
       run: |
@@ -458,11 +466,8 @@ jobs:
     - name: 🔍 Линтинг frontend
       run: |
         cd frontend
-        if npm run lint:check; then
-          echo "✅ Frontend lint passed"
-        else
-          echo "::warning::Frontend lint has legacy violations and is non-blocking in this phase. Frontend tests/build remain blocking."
-        fi
+        npm run lint:check
+        echo "✅ Frontend lint passed"
     
     - name: 🧪 Тесты frontend
       run: |
@@ -581,6 +586,7 @@ jobs:
       with:
         name: coverage-report
         path: backend/htmlcov/
+        retention-days: 7
         if-no-files-found: warn
 
   # --- Архитектурные boundary тесты ---
@@ -729,6 +735,7 @@ jobs:
           docs/reports/FRONTEND_BACKEND_PARITY_REPORT.md
           docs/reports/FRONTEND_UX_CORRECTNESS_SCORECARD.md
           docs/reports/frontend_ux_correctness_scorecard.json
+        retention-days: 14
         if-no-files-found: error
 
   # --- Security сканирование ---
@@ -817,6 +824,7 @@ jobs:
       with:
         name: security-reports
         path: backend/security-reports/
+        retention-days: 14
         if-no-files-found: warn
 
   # --- Docker сборка ---
@@ -856,8 +864,8 @@ jobs:
         file: ./ops/backend.Dockerfile
         push: false
         tags: clinic-backend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=clinic-backend
+        cache-to: type=gha,mode=min,scope=clinic-backend,ignore-error=true
         build-args: |
           BUILDKIT_INLINE_CACHE=1
     
@@ -868,8 +876,8 @@ jobs:
         file: ./ops/frontend.Dockerfile
         push: false
         tags: clinic-frontend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=clinic-frontend
+        cache-to: type=gha,mode=min,scope=clinic-frontend,ignore-error=true
         build-args: |
           BUILDKIT_INLINE_CACHE=1
 
@@ -1309,6 +1317,7 @@ jobs:
           artifacts/load/load-regression-report.md
           artifacts/load/load-regression-report.json
           artifacts/load/profiles/**
+        retention-days: 14
         if-no-files-found: warn
 
     - name: 🛑 Stop API
@@ -1491,10 +1500,11 @@ jobs:
 
     - name: 📤 Upload ZAP artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: zap-nightly-report
         path: zap-report/
+        retention-days: 14
         if-no-files-found: warn
 
     - name: 🛑 Stop API
@@ -1649,10 +1659,11 @@ jobs:
       with:
         name: api-docs
         path: backend/openapi.json
+        retention-days: 14
 
-  # --- Deploy Staging ---
+  # --- Staging readiness report (no live deploy) ---
   deploy-staging:
-    name: 🚀 Deploy Staging
+    name: Staging readiness report
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
@@ -1661,17 +1672,17 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     
-    - name: 🚀 Deploy to Staging
+    - name: Staging readiness summary
       run: |
-        echo "🚀 Развертывание в staging окружение"
+        echo "🚀 Staging readiness report (no live deployment)"
         echo "✅ Все проверки пройдены"
         echo "📦 Docker образы собраны"
         echo "🔒 Security сканирование завершено"
         echo "🔗 Интеграционные тесты пройдены"
 
-  # --- Deploy Production ---
+  # --- Production readiness report (no live deploy) ---
   deploy-production:
-    name: 🌟 Deploy Production
+    name: Production readiness report
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
@@ -1682,9 +1693,9 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     
-    - name: 🌟 Deploy to Production
+    - name: Production readiness summary
       run: |
-        echo "🌟 Развертывание в production окружение"
+        echo "🌟 Production readiness report (no live deployment)"
         echo "✅ Все проверки пройдены"
         echo "📦 Docker образы собраны"
         echo "🔒 Security сканирование завершено"

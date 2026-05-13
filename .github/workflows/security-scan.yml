@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: '0 3 * * *'  # Каждый день в 3:00 UTC
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
 jobs:
   security-scan:
     name: 🔒 Сканирование безопасности
@@ -52,6 +59,7 @@ jobs:
           backend/safety-report.json
           backend/pip-audit-report.json
           backend/bandit-report.json
+        retention-days: 14
         
     - name: 📊 Анализ результатов
       run: |

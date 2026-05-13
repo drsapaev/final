@@ -13,6 +13,13 @@ on:
       - "backend/app/core/role_validation.py"
       - "backend/tests/integration/test_rbac_matrix.py"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
 jobs:
   role-system-check:
     runs-on: ubuntu-latest

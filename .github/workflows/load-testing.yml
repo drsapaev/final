@@ -10,6 +10,13 @@ on:
   #   branches: [main]  # Только после успешного CI/CD на main
   workflow_dispatch:  # Только ручной запуск
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   load-testing:
     name: ⚡ Нагрузочное тестирование
@@ -374,6 +381,7 @@ jobs:
       with:
         name: performance-report
         path: performance-report.md
+        retention-days: 14
         if-no-files-found: warn
         
     - name: 🛑 Остановка сервера
