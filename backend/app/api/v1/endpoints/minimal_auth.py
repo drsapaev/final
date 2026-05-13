@@ -2,7 +2,8 @@
 Минимальный endpoint авторизации без зависимостей от сложных моделей
 """
 
-from typing import Any, Dict
+import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ from app.services.auth_fallback_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class MinimalLoginRequest(BaseModel):
@@ -31,7 +33,7 @@ class MinimalLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 @router.options("/minimal-login")
@@ -58,7 +60,12 @@ async def minimal_login(
     except AuthFallbackDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as exc:
+        logger.warning(
+            "Minimal fallback login endpoint failed operation=%s error_type=%s",
+            "minimal_login",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(exc)}",
+            detail="Internal server error",
         ) from exc
