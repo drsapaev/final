@@ -2,10 +2,11 @@
 API endpoints для динамического ценообразования и пакетных услуг
 """
 
+import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -19,107 +20,135 @@ from app.services.dynamic_pricing_api_service import (
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
+
+def _raise_dynamic_pricing_internal_error(action: str, exc: Exception) -> NoReturn:
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.error(
+        "Dynamic pricing endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
+
+
+def _raise_dynamic_pricing_bad_request(action: str, exc: Exception) -> NoReturn:
+    logger.warning(
+        "Dynamic pricing request rejected action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid dynamic pricing request",
+    ) from exc
+
 
 # === Pydantic схемы ===
 
 
 class PricingRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
     rule_type: PricingRuleType
     discount_type: DiscountType
     discount_value: float = Field(..., gt=0)
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    start_time: Optional[str] = Field(
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    start_time: str | None = Field(
         None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    end_time: Optional[str] = Field(
+    end_time: str | None = Field(
         None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    days_of_week: Optional[str] = Field(None, pattern=r"^[1-7](,[1-7])*$")
+    days_of_week: str | None = Field(None, pattern=r"^[1-7](,[1-7])*$")
     min_quantity: int = Field(1, ge=1)
-    max_quantity: Optional[int] = Field(None, ge=1)
-    min_amount: Optional[float] = Field(None, ge=0)
+    max_quantity: int | None = Field(None, ge=1)
+    min_amount: float | None = Field(None, ge=0)
     priority: int = Field(0, ge=0)
-    max_uses: Optional[int] = Field(None, ge=1)
-    service_ids: List[int] = Field(..., min_length=1)
+    max_uses: int | None = Field(None, ge=1)
+    service_ids: list[int] = Field(..., min_length=1)
 
 
 class PricingRuleUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    discount_value: Optional[float] = Field(None, gt=0)
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    start_time: Optional[str] = Field(
+    name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+    is_active: bool | None = None
+    discount_value: float | None = Field(None, gt=0)
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    start_time: str | None = Field(
         None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    end_time: Optional[str] = Field(
+    end_time: str | None = Field(
         None, pattern=r"^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
     )
-    days_of_week: Optional[str] = Field(None, pattern=r"^[1-7](,[1-7])*$")
-    min_quantity: Optional[int] = Field(None, ge=1)
-    max_quantity: Optional[int] = Field(None, ge=1)
-    min_amount: Optional[float] = Field(None, ge=0)
-    priority: Optional[int] = Field(None, ge=0)
-    max_uses: Optional[int] = Field(None, ge=1)
+    days_of_week: str | None = Field(None, pattern=r"^[1-7](,[1-7])*$")
+    min_quantity: int | None = Field(None, ge=1)
+    max_quantity: int | None = Field(None, ge=1)
+    min_amount: float | None = Field(None, ge=0)
+    priority: int | None = Field(None, ge=0)
+    max_uses: int | None = Field(None, ge=1)
 
 
 class ServicePackageCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    service_ids: List[int] = Field(..., min_length=2)
+    description: str | None = None
+    service_ids: list[int] = Field(..., min_length=2)
     package_price: float = Field(..., gt=0)
-    valid_from: Optional[datetime] = None
-    valid_to: Optional[datetime] = None
-    max_purchases: Optional[int] = Field(None, ge=1)
-    per_patient_limit: Optional[int] = Field(None, ge=1)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    max_purchases: int | None = Field(None, ge=1)
+    per_patient_limit: int | None = Field(None, ge=1)
 
 
 class ServicePackageUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    package_price: Optional[float] = Field(None, gt=0)
-    valid_from: Optional[datetime] = None
-    valid_to: Optional[datetime] = None
-    max_purchases: Optional[int] = Field(None, ge=1)
-    per_patient_limit: Optional[int] = Field(None, ge=1)
+    name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+    is_active: bool | None = None
+    package_price: float | None = Field(None, gt=0)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    max_purchases: int | None = Field(None, ge=1)
+    per_patient_limit: int | None = Field(None, ge=1)
 
 
 class PriceCalculationRequest(BaseModel):
-    services: List[Dict[str, Any]] = Field(..., min_length=1)
-    patient_id: Optional[int] = None
-    appointment_time: Optional[datetime] = None
+    services: list[dict[str, Any]] = Field(..., min_length=1)
+    patient_id: int | None = None
+    appointment_time: datetime | None = None
 
 
 class PackagePurchaseRequest(BaseModel):
     package_id: int
     patient_id: int
-    visit_id: Optional[int] = None
-    appointment_id: Optional[int] = None
+    visit_id: int | None = None
+    appointment_id: int | None = None
 
 
 class PricingRuleResponse(BaseModel):
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     rule_type: str
     discount_type: str
     discount_value: float
     is_active: bool
-    start_date: Optional[datetime]
-    end_date: Optional[datetime]
-    start_time: Optional[str]
-    end_time: Optional[str]
-    days_of_week: Optional[str]
+    start_date: datetime | None
+    end_date: datetime | None
+    start_time: str | None
+    end_time: str | None
+    days_of_week: str | None
     min_quantity: int
-    max_quantity: Optional[int]
-    min_amount: Optional[float]
+    max_quantity: int | None
+    min_amount: float | None
     priority: int
-    max_uses: Optional[int]
+    max_uses: int | None
     current_uses: int
     created_at: datetime
 
@@ -129,17 +158,17 @@ class PricingRuleResponse(BaseModel):
 class ServicePackageResponse(BaseModel):
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
     package_price: float
-    original_price: Optional[float]
-    savings_amount: Optional[float]
-    savings_percentage: Optional[float]
-    valid_from: Optional[datetime]
-    valid_to: Optional[datetime]
-    max_purchases: Optional[int]
+    original_price: float | None
+    savings_amount: float | None
+    savings_percentage: float | None
+    valid_from: datetime | None
+    valid_to: datetime | None
+    max_purchases: int | None
     current_purchases: int
-    per_patient_limit: Optional[int]
+    per_patient_limit: int | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -169,15 +198,15 @@ def create_pricing_rule(
         )
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        _raise_dynamic_pricing_bad_request("create_pricing_rule", e)
 
 
-@router.get("/pricing-rules", response_model=List[PricingRuleResponse])
+@router.get("/pricing-rules", response_model=list[PricingRuleResponse])
 def get_pricing_rules(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    rule_type: Optional[PricingRuleType] = None,
-    is_active: Optional[bool] = None,
+    rule_type: PricingRuleType | None = None,
+    is_active: bool | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -221,7 +250,7 @@ def update_pricing_rule(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("update_pricing_rule", e)
 
 
 @router.delete("/pricing-rules/{rule_id}")
@@ -238,7 +267,7 @@ def delete_pricing_rule(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("delete_pricing_rule", e)
 
 
 @router.post("/calculate-price")
@@ -256,7 +285,7 @@ def calculate_price(
             appointment_time=request.appointment_time,
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        _raise_dynamic_pricing_bad_request("calculate_price", e)
 
 
 @router.post("/service-packages", response_model=ServicePackageResponse)
@@ -274,15 +303,15 @@ def create_service_package(
         )
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        _raise_dynamic_pricing_bad_request("create_service_package", e)
 
 
-@router.get("/service-packages", response_model=List[ServicePackageResponse])
+@router.get("/service-packages", response_model=list[ServicePackageResponse])
 def get_service_packages(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    is_active: Optional[bool] = None,
-    patient_id: Optional[int] = None,
+    is_active: bool | None = None,
+    patient_id: int | None = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -326,7 +355,7 @@ def update_service_package(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("update_service_package", e)
 
 
 @router.delete("/service-packages/{package_id}")
@@ -343,7 +372,7 @@ def delete_service_package(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         service.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("delete_service_package", e)
 
 
 @router.post("/purchase-package")
@@ -372,9 +401,9 @@ def purchase_package(
             "expires_at": purchase.expires_at,
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        _raise_dynamic_pricing_bad_request("purchase_package_validation", e)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("purchase_package", e)
 
 
 @router.post("/update-dynamic-prices")
@@ -387,13 +416,13 @@ def update_dynamic_prices(
     try:
         return service.update_dynamic_prices()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("update_dynamic_prices", e)
 
 
 @router.get("/pricing-analytics")
 def get_pricing_analytics(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -402,7 +431,7 @@ def get_pricing_analytics(
     try:
         return service.get_pricing_analytics(start_date=start_date, end_date=end_date)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_dynamic_pricing_internal_error("get_pricing_analytics", e)
 
 
 @router.get("/price-history/{service_id}")
