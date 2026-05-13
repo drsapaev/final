@@ -1,7 +1,9 @@
 """
 Упрощенный endpoint авторизации без сложных зависимостей
 """
-from typing import Any, Dict
+
+import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -15,10 +17,12 @@ from app.services.auth_fallback_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class SimpleLoginRequest(BaseModel):
     """Простая схема для входа"""
+
     username: str
     password: str
     remember_me: bool = False
@@ -26,17 +30,15 @@ class SimpleLoginRequest(BaseModel):
 
 class SimpleLoginResponse(BaseModel):
     """Простая схема ответа"""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 @router.post("/simple-login", response_model=SimpleLoginResponse)
-async def simple_login(
-    request_data: SimpleLoginRequest,
-    db: Session = Depends(get_db)
-):
+async def simple_login(request_data: SimpleLoginRequest, db: Session = Depends(get_db)):
     """
     Упрощенный вход в систему без сложных зависимостей
     """
@@ -51,20 +53,24 @@ async def simple_login(
     except AuthFallbackDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as exc:
+        logger.warning(
+            "Simple fallback login endpoint failed operation=%s error_type=%s",
+            "simple_login",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(exc)}",
+            detail="Internal server error",
         ) from exc
 
 
 @router.get("/me")
 async def get_current_user_simple(
     db: Session = Depends(get_db),
-    current_user: User = Depends(lambda: None)  # Временно отключено
+    current_user: User = Depends(lambda: None),  # Временно отключено
 ):
     """
     Получить информацию о текущем пользователе
     """
     # Временная заглушка
     return {"message": "Endpoint /me временно недоступен"}
-
