@@ -13,6 +13,49 @@ Workflow: `/aif-plan` -> `/aif-improve @.ai-factory/PLAN.md` -> `/aif-implement 
 - Runtime code changed: yes
 - Secrets inspected or printed: no
 
+## Task 26 Slice Queue Limits Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`, continued as narrow override
+- reason: mounted queue limits endpoint leaked raw exception text through public HTTP 500 details
+- risky domain: yes, queue limits and staff workflow
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 26 sanitize mounted queue limits endpoint raw public exception leakage without changing queue limit route contracts roles domain behavior or success payloads" --known-root-cause "backend/app/api/v1/endpoints/queue_limits.py"`
+
+Gate result:
+
+- The gate returned frontend routing files alongside the confirmed backend root-cause file.
+- Per `AGENTS.md`, execution continued as a narrow override limited to `backend/app/api/v1/endpoints/queue_limits.py` plus this recovery log.
+
+Changed behavior:
+
+- Replaced raw public HTTP 500 details that included exception text with generic `Internal server error`.
+- Added structured endpoint logging with action name plus exception class only.
+- Preserved route paths, role dependencies, domain 404 behavior, success payload shapes, and service/repository behavior.
+- Added explicit `HTTPException` passthrough so endpoint-local HTTP errors are not masked as generic 500.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\queue_limits.py`
+  - result: passed
+- `python -m ruff check backend\app\api\v1\endpoints\queue_limits.py`
+  - result: passed
+- `python -m black --check backend\app\api\v1\endpoints\queue_limits.py`
+  - result: passed
+- static leakage scan for raw exception details/logging in the file
+  - result: no matches
+- direct endpoint smoke with marker exception
+  - result: passed; HTTP 500 returned `Internal server error`, marker text did not leak to response or logs, and `DOCTOR_NOT_FOUND` stayed HTTP 404
+- `python -m pytest backend\tests\architecture\test_w2c_queue_boundaries.py backend\tests\unit\test_queue_limits_api_service.py backend\tests\unit\test_queue_domain_service.py backend\tests\unit\test_service_repository_boundary.py -q --tb=short --disable-warnings`
+  - result: 69 passed, 1 warning
+- `npm.cmd --prefix frontend run build`
+  - result: passed from `C:\final` because the isolated worktree does not have `frontend\node_modules`; warnings are existing Vite dynamic/static import and large chunk warnings
+
+Scope note:
+
+- Task 26 remains open. This slice only hardens the mounted queue limits endpoint and does not claim all backend runtime leakage is gone.
+
 ## Task 26 Slice Wait-Time Analytics Evidence
 
 Post-merge recovery note:
