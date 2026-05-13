@@ -87,9 +87,9 @@ class LabReportingService:
         offset: int,
     ) -> list[LabOrder]:
         logger.info(
-            "[LAB] list_orders status=%s patient_id=%s limit=%s offset=%s",
+            "[LAB] list_orders status=%s has_patient_filter=%s limit=%s offset=%s",
             status,
-            patient_id,
+            patient_id is not None,
             limit,
             offset,
         )
@@ -125,11 +125,12 @@ class LabReportingService:
         service_items: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         logger.info(
-            "[LAB] resolve_template_options patient_id=%s appointment_id=%s visit_id=%s service_codes=%s",
-            patient_id,
-            appointment_id,
-            visit_id,
-            service_codes,
+            "[LAB] resolve_template_options has_patient_context=%s has_appointment_context=%s has_visit_context=%s service_code_count=%s service_item_count=%s",
+            patient_id is not None,
+            appointment_id is not None,
+            visit_id is not None,
+            len(service_codes or []),
+            len(service_items or []),
         )
         self.ensure_default_templates()
         self.ensure_default_template_bindings()
@@ -408,9 +409,9 @@ class LabReportingService:
         offset: int,
     ) -> list[LabReportInstance]:
         logger.info(
-            "[LAB] list_instances patient_id=%s visit_ids=%s status=%s limit=%s offset=%s",
-            patient_id,
-            visit_ids,
+            "[LAB] list_instances has_patient_filter=%s visit_filter_count=%s status=%s limit=%s offset=%s",
+            patient_id is not None,
+            len(visit_ids or []),
             status,
             limit,
             offset,
@@ -437,12 +438,10 @@ class LabReportingService:
         actor_name: str | None = None,
     ) -> LabReportInstance:
         logger.info(
-            "[LAB] create_instance patient_id=%s appointment_id=%s visit_id=%s template_id=%s template_version_id=%s",
-            payload.get("patient_id"),
-            payload.get("appointment_id"),
-            payload.get("visit_id"),
-            payload.get("template_id"),
-            payload.get("template_version_id"),
+            "[LAB] create_instance has_appointment_context=%s has_visit_context=%s has_template_version=%s",
+            payload.get("appointment_id") is not None,
+            payload.get("visit_id") is not None,
+            payload.get("template_version_id") is not None,
         )
         patient = self.repository.get_patient(payload["patient_id"])
         if not patient:
@@ -1157,9 +1156,8 @@ class LabReportingService:
         if order:
             return order, False
         logger.info(
-            "[LAB] creating synthetic lab order patient_id=%s visit_id=%s",
-            patient_id,
-            visit_id,
+            "[LAB] creating synthetic lab order has_visit_context=%s",
+            visit_id is not None,
         )
         return self.repository.add_order(
             LabOrder(
@@ -1209,29 +1207,23 @@ class LabReportingService:
                     logger.warning(
                         "[FIX:NOTIFICATIONS] lab_new_study canonical delivery failed",
                         extra={
-                            "order_id": order.id,
-                            "patient_id": patient_id,
-                            "recipient_id": recipient.id,
+                            "has_order": order.id is not None,
                         },
                     )
             except RuntimeError as exc:
                 logger.warning(
                     "[FIX:NOTIFICATIONS] lab_new_study canonical delivery skipped due runtime context",
                     extra={
-                        "order_id": order.id,
-                        "patient_id": patient_id,
-                        "recipient_id": recipient.id,
-                        "error": str(exc),
+                        "has_order": order.id is not None,
+                        "error_type": type(exc).__name__,
                     },
                 )
             except Exception as exc:
                 logger.error(
                     "[FIX:NOTIFICATIONS] lab_new_study canonical delivery error",
                     extra={
-                        "order_id": order.id,
-                        "patient_id": patient_id,
-                        "recipient_id": recipient.id,
-                        "error": str(exc),
+                        "has_order": order.id is not None,
+                        "error_type": type(exc).__name__,
                     },
                 )
 
@@ -1287,15 +1279,14 @@ class LabReportingService:
         except CanonicalVisitResolutionError as exc:
             if not create_if_missing and exc.status_code == 404:
                 logger.info(
-                    "[LAB] canonical visit is not available yet for appointment_id=%s",
-                    appointment_id,
+                    "[LAB] canonical visit is not available yet for appointment context",
                 )
                 return None
             raise LabReportingDomainError(exc.status_code, exc.detail) from exc
         logger.info(
-            "[LAB] resolved visit context appointment_id=%s visit_id=%s",
-            appointment_id,
-            resolved_visit_id,
+            "[LAB] resolved visit context has_appointment_context=%s has_resolved_visit_context=%s",
+            appointment_id is not None,
+            resolved_visit_id is not None,
         )
         return resolved_visit_id
 
