@@ -3,7 +3,7 @@
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -33,7 +33,7 @@ class MinimalLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 @router.options("/minimal-login")
