@@ -2,6 +2,7 @@
 API endpoints для управления расширенным Telegram ботом
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -18,6 +19,23 @@ from app.services.telegram_bot_management_api_service import (
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+TELEGRAM_BOT_MANAGEMENT_PUBLIC_ERROR = "Telegram bot management operation failed"
+
+
+def _telegram_bot_management_http_error(
+    exc: Exception, operation: str
+) -> HTTPException:
+    logger.warning(
+        "Telegram bot management endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=TELEGRAM_BOT_MANAGEMENT_PUBLIC_ERROR,
+    )
 
 
 class TelegramNotificationRequest(BaseModel):
@@ -58,10 +76,7 @@ async def get_telegram_bot_stats(
         return TelegramBotStatsResponse(**payload)
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting bot stats: {str(e)}",
-        ) from e
+        raise _telegram_bot_management_http_error(e, "get_telegram_bot_stats") from e
 
 
 @router.post(
@@ -119,9 +134,8 @@ async def send_telegram_notification(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error sending notification: {str(e)}",
+        raise _telegram_bot_management_http_error(
+            e, "send_telegram_notification"
         ) from e
 
 
@@ -150,10 +164,7 @@ async def send_admin_alert(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error sending admin alert: {str(e)}",
-        )
+        raise _telegram_bot_management_http_error(e, "send_admin_alert") from e
 
 
 @router.get("/users-with-telegram")
@@ -166,10 +177,7 @@ async def get_users_with_telegram(
         return TelegramBotManagementApiService(db).get_users_with_telegram_payload()
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting users: {str(e)}",
-        ) from e
+        raise _telegram_bot_management_http_error(e, "get_users_with_telegram") from e
 
 
 @router.post("/test-bot")
@@ -188,7 +196,7 @@ async def test_telegram_bot(
             )
 
         test_message = f"""🤖 **Тест Telegram бота**
-        
+
 ✅ Бот работает корректно!
 👤 Администратор: {current_user.full_name}
 ⏰ Время теста: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
@@ -210,10 +218,7 @@ async def test_telegram_bot(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error testing bot: {str(e)}",
-        ) from e
+        raise _telegram_bot_management_http_error(e, "test_telegram_bot") from e
 
 
 @router.post("/broadcast-system-message")
@@ -263,10 +268,7 @@ async def broadcast_system_message(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error broadcasting system message: {str(e)}",
-        ) from e
+        raise _telegram_bot_management_http_error(e, "broadcast_system_message") from e
 
 
 @router.get("/bot-commands")
@@ -317,7 +319,4 @@ async def get_bot_commands(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting bot commands: {str(e)}",
-        ) from e
+        raise _telegram_bot_management_http_error(e, "get_bot_commands") from e

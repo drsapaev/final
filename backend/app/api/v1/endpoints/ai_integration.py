@@ -3,6 +3,7 @@ API endpoints для AI интеграции в панелях врачей
 Основа: passport.md стр. 3325-3888, detail.md стр. 3889-4282
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -15,6 +16,21 @@ from app.models.user import User
 from app.services.ai_service import AIService, get_ai_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+AI_INTEGRATION_PUBLIC_ERROR = "Internal server error"
+
+
+def _ai_integration_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "AI integration endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=AI_INTEGRATION_PUBLIC_ERROR,
+    )
 
 # ===================== АНАЛИЗ ЖАЛОБ ПАЦИЕНТОВ =====================
 
@@ -51,10 +67,7 @@ async def analyze_patient_complaints(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка анализа жалоб: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "analyze_patient_complaints") from e
 
 
 # ===================== ПОДБОР КОДОВ МКБ-10 =====================
@@ -92,10 +105,7 @@ async def suggest_icd10_codes(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка подбора МКБ-10: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "suggest_icd10_codes") from e
 
 
 # ===================== АНАЛИЗ ДОКУМЕНТОВ =====================
@@ -134,10 +144,7 @@ async def analyze_medical_document(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка анализа документа: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "analyze_medical_document") from e
 
 
 # ===================== ИНТЕРПРЕТАЦИЯ ЛАБОРАТОРНЫХ АНАЛИЗОВ =====================
@@ -196,10 +203,7 @@ async def interpret_lab_results(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка интерпретации анализов: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "interpret_lab_results") from e
 
 
 # ===================== ПОМОЩЬ ПО СИМПТОМАМ =====================
@@ -250,10 +254,7 @@ async def check_symptoms(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки симптомов: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "check_symptoms") from e
 
 
 # ===================== СТАТИСТИКА AI =====================
@@ -315,10 +316,7 @@ def get_ai_usage_stats(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики AI: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "get_ai_usage_stats") from e
 
 
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
@@ -378,7 +376,4 @@ async def quick_diagnosis_help(
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка AI помощи: {str(e)}",
-        )
+        raise _ai_integration_http_error(e, "quick_diagnosis_help") from e
