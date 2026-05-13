@@ -7,11 +7,55 @@ Workflow: `/aif-plan` -> `/aif-improve @.ai-factory/PLAN.md` -> `/aif-implement 
 ## Current Status
 
 - Current task: Task 26 - remaining backend raw print/public error leakage
-- Last completed slice: Task 26 queue cabinet management endpoint leakage cleanup
+- Last completed slice: Task 26 dynamic pricing endpoint leakage cleanup
 - Next task: continue Task 26 with the next one-file mounted runtime leakage slice
 - Blocker state: none for the current slice; Task 26 remains open as a multi-slice audit
 - Runtime code changed: yes
 - Secrets inspected or printed: no
+
+## Task 26 Slice Dynamic Pricing Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`, continued as narrow override
+- reason: mounted dynamic pricing endpoint leaked raw exception text through public HTTP error details
+- risky domain: yes, billing/pricing-adjacent workflow
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 26 sanitize mounted dynamic pricing endpoint raw public exception leakage without changing pricing route contracts roles domain behavior or success payloads" --known-root-cause "backend/app/api/v1/endpoints/dynamic_pricing.py"`
+
+Gate result:
+
+- The gate returned frontend routing files alongside the confirmed backend root-cause file.
+- Per `AGENTS.md`, execution stayed narrowed to `backend/app/api/v1/endpoints/dynamic_pricing.py` plus this recovery log.
+
+Changed behavior:
+
+- Replaced raw public HTTP 500 details that included exception text with generic `Internal server error`.
+- Replaced remaining raw public HTTP 400 `str(e)` details with generic `Invalid dynamic pricing request`.
+- Added structured endpoint logging with action name plus exception class only.
+- Preserved route paths, auth dependencies, status-code classes, success payload shapes, and service/repository behavior.
+- Applied mechanical pyupgrade annotation fixes in the same file because the required `ruff check` failed on existing `typing.List`/`Optional`/`Dict` usage after the endpoint file was selected for validation.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\dynamic_pricing.py`
+  - result: passed
+- `python -m ruff check backend\app\api\v1\endpoints\dynamic_pricing.py`
+  - result: passed after same-file mechanical annotation fixes
+- `python -m black --check backend\app\api\v1\endpoints\dynamic_pricing.py`
+  - result: passed
+- static leakage scan for raw exception details/logging in the file
+  - result: no matches
+- direct endpoint smoke with marker exception
+  - result: passed; HTTP 400 returned `Invalid dynamic pricing request`, HTTP 500 returned `Internal server error`, and marker text did not leak to response or logs
+- `python -m pytest backend\tests\integration\test_dynamic_pricing_api.py backend\tests\unit\test_dynamic_pricing_api_service.py backend\tests\unit\test_service_repository_boundary.py -q --tb=short --disable-warnings`
+  - result: 57 passed, 1 warning
+- `npm.cmd --prefix frontend run build`
+  - result: passed with existing Vite dynamic/static import and large chunk warnings
+
+Scope note:
+
+- Task 26 remains open. This slice only hardens the mounted dynamic pricing endpoint and does not claim all backend runtime leakage is gone.
 
 ## Task 26 Slice Queue Limits Evidence
 
