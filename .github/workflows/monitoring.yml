@@ -6,6 +6,13 @@ on:
   #   - cron: '0 */6 * * *'  # Каждые 6 часов для стабильности
   workflow_dispatch:  # Только ручной запуск
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   system-monitoring:
     name: 📊 Мониторинг системы
@@ -212,6 +219,8 @@ jobs:
       with:
         name: monitoring-report
         path: monitoring-report.md
+        retention-days: 14
+        if-no-files-found: warn
         
     - name: 📧 Уведомление о статусе
       run: |

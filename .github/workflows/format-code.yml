@@ -1,4 +1,4 @@
-name: 🎨 Автоматическое форматирование кода
+name: Code formatting report
 
 on:
   workflow_dispatch:  # Только ручной запуск
@@ -7,9 +7,16 @@ on:
       - 'backend/**/*.py'
       - 'frontend/**/*.{js,jsx,ts,tsx}'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   format-backend:
-    name: 🐍 Форматирование Python кода
+    name: Python formatting report
     runs-on: ubuntu-latest
     
     steps:
@@ -27,33 +34,19 @@ jobs:
         pip install --upgrade pip
         pip install black isort
     
-    - name: 🎨 Форматирование кода
+    - name: 🎨 Отчет о форматировании кода
       run: |
         cd backend
-        echo "🎨 Применяем black форматирование..."
-        black . --line-length 88
-        
-        echo "📦 Применяем isort сортировку импортов..."
-        isort . --profile black
-        
-        echo "✅ Форматирование завершено"
-    
-    - name: 📤 Коммит изменений
-      run: |
-        cd backend
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "⚠️ Найдены изменения форматирования, но автопуш отключен"
-          git status --porcelain
-          echo "✅ Форматирование выполнено (без коммита)"
-        else
-          echo "ℹ️ Нет изменений для коммита"
-        fi
+        echo "🎨 Проверяем black форматирование..."
+        black . --line-length 88 --check --diff || echo "::warning::Python formatting drift detected; report-only workflow."
+
+        echo "📦 Проверяем isort сортировку импортов..."
+        isort . --profile black --check-only --diff || echo "::warning::Python import ordering drift detected; report-only workflow."
+
+        echo "✅ Python formatting report completed without modifying files"
 
   format-frontend:
-    name: 🎨 Форматирование Frontend кода
+    name: Frontend lint report
     runs-on: ubuntu-latest
     
     steps:
@@ -64,33 +57,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
     
     - name: 📦 Установка зависимостей
       run: |
         cd frontend
         npm ci
     
-    - name: 🎨 Форматирование кода
+    - name: 🔍 Отчет frontend lint
       run: |
         cd frontend
-        echo "🎨 Применяем Prettier форматирование..."
-        npm run format || echo "⚠️ Prettier не настроен"
-        
-        echo "🔍 Применяем ESLint исправления..."
-        npm run lint:fix || echo "⚠️ ESLint не настроен"
-        
-        echo "✅ Форматирование завершено"
-    
-    - name: 📤 Коммит изменений
-      run: |
-        cd frontend
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "⚠️ Найдены изменения форматирования frontend, но автопуш отключен"
-          git status --porcelain
-          echo "✅ Frontend форматирование выполнено (без коммита)"
-        else
-          echo "ℹ️ Нет изменений для коммита"
-        fi
+        npm run lint:check || echo "::warning::Frontend lint drift detected; report-only workflow."
+        echo "✅ Frontend lint report completed without modifying files"
