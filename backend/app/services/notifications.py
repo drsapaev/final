@@ -603,7 +603,7 @@ class NotificationSenderService:
                 if not user:
                     logger.warning(
                         "Push target user not found",
-                        extra={"user_id": user_id, "notification_type": notification_type},
+                        extra={"notification_type": notification_type},
                     )
                     return False
 
@@ -641,7 +641,10 @@ class NotificationSenderService:
                 except Exception as hist_e:
                     logger.error(
                         "Failed to save notification history",
-                        extra={"user_id": user_id, "error": str(hist_e)},
+                        extra={
+                            "notification_type": notification_type,
+                            "error_type": type(hist_e).__name__,
+                        },
                     )
 
                 # Отправляем FCM только если есть токен
@@ -659,12 +662,21 @@ class NotificationSenderService:
                 except Exception as ws_e:
                     logger.warning(
                         "Failed to send WebSocket notification without DB",
-                        extra={"user_id": user_id, "error": str(ws_e)},
+                        extra={
+                            "notification_type": notification_type,
+                            "error_type": type(ws_e).__name__,
+                        },
                     )
 
             return True
         except Exception as e:
-            logger.error(f"Ошибка отправки Push: {e}")
+            logger.error(
+                "Push notification delivery failed",
+                extra={
+                    "notification_type": notification_type,
+                    "error_type": type(e).__name__,
+                },
+            )
             return False
 
     async def send_appointment_reminder(
