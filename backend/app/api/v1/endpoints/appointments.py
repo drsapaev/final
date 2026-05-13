@@ -21,6 +21,19 @@ from app.services.service_mapping import get_service_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+APPOINTMENTS_PUBLIC_ERROR = "Internal server error"
+
+
+def _appointments_http_error(exc: Exception, operation: str) -> HTTPException:
+    logger.warning(
+        "Appointments endpoint failed operation=%s error_type=%s",
+        operation,
+        type(exc).__name__,
+    )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=APPOINTMENTS_PUBLIC_ERROR,
+    )
 
 
 # Схема для ответа pending-payments
@@ -446,13 +459,7 @@ async def get_pending_payments(
         return result
 
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения записей: {str(e)}",
-        )
+        raise _appointments_http_error(e, "list_appointments") from e
 
 
 @router.get("/{appointment_id}", response_model=appointment_schemas.Appointment)
@@ -1095,10 +1102,4 @@ async def get_pending_payments(
         return json_result
 
     except Exception as e:
-        import logging
-
-        logging.error(f"Error in get_pending_payments: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при получении записей, ожидающих оплаты: {str(e)}",
-        )
+        raise _appointments_http_error(e, "get_pending_payments") from e
