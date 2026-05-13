@@ -122,6 +122,21 @@ def _resolve_payment_truth(
 
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
+
+def _raise_registrar_internal_error(action: str, exc: Exception) -> None:
+    if isinstance(exc, HTTPException):
+        raise exc
+
+    logger.exception(
+        "registrar_integration: unexpected error during %s (%s)",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    )
+
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
 
 
@@ -478,7 +493,7 @@ def create_queue_profile(
     except Exception as e:
         logger.error(f"Error creating queue profile: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_registrar_internal_error("create queue profile", e)
 
 
 @router.put("/queues/profiles/{profile_key}")
@@ -533,7 +548,7 @@ def update_queue_profile(
     except Exception as e:
         logger.error(f"Error updating queue profile: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_registrar_internal_error("update queue profile", e)
 
 
 @router.delete("/queues/profiles/{profile_key}")
@@ -570,7 +585,7 @@ def delete_queue_profile(
     except Exception as e:
         logger.error(f"Error deleting queue profile: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_registrar_internal_error("delete queue profile", e)
 
 
 @router.post("/queues/profiles/reorder")
@@ -606,7 +621,7 @@ def reorder_queue_profiles(
     except Exception as e:
         logger.error(f"Error reordering queue profiles: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_registrar_internal_error("reorder queue profiles", e)
 
 
 # ===================== СПРАВОЧНИК УСЛУГ (СТАРЫЙ) =====================
