@@ -158,9 +158,13 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Exception in JSON login: {e}")
+    except Exception as exc:
+        logger.warning(
+            "Legacy JSON login endpoint failed operation=%s error_type=%s",
+            "json_login",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}",
-        )
+            detail="Internal server error",
+        ) from exc
