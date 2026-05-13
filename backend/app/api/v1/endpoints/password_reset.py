@@ -2,9 +2,10 @@
 API endpoints для восстановления паролей
 """
 
+import logging
 import re
 from datetime import datetime
-from typing import Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator, model_validator
@@ -16,17 +17,30 @@ from app.models.user import User
 from app.services.password_reset_service import get_password_reset_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def raise_password_reset_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "Password reset endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
 
 
 class PasswordResetInitiateRequest(BaseModel):
     """Запрос на инициацию сброса пароля"""
 
-    phone: Optional[str] = None
-    email: Optional[str] = None
+    phone: str | None = None
+    email: str | None = None
 
     @field_validator('phone')
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if v is None:
             return v
         phone = re.sub(r'[^\d+]', '', v)
@@ -36,7 +50,7 @@ class PasswordResetInitiateRequest(BaseModel):
 
     @field_validator('email')
     @classmethod
-    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+    def validate_email(cls, v: str | None) -> str | None:
         if v is None:
             return v
         if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', v):
@@ -127,10 +141,7 @@ async def initiate_password_reset(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка инициации сброса пароля: {str(e)}",
-        )
+        raise_password_reset_internal_error("initiate_password_reset", e)
 
 
 @router.post("/verify-phone")
@@ -177,10 +188,7 @@ async def verify_phone_for_reset(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка верификации телефона: {str(e)}",
-        )
+        raise_password_reset_internal_error("verify_phone_for_reset", e)
 
 
 @router.post("/confirm")
@@ -215,10 +223,7 @@ async def confirm_password_reset(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка подтверждения сброса пароля: {str(e)}",
-        )
+        raise_password_reset_internal_error("confirm_password_reset", e)
 
 
 @router.get("/validate-token")
@@ -252,10 +257,7 @@ async def validate_reset_token(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка проверки токена: {str(e)}",
-        )
+        raise_password_reset_internal_error("validate_reset_token", e)
 
 
 @router.get("/statistics")
@@ -271,7 +273,4 @@ async def get_password_reset_statistics(
         return {"statistics": stats, "timestamp": datetime.now().isoformat()}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+        raise_password_reset_internal_error("get_password_reset_statistics", e)
