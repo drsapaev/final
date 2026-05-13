@@ -188,7 +188,7 @@ const MacOSStatCard = ({
   };
 
   const renderLoading = () => (
-    <div style={cardStyle}>
+    <div style={cardStyle} aria-busy="true">
       <div style={headerStyle}>
         <div style={{ 
           width: '60%', 
@@ -251,6 +251,7 @@ const MacOSStatCard = ({
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
+        aria-busy={loading}
       >
         {content}
       </div>
@@ -258,7 +259,7 @@ const MacOSStatCard = ({
   }
 
   return (
-    <div className={className} style={cardStyle}>
+    <div className={className} style={cardStyle} aria-busy={loading}>
       {content}
     </div>
   );
