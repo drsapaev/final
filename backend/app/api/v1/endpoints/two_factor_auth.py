@@ -2,11 +2,11 @@
 API endpoints для двухфакторной аутентификации (2FA)
 """
 
-from datetime import datetime, timedelta
 import logging
-from typing import List, NoReturn, Optional
+from datetime import datetime, timedelta
+from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -15,16 +15,13 @@ from app.crud.two_factor_auth import (
     two_factor_backup_code,
     two_factor_device,
     two_factor_recovery,
-    two_factor_session,
 )
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.authentication import LoginResponse
 from app.schemas.two_factor_auth import (
     TwoFactorBackupCodesResponse,
     TwoFactorDeviceListResponse,
     TwoFactorDisableRequest,
-    TwoFactorErrorResponse,
     TwoFactorRecoveryRequest,
     TwoFactorRecoveryResponse,
     TwoFactorSetupRequest,
@@ -35,8 +32,8 @@ from app.schemas.two_factor_auth import (
     TwoFactorVerifyResponse,
 )
 from app.services.authentication_service import get_authentication_service
-from app.services.two_factor_service import get_two_factor_service, TwoFactorService
 from app.services.two_factor_auth_api_service import TwoFactorAuthApiService
+from app.services.two_factor_service import get_two_factor_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,7 +47,7 @@ def raise_two_factor_internal_error(action: str, exc: Exception) -> NoReturn:
     )
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"Error {action}",
+        detail="Internal server error",
     )
 
 
@@ -164,11 +161,12 @@ async def verify_two_factor(
             )
 
         # ✅ CERTIFICATION: Получаем пользователя из access_token или pending_2fa_token
-        user: Optional[User] = None
-        
+        user: User | None = None
+
         # Пробуем получить из access_token (если передан в заголовке)
         try:
             from fastapi.security import HTTPBearer
+
             security = HTTPBearer(auto_error=False)
             token_result = await security(request)
             if token_result and token_result.credentials:
@@ -178,13 +176,13 @@ async def verify_two_factor(
                     pass  # Не JWT токен, пробуем pending_2fa_token
         except Exception:
             pass
-        
+
         # Если access_token не сработал, пробуем pending_2fa_token
         if not user and request_data.pending_2fa_token:
             user = TwoFactorAuthApiService(db).get_user_from_pending_token(
                 request_data.pending_2fa_token
             )
-        
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -207,9 +205,7 @@ async def verify_two_factor(
             # Получаем количество оставшихся backup кодов
             backup_codes_remaining = None
             if request_data.backup_code:
-                two_factor_auth_obj = two_factor_auth.get_by_user_id(
-                    db, user.id
-                )
+                two_factor_auth_obj = two_factor_auth.get_by_user_id(db, user.id)
                 if two_factor_auth_obj:
                     backup_codes_remaining = two_factor_backup_code.get_unused_count(
                         db, two_factor_auth_obj.id
@@ -315,7 +311,7 @@ async def request_two_factor_recovery(
                 detail="2FA configuration not found",
             )
 
-        recovery = two_factor_recovery.create(
+        two_factor_recovery.create(
             db,
             obj_in={
                 "two_factor_auth_id": two_factor_auth_obj.id,
@@ -435,7 +431,9 @@ async def regenerate_backup_codes(
         raise_two_factor_internal_error("regenerating backup codes", e)
 
 
-@router.get("/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False)
+@router.get(
+    "/devices", response_model=TwoFactorDeviceListResponse, include_in_schema=False
+)
 async def get_trusted_devices(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
