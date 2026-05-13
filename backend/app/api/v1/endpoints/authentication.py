@@ -4,44 +4,22 @@ API endpoints для системы аутентификации
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.db.session import get_db
-from app.models.user import User
-from app.services.authentication_service import (
-    get_authentication_service,
-)
-from app.services.authentication_api_service import (
-    AuthenticationApiDomainError,
-    AuthenticationApiService,
-)
-from app.services.user_management_service import get_user_management_service
-
-logger = logging.getLogger(__name__)
 from app.crud.authentication import (
-    email_verification_token,
-    login_attempt,
-    password_reset_token,
-    refresh_token,
-    security_event,
-    user,
     user_activity,
     user_session,
 )
+from app.db.session import get_db
+from app.models.user import User
 from app.schemas.authentication import (
-    AuthErrorResponse,
-    AuthStatsResponse,
     AuthStatusResponse,
     AuthSuccessResponse,
-    DeviceInfoResponse,
     EmailVerificationConfirmRequest,
-    EmailVerificationRequest,
-    LoginAttemptResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -49,26 +27,26 @@ from app.schemas.authentication import (
     PasswordChangeRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
-    PasswordStrengthResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
-    SecurityEventListResponse,
-    SecurityEventResolveRequest,
-    SecurityEventResponse,
     SessionListResponse,
     SessionRevokeRequest,
-    TokenValidationResponse,
     UserActivityResponse,
-    UserCreateRequest,
-    UserDeleteRequest,
-    UserListResponse,
     UserProfileResponse,
     UserProfileUpdateRequest,
     UserSessionResponse,
-    UserUpdateRequest,
 )
+from app.services.authentication_api_service import (
+    AuthenticationApiDomainError,
+    AuthenticationApiService,
+)
+from app.services.authentication_service import (
+    get_authentication_service,
+)
+from app.services.user_management_service import get_user_management_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def get_client_info(request: Request) -> tuple[str, str]:
@@ -76,6 +54,18 @@ def get_client_info(request: Request) -> tuple[str, str]:
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     return ip_address, user_agent
+
+
+def raise_authentication_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "Authentication endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -137,14 +127,7 @@ async def login(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Authentication login endpoint failed",
-            extra={"exception_type": type(e).__name__},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка входа",
-        )
+        raise_authentication_internal_error("login", e)
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
@@ -171,10 +154,7 @@ async def refresh_access_token(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления токена: {str(e)}",
-        )
+        raise_authentication_internal_error("refresh_access_token", e)
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -204,10 +184,7 @@ async def logout(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка выхода: {str(e)}",
-        )
+        raise_authentication_internal_error("logout", e)
 
 
 @router.post("/password-reset", response_model=AuthSuccessResponse)
@@ -240,10 +217,7 @@ async def request_password_reset(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запроса сброса пароля: {str(e)}",
-        )
+        raise_authentication_internal_error("request_password_reset", e)
 
 
 @router.post("/password-reset/confirm", response_model=AuthSuccessResponse)
@@ -267,10 +241,7 @@ async def confirm_password_reset(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка сброса пароля: {str(e)}",
-        )
+        raise_authentication_internal_error("confirm_password_reset", e)
 
 
 @router.post("/password-change", response_model=AuthSuccessResponse)
@@ -299,10 +270,7 @@ async def change_password(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка смены пароля: {str(e)}",
-        )
+        raise_authentication_internal_error("change_password", e)
 
 
 @router.post("/email-verification", response_model=AuthSuccessResponse)
@@ -334,10 +302,7 @@ async def request_email_verification(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запроса верификации email: {str(e)}",
-        )
+        raise_authentication_internal_error("request_email_verification", e)
 
 
 @router.post("/email-verification/confirm", response_model=AuthSuccessResponse)
@@ -359,10 +324,7 @@ async def confirm_email_verification(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка верификации email: {str(e)}",
-        )
+        raise_authentication_internal_error("confirm_email_verification", e)
 
 
 @router.get("/profile", response_model=UserProfileResponse)
@@ -385,10 +347,7 @@ async def get_user_profile(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения профиля: {str(e)}",
-        )
+        raise_authentication_internal_error("get_user_profile", e)
 
 
 @router.put("/profile", response_model=UserProfileResponse)
@@ -416,10 +375,7 @@ async def update_user_profile(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as e:
         api_service.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления профиля: {str(e)}",
-        ) from e
+        raise_authentication_internal_error("update_user_profile", e)
 
 
 @router.get("/sessions", response_model=SessionListResponse)
@@ -465,10 +421,7 @@ async def get_user_sessions(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сессий: {str(e)}",
-        )
+        raise_authentication_internal_error("get_user_sessions", e)
 
 
 @router.delete("/sessions/{session_id}")
@@ -498,13 +451,10 @@ async def revoke_session(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отзыва сессии: {str(e)}",
-        )
+        raise_authentication_internal_error("revoke_session", e)
 
 
-@router.get("/activity", response_model=List[UserActivityResponse])
+@router.get("/activity", response_model=list[UserActivityResponse])
 async def get_user_activity(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -532,10 +482,7 @@ async def get_user_activity(
         return activity_responses
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения активности: {str(e)}",
-        )
+        raise_authentication_internal_error("get_user_activity", e)
 
 
 @router.get("/status", response_model=AuthStatusResponse)
@@ -584,10 +531,7 @@ async def get_auth_status(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса: {str(e)}",
-        )
+        raise_authentication_internal_error("get_auth_status", e)
 
 
 @router.get("/health")
