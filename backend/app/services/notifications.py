@@ -601,10 +601,7 @@ class NotificationSenderService:
             if db:
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
-                    logger.warning(
-                        "Push target user not found",
-                        extra={"user_id": user_id, "notification_type": notification_type},
-                    )
+                    logger.warning("Push target user not found")
                     return False
 
                 platform_service = self._platform_service(db)
@@ -641,7 +638,9 @@ class NotificationSenderService:
                 except Exception as hist_e:
                     logger.error(
                         "Failed to save notification history",
-                        extra={"user_id": user_id, "error": str(hist_e)},
+                        extra={
+                            "error_type": type(hist_e).__name__,
+                        },
                     )
 
                 # Отправляем FCM только если есть токен
@@ -659,12 +658,19 @@ class NotificationSenderService:
                 except Exception as ws_e:
                     logger.warning(
                         "Failed to send WebSocket notification without DB",
-                        extra={"user_id": user_id, "error": str(ws_e)},
+                        extra={
+                            "error_type": type(ws_e).__name__,
+                        },
                     )
 
             return True
         except Exception as e:
-            logger.error(f"Ошибка отправки Push: {e}")
+            logger.error(
+                "Push notification delivery failed",
+                extra={
+                    "error_type": type(e).__name__,
+                },
+            )
             return False
 
     async def send_appointment_reminder(
@@ -846,8 +852,7 @@ class NotificationSenderService:
                     logger.warning(
                         "Failed to parse appointment time for notification",
                         extra={
-                            "appointment_id": appointment_id,
-                            "appointment_time": appointment.appointment_time,
+                            "has_appointment_time": True,
                         },
                     )
 
@@ -1586,13 +1591,19 @@ class NotificationSenderService:
             db.query(Appointment).filter(Appointment.id == appointment_id).first()
         )
         if not appointment:
-            logger.warning(f"Запись не найдена: {appointment_id}")
+            logger.warning(
+                "Appointment notification skipped: appointment not found",
+                extra={"notification_type": notification_type},
+            )
             return []
 
         # Получаем данные пациента
         patient = patient_crud.get(db, id=patient_id)
         if not patient:
-            logger.warning(f"Пациент не найден: {patient_id}")
+            logger.warning(
+                "Appointment notification skipped: patient not found",
+                extra={"notification_type": notification_type},
+            )
             return []
 
         # Данные для шаблона
@@ -1655,15 +1666,19 @@ class NotificationSenderService:
         from app.crud import patient as patient_crud
 
         # Получаем данные пациента
-        patient = patient_crud.get(db, id=patient_id)
-        if not patient:
-            logger.warning(f"Пациент не найден: {patient_id}")
-            return []
-
         canonical_notification_type = _normalize_notification_event_type(
             notification_type,
             fallback="payment_notification",
         )
+
+        patient = patient_crud.get(db, id=patient_id)
+        if not patient:
+            logger.warning(
+                "Payment notification skipped: patient not found",
+                extra={"notification_type": canonical_notification_type},
+            )
+            return []
+
 
         # Данные для шаблона
         template_data = {
