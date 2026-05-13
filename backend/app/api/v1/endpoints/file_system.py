@@ -3,11 +3,12 @@ API endpoints для файловой системы
 """
 
 import io
+import logging
 import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import (
     APIRouter,
@@ -52,8 +53,21 @@ from app.services.file_system_service import get_file_system_service
 from app.utils.file_validator import validate_upload_file
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 IMPORT_ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
+
+
+def raise_file_system_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "File system endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
 
 
 async def _read_limited_import_archive(file: UploadFile, max_bytes: int) -> bytes:
@@ -150,10 +164,7 @@ async def upload_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка загрузки файла: {str(e)}",
-        )
+        raise_file_system_internal_error("upload_file", e)
 
 
 @router.get("/statistics", response_model=FileStats)
@@ -171,10 +182,7 @@ async def get_file_statistics(
         return FileStats(**stats)
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+        raise_file_system_internal_error("get_file_statistics", e)
 
 
 @router.get("/{file_id}", response_model=FileOut)
@@ -201,10 +209,7 @@ async def get_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения файла: {str(e)}",
-        )
+        raise_file_system_internal_error("get_file", e)
 
 
 @router.get("/{file_id}/download")
@@ -231,10 +236,7 @@ async def download_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка скачивания файла: {str(e)}",
-        )
+        raise_file_system_internal_error("download_file", e)
 
 
 @router.get("/{file_id}/preview")
@@ -276,10 +278,7 @@ async def preview_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка предварительного просмотра: {str(e)}",
-        )
+        raise_file_system_internal_error("preview_file", e)
 
 
 @router.post("/search", response_model=FileSearchResponse)
@@ -308,10 +307,7 @@ async def search_files(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка поиска файлов: {str(e)}",
-        )
+        raise_file_system_internal_error("search_files", e)
 
 
 @router.get("/", response_model=FileList)
@@ -373,10 +369,7 @@ async def get_files(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка файлов: {str(e)}",
-        )
+        raise_file_system_internal_error("get_files", e)
 
 
 @router.put("/{file_id}", response_model=FileOut)
@@ -447,10 +440,7 @@ async def update_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления файла: {str(e)}",
-        )
+        raise_file_system_internal_error("update_file", e)
 
 
 @router.put("/{file_id}/content", response_model=FileOut)
@@ -492,10 +482,7 @@ async def replace_file_content(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка замены содержимого файла: {str(e)}",
-        )
+        raise_file_system_internal_error("replace_file_content", e)
 
 
 @router.delete("/{file_id}")
@@ -545,10 +532,7 @@ async def delete_file(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления файла: {str(e)}",
-        )
+        raise_file_system_internal_error("delete_file", e)
 
 
 @router.post("/{file_id}/share", response_model=FileShareOut)
@@ -572,10 +556,7 @@ async def create_file_share(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания совместного использования: {str(e)}",
-        )
+        raise_file_system_internal_error("create_file_share", e)
 
 
 @router.get("/{file_id}/shares", response_model=List[FileShareOut])
@@ -605,10 +586,7 @@ async def get_file_shares(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения совместных использований: {str(e)}",
-        )
+        raise_file_system_internal_error("get_file_shares", e)
 
 
 @router.post("/export", response_model=FileExportResponse)
@@ -644,10 +622,7 @@ async def export_files(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка экспорта файлов: {str(e)}",
-        )
+        raise_file_system_internal_error("export_files", e)
 
 
 @router.post("/import", response_model=FileImportResponse)
@@ -697,10 +672,7 @@ async def import_files(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка импорта файлов: {str(e)}",
-        )
+        raise_file_system_internal_error("import_files", e)
 
 
 @router.post("/cleanup")
@@ -719,7 +691,4 @@ async def cleanup_files(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка очистки файлов: {str(e)}",
-        )
+        raise_file_system_internal_error("cleanup_files", e)
