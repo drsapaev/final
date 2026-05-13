@@ -4,7 +4,6 @@ API endpoints для управления расширенным Telegram бот
 
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -13,10 +12,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
+from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 from app.services.telegram_bot_management_api_service import (
     TelegramBotManagementApiService,
 )
-from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class TelegramNotificationRequest(BaseModel):
     """Запрос на отправку Telegram уведомления"""
 
     message: str
-    user_ids: Optional[List[int]] = None
+    user_ids: list[int] | None = None
     send_to_all_admins: bool = False
     send_to_all_users: bool = False
 
@@ -60,8 +59,8 @@ class TelegramBotStatsResponse(BaseModel):
 class TelegramBotConfigRequest(BaseModel):
     """Конфигурация Telegram бота"""
 
-    bot_token: Optional[str] = None
-    webhook_url: Optional[str] = None
+    bot_token: str | None = None
+    webhook_url: str | None = None
     active: bool = True
 
 

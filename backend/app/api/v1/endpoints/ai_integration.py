@@ -5,15 +5,15 @@ API endpoints для AI интеграции в панелях врачей
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import ai_config as crud_ai
 from app.models.user import User
-from app.services.ai_service import AIService, get_ai_service
+from app.services.ai_service import get_ai_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,12 +32,13 @@ def _ai_integration_http_error(exc: Exception, operation: str) -> HTTPException:
         detail=AI_INTEGRATION_PUBLIC_ERROR,
     )
 
+
 # ===================== АНАЛИЗ ЖАЛОБ ПАЦИЕНТОВ =====================
 
 
 @router.post("/analyze-complaints")
 async def analyze_patient_complaints(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
@@ -75,7 +76,7 @@ async def analyze_patient_complaints(
 
 @router.post("/suggest-icd10")
 async def suggest_icd10_codes(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
@@ -113,7 +114,7 @@ async def suggest_icd10_codes(
 
 @router.post("/analyze-document")
 async def analyze_medical_document(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
@@ -152,7 +153,7 @@ async def analyze_medical_document(
 
 @router.post("/interpret-lab-results")
 async def interpret_lab_results(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Lab")),
 ):
@@ -211,7 +212,7 @@ async def interpret_lab_results(
 
 @router.post("/symptom-checker")
 async def check_symptoms(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
@@ -221,8 +222,6 @@ async def check_symptoms(
     """
     try:
         symptoms = request.get("symptoms", [])
-        patient_age = request.get("patient_age")
-        patient_gender = request.get("patient_gender", "unknown")
 
         if not symptoms:
             raise HTTPException(
@@ -324,7 +323,7 @@ def get_ai_usage_stats(
 
 @router.post("/quick/diagnosis-help")
 async def quick_diagnosis_help(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles("Doctor", "cardio", "cardiology", "derma", "dentist")
