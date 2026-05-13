@@ -593,7 +593,11 @@ async def get_current_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting current session: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "get current session",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка получения текущей сессии",
@@ -625,7 +629,11 @@ async def get_active_user_sessions(
         }
 
     except Exception as e:
-        logger.error(f"Error getting user sessions: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "get active user sessions",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка получения сессий пользователя",
@@ -667,7 +675,11 @@ async def revoke_user_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error revoking session {session_id}: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "revoke session",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка отзыва сессии",
@@ -707,7 +719,11 @@ async def revoke_all_sessions(
         }
 
     except Exception as e:
-        logger.error(f"Error revoking all sessions: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "revoke all sessions",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка отзыва всех сессий",
@@ -739,7 +755,11 @@ async def cleanup_expired_sessions(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error cleaning up expired sessions: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "cleanup expired sessions",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка очистки истекших сессий",
@@ -780,7 +800,11 @@ async def get_session_info(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting session info {session_id}: {e}")
+        logger.error(
+            "Authentication endpoint failed action=%s error_type=%s",
+            "get session info",
+            type(e).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка получения информации о сессии",
