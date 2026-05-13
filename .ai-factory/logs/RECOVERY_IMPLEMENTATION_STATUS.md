@@ -6,10 +6,10 @@ Workflow: `/aif-plan` -> `/aif-improve @.ai-factory/PLAN.md` -> `/aif-implement 
 
 ## Current Status
 
-- Current task: implementation plan tasks completed
-- Last completed task: Task 21 - Align docs and AIF context
-- Next task: `/aif-verify --strict`
-- Blocker state: none for plan implementation; verification still required
+- Current task: Task 26 - remaining backend raw print/public error leakage
+- Last completed slice: Task 26 MCP endpoint leakage cleanup
+- Next task: continue Task 26 with the next one-file mounted runtime leakage slice
+- Blocker state: none for the current slice; Task 26 remains open as a multi-slice audit
 - Runtime code changed: yes
 - Secrets inspected or printed: no
 
@@ -1417,6 +1417,52 @@ Validation run:
 LightRAG evidence note:
 
 - No new LightRAG readiness entry was appended for this routine narrow gate slice; no gate misroute or retrieval regression was observed.
+
+## Task 26 Slice MCP Endpoint Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause` with `backend/app/api/v1/endpoints/mcp.py`
+- reason: mounted MCP/AI clinical endpoint leaked raw exception text in public HTTP 500 details and f-string exception logs
+- risky domain: yes, AI/clinical support endpoint
+- root cause known: selected after the broad Task 26 gate stopped without a first-touch file and repository search identified `mcp.py`
+- command: `python scripts\agent_gate.py "Task 26 sanitize mounted MCP endpoint raw public exception leakage and f-string exception logging without changing AI clinical suggestion behavior auth guards routes or success payloads" --known-root-cause "backend/app/api/v1/endpoints/mcp.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/api/v1/endpoints/mcp.py`
+- first-touch files: `backend/app/api/v1/endpoints/mcp.py`
+- validation target: compile, ruff, black, static leakage scan, direct endpoint smoke
+- stop condition watched first: any required edit outside `mcp.py` or any change to routes, auth guards, success payload shapes, or AI clinical decision boundaries
+
+Changed behavior:
+
+- Replaced raw public `detail=str(e)` HTTP 500 responses with a generic `Internal server error`.
+- Replaced f-string exception logs with structured action name plus exception class only.
+- Removed raw exception text from ICD-10 fallback response messages while preserving the existing non-500 fallback shape.
+- Preserved explicit `HTTPException` guard behavior for role/file/JSON validation paths so intended 403/400 responses are not converted to generic 500 responses.
+- Applied same-file ruff mechanical typing fixes so changed-file lint stays clean.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\mcp.py`
+  - result: passed
+- `python -m ruff check backend\app\api\v1\endpoints\mcp.py`
+  - result: passed
+- `python -m black --check backend\app\api\v1\endpoints\mcp.py`
+  - result: passed
+- `rg -n "str\(e\)|str\(exc\)|str\(mcp_error\)|detail=str\(|logger\.error\(f|logger\.warning\(f|print\(" backend\app\api\v1\endpoints\mcp.py`
+  - result: no matches
+- direct async endpoint smoke with monkeypatched MCP managers raising a marker exception
+  - result: passed; HTTP 500 returned `Internal server error`, marker text did not leak to response or logs, ICD-10 fallback message did not include the marker, and a role guard still returned HTTP 403
+- `python -m pytest backend\tests\test_security_middleware.py -q --tb=short --disable-warnings`
+  - result: 24 passed, 1 warning
+- `git diff --check`
+  - result: passed; Git printed line-ending normalization warnings only
+
+Scope note:
+
+- Task 26 remains open. This slice hardens only the mounted MCP endpoint and does not claim all backend runtime leakage is gone.
 
 ## Task 26 Current Slice Evidence (2026-05-12 - EMR AI endpoint)
 

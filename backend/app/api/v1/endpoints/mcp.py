@@ -5,7 +5,7 @@ MCP (Model Context Protocol) API endpoints
 import base64
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -19,13 +19,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def log_mcp_service_unavailable(action: str, exc: Exception) -> None:
+    logger.warning(
+        "MCP service unavailable action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+
+
+def raise_mcp_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "MCP endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(status_code=500, detail="Internal server error") from exc
+
+
 # === MCP Management Endpoints ===
 
 
 @router.get("/status")
 async def get_mcp_status(
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получить статус MCP системы"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -35,14 +52,13 @@ async def get_mcp_status(
             "capabilities": await mcp_manager.get_capabilities(),
         }
     except Exception as e:
-        logger.error(f"Error getting MCP status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("get_mcp_status", e)
 
 
 @router.get("/health")
 async def mcp_health_check(
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Проверка здоровья MCP серверов"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -52,14 +68,13 @@ async def mcp_health_check(
         else:
             return {"overall": "unhealthy", "error": "MCP client not initialized"}
     except Exception as e:
-        logger.error(f"Error checking MCP health: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_health_check", e)
 
 
 @router.get("/metrics")
 async def get_mcp_metrics(
-    server: Optional[str] = None, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+    server: str | None = None, current_user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """Получить метрики MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -67,14 +82,13 @@ async def get_mcp_metrics(
             return mcp_manager.get_server_metrics(server)
         return mcp_manager.get_metrics()
     except Exception as e:
-        logger.error(f"Error getting MCP metrics: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("get_mcp_metrics", e)
 
 
 @router.get("/circuit-breaker")
 async def get_circuit_breaker_status(
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получить статус circuit breaker для всех серверов"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -87,14 +101,13 @@ async def get_circuit_breaker_status(
             },
         }
     except Exception as e:
-        logger.error(f"Error getting circuit breaker status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("get_circuit_breaker_status", e)
 
 
 @router.post("/reset-metrics")
 async def reset_mcp_metrics(
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Сбросить метрики MCP (только для админов)"""
     try:
         if current_user.role not in ["admin", "Admin"]:
@@ -103,9 +116,10 @@ async def reset_mcp_metrics(
         mcp_manager = await get_mcp_manager()
         await mcp_manager.reset_metrics()
         return {"status": "success", "message": "Metrics reset successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error resetting MCP metrics: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("reset_mcp_metrics", e)
 
 
 # === Complaint Analysis via MCP ===
@@ -115,16 +129,16 @@ class MCPComplaintRequest(BaseModel):
     """Запрос на анализ жалоб через MCP"""
 
     complaint: str
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
+    patient_age: int | None = None
+    patient_gender: str | None = None
     urgency_assessment: bool = True
-    provider: Optional[str] = None
+    provider: str | None = None
 
 
 @router.post("/complaint/analyze")
 async def mcp_analyze_complaint(
     request: MCPComplaintRequest, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Анализ жалоб через MCP"""
     try:
         # Расширенный список разрешенных ролей
@@ -172,15 +186,16 @@ async def mcp_analyze_complaint(
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in MCP complaint analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_analyze_complaint", e)
 
 
 @router.post("/complaint/validate")
 async def mcp_validate_complaint(
     complaint: str, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Валидация жалоб через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -194,14 +209,13 @@ async def mcp_validate_complaint(
         return result
 
     except Exception as e:
-        logger.error(f"Error in MCP complaint validation: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_validate_complaint", e)
 
 
 @router.get("/complaint/templates")
 async def mcp_get_complaint_templates(
-    specialty: Optional[str] = None, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+    specialty: str | None = None, current_user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """Получить шаблоны жалоб через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -215,8 +229,7 @@ async def mcp_get_complaint_templates(
         return result
 
     except Exception as e:
-        logger.error(f"Error getting complaint templates: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_get_complaint_templates", e)
 
 
 # === ICD-10 via MCP ===
@@ -225,17 +238,17 @@ async def mcp_get_complaint_templates(
 class MCPICD10Request(BaseModel):
     """Запрос на работу с МКБ-10 через MCP"""
 
-    symptoms: List[str]
-    diagnosis: Optional[str] = None
-    specialty: Optional[str] = None
-    provider: Optional[str] = None
+    symptoms: list[str]
+    diagnosis: str | None = None
+    specialty: str | None = None
+    provider: str | None = None
     max_suggestions: int = 5
 
 
 @router.post("/icd10/suggest")
 async def mcp_suggest_icd10(
     request: MCPICD10Request, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Подсказки МКБ-10 через MCP"""
     try:
         # Расширенный список разрешенных ролей
@@ -327,21 +340,21 @@ async def mcp_suggest_icd10(
 
         except Exception as mcp_error:
             # Если ошибка при обращении к MCP, возвращаем корректный ответ вместо 500
-            logger.warning(f"MCP ICD-10 service error: {str(mcp_error)}")
+            log_mcp_service_unavailable("mcp_suggest_icd10_service", mcp_error)
             return {
                 "suggestions": [],
-                "message": f"Сервис подбора МКБ-10 временно недоступен: {str(mcp_error)}",
+                "message": "Сервис подбора МКБ-10 временно недоступен",
                 "success": False,
             }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in MCP ICD-10 suggestions: {str(e)}")
+        log_mcp_service_unavailable("mcp_suggest_icd10", e)
         # Возвращаем корректный ответ вместо 500
         return {
             "suggestions": [],
-            "message": f"Ошибка при подборе кодов МКБ-10: {str(e)}",
+            "message": "Сервис подбора МКБ-10 временно недоступен",
             "success": False,
         }
 
@@ -349,10 +362,10 @@ async def mcp_suggest_icd10(
 @router.post("/icd10/validate")
 async def mcp_validate_icd10(
     code: str,
-    symptoms: Optional[List[str]] = None,
-    diagnosis: Optional[str] = None,
+    symptoms: list[str] | None = None,
+    diagnosis: str | None = None,
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Валидация кода МКБ-10 через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -366,17 +379,16 @@ async def mcp_validate_icd10(
         return result
 
     except Exception as e:
-        logger.error(f"Error in MCP ICD-10 validation: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_validate_icd10", e)
 
 
 @router.get("/icd10/search")
 async def mcp_search_icd10(
     query: str,
-    category: Optional[str] = None,
+    category: str | None = None,
     limit: int = 10,
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Поиск кодов МКБ-10 через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -390,8 +402,7 @@ async def mcp_search_icd10(
         return result
 
     except Exception as e:
-        logger.error(f"Error in MCP ICD-10 search: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_search_icd10", e)
 
 
 # === Lab Analysis via MCP ===
@@ -400,17 +411,17 @@ async def mcp_search_icd10(
 class MCPLabRequest(BaseModel):
     """Запрос на анализ лабораторных данных через MCP"""
 
-    results: List[Dict[str, Any]]
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
-    provider: Optional[str] = None
+    results: list[dict[str, Any]]
+    patient_age: int | None = None
+    patient_gender: str | None = None
+    provider: str | None = None
     include_recommendations: bool = True
 
 
 @router.post("/lab/interpret")
 async def mcp_interpret_lab_results(
     request: MCPLabRequest, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Интерпретация лабораторных результатов через MCP"""
     try:
         if current_user.role not in ["doctor", "lab", "admin", "Admin"]:
@@ -437,15 +448,16 @@ async def mcp_interpret_lab_results(
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in MCP lab interpretation: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_interpret_lab_results", e)
 
 
 @router.post("/lab/check-critical")
 async def mcp_check_critical_values(
-    results: List[Dict[str, Any]], current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+    results: list[dict[str, Any]], current_user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """Проверка критических значений через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -459,16 +471,15 @@ async def mcp_check_critical_values(
         return result
 
     except Exception as e:
-        logger.error(f"Error checking critical values: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_check_critical_values", e)
 
 
 @router.get("/lab/normal-ranges")
 async def mcp_get_normal_ranges(
-    test_name: Optional[str] = None,
-    patient_gender: Optional[str] = None,
+    test_name: str | None = None,
+    patient_gender: str | None = None,
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Получить нормальные диапазоны через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -482,8 +493,7 @@ async def mcp_get_normal_ranges(
         return result
 
     except Exception as e:
-        logger.error(f"Error getting normal ranges: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_get_normal_ranges", e)
 
 
 # === Medical Imaging via MCP ===
@@ -493,11 +503,11 @@ async def mcp_get_normal_ranges(
 async def mcp_analyze_image(
     image: UploadFile = File(...),
     image_type: str = Form(...),
-    modality: Optional[str] = Form(None),
-    clinical_context: Optional[str] = Form(None),
-    provider: Optional[str] = Form(None),
+    modality: str | None = Form(None),
+    clinical_context: str | None = Form(None),
+    provider: str | None = Form(None),
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Анализ медицинского изображения через MCP"""
     try:
         if current_user.role not in ["doctor", "admin", "Admin"]:
@@ -528,19 +538,20 @@ async def mcp_analyze_image(
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in MCP image analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_analyze_image", e)
 
 
 @router.post("/imaging/skin-lesion")
 async def mcp_analyze_skin_lesion(
     image: UploadFile = File(...),
-    lesion_info: Optional[str] = Form(None),
-    patient_history: Optional[str] = Form(None),
-    provider: Optional[str] = Form(None),
+    lesion_info: str | None = Form(None),
+    patient_history: str | None = Form(None),
+    provider: str | None = Form(None),
     current_user: User = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Анализ кожных образований через MCP"""
     try:
         if current_user.role not in ["doctor", "admin", "Admin"]:
@@ -569,17 +580,18 @@ async def mcp_analyze_skin_lesion(
 
         return result
 
+    except HTTPException:
+        raise
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Неверный формат JSON данных")
     except Exception as e:
-        logger.error(f"Error in MCP skin lesion analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_analyze_skin_lesion", e)
 
 
 @router.get("/imaging/types")
 async def mcp_get_imaging_types(
-    category: Optional[str] = None, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+    category: str | None = None, current_user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """Получить типы медицинских изображений через MCP"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -593,8 +605,7 @@ async def mcp_get_imaging_types(
         return result
 
     except Exception as e:
-        logger.error(f"Error getting imaging types: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_get_imaging_types", e)
 
 
 # === Batch Processing ===
@@ -603,14 +614,14 @@ async def mcp_get_imaging_types(
 class MCPBatchRequest(BaseModel):
     """Запрос на пакетную обработку через MCP"""
 
-    requests: List[Dict[str, Any]]
+    requests: list[dict[str, Any]]
     parallel: bool = True
 
 
 @router.post("/batch")
 async def mcp_batch_process(
     request: MCPBatchRequest, current_user: User = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Пакетная обработка запросов через MCP"""
     try:
         if current_user.role not in ["doctor", "admin", "Admin"]:
@@ -624,9 +635,10 @@ async def mcp_batch_process(
 
         return results
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in MCP batch processing: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_batch_process", e)
 
 
 # === Server Capabilities ===
@@ -634,8 +646,8 @@ async def mcp_batch_process(
 
 @router.get("/capabilities")
 async def mcp_get_capabilities(
-    server: Optional[str] = None, current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
+    server: str | None = None, current_user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """Получить возможности MCP серверов"""
     try:
         mcp_manager = await get_mcp_manager()
@@ -646,5 +658,4 @@ async def mcp_get_capabilities(
             return {"status": "error", "error": "MCP client not initialized"}
 
     except Exception as e:
-        logger.error(f"Error getting MCP capabilities: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise_mcp_internal_error("mcp_get_capabilities", e)
