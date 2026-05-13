@@ -198,7 +198,7 @@ def create_payment(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания платежа: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -301,7 +301,7 @@ def generate_receipt(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации квитанции: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -328,7 +328,7 @@ def download_receipt(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка скачивания квитанции: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -359,7 +359,7 @@ async def create_payment_invoice(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания счета: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -377,5 +377,5 @@ async def get_pending_invoices(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения счетов: {str(e)}",
+            detail="Internal server error",
         )
