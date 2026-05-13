@@ -85,7 +85,7 @@ def get_user_data_summary(
         logger.error(f"Ошибка получения сводки данных пользователя {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения данных: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -128,7 +128,7 @@ def search_users_for_transfer(
         logger.error(f"Ошибка поиска пользователей: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка поиска: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -181,7 +181,7 @@ def transfer_user_data(
         logger.error(f"Ошибка передачи данных: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка передачи данных: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -235,7 +235,7 @@ def request_transfer_confirmation(
         logger.error(f"Ошибка создания запроса на передачу: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания запроса: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -269,7 +269,7 @@ def confirm_data_transfer(
         logger.error(f"Ошибка подтверждения передачи: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка подтверждения: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -304,7 +304,7 @@ def get_transfer_history(
         logger.error(f"Ошибка получения истории передач: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения истории: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -335,7 +335,7 @@ def get_transfer_statistics(
         logger.error(f"Ошибка получения статистики передач: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -372,7 +372,7 @@ def validate_transfer_request(
         logger.error(f"Ошибка валидации запроса передачи: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка валидации: {str(e)}",
+            detail="Internal server error",
         )
 
 
