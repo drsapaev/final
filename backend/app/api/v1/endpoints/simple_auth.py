@@ -1,6 +1,7 @@
 """
 Упрощенный endpoint авторизации без сложных зависимостей
 """
+import logging
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,7 @@ from app.services.auth_fallback_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class SimpleLoginRequest(BaseModel):
@@ -51,9 +53,14 @@ async def simple_login(
     except AuthFallbackDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as exc:
+        logger.warning(
+            "Simple fallback login endpoint failed operation=%s error_type=%s",
+            "simple_login",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(exc)}",
+            detail="Internal server error",
         ) from exc
 
 
