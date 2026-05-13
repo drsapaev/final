@@ -32,8 +32,11 @@ import auth from './stores/auth.js';
 import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards.jsx';
 import { getRouteChromeState } from './routing/routeSelectors.js';
+import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy.js';
 
 bootstrapStoredColorScheme();
+
+const beforeSendSpeedInsights = (event) => sanitizeSpeedInsightsEvent(event, ROUTE_REGISTRY);
 
 const CashierPanel = lazy(() => import('./pages/CashierPanel.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -296,7 +299,7 @@ export default function App() {
             draggable
             theme="colored"
           />
-          <SpeedInsights />
+          <SpeedInsights beforeSend={beforeSendSpeedInsights} />
         </AppProviders>
       </ThemeProvider>
     </MacOSThemeProvider>
