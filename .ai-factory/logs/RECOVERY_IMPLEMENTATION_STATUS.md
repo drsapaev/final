@@ -7,11 +7,93 @@ Workflow: `/aif-plan` -> `/aif-improve @.ai-factory/PLAN.md` -> `/aif-implement 
 ## Current Status
 
 - Current task: Task 26 - remaining backend raw print/public error leakage
-- Last completed slice: Task 26 MCP endpoint leakage cleanup
+- Last completed slice: Task 26 queue cabinet management endpoint leakage cleanup
 - Next task: continue Task 26 with the next one-file mounted runtime leakage slice
 - Blocker state: none for the current slice; Task 26 remains open as a multi-slice audit
 - Runtime code changed: yes
 - Secrets inspected or printed: no
+
+## Task 26 Slice Wait-Time Analytics Evidence
+
+Post-merge recovery note:
+
+- PR #672 merged commit `a5efc515670478947eb17167137d3214f8c77908`.
+- Runtime file changed: `backend/app/api/v1/endpoints/wait_time_analytics.py`.
+- The intended recovery-log note was not included in PR #672, so this section records the already-merged evidence without reopening that code slice.
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`, continued as narrow override
+- reason: mounted analytics endpoint leaked raw exception text through public HTTP 500 details and f-string exception logs
+- risky domain: yes
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 26 sanitize mounted wait_time_analytics endpoint raw public exception leakage and f-string exception logging without changing analytics route contracts auth guards or success payloads" --known-root-cause "backend/app/api/v1/endpoints/wait_time_analytics.py"`
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\wait_time_analytics.py`
+  - result: passed
+- `python -m ruff check backend\app\api\v1\endpoints\wait_time_analytics.py`
+  - result: passed
+- `python -m black --check backend\app\api\v1\endpoints\wait_time_analytics.py`
+  - result: passed
+- static leakage scan for raw exception details/logging in the file
+  - result: no matches
+- direct async endpoint smoke with marker exception
+  - result: passed; HTTP 500 returned `Internal server error`, marker text did not leak to response or logs, and invalid date remained HTTP 400
+- `python -m pytest backend\tests\test_security_middleware.py -q --tb=short --disable-warnings`
+  - result: 24 passed, 1 warning
+- `npm.cmd --prefix frontend run build`
+  - result: passed with existing Vite chunk/import warnings
+- GitHub PR #672 CI
+  - result: passed; PR merged and remote branch pruned
+
+Scope note:
+
+- Task 26 remains open. This slice only hardened the mounted wait-time analytics endpoint and did not claim repo-wide leak cleanup.
+
+## Task 26 Slice Queue Cabinet Management Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`, continued as narrow override
+- reason: mounted queue cabinet endpoint leaked raw exception text through public HTTP 500 details and f-string exception logs
+- risky domain: yes, queue/cabinet routing and staff workflow
+- root cause known: yes
+- command: `python scripts\agent_gate.py "Task 26 sanitize mounted queue cabinet management endpoint raw public exception leakage and f-string exception logging without changing queue cabinet route contracts roles domain errors or success payloads" --known-root-cause "backend/app/api/v1/endpoints/queue_cabinet_management.py"`
+
+Gate result:
+
+- The gate included frontend routing files due routing ownership, even with the confirmed backend root-cause file.
+- Per `AGENTS.md`, execution continued as a narrow override limited to `backend/app/api/v1/endpoints/queue_cabinet_management.py` plus this recovery log.
+
+Changed behavior:
+
+- Replaced raw public HTTP 500 details that included exception text with generic `Internal server error`.
+- Replaced f-string exception logging with structured action name plus exception class only.
+- Preserved route paths, role dependencies, domain-error passthrough, success payload shapes, and service/repository behavior.
+- Added explicit `HTTPException` passthrough so endpoint-local validation such as bad date keeps its intended 400 response instead of being masked as generic 500.
+
+Validation run:
+
+- `python -m py_compile backend\app\api\v1\endpoints\queue_cabinet_management.py`
+  - result: passed
+- `python -m ruff check backend\app\api\v1\endpoints\queue_cabinet_management.py`
+  - result: passed
+- `python -m black --check backend\app\api\v1\endpoints\queue_cabinet_management.py`
+  - result: passed
+- static leakage scan for raw exception details/logging in the file
+  - result: no matches
+- direct endpoint smoke with marker exception
+  - result: passed; HTTP 500 returned `Internal server error`, marker text did not leak to response or logs, and bad-date remained HTTP 400
+- `python -m pytest backend\tests\architecture\test_w2c_queue_boundaries.py backend\tests\unit\test_queue_cabinet_management_api_service.py backend\tests\integration\test_admin_linkage_cleanup.py -q --tb=short --disable-warnings`
+  - result: 15 passed, 1 warning
+- `npm.cmd --prefix frontend run build`
+  - result: passed with existing Vite chunk/import warnings
+
+Scope note:
+
+- Task 26 remains open. This slice only hardens the mounted queue cabinet management endpoint and does not claim all backend runtime leakage is gone.
 
 ## Task 1 Evidence
 
