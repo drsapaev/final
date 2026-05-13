@@ -379,7 +379,7 @@ async def update_user_profile(
 
 
 @router.get("/sessions", response_model=SessionListResponse)
-async def get_user_sessions(
+async def get_paginated_user_sessions(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -425,7 +425,7 @@ async def get_user_sessions(
 
 
 @router.delete("/sessions/{session_id}")
-async def revoke_session(
+async def delete_user_session(
     session_id: int,
     request_data: SessionRevokeRequest,
     db: Session = Depends(get_db),
@@ -601,7 +601,7 @@ async def get_current_session(
 
 
 @router.get("/sessions", include_in_schema=False)
-async def get_user_sessions(
+async def get_active_user_sessions(
     active_only: bool = Query(True, description="Только активные сессии"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -633,7 +633,7 @@ async def get_user_sessions(
 
 
 @router.post("/sessions/{session_id}/revoke")
-async def revoke_session(
+async def revoke_user_session(
     session_id: int,
     reason: str = Query("manual", description="Причина отзыва сессии"),
     current_user: User = Depends(get_current_user),
