@@ -1,8 +1,9 @@
 """
 Упрощенный endpoint авторизации без сложных зависимостей
 """
+
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class SimpleLoginRequest(BaseModel):
     """Простая схема для входа"""
+
     username: str
     password: str
     remember_me: bool = False
@@ -28,17 +30,15 @@ class SimpleLoginRequest(BaseModel):
 
 class SimpleLoginResponse(BaseModel):
     """Простая схема ответа"""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 @router.post("/simple-login", response_model=SimpleLoginResponse)
-async def simple_login(
-    request_data: SimpleLoginRequest,
-    db: Session = Depends(get_db)
-):
+async def simple_login(request_data: SimpleLoginRequest, db: Session = Depends(get_db)):
     """
     Упрощенный вход в систему без сложных зависимостей
     """
@@ -67,11 +67,10 @@ async def simple_login(
 @router.get("/me")
 async def get_current_user_simple(
     db: Session = Depends(get_db),
-    current_user: User = Depends(lambda: None)  # Временно отключено
+    current_user: User = Depends(lambda: None),  # Временно отключено
 ):
     """
     Получить информацию о текущем пользователе
     """
     # Временная заглушка
     return {"message": "Endpoint /me временно недоступен"}
-
