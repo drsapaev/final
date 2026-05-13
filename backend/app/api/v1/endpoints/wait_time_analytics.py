@@ -4,7 +4,7 @@ API endpoints для аналитики времени ожидания
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import List, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -17,6 +17,19 @@ from app.services.wait_time_analytics_service import get_wait_time_analytics_ser
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def raise_wait_time_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "Wait-time analytics endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
+
 
 # ===================== PYDANTIC СХЕМЫ =====================
 
@@ -111,11 +124,7 @@ async def get_wait_time_analytics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения аналитики времени ожидания: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения аналитики: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_wait_time_analytics", e)
 
 
 @router.get("/real-time-wait-estimates", response_model=RealTimeWaitEstimateResponse)
@@ -132,13 +141,7 @@ async def get_real_time_wait_estimates(
         return RealTimeWaitEstimateResponse(**estimates)
 
     except Exception as e:
-        logger.error(
-            f"Ошибка получения оценок времени ожидания в реальном времени: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения оценок: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_real_time_wait_estimates", e)
 
 
 @router.get("/service-wait-analytics", response_model=ServiceWaitAnalyticsResponse)
@@ -182,11 +185,7 @@ async def get_service_wait_analytics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения аналитики времени ожидания по услугам: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения аналитики: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_service_wait_analytics", e)
 
 
 @router.get("/wait-time-summary")
@@ -229,11 +228,7 @@ async def get_wait_time_summary(
         return summary
 
     except Exception as e:
-        logger.error(f"Ошибка получения сводки времени ожидания: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_wait_time_summary", e)
 
 
 @router.get("/wait-time-comparison")
@@ -321,11 +316,7 @@ async def get_wait_time_comparison(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка сравнения времени ожидания: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка сравнения: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_wait_time_comparison", e)
 
 
 @router.get("/wait-time-heatmap")
@@ -404,11 +395,7 @@ async def get_wait_time_heatmap(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка получения тепловой карты времени ожидания: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения тепловой карты: {str(e)}",
-        )
+        raise_wait_time_internal_error("get_wait_time_heatmap", e)
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
