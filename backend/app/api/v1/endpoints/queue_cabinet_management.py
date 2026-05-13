@@ -4,7 +4,7 @@ API endpoints для управления информацией о кабине
 
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -12,15 +12,27 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
-from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 from app.services.queue_cabinet_management_api_service import (
     QueueCabinetManagementApiService,
     QueueCabinetManagementDomainError,
 )
+from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _raise_queue_cabinet_internal_error(action: str, exc: Exception) -> NoReturn:
+    logger.error(
+        "Queue cabinet management endpoint failed action=%s error_type=%s",
+        action,
+        type(exc).__name__,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+    ) from exc
 
 
 def _parse_day_query(day: str | None) -> date | None:
@@ -39,9 +51,9 @@ def _parse_day_query(day: str | None) -> date | None:
 
 
 class CabinetInfo(BaseModel):
-    cabinet_number: Optional[str] = None
-    cabinet_floor: Optional[int] = None
-    cabinet_building: Optional[str] = None
+    cabinet_number: str | None = None
+    cabinet_floor: int | None = None
+    cabinet_building: str | None = None
 
 
 class QueueCabinetUpdateRequest(BaseModel):
@@ -54,32 +66,32 @@ class QueueCabinetResponse(BaseModel):
     day: str
     specialist_id: int
     specialist_name: str
-    queue_tag: Optional[str]
-    cabinet_number: Optional[str]
-    doctor_cabinet: Optional[str]
-    effective_cabinet: Optional[str]
-    cabinet_floor: Optional[int]
-    cabinet_building: Optional[str]
+    queue_tag: str | None
+    cabinet_number: str | None
+    doctor_cabinet: str | None
+    effective_cabinet: str | None
+    cabinet_floor: int | None
+    cabinet_building: str | None
     entries_count: int
     active: bool
     linked_doctor_found: bool
     doctor_has_cabinet: bool
     sync_status: str
-    integrity_warnings: List[str]
+    integrity_warnings: list[str]
 
 
 class BulkCabinetUpdateRequest(BaseModel):
-    updates: List[QueueCabinetUpdateRequest]
+    updates: list[QueueCabinetUpdateRequest]
 
 
 # ===================== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
 
 
-@router.get("/queues/cabinet-info", response_model=List[QueueCabinetResponse])
+@router.get("/queues/cabinet-info", response_model=list[QueueCabinetResponse])
 def get_queues_cabinet_info(
-    day: Optional[str] = Query(None, description="Дата в формате YYYY-MM-DD"),
-    specialist_id: Optional[int] = Query(None, description="ID специалиста"),
-    cabinet_number: Optional[str] = Query(None, description="Номер кабинета"),
+    day: str | None = Query(None, description="Дата в формате YYYY-MM-DD"),
+    specialist_id: int | None = Query(None, description="ID специалиста"),
+    cabinet_number: str | None = Query(None, description="Номер кабинета"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
@@ -95,12 +107,10 @@ def get_queues_cabinet_info(
         return [QueueCabinetResponse(**item) for item in payload]
     except QueueDomainReadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
-        logger.error(f"Ошибка получения информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о кабинетах: {str(e)}",
-        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _raise_queue_cabinet_internal_error("get_queues_cabinet_info", exc)
 
 
 @router.get("/queues/{queue_id}/cabinet-info")
@@ -117,14 +127,10 @@ def get_queue_cabinet_info(
         return QueueCabinetResponse(**payload)
     except QueueDomainReadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
-        logger.error(
-            f"Ошибка получения информации о кабинете для очереди {queue_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения информации о кабинете: {str(e)}",
-        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _raise_queue_cabinet_internal_error("get_queue_cabinet_info", exc)
 
 
 # ===================== ОБНОВЛЕНИЕ ИНФОРМАЦИИ О КАБИНЕТАХ =====================
@@ -154,15 +160,11 @@ def update_queue_cabinet_info(
         )
     except QueueCabinetManagementDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as exc:
         service.rollback()
-        logger.error(
-            f"Ошибка обновления информации о кабинете для очереди {queue_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления информации о кабинете: {str(e)}",
-        )
+        _raise_queue_cabinet_internal_error("update_queue_cabinet_info", exc)
 
 
 @router.put("/queues/cabinet-info/bulk")
@@ -185,13 +187,11 @@ def bulk_update_cabinet_info(
             updates=updates,
             updated_by=current_user.username,
         )
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as exc:
         service.rollback()
-        logger.error(f"Ошибка массового обновления информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка массового обновления: {str(e)}",
-        )
+        _raise_queue_cabinet_internal_error("bulk_update_cabinet_info", exc)
 
 
 # ===================== СИНХРОНИЗАЦИЯ С ТАБЛИЦЕЙ DOCTORS =====================
@@ -199,12 +199,10 @@ def bulk_update_cabinet_info(
 
 @router.post("/queues/sync-cabinet-info")
 def sync_cabinet_info_from_doctors(
-    day: Optional[str] = Query(
+    day: str | None = Query(
         None, description="Дата для синхронизации (по умолчанию сегодня)"
     ),
-    specialist_id: Optional[int] = Query(
-        None, description="ID конкретного специалиста"
-    ),
+    specialist_id: int | None = Query(None, description="ID конкретного специалиста"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ):
@@ -221,13 +219,11 @@ def sync_cabinet_info_from_doctors(
         )
     except QueueCabinetManagementDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as exc:
         service.rollback()
-        logger.error(f"Ошибка синхронизации информации о кабинетах: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка синхронизации: {str(e)}",
-        )
+        _raise_queue_cabinet_internal_error("sync_cabinet_info_from_doctors", exc)
 
 
 # ===================== СТАТИСТИКА ПО КАБИНЕТАМ =====================
@@ -235,10 +231,8 @@ def sync_cabinet_info_from_doctors(
 
 @router.get("/queues/cabinet-statistics")
 def get_cabinet_statistics(
-    date_from: Optional[str] = Query(
-        None, description="Дата начала в формате YYYY-MM-DD"
-    ),
-    date_to: Optional[str] = Query(
+    date_from: str | None = Query(None, description="Дата начала в формате YYYY-MM-DD"),
+    date_to: str | None = Query(
         None, description="Дата окончания в формате YYYY-MM-DD"
     ),
     db: Session = Depends(get_db),
@@ -254,9 +248,7 @@ def get_cabinet_statistics(
         )
     except QueueCabinetManagementDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except Exception as e:
-        logger.error(f"Ошибка получения статистики по кабинетам: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _raise_queue_cabinet_internal_error("get_cabinet_statistics", exc)
