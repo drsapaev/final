@@ -5,32 +5,34 @@ from pathlib import Path
 import unittest
 
 
-SOURCE_PATH = Path(__file__).resolve().parents[2] / "app" / "services" / "notifications.py"
+SOURCE_PATH = (
+    Path(__file__).resolve().parents[2] / "app" / "services" / "notifications.py"
+)
 SOURCE_TEXT = SOURCE_PATH.read_text(encoding="utf-8")
 SOURCE_TREE = ast.parse(SOURCE_TEXT)
 
 
-def _send_push_node() -> ast.AsyncFunctionDef:
+def _async_function_node(name: str) -> ast.AsyncFunctionDef:
     for node in ast.walk(SOURCE_TREE):
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "send_push":
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name:
             return node
-    raise AssertionError("send_push async function not found")
+    raise AssertionError(f"{name} async function not found")
 
 
-def _logger_calls() -> list[ast.Call]:
+def _logger_calls_in(node: ast.AST) -> list[ast.Call]:
     calls: list[ast.Call] = []
-    for node in ast.walk(_send_push_node()):
-        if not isinstance(node, ast.Call):
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Call):
             continue
-        if not isinstance(node.func, ast.Attribute):
+        if not isinstance(child.func, ast.Attribute):
             continue
-        if not isinstance(node.func.value, ast.Name):
+        if not isinstance(child.func.value, ast.Name):
             continue
-        if node.func.value.id != "logger":
+        if child.func.value.id != "logger":
             continue
-        if node.func.attr not in {"warning", "error"}:
+        if child.func.attr not in {"warning", "error"}:
             continue
-        calls.append(node)
+        calls.append(child)
     return calls
 
 
@@ -40,11 +42,23 @@ def _string_arg(node: ast.AST) -> str | None:
     return None
 
 
-def _find_logger_call(message: str) -> ast.Call:
-    for call in _logger_calls():
+def _find_logger_call_in(node: ast.AST, message: str) -> ast.Call:
+    for call in _logger_calls_in(node):
         if call.args and _string_arg(call.args[0]) == message:
             return call
     raise AssertionError(f"logger call not found for message: {message}")
+
+
+def _find_module_logger_call(message: str) -> ast.Call:
+    return _find_logger_call_in(SOURCE_TREE, message)
+
+
+def _send_push_node() -> ast.AsyncFunctionDef:
+    return _async_function_node("send_push")
+
+
+def _send_push_logger_call(message: str) -> ast.Call:
+    return _find_logger_call_in(_send_push_node(), message)
 
 
 def _extra_keys(call: ast.Call) -> set[str]:
@@ -60,35 +74,78 @@ def _extra_keys(call: ast.Call) -> set[str]:
     return set()
 
 
-def _send_push_source() -> str:
-    source = ast.get_source_segment(SOURCE_TEXT, _send_push_node())
+def _function_source(name: str) -> str:
+    source = ast.get_source_segment(SOURCE_TEXT, _async_function_node(name))
     if source is None:
-        raise AssertionError("send_push source segment not found")
+        raise AssertionError(f"{name} source segment not found")
     return source
 
 
 class NotificationsPushLoggingTest(unittest.TestCase):
     def test_missing_user_log_redacts_user_id(self) -> None:
-        call = _find_logger_call("Push target user not found")
+        call = _send_push_logger_call("Push target user not found")
         self.assertEqual(_extra_keys(call), {"notification_type"})
 
     def test_notification_history_log_redacts_identifiers_and_raw_error(self) -> None:
-        call = _find_logger_call("Failed to save notification history")
+        call = _send_push_logger_call("Failed to save notification history")
         self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
 
     def test_websocket_log_redacts_identifiers_and_raw_error(self) -> None:
-        call = _find_logger_call("Failed to send WebSocket notification without DB")
+        call = _send_push_logger_call("Failed to send WebSocket notification without DB")
         self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
 
     def test_top_level_push_error_log_uses_error_type_only(self) -> None:
-        call = _find_logger_call("Push notification delivery failed")
+        call = _send_push_logger_call("Push notification delivery failed")
         self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
 
     def test_send_push_source_no_longer_logs_user_id_or_raw_error_strings(self) -> None:
-        send_push_source = _send_push_source()
+        send_push_source = _function_source("send_push")
         self.assertNotIn('extra={"user_id": user_id', send_push_source)
         self.assertNotIn('"error": str(', send_push_source)
-        self.assertNotIn('Ошибка отправки Push: {e}', send_push_source)
+        self.assertNotIn("Ошибка отправки Push:", send_push_source)
+
+    def test_appointment_time_parse_warning_redacts_identifiers(self) -> None:
+        call = _find_module_logger_call("Failed to parse appointment time for notification")
+        self.assertEqual(_extra_keys(call), {"has_appointment_time"})
+
+    def test_appointment_notification_missing_entities_redact_identifiers(self) -> None:
+        appointment_call = _find_module_logger_call(
+            "Appointment notification skipped: appointment not found"
+        )
+        patient_call = _find_module_logger_call(
+            "Appointment notification skipped: patient not found"
+        )
+        self.assertEqual(_extra_keys(appointment_call), {"notification_type"})
+        self.assertEqual(_extra_keys(patient_call), {"notification_type"})
+
+    def test_payment_notification_missing_patient_redacts_identifiers(self) -> None:
+        call = _find_module_logger_call("Payment notification skipped: patient not found")
+        self.assertEqual(_extra_keys(call), {"notification_type"})
+
+    def test_fixed_notification_functions_no_longer_log_sensitive_ids(self) -> None:
+        appointment_confirmation_source = _function_source(
+            "send_appointment_confirmation"
+        )
+        appointment_notification_source = _function_source(
+            "send_appointment_notification"
+        )
+        payment_notification_source = _function_source(
+            "send_payment_notification_by_id"
+        )
+
+        self.assertNotIn(
+            '"appointment_time": appointment.appointment_time',
+            appointment_confirmation_source,
+        )
+        self.assertNotIn(
+            "Запись не найдена:", appointment_notification_source
+        )
+        self.assertNotIn(
+            "Пациент не найден:", appointment_notification_source
+        )
+        self.assertNotIn(
+            "Пациент не найден:", payment_notification_source
+        )
 
 
 if __name__ == "__main__":

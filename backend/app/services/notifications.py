@@ -858,8 +858,7 @@ class NotificationSenderService:
                     logger.warning(
                         "Failed to parse appointment time for notification",
                         extra={
-                            "appointment_id": appointment_id,
-                            "appointment_time": appointment.appointment_time,
+                            "has_appointment_time": True,
                         },
                     )
 
@@ -1598,13 +1597,19 @@ class NotificationSenderService:
             db.query(Appointment).filter(Appointment.id == appointment_id).first()
         )
         if not appointment:
-            logger.warning(f"Запись не найдена: {appointment_id}")
+            logger.warning(
+                "Appointment notification skipped: appointment not found",
+                extra={"notification_type": notification_type},
+            )
             return []
 
         # Получаем данные пациента
         patient = patient_crud.get(db, id=patient_id)
         if not patient:
-            logger.warning(f"Пациент не найден: {patient_id}")
+            logger.warning(
+                "Appointment notification skipped: patient not found",
+                extra={"notification_type": notification_type},
+            )
             return []
 
         # Данные для шаблона
@@ -1669,7 +1674,10 @@ class NotificationSenderService:
         # Получаем данные пациента
         patient = patient_crud.get(db, id=patient_id)
         if not patient:
-            logger.warning(f"Пациент не найден: {patient_id}")
+            logger.warning(
+                "Payment notification skipped: patient not found",
+                extra={"notification_type": canonical_notification_type},
+            )
             return []
 
         canonical_notification_type = _normalize_notification_event_type(
