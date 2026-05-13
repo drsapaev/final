@@ -84,19 +84,19 @@ def _function_source(name: str) -> str:
 class NotificationsPushLoggingTest(unittest.TestCase):
     def test_missing_user_log_redacts_user_id(self) -> None:
         call = _send_push_logger_call("Push target user not found")
-        self.assertEqual(_extra_keys(call), {"notification_type"})
+        self.assertEqual(_extra_keys(call), set())
 
     def test_notification_history_log_redacts_identifiers_and_raw_error(self) -> None:
         call = _send_push_logger_call("Failed to save notification history")
-        self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
+        self.assertEqual(_extra_keys(call), {"error_type"})
 
     def test_websocket_log_redacts_identifiers_and_raw_error(self) -> None:
         call = _send_push_logger_call("Failed to send WebSocket notification without DB")
-        self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
+        self.assertEqual(_extra_keys(call), {"error_type"})
 
     def test_top_level_push_error_log_uses_error_type_only(self) -> None:
         call = _send_push_logger_call("Push notification delivery failed")
-        self.assertEqual(_extra_keys(call), {"notification_type", "error_type"})
+        self.assertEqual(_extra_keys(call), {"error_type"})
 
     def test_send_push_source_no_longer_logs_user_id_or_raw_error_strings(self) -> None:
         send_push_source = _function_source("send_push")

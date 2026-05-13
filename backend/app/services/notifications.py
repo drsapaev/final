@@ -601,10 +601,7 @@ class NotificationSenderService:
             if db:
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
-                    logger.warning(
-                        "Push target user not found",
-                        extra={"notification_type": notification_type},
-                    )
+                    logger.warning("Push target user not found")
                     return False
 
                 platform_service = self._platform_service(db)
@@ -642,7 +639,6 @@ class NotificationSenderService:
                     logger.error(
                         "Failed to save notification history",
                         extra={
-                            "notification_type": notification_type,
                             "error_type": type(hist_e).__name__,
                         },
                     )
@@ -663,7 +659,6 @@ class NotificationSenderService:
                     logger.warning(
                         "Failed to send WebSocket notification without DB",
                         extra={
-                            "notification_type": notification_type,
                             "error_type": type(ws_e).__name__,
                         },
                     )
@@ -673,7 +668,6 @@ class NotificationSenderService:
             logger.error(
                 "Push notification delivery failed",
                 extra={
-                    "notification_type": notification_type,
                     "error_type": type(e).__name__,
                 },
             )
