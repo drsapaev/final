@@ -1604,6 +1604,11 @@ class NotificationSenderService:
             return []
 
         # Получаем данные пациента
+        canonical_notification_type = _normalize_notification_event_type(
+            notification_type,
+            fallback="payment_notification",
+        )
+
         patient = patient_crud.get(db, id=patient_id)
         if not patient:
             logger.warning(
@@ -1680,10 +1685,6 @@ class NotificationSenderService:
             )
             return []
 
-        canonical_notification_type = _normalize_notification_event_type(
-            notification_type,
-            fallback="payment_notification",
-        )
 
         # Данные для шаблона
         template_data = {
