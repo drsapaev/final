@@ -38,6 +38,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       guardrails_required: ${{ steps.scope.outputs.guardrails_required }}
+      backend_required: ${{ steps.scope.outputs.backend_required }}
+      frontend_required: ${{ steps.scope.outputs.frontend_required }}
+      metadata_required: ${{ steps.scope.outputs.metadata_required }}
+      architecture_required: ${{ steps.scope.outputs.architecture_required }}
+      parity_required: ${{ steps.scope.outputs.parity_required }}
+      docs_required: ${{ steps.scope.outputs.docs_required }}
+      frontend_e2e_required: ${{ steps.scope.outputs.frontend_e2e_required }}
+      workflow_changed: ${{ steps.scope.outputs.workflow_changed }}
+      skills_changed: ${{ steps.scope.outputs.skills_changed }}
+      deps_changed: ${{ steps.scope.outputs.deps_changed }}
+      ops_changed: ${{ steps.scope.outputs.ops_changed }}
 
     steps:
     - uses: actions/checkout@v6
@@ -55,6 +66,66 @@ jobs:
             - 'frontend/**'
             - 'ops/**'
             - '.github/workflows/**'
+          backend:
+            - 'backend/**'
+          frontend:
+            - 'frontend/**'
+          frontend_contract:
+            - 'frontend/src/api/**'
+            - 'frontend/src/routing/**'
+            - 'frontend/src/**/auth/**'
+            - 'frontend/src/**/rbac/**'
+            - 'frontend/src/**/permissions/**'
+            - 'frontend/src/**/queue/**'
+            - 'frontend/src/**/payment/**'
+            - 'frontend/src/**/emr/**'
+            - 'frontend/src/**/lab/**'
+          frontend_e2e:
+            - 'frontend/e2e/**'
+            - 'frontend/playwright.config.*'
+            - 'frontend/src/App.jsx'
+            - 'frontend/src/PublicApp.jsx'
+            - 'frontend/src/routing/**'
+            - 'frontend/src/pages/**'
+            - 'frontend/src/panels/**'
+            - 'frontend/src/components/registrar/**'
+            - 'frontend/src/components/queue/**'
+            - 'frontend/src/components/payment/**'
+            - 'frontend/src/components/emr/**'
+            - 'frontend/src/components/lab/**'
+          api_docs:
+            - 'backend/app/main.py'
+            - 'backend/app/api/**'
+            - 'backend/app/graphql/**'
+            - 'backend/app/routers/**'
+            - 'backend/app/schemas/**'
+            - 'backend/app/models/**'
+          ops:
+            - 'ops/**'
+          parity_tools:
+            - 'ops/scripts/extract_frontend_api_usage.py'
+            - 'ops/scripts/build_frontend_backend_parity.py'
+            - 'ops/scripts/evaluate_frontend_ux_scorecard.py'
+            - 'ops/scripts/check_frontend_backend_parity.py'
+          workflow:
+            - '.github/workflows/**'
+            - '.github/actions/**'
+          skills:
+            - '.agents/**'
+            - 'skills-lock.json'
+            - 'AGENTS.md'
+          docs:
+            - 'docs/**'
+            - '*.md'
+          deps:
+            - 'package.json'
+            - 'package-lock.json'
+            - 'frontend/package.json'
+            - 'frontend/package-lock.json'
+            - 'backend/requirements*.txt'
+            - 'backend/pyproject.toml'
+            - 'backend/poetry.lock'
+            - 'backend/pdm.lock'
 
     - name: 📌 Resolve guardrail scope
       id: scope
@@ -62,21 +133,174 @@ jobs:
       env:
         EVENT_NAME: ${{ github.event_name }}
         PR_GUARDRAILS: ${{ steps.changes.outputs.guardrails }}
+        PR_BACKEND: ${{ steps.changes.outputs.backend }}
+        PR_FRONTEND: ${{ steps.changes.outputs.frontend }}
+        PR_FRONTEND_CONTRACT: ${{ steps.changes.outputs.frontend_contract }}
+        PR_FRONTEND_E2E: ${{ steps.changes.outputs.frontend_e2e }}
+        PR_API_DOCS: ${{ steps.changes.outputs.api_docs }}
+        PR_OPS: ${{ steps.changes.outputs.ops }}
+        PR_PARITY_TOOLS: ${{ steps.changes.outputs.parity_tools }}
+        PR_WORKFLOW: ${{ steps.changes.outputs.workflow }}
+        PR_SKILLS: ${{ steps.changes.outputs.skills }}
+        PR_DOCS: ${{ steps.changes.outputs.docs }}
+        PR_DEPS: ${{ steps.changes.outputs.deps }}
       run: |
         if [ "$EVENT_NAME" = "pull_request" ]; then
           REQUIRED="${PR_GUARDRAILS:-false}"
+          BACKEND_REQUIRED="${PR_BACKEND:-false}"
+          FRONTEND_REQUIRED="${PR_FRONTEND:-false}"
+          WORKFLOW_CHANGED="${PR_WORKFLOW:-false}"
+          SKILLS_CHANGED="${PR_SKILLS:-false}"
+          DOCS_CHANGED="${PR_DOCS:-false}"
+          DEPS_CHANGED="${PR_DEPS:-false}"
+          FRONTEND_CONTRACT="${PR_FRONTEND_CONTRACT:-false}"
+          FRONTEND_E2E="${PR_FRONTEND_E2E:-false}"
+          API_DOCS_CHANGED="${PR_API_DOCS:-false}"
+          OPS_CHANGED="${PR_OPS:-false}"
+          PARITY_TOOLS_CHANGED="${PR_PARITY_TOOLS:-false}"
         else
           REQUIRED="true"
+          BACKEND_REQUIRED="true"
+          FRONTEND_REQUIRED="true"
+          WORKFLOW_CHANGED="true"
+          SKILLS_CHANGED="true"
+          DOCS_CHANGED="true"
+          DEPS_CHANGED="true"
+          FRONTEND_CONTRACT="true"
+          FRONTEND_E2E="true"
+          API_DOCS_CHANGED="true"
+          OPS_CHANGED="true"
+          PARITY_TOOLS_CHANGED="true"
+        fi
+
+        if [ "$DEPS_CHANGED" = "true" ]; then
+          BACKEND_REQUIRED="true"
+          FRONTEND_REQUIRED="true"
+          FRONTEND_E2E="true"
+          API_DOCS_CHANGED="true"
+        fi
+
+        METADATA_REQUIRED="false"
+        if [ "$WORKFLOW_CHANGED" = "true" ] || [ "$SKILLS_CHANGED" = "true" ] || [ "$DOCS_CHANGED" = "true" ] || [ "$OPS_CHANGED" = "true" ]; then
+          METADATA_REQUIRED="true"
+        fi
+
+        ARCHITECTURE_REQUIRED="false"
+        if [ "$BACKEND_REQUIRED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+          ARCHITECTURE_REQUIRED="true"
+        fi
+
+        PARITY_REQUIRED="false"
+        if [ "$BACKEND_REQUIRED" = "true" ] || [ "$FRONTEND_CONTRACT" = "true" ] || [ "$PARITY_TOOLS_CHANGED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+          PARITY_REQUIRED="true"
+        fi
+
+        DOCS_REQUIRED="false"
+        if [ "$API_DOCS_CHANGED" = "true" ] || [ "$DEPS_CHANGED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+          DOCS_REQUIRED="true"
         fi
 
         echo "guardrails_required=${REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "backend_required=${BACKEND_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "frontend_required=${FRONTEND_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "metadata_required=${METADATA_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "architecture_required=${ARCHITECTURE_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "parity_required=${PARITY_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "docs_required=${DOCS_REQUIRED}" >> "$GITHUB_OUTPUT"
+        echo "frontend_e2e_required=${FRONTEND_E2E}" >> "$GITHUB_OUTPUT"
+        echo "workflow_changed=${WORKFLOW_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "skills_changed=${SKILLS_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "deps_changed=${DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "ops_changed=${OPS_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "guardrails_required=${REQUIRED}"
+        echo "backend_required=${BACKEND_REQUIRED}"
+        echo "frontend_required=${FRONTEND_REQUIRED}"
+        echo "metadata_required=${METADATA_REQUIRED}"
+        echo "architecture_required=${ARCHITECTURE_REQUIRED}"
+        echo "parity_required=${PARITY_REQUIRED}"
+        echo "docs_required=${DOCS_REQUIRED}"
+        echo "frontend_e2e_required=${FRONTEND_E2E}"
+
+  metadata-checks:
+    name: 🧾 Metadata checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        needs.ci-scope.outputs.metadata_required == 'true'
+      )
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Validate changed repository metadata
+      shell: bash
+      env:
+        WORKFLOW_CHANGED: ${{ needs.ci-scope.outputs.workflow_changed }}
+        SKILLS_CHANGED: ${{ needs.ci-scope.outputs.skills_changed }}
+      run: |
+        set -euo pipefail
+
+        if [ "$WORKFLOW_CHANGED" = "true" ]; then
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.{yml,yaml}"].sort.each { |f| YAML.load_file(f); puts "workflow yaml ok: #{f}" }'
+        else
+          echo "workflow yaml check skipped"
+        fi
+
+        if [ "$SKILLS_CHANGED" = "true" ]; then
+          python - <<'PY'
+        import json
+        from pathlib import Path
+
+        lock_path = Path("skills-lock.json")
+        if lock_path.exists():
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            missing = [
+                name
+                for name in lock.get("skills", {})
+                if not (Path(".agents/skills") / name / "SKILL.md").exists()
+            ]
+            if missing:
+                raise SystemExit(f"skills-lock.json references missing skills: {', '.join(missing)}")
+            print(f"skills lock ok: {len(lock.get('skills', {}))} skills")
+
+        for skill in sorted(Path(".agents/skills").glob("*/SKILL.md")):
+            text = skill.read_text(encoding="utf-8")
+            if not text.startswith("---\n"):
+                raise SystemExit(f"{skill} missing YAML frontmatter")
+            frontmatter = text.split("---", 2)[1]
+            if "\nname:" not in f"\n{frontmatter}":
+                raise SystemExit(f"{skill} missing name in frontmatter")
+            if "\ndescription:" not in f"\n{frontmatter}":
+                raise SystemExit(f"{skill} missing description in frontmatter")
+        print("skill frontmatter ok")
+        PY
+        else
+          echo "skill metadata check skipped"
+        fi
 
   # --- Проверка качества кода ---
   code-quality:
     name: 🔍 Качество кода
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        (
+          needs.ci-scope.outputs.backend_required == 'true' ||
+          needs.ci-scope.outputs.workflow_changed == 'true'
+        )
+      )
     
     steps:
     - uses: actions/checkout@v6
@@ -282,6 +506,18 @@ jobs:
     name: 🎨 Frontend тесты
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        (
+          needs.ci-scope.outputs.frontend_required == 'true' ||
+          needs.ci-scope.outputs.workflow_changed == 'true'
+        )
+      )
     
     steps:
     - uses: actions/checkout@v6
@@ -315,6 +551,7 @@ jobs:
         npm run build
 
     - name: 🧪 Registrar time e2e (Chromium)
+      if: needs.ci-scope.outputs.frontend_e2e_required == 'true'
       run: |
         cd frontend
         npx playwright install --with-deps chromium
@@ -325,7 +562,23 @@ jobs:
     name: 🐍 Backend тесты
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: code-quality
+    needs: [ci-scope, code-quality]
+    if: |
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'pull_request' &&
+          (
+            needs.ci-scope.outputs.backend_required == 'true' ||
+            needs.ci-scope.outputs.workflow_changed == 'true'
+          )
+        )
+      ) &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     services:
       postgres:
         image: postgres:16
@@ -438,7 +691,7 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'pull_request' && github.base_ref == 'main')
       ) &&
-      needs.ci-scope.outputs.guardrails_required == 'true'
+      needs.ci-scope.outputs.architecture_required == 'true'
 
     steps:
     - uses: actions/checkout@v6
@@ -499,12 +752,15 @@ jobs:
     # Required for PRs into `main` after the core test jobs pass.
     # This job is the contract/UX/RBAC guardrail for frontend↔backend drift.
     if: |
+      always() &&
       (
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'pull_request' && github.base_ref == 'main')
       ) &&
-      needs.ci-scope.outputs.guardrails_required == 'true'
+      needs.ci-scope.outputs.parity_required == 'true' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
 
     steps:
     - uses: actions/checkout@v6
@@ -1354,6 +1610,15 @@ jobs:
     name: 📚 Генерация документации
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        needs.ci-scope.outputs.docs_required == 'true'
+      )
     services:
       postgres:
         image: postgres:16
@@ -1495,6 +1760,73 @@ jobs:
         name: api-docs
         path: backend/openapi.json
         retention-days: 14
+
+  pr-required-gate:
+    name: PR Required Gate
+    runs-on: ubuntu-latest
+    needs:
+      - ci-scope
+      - metadata-checks
+      - code-quality
+      - frontend-tests
+      - backend-tests
+      - architecture-boundary
+      - frontend-backend-parity
+      - docs
+    if: always() && github.event_name == 'pull_request'
+
+    steps:
+    - name: Summarize path-aware PR gates
+      shell: bash
+      env:
+        METADATA_RESULT: ${{ needs.metadata-checks.result }}
+        CODE_QUALITY_RESULT: ${{ needs.code-quality.result }}
+        FRONTEND_RESULT: ${{ needs.frontend-tests.result }}
+        BACKEND_RESULT: ${{ needs.backend-tests.result }}
+        ARCHITECTURE_RESULT: ${{ needs.architecture-boundary.result }}
+        PARITY_RESULT: ${{ needs.frontend-backend-parity.result }}
+        DOCS_RESULT: ${{ needs.docs.result }}
+        BACKEND_REQUIRED: ${{ needs.ci-scope.outputs.backend_required }}
+        FRONTEND_REQUIRED: ${{ needs.ci-scope.outputs.frontend_required }}
+        METADATA_REQUIRED: ${{ needs.ci-scope.outputs.metadata_required }}
+        ARCHITECTURE_REQUIRED: ${{ needs.ci-scope.outputs.architecture_required }}
+        PARITY_REQUIRED: ${{ needs.ci-scope.outputs.parity_required }}
+        DOCS_REQUIRED: ${{ needs.ci-scope.outputs.docs_required }}
+      run: |
+        set -euo pipefail
+
+        echo "## PR Required Gate" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "| gate | required | result |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+        fail=0
+        check_result() {
+          local gate="$1"
+          local required="$2"
+          local result="$3"
+          echo "| ${gate} | ${required} | ${result} |" >> "$GITHUB_STEP_SUMMARY"
+          case "$result" in
+            failure|cancelled)
+              echo "::error title=${gate} failed::${gate} result is ${result}"
+              fail=1
+              ;;
+          esac
+        }
+
+        check_result "metadata" "$METADATA_REQUIRED" "$METADATA_RESULT"
+        check_result "code-quality" "$BACKEND_REQUIRED" "$CODE_QUALITY_RESULT"
+        check_result "frontend" "$FRONTEND_REQUIRED" "$FRONTEND_RESULT"
+        check_result "backend" "$BACKEND_REQUIRED" "$BACKEND_RESULT"
+        check_result "architecture" "$ARCHITECTURE_REQUIRED" "$ARCHITECTURE_RESULT"
+        check_result "parity" "$PARITY_REQUIRED" "$PARITY_RESULT"
+        check_result "docs" "$DOCS_REQUIRED" "$DOCS_RESULT"
+
+        if [ "$fail" -ne 0 ]; then
+          exit 1
+        fi
+
+        echo "Path-aware PR gates passed or were intentionally skipped."
 
   # --- Staging readiness report (no live deploy) ---
   deploy-staging:
