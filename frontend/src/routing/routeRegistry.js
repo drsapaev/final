@@ -22,6 +22,14 @@ export const ROLE_HOME_PRIORITY = [
   'patient',
 ];
 
+const AI_SIDEBAR_DISCLAIMER = 'Черновик · не медицинское заключение';
+const AI_SIDEBAR_ACCESSIBLE_LABEL = 'AI-помощник: черновик, не диагноз, не медицинское заключение';
+const AI_SIDEBAR_DISCLAIMER_META = {
+  badge: AI_SIDEBAR_DISCLAIMER,
+  tooltip: AI_SIDEBAR_ACCESSIBLE_LABEL,
+  ariaLabel: AI_SIDEBAR_ACCESSIBLE_LABEL,
+};
+
 export const SIDEBAR_PRESETS = {
   admin: {
     navigation: 'path',
@@ -55,7 +63,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
       { id: 'patients', label: 'Пациенты', icon: 'person.2' },
       { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain' },
+      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
       { id: 'reports', label: 'Отчёты', icon: 'doc.text' },
     ],
   },
@@ -101,7 +109,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'visit', label: 'Приём', icon: 'heart' },
       { id: 'ecg', label: 'ЭКГ', icon: 'waveform.path.ecg' },
       { id: 'blood', label: 'Анализы крови', icon: 'testtube.2' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain' },
+      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
       { id: 'services', label: 'Услуги', icon: 'stethoscope' },
       { id: 'history', label: 'История', icon: 'doc.text' },
     ],
@@ -118,7 +126,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'photos', label: 'Фото', icon: 'camera' },
       { id: 'skin', label: 'Осмотр кожи', icon: 'eye' },
       { id: 'cosmetic', label: 'Косметология', icon: 'sparkles' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain' },
+      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
       { id: 'services', label: 'Услуги', icon: 'scissors' },
       { id: 'history', label: 'История', icon: 'doc.text' },
     ],
@@ -140,7 +148,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'dental-chart', label: 'Зубная карта', icon: 'smile' },
       { id: 'treatment-plans', label: 'Планы лечения', icon: 'list' },
       { id: 'prosthetics', label: 'Протезирование', icon: 'smile' },
-      { id: 'ai-assistant', label: 'AI-помощник', icon: 'brain' },
+      { id: 'ai-assistant', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
 };
@@ -729,7 +737,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'AI Инструменты', icon: 'brain', section: 'Система', order: 20, sidebar: true }),
+    nav: nav({ label: 'AI Инструменты', icon: 'brain', section: 'Система', order: 20, sidebar: true, ...AI_SIDEBAR_DISCLAIMER_META }),
     title: 'Admin AI Settings',
     owner: 'admin.ai',
     component: 'AdminPanel',

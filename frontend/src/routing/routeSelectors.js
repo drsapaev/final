@@ -184,6 +184,9 @@ export function getAdminNavSections(profile, options = {}) {
       to: route.path,
       label: route.nav?.label || route.title,
       icon: route.nav?.icon || 'circle',
+      badge: route.nav?.badge,
+      tooltip: route.nav?.tooltip,
+      ariaLabel: route.nav?.ariaLabel,
       route,
     };
 
@@ -233,6 +236,9 @@ export function getRouteChromeState(pathname, search = '', profile = null) {
       id: navRoute.id,
       label: navRoute.nav?.label || navRoute.title,
       icon: navRoute.nav?.icon || 'circle',
+      badge: navRoute.nav?.badge,
+      tooltip: navRoute.nav?.tooltip,
+      ariaLabel: navRoute.nav?.ariaLabel,
       to: navRoute.path,
     }));
   }
@@ -241,6 +247,9 @@ export function getRouteChromeState(pathname, search = '', profile = null) {
       id: navRoute.id,
       label: navRoute.nav?.label || navRoute.title,
       icon: navRoute.nav?.icon || 'circle',
+      badge: navRoute.nav?.badge,
+      tooltip: navRoute.nav?.tooltip,
+      ariaLabel: navRoute.nav?.ariaLabel,
       to: navRoute.path,
     }));
   }

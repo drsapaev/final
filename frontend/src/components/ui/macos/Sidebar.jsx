@@ -119,6 +119,8 @@ const Sidebar = React.forwardRef(({
       <nav className="mac-sidebar-nav" style={navStyles}>
         {items.map((item) => {
           const isActive = activeItem === item.id;
+          const itemAriaLabel = item.ariaLabel || item.tooltip || item.label;
+          const itemTitle = item.tooltip || item.title || (isCollapsed ? item.label : undefined);
           const itemStyles = {
             display: 'flex',
             alignItems: 'center',
@@ -148,11 +150,11 @@ const Sidebar = React.forwardRef(({
           return (
             <button
               key={item.id}
-              aria-label={item.label}
+              aria-label={itemAriaLabel}
               className={`mac-sidebar-item ${isActive ? 'mac-sidebar-item--active' : ''}`}
               style={itemStyles}
               onClick={handleItemClick}
-              title={isCollapsed ? item.label : undefined}>
+              title={itemTitle}>
 
               {item.icon &&
               <Icon
