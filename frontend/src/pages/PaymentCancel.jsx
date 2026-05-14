@@ -1,7 +1,10 @@
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Box, Card, CardContent, Typography, Button, Alert } from '../components/ui/macos';
-import { XCircle as CancelIcon, Home as HomeIcon, RefreshCw as RetryIcon, Headset as SupportIcon } from 'lucide-react';
+import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
+
+const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';
+const SUPPORT_TELEGRAM_URL = 'https://t.me/clinic_support';
 
 const PaymentCancel = () => {
   const navigate = useNavigate();
@@ -12,18 +15,14 @@ const PaymentCancel = () => {
   const reason = searchParams.get('reason');
   const error = searchParams.get('error');
 
-  const handleRetryPayment = () => {
-    // Возвращаемся к оплате или на страницу с услугами
-    if (paymentId) {
-      navigate(`/payment/retry?payment_id=${paymentId}`);
-    } else {
-      navigate('/cashier');
-    }
+  const handleCashierPayment = () => {
+    // Возвращаемся в существующий кассовый маршрут без несуществующего retry-route.
+    navigate('/cashier');
   };
 
   const handleContactSupport = () => {
-    // Переход к контактам или открытие чата поддержки
-    navigate('/support');
+    // Открываем существующий официальный Telegram-канал поддержки из landing/contact copy.
+    window.location.assign(SUPPORT_TELEGRAM_URL);
   };
 
   const getReason = () => {
@@ -36,7 +35,7 @@ const PaymentCancel = () => {
       'provider_error': 'Ошибка платежной системы'
     };
 
-    return reasons[reason] || 'Платеж был отменен';
+    return reasons[reason] || 'Платеж был отменен или не подтвержден';
   };
 
   return (
@@ -46,7 +45,7 @@ const PaymentCancel = () => {
         <CardContent style={{ textAlign: 'center', padding: '32px 16px' }}>
           <CancelIcon style={{ fontSize: 80, color: 'var(--mac-warning)', marginBottom: 8 }} />
           <Typography variant="h4" color="warning" gutterBottom>
-            Платеж отменен
+            Платеж не завершен
           </Typography>
           <Typography variant="h6" color="textSecondary">
             {getReason()}
@@ -104,7 +103,7 @@ const PaymentCancel = () => {
               • Попробуйте использовать другой способ оплаты
             </Typography>
             <Typography variant="body1" paragraph>
-              • Обратитесь в службу поддержки при повторных ошибках
+              • Обратитесь в клинику через официальный канал поддержки при повторных ошибках
             </Typography>
           </Box>
         </CardContent>
@@ -117,10 +116,9 @@ const PaymentCancel = () => {
             Доступные действия
           </Typography>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
-            <Button onClick={handleRetryPayment}><RetryIcon style={{ marginRight: 8 }} />Повторить оплату</Button>
-            <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />Связаться с поддержкой</Button>
+            <Button onClick={handleCashierPayment}>К оплате в кассе</Button>
+            <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />Связаться в Telegram</Button>
             <Button variant="outline" onClick={() => navigate('/')}><HomeIcon style={{ marginRight: 8 }} />На главную</Button>
-            <Button variant="outline" onClick={() => navigate('/cashier')}>К оплате в кассе</Button>
           </div>
         </CardContent>
       </Card>
@@ -128,10 +126,10 @@ const PaymentCancel = () => {
       {/* Контактная информация */}
       <Box style={{ marginTop: 16, textAlign: 'center' }}>
         <Typography variant="body2" color="textSecondary" paragraph>
-          Служба поддержки: +998 (71) 123-45-67
+          Официальный канал поддержки: {SUPPORT_TELEGRAM_HANDLE}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Email: support@clinic.uz
+          Контакты клиники также доступны на главной странице.
         </Typography>
       </Box>
     </Box>);
