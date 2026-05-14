@@ -179,12 +179,12 @@ def create_visit(
 
         logger = logging.getLogger(__name__)
         logger.info(
-            "Создан визит ID=%d для пациента %d, врач=%s, дата=%s, услуг=%d",
-            visit.id,
-            visit.patient_id,
-            visit.doctor_id,
-            visit.visit_date,
-            len(services) if services else 0,
+            "Visit created",
+            extra={
+                "has_doctor": visit.doctor_id is not None,
+                "has_visit_date": visit.visit_date is not None,
+                "service_count": len(services) if services else 0,
+            },
         )
 
     # Уведомления (для будущего использования)
