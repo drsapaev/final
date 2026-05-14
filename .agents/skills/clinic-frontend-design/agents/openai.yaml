@@ -1,0 +1,7 @@
+interface:
+  display_name: "Clinic Frontend Design"
+  short_description: "Clinic-safe UI/UX audit workflow"
+  default_prompt: "Use $clinic-frontend-design to audit or improve this clinic frontend UI safely."
+
+policy:
+  allow_implicit_invocation: true
