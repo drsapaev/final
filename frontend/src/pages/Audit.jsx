@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
+import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
 
 /**
  * Аудит: список последних действий пользователей.
@@ -41,6 +42,8 @@ export default function Audit() {
     );
   }, [q, rows]);
 
+  const stateCellStyle = { minHeight: '96px', padding: '16px' };
+
   return (
     <div>
       <RoleGate roles={['Admin']}>
@@ -56,7 +59,13 @@ export default function Audit() {
             <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
           </div>
 
-          {err && <div className="legacy-error">{String(err)}</div>}
+          {err && (
+            <AppError
+              title="Ошибка загрузки аудита"
+              description={String(err)}
+              style={{ marginBottom: 12 }}
+            />
+          )}
 
           <div className="legacy-table-wrap">
             <table className="legacy-table">
@@ -70,18 +79,40 @@ export default function Audit() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a, i) =>
-                <tr key={a.id || i}>
-                    <td>{a.created_at || a.time || '—'}</td>
-                    <td>{a.user || a.username || a.actor_user_id || '—'}</td>
-                    <td>{a.action || '—'}</td>
-                    <td>{a.entity || a.table || a.entity_type || '—'}</td>
-                    <td><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : a.payload ? JSON.stringify(a.payload) : '—'}</code></td>
+                {busy && rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <AppLoading
+                        title="Загрузка аудита"
+                        size="sm"
+                        style={stateCellStyle}
+                      />
+                    </td>
                   </tr>
+                ) : (
+                  <>
+                    {filtered.map((a, i) =>
+                    <tr key={a.id || i}>
+                        <td>{a.created_at || a.time || '—'}</td>
+                        <td>{a.user || a.username || a.actor_user_id || '—'}</td>
+                        <td>{a.action || '—'}</td>
+                        <td>{a.entity || a.table || a.entity_type || '—'}</td>
+                        <td><code style={{ fontSize: 12 }}>{a.details ? JSON.stringify(a.details) : a.payload ? JSON.stringify(a.payload) : '—'}</code></td>
+                      </tr>
+                    )}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={5}>
+                          <AppEmpty
+                            title="Нет записей"
+                            description={q ? 'По текущему поиску записи не найдены.' : 'Журнал аудита пока пуст.'}
+                            style={stateCellStyle}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
-                {filtered.length === 0 &&
-                <tr><td colSpan={5}>Нет записей</td></tr>
-                }
               </tbody>
             </table>
           </div>
