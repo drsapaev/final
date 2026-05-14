@@ -1,51 +1,59 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Login from '../Login';
-import { login } from '../../api/client';
+import { ThemeProvider } from '../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
 
 vi.mock('../../api/client', () => ({
-  login: vi.fn(),
-  me: vi.fn(),
+  api: {
+    get: vi.fn(),
+  },
+  buildApiUrl: vi.fn((path) => path),
   setToken: vi.fn(),
 }));
 
-describe('Login Accessibility', () => {
+function renderLogin() {
+  return render(
+    <MemoryRouter>
+      <MacOSThemeProvider>
+        <ThemeProvider>
+          <Login />
+        </ThemeProvider>
+      </MacOSThemeProvider>
+    </MemoryRouter>
+  );
+}
+
+describe('Login canonical surface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = vi.fn();
   });
 
-  it('binds labels to role, username and password fields', () => {
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    );
+  it('renders canonical login fields without legacy role defaults', () => {
+    const { container } = renderLogin();
 
-    expect(screen.getByRole('combobox', { name: /выбрать роль|rolni tanlang|select role/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/логин|username|login/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/пароль|password|parol/i, { selector: 'input' })).toBeInTheDocument();
+    const usernameField = container.querySelector('input[name="username"]');
+    const passwordField = container.querySelector('input[name="password"]');
+    const legacyRoleSelect = container.querySelector('select[name="role"]');
+
+    expect(usernameField).toBeInTheDocument();
+    expect(usernameField).toHaveValue('');
+    expect(passwordField).toBeInTheDocument();
+    expect(legacyRoleSelect).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent('admin@example.com');
+    expect(container).not.toHaveTextContent('registrar@example.com');
   });
 
-  it('announces login errors via alert region', async () => {
-    login.mockRejectedValueOnce(new Error('Неверные данные'));
+  it('does not call backend auth when canonical fields are empty', () => {
+    const { container } = renderLogin();
+    const form = container.querySelector('form');
 
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    );
+    fireEvent.submit(form);
 
-    fireEvent.click(screen.getByRole('button', { name: /войти|kirish|sign in/i }));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveAttribute('aria-live', 'assertive');
-    expect(alert).toHaveTextContent('Неверные данные');
-
-    const passwordField = screen.getByLabelText(/пароль|password|parol/i, { selector: 'input' });
-    expect(passwordField).toHaveAttribute('aria-invalid', 'true');
-    expect(passwordField).toHaveAttribute('aria-describedby', 'login-error');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
