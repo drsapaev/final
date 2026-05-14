@@ -27,7 +27,7 @@ env:
 jobs:
   # GitHub-native merge blockers for PRs into `main`:
   # - `🐍 Backend тесты`
-  # - `🎨 Frontend тесты` (includes registrar-time Playwright e2e)
+  # - split frontend lint/unit/build checks, plus conditional registrar-time Playwright e2e
   # - `🧱 Context Boundary Integrity`
   # - `🔄 Frontend-Backend Parity`
   #
@@ -501,11 +501,11 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "📦 Отчеты сохранены как артефакты" >> $GITHUB_STEP_SUMMARY
 
-  # --- Frontend тесты ---
-  frontend-tests:
-    name: 🎨 Frontend тесты
+  # --- Frontend checks ---
+  frontend-lint:
+    name: Frontend lint
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     needs: [ci-scope]
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -539,19 +539,111 @@ jobs:
         cd frontend
         npm run lint:check
         echo "✅ Frontend lint passed"
+
+  frontend-unit-tests:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        (
+          needs.ci-scope.outputs.frontend_required == 'true' ||
+          needs.ci-scope.outputs.workflow_changed == 'true'
+        )
+      )
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: 📦 Установка Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd frontend
+        npm ci
     
     - name: 🧪 Тесты frontend
       run: |
         cd frontend
         npm run test:run -- --coverage
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [ci-scope]
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        (
+          needs.ci-scope.outputs.frontend_required == 'true' ||
+          needs.ci-scope.outputs.workflow_changed == 'true'
+        )
+      )
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: 📦 Установка Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd frontend
+        npm ci
     
     - name: 🏗️ Сборка frontend
       run: |
         cd frontend
         npm run build
 
+  frontend-e2e:
+    name: Frontend e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [ci-scope]
+    if: |
+      needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        github.event_name == 'push' ||
+        github.event_name == 'pull_request'
+      )
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: 📦 Установка Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📦 Установка зависимостей
+      run: |
+        cd frontend
+        npm ci
+
     - name: 🧪 Registrar time e2e (Chromium)
-      if: needs.ci-scope.outputs.frontend_e2e_required == 'true'
       run: |
         cd frontend
         npx playwright install --with-deps chromium
@@ -562,7 +654,7 @@ jobs:
     name: 🐍 Backend тесты
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [ci-scope, code-quality]
+    needs: [ci-scope]
     if: |
       always() &&
       (
@@ -748,7 +840,7 @@ jobs:
     name: 🔄 Frontend-Backend Parity
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [ci-scope, frontend-tests, backend-tests, architecture-boundary]
+    needs: [ci-scope, frontend-lint, frontend-unit-tests, frontend-build, backend-tests, architecture-boundary]
     # Required for PRs into `main` after the core test jobs pass.
     # This job is the contract/UX/RBAC guardrail for frontend↔backend drift.
     if: |
@@ -834,7 +926,7 @@ jobs:
     name: 🔒 Security сканирование
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [code-quality, frontend-tests, backend-tests]
+    needs: [code-quality, frontend-lint, frontend-unit-tests, frontend-build, backend-tests]
     # Security scanning stays GitHub-native, but is not part of the lightweight
     # PR blocker set for every pull request. Run it on branch pushes and manual dispatch.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
@@ -923,7 +1015,7 @@ jobs:
     name: 🐳 Docker сборка
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [code-quality, frontend-tests, backend-tests]
+    needs: [code-quality, frontend-lint, frontend-unit-tests, frontend-build, backend-tests]
     # Image build verification is useful before branch/main pushes, but it is not
     # required on every PR once the GitHub-native test/parity guardrails are green.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
@@ -977,7 +1069,7 @@ jobs:
     name: 🔗 Интеграционные тесты
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend-tests, frontend-tests, architecture-boundary, frontend-backend-parity]
+    needs: [backend-tests, frontend-lint, frontend-unit-tests, frontend-build, frontend-e2e, architecture-boundary, frontend-backend-parity]
     # Integration remains a heavier gate: manual runs and push-to-main only.
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     services:
@@ -1287,7 +1379,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     needs: [security, integration]
-    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     services:
       postgres:
         image: postgres:16
@@ -1655,6 +1747,8 @@ jobs:
         pip install sphinx sphinx-rtd-theme
     
     - name: 📚 Генерация API документации
+      env:
+        DOCS_REQUIRED: ${{ needs.ci-scope.outputs.docs_required }}
       run: |
         cd backend
         echo "⏳ Ожидаем готовность Postgres..."
@@ -1726,6 +1820,10 @@ jobs:
             print(f'❌ Ошибка генерации документации: {e}')
             print('📋 Детали ошибки:')
             traceback.print_exc()
+
+            if os.environ.get('DOCS_REQUIRED', 'false').lower() == 'true':
+                print('❌ OpenAPI generation is required for this run; failing instead of using fallback schema.')
+                sys.exit(1)
             
             # Создаем минимальную схему в случае ошибки
             print('⚠️ Создаем минимальную схему...')
@@ -1768,7 +1866,10 @@ jobs:
       - ci-scope
       - metadata-checks
       - code-quality
-      - frontend-tests
+      - frontend-lint
+      - frontend-unit-tests
+      - frontend-build
+      - frontend-e2e
       - backend-tests
       - architecture-boundary
       - frontend-backend-parity
@@ -1781,19 +1882,33 @@ jobs:
       env:
         METADATA_RESULT: ${{ needs.metadata-checks.result }}
         CODE_QUALITY_RESULT: ${{ needs.code-quality.result }}
-        FRONTEND_RESULT: ${{ needs.frontend-tests.result }}
+        FRONTEND_LINT_RESULT: ${{ needs.frontend-lint.result }}
+        FRONTEND_UNIT_RESULT: ${{ needs.frontend-unit-tests.result }}
+        FRONTEND_BUILD_RESULT: ${{ needs.frontend-build.result }}
+        FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
         BACKEND_RESULT: ${{ needs.backend-tests.result }}
         ARCHITECTURE_RESULT: ${{ needs.architecture-boundary.result }}
         PARITY_RESULT: ${{ needs.frontend-backend-parity.result }}
         DOCS_RESULT: ${{ needs.docs.result }}
         BACKEND_REQUIRED: ${{ needs.ci-scope.outputs.backend_required }}
         FRONTEND_REQUIRED: ${{ needs.ci-scope.outputs.frontend_required }}
+        FRONTEND_E2E_REQUIRED: ${{ needs.ci-scope.outputs.frontend_e2e_required }}
         METADATA_REQUIRED: ${{ needs.ci-scope.outputs.metadata_required }}
         ARCHITECTURE_REQUIRED: ${{ needs.ci-scope.outputs.architecture_required }}
         PARITY_REQUIRED: ${{ needs.ci-scope.outputs.parity_required }}
         DOCS_REQUIRED: ${{ needs.ci-scope.outputs.docs_required }}
+        WORKFLOW_CHANGED: ${{ needs.ci-scope.outputs.workflow_changed }}
       run: |
         set -euo pipefail
+
+        CODE_QUALITY_REQUIRED="$BACKEND_REQUIRED"
+        BACKEND_TESTS_REQUIRED="$BACKEND_REQUIRED"
+        FRONTEND_CHECKS_REQUIRED="$FRONTEND_REQUIRED"
+        if [ "$WORKFLOW_CHANGED" = "true" ]; then
+          CODE_QUALITY_REQUIRED="true"
+          BACKEND_TESTS_REQUIRED="true"
+          FRONTEND_CHECKS_REQUIRED="true"
+        fi
 
         echo "## PR Required Gate" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -1806,18 +1921,29 @@ jobs:
           local required="$2"
           local result="$3"
           echo "| ${gate} | ${required} | ${result} |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$required" = "true" ]; then
+            if [ "$result" != "success" ]; then
+              echo "::error title=${gate} required::${gate} is required but result is ${result}"
+              fail=1
+            fi
+            return
+          fi
+
           case "$result" in
             failure|cancelled)
-              echo "::error title=${gate} failed::${gate} result is ${result}"
+              echo "::error title=${gate} failed::${gate} is optional but result is ${result}"
               fail=1
               ;;
           esac
         }
 
         check_result "metadata" "$METADATA_REQUIRED" "$METADATA_RESULT"
-        check_result "code-quality" "$BACKEND_REQUIRED" "$CODE_QUALITY_RESULT"
-        check_result "frontend" "$FRONTEND_REQUIRED" "$FRONTEND_RESULT"
-        check_result "backend" "$BACKEND_REQUIRED" "$BACKEND_RESULT"
+        check_result "code-quality" "$CODE_QUALITY_REQUIRED" "$CODE_QUALITY_RESULT"
+        check_result "frontend-lint" "$FRONTEND_CHECKS_REQUIRED" "$FRONTEND_LINT_RESULT"
+        check_result "frontend-unit-tests" "$FRONTEND_CHECKS_REQUIRED" "$FRONTEND_UNIT_RESULT"
+        check_result "frontend-build" "$FRONTEND_CHECKS_REQUIRED" "$FRONTEND_BUILD_RESULT"
+        check_result "frontend-e2e" "$FRONTEND_E2E_REQUIRED" "$FRONTEND_E2E_RESULT"
+        check_result "backend" "$BACKEND_TESTS_REQUIRED" "$BACKEND_RESULT"
         check_result "architecture" "$ARCHITECTURE_REQUIRED" "$ARCHITECTURE_RESULT"
         check_result "parity" "$PARITY_REQUIRED" "$PARITY_RESULT"
         check_result "docs" "$DOCS_REQUIRED" "$DOCS_RESULT"
