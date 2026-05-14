@@ -3,14 +3,13 @@ API endpoints для интеграции с Telegram ботом
 Основа: passport.md стр. 2064-2570
 """
 
-import asyncio
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud import telegram_config as crud_telegram
 from app.models.user import User
 from app.services.telegram_service import (
@@ -62,7 +61,7 @@ async def send_notification(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -129,7 +128,7 @@ async def send_appointment_reminder(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки напоминания: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -193,7 +192,7 @@ async def send_lab_results_notification(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки уведомления о результатах: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -261,7 +260,7 @@ async def send_qr_code(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки QR кода: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -307,7 +306,7 @@ def get_bot_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса бота: {str(e)}",
+            detail="Internal server error",
         )
 
 
@@ -350,7 +349,7 @@ def get_telegram_users(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения пользователей: {str(e)}",
+            detail="Internal server error",
         )
 
 
