@@ -14,6 +14,7 @@ Before advising, planning, or editing, inspect the relevant current source and t
 - `AGENTS.md`
 - `.cursorrules`
 - `frontend/DESIGN_SYSTEM.md`
+  - Start with the `UI Layer Contract` section when deciding which UI layer to use.
 - `frontend/THEME_SYSTEM_GUIDE.md`
 - `frontend/src/routing/routeRegistry.js` when routes or panels are involved
 - the specific role panel, component, hook, state, style, and test files for the requested screen

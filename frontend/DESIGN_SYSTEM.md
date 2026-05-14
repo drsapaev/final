@@ -4,6 +4,7 @@
 ---
 
 ## 📋 Table of Contents
+0. [UI Layer Contract](#ui-layer-contract)
 1. [Quick Start](#quick-start)
 2. [Core Principles](#core-principles)
 3. [Color System](#color-system)
@@ -15,6 +16,135 @@
 9. [Anti-Patterns (What NOT to Do)](#anti-patterns-what-not-to-do)
 10. [Migration Checklist](#migration-checklist)
 11. [Code Review Guidelines](#code-review-guidelines)
+
+---
+
+## UI Layer Contract
+
+This section is the frontend UI layer contract for new clinic operations work. It is intentionally narrow: it documents what to use next without claiming that older layers have already been removed.
+
+When this section conflicts with older examples later in this file or in historical migration reports, follow this section first.
+
+### Canonical UI layer
+
+For role dashboards, clinic operations pages, forms, tables, payment result pages, empty/loading/error states, navigation, sidebar, and app-shell work, use:
+
+- `frontend/src/components/ui/macos`
+- `frontend/src/theme/macos-tokens.css`
+- `frontend/src/theme/macosTheme.jsx`
+- `frontend/src/styles/macos.css`
+- existing macOS app shell/sidebar/header patterns
+
+Prefer the exported macOS primitives from `frontend/src/components/ui/macos/index.js` before creating anything new. Common first choices are `Card`, `CardContent`, `Button`, `Input`, `Select`, `Textarea`, `Badge`, `Alert`, `Dialog`, `Table`, `Progress`, `Skeleton`, `Tooltip`, and the existing `MacOS*` aliases where the surrounding code already uses them.
+
+### Use macOS UI for
+
+- Admin, Doctor, Registrar, Cashier, Lab, Patient, and specialty role dashboards.
+- Clinic workflow pages and panels.
+- Forms, filters, field labels, validation messages, and disabled states.
+- Tables, lists, metrics, cards, badges, dialogs, and confirmation flows.
+- Payment success/cancel/result pages.
+- Public and authenticated empty/loading/error states.
+- Navigation, sidebar, header, and route shell surfaces.
+
+### Do
+
+- Inspect `frontend/src/components/ui/macos/index.js` first.
+- Reuse existing macOS primitives and CSS variables before adding a component.
+- Keep layouts dense enough for staff work, but readable and accessible.
+- Preserve backend contracts, route behavior, role access, queue/payment/EMR/lab logic, and existing user flows.
+- Migrate one safe slice at a time and validate after each slice.
+- Use semantic HTML, visible text labels, keyboard-accessible controls, and clear error recovery.
+
+### Do not
+
+- Do not create a parallel UI framework.
+- Do not add new MUI usage in app pages or clinic workflow panels.
+- Do not expand `frontend/src/design-system`, `Modern*`, Tailwind-style utility patterns, or page-specific CSS unless the PR explicitly justifies that legacy boundary.
+- Do not add duplicate primitives such as `MacOSButton2`, `ModernCardNew`, or one-off component systems.
+- Do not add large page-local inline style blocks when an existing primitive, token, or small local style is enough.
+- Do not use decorative marketing-style layouts, unusual fonts, chaotic animation, or visual effects that slow clinical scanning.
+- Do not put business logic, API contract changes, or role decisions inside visual cleanup work.
+
+### Legacy and allowed existing layers
+
+These layers still exist and may remain in untouched code:
+
+- `frontend/src/design-system`
+- `Modern*` components
+- MUI theme files and existing MUI component usage
+- Tailwind-like utility classes or historical utility CSS
+- page-specific CSS modules/files
+- historical migration docs and reports
+
+Treat them as legacy or compatibility surfaces for existing code. New PRs should not expand them unless the task explicitly targets that layer, the owner is clear, and the PR explains why the canonical macOS UI layer is not suitable.
+
+### Migration order
+
+No mass refactor.
+
+1. Identify the exact screen, role, user action, and state being touched.
+2. Verify the current behavior and the canonical route or panel owner.
+3. Replace or normalize only the smallest safe UI slice.
+4. Preserve API payloads, state machines, event dispatches, route guards, RBAC, and redirects.
+5. Prefer shared macOS primitives and tokens.
+6. Run targeted validation first, then broader frontend checks when reasonable.
+7. Leave unrelated legacy UI in place for a later prompt.
+
+### Future shared primitives
+
+When the same pattern repeats across screens, prefer adding shared primitives in a dedicated future PR instead of copying another local variant. Good candidates are:
+
+- `Field`
+- `DataTable`
+- `ConfirmDialog`
+- `AppLoading`
+- `AppEmpty`
+- `AppError`
+- `DraftBadge`
+- `RoleBadge`
+
+Do not implement these in documentation-only PRs. Define them only when a concrete migration slice needs them.
+
+### Examples
+
+Good:
+
+```jsx
+import { Card, CardContent, Button, Alert } from '../components/ui/macos';
+
+<Card>
+  <CardContent>
+    <Alert severity="warning">Проверьте данные и попробуйте еще раз.</Alert>
+    <Button>Сохранить</Button>
+  </CardContent>
+</Card>
+```
+
+Acceptable:
+
+```jsx
+// Existing unrelated legacy panel remains untouched in a narrow PR.
+import ModernButton from '../components/buttons/ModernButton';
+```
+
+Bad:
+
+```jsx
+// New app page: do not expand MUI or create duplicate primitives.
+import { Button, Card } from '@mui/material';
+import MacOSButton2 from './MacOSButton2';
+```
+
+### Agent checklist
+
+- Read this UI Layer Contract before frontend UI work.
+- Inspect existing macOS exports first.
+- Reuse before creating.
+- Do not create a parallel UI framework.
+- Keep clinic UI readable, predictable, accessible, and low cognitive load.
+- State when legacy UI is intentionally left unchanged.
+- Validate that no runtime behavior changed when the PR is documentation-only.
 
 ---
 
