@@ -14,6 +14,20 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
 
+## Skill Routing Policy
+
+Installed repo skills live in `.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
+
+- Skill discovery/setup: use `find-skills` only when searching for or installing new skills.
+- Clinic frontend UI/UX: `clinic-frontend-design` is mandatory first for Admin, Doctor, Registrar, Cashier, Lab, dashboard, route view, form, table, empty/loading/error, accessibility, responsive, or visual consistency work.
+- React implementation: use `vercel-react-best-practices` for performance, bundle, data-fetching, and rerender concerns; add `vercel-composition-patterns` when component APIs, contexts, providers, or boolean-prop-heavy components are involved.
+- UI audit: use `web-design-guidelines` only as a secondary accessibility/interface audit after `clinic-frontend-design`; do not let it override clinic workflow readability or the existing design system.
+- Frontend validation: use `javascript-testing-patterns`, `vitest`, `webapp-testing`, and `playwright-best-practices` for unit, browser smoke, and E2E work. Prefer existing project scripts and keep artifacts in the repo's established output locations.
+- Backend and database: use `fastapi-templates` for FastAPI/Pydantic/SQLAlchemy shape and `supabase-postgres-best-practices` for Postgres query, index, schema, locking, and performance review. Do not assume Supabase runtime services are used here.
+- GitHub Actions and CI: use `github-actions-docs` for workflow syntax/security questions and `gh-fix-ci` for failing GitHub Actions checks.
+- Security: use `code-security` for secure-by-default review and `semgrep` when a concrete static-analysis scan or custom detection rule is needed.
+- Do not use a generic `frontend-design` skill for clinic application screens unless the user explicitly asks for non-clinic marketing or experimental design work.
+
 ## LightRAG Status
 
 - Treat LightRAG as an active dev-brain retrieval layer for graph-heavy workflows, but not as a fully accepted `unified brain` yet.
