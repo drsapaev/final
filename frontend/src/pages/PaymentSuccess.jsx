@@ -1,33 +1,110 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Grid,
-  Paper,
-  Typography,
-} from '@mui/material';
-import CheckIcon from '@mui/icons-material/CheckCircle';
-import DownloadIcon from '@mui/icons-material/Download';
-import HomeIcon from '@mui/icons-material/Home';
-import PrintIcon from '@mui/icons-material/Print';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import ShareIcon from '@mui/icons-material/Share';
+  AlertCircle,
+  CheckCircle,
+  Download,
+  Home,
+  Printer,
+  Receipt,
+  Share2,
+} from 'lucide-react';
+import { Alert, Badge, Button, Card, CardContent } from '../components/ui/macos';
 
 // API клиент
 import { api as apiClient } from '../api/client';
 
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
+
+const pageStyle = {
+  maxWidth: '960px',
+  margin: '32px auto',
+  padding: '0 16px 40px',
+  color: 'var(--mac-text-primary)',
+};
+
+const centeredCardStyle = {
+  textAlign: 'center',
+  marginBottom: '16px',
+};
+
+const statusIconWrapStyle = {
+  width: '88px',
+  height: '88px',
+  borderRadius: '50%',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: '18px',
+};
+
+const detailGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: '12px',
+  marginTop: '16px',
+};
+
+const detailItemStyle = {
+  border: '1px solid var(--mac-border)',
+  borderRadius: 'var(--mac-radius-md)',
+  background: 'var(--mac-bg-secondary)',
+  padding: '14px',
+  minWidth: 0,
+};
+
+const detailLabelStyle = {
+  margin: '0 0 6px',
+  color: 'var(--mac-text-secondary)',
+  fontSize: '13px',
+};
+
+const detailValueStyle = {
+  margin: 0,
+  color: 'var(--mac-text-primary)',
+  fontSize: '16px',
+  fontWeight: 600,
+  lineHeight: 1.35,
+  overflowWrap: 'anywhere',
+};
+
+const actionGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: '12px',
+  marginTop: '16px',
+};
+
+const buttonIconStyle = {
+  width: '18px',
+  height: '18px',
+  marginRight: '8px',
+  flexShrink: 0,
+};
+
+const loadingWrapStyle = {
+  minHeight: '60vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '32px 16px',
+};
+
+const spinnerStyle = {
+  width: '48px',
+  height: '48px',
+  borderRadius: '50%',
+  border: '4px solid rgba(52, 199, 89, 0.18)',
+  borderTopColor: 'var(--mac-success)',
+  animation: 'payment-success-spin 0.9s linear infinite',
+  margin: '0 auto 16px',
+};
+
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   // Состояния
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,7 +119,7 @@ const PaymentSuccess = () => {
       const response = await apiClient.post(`/payments/${paymentId}/receipt`, {
         format: 'pdf'
       });
-      
+
       if (response.data?.receipt_url) {
         setReceiptUrl(response.data.receipt_url);
       }
@@ -54,12 +131,12 @@ const PaymentSuccess = () => {
   const loadPaymentDetails = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const response = await apiClient.get(`/payments/${paymentId}`);
-      
+
       if (response.data) {
         setPaymentData(response.data);
-        
+
         // Если платеж успешен, генерируем квитанцию
         if (response.data.status === 'completed') {
           generateReceipt();
@@ -102,7 +179,7 @@ const PaymentSuccess = () => {
 
   const generateSimpleReceipt = () => {
     if (!paymentData) return '';
-    
+
     return `
 КВИТАНЦИЯ ОБ ОПЛАТЕ
 ===================
@@ -213,7 +290,7 @@ const PaymentSuccess = () => {
       processing: 'info',
       completed: 'success',
       paid: 'success',
-      failed: 'error',
+      failed: 'danger',
       cancelled: 'default'
     };
     const normalized = String(status || '').toLowerCase();
@@ -222,223 +299,213 @@ const PaymentSuccess = () => {
 
   if (loading) {
     return (
-      <Box 
-        display="flex" 
-        justifyContent="center" 
-        alignItems="center" 
-        minHeight="60vh"
-      >
-        <CircularProgress size={60} />
-      </Box>
+      <main style={loadingWrapStyle} aria-busy="true" aria-live="polite">
+        <Card padding="large" shadow="large" style={{ width: '100%', maxWidth: '420px', textAlign: 'center' }}>
+          <div style={spinnerStyle} aria-hidden="true" />
+          <h1 style={{ margin: '0 0 8px', fontSize: '22px' }}>
+            Проверяем платеж
+          </h1>
+          <p style={{ margin: 0, color: 'var(--mac-text-secondary)', lineHeight: 1.5 }}>
+            Загружаем информацию и готовим квитанцию.
+          </p>
+          <style>{`
+            @keyframes payment-success-spin {
+              to { transform: rotate(360deg); }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              div[style*="payment-success-spin"] {
+                animation: none !important;
+              }
+            }
+          `}</style>
+        </Card>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <Box maxWidth="md" mx="auto" mt={4} px={2}>
-        <Card>
-          <CardContent>
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-            <Button 
-              variant="contained" 
-              startIcon={<HomeIcon />}
-              onClick={() => navigate('/')}
-            >
-              На главную
-            </Button>
-          </CardContent>
+      <main style={pageStyle}>
+        <Card padding="large" shadow="large">
+          <Alert severity="error" role="alert" style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <AlertCircle size={20} style={{ flexShrink: 0, color: 'var(--mac-danger)' }} />
+              <div>
+                <strong style={{ display: 'block', marginBottom: '4px' }}>
+                  Платеж не найден
+                </strong>
+                <span>{error}</span>
+              </div>
+            </div>
+          </Alert>
+          <Button
+            variant="primary"
+            onClick={() => navigate('/')}
+          >
+            <Home style={buttonIconStyle} />
+            На главную
+          </Button>
         </Card>
-      </Box>
+      </main>
     );
   }
 
   const isSuccess = normalizePaymentStatus(paymentData?.status) === 'completed';
 
   return (
-    <Box maxWidth="md" mx="auto" mt={4} px={2}>
-      {/* Заголовок результата */}
-      <Card elevation={3} sx={{ mb: 3 }}>
-        <CardContent sx={{ textAlign: 'center', py: 4 }}>
-          {isSuccess ? (
-            <>
-              <CheckIcon 
-                sx={{ 
-                  fontSize: 80, 
-                  color: 'success.main', 
-                  mb: 2 
-                }} 
-              />
-              <Typography variant="h4" color="success.main" gutterBottom>
-                Оплата успешно завершена!
-              </Typography>
-              <Typography variant="h6" color="textSecondary">
-                Спасибо за использование наших услуг
-              </Typography>
-            </>
-          ) : (
-            <>
-              <Typography variant="h4" color="warning.main" gutterBottom>
-                Статус платежа: {getStatusText(paymentData?.status)}
-              </Typography>
-              <Typography variant="body1" color="textSecondary">
-                Информация о вашем платеже
-              </Typography>
-            </>
-          )}
-        </CardContent>
+    <main style={pageStyle}>
+      <Card padding="large" shadow="large" style={centeredCardStyle}>
+        {isSuccess ? (
+          <>
+            <div
+              style={{
+                ...statusIconWrapStyle,
+                color: 'var(--mac-success)',
+                background: 'rgba(52, 199, 89, 0.12)',
+                border: '1px solid rgba(52, 199, 89, 0.28)',
+              }}
+              aria-hidden="true"
+            >
+              <CheckCircle size={52} />
+            </div>
+            <h1 style={{ margin: '0 0 8px', fontSize: '26px', color: 'var(--mac-success)' }}>
+              Оплата успешно завершена
+            </h1>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '16px', lineHeight: 1.5 }}>
+              Спасибо за использование наших услуг.
+            </p>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                ...statusIconWrapStyle,
+                color: 'var(--mac-warning)',
+                background: 'rgba(255, 149, 0, 0.12)',
+                border: '1px solid rgba(255, 149, 0, 0.28)',
+              }}
+              aria-hidden="true"
+            >
+              <AlertCircle size={52} />
+            </div>
+            <h1 style={{ margin: '0 0 8px', fontSize: '26px', color: 'var(--mac-warning)' }}>
+              Статус платежа: {getStatusText(paymentData?.status)}
+            </h1>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '16px', lineHeight: 1.5 }}>
+              Информация о вашем платеже.
+            </p>
+          </>
+        )}
       </Card>
 
-      {/* Детали платежа */}
       {paymentData && (
-        <Card elevation={2} sx={{ mb: 3 }}>
+        <Card padding="large" shadow="default" style={{ marginBottom: '16px' }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <ReceiptIcon sx={{ mr: 1 }} />
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '18px' }}>
+              <Receipt size={20} aria-hidden="true" />
               Детали платежа
-            </Typography>
-            
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Номер платежа
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    #{paymentId}
-                  </Typography>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Сумма
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="primary">
-                    {formatAmount(paymentData.amount, paymentData.currency)}
-                  </Typography>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Способ оплаты
-                  </Typography>
-                  <Typography variant="body1">
-                    {getProviderName(paymentData.provider)}
-                  </Typography>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Статус
-                  </Typography>
-                  <Chip 
-                    label={getStatusText(paymentData.status)}
-                    color={getStatusColor(paymentData.status)}
-                    size="small"
-                  />
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Дата и время
-                  </Typography>
-                  <Typography variant="body1">
-                    {new Date(paymentData.created_at).toLocaleString('ru-RU')}
-                  </Typography>
-                </Paper>
-              </Grid>
-              
+            </h2>
+
+            <div style={detailGridStyle}>
+              <div style={detailItemStyle}>
+                <p style={detailLabelStyle}>Номер платежа</p>
+                <p style={detailValueStyle}>#{paymentId}</p>
+              </div>
+
+              <div style={detailItemStyle}>
+                <p style={detailLabelStyle}>Сумма</p>
+                <p style={{ ...detailValueStyle, color: 'var(--mac-accent-blue)' }}>
+                  {formatAmount(paymentData.amount, paymentData.currency)}
+                </p>
+              </div>
+
+              <div style={detailItemStyle}>
+                <p style={detailLabelStyle}>Способ оплаты</p>
+                <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                  {getProviderName(paymentData.provider)}
+                </p>
+              </div>
+
+              <div style={detailItemStyle}>
+                <p style={detailLabelStyle}>Статус</p>
+                <Badge variant={getStatusColor(paymentData.status)}>
+                  {getStatusText(paymentData.status)}
+                </Badge>
+              </div>
+
+              <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
+                <p style={detailLabelStyle}>Дата и время</p>
+                <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                  {new Date(paymentData.created_at).toLocaleString('ru-RU')}
+                </p>
+              </div>
+
               {paymentData.description && (
-                <Grid item xs={12}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="body2" color="textSecondary">
-                      Описание
-                    </Typography>
-                    <Typography variant="body1">
-                      {paymentData.description}
-                    </Typography>
-                  </Paper>
-                </Grid>
+                <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
+                  <p style={detailLabelStyle}>Описание</p>
+                  <p style={{ ...detailValueStyle, fontWeight: 500 }}>
+                    {paymentData.description}
+                  </p>
+                </div>
               )}
-            </Grid>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Действия */}
-      <Card elevation={2}>
+      <Card padding="large" shadow="default">
         <CardContent>
-          <Typography variant="h6" gutterBottom>
+          <h2 style={{ margin: 0, fontSize: '18px' }}>
             Действия
-          </Typography>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                startIcon={<DownloadIcon />}
-                onClick={downloadReceipt}
-                disabled={!paymentData}
-              >
-                Скачать квитанцию
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<PrintIcon />}
-                onClick={printReceipt}
-                disabled={!paymentData}
-              >
-                Печать
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<ShareIcon />}
-                onClick={shareReceipt}
-                disabled={!paymentData}
-              >
-                Поделиться
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<HomeIcon />}
-                onClick={() => navigate('/')}
-              >
-                На главную
-              </Button>
-            </Grid>
-          </Grid>
+          </h2>
+
+          <div style={actionGridStyle}>
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={downloadReceipt}
+              disabled={!paymentData}
+            >
+              <Download style={buttonIconStyle} />
+              Скачать квитанцию
+            </Button>
+
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={printReceipt}
+              disabled={!paymentData}
+            >
+              <Printer style={buttonIconStyle} />
+              Печать
+            </Button>
+
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={shareReceipt}
+              disabled={!paymentData}
+            >
+              <Share2 style={buttonIconStyle} />
+              Поделиться
+            </Button>
+
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={() => navigate('/')}
+            >
+              <Home style={buttonIconStyle} />
+              На главную
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Дополнительная информация */}
-      <Box mt={4} textAlign="center">
-        <Typography variant="body2" color="textSecondary">
-          При возникновении вопросов обратитесь в службу поддержки
-        </Typography>
-      </Box>
-    </Box>
+      <p style={{ margin: '24px 0 0', textAlign: 'center', color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+        При возникновении вопросов обратитесь в службу поддержки.
+      </p>
+    </main>
   );
 };
 
