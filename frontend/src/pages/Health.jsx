@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getApiBase } from '../api/client.js';
 import { getHealth, getActivationStatus } from '../api/index.js';
+import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
 import auth from '../stores/auth.js';
 
 export default function Health() {
@@ -83,19 +84,9 @@ export default function Health() {
       lineHeight: 1.5,
       maxHeight: '56vh',
     },
-    muted: {
-      color: 'var(--mac-text-secondary)',
-      fontSize: '14px',
-      lineHeight: 1.5,
-    },
-    alert: {
-      color: 'var(--mac-error, #b42318)',
-      background: 'color-mix(in srgb, var(--mac-error, #ff3b30), transparent 90%)',
-      border: '1px solid color-mix(in srgb, var(--mac-error, #ff3b30), transparent 60%)',
-      borderRadius: '12px',
-      padding: '12px',
-      marginBottom: '18px',
-      fontSize: '14px',
+    appState: {
+      minHeight: '120px',
+      padding: '16px',
     },
   };
 
@@ -108,23 +99,31 @@ export default function Health() {
         </div>
 
         {err && (
-          <div style={styles.alert} role="alert">
-            {err}
-          </div>
+          <AppError
+            title="Ошибка загрузки"
+            description={String(err)}
+            style={{ marginBottom: '18px' }}
+          />
         )}
 
         <section style={styles.section} aria-labelledby="health-status-title">
           <h2 id="health-status-title" style={styles.sectionTitle}>Health</h2>
           {loading ? (
-            <div style={styles.muted} role="status" aria-live="polite">Проверка состояния сервера...</div>
+            <AppLoading
+              title="Проверка состояния сервера..."
+              size="sm"
+              style={styles.appState}
+            />
           ) : health ? (
             <pre style={styles.pre}>
               {typeof health === 'string' ? health : JSON.stringify(health, null, 2)}
             </pre>
           ) : (
-            <div style={styles.muted}>
-              Спец-эндпоинт health не обнаружен в OpenAPI. Это нормально.
-            </div>
+            <AppEmpty
+              title="Health недоступен"
+              description="Спец-эндпоинт health не обнаружен в OpenAPI. Это нормально."
+              style={styles.appState}
+            />
           )}
         </section>
 
@@ -132,15 +131,21 @@ export default function Health() {
           <section style={styles.section} aria-labelledby="activation-status-title">
             <h2 id="activation-status-title" style={styles.sectionTitle}>Статус активации</h2>
             {loading ? (
-              <div style={styles.muted} role="status" aria-live="polite">Загрузка статуса...</div>
+              <AppLoading
+                title="Загрузка статуса..."
+                size="sm"
+                style={styles.appState}
+              />
             ) : act ? (
               <pre style={styles.pre}>
                 {typeof act === 'string' ? act : JSON.stringify(act, null, 2)}
               </pre>
             ) : (
-              <div style={styles.muted}>
-                Эндпоинт статуса активации отсутствует в OpenAPI. Всё в порядке.
-              </div>
+              <AppEmpty
+                title="Статус активации недоступен"
+                description="Эндпоинт статуса активации отсутствует в OpenAPI. Всё в порядке."
+                style={styles.appState}
+              />
             )}
           </section>
         )}
