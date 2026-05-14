@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { renderRouteDocsMarkdown } from '../routeDocsSnapshot.js';
 import { resolveSetupRedirect } from '../routeGuards.jsx';
-import { ROUTE_REGISTRY } from '../routeRegistry.js';
+import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry.js';
 import {
   getCompatibilityRedirects,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
   getRoleHomeRoute,
   getRouteDocsSnapshot,
+  getRouteChromeState,
   isInternalDemoEnabled,
   isRouteAccessibleToProfile,
 } from '../routeSelectors.js';
@@ -23,6 +24,15 @@ const PRODUCTION_ROLE_HOMES = {
   dentist: '/doctor/dentistry',
   patient: '/patient',
 };
+
+const AI_SIDEBAR_BADGE = 'Черновик · не медицинское заключение';
+const AI_SIDEBAR_ACCESSIBLE_COPY = /черновик, не диагноз, не медицинское заключение/i;
+
+function assertAiSidebarDisclaimer(item) {
+  expect(item.badge).toBe(AI_SIDEBAR_BADGE);
+  expect(item.tooltip).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
+  expect(item.ariaLabel).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
+}
 
 describe('route contract invariants', () => {
   it('keeps route ids unique and canonical paths singular', () => {
@@ -93,6 +103,23 @@ describe('route contract invariants', () => {
     getCompatibilityRedirects().forEach((redirect) => {
       expect(canonicalPaths.has(redirect.aliasPath)).toBe(false);
     });
+  });
+
+  it('labels AI sidebar navigation as draft support, not a diagnosis', () => {
+    const presetAiItems = Object.values(SIDEBAR_PRESETS)
+      .flatMap((preset) => preset.items || [])
+      .filter((item) => item.id === 'ai' || item.id === 'ai-assistant');
+
+    expect(presetAiItems).toHaveLength(4);
+    presetAiItems.forEach(assertAiSidebarDisclaimer);
+
+    const adminAiRoute = ROUTE_REGISTRY.find((route) => route.id === 'admin-ai-settings');
+    assertAiSidebarDisclaimer(adminAiRoute.nav);
+
+    const adminChrome = getRouteChromeState('/admin/ai-settings', '', { role: 'Admin' });
+    const adminAiItem = adminChrome.sidebarItems.find((item) => item.id === 'admin-ai-settings');
+
+    assertAiSidebarDisclaimer(adminAiItem);
   });
 });
 
