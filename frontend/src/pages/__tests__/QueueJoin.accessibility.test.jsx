@@ -110,7 +110,7 @@ describe('QueueJoin Accessibility & UX', () => {
     fireEvent.click(screen.getByRole('button', { name: /қўшилиш/i }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/телефон рақами тўлиқ эмас/i);
+    expect(alert).toHaveTextContent(/телефон указан не полностью/i);
 
     expect(screen.getByLabelText(/фио/i)).toHaveAttribute('aria-required', 'true');
     expect(screen.getByLabelText(/телефон рақами/i)).toHaveAttribute('aria-required', 'true');
@@ -198,6 +198,7 @@ describe('QueueJoin Accessibility & UX', () => {
     });
 
     renderQueueJoin('retry-token');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/qr-токен не найден/i);
     const retryButton = await screen.findByRole('button', { name: /қайта уриниш/i });
     fireEvent.click(retryButton);
 

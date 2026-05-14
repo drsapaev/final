@@ -95,6 +95,25 @@ const formatSpecialistLabel = (specialist) => {
 };
 
 const MISSING_QUEUE_TOKEN_MESSAGE = 'QR-код не найден. Откройте ссылку из клиники или отсканируйте QR-код заново.';
+const QUEUE_JOIN_MESSAGES = {
+  sessionStartFailed: 'Не удалось начать сессию очереди.',
+  queueInactive: 'Очередь сейчас не активна.',
+  registrationClosedAt: (endTime) => `Запись закрылась в ${endTime}.`,
+  receptionAlreadyOpened: 'Запись закрыта: прием уже начался.',
+  limitReached: (maxEntries) => `Лимит записи достигнут (${maxEntries}).`,
+  registrationUnavailable: 'Запись в очередь недоступна.',
+  qrTokenUnavailable: 'QR-токен не найден или срок его действия истек.',
+  requiredFields: 'Заполните обязательные поля.',
+  sessionExpired: 'Сессия очереди истекла. Создаем новую сессию...',
+  sessionCreateFailed: 'Не удалось создать сессию очереди. Обновите страницу.',
+  nameTooShort: 'Введите полное имя пациента (минимум 2 символа).',
+  nameTooLong: 'ФИО слишком длинное (максимум 200 символов).',
+  phoneTooShort: 'Телефон указан не полностью (минимум 12 цифр: +998 XX XXX XX XX).',
+  phoneTooLong: 'Телефон слишком длинный (максимум 12 цифр).',
+  missingSessionToken: 'Сессия очереди недоступна или истекла. Обновите страницу.',
+  joinFailed: 'Не удалось присоединиться к очереди.',
+  selectSpecialist: 'Выберите специалиста.',
+};
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
@@ -134,9 +153,6 @@ const QueueJoin = () => {
     }
     if (typeof responseData?.message === 'string') {
       return responseData.message;
-    }
-    if (typeof err?.message === 'string' && err.message.trim()) {
-      return err.message;
     }
     return fallbackMessage;
   }, []);
@@ -228,7 +244,7 @@ const QueueJoin = () => {
       }
 
     } catch (error) {
-      setError(getApiErrorMessage(error, 'Сессияни бошлашда хатолик'));
+      setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
     }
   }, [getApiErrorMessage, token]);
@@ -246,7 +262,7 @@ const QueueJoin = () => {
       setQueueInfo(tokenInfo);
 
       if (!tokenInfo.queue_active) {
-        setError('Навбат ҳозирда фаол эмас');
+        setError(QUEUE_JOIN_MESSAGES.queueInactive);
         setStep('error');
         return;
       }
@@ -256,19 +272,19 @@ const QueueJoin = () => {
         setStep('waiting');
         return;
       } else if (tokenInfo.status === 'after_end_time') {
-        setError(`Ёзилиш ${tokenInfo.end_time}да ёпилган`);
+        setError(QUEUE_JOIN_MESSAGES.registrationClosedAt(tokenInfo.end_time));
         setStep('error');
         return;
       } else if (tokenInfo.status === 'closed_reception_opened') {
-        setError('Ёзилиш ёпилган - қабул аллақачон очилган');
+        setError(QUEUE_JOIN_MESSAGES.receptionAlreadyOpened);
         setStep('error');
         return;
       } else if (tokenInfo.status === 'limit_reached') {
-        setError(`Ёзилиш лимитига етилди (${tokenInfo.max_entries})`);
+        setError(QUEUE_JOIN_MESSAGES.limitReached(tokenInfo.max_entries));
         setStep('error');
         return;
       } else if (tokenInfo.allowed === false) {
-        setError(tokenInfo.message || 'Ёзилиш мавжуд эмас');
+        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationUnavailable);
         setStep('error');
         return;
       }
@@ -276,7 +292,7 @@ const QueueJoin = () => {
       await startJoinSession();
 
     } catch (error) {
-      setError(getApiErrorMessage(error, 'QR токен топилмади ёки муддати тугаган'));
+      setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
       setStep('error');
     }
   }, [getApiErrorMessage, startJoinSession, token]);
@@ -329,7 +345,7 @@ const QueueJoin = () => {
     e.preventDefault();
 
     if (!formData.patientName.trim() || !formData.phone.trim()) {
-      setError('Илтимос, барча мажбурий майдонларни тўлдиринг');
+      setError(QUEUE_JOIN_MESSAGES.requiredFields);
       return;
     }
 
@@ -342,11 +358,11 @@ const QueueJoin = () => {
 
       if (!currentSessionToken) {
         // Если нет сохраненной сессии, создаем новую
-        setError('Сессия муддати тугади. Янги сессия яратилмоқда...');
+        setError(QUEUE_JOIN_MESSAGES.sessionExpired);
         await startJoinSession();
         currentSessionToken = sessionToken;
         if (!currentSessionToken) {
-          setError('Сессияни яратиб бўлмади. Илтимос, саҳифани янгиланг.');
+          setError(QUEUE_JOIN_MESSAGES.sessionCreateFailed);
           return;
         }
       } else {
@@ -363,13 +379,13 @@ const QueueJoin = () => {
       const trimmedPhone = formData.phone.trim();
 
       if (trimmedPatientName.length < 2) {
-        setError('Илтимос, тўлиқ исм-шариф киритинг (камда 2 та белги)');
+        setError(QUEUE_JOIN_MESSAGES.nameTooShort);
         setLoading(false);
         return;
       }
 
       if (trimmedPatientName.length > 200) {
-        setError('Исм-шариф жуда узун (максимум 200 та белги)');
+        setError(QUEUE_JOIN_MESSAGES.nameTooLong);
         setLoading(false);
         return;
       }
@@ -391,19 +407,19 @@ const QueueJoin = () => {
 
       // Узбекский номер должен быть 12 цифр (998 + 9 цифр)
       if (normalizedPhone.length < 12) {
-        setError('Телефон рақами тўлиқ эмас (камда 12 та рақам: +998 XX XXX XX XX)');
+        setError(QUEUE_JOIN_MESSAGES.phoneTooShort);
         setLoading(false);
         return;
       }
 
       if (normalizedPhone.length > 12) {
-        setError('Телефон рақами жуда узун (максимум 12 та рақам)');
+        setError(QUEUE_JOIN_MESSAGES.phoneTooLong);
         setLoading(false);
         return;
       }
 
       if (!currentSessionToken) {
-        setError('Сессия токени топилмади. Илтимос, саҳифани янгиланг.');
+        setError(QUEUE_JOIN_MESSAGES.missingSessionToken);
         setLoading(false);
         return;
       }
@@ -498,7 +514,7 @@ const QueueJoin = () => {
       setStep('success');
 
     } catch (error) {
-      setError(getApiErrorMessage(error, 'Навбатга қўшилишда хатолик'));
+      setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
     } finally {
       setLoading(false);
     }
@@ -1287,7 +1303,7 @@ const QueueJoin = () => {
             <button
               onClick={() => {
                 if (selectedSpecialists.length === 0) {
-                  setError('Кам деганда бир мутахассисни танланг');
+                  setError(QUEUE_JOIN_MESSAGES.selectSpecialist);
                   setTimeout(() => setError(null), 3000);
                   return;
                 }
