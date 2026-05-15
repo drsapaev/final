@@ -28,7 +28,7 @@ const EmptyState = ({
   const stateRole = type === 'error' ? 'alert' : 'status';
 
   const getIcon = () => {
-    if (CustomIcon) return <CustomIcon className="w-12 h-12" aria-hidden="true" />;
+    if (CustomIcon) return <CustomIcon className="w-12 h-12" aria-hidden="true" focusable="false" />;
 
     const iconMap = {
       default: FileText,
@@ -44,7 +44,7 @@ const EmptyState = ({
     };
 
     const Icon = iconMap[type] || iconMap.default;
-    return <Icon className="w-12 h-12" aria-hidden="true" />;
+    return <Icon className="w-12 h-12" aria-hidden="true" focusable="false" />;
   };
 
   const getColor = () => {
@@ -100,7 +100,7 @@ const EmptyState = ({
         </p>
         
         {action &&
-        <div className="flex gap-3 justify-center">
+        <div className="flex gap-3 justify-center" role="group" aria-labelledby={titleId}>
             {action}
           </div>
         }
