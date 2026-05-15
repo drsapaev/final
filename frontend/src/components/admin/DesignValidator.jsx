@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Card, Button, Badge } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { validateComponentDesign } from '../../utils/designValidator';
@@ -10,6 +10,9 @@ import PropTypes from 'prop-types';
  */
 const DesignValidator = ({ onValidationComplete }) => {
   const { getColor, getSpacing, getFontSize } = useTheme();
+  const componentSelectId = useId();
+  const resultsRegionId = useId();
+  const resultsTitleId = useId();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState('CardiologistPanelUnified');
@@ -76,7 +79,7 @@ const DesignValidator = ({ onValidationComplete }) => {
       </div>
 
       <div style={{ marginBottom: getSpacing('lg') }}>
-        <label style={{
+        <label htmlFor={componentSelectId} style={{
           display: 'block',
           fontSize: getFontSize('sm'),
           fontWeight: '500',
@@ -86,6 +89,7 @@ const DesignValidator = ({ onValidationComplete }) => {
           Выберите компонент для проверки:
         </label>
         <select
+          id={componentSelectId}
           value={selectedComponent}
           onChange={(e) => setSelectedComponent(e.target.value)}
           style={{
@@ -107,13 +111,20 @@ const DesignValidator = ({ onValidationComplete }) => {
       <Button
         onClick={() => validateComponent(selectedComponent)}
         disabled={isValidating}
+        aria-busy={isValidating}
+        aria-controls={validationResults ? resultsRegionId : undefined}
         style={{ marginBottom: getSpacing('lg') }}>
         
         {isValidating ? 'Проверяем...' : 'Запустить валидацию'}
       </Button>
 
       {validationResults &&
-      <div style={{
+      <div
+        id={resultsRegionId}
+        role="region"
+        aria-live="polite"
+        aria-labelledby={resultsTitleId}
+        style={{
         border: `1px solid ${getColor('border')}`,
         borderRadius: '8px',
         padding: getSpacing('lg'),
@@ -125,7 +136,7 @@ const DesignValidator = ({ onValidationComplete }) => {
           justifyContent: 'space-between',
           marginBottom: getSpacing('lg')
         }}>
-            <h3 style={{
+            <h3 id={resultsTitleId} style={{
             fontSize: getFontSize('lg'),
             fontWeight: '600',
             color: getColor('text')
