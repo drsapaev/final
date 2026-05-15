@@ -306,12 +306,13 @@ const LicenseManagement = () => {
           <div style={{ flex: 1, position: 'relative' }}>
             <MacOSInput
               type="text"
+              aria-label="Поиск лицензий по названию, поставщику или ключу"
               placeholder="Поиск по названию, поставщику или ключу..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '40px' }} />
             
-            <Search style={{
+            <Search aria-hidden="true" style={{
               position: 'absolute',
               left: '12px',
               top: '50%',
@@ -323,6 +324,7 @@ const LicenseManagement = () => {
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <MacOSSelect
+              aria-label="Фильтр лицензий по статусу"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -333,6 +335,7 @@ const LicenseManagement = () => {
               )}
             </MacOSSelect>
             <MacOSSelect
+              aria-label="Фильтр лицензий по типу"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -353,7 +356,7 @@ const LicenseManagement = () => {
                 padding: '8px 16px'
               }}>
               
-              <Plus style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить лицензию</span>
             </MacOSButton>
           </div>
@@ -379,6 +382,8 @@ const LicenseManagement = () => {
             </h3>
             <MacOSButton
             variant="outline"
+            type="button"
+            aria-label={editingLicense ? 'Закрыть форму редактирования лицензии' : 'Закрыть форму добавления лицензии'}
             onClick={() => {
               setShowAddForm(false);
               setEditingLicense(null);
@@ -386,7 +391,7 @@ const LicenseManagement = () => {
             }}
             style={{ padding: '8px' }}>
             
-              <X style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             </MacOSButton>
           </div>
 
@@ -606,7 +611,7 @@ const LicenseManagement = () => {
               
                 {saving ?
               <>
-                    <RefreshCw style={{
+                    <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
@@ -615,7 +620,7 @@ const LicenseManagement = () => {
                   </> :
 
               <>
-                    <Save style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     {editingLicense ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -646,7 +651,7 @@ const LicenseManagement = () => {
         description="Добавьте первую лицензию или измените фильтры поиска"
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить лицензию
             </MacOSButton>
         } /> :
@@ -697,7 +702,7 @@ const LicenseManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Key style={{ width: '16px', height: '16px' }} />
+                  <Key aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span style={{
                 fontFamily: 'monospace',
                 backgroundColor: 'var(--mac-bg-secondary)',
@@ -708,22 +713,26 @@ const LicenseManagement = () => {
                     {showKeys[license.id] ? license.license_key : '••••••••••••••••'}
                   </span>
                   <MacOSButton
+                type="button"
                 variant="outline"
+                aria-label={showKeys[license.id] ? `Скрыть ключ лицензии ${license.name}` : `Показать ключ лицензии ${license.name}`}
                 onClick={() => toggleKeyVisibility(license.id)}
                 style={{ padding: '2px 6px', minWidth: 'auto' }}>
                 
                     {showKeys[license.id] ?
-                <EyeOff style={{ width: '12px', height: '12px' }} /> :
+                <EyeOff aria-hidden="true" style={{ width: '12px', height: '12px' }} /> :
 
-                <Eye style={{ width: '12px', height: '12px' }} />
+                <Eye aria-hidden="true" style={{ width: '12px', height: '12px' }} />
                 }
                   </MacOSButton>
                   <MacOSButton
+                type="button"
                 variant="outline"
+                aria-label={`Скопировать ключ лицензии ${license.name}`}
                 onClick={() => copyKey(license.license_key)}
                 style={{ padding: '2px 6px', minWidth: 'auto' }}>
                 
-                    <Copy style={{ width: '12px', height: '12px' }} />
+                    <Copy aria-hidden="true" style={{ width: '12px', height: '12px' }} />
                   </MacOSButton>
                 </div>
                 {license.cost > 0 &&
@@ -734,7 +743,7 @@ const LicenseManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <DollarSign style={{ width: '16px', height: '16px' }} />
+                    <DollarSign aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>{license.cost.toLocaleString()} сум</span>
                   </div>
             }
@@ -745,7 +754,7 @@ const LicenseManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Shield style={{ width: '16px', height: '16px' }} />
+                  <Shield aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>{license.seats} мест</span>
                 </div>
                 {license.expiry_date &&
@@ -756,10 +765,10 @@ const LicenseManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)'
             }}>
-                    <Calendar style={{ width: '16px', height: '16px' }} />
+                    <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>Истекает: {new Date(license.expiry_date).toLocaleDateString()}</span>
                     {isExpiringSoon(license.expiry_date) &&
-              <AlertTriangle style={{ width: '14px', height: '14px' }} />
+              <AlertTriangle aria-hidden="true" style={{ width: '14px', height: '14px' }} />
               }
                   </div>
             }
@@ -784,14 +793,18 @@ const LicenseManagement = () => {
             gap: '8px'
           }}>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Редактировать лицензию ${license.name}`}
               onClick={() => handleEdit(license)}
               style={{ padding: '6px 12px' }}>
               
-                  <Edit style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Удалить лицензию ${license.name}`}
               onClick={() => handleDelete(license.id)}
               style={{
                 padding: '6px 12px',
@@ -799,7 +812,7 @@ const LicenseManagement = () => {
                 borderColor: 'var(--mac-error)'
               }}>
               
-                  <Trash2 style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
               </div>
             </MacOSCard>
