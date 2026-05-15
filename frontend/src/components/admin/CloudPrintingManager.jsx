@@ -6,8 +6,7 @@ import {
   MacOSInput,
   MacOSSelect,
   MacOSTextarea,
-
-  MacOSEmptyState,
+  AppEmpty,
 
   MacOSModal } from
 '../ui/macos';
@@ -320,7 +319,7 @@ const CloudPrintingManager = () => {
       </div>
 
       {list.length === 0 && !loading &&
-      <MacOSEmptyState
+      <AppEmpty
         icon={Printer}
         title={emptyTitle}
         description="Добавьте принтеры или проверьте подключение к облачным сервисам" />
