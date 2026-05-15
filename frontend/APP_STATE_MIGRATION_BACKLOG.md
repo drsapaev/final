@@ -12,6 +12,16 @@ Completed pilots:
 
 - `frontend/src/pages/Health.jsx`
 - `frontend/src/pages/Audit.jsx`
+- `frontend/src/components/admin/ServiceAuditHistory.jsx`
+- `frontend/src/pages/Activation.jsx`
+- `frontend/src/pages/Search.jsx`
+
+Current stack status:
+
+- `ServiceAuditHistory.jsx` is covered by the parent UX remediation PR as the first safe UI fix.
+- `Activation.jsx` is covered by the `ux-activation-control-labels` slice.
+- `Search.jsx` is covered by the `ux-search-empty-accessibility` slice.
+- Do not reselect completed pilots for a future AppState PR unless the prompt explicitly asks for a follow-up review.
 
 This document is search-based. The searches below identify recurring state patterns; selected candidates were spot-checked for risk and migration shape. It does not claim that every match was manually reviewed.
 
@@ -184,20 +194,20 @@ No mass refactor.
 4. Phase D: role panels one slice at a time, after a dedicated route/workflow review.
 5. Phase E: clinical-heavy flows only after dedicated review and behavior-specific validation.
 
-## Top 10 Candidate Migrations
+## Top Candidate Migrations and Status
 
-| Rank | File | Current state pattern | Recommended primitive | Risk | Effort | Acceptance criteria | Do not change |
+| Status | File | Current state pattern | Recommended primitive | Risk | Effort | Acceptance criteria | Do not change |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `frontend/src/pages/Activation.jsx` | Inline loading text, inline error box, inline no-data text | `AppLoading`, `AppError`, `AppEmpty` | Low | S | Loading/status/list empty states render through AppState primitives; API calls and Admin `RoleGate` remain unchanged | Activation API calls, filter behavior, roles |
-| 2 | `frontend/src/pages/Appointments.jsx` | `legacy-error`, refresh button busy text, table `colSpan` empty row | `AppError`, `AppEmpty`; only use `AppLoading` for an initial table state if behavior stays identical | Medium | S | Error and empty table state use AppState primitives; date/search filtering and table columns are unchanged | `/appointments` fallback request, filters, advanced table toggle, appointment flow |
-| 3 | `frontend/src/pages/Search.jsx` | Local error box and no-results block | `AppError`, `AppEmpty`; keep button spinner as-is unless local-only | Low | S | No-results and search error states use AppState primitives; search query behavior is unchanged | Search API calls, result grouping, navigation |
-| 4 | `frontend/src/pages/PatientPickupView.jsx` | Full-page loading and error blocks with local styles | `AppLoading`, `AppError` | Low/Medium | S | Loading/error page states use AppState primitives; pickup token handling and displayed patient data stay unchanged | Route params, pickup/session logic, patient data rendering |
-| 5 | `frontend/src/components/admin/AdminSection.jsx` | Shared loading skeleton and error block using native `Card`/utility classes | `AppLoading`, `AppError` or a wrapper using macOS `Card` | Medium | M | Existing consumers still render; section loading/error states use canonical primitives | Component API, reload action semantics, consumers |
-| 6 | `frontend/src/components/admin/ServiceAuditHistory.jsx` | Direct `MacOSLoadingSkeleton` and `MacOSEmptyState` for a small audit-history panel | `AppLoading`, `AppEmpty`; consider `AppError` only if adding visible error remains behavior-preserving | Low | S | Loading and empty history states use AppState primitives; history fetch/rendering is unchanged | `servicesService.getServiceHistory`, expansion behavior, history row fields |
-| 7 | `frontend/src/components/admin/ActivationSystem.jsx` | Full loading return and `setMessage({ type: 'error' })` blocks | `AppLoading`, possibly `AppError` for load failure only | Low/Medium | S | Initial loading state is canonical; action messages remain unchanged unless explicitly scoped | Create/revoke/extend activation behavior, clipboard behavior |
-| 8 | `frontend/src/components/admin/AISettings.jsx` | Full loading return and message-driven error display | `AppLoading`, possibly `AppError` for load failure only | Low/Medium | S | Initial loading state is canonical; provider save/test behavior remains unchanged | AI provider settings, test API, copy that affects AI policy |
-| 9 | `frontend/src/components/admin/QueueLimitsManager.jsx` | Full loading return and table/list empty state string | `AppLoading`, `AppEmpty` | Medium | M | Initial loading and queue status empty state use primitives; limit calculations and save/reset behavior are unchanged | Queue domain limits, utilization logic, API calls |
-| 10 | `frontend/src/components/admin/CloudPrintingManager.jsx` | Repeated grid empty state through `MacOSEmptyState`; loading only in action buttons | `AppEmpty` for grid empty state | Medium | S | Empty printer lists use AppState primitives; print/test actions are unchanged | Printer API calls, print payloads, toast behavior |
+| Completed | `frontend/src/pages/Activation.jsx` | Inline loading text, inline error box, inline no-data text | `AppLoading`, `AppError`, `AppEmpty` plus labeled macOS controls | Low | S | Loading/status/list empty states render through AppState primitives; API calls and Admin `RoleGate` remain unchanged | Activation API calls, filter behavior, roles |
+| Next review | `frontend/src/pages/Appointments.jsx` | `legacy-error`, refresh button busy text, table `colSpan` empty row | `AppError`, `AppEmpty`; only use `AppLoading` for an initial table state if behavior stays identical | Medium | S | Error and empty table state use AppState primitives; date/search filtering and table columns are unchanged | `/appointments` fallback request, filters, advanced table toggle, appointment flow |
+| Completed | `frontend/src/pages/Search.jsx` | Local error box and no-results block | `AppError`, `AppEmpty`; keep button spinner as-is unless local-only | Low | S | No-results and search error states use AppState primitives; search query behavior is unchanged | Search API calls, result grouping, navigation |
+| Review first | `frontend/src/pages/PatientPickupView.jsx` | Full-page loading and error blocks with local styles | `AppLoading`, `AppError` | Low/Medium | S | Loading/error page states use AppState primitives; pickup token handling and displayed patient data stay unchanged | Route params, pickup/session logic, patient data rendering |
+| Next review | `frontend/src/components/admin/AdminSection.jsx` | Shared loading skeleton and error block using native `Card`/utility classes | `AppLoading`, `AppError` or a wrapper using macOS `Card` | Medium | M | Existing consumers still render; section loading/error states use canonical primitives | Component API, reload action semantics, consumers |
+| Completed | `frontend/src/components/admin/ServiceAuditHistory.jsx` | Direct `MacOSLoadingSkeleton` and `MacOSEmptyState` for a small audit-history panel | `AppLoading`, `AppEmpty`, `AppError` for visible retryable failure | Low | S | Loading and empty history states use AppState primitives; history fetch/rendering is unchanged | `servicesService.getServiceHistory`, expansion behavior, history row fields |
+| Candidate | `frontend/src/components/admin/ActivationSystem.jsx` | Full loading return and `setMessage({ type: 'error' })` blocks | `AppLoading`, possibly `AppError` for load failure only | Low/Medium | S | Initial loading state is canonical; action messages remain unchanged unless explicitly scoped | Create/revoke/extend activation behavior, clipboard behavior |
+| Review first | `frontend/src/components/admin/AISettings.jsx` | Full loading return and message-driven error display | `AppLoading`, possibly `AppError` for load failure only | Low/Medium | S | Initial loading state is canonical; provider save/test behavior remains unchanged | AI provider settings, test API, copy that affects AI policy |
+| Review first | `frontend/src/components/admin/QueueLimitsManager.jsx` | Full loading return and table/list empty state string | `AppLoading`, `AppEmpty` | Medium | M | Initial loading and queue status empty state use primitives; limit calculations and save/reset behavior are unchanged | Queue domain limits, utilization logic, API calls |
+| Candidate | `frontend/src/components/admin/CloudPrintingManager.jsx` | Repeated grid empty state through `MacOSEmptyState`; loading only in action buttons | `AppEmpty` for grid empty state | Medium | S | Empty printer lists use AppState primitives; print/test actions are unchanged | Printer API calls, print payloads, toast behavior |
 
 ## Dedicated Review Items
 
@@ -262,4 +272,6 @@ These are not good immediate candidates despite search hits:
 
 ## Suggested Prompt #11 Target
 
-Use `frontend/src/pages/Activation.jsx` as the next runtime candidate if it is still unchanged. It is a small non-clinical page with simple loading, error, and empty states, making it a good follow-up after `Health.jsx` and `Audit.jsx`.
+Use `frontend/src/components/admin/ActivationSystem.jsx` as the next small runtime candidate if the team wants another low/medium-risk AppState slice. Limit the scope to the initial loading/load-failure state only; do not touch create, revoke, extend, clipboard, activation payloads, or action-message semantics.
+
+If the team wants a docs-only follow-up instead, keep this backlog current after each AppState PR and preserve the "No mass refactor" rule.
