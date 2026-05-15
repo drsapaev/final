@@ -3,6 +3,7 @@ import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
+import { AppEmpty, AppError } from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
@@ -84,7 +85,12 @@ export default function Appointments() {
             </label>
           </div>
 
-          {err && <div className="legacy-error">{String(err)}</div>}
+          {err && (
+            <AppError
+              title="Не удалось загрузить записи"
+              description={String(err)}
+            />
+          )}
 
           {useAdvancedTable ? (
             <EnhancedAppointmentsTable
@@ -131,7 +137,14 @@ export default function Appointments() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={5}>Нет записей</td></tr>
+                  <tr>
+                    <td colSpan={5}>
+                      <AppEmpty
+                        title="Нет записей"
+                        description="Записи на выбранную дату появятся здесь после загрузки."
+                      />
+                    </td>
+                  </tr>
                 )}
               </tbody>
               </table>

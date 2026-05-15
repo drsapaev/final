@@ -20,8 +20,8 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSBadge,
-  MacOSEmptyState,
-  MacOSLoadingSkeleton
+  AppEmpty,
+  AppLoading
 } from '../ui/macos';
 
 const ServiceAuditHistory = ({ serviceId, serviceName }) => {
@@ -143,7 +143,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   if (loading) {
     return (
       <MacOSCard variant="default" style={{ padding: '24px' }}>
-        <MacOSLoadingSkeleton height={200} />
+        <AppLoading
+          title="Загрузка истории изменений..."
+          style={{ minHeight: 200 }}
+        />
       </MacOSCard>
     );
   }
@@ -151,10 +154,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   if (history.length === 0) {
     return (
       <MacOSCard variant="default" style={{ padding: '24px' }}>
-        <MacOSEmptyState
+        <AppEmpty
           icon={History}
           title="История изменений пуста"
-          description="Изменения услуги будут отображаться здесь"
+          description="Изменения услуги будут отображаться здесь."
         />
       </MacOSCard>
     );

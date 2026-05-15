@@ -9,6 +9,7 @@ import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
 import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
+import { AppError, AppLoading } from '../components/ui/macos';
 
 // Get user role for role-based UI
 const getUserRole = () => {
@@ -362,10 +363,10 @@ export default function PatientPickupView() {
   if (isLoading) {
     return (
       <div style={styles.container}>
-                <div style={styles.loading}>
-                    <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-                    Загрузка данных пациента...
-                </div>
+        <AppLoading
+          title="Загрузка данных пациента..."
+          style={styles.loading}
+        />
             </div>);
 
   }
@@ -373,10 +374,11 @@ export default function PatientPickupView() {
   if (error) {
     return (
       <div style={styles.container}>
-                <div style={styles.error}>
-                    <div style={{ fontSize: '32px', marginBottom: '16px' }}>❌</div>
-                    {error}
-                </div>
+        <AppError
+          title="Не удалось загрузить данные пациента"
+          description={error}
+          style={styles.error}
+        />
             </div>);
 
   }

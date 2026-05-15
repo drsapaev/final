@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
+import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -73,23 +74,29 @@ export default function Activation() {void
         </div>
 
         {err &&
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-4">
-            {err}
-          </div>
+        <AppError
+          title="Ошибка загрузки"
+          description={err}
+          style={{ marginBottom: '16px' }}
+        />
         }
 
         <section className="mb-6">
           <h2 className="text-lg font-medium mb-2">Статус</h2>
           {loading ?
-          <div>Загрузка статуса…</div> :
+          <AppLoading
+            size="sm"
+            title="Загрузка статуса..."
+          /> :
           status ?
           <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
               {typeof status === 'string' ? status : JSON.stringify(status, null, 2)}
             </pre> :
 
-          <div className="text-sm text-gray-700">
-              Эндпоинт статуса активации на сервере не найден. Вероятно, функция не используется — всё в порядке.
-            </div>
+          <AppEmpty
+            title="Статус активации недоступен"
+            description="Эндпоинт статуса активации на сервере не найден. Вероятно, функция не используется - все в порядке."
+          />
           }
         </section>
 
@@ -97,7 +104,10 @@ export default function Activation() {void
           <section>
             <h2 className="text-lg font-medium mb-2">Список</h2>
             {loading ?
-            <div>Загрузка…</div> :
+            <AppLoading
+              size="sm"
+              title="Загрузка..."
+            /> :
             filtered.length ?
             <div className="overflow-auto border border-gray-200 rounded">
                 <table className="min-w-full text-sm">
@@ -124,7 +134,10 @@ export default function Activation() {void
                 </table>
               </div> :
 
-            <div className="text-sm text-gray-700">Нет данных.</div>
+            <AppEmpty
+              title="Нет данных"
+              description="Записи активации появятся здесь после загрузки."
+            />
             }
           </section>
         </RoleGate>

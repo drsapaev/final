@@ -139,6 +139,12 @@ temp_old.jsx
 debug_test.py
 test_auth.json
 test_payload.json
+auth_*_diff.txt
+*_auth_payloads.json
+*auth-payloads.json
+test_*auth*.json
+debug_*auth*.json
+local-*auth*.json
 tree_F.txt
 mcp_test_report.json
 mcp_test_results_complaint.json

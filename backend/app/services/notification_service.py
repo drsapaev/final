@@ -16,6 +16,16 @@ from app.services.telegram.bot import TelegramBotService
 
 logger = logging.getLogger(__name__)
 
+VISIT_INVITATION_ERROR = "Не удалось отправить приглашение на подтверждение"
+TELEGRAM_INVITATION_ERROR = "Не удалось отправить Telegram-приглашение"
+PWA_INVITATION_ERROR = "Не удалось отправить PWA-приглашение"
+PHONE_INVITATION_ERROR = "Не удалось создать задачу для регистратуры"
+REMINDER_ERROR = "Не удалось отправить напоминание"
+
+
+def _log_notification_failure(operation: str, exc: Exception) -> None:
+    logger.error("%s failed error_type=%s", operation, type(exc).__name__)
+
 
 class NotificationService:
     """Сервис для отправки уведомлений о подтверждении визитов"""
@@ -62,9 +72,9 @@ class NotificationService:
             else:
                 return {"success": False, "error": f"Неподдерживаемый канал: {channel}"}
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки приглашения на подтверждение: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            _log_notification_failure("visit_confirmation_invitation", exc)
+            return {"success": False, "error": VISIT_INVITATION_ERROR}
 
     def _determine_best_channel(self, patient: Patient) -> str:
         """Определяет лучший канал для отправки уведомления"""
@@ -151,7 +161,7 @@ class NotificationService:
             )
 
             if result.get("success"):
-                logger.info(f"Telegram приглашение отправлено пациенту {patient.id}")
+                logger.info("Telegram invitation sent channel=telegram")
                 return {
                     "success": True,
                     "channel": "telegram",
@@ -163,9 +173,9 @@ class NotificationService:
                     "error": result.get("error", "Ошибка отправки Telegram"),
                 }
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки Telegram приглашения: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            _log_notification_failure("telegram_invitation", exc)
+            return {"success": False, "error": TELEGRAM_INVITATION_ERROR}
 
     def _format_telegram_message(self, data: dict[str, Any]) -> str:
         """Форматирует сообщение для Telegram"""
@@ -235,7 +245,7 @@ class NotificationService:
             result = await self._send_sms(patient.phone, sms_text)
 
             if result.get("success"):
-                logger.info(f"PWA приглашение отправлено пациенту {patient.id}")
+                logger.info("PWA invitation sent channel=pwa")
                 return {"success": True, "channel": "pwa", "pwa_url": pwa_url}
             else:
                 return {
@@ -243,9 +253,9 @@ class NotificationService:
                     "error": result.get("error", "Ошибка отправки SMS"),
                 }
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки PWA приглашения: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            _log_notification_failure("pwa_invitation", exc)
+            return {"success": False, "error": PWA_INVITATION_ERROR}
 
     def _format_sms_message(self, data: dict[str, Any], pwa_url: str) -> str:
         """Форматирует SMS сообщение"""
@@ -258,7 +268,7 @@ class NotificationService:
     async def _send_sms(self, phone: str, text: str) -> dict[str, Any]:
         """Отправляет SMS (заглушка для интеграции с SMS провайдером)"""
         # TODO: Интеграция с реальным SMS провайдером (Eskiz, PlayMobile и т.д.)
-        logger.info(f"SMS отправлено на {phone}: {text}")
+        logger.info("SMS invitation sent channel=sms")
         return {"success": True, "sms_id": f"mock_sms_{datetime.now().timestamp()}"}
 
     async def _send_phone_invitation(
@@ -269,9 +279,7 @@ class NotificationService:
             # Создаем уведомление для регистратуры
             notification = await self._create_registrar_notification(patient, data)
 
-            logger.info(
-                f"Создано уведомление для регистратуры о звонке пациенту {patient.id}"
-            )
+            logger.info("Registrar call notification created channel=phone")
             return {
                 "success": True,
                 "channel": "phone",
@@ -279,9 +287,9 @@ class NotificationService:
                 "message": "Создана задача для регистратуры",
             }
 
-        except Exception as e:
-            logger.error(f"Ошибка создания задачи для регистратуры: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            _log_notification_failure("phone_invitation", exc)
+            return {"success": False, "error": PHONE_INVITATION_ERROR}
 
     async def _create_registrar_notification(
         self, patient: Patient, data: dict[str, Any]
@@ -305,7 +313,11 @@ class NotificationService:
             "status": "pending",
         }
 
-        logger.info(f"Создано уведомление для регистратуры: {notification_data}")
+        logger.info(
+            "Registrar notification placeholder created type=%s status=%s",
+            notification_data["type"],
+            notification_data["status"],
+        )
         return notification_data
 
     async def send_confirmation_reminder(
@@ -335,9 +347,9 @@ class NotificationService:
             else:
                 return await self._send_phone_reminder(patient, notification_data)
 
-        except Exception as e:
-            logger.error(f"Ошибка отправки напоминания: {e}")
-            return {"success": False, "error": str(e)}
+        except Exception as exc:
+            _log_notification_failure("confirmation_reminder", exc)
+            return {"success": False, "error": REMINDER_ERROR}
 
     async def _send_telegram_reminder(
         self, patient: Patient, data: dict[str, Any]
