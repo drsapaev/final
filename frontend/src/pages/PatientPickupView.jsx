@@ -2,14 +2,14 @@
  * PatientPickupView - Read-only view for registrar/cashier to issue lab results
  * Shows patient info and lab results without clinical data
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
 import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
-import { AppError, AppLoading } from '../components/ui/macos';
+import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
 
 // Get user role for role-based UI
 const getUserRole = () => {
@@ -55,43 +55,43 @@ export default function PatientPickupView() {
   const [error, setError] = useState(null);
 
   // Load patient, lab data, and visit history
-  useEffect(() => {
-    const loadData = async () => {
-      if (!patientId) return;
+  const loadData = useCallback(async () => {
+    if (!patientId) return;
 
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      // Load patient info
+      const patientRes = await api.get(`/patients/${patientId}`);
+      setPatient(patientRes.data);
+
+      // Load lab results
       try {
-        // Load patient info
-        const patientRes = await api.get(`/patients/${patientId}`);
-        setPatient(patientRes.data);
-
-        // Load lab results
-        try {
-          const labRes = await api.get('/lab', { params: { patient_id: patientId } });
-          setLabResults(labRes.data || []);
-        } catch {
-          setLabResults([]);
-        }
-
-        // Load visit history
-        try {
-          const visitsRes = await api.get('/registrar/visits', { params: { patient_id: patientId } });
-          setVisits(visitsRes.data || []);
-        } catch {
-          setVisits([]);
-        }
-      } catch (err) {
-        logger.error('Error loading patient:', err);
-        setError('Не удалось загрузить данные пациента');
-      } finally {
-        setIsLoading(false);
+        const labRes = await api.get('/lab', { params: { patient_id: patientId } });
+        setLabResults(labRes.data || []);
+      } catch {
+        setLabResults([]);
       }
-    };
 
-    loadData();
+      // Load visit history
+      try {
+        const visitsRes = await api.get('/registrar/visits', { params: { patient_id: patientId } });
+        setVisits(visitsRes.data || []);
+      } catch {
+        setVisits([]);
+      }
+    } catch (err) {
+      logger.error('Error loading patient:', err);
+      setError('Не удалось загрузить данные пациента');
+    } finally {
+      setIsLoading(false);
+    }
   }, [patientId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Format date
   const formatDate = (dateStr) => {
@@ -357,6 +357,17 @@ export default function PatientPickupView() {
       textAlign: 'center',
       padding: '40px',
       color: 'var(--mac-text-tertiary, #64748b)'
+    },
+    visuallyHidden: {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      padding: 0,
+      margin: '-1px',
+      overflow: 'hidden',
+      clip: 'rect(0, 0, 0, 0)',
+      whiteSpace: 'nowrap',
+      border: 0
     }
   };
 
@@ -365,6 +376,8 @@ export default function PatientPickupView() {
       <div style={styles.container}>
         <AppLoading
           title="Загрузка данных пациента..."
+          description="Получаем карточку, анализы и историю визитов."
+          ariaLabel="Загружаем данные пациента"
           style={styles.loading}
         />
             </div>);
@@ -377,6 +390,18 @@ export default function PatientPickupView() {
         <AppError
           title="Не удалось загрузить данные пациента"
           description={error}
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="small"
+              onClick={loadData}
+              disabled={isLoading}
+              loading={isLoading}
+              aria-label="Повторить загрузку данных пациента">
+              Повторить
+            </Button>
+          }
           style={styles.error}
         />
             </div>);
@@ -384,13 +409,17 @@ export default function PatientPickupView() {
   }
 
   return (
-    <div style={styles.container}>
+    <section style={styles.container} aria-labelledby="patient-pickup-title">
             {/* Header */}
             <div style={styles.header}>
-                <button style={styles.backButton} onClick={() => navigate(-1)}>
+                <button
+                  type="button"
+                  style={styles.backButton}
+                  onClick={() => navigate(-1)}
+                  aria-label="Вернуться на предыдущую страницу">
                     ← Назад
                 </button>
-                <h1 style={styles.title}>{getPageTitle()}</h1>
+                <h1 id="patient-pickup-title" style={styles.title}>{getPageTitle()}</h1>
             </div>
 
             {/* Patient Info Card */}
@@ -437,10 +466,11 @@ export default function PatientPickupView() {
                     </h2>
 
                     {labResults.length === 0 ?
-        <div style={styles.emptyState}>
-                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
-                            Нет результатов анализов для этого пациента
-                        </div> :
+        <AppEmpty
+          title="Нет результатов анализов"
+          description="Для этого пациента пока нет лабораторных результатов для выдачи."
+          style={styles.emptyState}
+        /> :
 
         <div style={styles.labList}>
                             {labResults.map((lab) => {
@@ -457,6 +487,7 @@ export default function PatientPickupView() {
                                         </div>
 
                                         <div
+                  aria-label={`Статус анализа: ${status.label}`}
                   style={{
                     ...styles.statusBadge,
                     background: status.bg,
@@ -470,8 +501,10 @@ export default function PatientPickupView() {
                 <div style={styles.actions}>
                                                 {canPrint &&
                   <button
+                    type="button"
                     style={styles.actionButton}
                     onClick={() => handlePrint(lab)}
+                    aria-label={`Печать анализа ${lab.service_name || `#${lab.id}`}`}
                     title="Печать">
                     
                                                         🖨️ Печать
@@ -479,8 +512,10 @@ export default function PatientPickupView() {
                   }
                                                 {canDownloadPDF &&
                   <button
+                    type="button"
                     style={styles.actionButton}
                     onClick={() => handleDownloadPDF(lab)}
+                    aria-label={`Скачать PDF анализа ${lab.service_name || `#${lab.id}`}`}
                     title="Скачать PDF">
                     
                                                         📄 PDF
@@ -504,17 +539,19 @@ export default function PatientPickupView() {
                     </h2>
 
                     {visits.length === 0 ?
-        <div style={styles.emptyState}>
-                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📆</div>
-                            Нет истории визитов для этого пациента
-                        </div> :
+        <AppEmpty
+          title="Нет истории визитов"
+          description="Для этого пациента пока нет визитов, доступных в этом представлении."
+          style={styles.emptyState}
+        /> :
 
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto' }} aria-label="История визитов пациента">
                             <table style={{
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: '14px'
           }}>
+                                <caption style={styles.visuallyHidden}>История визитов пациента</caption>
                                 <thead>
                                     <tr style={{
                 background: 'var(--mac-bg-tertiary, #f1f5f9)',
@@ -560,7 +597,9 @@ export default function PatientPickupView() {
                                                     {totalAmount > 0 ? `${totalAmount.toLocaleString('ru-RU')} сум` : '—'}
                                                 </td>
                                                 <td style={{ padding: '12px', textAlign: 'center' }}>
-                                                    <span style={{
+                                                    <span
+                                                      aria-label={`Статус визита: ${visitStatus.label}`}
+                                                      style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -583,6 +622,6 @@ export default function PatientPickupView() {
         }
                 </div>
       }
-        </div>);
+        </section>);
 
 }
