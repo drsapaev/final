@@ -6,12 +6,488 @@ Workflow: `/aif-plan` -> `/aif-improve @.ai-factory/PLAN.md` -> `/aif-implement 
 
 ## Current Status
 
-- Current task: Task 26 - remaining backend raw print/public error leakage
-- Last completed slice: Task 26 dynamic pricing endpoint leakage cleanup
-- Next task: continue Task 26 with the next one-file mounted runtime leakage slice
-- Blocker state: none for the current slice; Task 26 remains open as a multi-slice audit
+- Current task: Phase 6 complete - ready for `/aif-verify --strict`
+- Last completed slice: Task 40 registrar panel dossier
+- Next task: run `/aif-verify --strict` or review/commit the completed Phase 6 slice
+- Blocker state: none
 - Runtime code changed: yes
 - Secrets inspected or printed: no
+
+## Task 28 Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause` for the policy documentation slice
+- reason: historical credential artifacts, rotation decisions, and history rewrite policy are security-sensitive
+- risky domain: yes, secrets and credential artifact handling
+- root cause known: initial gate selected `.gitignore`; follow-up policy slice selected `docs/SECURITY_CHECKLIST.md`
+- command: `python scripts\agent_gate.py "Task 28 document historical credential artifact cleanup policy without printing secret values or rewriting history" --known-root-cause "docs/SECURITY_CHECKLIST.md"`
+
+Changed behavior:
+
+- Added recurrence-prevention ignore rules for local auth payloads, auth diff artifacts, temporary auth fixtures, and local auth debug files.
+- Documented that historical credential-like artifacts must be rotated externally if reused, or formally accepted as non-reused development artifacts.
+- Documented that audits record filenames and classifications only, and that git history rewrite requires explicit human approval, backup planning, and a coordinated force-push window.
+- No secret values were printed, recovered, rotated inside the repository, or rewritten from history.
+
+Validation run:
+
+- `git diff --check -- .gitignore docs\SECURITY_CHECKLIST.md`
+  - result: passed
+- `git check-ignore -v -- temp_token.json test_auth.json auth_js_diff.txt auth_py_diff.txt local-auth-payloads.json output/playwright/local-auth-payloads.json local-specialist-auth-payloads.json`
+  - result: passed; expected ignore patterns matched
+- filename-only untracked credential-like artifact search
+  - result: no current untracked credential-like artifacts outside ignore rules
+
+Scope note:
+
+- Task 28 is complete as a policy and recurrence-prevention slice. It intentionally did not rewrite git history, delete commits, print secret values, or claim external rotation was performed.
+
+## Task 29 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: Phase 6 anchor checkpoint is documentation/source inspection only
+- risky domain: no runtime behavior changed
+- root cause known: yes, `.ai-factory/PLAN.md` Task 29 names the canonical frontend anchors
+
+Inspected anchors:
+
+- `frontend/FRONTEND_10_10_ANALYSIS.md`: current static frontend score is 6.8/10.0; target band is 9.5-10.0 production-excellent.
+- `frontend/DESIGN_SYSTEM.md`: UI Layer Contract makes `frontend/src/components/ui/macos` the canonical layer for clinic operations UI, forms, tables, app shell, and loading/empty/error states.
+- `frontend/APP_STATE_MIGRATION_BACKLOG.md`: first safe AppState wave is Activation, Appointments, Search, PatientPickupView, then ServiceAuditHistory/Admin utilities.
+- `frontend/src/components/ui/macos/AppState.jsx` and `index.js`: `AppLoading`, `AppEmpty`, and `AppError` are exported canonical primitives with accessibility-focused RTL coverage.
+- `frontend/src/routing/routeRegistry.js` and `frontend/src/routing/__tests__/routeContract.test.js`: 72 route entries and 72 component entries are centralized; tests cover unique routes, role homes, public route roles, compatibility redirects, setup redirects, and AI sidebar disclaimer copy.
+- `frontend/package.json` and `frontend/vite.config.js`: frontend scripts include `lint:check`, `test:run`, `build`, and `build:analyze`; local frontend port is 5173 and Vite proxies API/WebSocket traffic to backend 18000 by default.
+- Current runtime MUI import search across `frontend/src/pages` and `frontend/src/components` found 16 files, including the low-risk PWA targets `ConnectionStatus.jsx` and `PWAInstallPrompt.jsx`.
+
+Phase 6 boundaries:
+
+- First-touch task order remains Tasks 30-34 AppState wave, Task 35 MUI inventory, Tasks 36-37 PWA MUI reductions, then evidence gates and registrar dossier.
+- Runtime cleanup PRs must not change backend API, routes, RBAC, queue, payment, EMR, lab contracts, or clinical workflow semantics.
+- Runtime UI imports for touched app UI should come from `frontend/src/components/ui/macos`; do not remove MUI dependencies until runtime imports reach zero.
+- Figma is reference-only, Canva is stakeholder/deck-only, and Vercel is build/analyze/performance support-only for this phase.
+
+Validation run:
+
+- anchor reads and `rg` evidence commands for AppState backlog, UI Layer Contract, route registry/tests, package scripts, runtime defaults, and current MUI imports
+  - result: passed
+- no frontend runtime files changed in Task 29
+
+## Task 30 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: low-risk, one-page AppState migration with known first-touch file
+- risky domain: no backend/API/RBAC/route change
+- root cause known: yes, `frontend/src/pages/Activation.jsx` had local loading/error/empty blocks
+
+Changed behavior:
+
+- Replaced the local error box with `AppError`.
+- Replaced status and list loading text with `AppLoading`.
+- Replaced status-unavailable and empty-list text with `AppEmpty`.
+- Preserved `getActivationStatus`, `/activation/list`, `RoleGate`, filters, refresh behavior, table columns, routes, and API payloads.
+
+Validation run:
+
+- `git diff --check -- frontend\src\pages\Activation.jsx`
+  - result: passed
+- static check for `AppLoading`, `AppError`, `AppEmpty`, `getActivationStatus`, `/activation/list`, `RoleGate`, and `filterStatus`
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 30 touched only `Activation.jsx` plus plan/status metadata. No backend contracts, role logic, activation API calls, filter semantics, or table data semantics were changed.
+
+## Task 31 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: low-risk, one-page AppState migration with known first-touch file
+- risky domain: search navigation is workflow-sensitive, but no route/API/role behavior changed
+- root cause known: yes, `frontend/src/pages/Search.jsx` had local search error and no-results blocks
+
+Changed behavior:
+
+- Replaced the local search error box with `AppError`.
+- Replaced only the search-performed/no-results block with `AppEmpty`.
+- Preserved query length threshold, patient search endpoint, visit lookup strategies, result tabs, patient-name loading, keyboard activation, and navigation to `/registrar`.
+
+Validation run:
+
+- `git diff --check -- frontend\src\pages\Search.jsx`
+  - result: passed
+- static check for `AppEmpty`, `AppError`, patient/visit endpoints, `/registrar` navigation, tabs, `patientNames`, and `handleActivationKeyDown`
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 31 touched only `Search.jsx` plus plan/status metadata. Search strategies, routes, result grouping, patient-name hydration, and keyboard navigation were left unchanged.
+
+## Task 32 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: known-file AppState migration limited to full-page loading/error early returns
+- risky domain: patient pickup displays patient, lab, visit, print, and PDF data, but those blocks were not edited
+- root cause known: yes, `frontend/src/pages/PatientPickupView.jsx` had local full-page loading/error blocks
+
+Changed behavior:
+
+- Replaced the full-page loading block with `AppLoading`.
+- Replaced the full-page error block with `AppError`.
+- Preserved route params, role/view derivation, patient fetch, lab fallback, visit fallback, family relations rendering, print flow, PDF download, and displayed patient data.
+
+Validation run:
+
+- `git diff --check -- frontend\src\pages\PatientPickupView.jsx`
+  - result: passed
+- static check for `AppLoading`, `AppError`, route params, patient/lab/visit fetches, `FamilyRelationsCard`, `handlePrint`, `handleDownloadPDF`, and back navigation
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 32 touched only `PatientPickupView.jsx` plus plan/status metadata. No patient data rendering, lab/visit fallback, family relations, print, PDF, route, or role/view semantics changed.
+
+## Task 33 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: known-file AppState migration limited to `legacy-error` and empty table row state
+- risky domain: appointments are workflow-sensitive, but filters/table semantics were not edited
+- root cause known: yes, `frontend/src/pages/Appointments.jsx` had a local legacy error block and empty row
+
+Changed behavior:
+
+- Replaced `legacy-error` rendering with `AppError`.
+- Replaced the empty table row content with `AppEmpty` while preserving the same table and `colSpan={5}` structure.
+- Preserved date and search filters, fallback `/appointments` request using `d`, table columns, `EnhancedAppointmentsTable`, selected appointments, and `AppointmentFlow` callbacks.
+
+Validation run:
+
+- `git diff --check -- frontend\src\pages\Appointments.jsx`
+  - result: passed
+- static check for `AppEmpty`, `AppError`, `/appointments` calls, fallback `d`, filters, `EnhancedAppointmentsTable`, `AppointmentFlow`, `selectedAppointments`, and `colSpan={5}`
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 33 touched only `Appointments.jsx` plus plan/status metadata. No request behavior, filters, advanced-table wiring, selected appointments, or appointment flow callbacks changed.
+
+## Task 34 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: small admin component AppState migration limited to loading/empty rendering
+- risky domain: no clinical/payment/queue behavior changed
+- root cause known: yes, `frontend/src/components/admin/ServiceAuditHistory.jsx` used `MacOSLoadingSkeleton` and `MacOSEmptyState`
+
+Changed behavior:
+
+- Replaced `MacOSLoadingSkeleton` with `AppLoading`.
+- Replaced `MacOSEmptyState` with `AppEmpty`.
+- Preserved `servicesService.getServiceHistory`, refresh behavior, expansion state, history row fields, action icons, badges, timestamps, and existing logger-only error handling.
+- Added no new visible error behavior.
+
+Validation run:
+
+- `git diff --check -- frontend\src\components\admin\ServiceAuditHistory.jsx`
+  - result: passed
+- static check for `AppLoading`, `AppEmpty`, removed old state primitive imports, `servicesService.getServiceHistory`, `loadHistory`, `expandedItems`, `setExpandedItems`, `History`, `MacOSBadge`, `formatDate`, and `logger.error`
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 34 touched only `ServiceAuditHistory.jsx` plus plan/status metadata. Fetch, refresh, expansion, row rendering, icons, badges, timestamps, and error behavior stayed unchanged.
+
+## Task 35 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: documentation-only inventory from current runtime import evidence
+- risky domain: no runtime code changed
+- root cause known: yes, current `rg "@mui|Mui" frontend/src/pages frontend/src/components` output identified the inventory
+
+Changed behavior:
+
+- Created `frontend/MUI_RUNTIME_INVENTORY.md`.
+- Recorded the command used, current count of 16 MUI runtime/example files, risk class per file, do-not-touch buckets, and the next two low-risk targets.
+- Explicitly documented that MUI dependencies must not be removed until runtime imports reach `0`.
+
+Validation run:
+
+- `git diff --check -- frontend\MUI_RUNTIME_INVENTORY.md`
+  - result: passed
+- `rg -l "@mui|Mui" frontend\src\pages frontend\src\components`
+  - result: 16 files, matching the inventory
+- static inventory check for target files, do-not-touch buckets, and risk classes
+  - result: passed
+
+Scope note:
+
+- Task 35 touched only `frontend/MUI_RUNTIME_INVENTORY.md` plus plan/status metadata. No runtime code, dependency, or build configuration was changed.
+
+## Task 36 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: low-risk PWA status component migration with a known first-touch file
+- risky domain: no backend/API/RBAC/route/queue/payment/EMR/lab behavior changed
+- root cause known: yes, `frontend/src/components/pwa/ConnectionStatus.jsx` imported MUI runtime UI
+
+Changed behavior:
+
+- Replaced MUI UI and icon imports with lucide icons plus macOS `Alert`, `Badge`, and `Button`.
+- Preserved `usePWA`, online/offline notifications, service worker `SYNC_START` and `SYNC_COMPLETE` handling, fixed offline banner, `showOfflineAlert`, and `position` behavior.
+- Added accessible labels and live regions for visible status changes.
+
+Validation run:
+
+- `git diff --check -- frontend\src\components\pwa\ConnectionStatus.jsx frontend\src\components\pwa\PWAInstallPrompt.jsx`
+  - result: passed
+- static PWA check for removed `@mui` imports and preserved behavior terms
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 36 touched only `ConnectionStatus.jsx` plus plan/status metadata. No service worker logic, PWA provider behavior, routes, or API contracts changed.
+
+## Task 37 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: low-risk PWA install prompt migration with a known first-touch file
+- risky domain: no backend/API/RBAC/route/queue/payment/EMR/lab behavior changed
+- root cause known: yes, `frontend/src/components/pwa/PWAInstallPrompt.jsx` imported MUI runtime UI
+
+Changed behavior:
+
+- Replaced MUI `Box`, `Card`, `Typography`, `Chip`, `IconButton`, `Slide`, and MUI icons with lucide icons plus macOS `Alert`, `Badge`, `Button`, `Card`, `CardHeader`, `CardTitle`, `CardDescription`, and `CardContent`.
+- Preserved `usePWA`, install, update, notification permission, close callback, capability chips, offline indicator, installed gating, and update gating.
+- Added dialog labeling and an accessible close button name.
+
+Validation run:
+
+- `git diff --check -- frontend\src\components\pwa\ConnectionStatus.jsx frontend\src\components\pwa\PWAInstallPrompt.jsx`
+  - result: passed
+- static PWA check for removed `@mui` imports and preserved behavior terms
+  - result: passed
+- `npm.cmd run lint:check`
+  - result: passed with existing warnings
+- `npm.cmd run test:run`
+  - result: passed, 63 files and 302 tests
+- `npm.cmd run build`
+  - result: passed with existing Vite `errorHandler.js` dynamic/static import warning and large chunk warnings
+
+Scope note:
+
+- Task 37 touched only `PWAInstallPrompt.jsx` plus plan/status metadata. Service worker behavior and PWA install/update contracts were preserved.
+
+## Task 38 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: public route smoke plus protected-route redirect smoke can be validated without live role credentials
+- risky domain: no authenticated role workflow or backend state was modified
+- root cause known: yes, Phase 6 requested repeatable route smoke gates
+
+Changed behavior:
+
+- Added `frontend/e2e/frontend-10-route-smoke.spec.js`.
+- Covered public render smoke for `/login`, `/queue/join`, `/payment/success`, and `/payment/cancel`.
+- Covered no-credential protected-route behavior for `/admin`, `/registrar`, `/doctor`, and `/lab`.
+- Explicitly cleared browser storage and used no guessed credentials.
+
+Validation run:
+
+- `git diff --check -- frontend\e2e\frontend-10-route-smoke.spec.js`
+  - result: passed
+- static route and no-secret check
+  - result: passed
+- `npx.cmd playwright install chromium`
+  - result: passed after approval because the browser binary was missing
+- `npx.cmd playwright test frontend-10-route-smoke.spec.js --project=chromium --workers=1 --reporter=list`
+  - result: passed, 8 tests
+
+Scope note:
+
+- The Playwright run logged expected Vite proxy `ECONNREFUSED` warnings for `/api/v1/setup/status` because backend `18000` was not running. The route smoke still passed through graceful frontend fallback behavior.
+
+## Task 39 Evidence
+
+Execution mode:
+
+- selected mode: `direct_execute`
+- reason: public visual/a11y smoke and bundle analysis can be added without live role credentials
+- risky domain: authenticated shell/admin evidence remains gated until live role credentials are available
+- root cause known: yes, Phase 6 requested repeatable visual, accessibility, and performance evidence gates
+
+Changed behavior:
+
+- Added `frontend/e2e/frontend-10-visual-a11y.spec.js`.
+- Covered desktop, tablet, and mobile public visual/a11y smoke for `/login`, `/queue/join`, `/payment/success`, and `/payment/cancel`.
+- Checked app mount, body content, horizontal overflow, icon-only accessible names, keyboard focus reachability, and screenshots in ignored Playwright output.
+- Fixed `frontend/scripts/analyze-bundle.js` so the build analyzer `main()` guard works on Windows and writes the report under `frontend/test-results/bundle-analysis/`.
+
+Validation run:
+
+- `git diff --check -- frontend\e2e\frontend-10-visual-a11y.spec.js frontend\scripts\analyze-bundle.js`
+  - result: passed
+- `npx.cmd playwright test frontend-10-visual-a11y.spec.js --project=chromium --workers=1 --reporter=list`
+  - result: passed, 12 tests
+- `npm.cmd run build:analyze`
+  - result: passed
+
+Performance evidence:
+
+- Dist size: 6.20 MB.
+- Largest emitted JS assets included `index` at about 1704 kB, `heic2any` at about 1352 kB, and `AdminPanel` at about 1117 kB.
+- MUI-heavy residual chunks remain because 14 runtime/example files still import MUI after the PWA migrations.
+- Existing Vite warnings remain for mixed dynamic/static `errorHandler.js` imports and chunks larger than 1500 kB.
+
+Scope note:
+
+- Authenticated shell/sidebar and table-heavy admin visual evidence was intentionally left for a gated credential-backed run. No credentials were guessed from docs.
+
+## Task 40 Evidence
+
+Execution mode:
+
+- selected mode: `dossier`
+- reason: `RegistrarPanel.jsx` is queue-, payment-, role-, and workflow-sensitive
+- risky domain: yes, registrar workflow
+- root cause known: no runtime root cause selected; this task is a pre-refactor dossier
+
+Created artifact:
+
+- `.ai-factory/dossiers/registrar-panel-frontend-10-dossier.md`
+
+Evidence captured:
+
+- Route contract for `/registrar`, role ownership, home role metadata, and legacy redirect.
+- Registrar workflow map covering query params, data loading, demo fallback, queue events, payment/cancel/print/wizard flows, local i18n, and render boundaries.
+- API boundary list and no-touch areas for queue, payment, aggregation, status transitions, and dialogs.
+- Recommended first visual-only slice: extract a small data source/status indicator with props only, preserving all state and callbacks in `RegistrarPanel.jsx`.
+- Ready-to-send execution brief with first-touch file, reference-only files, validation target, and stop conditions.
+
+Scope note:
+
+- Task 40 created a dossier only. No registrar runtime source file was edited.
+
+## Task 27 Evidence
+
+Execution mode:
+
+- selected mode: `gate_known_root_cause`, then retry with confirmed canonical owner
+- reason: auth/login visible behavior is security-sensitive and must preserve the 2FA-aware contract
+- risky domain: yes, auth/login
+- root cause known: initial `frontend/src/pages/Login.jsx` was only a delegating page; static evidence selected `frontend/src/components/auth/LoginFormStyled.jsx` as the canonical login form owner
+- command: `python scripts\agent_gate.py "Task 27 remove visible default credential/login friction from canonical login form while preserving 2FA-aware /authentication/login contract" --known-root-cause "frontend/src/components/auth/LoginFormStyled.jsx"`
+
+Gate result:
+
+- The initial gate with `frontend/src/pages/Login.jsx` was a misroute because the page only renders `LoginFormStyled`.
+- Retry with `frontend/src/components/auth/LoginFormStyled.jsx` returned a narrow override for that file.
+- No runtime edit was made because the task requires fixing only confirmed visible default-credential/login friction, and the confirmed canonical form already had no such visible issue.
+
+Evidence:
+
+- `frontend/src/pages/Login.jsx` delegates directly to `LoginFormStyled`.
+- `LoginFormStyled.jsx` initializes `username` and `password` as empty strings.
+- Static search found no `admin/admin`, `admin@clinic`, `admin@`, `minimal-login`, read-only login field, or role preset text in the canonical login page/form.
+- Static search confirmed the canonical login endpoint remains `buildApiUrl('/authentication/login')`.
+
+Validation run:
+
+- `npm.cmd run build` from `frontend/`
+  - result: passed
+  - warnings: existing Vite dynamic/static `errorHandler.js` import warning and large chunk warnings
+
+Scope note:
+
+- Task 27 completed as a no-code audit/fix because no confirmed visible default-credential friction remained in the canonical login surface.
+
+## Task 26 Slice Notification Service Evidence
+
+Execution mode:
+
+- selected mode: `gate`, then `gate_known_root_cause`, continued as narrow override
+- reason: runtime notification service logged patient/contact-sensitive data and returned raw exception text in failure dicts
+- risky domain: yes, patient notification and confirmation workflow
+- root cause known: selected after static audit found phone/SMS text/full registrar notification payload logging in `backend/app/services/notification_service.py`
+- command: `python scripts\agent_gate.py "Task 26 remove notification_service logs/public error details that expose phone, SMS text, patient notification payload, or raw exception details while preserving notification behavior" --known-root-cause "backend/app/services/notification_service.py"`
+
+Initial boundaries:
+
+- canonical anchor: `backend/app/services/notification_service.py`
+- first-touch files: `backend/app/services/notification_service.py`
+- validation target: compile plus static search proving removed phone/SMS text/full payload/raw exception response patterns
+- stop condition watched first: any required edit outside the selected notification service file
+
+Changed behavior:
+
+- Removed logs that included patient id, phone number, full SMS text, and the full registrar notification payload.
+- Replaced raw `str(e)` failure responses from notification exception handlers with stable generic error messages.
+- Replaced raw exception message logging with exception-class-only structured logging.
+- Preserved channel selection, success response payload shapes, SMS/PWA/Telegram/phone workflow behavior, and notification data construction.
+
+Validation run:
+
+- `python -m py_compile backend\app\services\notification_service.py`
+  - result: passed
+- static leakage search in `notification_service.py` for removed phone/SMS text/full payload/raw exception response patterns
+  - result: no matches
+
+Scope note:
+
+- The Task 26 plan requirement for the next selected highest-risk one-file runtime slice is complete. Remaining broad static candidates were not swept in this patch and should be handled only by future evidence-backed narrow tasks.
 
 ## Task 26 Slice Dynamic Pricing Evidence
 

@@ -1,36 +1,192 @@
 import { useState, useEffect } from 'react';
-import {
-  Box,
-  Alert,
-  Chip,
-  LinearProgress,
-  Snackbar,
-  Typography,
-} from '@mui/material';
-import WifiIcon from '@mui/icons-material/Wifi';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import SyncIcon from '@mui/icons-material/Sync';
-import CloudDoneIcon from '@mui/icons-material/CloudDone';
-import { usePWA } from '../../hooks/usePWA';
 import PropTypes from 'prop-types';
+import { Cloud, RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
+
+import { Alert, Badge, Button } from '../ui/macos';
+import { usePWA } from '../../hooks/usePWA';
+
+const toneConfig = {
+  primary: {
+    badge: 'primary',
+    alert: 'info',
+    color: 'var(--mac-accent-blue, #007aff)'
+  },
+  success: {
+    badge: 'success',
+    alert: 'success',
+    color: 'var(--mac-success, #34c759)'
+  },
+  warning: {
+    badge: 'warning',
+    alert: 'warning',
+    color: 'var(--mac-warning, #ff9500)'
+  },
+  danger: {
+    badge: 'danger',
+    alert: 'warning',
+    color: 'var(--mac-danger, #ff3b30)'
+  }
+};
+
+const toastPositionStyle = (position) => ({
+  position: 'fixed',
+  top: position === 'top' ? 16 : 'auto',
+  bottom: position === 'top' ? 'auto' : 16,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 1400,
+  width: 'min(520px, calc(100vw - 32px))'
+});
+
+const styles = {
+  statusRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  badgeContent: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6
+  },
+  syncLabel: {
+    fontSize: 'var(--mac-font-size-xs, 12px)',
+    color: 'var(--mac-text-secondary, #64748b)'
+  },
+  progressWrap: {
+    width: '100%',
+    marginTop: 8
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+    background: 'rgba(255, 149, 0, 0.16)',
+    border: '1px solid rgba(255, 149, 0, 0.24)'
+  },
+  progressBar: {
+    width: '42%',
+    height: '100%',
+    borderRadius: 999,
+    background: 'var(--mac-warning, #ff9500)',
+    animation: 'connection-status-sync 1s ease-in-out infinite alternate'
+  },
+  toastAlert: {
+    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.18)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)'
+  },
+  toastContent: {
+    display: 'grid',
+    gridTemplateColumns: '20px 1fr auto',
+    gap: 10,
+    alignItems: 'start'
+  },
+  toastTitle: {
+    margin: 0,
+    fontSize: 'var(--mac-font-size-base, 14px)',
+    fontWeight: 600,
+    color: 'var(--mac-text-primary, #1e293b)'
+  },
+  toastDescription: {
+    margin: '4px 0 0',
+    fontSize: 'var(--mac-font-size-xs, 12px)',
+    lineHeight: 1.4,
+    color: 'var(--mac-text-secondary, #64748b)'
+  },
+  closeButton: {
+    width: 28,
+    height: 28,
+    minHeight: 28,
+    padding: 0
+  },
+  offlineBanner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1400,
+    background: 'var(--mac-warning, #ff9500)',
+    color: '#fff',
+    padding: '6px 16px',
+    textAlign: 'center'
+  },
+  offlineBannerInner: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    fontSize: 'var(--mac-font-size-xs, 12px)',
+    fontWeight: 500,
+    lineHeight: 1.4
+  }
+};
+
+function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }) {
+  if (!open) {
+    return null;
+  }
+
+  const config = toneConfig[tone] || toneConfig.primary;
+
+  return (
+    <div style={toastPositionStyle(position)}>
+      <Alert
+        severity={config.alert}
+        role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
+        aria-live={tone === 'danger' || tone === 'warning' ? 'assertive' : 'polite'}
+        style={styles.toastAlert}
+      >
+        <div style={styles.toastContent}>
+          <Icon size={18} aria-hidden="true" style={{ color: config.color, marginTop: 1 }} />
+          <div>
+            <p style={styles.toastTitle}>{title}</p>
+            <p style={styles.toastDescription}>{description}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="small"
+            aria-label="Закрыть уведомление"
+            onClick={onClose}
+            style={styles.closeButton}
+          >
+            <X size={14} aria-hidden="true" />
+          </Button>
+        </div>
+      </Alert>
+    </div>
+  );
+}
+
+ConnectionToast.propTypes = {
+  description: PropTypes.string.isRequired,
+  icon: PropTypes.elementType.isRequired,
+  onClose: PropTypes.func.isRequired,
+  open: PropTypes.bool.isRequired,
+  position: PropTypes.oneOf(['top', 'bottom']).isRequired,
+  title: PropTypes.string.isRequired,
+  tone: PropTypes.oneOf(['primary', 'success', 'warning', 'danger']).isRequired
+};
 
 const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   const { isOnline, isServiceWorkerReady } = usePWA();
-  const [showOfflineSnackbar, setShowOfflineSnackbar] = useState(false);
-  const [showOnlineSnackbar, setShowOnlineSnackbar] = useState(false);
+  const [showOfflineToast, setShowOfflineToast] = useState(false);
+  const [showOnlineToast, setShowOnlineToast] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Отслеживание изменений статуса подключения
   useEffect(() => {
     if (!isOnline && showOfflineAlert) {
-      setShowOfflineSnackbar(true);
-      setShowOnlineSnackbar(false);
+      setShowOfflineToast(true);
+      setShowOnlineToast(false);
     } else if (isOnline) {
-      setShowOnlineSnackbar(true);
-      setShowOfflineSnackbar(false);
+      setShowOnlineToast(true);
+      setShowOfflineToast(false);
       // Автоматически скрываем уведомление о восстановлении связи
-      setTimeout(() => setShowOnlineSnackbar(false), 3000);
+      setTimeout(() => setShowOnlineToast(false), 3000);
     }
   }, [isOnline, showOfflineAlert]);
 
@@ -47,22 +203,24 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
       };
 
       navigator.serviceWorker.addEventListener('message', handleMessage);
-      
+
       return () => {
         navigator.serviceWorker.removeEventListener('message', handleMessage);
       };
     }
+
+    return undefined;
   }, []);
 
   const getConnectionIcon = () => {
-    if (!isOnline) return <WifiOffIcon />;
-    if (isSyncing) return <SyncIcon />;
-    if (isServiceWorkerReady) return <CloudDoneIcon />;
-    return <WifiIcon />;
+    if (!isOnline) return WifiOff;
+    if (isSyncing) return RefreshCw;
+    if (isServiceWorkerReady) return Cloud;
+    return Wifi;
   };
 
-  const getConnectionColor = () => {
-    if (!isOnline) return 'error';
+  const getConnectionTone = () => {
+    if (!isOnline) return 'danger';
     if (isSyncing) return 'warning';
     if (isServiceWorkerReady) return 'success';
     return 'primary';
@@ -77,126 +235,111 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
 
   const formatLastSync = () => {
     if (!lastSyncTime) return null;
-    
+
     const now = new Date();
     const diffMs = now - lastSyncTime;
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'только что';
     if (diffMins < 60) return `${diffMins} мин назад`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours} ч назад`;
-    
+
     return lastSyncTime.toLocaleDateString();
   };
+
+  const Icon = getConnectionIcon();
+  const tone = getConnectionTone();
+  const label = getConnectionLabel();
+  const toneStyle = toneConfig[tone] || toneConfig.primary;
 
   return (
     <>
       {/* Индикатор статуса */}
-      <Box display="flex" alignItems="center" gap={1}>
-        <Chip
-          icon={getConnectionIcon()}
-          label={getConnectionLabel()}
-          color={getConnectionColor()}
+      <div style={styles.statusRow}>
+        <Badge
+          variant={toneStyle.badge}
           size="small"
-          variant={isOnline ? 'filled' : 'outlined'}
-        />
-        
+          aria-label={`Статус подключения: ${label}`}
+        >
+          <span style={styles.badgeContent}>
+            <Icon size={14} aria-hidden="true" />
+            {label}
+          </span>
+        </Badge>
+
         {lastSyncTime && (
-          <Typography variant="caption" color="text.secondary">
+          <span style={styles.syncLabel}>
             Синхронизация: {formatLastSync()}
-          </Typography>
+          </span>
         )}
-      </Box>
+      </div>
 
       {/* Прогресс синхронизации */}
       {isSyncing && (
-        <Box width="100%" mt={1}>
-          <LinearProgress size="small" />
-        </Box>
+        <div style={styles.progressWrap}>
+          <div
+            style={styles.progressTrack}
+            role="progressbar"
+            aria-label="Синхронизация данных"
+          >
+            <div style={styles.progressBar} />
+          </div>
+        </div>
       )}
 
-      {/* Уведомление об офлайн режиме */}
-      <Snackbar
-        open={showOfflineSnackbar}
-        onClose={() => setShowOfflineSnackbar(false)}
-        anchorOrigin={{ 
-          vertical: position === 'top' ? 'top' : 'bottom', 
-          horizontal: 'center' 
-        }}
-        autoHideDuration={null}
-      >
-        <Alert 
-          severity="warning" 
-          onClose={() => setShowOfflineSnackbar(false)}
-          icon={<WifiOffIcon />}
-        >
-          <Typography variant="body2" fontWeight="medium">
-            Нет подключения к интернету
-          </Typography>
-          <Typography variant="caption" display="block">
-            Приложение работает в офлайн режиме. Данные будут синхронизированы при восстановлении связи.
-          </Typography>
-        </Alert>
-      </Snackbar>
+      <ConnectionToast
+        open={showOfflineToast}
+        position={position}
+        tone="warning"
+        icon={WifiOff}
+        title="Нет подключения к интернету"
+        description="Приложение работает в офлайн режиме. Данные будут синхронизированы при восстановлении связи."
+        onClose={() => setShowOfflineToast(false)}
+      />
 
-      {/* Уведомление о восстановлении связи */}
-      <Snackbar
-        open={showOnlineSnackbar}
-        onClose={() => setShowOnlineSnackbar(false)}
-        anchorOrigin={{ 
-          vertical: position === 'top' ? 'top' : 'bottom', 
-          horizontal: 'center' 
-        }}
-        autoHideDuration={3000}
-      >
-        <Alert 
-          severity="success" 
-          onClose={() => setShowOnlineSnackbar(false)}
-          icon={<CloudDoneIcon />}
-        >
-          <Typography variant="body2" fontWeight="medium">
-            Подключение восстановлено
-          </Typography>
-          <Typography variant="caption" display="block">
-            Синхронизация данных...
-          </Typography>
-        </Alert>
-      </Snackbar>
+      <ConnectionToast
+        open={showOnlineToast}
+        position={position}
+        tone="success"
+        icon={Cloud}
+        title="Подключение восстановлено"
+        description="Синхронизация данных..."
+        onClose={() => setShowOnlineToast(false)}
+      />
 
       {/* Постоянный индикатор офлайн режима */}
       {!isOnline && (
-        <Box 
-          position="fixed" 
-          top={0} 
-          left={0} 
-          right={0} 
-          zIndex={1400}
-          sx={{ 
-            backgroundColor: 'warning.main',
-            color: 'warning.contrastText',
-            py: 0.5,
-            px: 2,
-            textAlign: 'center'
-          }}
-        >
-          <Typography variant="caption" display="flex" alignItems="center" justifyContent="center" gap={1}>
-            <WifiOffIcon fontSize="small" />
+        <div style={styles.offlineBanner} role="status" aria-live="polite">
+          <span style={styles.offlineBannerInner}>
+            <WifiOff size={14} aria-hidden="true" />
             Офлайн режим - данные будут синхронизированы при подключении
-          </Typography>
-        </Box>
+          </span>
+        </div>
       )}
+
+      <style>{`
+        @keyframes connection-status-sync {
+          from { transform: translateX(-12%); }
+          to { transform: translateX(152%); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          [role="progressbar"] > div {
+            animation: none !important;
+            transform: none !important;
+            width: 100% !important;
+          }
+        }
+      `}</style>
     </>
   );
 };
 
-
 ConnectionStatus.propTypes = {
-  ...(ConnectionStatus.propTypes || {}),
-  position: PropTypes.any,
-  showOfflineAlert: PropTypes.any,
+  position: PropTypes.oneOf(['top', 'bottom']),
+  showOfflineAlert: PropTypes.bool
 };
 
 export default ConnectionStatus;
-

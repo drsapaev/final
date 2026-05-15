@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { AppEmpty, AppError } from '../components/ui/macos';
 
 // Modern Search Page with Full Functionality
 export default function Search() {
@@ -229,9 +230,11 @@ export default function Search() {
 
       {/* Error Message */}
       {error && (
-        <div style={styles.errorBox}>
-          ⚠️ {error}
-        </div>
+        <AppError
+          title="Ошибка поиска"
+          description={error}
+          style={styles.errorBox}
+        />
       )}
 
       {/* Results Tabs */}
@@ -371,13 +374,11 @@ export default function Search() {
 
         {/* No Results */}
         {searchPerformed && !loading && patients.length === 0 && visits.length === 0 && (
-          <div style={styles.noResults}>
-            <div style={styles.noResultsIcon}>🔍</div>
-            <div style={styles.noResultsText}>Ничего не найдено</div>
-            <div style={styles.noResultsHint}>
-              Попробуйте изменить запрос или проверьте правильность ввода
-            </div>
-          </div>
+          <AppEmpty
+            title="Ничего не найдено"
+            description="Попробуйте изменить запрос или проверьте правильность ввода."
+            style={styles.noResults}
+          />
         )}
 
         {/* Initial State */}

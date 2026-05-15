@@ -287,6 +287,9 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
 - **Commit 3** after Tasks 11-12: `fix: secure payment webhook and upload surfaces`
 - **Commit 4** after Tasks 13-18: `test: verify critical clinic contracts`
 - **Commit 5** after Tasks 19-21: `docs: align recovery security testing and deployment docs`
+- **Commit 6** after Tasks 29-34: `refactor(frontend): consolidate app state primitives`
+- **Commit 7** after Tasks 35-37: `refactor(frontend): reduce legacy ui fragmentation`
+- **Commit 8** after Tasks 38-40: `test(frontend): add frontend 10/10 smoke gates`
 
 ## Tasks
 
@@ -430,35 +433,113 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
   Validation target: migration graph inspection plus a real disposable PostgreSQL `alembic upgrade head` proof, or a clearly documented blocker with a concrete next validation path.
   LOGGING REQUIREMENTS: log DB target class, command class, migration head, success/failure, and cleanup status; do not log database passwords, connection URLs, or patient data.
 
-- [ ] Task 26: Audit remaining backend raw print/public error leakage outside payment webhook.
+- [x] Task 26: Audit remaining backend raw print/public error leakage outside payment webhook.
   Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` for the audit and switch to `gate_known_root_cause` only after evidence selects exactly one highest-risk runtime file for the first fix slice. Search committed backend runtime code for `print(...)`, raw `str(exc)`/`str(e)` in public responses, and logs that may expose patient, payment, provider, token, filename, or credential data. Do not sweep unrelated files in one patch.
   Files: backend runtime file selected by evidence, targeted tests selected by evidence
   Validation target: targeted unit/API test or static assertion proving the selected public/logging leakage is removed without changing business behavior.
   LOGGING REQUIREMENTS: preserve audit/reconciliation evidence, convert only confirmed leakage to structured non-sensitive logs, and do not log PHI, tokens, payloads, raw filenames, credentials, or provider secrets.
 
-- [ ] Task 27: Remove visible default-credential/login friction from canonical login surfaces.
+- [x] Task 27: Remove visible default-credential/login friction from canonical login surfaces.
   Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate_known_root_cause` with `frontend/src/pages/Login.jsx` unless the gate shows a different canonical login owner. Verify whether `/login` still exposes `admin/admin`-style guidance, a prefilled password, read-only username selection, or role preset behavior in the current canonical path. Fix only the confirmed visible issue and preserve the 2FA-aware login contract.
   Files: `frontend/src/pages/Login.jsx`, `frontend/src/components/auth/LoginFormStyled.jsx`, `frontend/src/api/client.js`, auth tests as validation only unless evidence requires edits
   Validation target: targeted login UI test or browser/static smoke showing no visible default credentials and no regression of the canonical 2FA-aware login endpoint.
   LOGGING REQUIREMENTS: log visible before/after behavior and auth endpoint contract; do not log credentials, passwords, tokens, or entered usernames.
 
-- [ ] Task 28: Define and execute a historical credential-artifact cleanup policy.
+- [x] Task 28: Define and execute a historical credential-artifact cleanup policy.
   Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` because destructive history rewrite, rotation, and secret scanning are policy-sensitive. Audit tracked/untracked credential-like artifacts and repo history exposure after removal of unsafe auth fixtures. Decide whether rotation-only, git history rewrite, or documented accepted risk is appropriate. Stop before any destructive history rewrite unless explicitly approved.
   Files: `docs/SECURITY_CHECKLIST.md`, `docs/RECOVERY_PLAN.md`, secret scan config/runbook files, no runtime code unless evidence requires
   Validation target: secret-scan evidence and documented rotation/history decision without printing secret values.
   LOGGING REQUIREMENTS: log filenames and classification only; never print credential values, tokens, database URLs, passwords, or patient data.
 
+### Phase 6: Frontend 10/10 Consolidation
+
+This phase starts only after Tasks 26-28 are completed or explicitly deferred with evidence. The target is to move the frontend from the documented static score of 6.8/10 toward a production-excellent 9.5-10/10 without a broad redesign. Required execution stack: AI Factory plus `clinic-frontend-design`. Canonical frontend anchors are `frontend/FRONTEND_10_10_ANALYSIS.md`, `frontend/DESIGN_SYSTEM.md`, `frontend/APP_STATE_MIGRATION_BACKLOG.md`, `frontend/src/components/ui/macos`, `frontend/src/components/ui/macos/AppState.jsx`, `frontend/src/routing/routeRegistry.js`, and route contract tests.
+
+- [x] Task 29: Reconfirm Frontend 10/10 anchors and boundaries.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute` because this is a documentation and source inspection task. Re-read the Frontend 10/10 analysis, UI Layer Contract, AppState backlog, macOS UI exports, route registry, route contract tests, package scripts, and current runtime MUI inventory before any Phase 6 runtime edit. Do not edit runtime code in this task.
+  Files: `frontend/FRONTEND_10_10_ANALYSIS.md`, `frontend/DESIGN_SYSTEM.md`, `frontend/APP_STATE_MIGRATION_BACKLOG.md`, `frontend/src/components/ui/macos/index.js`, `frontend/src/components/ui/macos/AppState.jsx`, `frontend/src/routing/routeRegistry.js`, `frontend/src/routing/__tests__/routeContract.test.js`, `frontend/package.json`
+  Validation target: documented evidence checkpoint confirming canonical anchors, first-touch task order, runtime defaults `18000` and `5173`, and stop conditions for Phase 6.
+  LOGGING REQUIREMENTS: log inspected anchors, current score source, first-touch files, validation commands, and unresolved risks; do not log patient data or credentials.
+
+- [x] Task 30: Migrate `Activation.jsx` to canonical AppState primitives.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Replace local loading, error, and empty rendering with `AppLoading`, `AppError`, and `AppEmpty` from `frontend/src/components/ui/macos`. Preserve `getActivationStatus`, `/activation/list`, `RoleGate`, filters, table columns, refresh behavior, roles, routes, and API payloads.
+  Files: `frontend/src/pages/Activation.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, and `npm.cmd run build`, plus a focused RTL/static check if practical.
+  LOGGING REQUIREMENTS: log before/after state blocks, preserved API calls, preserved role gate, and validation result.
+
+- [x] Task 31: Migrate `Search.jsx` error and no-results states only.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Replace only the local search error and no-results rendering with `AppError` and `AppEmpty`. Preserve search query thresholds, patient search, visit lookup strategies, result tabs, patient-name loading, keyboard activation, and navigation to `/registrar`.
+  Files: `frontend/src/pages/Search.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, and `npm.cmd run build`, plus focused RTL coverage for error/no-results if API mocking is practical.
+  LOGGING REQUIREMENTS: log state blocks touched, search behavior explicitly preserved, navigation behavior preserved, and validation result.
+
+- [x] Task 32: Migrate `PatientPickupView.jsx` full-page loading and error states.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute` unless the slice expands beyond visual page-state rendering. Replace only full-page loading and error rendering with `AppLoading` and `AppError`. Preserve role/view derivation, route params, patient fetch, lab and visit fallback behavior, print flow, PDF download, family relations, and displayed patient data.
+  Files: `frontend/src/pages/PatientPickupView.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, and `npm.cmd run build`, plus browser/static smoke for a patient pickup route if safe test data is available.
+  LOGGING REQUIREMENTS: log visible state before/after, preserved route/view behavior, print/PDF untouched status, and validation result.
+
+- [x] Task 33: Migrate `Appointments.jsx` error and empty table states.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Replace `legacy-error` and the empty table row with canonical AppState rendering. Use `AppLoading` only if the initial table loading behavior can remain identical. Preserve date and search filters, fallback `/appointments` request using `d`, table columns, `EnhancedAppointmentsTable`, selected appointments, and `AppointmentFlow` callbacks.
+  Files: `frontend/src/pages/Appointments.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, and `npm.cmd run build`, plus focused RTL/static coverage for empty/error states if practical.
+  LOGGING REQUIREMENTS: log filters and table semantics preserved, fallback request preserved, state blocks changed, and validation result.
+
+- [x] Task 34: Migrate `ServiceAuditHistory.jsx` loading and empty states.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Replace `MacOSLoadingSkeleton` and `MacOSEmptyState` usage with `AppLoading` and `AppEmpty`. Do not add new visible error behavior unless a separate evidence-backed task approves it. Preserve `servicesService.getServiceHistory`, refresh, expansion state, history row fields, icons, badges, and timestamps.
+  Files: `frontend/src/components/admin/ServiceAuditHistory.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, and `npm.cmd run build`.
+  LOGGING REQUIREMENTS: log loading/empty migration, unchanged fetch and expansion behavior, no-new-error-behavior confirmation, and validation result.
+
+- [x] Task 35: Create runtime MUI inventory and migration risk map.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute` because this is documentation-only. Create `frontend/MUI_RUNTIME_INVENTORY.md` from current `@mui` runtime imports and classify each file as low-risk, payment/queue-adjacent, clinical-heavy, Telegram/AI-sensitive, example-only, or shared/admin-sensitive. Do not edit runtime code and do not remove dependencies.
+  Files: `frontend/MUI_RUNTIME_INVENTORY.md`, source files discovered by `rg "@mui|Mui" frontend/src/pages frontend/src/components` as reference only
+  Validation target: `git diff --check` and `rg "@mui|Mui" frontend/src/pages frontend/src/components` evidence recorded in the inventory.
+  LOGGING REQUIREMENTS: log command used, count of runtime MUI files, risk class per file, and explicit do-not-touch buckets.
+
+- [x] Task 36: Migrate `ConnectionStatus.jsx` away from MUI.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Convert `frontend/src/components/pwa/ConnectionStatus.jsx` to macOS UI primitives and lucide icons while preserving `usePWA`, online/offline snackbars, service worker sync message handling, fixed offline banner, `showOfflineAlert`, and `position` behavior. Do not touch other PWA files in this task.
+  Files: `frontend/src/components/pwa/ConnectionStatus.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, `npm.cmd run build`, and a browser/static smoke for online/offline visible states when practical.
+  LOGGING REQUIREMENTS: log MUI imports removed, behavior preserved, accessibility labels/focus behavior, and validation result.
+
+- [x] Task 37: Migrate `PWAInstallPrompt.jsx` away from MUI.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute`. Convert `frontend/src/components/pwa/PWAInstallPrompt.jsx` to macOS UI primitives and lucide icons while preserving install/update/notification permission behavior, close callback, capability chips, offline indicator, and installed/update gating. Do not touch service worker logic.
+  Files: `frontend/src/components/pwa/PWAInstallPrompt.jsx`, focused tests only if evidence requires
+  Validation target: `git diff --check`, `npm.cmd run lint:check`, `npm.cmd run test:run`, `npm.cmd run build`, and a browser/static smoke for install/update visible states when practical.
+  LOGGING REQUIREMENTS: log MUI imports removed, behavior preserved, notification permission handling preserved, and validation result.
+
+- [x] Task 38: Add Frontend 10/10 route smoke gates.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` if authenticated role smoke requires live credentials or backend state; otherwise use `direct_execute` for public/static route smoke. Add or refine Playwright/browser smoke coverage for `/login`, `/queue/join`, `/payment/success`, `/payment/cancel`, `/admin`, one registrar route, one doctor route, and one lab route. Resolve credentials only from live DB/auth response per `.ai-factory/RULES.md`; do not guess from docs.
+  Files: `frontend/e2e/*`, `frontend/playwright.config.js` as reference unless evidence requires edits, frontend route/source files as reference only
+  Validation target: targeted Playwright smoke on frontend `5173` through the Vite proxy to backend `18000`, or a documented blocker with exact missing environment/credential requirement.
+  LOGGING REQUIREMENTS: log route, role, browser/device, pass/fail/blocker, and credential source class only; do not log passwords, tokens, patient data, or entered usernames.
+
+- [x] Task 39: Add visual, accessibility, and performance evidence gates.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `direct_execute` for static/test configuration and `gate` if authenticated browser evidence requires live role state. Add repeatable evidence for desktop/tablet/mobile visual smoke of app shell/sidebar, AppState primitives, payment result pages, public queue join, and one table-heavy admin page. Verify keyboard focus, alert/status live regions, and icon-only accessible names. Run `npm.cmd run build:analyze` and flag MUI-heavy chunks or any critical-route chunk growth over 5%.
+  Files: `frontend/e2e/*`, `frontend/src/test/*`, `frontend/scripts/analyze-bundle.js` as reference unless evidence requires edits, generated reports only in established output locations
+  Validation target: visual/a11y smoke evidence plus `npm.cmd run build:analyze` or a documented blocker.
+  LOGGING REQUIREMENTS: log viewport, route, evidence artifact path, a11y checks, bundle metrics, and blockers without PHI or credentials.
+
+- [x] Task 40: Produce registrar panel dossier before runtime refactor.
+  Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `handoff` or `dossier` mode before any runtime edit because registrar is queue/payment/role-sensitive and monolithic. Map `RegistrarPanel.jsx` data loading, demo fallback, queue events, payment actions, tabs, local i18n, API calls, route query parameters, and first safe visual-only extraction candidates. Do not edit runtime code in this task.
+  Files: `frontend/src/pages/RegistrarPanel.jsx`, registrar utilities/hooks/components/tests as reference only, `.ai-factory/dossiers/*` if a dossier artifact is created
+  Validation target: a ready-to-send execution brief with canonical anchors, first-touch files, stop conditions, and narrow validation target for the first registrar slice.
+  LOGGING REQUIREMENTS: log workflow map, API boundaries, high-risk areas, first safe slice candidates, and explicit no-runtime-edit confirmation.
+
 ## Verification Plan
 
-- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan, Tasks 1-25 remain completed, and Task 26 is the next pending `/aif-implement @.ai-factory/PLAN.md` task.
+- Plan refinement: confirm `.ai-factory/PLAN.md` remains the only active fast-mode plan and Tasks 1-40 are completed; the next command is `/aif-verify --strict` before any commit-ready decision.
 - Auth P0: route map plus 2FA tests proving no production login path issues `access_token` before required 2FA.
 - Payment P0: webhook tests prove retryable failures do not return successful HTTP status and duplicate callback ownership is explicit.
 - Upload P0: simple upload endpoint is either disabled outside explicit dev/test mode or covered by filename, size, MIME, storage, and logging tests.
 - Backend targeted tests: auth/RBAC, patients, visits, queue, EMR v2, payments, audit logs.
-- Frontend targeted tests: route contract, role navigation, route access, visible UI smoke.
+- Frontend targeted tests: route contract, role navigation, route access, AppState state rendering, visible UI smoke, and focused RTL tests where API mocks are practical.
 - Existing useful frontend tests include route contract/ownership, API runtime/interceptors/queue, landing, login accessibility, queue join accessibility, and user profile tests.
 - Existing useful backend tests include patient documents, registrar appointments/services, queue/QR, doctor queue, payment E2E, RBAC matrix, visit flows, and security middleware tests.
 - Browser smoke: admin, registrar, doctor, cashier, lab, patient QR, landing on frontend `5173`.
+- Frontend 10/10 smoke: `/login`, `/queue/join`, `/payment/success`, `/payment/cancel`, `/admin`, one registrar route, one doctor route, and one lab route on frontend `5173` through backend `18000` when backend state is required.
+- Frontend visual/a11y/performance: desktop/tablet/mobile screenshots for shell/sidebar, AppState, payment pages, queue join, and one table-heavy admin page; keyboard focus and icon-only accessible names; `npm.cmd run build:analyze` with MUI-heavy chunks and >5% critical-route chunk growth flagged.
 - Database: Alembic upgrade against PostgreSQL where schema/persistence is touched.
 - Security: `/aif-security-checklist` before commit.
 - Review: `/aif-review` before commit.
@@ -476,3 +557,6 @@ Stop and report if:
 - AI could appear to make autonomous medical decisions
 - first-touch files are no longer enough
 - validation target is vague
+- a frontend UI cleanup requires backend/API/RBAC/route/queue/payment/EMR/lab behavior changes
+- runtime UI work would expand MUI, `frontend/src/design-system`, `Modern*`, or a parallel component system
+- registrar, doctor, lab, queue, payment, or EMR work starts without gate/handoff and a clinical safety review

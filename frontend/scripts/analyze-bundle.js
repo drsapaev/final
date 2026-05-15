@@ -6,7 +6,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -293,7 +293,10 @@ function generateReport() {
     };
   }
   
-  const reportPath = path.join(projectRoot, 'bundle-analysis-report.json');
+  const reportDir = path.join(projectRoot, 'test-results', 'bundle-analysis');
+  fs.mkdirSync(reportDir, { recursive: true });
+
+  const reportPath = path.join(reportDir, 'bundle-analysis-report.json');
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   
   console.log(`📊 Отчет сохранен: ${reportPath}`);
@@ -336,6 +339,6 @@ function main() {
 }
 
 // Запуск если файл выполняется напрямую
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
