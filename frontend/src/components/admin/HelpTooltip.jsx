@@ -32,6 +32,7 @@ const HelpTooltip = ({ content, shortcuts = [], position = 'top' }) => {
         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         aria-label="Показать справку"
         aria-expanded={isVisible}
+        aria-controls={isVisible ? tooltipId : undefined}
         aria-describedby={isVisible ? tooltipId : undefined}
         onMouseEnter={showTooltip}
         onMouseLeave={hideTooltip}
@@ -71,7 +72,7 @@ const HelpTooltip = ({ content, shortcuts = [], position = 'top' }) => {
             </div>
             
             {/* Стрелка подсказки */}
-            <div className={`absolute w-3 h-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 transform rotate-45 ${
+            <div aria-hidden="true" className={`absolute w-3 h-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 transform rotate-45 ${
               position === 'top' ? 'top-full left-1/2 -translate-x-1/2 -translate-y-1/2 border-t-0 border-l-0' :
               position === 'bottom' ? 'bottom-full left-1/2 -translate-x-1/2 translate-y-1/2 border-b-0 border-r-0' :
               position === 'left' ? 'left-full top-1/2 -translate-x-1/2 -translate-y-1/2 border-l-0 border-b-0' :
@@ -98,6 +99,12 @@ HelpTooltip.propTypes = {
 export const HotkeysModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
   const titleId = 'admin-hotkeys-modal-title';
+  const descriptionId = 'admin-hotkeys-modal-description';
+  const handleDialogKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      onClose();
+    }
+  };
 
   const hotkeyCategories = [
     {
@@ -139,6 +146,8 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        onKeyDown={handleDialogKeyDown}
       >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
@@ -147,7 +156,7 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
               Горячие клавиши
             </h2>
           </div>
-          <Button variant="ghost" aria-label="Закрыть окно горячих клавиш" onClick={onClose}>
+          <Button type="button" variant="ghost" aria-label="Закрыть окно горячих клавиш" onClick={onClose}>
             <X aria-hidden="true" size={20} />
           </Button>
         </div>
@@ -175,7 +184,7 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
         </div>
         
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 text-center">
+          <p id={descriptionId} className="text-sm text-gray-500 text-center">
             💡 Горячие клавиши работают в любом разделе админ панели
           </p>
         </div>
