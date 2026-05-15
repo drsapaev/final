@@ -1,4 +1,5 @@
 import { Card } from '../ui/native';
+import { AppError, AppLoading, Button } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 
@@ -22,15 +23,11 @@ const AdminSection = ({
     return (
       <div className="space-y-6">
         <Card className="p-6">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-              <div className="h-4 bg-gray-200 rounded w-4/6"></div>
-            </div>
-          </div>
+          <AppLoading
+            title={title ? `Загрузка: ${title}` : 'Загрузка раздела'}
+            description={description || 'Получаем данные раздела.'}
+            size="sm"
+          />
         </Card>
       </div>
     );
@@ -40,20 +37,15 @@ const AdminSection = ({
     return (
       <div className="space-y-6">
         <Card className="p-6">
-          <div className="text-center py-8">
-            <div className="text-red-500 text-lg font-semibold mb-2">
-              Ошибка загрузки данных
-            </div>
-            <div className="text-gray-600 mb-4">
-              {error.message || 'Произошла неизвестная ошибка'}
-            </div>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-            >
-              Обновить страницу
-            </button>
-          </div>
+          <AppError
+            title="Ошибка загрузки данных"
+            description={error.message || 'Произошла неизвестная ошибка'}
+            action={
+              <Button type="button" variant="outline" size="small" onClick={() => window.location.reload()}>
+                Обновить страницу
+              </Button>
+            }
+          />
         </Card>
       </div>
     );
