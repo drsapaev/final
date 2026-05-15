@@ -3,7 +3,7 @@ import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
-import { AppEmpty, AppError } from '../components/ui/macos';
+import { AppEmpty, AppError, Button } from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
@@ -60,6 +60,7 @@ export default function Appointments() {
       String(a.status || '').toLowerCase().includes(qq)
     );
   }, [q, rows]);
+  const isFilteredEmpty = q.trim().length > 0 && rows.length > 0 && filtered.length === 0;
 
   return (
     <div>
@@ -89,6 +90,11 @@ export default function Appointments() {
             <AppError
               title="Не удалось загрузить записи"
               description={String(err)}
+              action={
+                <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
+                  Повторить
+                </Button>
+              }
             />
           )}
 
@@ -140,8 +146,12 @@ export default function Appointments() {
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
-                        title="Нет записей"
-                        description="Записи на выбранную дату появятся здесь после загрузки."
+                        title={isFilteredEmpty ? 'Записи не найдены' : 'Нет записей на выбранную дату'}
+                        description={
+                          isFilteredEmpty ?
+                            'Измените поиск по пациенту, врачу, статусу или ID, чтобы увидеть записи.' :
+                            'Если запись только что создана, обновите список.'
+                        }
                       />
                     </td>
                   </tr>
