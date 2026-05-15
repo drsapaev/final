@@ -28,10 +28,33 @@ const PRODUCTION_ROLE_HOMES = {
 const AI_SIDEBAR_BADGE = 'Черновик · не медицинское заключение';
 const AI_SIDEBAR_ACCESSIBLE_COPY = /черновик, не диагноз, не медицинское заключение/i;
 
+const ADMIN_CONTEXTUAL_ROUTE_IDS = [
+  'admin-benefit-settings',
+  'admin-wizard-settings',
+  'admin-payment-providers',
+  'admin-clinic-settings',
+  'admin-queue-settings',
+  'admin-telegram-settings',
+  'admin-display-settings',
+  'admin-user-select',
+];
+
+const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
+  'clinical-profile',
+  'clinical-security',
+  'clinical-two-factor',
+  'clinical-visit-details',
+  'clinical-pickup',
+];
+
 function assertAiSidebarDisclaimer(item) {
   expect(item.badge).toBe(AI_SIDEBAR_BADGE);
   expect(item.tooltip).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
   expect(item.ariaLabel).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
+}
+
+function getRouteById(routeId) {
+  return ROUTE_REGISTRY.find((route) => route.id === routeId);
 }
 
 describe('route contract invariants', () => {
@@ -120,6 +143,56 @@ describe('route contract invariants', () => {
     const adminAiItem = adminChrome.sidebarItems.find((item) => item.id === 'admin-ai-settings');
 
     assertAiSidebarDisclaimer(adminAiItem);
+  });
+
+  it('keeps admin contextual routes registered and out of admin sidebar navigation', () => {
+    const adminProfile = { role: 'Admin' };
+    const adminChrome = getRouteChromeState('/admin', '', adminProfile);
+    const adminSidebarIds = new Set(adminChrome.sidebarItems.map((item) => item.id));
+    const adminSidebarTargets = new Set(adminChrome.sidebarItems.map((item) => item.to));
+
+    ADMIN_CONTEXTUAL_ROUTE_IDS.forEach((routeId) => {
+      const route = getRouteById(routeId);
+
+      expect(route).toBeTruthy();
+      expect(route.group).toBe('admin');
+      expect(route.nav).toBe(false);
+      expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
+      expect(adminSidebarIds.has(route.id)).toBe(false);
+      expect(adminSidebarTargets.has(route.path)).toBe(false);
+    });
+  });
+
+  it('keeps clinical contextual routes registered and out of default sidebar navigation', () => {
+    const doctorProfile = { role: 'Doctor' };
+    const clinicalChrome = getRouteChromeState('/clinical/search', '', doctorProfile);
+    const clinicalSidebarIds = new Set(clinicalChrome.sidebarItems.map((item) => item.id));
+    const clinicalSidebarTargets = new Set(clinicalChrome.sidebarItems.map((item) => item.to));
+
+    CLINICAL_CONTEXTUAL_ROUTE_IDS.forEach((routeId) => {
+      const route = getRouteById(routeId);
+
+      expect(route).toBeTruthy();
+      expect(route.group).toBe('clinical');
+      expect(route.nav).toBe(false);
+      expect(isRouteAccessibleToProfile(route, doctorProfile)).toBe(true);
+      expect(clinicalSidebarIds.has(route.id)).toBe(false);
+      expect(clinicalSidebarTargets.has(route.path)).toBe(false);
+    });
+  });
+
+  it('keeps route-derived admin and default sidebar targets backed by canonical routes', () => {
+    const canonicalPaths = new Set(ROUTE_REGISTRY.map((route) => route.path));
+    const routeDerivedSidebarItems = [
+      ...getRouteChromeState('/admin', '', { role: 'Admin' }).sidebarItems,
+      ...getRouteChromeState('/clinical/search', '', { role: 'Doctor' }).sidebarItems,
+    ];
+
+    expect(routeDerivedSidebarItems.length).toBeGreaterThan(0);
+    routeDerivedSidebarItems.forEach((item) => {
+      expect(item.to).toBeTruthy();
+      expect(canonicalPaths.has(item.to)).toBe(true);
+    });
   });
 });
 
