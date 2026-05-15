@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSBadge } from '../ui/macos';
+import { MacOSCard, MacOSButton, MacOSBadge, AppEmpty } from '../ui/macos';
 
 const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) => {
   const formatFieldName = (field) => {
@@ -76,44 +76,54 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
 
   const changes = calculateChanges();
   const hasImportantChanges = changes.some(c => c.isImportant);
+  const importantChangesCount = changes.filter(c => c.isImportant).length;
+  const previewTitleId = 'service-changes-preview-title';
+  const previewDescriptionId = 'service-changes-preview-description';
+  const changesListLabel = `Список изменений услуги, всего ${changes.length}`;
 
   if (changes.length === 0) {
     return (
-      <MacOSCard variant="default" style={{ padding: '24px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <AlertCircle size={48} style={{ color: 'var(--mac-text-tertiary)', marginBottom: '16px' }} />
-          <h3 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: 'var(--mac-text-primary)',
-            margin: '0 0 8px 0'
-          }}>
-            Нет изменений
-          </h3>
-          <p style={{
-            fontSize: '14px',
-            color: 'var(--mac-text-secondary)',
-            margin: '0 0 20px 0'
-          }}>
-            Вы не внесли никаких изменений в услугу
-          </p>
-          <MacOSButton onClick={onCancel}>
-            Закрыть
-          </MacOSButton>
-        </div>
+      <MacOSCard
+        variant="default"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Предпросмотр изменений услуги"
+        style={{ padding: '24px' }}
+      >
+        <AppEmpty
+          icon={AlertCircle}
+          title="Нет изменений"
+          description="Вы не внесли изменений в услугу. Можно закрыть просмотр и вернуться к форме."
+          action={
+            <MacOSButton
+              type="button"
+              aria-label="Закрыть просмотр изменений услуги"
+              onClick={onCancel}
+            >
+              Закрыть
+            </MacOSButton>
+          }
+        />
       </MacOSCard>
     );
   }
 
   return (
-    <MacOSCard variant="default" style={{ padding: '0' }}>
+    <MacOSCard
+      variant="default"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={previewTitleId}
+      aria-describedby={previewDescriptionId}
+      style={{ padding: '0' }}
+    >
       {/* Header */}
       <div style={{
         padding: '20px 24px',
         borderBottom: '1px solid var(--mac-border)',
         backgroundColor: hasImportantChanges ? 'rgba(245, 158, 11, 0.05)' : 'transparent'
       }}>
-        <h3 style={{
+        <h3 id={previewTitleId} style={{
           fontSize: '18px',
           fontWeight: '600',
           color: 'var(--mac-text-primary)',
@@ -121,7 +131,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
         }}>
           Предпросмотр изменений
         </h3>
-        <p style={{
+        <p id={previewDescriptionId} style={{
           fontSize: '14px',
           color: 'var(--mac-text-secondary)',
           margin: 0
@@ -147,10 +157,16 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
       </div>
 
       {/* Changes List */}
-      <div style={{ padding: '16px 24px', maxHeight: '400px', overflowY: 'auto' }}>
+      <div
+        role="list"
+        aria-label={changesListLabel}
+        style={{ padding: '16px 24px', maxHeight: '400px', overflowY: 'auto' }}
+      >
         {changes.map((change, index) => (
           <div
             key={change.field}
+            role="listitem"
+            aria-label={`${formatFieldName(change.field)}: было ${formatValue(change.oldValue, change.field)}, станет ${formatValue(change.newValue, change.field)}`}
             style={{
               padding: '16px',
               marginBottom: index < changes.length - 1 ? '12px' : 0,
@@ -190,7 +206,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
               alignItems: 'center'
             }}>
               {/* Old Value */}
-              <div style={{
+              <div aria-label={`Было: ${formatValue(change.oldValue, change.field)}`} style={{
                 padding: '12px',
                 backgroundColor: 'var(--mac-bg-primary)',
                 borderRadius: '6px',
@@ -217,10 +233,10 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
               </div>
 
               {/* Arrow */}
-              <ArrowRight size={20} style={{ color: 'var(--mac-accent)', flexShrink: 0 }} />
+              <ArrowRight aria-hidden="true" size={20} style={{ color: 'var(--mac-accent)', flexShrink: 0 }} />
 
               {/* New Value */}
-              <div style={{
+              <div aria-label={`Станет: ${formatValue(change.newValue, change.field)}`} style={{
                 padding: '12px',
                 backgroundColor: 'rgba(16, 185, 129, 0.05)',
                 borderRadius: '6px',
@@ -263,16 +279,25 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
           Изменений: <strong>{changes.length}</strong>
           {hasImportantChanges && (
             <span style={{ color: 'var(--mac-warning)', marginLeft: '8px' }}>
-              • Важных: <strong>{changes.filter(c => c.isImportant).length}</strong>
+              • Важных: <strong>{importantChangesCount}</strong>
             </span>
           )}
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <MacOSButton variant="outline" onClick={onCancel}>
+          <MacOSButton
+            type="button"
+            variant="outline"
+            aria-label="Отменить и вернуться к редактированию услуги"
+            onClick={onCancel}
+          >
             <X size={16} style={{ marginRight: '8px' }} />
             Отменить
           </MacOSButton>
-          <MacOSButton onClick={onConfirm}>
+          <MacOSButton
+            type="button"
+            aria-label={`Подтвердить ${changes.length} изменений услуги`}
+            onClick={onConfirm}
+          >
             <Check size={16} style={{ marginRight: '8px' }} />
             Подтвердить изменения
           </MacOSButton>
