@@ -325,12 +325,13 @@ const BackupManagement = () => {
           <div style={{ flex: 1, position: 'relative' }}>
             <MacOSInput
               type="text"
+              aria-label="Поиск резервных копий по названию или описанию"
               placeholder="Поиск по названию или описанию..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '40px' }} />
             
-            <Search style={{
+            <Search aria-hidden="true" style={{
               position: 'absolute',
               left: '12px',
               top: '50%',
@@ -342,6 +343,7 @@ const BackupManagement = () => {
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <MacOSSelect
+              aria-label="Фильтр резервных копий по статусу"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -352,6 +354,7 @@ const BackupManagement = () => {
               )}
             </MacOSSelect>
             <MacOSSelect
+              aria-label="Фильтр резервных копий по типу"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -372,10 +375,12 @@ const BackupManagement = () => {
                 padding: '8px 16px'
               }}>
               
-              <Plus style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Создать копию</span>
             </MacOSButton>
             <MacOSButton
+              type="button"
+              aria-label="Очистить просроченные резервные копии"
               onClick={handleCleanupExpired}
               variant="outline"
               style={{
@@ -383,7 +388,7 @@ const BackupManagement = () => {
                 alignItems: 'center',
                 gap: '8px'
               }}>
-              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              <RefreshCw aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Очистить просроченные</span>
             </MacOSButton>
           </div>
@@ -409,6 +414,8 @@ const BackupManagement = () => {
             </h3>
             <MacOSButton
             variant="outline"
+            type="button"
+            aria-label={editingBackup ? 'Закрыть форму редактирования резервной копии' : 'Закрыть форму создания резервной копии'}
             onClick={() => {
               setShowAddForm(false);
               setEditingBackup(null);
@@ -416,7 +423,7 @@ const BackupManagement = () => {
             }}
             style={{ padding: '8px' }}>
             
-              <X style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             </MacOSButton>
           </div>
 
@@ -590,7 +597,7 @@ const BackupManagement = () => {
               
                 {saving ?
               <>
-                    <RefreshCw style={{
+                    <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
@@ -599,7 +606,7 @@ const BackupManagement = () => {
                   </> :
 
               <>
-                    <Save style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     {editingBackup ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -630,7 +637,7 @@ const BackupManagement = () => {
         description="Создайте первую резервную копию или измените фильтры поиска"
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать копию
             </MacOSButton>
         } /> :
@@ -681,7 +688,7 @@ const BackupManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <HardDrive style={{ width: '16px', height: '16px' }} />
+                  <HardDrive aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>{formatFileSize(backup.file_size)}</span>
                 </div>
                 <div style={{
@@ -691,7 +698,7 @@ const BackupManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Calendar style={{ width: '16px', height: '16px' }} />
+                  <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>{new Date(backup.created_at).toLocaleString()}</span>
                 </div>
                 <div style={{
@@ -701,7 +708,7 @@ const BackupManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Clock style={{ width: '16px', height: '16px' }} />
+                  <Clock aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>Хранение: {backup.retention_days} дней</span>
                 </div>
                 {backup.file_path &&
@@ -736,14 +743,18 @@ const BackupManagement = () => {
             gap: '8px'
           }}>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Редактировать резервную копию ${backup.name}`}
               onClick={() => handleEdit(backup)}
               style={{ padding: '6px 12px' }}>
               
-                  <Edit style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Удалить резервную копию ${backup.name}`}
               onClick={() => handleDelete(backup.id)}
               style={{
                 padding: '6px 12px',
@@ -751,7 +762,7 @@ const BackupManagement = () => {
                 borderColor: 'var(--mac-error)'
               }}>
               
-                  <Trash2 style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
               </div>
             </MacOSCard>
