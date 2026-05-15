@@ -18,6 +18,7 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 
 Installed repo skills live in `.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
 
+- Codex/Superpowers local SSOT: use `docs/runbooks/CODEX_SUPERPOWERS_GUARD.md` together with this file. The external Superpowers plugin is a manual workflow guard, not repo runtime code, and must not be vendored into this repository.
 - Skill discovery/setup: use `find-skills` only when searching for or installing new skills.
 - Clinic frontend UI/UX: `clinic-frontend-design` is mandatory first for Admin, Doctor, Registrar, Cashier, Lab, dashboard, route view, form, table, empty/loading/error, accessibility, responsive, or visual consistency work.
 - React implementation: use `vercel-react-best-practices` for performance, bundle, data-fetching, and rerender concerns; add `vercel-composition-patterns` when component APIs, contexts, providers, or boolean-prop-heavy components are involved.
