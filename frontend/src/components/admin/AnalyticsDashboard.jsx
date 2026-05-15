@@ -166,7 +166,10 @@ const AnalyticsDashboard = ({
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div
+        role="status"
+        aria-label="Загрузка аналитики"
+        style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -231,6 +234,8 @@ const AnalyticsDashboard = ({
               </p>
               <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                 {React.createElement(getGrowthIcon(currentData.revenueGrowth), {
+                  'aria-hidden': true,
+                  focusable: 'false',
                   style: {
                     width: '16px',
                     height: '16px',
@@ -249,7 +254,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <DollarSign style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
+            <DollarSign aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
           </div>
         </MacOSCard>
 
@@ -274,6 +279,8 @@ const AnalyticsDashboard = ({
               </p>
               <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                 {React.createElement(getGrowthIcon(currentData.patientGrowth), {
+                  'aria-hidden': true,
+                  focusable: 'false',
                   style: {
                     width: '16px',
                     height: '16px',
@@ -292,7 +299,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Users style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <Users aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           </div>
         </MacOSCard>
 
@@ -317,6 +324,8 @@ const AnalyticsDashboard = ({
               </p>
               <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                 {React.createElement(getGrowthIcon(currentData.appointmentGrowth), {
+                  'aria-hidden': true,
+                  focusable: 'false',
                   style: {
                     width: '16px',
                     height: '16px',
@@ -335,7 +344,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Calendar style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <Calendar aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           </div>
         </MacOSCard>
 
@@ -360,6 +369,8 @@ const AnalyticsDashboard = ({
               </p>
               <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                 {React.createElement(getGrowthIcon(currentData.ratingGrowth), {
+                  'aria-hidden': true,
+                  focusable: 'false',
                   style: {
                     width: '16px',
                     height: '16px',
@@ -378,7 +389,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Award style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
+            <Award aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
           </div>
         </MacOSCard>
       </div>
@@ -420,13 +431,20 @@ const AnalyticsDashboard = ({
                       {formatCurrency(item.amount)}
                     </span>
                   </div>
-                  <div style={{
+                  <div
+                  role="progressbar"
+                  aria-label={`Доля дохода категории ${item.category}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={item.percentage}
+                  style={{
                   width: '100%',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   borderRadius: 'var(--mac-radius-full)',
                   height: '8px'
                 }}>
                     <div
+                    aria-hidden="true"
                     style={{
                       height: '8px',
                       borderRadius: 'var(--mac-radius-full)',
@@ -464,6 +482,7 @@ const AnalyticsDashboard = ({
             <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div
+                  aria-hidden="true"
                   style={{
                     width: '12px',
                     height: '12px',
@@ -582,13 +601,20 @@ const AnalyticsDashboard = ({
                   {day.day}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
+                  <div
+                  role="progressbar"
+                  aria-label={`Количество записей в день ${day.day}`}
+                  aria-valuemin={0}
+                  aria-valuemax={Math.max(...appointmentsData.byDay.map((d) => d.count))}
+                  aria-valuenow={day.count}
+                  style={{
                   width: '96px',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   borderRadius: 'var(--mac-radius-full)',
                   height: '8px'
                 }}>
                     <div
+                    aria-hidden="true"
                     style={{
                       height: '8px',
                       borderRadius: 'var(--mac-radius-full)',
@@ -639,13 +665,20 @@ const AnalyticsDashboard = ({
                   {group.range} лет
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
+                  <div
+                  role="progressbar"
+                  aria-label={`Доля пациентов в возрастной группе ${group.range}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={group.percentage}
+                  style={{
                   width: '80px',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   borderRadius: 'var(--mac-radius-full)',
                   height: '8px'
                 }}>
                     <div
+                    aria-hidden="true"
                     style={{
                       height: '8px',
                       borderRadius: 'var(--mac-radius-full)',
@@ -695,13 +728,20 @@ const AnalyticsDashboard = ({
                   {gender.gender}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
+                  <div
+                  role="progressbar"
+                  aria-label={`Доля пациентов: ${gender.gender}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={gender.percentage}
+                  style={{
                   width: '80px',
                   backgroundColor: 'var(--mac-bg-tertiary)',
                   borderRadius: 'var(--mac-radius-full)',
                   height: '8px'
                 }}>
                     <div
+                    aria-hidden="true"
                     style={{
                       height: '8px',
                       borderRadius: 'var(--mac-radius-full)',
