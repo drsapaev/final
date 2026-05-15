@@ -326,12 +326,13 @@ const BranchManagement = () => {
           <div style={{ flex: 1, position: 'relative' }}>
             <MacOSInput
               type="text"
+              aria-label="Поиск филиалов по названию, адресу или коду"
               placeholder="Поиск по названию, адресу или коду..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '40px' }} />
-            
-            <Search style={{
+
+            <Search aria-hidden="true" style={{
               position: 'absolute',
               left: '12px',
               top: '50%',
@@ -343,6 +344,7 @@ const BranchManagement = () => {
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <MacOSSelect
+              aria-label="Фильтр филиалов по статусу"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -363,7 +365,7 @@ const BranchManagement = () => {
                 padding: '8px 16px'
               }}>
               
-              <Plus style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить филиал</span>
             </MacOSButton>
           </div>
@@ -389,14 +391,16 @@ const BranchManagement = () => {
             </h3>
             <MacOSButton
             variant="outline"
+            type="button"
+            aria-label={editingBranch ? 'Закрыть форму редактирования филиала' : 'Закрыть форму добавления филиала'}
             onClick={() => {
               setShowAddForm(false);
               setEditingBranch(null);
               resetForm();
             }}
             style={{ padding: '8px' }}>
-            
-              <X style={{ width: '16px', height: '16px' }} />
+
+              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             </MacOSButton>
           </div>
 
@@ -619,7 +623,7 @@ const BranchManagement = () => {
               
                 {saving ?
               <>
-                    <RefreshCw style={{
+                    <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
@@ -628,7 +632,7 @@ const BranchManagement = () => {
                   </> :
 
               <>
-                    <Save style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     {editingBranch ? 'Обновить' : 'Создать'}
                   </>
               }
@@ -659,7 +663,7 @@ const BranchManagement = () => {
         description="Создайте первый филиал или измените фильтры поиска"
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить филиал
             </MacOSButton>
         } /> :
@@ -711,7 +715,7 @@ const BranchManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <MapPin style={{ width: '16px', height: '16px' }} />
+                    <MapPin aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>{branch.address}</span>
                   </div>
             }
@@ -723,7 +727,7 @@ const BranchManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <Phone style={{ width: '16px', height: '16px' }} />
+                    <Phone aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>{formatBranchPhone(branch.phone)}</span>
                   </div>
             }
@@ -735,7 +739,7 @@ const BranchManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <Mail style={{ width: '16px', height: '16px' }} />
+                    <Mail aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>{branch.email}</span>
                   </div>
             }
@@ -746,7 +750,7 @@ const BranchManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Users style={{ width: '16px', height: '16px' }} />
+                  <Users aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>Вместимость: {branch.capacity}</span>
                 </div>
               </div>
@@ -783,14 +787,18 @@ const BranchManagement = () => {
             gap: '8px'
           }}>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Редактировать филиал ${branch.name}`}
               onClick={() => handleEdit(branch)}
               style={{ padding: '6px 12px' }}>
-              
-                  <Edit style={{ width: '16px', height: '16px' }} />
+
+                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Удалить филиал ${branch.name}`}
               onClick={() => handleDelete(branch.id)}
               style={{
                 padding: '6px 12px',
@@ -798,7 +806,7 @@ const BranchManagement = () => {
                 borderColor: 'var(--mac-error)'
               }}>
               
-                  <Trash2 style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
               </div>
             </MacOSCard>
