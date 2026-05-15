@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getApiBase } from '../api/client.js';
 import { getHealth, getActivationStatus } from '../api/index.js';
-import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
+import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
 import auth from '../stores/auth.js';
 
 export default function Health() {
@@ -10,6 +10,7 @@ export default function Health() {
   const [act, setAct] = useState(null);
   const [err, setErr] = useState('');
   const [authState, setAuthState] = useState(() => auth.getState());
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   useEffect(() => auth.subscribe(setAuthState), []);
   const isAdmin = Boolean(authState?.token) && String(authState?.profile?.role || '').toLowerCase() === 'admin';
@@ -35,7 +36,11 @@ export default function Health() {
     }
     load();
     return () => { mounted = false; };
-  }, [isAdmin]);
+  }, [isAdmin, refreshNonce]);
+
+  const refreshStatus = () => {
+    setRefreshNonce((value) => value + 1);
+  };
 
   const styles = {
     page: {
@@ -47,6 +52,17 @@ export default function Health() {
     main: {
       maxWidth: '960px',
       margin: '0 auto',
+    },
+    headingRow: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: '16px',
+      marginBottom: '8px',
+    },
+    headingCopy: {
+      minWidth: 0,
     },
     title: {
       fontSize: '28px',
@@ -92,30 +108,58 @@ export default function Health() {
 
   return (
     <div style={styles.page}>
-      <main style={styles.main}>
-        <h1 style={styles.title}>Состояние приложения</h1>
-        <div style={styles.meta}>
-          API base: <code>{getApiBase()}</code>
+      <main style={styles.main} aria-labelledby="health-page-title">
+        <div style={styles.headingRow}>
+          <div style={styles.headingCopy}>
+            <h1 id="health-page-title" style={styles.title}>Состояние приложения</h1>
+            <div style={styles.meta}>
+              API base: <code>{getApiBase()}</code>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="small"
+            onClick={refreshStatus}
+            disabled={loading}
+            loading={loading}
+            aria-label="Обновить состояние приложения">
+            Обновить
+          </Button>
         </div>
 
         {err && (
           <AppError
             title="Ошибка загрузки"
             description={String(err)}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="small"
+                onClick={refreshStatus}
+                disabled={loading}
+                loading={loading}
+                aria-label="Повторить проверку состояния приложения">
+                Повторить
+              </Button>
+            }
             style={{ marginBottom: '18px' }}
           />
         )}
 
-        <section style={styles.section} aria-labelledby="health-status-title">
+        <section style={styles.section} aria-labelledby="health-status-title" aria-busy={loading}>
           <h2 id="health-status-title" style={styles.sectionTitle}>Health</h2>
           {loading ? (
             <AppLoading
               title="Проверка состояния сервера..."
+              description="Запрашиваем текущий ответ health endpoint."
+              ariaLabel="Проверяем состояние сервера"
               size="sm"
               style={styles.appState}
             />
           ) : health ? (
-            <pre style={styles.pre}>
+            <pre style={styles.pre} aria-label="Ответ health endpoint" tabIndex={0}>
               {typeof health === 'string' ? health : JSON.stringify(health, null, 2)}
             </pre>
           ) : (
@@ -128,16 +172,18 @@ export default function Health() {
         </section>
 
         {isAdmin && (
-          <section style={styles.section} aria-labelledby="activation-status-title">
+          <section style={styles.section} aria-labelledby="activation-status-title" aria-busy={loading}>
             <h2 id="activation-status-title" style={styles.sectionTitle}>Статус активации</h2>
             {loading ? (
               <AppLoading
                 title="Загрузка статуса..."
+                description="Запрашиваем текущий статус активации для администратора."
+                ariaLabel="Загружаем статус активации"
                 size="sm"
                 style={styles.appState}
               />
             ) : act ? (
-              <pre style={styles.pre}>
+              <pre style={styles.pre} aria-label="Ответ activation status endpoint" tabIndex={0}>
                 {typeof act === 'string' ? act : JSON.stringify(act, null, 2)}
               </pre>
             ) : (
