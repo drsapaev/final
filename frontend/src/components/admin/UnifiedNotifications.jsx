@@ -18,7 +18,7 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
   };
 
   return (
-    <div style={{
+    <div role="tablist" aria-label="Notification sections" style={{
       display: 'flex',
       gap: '4px',
       padding: '8px',
@@ -30,6 +30,11 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
       {tabs.map((tab) =>
       <button
         key={tab.id}
+        id={`notifications-tab-${tab.id}`}
+        type="button"
+        role="tab"
+        aria-selected={activeTab === tab.id}
+        aria-controls={`notifications-panel-${tab.id}`}
         onClick={() => onTabChange(tab.id)}
         style={{
           padding: '8px 16px',
@@ -101,7 +106,12 @@ const UnifiedNotifications = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab} />
       
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div
+        id={`notifications-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`notifications-tab-${activeTab}`}
+        style={{ flex: 1, overflow: 'auto' }}
+      >
         {renderContent()}
       </div>
     </div>);
