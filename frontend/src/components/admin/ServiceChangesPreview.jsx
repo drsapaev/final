@@ -139,16 +139,19 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
           Проверьте изменения перед сохранением
         </p>
         {hasImportantChanges && (
-          <div style={{
-            marginTop: '12px',
-            padding: '8px 12px',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <AlertCircle size={16} style={{ color: 'var(--mac-warning)' }} />
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+            <AlertCircle aria-hidden="true" focusable="false" size={16} style={{ color: 'var(--mac-warning)' }} />
             <span style={{ fontSize: '13px', color: 'var(--mac-warning)', fontWeight: '500' }}>
               Обнаружены важные изменения
             </span>
@@ -290,7 +293,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
             aria-label="Отменить и вернуться к редактированию услуги"
             onClick={onCancel}
           >
-            <X size={16} style={{ marginRight: '8px' }} />
+            <X aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
             Отменить
           </MacOSButton>
           <MacOSButton
@@ -298,7 +301,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
             aria-label={`Подтвердить ${changes.length} изменений услуги`}
             onClick={onConfirm}
           >
-            <Check size={16} style={{ marginRight: '8px' }} />
+            <Check aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
             Подтвердить изменения
           </MacOSButton>
         </div>
