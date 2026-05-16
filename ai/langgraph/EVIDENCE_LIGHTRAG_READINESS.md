@@ -3341,3 +3341,42 @@ Continue recovery through `/aif-implement @.ai-factory/PLAN.md`, Task 25: prove 
 - current stack sufficient: partial
 - would LightRAG likely help here: yes
 - Better retrieval should connect Alembic proof tasks to `backend/alembic/env.py`, migration revision files, testing/deployment docs, and local contour blockers.
+
+## Task 94 - Telegram staff link token migration gate misroute
+
+### User task
+Continue the Telegram bot implementation loop and close the storage gap after the
+`TelegramStaffLinkToken` model shape landed on `main`.
+
+### Gate result
+- mode: execute
+- handoff required: yes
+- handoff used: yes, with narrow override
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: backend/app/models/telegram_config.py
+
+### What handoff solved well
+- It preserved the rule that Telegram integration and database ownership are risky domains.
+- It stopped runtime handler/storage-write enablement while staff token storage is incomplete.
+
+### Missing relationship mapping
+- The gate mapped a missing Alembic migration task to Docker/runtime packaging files.
+- The known-root-cause retry included the SQLAlchemy model but still omitted the required new migration file under `backend/alembic/versions/`.
+- This left the model shape on `main` without an approved migration patch path.
+
+### Manual reconstruction needed
+- Manually inspected `backend/app/models/telegram_config.py`, `backend/alembic/versions/0024_tg_user_lang_bcp47.py`, and `origin/main` history.
+- Manually confirmed the next safe slice should create `0025_telegram_staff_link_tokens.py` after revision `0024_tg_user_lang_bcp47`.
+
+### Signals observed
+- multi-hop gap: yes
+- ownership ambiguity: yes
+- manual graph reconstruction: yes
+- gate_misroute: yes
+- override_used: yes
+
+### Short verdict
+- current stack sufficient: no for this schema slice
+- would LightRAG likely help here: yes
+- Better retrieval should connect new SQLAlchemy table models to Alembic migration creation, revision chain ownership, and migration validation targets.
