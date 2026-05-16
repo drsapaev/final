@@ -121,6 +121,30 @@ STAFF_BOT_GUARDRAILS = [
     "no_queue_fairness_mutation_without_domain_service",
 ]
 
+STAFF_BOT_TOKEN_CONTRACT = {
+    "contract_version": "staff-token-v1",
+    "enabled": False,
+    "runtime_read_enabled": False,
+    "required_before_enablement": True,
+    "scope": "dedicated_staff_bot",
+    "must_not_share_patient_bot_token": True,
+    "secret_source": "environment_or_secret_store",
+    "required_server_checks": [
+        "separate_staff_bot_token_configured",
+        "token_not_logged",
+        "token_not_returned_to_frontend",
+        "staff_webhook_or_polling_transport_selected",
+        "patient_bot_transport_unchanged",
+    ],
+    "enablement_gate": [
+        "dedicated_staff_bot_token",
+        "role_based_staff_linking",
+        "server_side_authorization",
+        "audit_logging",
+        "state_change_confirmations",
+    ],
+}
+
 STAFF_BOT_LINKING_CONTRACT = {
     "contract_version": "staff-linking-v1",
     "enabled": False,
@@ -342,6 +366,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
                 "one_time_signed_staff_token",
             ],
         },
+        "token_contract": STAFF_BOT_TOKEN_CONTRACT,
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -359,7 +384,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "readiness": STAFF_BOT_READINESS,
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_role_menus",
+        "next_slice": "dedicated_staff_bot_token_readiness_contract",
     }
 
 
@@ -809,6 +834,7 @@ def get_telegram_integration_status(
                 "lab_results_pdf",
             ],
             "planned_functions": [
+                "dedicated_staff_bot_token_readiness_contract",
                 "staff_read_only_menu_contract",
                 "staff_role_linking_contract",
                 "staff_command_registration_contract",
