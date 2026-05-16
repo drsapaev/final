@@ -36,6 +36,9 @@ const ACCENT_LABELS = {
 function ThemePreviewCard({ scheme, isActive, onSelect }) {
   const Icon = ICONS[scheme.id] || Sun;
   const preview = scheme.preview;
+  const buttonLabel = isActive
+    ? `Текущая цветовая схема: ${scheme.name}. ${scheme.mood}, контраст: ${scheme.contrast}`
+    : `Выбрать цветовую схему: ${scheme.name}. ${scheme.mood}, контраст: ${scheme.contrast}`;
 
   return (
     <button
@@ -43,6 +46,7 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
       data-preview-card="true"
       onClick={() => onSelect(scheme.id)}
       aria-pressed={isActive}
+      aria-label={buttonLabel}
       style={{
         cursor: 'pointer',
         borderRadius: '18px',
@@ -60,7 +64,7 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div style={{ display: 'grid', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon style={{ width: '18px', height: '18px' }} />
+            <Icon aria-hidden="true" style={{ width: '18px', height: '18px' }} />
             <span style={{ fontSize: '15px', fontWeight: 700 }}>
               {scheme.name}
             </span>
@@ -174,14 +178,24 @@ export default function ColorSchemeSelector() {
   const currentScheme = colorSchemes.find((scheme) => scheme.id === colorScheme) || colorSchemes[0];
   const currentAccentLabel = ACCENT_LABELS[accent] || accent;
   const ActiveIcon = currentScheme.icon;
+  const selectorTitleId = 'color-scheme-selector-title';
+  const selectorDescriptionId = 'color-scheme-selector-description';
+  const quickSelectId = 'color-scheme-selector-quick-select';
+  const helpTextId = 'color-scheme-selector-help';
+  const currentPreviewLabel = `Текущая цветовая схема: ${currentScheme.name}. Accent: ${currentAccentLabel}`;
 
   return (
-    <MacOSCard style={{ padding: '24px', display: 'grid', gap: '20px' }}>
+    <MacOSCard
+      role="region"
+      aria-labelledby={selectorTitleId}
+      aria-describedby={selectorDescriptionId}
+      style={{ padding: '24px', display: 'grid', gap: '20px' }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Palette style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+          <Palette aria-hidden="true" style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
           <div style={{ display: 'grid', gap: '4px' }}>
-            <h3 style={{
+            <h3 id={selectorTitleId} style={{
               fontSize: 'var(--mac-font-size-lg)',
               fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
@@ -189,7 +203,7 @@ export default function ColorSchemeSelector() {
             }}>
               Цветовая схема интерфейса
             </h3>
-            <p style={{
+            <p id={selectorDescriptionId} style={{
               margin: 0,
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
@@ -199,7 +213,10 @@ export default function ColorSchemeSelector() {
           </div>
         </div>
 
-        <div style={{
+        <div
+          role="status"
+          aria-label={`Accent сейчас: ${currentAccentLabel}`}
+          style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
@@ -209,20 +226,24 @@ export default function ColorSchemeSelector() {
           border: '1px solid var(--mac-border)',
           color: 'var(--mac-text-secondary)',
           fontSize: '12px',
-        }}>
-          <SwatchBook style={{ width: '14px', height: '14px', color: 'var(--mac-accent-blue)' }} />
+        }}
+        >
+          <SwatchBook aria-hidden="true" style={{ width: '14px', height: '14px', color: 'var(--mac-accent-blue)' }} />
           Accent сейчас: <strong style={{ color: 'var(--mac-text-primary)' }}>{currentAccentLabel}</strong>
         </div>
       </div>
 
-      <div style={{
+      <div
+        id={helpTextId}
+        style={{
         padding: '14px 16px',
         borderRadius: '16px',
         background: 'linear-gradient(135deg, var(--mac-bg-primary), var(--mac-bg-secondary))',
         border: '1px solid var(--mac-border)',
         display: 'grid',
         gap: '8px',
-      }}>
+      }}
+      >
         <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
           Что именно меняет настройка
         </div>
@@ -233,7 +254,7 @@ export default function ColorSchemeSelector() {
       </div>
 
       <div style={{ display: 'grid', gap: '10px' }}>
-        <label style={{
+        <label htmlFor={quickSelectId} style={{
           display: 'block',
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-medium)',
@@ -242,8 +263,10 @@ export default function ColorSchemeSelector() {
           Быстрый выбор схемы
         </label>
         <MacOSSelect
+          id={quickSelectId}
           value={colorScheme}
           onChange={(event) => setColorScheme(event.target.value)}
+          aria-describedby={helpTextId}
           options={colorSchemes.map((scheme) => ({
             value: scheme.id,
             label: scheme.name,
@@ -252,11 +275,15 @@ export default function ColorSchemeSelector() {
         />
       </div>
 
-      <div style={{
+      <div
+        role="group"
+        aria-label="Карточки выбора цветовой схемы"
+        style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: '16px',
-      }}>
+      }}
+      >
         {colorSchemes.map((scheme) => (
           <ThemePreviewCard
             key={scheme.id}
@@ -272,7 +299,10 @@ export default function ColorSchemeSelector() {
         gridTemplateColumns: 'minmax(240px, 1.15fr) minmax(260px, 1fr)',
         gap: '18px',
       }}>
-        <div style={{
+        <div
+          role="img"
+          aria-label={currentPreviewLabel}
+          style={{
           padding: '18px',
           borderRadius: '18px',
           border: '1px solid var(--mac-border)',
@@ -281,10 +311,11 @@ export default function ColorSchemeSelector() {
           display: 'grid',
           gap: '16px',
           minHeight: '220px',
-        }}>
+        }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ActiveIcon style={{ width: '18px', height: '18px' }} />
+              <ActiveIcon aria-hidden="true" style={{ width: '18px', height: '18px' }} />
               <div style={{ display: 'grid', gap: '2px' }}>
                 <strong>{currentScheme.name}</strong>
                 <span style={{ fontSize: '12px', opacity: 0.84 }}>{currentScheme.description}</span>
