@@ -218,6 +218,38 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "\"Telefon raqamni ulashish\" tugmasini bosing."
         ),
     },
+    "lab_results_empty": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Готовых PDF-результатов пока нет. "
+            "Когда лаборатория финализирует отчет, он появится здесь."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Tayyor PDF natijalar hozircha yo'q. "
+            "Laboratoriya hisobotni yakunlaganda u shu yerda paydo bo'ladi."
+        ),
+    },
+    "lab_results_found": {
+        TELEGRAM_LANGUAGE_RU: "Нашел готовые результаты: {count}. Отправляю PDF-файлы.",
+        TELEGRAM_LANGUAGE_UZ: "Tayyor natijalar topildi: {count}. PDF fayllarni yuboryapman.",
+    },
+    "lab_results_send_failed": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Не удалось отправить PDF-результаты. Обратитесь в регистратуру."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "PDF natijalarni yuborib bo'lmadi. Registraturaga murojaat qiling."
+        ),
+    },
+    "results_hint": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Результаты будут приходить сюда, когда лаборатория или врач отметит их "
+            "готовыми к выдаче. Если результат нужен срочно, обратитесь в регистратуру."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Natijalar laboratoriya yoki shifokor ularni berishga tayyor deb belgilaganda "
+            "shu yerga keladi. Natija shoshilinch kerak bo'lsa, registraturaga murojaat qiling."
+        ),
+    },
 }
 TELEGRAM_WEBHOOK_PUBLIC_ERROR = "Ошибка обработки webhook"
 TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
@@ -810,6 +842,7 @@ def _log_lab_report_document_send(
 
 async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> None:
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+    language = _telegram_chat_language(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
         await bot_service._send_message(
             chat_id,
@@ -822,17 +855,14 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
     if not instances:
         await bot_service._send_message(
             chat_id,
-            (
-                "Готовых PDF-результатов пока нет. "
-                "Когда лаборатория финализирует отчет, он появится здесь."
-            ),
+            _localized_text("lab_results_empty", language),
             _telegram_chat_menu(db, chat_id),
         )
         return
 
     await bot_service._send_message(
         chat_id,
-        f"Нашел готовые результаты: {len(instances)}. Отправляю PDF-файлы.",
+        _localized_text("lab_results_found", language).format(count=len(instances)),
         _telegram_chat_menu(db, chat_id),
     )
     sent_count = 0
@@ -879,7 +909,7 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
     if sent_count == 0:
         await bot_service._send_message(
             chat_id,
-            "Не удалось отправить PDF-результаты. Обратитесь в регистратуру.",
+            _localized_text("lab_results_send_failed", language),
             _telegram_chat_menu(db, chat_id),
         )
 
@@ -900,10 +930,7 @@ def _clinic_results_message(db: Session, chat_id: int) -> str:
     if not telegram_user or not telegram_user.patient_id:
         return _telegram_chat_text(db, chat_id, "needs_link")
 
-    return (
-        "Результаты будут приходить сюда, когда лаборатория или врач отметит их "
-        "готовыми к выдаче. Если результат нужен срочно, обратитесь в регистратуру."
-    )
+    return _telegram_chat_text(db, chat_id, "results_hint")
 
 
 async def _send_language_choice(bot_service, chat_id: int) -> None:
