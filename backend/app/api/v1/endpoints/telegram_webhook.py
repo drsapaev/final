@@ -70,7 +70,7 @@ TELEGRAM_MAIN_MENU = {
         [{"text": "Поделиться номером", "request_contact": True}],
         [{"text": "Моя очередь"}, {"text": "Оплаты и долг"}],
         [{"text": "Мой статус"}, {"text": "Результаты"}],
-        [{"text": "Помощь"}],
+        [{"text": "Настройки"}, {"text": "Помощь"}],
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False,
@@ -101,7 +101,27 @@ TELEGRAM_MAIN_MENUS = {
             [{"text": "Telefon raqamni ulashish", "request_contact": True}],
             [{"text": "Mening navbatim"}, {"text": "To'lovlar va qarz"}],
             [{"text": "Mening holatim"}, {"text": "Natijalar"}],
-            [{"text": "Yordam"}],
+            [{"text": "Sozlamalar"}, {"text": "Yordam"}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    },
+}
+TELEGRAM_SETTINGS_MENUS = {
+    TELEGRAM_LANGUAGE_RU: {
+        "keyboard": [
+            [{"text": "Русский"}, {"text": "O'zbekcha"}],
+            [{"text": "Разрешить уведомления"}, {"text": "Без уведомлений"}],
+            [{"text": "Моя очередь"}, {"text": "Помощь"}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    },
+    TELEGRAM_LANGUAGE_UZ: {
+        "keyboard": [
+            [{"text": "Русский"}, {"text": "O'zbekcha"}],
+            [{"text": "Xabarnomalarga roziman"}, {"text": "Xabarnomasiz"}],
+            [{"text": "Mening navbatim"}, {"text": "Yordam"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -203,6 +223,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "/queue - моя очередь\n"
             "/payments - оплаты и долг\n"
             "/profile - статус привязки\n"
+            "/settings - язык и уведомления\n"
             "/results - получить готовые PDF-результаты\n\n"
             "Для привязки можно отсканировать QR с чека или нажать "
             "\"Поделиться номером\"."
@@ -213,9 +234,18 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "/queue - mening navbatim\n"
             "/payments - to'lovlar va qarz\n"
             "/profile - bog'lanish holati\n"
+            "/settings - til va xabarnomalar\n"
             "/results - tayyor PDF natijalarni olish\n\n"
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing."
+        ),
+    },
+    "settings": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Настройки Telegram: выберите язык обслуживания или режим уведомлений."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Telegram sozlamalari: xizmat tilini yoki xabarnoma rejimini tanlang."
         ),
     },
     "lab_results_empty": {
@@ -478,6 +508,13 @@ def _localized_notification_consent_menu(language_code: Any) -> Dict[str, Any]:
     return TELEGRAM_NOTIFICATION_CONSENT_MENUS.get(
         _normalize_patient_language(language_code),
         TELEGRAM_NOTIFICATION_CONSENT_MENUS[TELEGRAM_LANGUAGE_RU],
+    )
+
+
+def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
+    return TELEGRAM_SETTINGS_MENUS.get(
+        _normalize_patient_language(language_code),
+        TELEGRAM_SETTINGS_MENUS[TELEGRAM_LANGUAGE_RU],
     )
 
 
@@ -1283,6 +1320,14 @@ async def _handle_clinic_bot_update(
             _localized_main_menu(language),
         )
 
+    async def settings_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await bot_service._send_message(
+            chat_id,
+            _localized_text("settings", language),
+            _localized_settings_menu(language),
+        )
+
     async def queue_handler(chat_id: int) -> None:
         await bot_service._send_message(
             chat_id, _clinic_queue_message(db, chat_id), _telegram_chat_menu(db, chat_id)
@@ -1326,9 +1371,11 @@ async def _handle_clinic_bot_update(
         "/payments": payments_handler,
         "/profile": profile_handler,
         "/results": results_handler,
+        "/settings": settings_handler,
     }
     text_handlers = {
         "помощь": help_handler,
+        "настройки": settings_handler,
         "моя очередь": queue_handler,
         "оплаты и долг": payments_handler,
         "мой статус": profile_handler,
@@ -1343,6 +1390,7 @@ async def _handle_clinic_bot_update(
         "xabarnomalarga roziman": enable_notifications_handler,
         "xabarnomasiz": disable_notifications_handler,
         "yordam": help_handler,
+        "sozlamalar": settings_handler,
         "mening navbatim": queue_handler,
         "to'lovlar va qarz": payments_handler,
         "mening holatim": profile_handler,

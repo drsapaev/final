@@ -207,18 +207,55 @@ STAFF_BOT_LINKING_RUNTIME_CONTRACT = {
     "state_changing_actions_allowed_after_link": False,
 }
 
+STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT = {
+    "contract_version": "staff-link-token-storage-v1",
+    "enabled": False,
+    "migration_created": False,
+    "runtime_write_enabled": False,
+    "table": "telegram_staff_link_tokens",
+    "raw_token_storage_allowed": False,
+    "columns": [
+        "id",
+        "token_hash",
+        "staff_user_id",
+        "telegram_chat_id",
+        "expires_at",
+        "consumed_at",
+        "issued_by_user_id",
+        "created_at",
+        "request_id",
+    ],
+    "required_indexes": [
+        "unique(token_hash)",
+        "index(staff_user_id)",
+        "index(telegram_chat_id)",
+        "partial_index(expires_at) where consumed_at is null",
+    ],
+    "required_constraints": [
+        "expires_at > created_at",
+        "consumed_at is null or consumed_at <= expires_at",
+        "staff_user_id references users(id)",
+    ],
+    "retention_policy": {
+        "expired_token_ttl_days": 7,
+        "consumed_token_ttl_days": 30,
+    },
+}
+
 STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "contract_version": "staff-link-token-validation-v1",
     "enabled": False,
-    "validator_enabled": False,
+    "validator_enabled": True,
     "runtime_helper_available": True,
     "signature_validator_available": True,
     "expiry_validator_available": True,
     "binding_parser_available": True,
+    "stateless_validator_enabled": True,
     "single_use_enforcement_enabled": False,
     "token_storage_enabled": False,
     "handler_enabled": False,
     "storage_migration_required": True,
+    "storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
     "runtime_blocked_by": [
         "staff_link_token_storage_migration",
         "staff_link_token_validator_service",
@@ -227,6 +264,7 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
     "builder": "build_staff_link_start_token",
     "parser": "parse_staff_link_start_token",
+    "validator": "validate_staff_link_start_token",
     "token_hash_prefix": STAFF_LINK_TOKEN_HASH_PREFIX,
     "token_properties": [
         "signed",
@@ -242,6 +280,7 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
         "staff_user_inactive",
         "role_not_allowed",
         "telegram_account_already_linked",
+        "staff_user_already_linked",
     ],
     "required_audit_events": [
         "staff_link_token_issued",
@@ -571,6 +610,89 @@ def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
     }
 
 
+def _normalize_staff_role(role: Any) -> str:
+    role_key = str(role or "").strip().lower().replace("-", "_").replace(" ", "_")
+    role_aliases = {
+        "administrator": "admin",
+        "admin": "admin",
+        "owner": "owner",
+        "doctor": "doctor",
+        "cashier": "cashier",
+        "lab": "lab",
+        "lab_tech": "lab",
+        "laboratory": "lab",
+        "registrar": "registrar",
+        "receptionist": "registrar",
+    }
+    return role_aliases.get(role_key, role_key)
+
+
+def validate_staff_link_start_token(
+    db: Session, token: str, telegram_chat_id: int
+) -> Dict[str, Any]:
+    parsed = parse_staff_link_start_token(token)
+    if not parsed:
+        return {"valid": False, "reason": "signature_invalid"}
+
+    if int(parsed["chat_id"]) != int(telegram_chat_id):
+        return {
+            "valid": False,
+            "reason": "chat_mismatch",
+            "token_hash": parsed["token_hash"],
+        }
+
+    user = db.query(User).filter(User.id == parsed["user_id"]).first()
+    if not user or not user.is_active:
+        return {
+            "valid": False,
+            "reason": "staff_user_inactive",
+            "token_hash": parsed["token_hash"],
+        }
+
+    role_key = _normalize_staff_role(user.role)
+    if role_key not in STAFF_BOT_SUPPORTED_ROLES:
+        return {
+            "valid": False,
+            "reason": "role_not_allowed",
+            "role": role_key,
+            "token_hash": parsed["token_hash"],
+        }
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+        db, int(parsed["chat_id"])
+    )
+    linked_user_id = getattr(telegram_user, "user_id", None)
+    if linked_user_id and int(linked_user_id) != int(user.id):
+        return {
+            "valid": False,
+            "reason": "telegram_account_already_linked",
+            "token_hash": parsed["token_hash"],
+        }
+
+    linked_telegram_user = crud_telegram.get_telegram_user_by_linked_user_id(
+        db, int(user.id)
+    )
+    linked_chat_id = getattr(linked_telegram_user, "chat_id", None)
+    if linked_chat_id and int(linked_chat_id) != int(parsed["chat_id"]):
+        return {
+            "valid": False,
+            "reason": "staff_user_already_linked",
+            "token_hash": parsed["token_hash"],
+        }
+
+    logger.info("Staff Telegram link token validated role=%s", role_key)
+    return {
+        "valid": True,
+        "reason": "ok",
+        "token_hash": parsed["token_hash"],
+        "user_id": int(user.id),
+        "chat_id": int(parsed["chat_id"]),
+        "role": role_key,
+        "expires_at": parsed["expires_at"].isoformat(),
+        "single_use_enforced": False,
+    }
+
+
 def _build_staff_role_menus_summary() -> Dict[str, Any]:
     menu_roles = [
         role_menu["role"] for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT
@@ -632,6 +754,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "linking_runtime_contract": STAFF_BOT_LINKING_RUNTIME_CONTRACT,
         "link_token_validation_contract": STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT,
+        "link_token_storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -1100,6 +1223,7 @@ def get_telegram_integration_status(
                 "patient_queue",
                 "patient_payments_debt",
                 "patient_status",
+                "patient_language_notification_settings",
                 "lab_results_pdf",
             ],
             "planned_functions": [
@@ -1110,6 +1234,7 @@ def get_telegram_integration_status(
                 "staff_role_linking_runtime",
                 "staff_link_token_validation_contract",
                 "staff_link_token_validation_runtime_helper",
+                "staff_link_token_storage_migration_contract",
                 "staff_server_side_authorization_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",
@@ -1133,6 +1258,7 @@ def get_telegram_integration_status(
                     {"command": "/payments", "label": "Оплаты и долг"},
                     {"command": "/results", "label": "PDF-результаты"},
                     {"command": "/profile", "label": "Мой статус"},
+                    {"command": "/settings", "label": "Язык и уведомления"},
                     {"command": "/help", "label": "Помощь"},
                 ],
                 "features": [
@@ -1159,6 +1285,11 @@ def get_telegram_integration_status(
                     {
                         "key": "lab_results_pdf",
                         "label": "PDF-результаты лаборатории",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_language_notification_settings",
+                        "label": "Настройки языка и уведомлений",
                         "enabled": bool(bot_token),
                     },
                 ],
