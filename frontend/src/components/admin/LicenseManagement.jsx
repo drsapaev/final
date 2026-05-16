@@ -216,6 +216,11 @@ const LicenseManagement = () => {
     const matchesType = typeFilter === 'all' || license.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
+  const hasLicenseFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
+  const licenseEmptyTitle = hasLicenseFilters ? 'Лицензии по фильтрам не найдены' : 'Лицензии ещё не добавлены';
+  const licenseEmptyDescription = hasLicenseFilters ?
+  'Измените поиск, статус или тип, чтобы увидеть другие лицензии.' :
+  'Добавьте первую лицензию, чтобы контролировать доступы и сроки действия программ.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
@@ -647,11 +652,11 @@ const LicenseManagement = () => {
       filteredLicenses.length === 0 ?
       <MacOSEmptyState
         icon={Key}
-        title="Лицензии не найдены"
-        description="Добавьте первую лицензию или измените фильтры поиска"
+        title={licenseEmptyTitle}
+        description={licenseEmptyDescription}
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить лицензию
             </MacOSButton>
         } /> :
