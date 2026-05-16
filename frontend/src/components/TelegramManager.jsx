@@ -182,6 +182,7 @@ const TelegramManager = () => {
     return count + items.length;
   }, 0);
   const staffRoleSummary = staffRoles.length ? staffRoles.join(', ') : 'none';
+  const staffTokenContract = staffBot.token_contract || {};
   const staffLinkingContract = staffBot.linking_contract || staffBot.role_linking || {};
   const staffLinkingMethods = Array.isArray(staffLinkingContract.accepted_methods) ?
   staffLinkingContract.accepted_methods :
@@ -303,6 +304,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff token separation"
+                    secondary={staffTokenContract.contract_version ?
+                    `scope: ${staffTokenContract.scope || 'staff'}; runtime read: ${staffTokenContract.runtime_read_enabled ? 'enabled' : 'disabled'}` :
+                    'Dedicated staff bot token contract не опубликован'} />
+
+                  <Badge
+                    variant={staffTokenContract.runtime_read_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffTokenContract.required_before_enablement ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
