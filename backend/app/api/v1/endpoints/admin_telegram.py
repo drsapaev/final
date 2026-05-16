@@ -206,6 +206,65 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
     "state_changing_commands_registered": False,
 }
 
+STAFF_BOT_CONFIRMATION_CONTRACT = {
+    "contract_version": "staff-confirmations-v1",
+    "enabled": False,
+    "required_for_state_changes": True,
+    "state_changing_actions_enabled": False,
+    "confirmation_window_seconds": 120,
+    "operations": [
+        {
+            "key": "queue_call_or_skip_patient",
+            "label": "Вызвать или пропустить пациента",
+            "roles": ["registrar"],
+            "domain_service_required": "queue",
+        },
+        {
+            "key": "visit_cancel_or_move",
+            "label": "Отменить или перенести визит",
+            "roles": ["registrar", "admin"],
+            "domain_service_required": "visit",
+        },
+        {
+            "key": "payment_status_change",
+            "label": "Изменить статус оплаты",
+            "roles": ["cashier", "admin"],
+            "domain_service_required": "payment",
+        },
+        {
+            "key": "refund_issue",
+            "label": "Оформить возврат",
+            "roles": ["cashier", "admin", "owner"],
+            "domain_service_required": "payment",
+        },
+        {
+            "key": "medical_document_publish",
+            "label": "Закрыть ЭМК или опубликовать документ",
+            "roles": ["doctor", "lab", "admin"],
+            "domain_service_required": "emr_or_lab",
+        },
+        {
+            "key": "doctor_schedule_change",
+            "label": "Изменить расписание врача",
+            "roles": ["admin", "owner"],
+            "domain_service_required": "schedule",
+        },
+    ],
+    "required_server_checks": [
+        "staff_linked_to_active_application_user",
+        "role_allowed_for_operation",
+        "fresh_confirmation_token",
+        "idempotency_key_present",
+        "domain_service_authorizes_target",
+        "audit_log_write_succeeds",
+    ],
+    "telegram_payload_rules": [
+        "no_raw_internal_ids",
+        "no_plain_medical_details",
+        "short_human_readable_summary_only",
+    ],
+}
+
 
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     return {
@@ -229,6 +288,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         },
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
+        "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
         "authorization": {
             "source": "application_rbac",
             "server_side_required": True,
@@ -242,7 +302,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "readiness": STAFF_BOT_READINESS,
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_bot_command_registration_contract",
+        "next_slice": "staff_state_change_confirmation_contract",
     }
 
 
@@ -695,6 +755,7 @@ def get_telegram_integration_status(
                 "staff_read_only_menu_contract",
                 "staff_role_linking_contract",
                 "staff_command_registration_contract",
+                "staff_state_change_confirmation_contract",
                 "staff_role_menus",
                 "staff_action_confirmations",
                 "staff_audit_logging",
