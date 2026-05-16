@@ -101,7 +101,9 @@ const TelegramManager = () => {
         transition_path: integrationData.transition_path,
         webhook_error: integrationData.webhook_error,
         patient_bot: integrationData.patient_bot || null,
+        staff_bot: integrationData.staff_bot || null,
         supported_functions: Array.isArray(integrationData.supported_functions) ? integrationData.supported_functions : [],
+        planned_functions: Array.isArray(integrationData.planned_functions) ? integrationData.planned_functions : [],
         configured: Boolean(integrationData.configured ?? statusData.configured),
         raw: { status: statusData, integration: integrationData }
       });
@@ -170,6 +172,16 @@ const TelegramManager = () => {
   const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
   const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
+  const staffBot = botStatus?.staff_bot || {};
+  const staffBotReadiness = Array.isArray(staffBot.readiness) ? staffBot.readiness : [];
+  const readyStaffControls = staffBotReadiness.filter((item) => item?.ready);
+  const staffRoles = Array.isArray(staffBot.supported_roles) ? staffBot.supported_roles : [];
+  const staffMenuContract = Array.isArray(staffBot.read_only_menu_contract) ? staffBot.read_only_menu_contract : [];
+  const staffMenuItemCount = staffMenuContract.reduce((count, role) => {
+    const items = Array.isArray(role?.items) ? role.items : [];
+    return count + items.length;
+  }, 0);
+  const staffRoleSummary = staffRoles.length ? staffRoles.join(', ') : 'none';
 
   return (
     <Box sx={{ p: 3 }}>
@@ -318,6 +330,51 @@ const TelegramManager = () => {
                     patientBotCommands.map((item) => item.command).join(' ') :
                     'Нет данных'} />
 
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <MessageSquare />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`Staff bot ${staffBot.version || 'planning'}`}
+                    secondary={staffBot.enabled ?
+                    'Готов к ролевым действиям' :
+                    'План: роли, audit и подтверждения до включения'} />
+
+                  <Badge
+                    variant={staffBot.enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffBot.enabled ? 'Готов' : 'План'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff guardrails"
+                    secondary={staffBotReadiness.length ?
+                    `${readyStaffControls.length}/${staffBotReadiness.length} готово; роли: ${staffRoleSummary}` :
+                    'Требуется отдельный staff/admin contract'} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff menu contract"
+                    secondary={staffMenuContract.length ?
+                    `${staffMenuContract.length} ролей, ${staffMenuItemCount} read-only пунктов; действия: выключены` :
+                    'Read-only contract не опубликован'} />
+
+                  <Badge
+                    variant={staffBot.state_changing_actions_enabled ? 'error' : 'warning'}
+                    size="small">
+
+                    {staffBot.state_changing_actions_enabled ? 'Actions' : 'Read-only'}
+                  </Badge>
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
