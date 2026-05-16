@@ -8,14 +8,17 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    CheckConstraint,
     JSON,
     BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -144,6 +147,72 @@ class TelegramUser(Base):
     # Relationships
     patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])
     user: Mapped[User | None] = relationship("User", foreign_keys=[user_id])
+
+
+class TelegramStaffLinkToken(Base):
+    """Hash-only storage shape for one-time staff Telegram link tokens."""
+
+    __tablename__ = "telegram_staff_link_tokens"
+    __table_args__ = (
+        CheckConstraint(
+            "expires_at > created_at",
+            name="ck_telegram_staff_link_tokens_expires_after_created",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR consumed_at <= expires_at",
+            name="ck_telegram_staff_link_tokens_consumed_before_expiry",
+        ),
+        Index(
+            "ix_telegram_staff_link_tokens_staff_user_id",
+            "staff_user_id",
+        ),
+        Index(
+            "ix_telegram_staff_link_tokens_telegram_chat_id",
+            "telegram_chat_id",
+        ),
+        Index(
+            "ix_telegram_staff_link_tokens_unconsumed_expires",
+            "expires_at",
+            postgresql_where=text("consumed_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    token_hash: Mapped[str] = mapped_column(
+        String(96), unique=True, nullable=False, index=True
+    )
+    staff_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    telegram_chat_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    issued_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    staff_user: Mapped[User] = relationship("User", foreign_keys=[staff_user_id])
+    issued_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[issued_by_user_id]
+    )
 
 
 class TelegramMessage(Base):
