@@ -498,8 +498,8 @@ const ReportsManager = () => {
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
             <MacOSEmptyState
           icon={FileX}
-          title="Файлы отчетов не найдены"
-          description="Сгенерированные отчеты появятся здесь" />
+          title="Файлы отчетов ещё не сформированы"
+          description="Готовые файлы будут отображаться здесь после формирования отчета." />
 
           </div> :
 
