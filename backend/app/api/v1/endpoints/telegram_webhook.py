@@ -270,6 +270,52 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Последний визит: #{visit_id}, {visit_date}, статус: {status}.",
         TELEGRAM_LANGUAGE_UZ: "Oxirgi tashrif: #{visit_id}, {visit_date}, holat: {status}.",
     },
+    "payments_empty": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Пациент: {patient}\n"
+            "Активных начислений и оплат пока нет."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Bemor: {patient}\n"
+            "Hozircha faol hisob-kitoblar va to'lovlar yo'q."
+        ),
+    },
+    "payments_patient": {
+        TELEGRAM_LANGUAGE_RU: "Пациент: {patient}",
+        TELEGRAM_LANGUAGE_UZ: "Bemor: {patient}",
+    },
+    "payments_title": {
+        TELEGRAM_LANGUAGE_RU: "Оплаты и долг:",
+        TELEGRAM_LANGUAGE_UZ: "To'lovlar va qarz:",
+    },
+    "payments_billed": {
+        TELEGRAM_LANGUAGE_RU: "Начислено: {amount} сум",
+        TELEGRAM_LANGUAGE_UZ: "Hisoblangan: {amount} so'm",
+    },
+    "payments_paid": {
+        TELEGRAM_LANGUAGE_RU: "Оплачено: {amount} сум",
+        TELEGRAM_LANGUAGE_UZ: "To'langan: {amount} so'm",
+    },
+    "payments_debt": {
+        TELEGRAM_LANGUAGE_RU: "Долг: {amount} сум",
+        TELEGRAM_LANGUAGE_UZ: "Qarz: {amount} so'm",
+    },
+    "payments_pending": {
+        TELEGRAM_LANGUAGE_RU: "Ожидает подтверждения: {amount} сум",
+        TELEGRAM_LANGUAGE_UZ: "Tasdiqlanishi kutilmoqda: {amount} so'm",
+    },
+    "payments_visits": {
+        TELEGRAM_LANGUAGE_RU: "Визит: {visits}",
+        TELEGRAM_LANGUAGE_UZ: "Tashrif: {visits}",
+    },
+    "payments_online_unavailable": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Онлайн-оплата пока не подключена. Для оплаты обратитесь в кассу."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Onlayn to'lov hozircha ulanmagan. To'lov uchun kassaga murojaat qiling."
+        ),
+    },
 }
 TELEGRAM_WEBHOOK_PUBLIC_ERROR = "Ошибка обработки webhook"
 TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
@@ -768,28 +814,39 @@ def _clinic_payments_message(db: Session, chat_id: int) -> str:
     if not telegram_user or not telegram_user.patient_id:
         return _telegram_chat_text(db, chat_id, "needs_link")
 
+    language = _telegram_chat_language(db, chat_id)
+    patient_name = _html_text(_patient_display_name(patient))
     entries, visits, expected_total, paid_total, pending_total, debt_total = _billing_totals(
         db, telegram_user.patient_id
     )
     if not entries and not visits and expected_total <= 0 and paid_total <= 0:
-        return (
-            f"Пациент: {_html_text(_patient_display_name(patient))}\n"
-            "Активных начислений и оплат пока нет."
-        )
+        return _localized_text("payments_empty", language).format(patient=patient_name)
 
     lines = [
-        f"Пациент: {_html_text(_patient_display_name(patient))}",
-        "Оплаты и долг:",
-        f"Начислено: {_format_money(expected_total)} сум",
-        f"Оплачено: {_format_money(paid_total)} сум",
-        f"Долг: {_format_money(debt_total)} сум",
+        _localized_text("payments_patient", language).format(patient=patient_name),
+        _localized_text("payments_title", language),
+        _localized_text("payments_billed", language).format(
+            amount=_format_money(expected_total)
+        ),
+        _localized_text("payments_paid", language).format(
+            amount=_format_money(paid_total)
+        ),
+        _localized_text("payments_debt", language).format(
+            amount=_format_money(debt_total)
+        ),
     ]
     if pending_total > 0:
-        lines.append(f"Ожидает подтверждения: {_format_money(pending_total)} сум")
+        lines.append(
+            _localized_text("payments_pending", language).format(
+                amount=_format_money(pending_total)
+            )
+        )
     if visits:
         visit_numbers = ", ".join(f"#{visit.id}" for visit in visits[:5])
-        lines.append(f"Визит: {visit_numbers}")
-    lines.append("Онлайн-оплата пока не подключена. Для оплаты обратитесь в кассу.")
+        lines.append(
+            _localized_text("payments_visits", language).format(visits=visit_numbers)
+        )
+    lines.append(_localized_text("payments_online_unavailable", language))
     return "\n".join(lines)
 
 
