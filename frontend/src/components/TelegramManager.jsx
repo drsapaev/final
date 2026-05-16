@@ -196,6 +196,10 @@ const TelegramManager = () => {
   const staffCommandNames = staffCommandList.
   map((item) => item?.command).
   filter(Boolean);
+  const staffConfirmationContract = staffBot.confirmation_contract || {};
+  const staffConfirmationOperations = Array.isArray(staffConfirmationContract.operations) ?
+  staffConfirmationContract.operations :
+  [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -422,6 +426,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffCommandContract.registration_enabled ? 'Enabled' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff action confirmations"
+                    secondary={staffConfirmationOperations.length ?
+                    `${staffConfirmationOperations.length} state-changing actions require confirmation; actions: ${staffConfirmationContract.state_changing_actions_enabled ? 'enabled' : 'disabled'}` :
+                    'Confirmation contract не опубликован'} />
+
+                  <Badge
+                    variant={staffConfirmationContract.state_changing_actions_enabled ? 'error' : 'warning'}
+                    size="small">
+
+                    {staffConfirmationContract.required_for_state_changes ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
