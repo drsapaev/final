@@ -308,12 +308,13 @@ const EquipmentManagement = () => {
           <div style={{ flex: 1, position: 'relative' }}>
             <MacOSInput
               type="text"
+              aria-label="Поиск оборудования по названию, модели или серийному номеру"
               placeholder="Поиск по названию, модели или серийному номеру..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '40px' }} />
             
-            <Search style={{
+            <Search aria-hidden="true" style={{
               position: 'absolute',
               left: '12px',
               top: '50%',
@@ -325,6 +326,7 @@ const EquipmentManagement = () => {
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <MacOSSelect
+              aria-label="Фильтр оборудования по статусу"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -335,6 +337,7 @@ const EquipmentManagement = () => {
               )}
             </MacOSSelect>
             <MacOSSelect
+              aria-label="Фильтр оборудования по типу"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -345,6 +348,7 @@ const EquipmentManagement = () => {
               )}
             </MacOSSelect>
             <MacOSSelect
+              aria-label="Фильтр оборудования по филиалу"
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
               style={{ minWidth: '150px' }}>
@@ -365,7 +369,7 @@ const EquipmentManagement = () => {
                 padding: '8px 16px'
               }}>
               
-              <Plus style={{ width: '16px', height: '16px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить оборудование</span>
             </MacOSButton>
           </div>
@@ -391,6 +395,8 @@ const EquipmentManagement = () => {
             </h3>
             <MacOSButton
             variant="outline"
+            type="button"
+            aria-label={editingEquipment ? 'Закрыть форму редактирования оборудования' : 'Закрыть форму добавления оборудования'}
             onClick={() => {
               setShowAddForm(false);
               setEditingEquipment(null);
@@ -398,7 +404,7 @@ const EquipmentManagement = () => {
             }}
             style={{ padding: '8px' }}>
             
-              <X style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             </MacOSButton>
           </div>
 
@@ -636,7 +642,7 @@ const EquipmentManagement = () => {
               
                 {saving ?
               <>
-                    <RefreshCw style={{
+                    <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
@@ -645,7 +651,7 @@ const EquipmentManagement = () => {
                   </> :
 
               <>
-                    <Save style={{ width: '16px', height: '16px' }} />
+                    <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     {editingEquipment ? 'Обновить' : 'Добавить'}
                   </>
               }
@@ -676,7 +682,7 @@ const EquipmentManagement = () => {
         description="Добавьте первое оборудование или измените фильтры поиска"
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить оборудование
             </MacOSButton>
         } /> :
@@ -727,7 +733,7 @@ const EquipmentManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Building2 style={{ width: '16px', height: '16px' }} />
+                  <Building2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>{getBranchName(item.branch_id)}</span>
                 </div>
                 <div style={{
@@ -737,7 +743,7 @@ const EquipmentManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                  <Wrench style={{ width: '16px', height: '16px' }} />
+                  <Wrench aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   <span>{getTypeLabel(item.type)}</span>
                 </div>
                 {item.cost > 0 &&
@@ -748,7 +754,7 @@ const EquipmentManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <DollarSign style={{ width: '16px', height: '16px' }} />
+                    <DollarSign aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>{item.cost.toLocaleString()} сум</span>
                   </div>
             }
@@ -760,7 +766,7 @@ const EquipmentManagement = () => {
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
-                    <Calendar style={{ width: '16px', height: '16px' }} />
+                    <Calendar aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     <span>Гарантия до: {new Date(item.warranty_expiry).toLocaleDateString()}</span>
                   </div>
             }
@@ -785,14 +791,18 @@ const EquipmentManagement = () => {
             gap: '8px'
           }}>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Редактировать оборудование ${item.name}`}
               onClick={() => handleEdit(item)}
               style={{ padding: '6px 12px' }}>
               
-                  <Edit style={{ width: '16px', height: '16px' }} />
+                  <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
                 <MacOSButton
+              type="button"
               variant="outline"
+              aria-label={`Удалить оборудование ${item.name}`}
               onClick={() => handleDelete(item.id)}
               style={{
                 padding: '6px 12px',
@@ -800,7 +810,7 @@ const EquipmentManagement = () => {
                 borderColor: 'var(--mac-error)'
               }}>
               
-                  <Trash2 style={{ width: '16px', height: '16px' }} />
+                  <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                 </MacOSButton>
               </div>
             </MacOSCard>
