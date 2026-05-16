@@ -178,6 +178,45 @@ STAFF_BOT_LINKING_CONTRACT = {
     "state_changing_actions_allowed_after_link": False,
 }
 
+STAFF_BOT_AUTHORIZATION_CONTRACT = {
+    "contract_version": "staff-authorization-v1",
+    "enabled": False,
+    "source": "application_rbac",
+    "server_side_required": True,
+    "default_decision": "deny",
+    "role_checks": [
+        {
+            "role": "registrar",
+            "allowed_intents": ["queue_read", "patient_lookup_read", "payment_status_read"],
+        },
+        {
+            "role": "doctor",
+            "allowed_intents": ["schedule_read", "next_patient_read", "emr_reminder_read"],
+        },
+        {
+            "role": "cashier",
+            "allowed_intents": ["invoice_read", "payment_reconciliation_read"],
+        },
+        {
+            "role": "lab",
+            "allowed_intents": ["report_status_read", "result_delivery_status_read"],
+        },
+        {
+            "role": "admin",
+            "allowed_intents": ["operations_summary_read", "integration_error_read"],
+        },
+        {
+            "role": "owner",
+            "allowed_intents": ["operations_summary_read", "revenue_summary_read"],
+        },
+    ],
+    "denied_behavior": [
+        "send_generic_forbidden_message",
+        "do_not_execute_domain_action",
+        "write_audit_denied_event_when_audit_enabled",
+    ],
+}
+
 STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
     "contract_version": "staff-commands-v1",
     "registration_enabled": False,
@@ -393,6 +432,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         },
         "token_contract": STAFF_BOT_TOKEN_CONTRACT,
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
+        "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
         "audit_contract": STAFF_BOT_AUDIT_CONTRACT,
@@ -410,7 +450,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "role_menus": _build_staff_role_menus_summary(),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "dedicated_staff_bot_token_readiness_contract",
+        "next_slice": "staff_server_side_authorization_contract",
     }
 
 
@@ -863,6 +903,7 @@ def get_telegram_integration_status(
                 "dedicated_staff_bot_token_readiness_contract",
                 "staff_read_only_menu_contract",
                 "staff_role_linking_contract",
+                "staff_server_side_authorization_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",
                 "staff_audit_logging_contract",
