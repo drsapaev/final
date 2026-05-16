@@ -21,7 +21,7 @@ import {
 
 
 'lucide-react';
-import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
+import { AppError, AppLoading, Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
@@ -52,6 +52,7 @@ const ActivationSystem = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [loadError, setLoadError] = useState('');
 
   // Статусы активации
   const statusLabels = {
@@ -65,6 +66,7 @@ const ActivationSystem = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError('');
 
       const [activationsRes, statusRes] = await Promise.all([
         api.get('/activation/list', { params: { limit: 100 } }),
@@ -78,7 +80,9 @@ const ActivationSystem = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки данных активации:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки данных активации' });
+      const errorText = 'Ошибка загрузки данных активации';
+      setLoadError(errorText);
+      setMessage({ type: 'error', text: errorText });
     } finally {
       setLoading(false);
     }
@@ -158,19 +162,32 @@ const ActivationSystem = () => {
 
     return matchesSearch && matchesStatus;
   });
+  const showInitialLoadError = loadError && activations.length === 0 && !serverStatus;
 
   if (loading) {
     return (
       <Card style={{ padding: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <RefreshCw style={{
-            width: '20px',
-            height: '20px',
-            marginRight: '8px',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка системы активации...</span>
-        </div>
+        <AppLoading
+          title="Загрузка системы активации"
+          description="Получаем список ключей и статус сервера."
+          size="sm"
+        />
+      </Card>);
+
+  }
+
+  if (showInitialLoadError) {
+    return (
+      <Card style={{ padding: '32px' }}>
+        <AppError
+          title="Не удалось загрузить систему активации"
+          description={loadError}
+          action={
+            <Button type="button" variant="outline" onClick={loadData} disabled={loading} loading={loading}>
+              Повторить
+            </Button>
+          }
+        />
       </Card>);
 
   }
