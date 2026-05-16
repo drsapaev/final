@@ -352,6 +352,43 @@ class TestTelegramWebhookSecurity:
         assert telegram_user.appointment_reminders is False
         assert telegram_user.lab_notifications is False
 
+    @pytest.mark.asyncio
+    async def test_settings_command_returns_localized_settings_menu(self, db_session):
+        telegram_user = TelegramUser(
+            chat_id=7009,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 105,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7009},
+                "from": {"id": 111},
+                "text": "/settings",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            7009,
+            telegram_webhook._localized_text("settings", "uz-Latn"),
+            telegram_webhook._localized_settings_menu("uz-Latn"),
+        )
+
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry
     ):
