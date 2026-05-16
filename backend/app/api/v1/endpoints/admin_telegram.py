@@ -200,6 +200,35 @@ STAFF_BOT_LINKING_RUNTIME_CONTRACT = {
     "state_changing_actions_allowed_after_link": False,
 }
 
+STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
+    "contract_version": "staff-link-token-validation-v1",
+    "enabled": False,
+    "validator_enabled": False,
+    "token_storage_enabled": False,
+    "handler_enabled": False,
+    "required_before_enablement": True,
+    "token_properties": [
+        "signed",
+        "single_use",
+        "expires_at",
+        "bound_to_application_user_id",
+        "bound_to_telegram_chat_id",
+    ],
+    "rejection_reasons": [
+        "expired",
+        "signature_invalid",
+        "already_used",
+        "staff_user_inactive",
+        "role_not_allowed",
+        "telegram_account_already_linked",
+    ],
+    "required_audit_events": [
+        "staff_link_token_issued",
+        "staff_link_token_consumed",
+        "staff_link_token_rejected",
+    ],
+}
+
 STAFF_BOT_AUTHORIZATION_CONTRACT = {
     "contract_version": "staff-authorization-v1",
     "enabled": False,
@@ -487,6 +516,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "token_contract": STAFF_BOT_TOKEN_CONTRACT,
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "linking_runtime_contract": STAFF_BOT_LINKING_RUNTIME_CONTRACT,
+        "link_token_validation_contract": STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT,
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -508,7 +538,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_role_linking_token_validation",
+        "next_slice": "staff_link_token_validation_runtime",
     }
 
 
@@ -963,6 +993,7 @@ def get_telegram_integration_status(
                 "staff_role_menu_enablement_status",
                 "staff_role_linking_contract",
                 "staff_role_linking_runtime",
+                "staff_link_token_validation_contract",
                 "staff_server_side_authorization_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",

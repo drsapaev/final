@@ -191,6 +191,7 @@ const TelegramManager = () => {
   map((method) => method?.label || method?.key || method).
   filter(Boolean);
   const staffLinkingRuntimeContract = staffBot.linking_runtime_contract || {};
+  const staffLinkTokenValidationContract = staffBot.link_token_validation_contract || {};
   const staffAuthorizationContract = staffBot.authorization_contract || staffBot.authorization || {};
   const staffAuthorizationRoles = Array.isArray(staffAuthorizationContract.role_checks) ?
   staffAuthorizationContract.role_checks :
@@ -443,6 +444,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffLinkingRuntimeContract.helper_available ? 'Helper' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff link token validation"
+                    secondary={staffLinkTokenValidationContract.contract_version ?
+                    `${staffLinkTokenValidationContract.token_properties?.length || 0} token checks; validator: ${staffLinkTokenValidationContract.validator_enabled ? 'enabled' : 'disabled'}` :
+                    'Staff link token validation contract not published'} />
+
+                  <Badge
+                    variant={staffLinkTokenValidationContract.validator_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffLinkTokenValidationContract.required_before_enablement ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
