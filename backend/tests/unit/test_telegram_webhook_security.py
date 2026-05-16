@@ -561,3 +561,38 @@ class TestTelegramWebhookSecurity:
             "application/pdf",
         )
         assert captured["timeout"] == 20
+
+    @pytest.mark.asyncio
+    async def test_telegram_bot_service_registers_patient_commands(self, monkeypatch):
+        captured = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"ok": True, "result": True}
+
+        def fake_post(url, json, timeout):
+            captured.append({"url": url, "json": json, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr(telegram_bot.requests, "post", fake_post)
+        service = telegram_bot.TelegramBotService()
+        service.bot_token = "bot-token"
+
+        ok, error = await service.set_patient_bot_commands()
+
+        assert ok is True
+        assert error is None
+        assert [item["json"].get("language_code") for item in captured] == [None, "uz"]
+        assert captured[0]["url"].endswith("/setMyCommands")
+        assert captured[0]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_RU
+        assert captured[1]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_UZ
+        assert {command["command"] for command in captured[0]["json"]["commands"]} == {
+            "start",
+            "queue",
+            "payments",
+            "results",
+            "profile",
+            "help",
+        }

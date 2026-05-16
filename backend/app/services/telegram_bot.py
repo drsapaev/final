@@ -23,6 +23,22 @@ from app.crud import (
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
+PATIENT_BOT_COMMANDS_RU = [
+    {"command": "start", "description": "Начать"},
+    {"command": "queue", "description": "Моя очередь"},
+    {"command": "payments", "description": "Оплаты и долг"},
+    {"command": "results", "description": "Результаты"},
+    {"command": "profile", "description": "Мой статус"},
+    {"command": "help", "description": "Помощь"},
+]
+PATIENT_BOT_COMMANDS_UZ = [
+    {"command": "start", "description": "Boshlash"},
+    {"command": "queue", "description": "Mening navbatim"},
+    {"command": "payments", "description": "To'lovlar va qarz"},
+    {"command": "results", "description": "Natijalar"},
+    {"command": "profile", "description": "Mening holatim"},
+    {"command": "help", "description": "Yordam"},
+]
 
 
 class TelegramBotService:
@@ -487,6 +503,46 @@ class TelegramBotService:
 
         message_id = (payload.get("result") or {}).get("message_id")
         return True, int(message_id) if message_id is not None else None, None
+
+    async def set_patient_bot_commands(self) -> tuple[bool, str | None]:
+        """Register patient bot command menu in Telegram."""
+        if not self.bot_token:
+            logger.error("Bot token is not configured for Telegram command registration")
+            return False, "bot_token_not_configured"
+
+        url = f"https://api.telegram.org/bot{self.bot_token}/setMyCommands"
+        payloads = [
+            {"commands": PATIENT_BOT_COMMANDS_RU},
+            {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
+        ]
+        for payload in payloads:
+            try:
+                response = requests.post(url, json=payload, timeout=10)
+            except requests.RequestException as exc:
+                logger.warning(
+                    "Telegram command registration request failed error_type=%s",
+                    type(exc).__name__,
+                )
+                return False, type(exc).__name__
+
+            if response.status_code != 200:
+                logger.warning(
+                    "Telegram command registration failed status_code=%s",
+                    response.status_code,
+                )
+                return False, f"telegram_http_{response.status_code}"
+
+            try:
+                result = response.json()
+            except ValueError:
+                logger.warning("Telegram command registration returned invalid json")
+                return False, "telegram_invalid_json"
+
+            if not result.get("ok"):
+                logger.warning("Telegram command registration returned not ok")
+                return False, "telegram_api_error"
+
+        return True, None
 
     async def _answer_callback_query(self, callback_query_id: str, text: str = ""):
         """Ответ на callback запрос"""
