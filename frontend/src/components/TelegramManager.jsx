@@ -453,14 +453,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff link token validation"
                     secondary={staffLinkTokenValidationContract.contract_version ?
-                    `${staffLinkTokenValidationContract.token_properties?.length || 0} token checks; validator: ${staffLinkTokenValidationContract.validator_enabled ? 'enabled' : 'disabled'}` :
+                    `${staffLinkTokenValidationContract.token_properties?.length || 0} token checks; helper: ${staffLinkTokenValidationContract.runtime_helper_available ? 'available' : 'planned'}; storage: ${staffLinkTokenValidationContract.storage_migration_required ? 'migration required' : 'ready'}` :
                     'Staff link token validation contract not published'} />
 
                   <Badge
                     variant={staffLinkTokenValidationContract.validator_enabled ? 'success' : 'warning'}
                     size="small">
 
-                    {staffLinkTokenValidationContract.required_before_enablement ? 'Required' : 'Planned'}
+                    {staffLinkTokenValidationContract.runtime_helper_available ? 'Helper' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>

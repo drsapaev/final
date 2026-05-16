@@ -3,9 +3,11 @@ API endpoints для управления Telegram в админ панели
 """
 
 import asyncio
+import hashlib
+import hmac
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, NoReturn, Optional
 
 import requests
@@ -14,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.config import settings
 from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.user import User
 from app.services.telegram_bot import (
@@ -24,6 +27,10 @@ from app.services.telegram_bot import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+STAFF_LINK_TOKEN_PREFIX = "stl"
+STAFF_LINK_TOKEN_HASH_PREFIX = "staff_link_token:"
+STAFF_LINK_TOKEN_SEPARATOR = "_"
 
 STAFF_BOT_SUPPORTED_ROLES = [
     "registrar",
@@ -204,9 +211,23 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "contract_version": "staff-link-token-validation-v1",
     "enabled": False,
     "validator_enabled": False,
+    "runtime_helper_available": True,
+    "signature_validator_available": True,
+    "expiry_validator_available": True,
+    "binding_parser_available": True,
+    "single_use_enforcement_enabled": False,
     "token_storage_enabled": False,
     "handler_enabled": False,
+    "storage_migration_required": True,
+    "runtime_blocked_by": [
+        "staff_link_token_storage_migration",
+        "staff_link_token_validator_service",
+    ],
     "required_before_enablement": True,
+    "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
+    "builder": "build_staff_link_start_token",
+    "parser": "parse_staff_link_start_token",
+    "token_hash_prefix": STAFF_LINK_TOKEN_HASH_PREFIX,
     "token_properties": [
         "signed",
         "single_use",
@@ -456,6 +477,100 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
 }
 
 
+def _base36_encode(value: int) -> str:
+    if value < 0:
+        raise ValueError("base36 value must be non-negative")
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    result = ""
+    while value:
+        value, remainder = divmod(value, 36)
+        result = alphabet[remainder] + result
+    return result
+
+
+def _base36_decode(value: str) -> int:
+    return int(value, 36)
+
+
+def _staff_link_token_expires_epoch(expires_at: datetime) -> int:
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    else:
+        expires_at = expires_at.astimezone(timezone.utc)
+    return int(expires_at.timestamp())
+
+
+def _staff_link_token_signature(body: str) -> str:
+    digest = hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return _base36_encode(int.from_bytes(digest[:12], "big"))
+
+
+def _hash_staff_link_start_token(token: str) -> str:
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"{STAFF_LINK_TOKEN_HASH_PREFIX}{digest}"
+
+
+def build_staff_link_start_token(
+    *,
+    user_id: int,
+    chat_id: int,
+    expires_at: datetime,
+    nonce: str | None = None,
+) -> str:
+    if user_id <= 0 or chat_id == 0:
+        raise ValueError(
+            "staff link token requires positive user_id and nonzero chat_id"
+        )
+    token_nonce = nonce or _base36_encode(secrets.randbits(64))
+    body = STAFF_LINK_TOKEN_SEPARATOR.join(
+        [
+            STAFF_LINK_TOKEN_PREFIX,
+            str(user_id),
+            str(chat_id),
+            _base36_encode(_staff_link_token_expires_epoch(expires_at)),
+            token_nonce,
+        ]
+    )
+    signature = _staff_link_token_signature(body)
+    return f"{body}{STAFF_LINK_TOKEN_SEPARATOR}{signature}"
+
+
+def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
+    parts = (token or "").split(STAFF_LINK_TOKEN_SEPARATOR)
+    if len(parts) != 6 or parts[0] != STAFF_LINK_TOKEN_PREFIX:
+        return None
+
+    body = STAFF_LINK_TOKEN_SEPARATOR.join(parts[:5])
+    if not hmac.compare_digest(parts[5], _staff_link_token_signature(body)):
+        return None
+
+    try:
+        user_id = int(parts[1])
+        chat_id = int(parts[2])
+        expires_at = datetime.fromtimestamp(
+            _base36_decode(parts[3]),
+            tz=timezone.utc,
+        )
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+    if user_id <= 0 or chat_id == 0 or expires_at < datetime.now(timezone.utc):
+        return None
+
+    return {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "expires_at": expires_at.replace(tzinfo=None),
+        "token_hash": _hash_staff_link_start_token(token),
+    }
+
+
 def _build_staff_role_menus_summary() -> Dict[str, Any]:
     menu_roles = [
         role_menu["role"] for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT
@@ -538,7 +653,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_link_token_validation_runtime",
+        "next_slice": "staff_link_token_storage_migration",
     }
 
 
@@ -994,6 +1109,7 @@ def get_telegram_integration_status(
                 "staff_role_linking_contract",
                 "staff_role_linking_runtime",
                 "staff_link_token_validation_contract",
+                "staff_link_token_validation_runtime_helper",
                 "staff_server_side_authorization_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",
