@@ -240,6 +240,20 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "PDF natijalarni yuborib bo'lmadi. Registraturaga murojaat qiling."
         ),
     },
+    "lab_result_document_caption": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Результат анализа: {template_name}\n"
+            "Отчет #{report_id} от {report_date}"
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Tahlil natijasi: {template_name}\n"
+            "Hisobot #{report_id}, sana: {report_date}"
+        ),
+    },
+    "lab_result_document_failed_caption": {
+        TELEGRAM_LANGUAGE_RU: "Отчет #{report_id}",
+        TELEGRAM_LANGUAGE_UZ: "Hisobot #{report_id}",
+    },
     "results_hint": {
         TELEGRAM_LANGUAGE_RU: (
             "Результаты будут приходить сюда, когда лаборатория или врач отметит их "
@@ -957,6 +971,21 @@ def _latest_ready_lab_report_instances(
     )
 
 
+def _lab_report_document_caption(
+    instance: LabReportInstance,
+    report_date: datetime,
+    language_code: str = TELEGRAM_LANGUAGE_RU,
+) -> str:
+    caption = _localized_text("lab_result_document_caption", language_code).format(
+        template_name=_html_text(instance.template.name),
+        report_id=instance.id,
+        report_date=report_date.strftime("%d.%m.%Y"),
+    )
+    if len(caption) > 1000:
+        return f"{caption[:997]}..."
+    return caption
+
+
 def _build_lab_report_pdf(db: Session, instance: LabReportInstance) -> tuple[str, bytes, str]:
     service = LabReportingService(db)
     materialized_sections = service.materialize_instance(instance)
@@ -977,12 +1006,9 @@ def _build_lab_report_pdf(db: Session, instance: LabReportInstance) -> tuple[str
         }
     )
     filename = f"kosmed-lab-report-{instance.id}.pdf"
-    caption = (
-        f"Результат анализа: {_html_text(instance.template.name)}\n"
-        f"Отчет #{instance.id} от {report_date.strftime('%d.%m.%Y')}"
+    caption = _lab_report_document_caption(
+        instance, report_date, TELEGRAM_LANGUAGE_RU
     )
-    if len(caption) > 1000:
-        caption = f"{caption[:997]}..."
     return filename, pdf_bytes, caption
 
 
@@ -1048,6 +1074,11 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
     for instance in instances:
         try:
             filename, pdf_bytes, caption = _build_lab_report_pdf(db, instance)
+            if language == TELEGRAM_LANGUAGE_UZ:
+                report_date = (
+                    instance.finalized_at or instance.created_at or datetime.utcnow()
+                )
+                caption = _lab_report_document_caption(instance, report_date, language)
             send_document = getattr(bot_service, "_send_document", None)
             if callable(send_document):
                 ok, message_id, error_message = await send_document(
@@ -1080,7 +1111,9 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
                 db,
                 chat_id,
                 instance.id,
-                f"Отчет #{instance.id}",
+                _localized_text(
+                    "lab_result_document_failed_caption", language
+                ).format(report_id=instance.id),
                 "failed",
                 error_message=type(exc).__name__,
             )
