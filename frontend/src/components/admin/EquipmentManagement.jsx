@@ -218,6 +218,11 @@ const EquipmentManagement = () => {
     const matchesBranch = branchFilter === 'all' || item.branch_id === parseInt(branchFilter);
     return matchesSearch && matchesStatus && matchesType && matchesBranch;
   });
+  const hasEquipmentFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all' || branchFilter !== 'all';
+  const equipmentEmptyTitle = hasEquipmentFilters ? 'Оборудование по фильтрам не найдено' : 'Оборудование ещё не добавлено';
+  const equipmentEmptyDescription = hasEquipmentFilters ?
+  'Измените поиск, статус, тип или филиал, чтобы увидеть другое оборудование.' :
+  'Добавьте первую единицу оборудования, чтобы вести учет техники по филиалам.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
@@ -678,11 +683,11 @@ const EquipmentManagement = () => {
       filteredEquipment.length === 0 ?
       <MacOSEmptyState
         icon={Wrench}
-        title="Оборудование не найдено"
-        description="Добавьте первое оборудование или измените фильтры поиска"
+        title={equipmentEmptyTitle}
+        description={equipmentEmptyDescription}
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить оборудование
             </MacOSButton>
         } /> :
