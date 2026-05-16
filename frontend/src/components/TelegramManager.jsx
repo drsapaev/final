@@ -192,6 +192,8 @@ const TelegramManager = () => {
   filter(Boolean);
   const staffLinkingRuntimeContract = staffBot.linking_runtime_contract || {};
   const staffLinkTokenValidationContract = staffBot.link_token_validation_contract || {};
+  const staffLinkTokenStorageContract =
+  staffBot.link_token_storage_contract || staffLinkTokenValidationContract.storage_contract || {};
   const staffAuthorizationContract = staffBot.authorization_contract || staffBot.authorization || {};
   const staffAuthorizationRoles = Array.isArray(staffAuthorizationContract.role_checks) ?
   staffAuthorizationContract.role_checks :
@@ -461,6 +463,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffLinkTokenValidationContract.runtime_helper_available ? 'Helper' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff link token storage"
+                    secondary={staffLinkTokenStorageContract.contract_version ?
+                    `${staffLinkTokenStorageContract.table || 'token table'}; indexes: ${staffLinkTokenStorageContract.required_indexes?.length || 0}; migration: ${staffLinkTokenStorageContract.migration_created ? 'created' : 'required'}` :
+                    'Staff link token storage contract not published'} />
+
+                  <Badge
+                    variant={staffLinkTokenStorageContract.migration_created ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffLinkTokenStorageContract.runtime_write_enabled ? 'Writes' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
