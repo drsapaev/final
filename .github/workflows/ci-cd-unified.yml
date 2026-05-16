@@ -242,7 +242,6 @@ jobs:
       shell: bash
       env:
         WORKFLOW_CHANGED: ${{ needs.ci-scope.outputs.workflow_changed }}
-        SKILLS_CHANGED: ${{ needs.ci-scope.outputs.skills_changed }}
       run: |
         set -euo pipefail
 
@@ -251,6 +250,31 @@ jobs:
         else
           echo "workflow yaml check skipped"
         fi
+
+    - name: Lint GitHub Actions workflows
+      if: needs.ci-scope.outputs.workflow_changed == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker run --rm \
+          -v "${PWD}:/repo:ro" \
+          -w /repo \
+          rhysd/actionlint:1.7.12 \
+          -color \
+          -shellcheck= \
+          -pyflakes=
+
+    - name: Skip GitHub Actions workflow lint
+      if: needs.ci-scope.outputs.workflow_changed != 'true'
+      shell: bash
+      run: echo "actionlint skipped"
+
+    - name: Validate changed skill metadata
+      shell: bash
+      env:
+        SKILLS_CHANGED: ${{ needs.ci-scope.outputs.skills_changed }}
+      run: |
+        set -euo pipefail
 
         if [ "$SKILLS_CHANGED" = "true" ]; then
           python - <<'PY'
