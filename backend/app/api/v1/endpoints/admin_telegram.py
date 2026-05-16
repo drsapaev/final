@@ -580,14 +580,16 @@ def build_staff_link_start_token(
     return f"{body}{STAFF_LINK_TOKEN_SEPARATOR}{signature}"
 
 
-def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
+def _decode_staff_link_start_token(
+    token: str,
+) -> tuple[Dict[str, Any] | None, str | None]:
     parts = (token or "").split(STAFF_LINK_TOKEN_SEPARATOR)
     if len(parts) != 6 or parts[0] != STAFF_LINK_TOKEN_PREFIX:
-        return None
+        return None, "signature_invalid"
 
     body = STAFF_LINK_TOKEN_SEPARATOR.join(parts[:5])
     if not hmac.compare_digest(parts[5], _staff_link_token_signature(body)):
-        return None
+        return None, "signature_invalid"
 
     try:
         user_id = int(parts[1])
@@ -597,17 +599,27 @@ def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
             tz=timezone.utc,
         )
     except (TypeError, ValueError, OverflowError, OSError):
-        return None
+        return None, "signature_invalid"
 
-    if user_id <= 0 or chat_id == 0 or expires_at < datetime.now(timezone.utc):
-        return None
+    if user_id <= 0 or chat_id == 0:
+        return None, "signature_invalid"
 
-    return {
+    decoded = {
         "user_id": user_id,
         "chat_id": chat_id,
         "expires_at": expires_at.replace(tzinfo=None),
         "token_hash": _hash_staff_link_start_token(token),
     }
+    if expires_at < datetime.now(timezone.utc):
+        return decoded, "expired"
+    return decoded, None
+
+
+def parse_staff_link_start_token(token: str) -> Dict[str, Any] | None:
+    decoded, rejection_reason = _decode_staff_link_start_token(token)
+    if rejection_reason:
+        return None
+    return decoded
 
 
 def _normalize_staff_role(role: Any) -> str:
@@ -630,9 +642,16 @@ def _normalize_staff_role(role: Any) -> str:
 def validate_staff_link_start_token(
     db: Session, token: str, telegram_chat_id: int
 ) -> Dict[str, Any]:
-    parsed = parse_staff_link_start_token(token)
+    parsed, rejection_reason = _decode_staff_link_start_token(token)
     if not parsed:
-        return {"valid": False, "reason": "signature_invalid"}
+        return {"valid": False, "reason": rejection_reason or "signature_invalid"}
+
+    if rejection_reason == "expired":
+        return {
+            "valid": False,
+            "reason": "expired",
+            "token_hash": parsed["token_hash"],
+        }
 
     if int(parsed["chat_id"]) != int(telegram_chat_id):
         return {
