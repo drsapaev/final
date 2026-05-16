@@ -236,6 +236,11 @@ const BranchManagement = () => {
     const matchesStatus = statusFilter === 'all' || branch.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const hasBranchFilters = searchTerm.trim() !== '' || statusFilter !== 'all';
+  const branchEmptyTitle = hasBranchFilters ? 'Филиалы по фильтрам не найдены' : 'Филиалы ещё не добавлены';
+  const branchEmptyDescription = hasBranchFilters ?
+  'Измените поисковый запрос или статус, чтобы увидеть другие филиалы.' :
+  'Создайте первый филиал, чтобы начать управлять филиальной структурой клиники.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
@@ -659,11 +664,11 @@ const BranchManagement = () => {
       filteredBranches.length === 0 ?
       <MacOSEmptyState
         icon={Building2}
-        title="Филиалы не найдены"
-        description="Создайте первый филиал или измените фильтры поиска"
+        title={branchEmptyTitle}
+        description={branchEmptyDescription}
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить филиал
             </MacOSButton>
         } /> :
