@@ -82,6 +82,18 @@ TELEGRAM_LANGUAGE_MENU = {
     "resize_keyboard": True,
     "one_time_keyboard": True,
 }
+TELEGRAM_NOTIFICATION_CONSENT_MENUS = {
+    TELEGRAM_LANGUAGE_RU: {
+        "keyboard": [[{"text": "Разрешить уведомления"}, {"text": "Без уведомлений"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    },
+    TELEGRAM_LANGUAGE_UZ: {
+        "keyboard": [[{"text": "Xabarnomalarga roziman"}, {"text": "Xabarnomasiz"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    },
+}
 TELEGRAM_MAIN_MENUS = {
     TELEGRAM_LANGUAGE_RU: TELEGRAM_MAIN_MENU,
     TELEGRAM_LANGUAGE_UZ: {
@@ -167,6 +179,22 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Bot orqali Telegramni bemor kartasiga bog'lash, klinika xabarnomalarini olish "
             "va natijalar tayyor bo'lganda ularni ochish mumkin."
         ),
+    },
+    "notification_consent": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Разрешить Telegram-уведомления от клиники: напоминания, очередь, оплаты и готовые результаты?"
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Klinikadan Telegram xabarnomalarini olishga rozimisiz: eslatmalar, navbat, to'lovlar va tayyor natijalar?"
+        ),
+    },
+    "notifications_enabled": {
+        TELEGRAM_LANGUAGE_RU: "Уведомления включены.",
+        TELEGRAM_LANGUAGE_UZ: "Xabarnomalar yoqildi.",
+    },
+    "notifications_disabled": {
+        TELEGRAM_LANGUAGE_RU: "Уведомления отключены. Их можно включить позже через клинику.",
+        TELEGRAM_LANGUAGE_UZ: "Xabarnomalar o'chirildi. Ularni keyin klinika orqali yoqish mumkin.",
     },
     "help": {
         TELEGRAM_LANGUAGE_RU: (
@@ -269,6 +297,13 @@ def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
     )
 
 
+def _localized_notification_consent_menu(language_code: Any) -> Dict[str, Any]:
+    return TELEGRAM_NOTIFICATION_CONSENT_MENUS.get(
+        _normalize_patient_language(language_code),
+        TELEGRAM_NOTIFICATION_CONSENT_MENUS[TELEGRAM_LANGUAGE_RU],
+    )
+
+
 def _telegram_chat_language(db: Session, chat_id: int) -> str:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
     return _normalize_patient_language(getattr(telegram_user, "language_code", None))
@@ -287,6 +322,7 @@ def _upsert_ticket_qr_telegram_user(
     message: Dict[str, Any],
     patient_id: int | None = None,
     language_code: str | None = None,
+    notifications_enabled: bool | None = None,
 ) -> None:
     chat = message.get("chat") or {}
     from_user = message.get("from") or {}
@@ -311,6 +347,10 @@ def _upsert_ticket_qr_telegram_user(
         )
     if patient_id is not None:
         payload["patient_id"] = patient_id
+    if notifications_enabled is not None:
+        payload["notifications_enabled"] = notifications_enabled
+        payload["appointment_reminders"] = notifications_enabled
+        payload["lab_notifications"] = notifications_enabled
 
     if telegram_user:
         for field, value in payload.items():
@@ -319,13 +359,16 @@ def _upsert_ticket_qr_telegram_user(
         db.flush()
         return
 
+    create_notifications_enabled = payload.pop("notifications_enabled", True)
+    create_appointment_reminders = payload.pop("appointment_reminders", True)
+    create_lab_notifications = payload.pop("lab_notifications", True)
     db.add(
         TelegramUser(
             **payload,
             chat_id=int(chat_id),
-            notifications_enabled=True,
-            appointment_reminders=True,
-            lab_notifications=True,
+            notifications_enabled=create_notifications_enabled,
+            appointment_reminders=create_appointment_reminders,
+            lab_notifications=create_lab_notifications,
         )
     )
     db.flush()
@@ -881,6 +924,36 @@ async def _send_clinic_welcome(
     )
 
 
+async def _send_notification_consent(
+    bot_service, chat_id: int, language_code: str = TELEGRAM_LANGUAGE_RU
+) -> None:
+    await bot_service._send_message(
+        chat_id,
+        _localized_text("notification_consent", language_code),
+        _localized_notification_consent_menu(language_code),
+    )
+
+
+async def _set_notification_consent(
+    db: Session, bot_service, chat_id: int, enabled: bool
+) -> None:
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    language = _normalize_patient_language(getattr(telegram_user, "language_code", None))
+    if telegram_user:
+        telegram_user.notifications_enabled = enabled
+        telegram_user.appointment_reminders = enabled
+        telegram_user.lab_notifications = enabled
+        telegram_user.last_activity = datetime.utcnow()
+        db.commit()
+
+    result_key = "notifications_enabled" if enabled else "notifications_disabled"
+    await bot_service._send_message(
+        chat_id,
+        _localized_text(result_key, language),
+        _localized_main_menu(language),
+    )
+
+
 async def _handle_contact_link(
     message: Dict[str, Any], db: Session, bot_service
 ) -> bool:
@@ -947,13 +1020,18 @@ async def _handle_clinic_bot_update(
 
     async def language_handler(chat_id: int, language_code: str) -> None:
         message = _message_from_update(update)
-        _upsert_ticket_qr_telegram_user(db, message, language_code=language_code)
+        _upsert_ticket_qr_telegram_user(
+            db,
+            message,
+            language_code=language_code,
+            notifications_enabled=False,
+        )
         db.commit()
         logger.info(
             "Telegram patient bot language selected",
             extra={"language_code": _normalize_patient_language(language_code)},
         )
-        await _send_clinic_welcome(bot_service, chat_id, language_code)
+        await _send_notification_consent(bot_service, chat_id, language_code)
 
     async def help_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
@@ -988,6 +1066,12 @@ async def _handle_clinic_bot_update(
             _telegram_chat_menu(db, chat_id),
         )
 
+    async def enable_notifications_handler(chat_id: int) -> None:
+        await _set_notification_consent(db, bot_service, chat_id, True)
+
+    async def disable_notifications_handler(chat_id: int) -> None:
+        await _set_notification_consent(db, bot_service, chat_id, False)
+
     async def russian_language_handler(chat_id: int) -> None:
         await language_handler(chat_id, TELEGRAM_LANGUAGE_RU)
 
@@ -1012,6 +1096,10 @@ async def _handle_clinic_bot_update(
         "o'zbekcha": uzbek_language_handler,
         "ozbekcha": uzbek_language_handler,
         "uzbekcha": uzbek_language_handler,
+        "разрешить уведомления": enable_notifications_handler,
+        "без уведомлений": disable_notifications_handler,
+        "xabarnomalarga roziman": enable_notifications_handler,
+        "xabarnomasiz": disable_notifications_handler,
         "yordam": help_handler,
         "mening navbatim": queue_handler,
         "to'lovlar va qarz": payments_handler,
