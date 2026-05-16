@@ -6,7 +6,7 @@ Telegram Bot сервис для клиники
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Awaitable, Callable, Mapping
 
 import requests
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from app.crud import (
 )
 
 logger = logging.getLogger(__name__)
+MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
 
 
 class TelegramBotService:
@@ -57,6 +58,48 @@ class TelegramBotService:
                 await self._handle_inline_query(update["inline_query"], db)
         except Exception as e:
             logger.error(f"Ошибка обработки webhook: {e}")
+
+    async def process_patient_bot_update(
+        self,
+        update: dict[str, Any],
+        db: Session,
+        *,
+        ticket_start_handler: Callable[..., Awaitable[bool]],
+        contact_handler: Callable[..., Awaitable[bool]],
+        start_handler: Callable[[int, dict[str, Any]], Awaitable[None]],
+        command_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
+        text_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
+    ) -> bool:
+        """Dispatch clinic patient bot updates above webhook/polling transports."""
+        if await ticket_start_handler(update, db, self):
+            return True
+
+        message = update.get("message") or {}
+        if not message:
+            return False
+
+        chat_id = (message.get("chat") or {}).get("id")
+        if chat_id is None:
+            return False
+        chat_id = int(chat_id)
+
+        if await contact_handler(message, db, self):
+            return True
+
+        text = str(message.get("text") or "").strip()
+        command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
+        normalized_text = text.lower()
+
+        if command == "/start":
+            await start_handler(chat_id, message)
+            return True
+
+        handler = command_handlers.get(command) or text_handlers.get(normalized_text)
+        if handler:
+            await handler(chat_id)
+            return True
+
+        return False
 
     async def _handle_message(self, message: dict[str, Any], db: Session):
         """Обработка текстовых сообщений"""
@@ -397,6 +440,53 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка отправки сообщения: {e}")
             return False
+
+    async def _send_document(
+        self,
+        chat_id: int,
+        filename: str,
+        document_bytes: bytes,
+        caption: str = "",
+    ) -> tuple[bool, int | None, str | None]:
+        """Send a PDF/document to Telegram without logging document contents."""
+        if not self.bot_token:
+            logger.error("Bot token is not configured for Telegram document send")
+            return False, None, "bot_token_not_configured"
+
+        if len(document_bytes) > MAX_TELEGRAM_DOCUMENT_BYTES:
+            return False, None, "document_too_large"
+
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendDocument"
+        data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
+        files = {"document": (filename, document_bytes, "application/pdf")}
+        try:
+            response = requests.post(url, data=data, files=files, timeout=20)
+        except requests.RequestException as exc:
+            logger.warning(
+                "Telegram document send request failed error_type=%s",
+                type(exc).__name__,
+            )
+            return False, None, type(exc).__name__
+
+        if response.status_code != 200:
+            logger.warning(
+                "Telegram document send failed status_code=%s",
+                response.status_code,
+            )
+            return False, None, f"telegram_http_{response.status_code}"
+
+        try:
+            payload = response.json()
+        except ValueError:
+            logger.warning("Telegram document send returned invalid json")
+            return False, None, "telegram_invalid_json"
+
+        if not payload.get("ok"):
+            logger.warning("Telegram document send returned not ok")
+            return False, None, "telegram_api_error"
+
+        message_id = (payload.get("result") or {}).get("message_id")
+        return True, int(message_id) if message_id is not None else None, None
 
     async def _answer_callback_query(self, callback_query_id: str, text: str = ""):
         """Ответ на callback запрос"""

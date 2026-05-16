@@ -99,6 +99,8 @@ const TelegramManager = () => {
         pending_update_count: integrationData.pending_update_count,
         transition_path: integrationData.transition_path,
         webhook_error: integrationData.webhook_error,
+        patient_bot: integrationData.patient_bot || null,
+        supported_functions: Array.isArray(integrationData.supported_functions) ? integrationData.supported_functions : [],
         configured: Boolean(integrationData.configured ?? statusData.configured),
         raw: { status: statusData, integration: integrationData }
       });
@@ -141,6 +143,12 @@ const TelegramManager = () => {
       </Box>);
 
   }
+
+  const patientBot = botStatus?.patient_bot || {};
+  const patientBotFeatures = Array.isArray(patientBot.features) ? patientBot.features : [];
+  const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
+  const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
+  const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -249,6 +257,56 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Привязка пациентов"
                     secondary={`QR: ${botStatus?.qr_linking_enabled ? 'да' : 'нет'}, телефон: ${botStatus?.contact_linking_enabled ? 'да' : 'нет'}`} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <MessageSquare />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`Patient bot ${patientBot.version || 'v1'}`}
+                    secondary={enabledPatientFeatures.length ?
+                    enabledPatientFeatures.map((feature) => feature.label).join(', ') :
+                    'Функции пациента не активны'} />
+
+                  <Badge
+                    variant={enabledPatientFeatures.length ? 'success' : 'warning'}
+                    size="small">
+
+                    {enabledPatientFeatures.length || 0}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Языки пациента"
+                    secondary={patientBotLanguages.length ?
+                    patientBotLanguages.map((item) => item.label).join(', ') :
+                    'Русский'} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Команды пациента"
+                    secondary={patientBotCommands.length ?
+                    patientBotCommands.map((item) => item.command).join(' ') :
+                    'Нет данных'} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Send />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Результаты"
+                    secondary={patientBot.results_delivery === 'telegram_pdf' ?
+                    `PDF в Telegram, до ${patientBot.max_pdf_reports_per_request || 3} файлов` :
+                    'Уведомление в Telegram'} />
 
                 </ListItem>
                 {botStatus?.webhook_error &&
