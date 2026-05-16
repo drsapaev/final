@@ -53,7 +53,7 @@ class TicketPrintSettingsBase(BaseModel):
     show_doctor_name: bool = False
     show_cabinet: bool = True
     show_price: bool = False
-    show_qr_code: bool = False
+    show_qr_code: bool = True
     show_printed_at: bool = True
 
 

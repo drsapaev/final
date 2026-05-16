@@ -9,7 +9,7 @@ export const TICKET_PRINT_SETTINGS_DEFAULTS = {
   show_doctor_name: false,
   show_cabinet: true,
   show_price: false,
-  show_qr_code: false,
+  show_qr_code: true,
   show_printed_at: true,
 };
 

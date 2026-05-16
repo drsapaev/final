@@ -32,7 +32,7 @@ TICKET_PRINT_SETTINGS_DEFAULTS: dict[str, bool] = {
     "show_doctor_name": False,
     "show_cabinet": True,
     "show_price": False,
-    "show_qr_code": False,
+    "show_qr_code": True,
     "show_printed_at": True,
 }
 

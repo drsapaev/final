@@ -76,20 +76,31 @@ const TelegramManager = () => {
   const loadTelegramData = async () => {
     try {
       setLoading(true);
-      const [statusRes, templatesRes] = await Promise.all([
+      const [statusRes, integrationRes, templatesRes] = await Promise.all([
         api.get('/telegram/bot-status'),
+        api.get('/admin/telegram/integration-status').catch(() => ({ data: null })),
         api.get('/admin/telegram/templates')
       ]);
 
       const statusData = statusRes?.data || {};
+      const integrationData = integrationRes?.data || {};
       const templatesData = templatesRes?.data || {};
 
       setBotStatus({
-        bot_active: Boolean(statusData.active || statusData.configured),
-        webhook_configured: Boolean(statusData.webhook_configured || statusData.webhook_set),
-        subscribers_count: Number(statusData?.stats?.active_users ?? statusData?.stats?.total_users ?? 0),
-        configured: Boolean(statusData.configured),
-        raw: statusData
+        bot_active: Boolean(integrationData.active ?? statusData.active ?? statusData.configured),
+        webhook_configured: Boolean(integrationData.webhook_set || statusData.webhook_configured || statusData.webhook_set),
+        subscribers_count: Number(integrationData.linked_users ?? statusData?.stats?.active_users ?? statusData?.stats?.total_users ?? 0),
+        total_users: Number(integrationData.total_users ?? statusData?.stats?.total_users ?? 0),
+        bot_username: integrationData.bot_username || statusData.bot_username || statusData?.bot_info?.username,
+        mode: integrationData.mode || ((statusData.webhook_configured || statusData.webhook_set) ? 'webhook' : 'polling'),
+        polling_ready: Boolean(integrationData.polling_ready),
+        qr_linking_enabled: Boolean(integrationData.qr_linking_enabled),
+        contact_linking_enabled: Boolean(integrationData.contact_linking_enabled),
+        pending_update_count: integrationData.pending_update_count,
+        transition_path: integrationData.transition_path,
+        webhook_error: integrationData.webhook_error,
+        configured: Boolean(integrationData.configured ?? statusData.configured),
+        raw: { status: statusData, integration: integrationData }
       });
 
       const normalizedTemplates = Array.isArray(templatesData) ?
@@ -204,9 +215,53 @@ const TelegramManager = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Подписчиков"
-                    secondary={botStatus?.subscribers_count || 0} />
+                    secondary={`${botStatus?.subscribers_count || 0} привязано / ${botStatus?.total_users || 0} всего`} />
                   
                 </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <MessageSquare />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Telegram bot"
+                    secondary={botStatus?.bot_username ? `@${botStatus.bot_username}` : 'Не настроен'} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Режим подключения"
+                    secondary={botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'} />
+
+                  <Badge
+                    variant={botStatus?.mode === 'webhook' ? 'success' : 'warning'}
+                    size="small">
+
+                    {botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Привязка пациентов"
+                    secondary={`QR: ${botStatus?.qr_linking_enabled ? 'да' : 'нет'}, телефон: ${botStatus?.contact_linking_enabled ? 'да' : 'нет'}`} />
+
+                </ListItem>
+                {botStatus?.webhook_error &&
+                <ListItem>
+                    <ListItemIcon>
+                      <Settings />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Telegram API"
+                      secondary={botStatus.webhook_error} />
+
+                  </ListItem>
+                }
               </List>
             </CardContent>
           </Card>
