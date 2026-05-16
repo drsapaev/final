@@ -359,7 +359,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "readiness": STAFF_BOT_READINESS,
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_audit_logging_contract",
+        "next_slice": "staff_role_menus",
     }
 
 
