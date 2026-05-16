@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { HelpCircle, Keyboard, X } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 import PropTypes from 'prop-types';
@@ -8,6 +8,15 @@ import PropTypes from 'prop-types';
  */
 const HelpTooltip = ({ content, shortcuts = [], position = 'top' }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const tooltipId = useId();
+  const showTooltip = () => setIsVisible(true);
+  const hideTooltip = () => setIsVisible(false);
+  const toggleTooltip = () => setIsVisible((visible) => !visible);
+  const handleButtonKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      hideTooltip();
+    }
+  };
 
   const positionClasses = {
     top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
@@ -21,15 +30,19 @@ const HelpTooltip = ({ content, shortcuts = [], position = 'top' }) => {
       <button
         type="button"
         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-        onClick={() => setIsVisible(!isVisible)}
+        aria-label="Показать справку"
+        aria-expanded={isVisible}
+        aria-describedby={isVisible ? tooltipId : undefined}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onClick={toggleTooltip}
+        onKeyDown={handleButtonKeyDown}
       >
-        <HelpCircle size={16} />
+        <HelpCircle aria-hidden="true" size={16} />
       </button>
       
       {isVisible && (
-        <div className={`absolute z-50 ${positionClasses[position]} w-80`}>
+        <div id={tooltipId} role="tooltip" className={`absolute z-50 ${positionClasses[position]} w-80`}>
           <Card className="p-4 shadow-lg border border-gray-200 dark:border-gray-700">
             <div className="space-y-3">
               {/* Основная подсказка */}
@@ -84,6 +97,7 @@ HelpTooltip.propTypes = {
  */
 export const HotkeysModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
+  const titleId = 'admin-hotkeys-modal-title';
 
   const hotkeyCategories = [
     {
@@ -120,16 +134,21 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <Card className="w-full max-w-2xl m-4 p-6 max-h-[80vh] overflow-y-auto">
+      <Card
+        className="w-full max-w-2xl m-4 p-6 max-h-[80vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <Keyboard size={24} className="mr-3 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <Keyboard aria-hidden="true" size={24} className="mr-3 text-blue-600" />
+            <h2 id={titleId} className="text-xl font-semibold text-gray-900 dark:text-white">
               Горячие клавиши
             </h2>
           </div>
-          <Button variant="ghost" onClick={onClose}>
-            <X size={20} />
+          <Button variant="ghost" aria-label="Закрыть окно горячих клавиш" onClick={onClose}>
+            <X aria-hidden="true" size={20} />
           </Button>
         </div>
         
