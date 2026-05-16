@@ -254,7 +254,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <DollarSign aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
+            <DollarSign aria-hidden="true" focusable="false" style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
           </div>
         </MacOSCard>
 
@@ -299,7 +299,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Users aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <Users aria-hidden="true" focusable="false" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           </div>
         </MacOSCard>
 
@@ -344,7 +344,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Calendar aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <Calendar aria-hidden="true" focusable="false" style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           </div>
         </MacOSCard>
 
@@ -389,7 +389,7 @@ const AnalyticsDashboard = ({
                 </span>
               </div>
             </div>
-            <Award aria-hidden="true" style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
+            <Award aria-hidden="true" focusable="false" style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
           </div>
         </MacOSCard>
       </div>
