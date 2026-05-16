@@ -4,10 +4,16 @@ import { Card, Button } from '../ui/native';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+
+let errorBoundaryInstance = 0;
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
+    errorBoundaryInstance += 1;
+    this.titleId = `admin-error-boundary-title-${errorBoundaryInstance}`;
+    this.descriptionId = `admin-error-boundary-description-${errorBoundaryInstance}`;
   }
 
   static getDerivedStateFromError() {
@@ -31,28 +37,35 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <Card className="p-6">
+        <Card
+          className="p-6"
+          role="alert"
+          aria-live="assertive"
+          aria-labelledby={this.titleId}
+          aria-describedby={this.descriptionId}>
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            aria-hidden="true"
             style={{ background: 'var(--danger-color)', opacity: 0.1 }}>
-              <AlertTriangle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+              <AlertTriangle className="w-8 h-8" focusable="false" style={{ color: 'var(--danger-color)' }} />
             </div>
             
-            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+            <h2 id={this.titleId} className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
               Что-то пошло не так
             </h2>
             
-            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+            <p id={this.descriptionId} className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
               Произошла ошибка при загрузке этого раздела. Попробуйте обновить страницу.
             </p>
             
             <div className="flex gap-3 justify-center">
-              <Button onClick={this.handleRetry} variant="primary">
-                <RefreshCw className="w-4 h-4 mr-2" />
+              <Button type="button" onClick={this.handleRetry} variant="primary">
+                <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" focusable="false" />
                 Попробовать снова
               </Button>
               
               <Button
+                type="button"
                 onClick={() => window.location.reload()}
                 variant="outline">
                 
