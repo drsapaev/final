@@ -450,7 +450,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "role_menus": _build_staff_role_menus_summary(),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_server_side_authorization_contract",
+        "next_slice": "staff_role_linking_runtime",
     }
 
 
@@ -903,6 +903,7 @@ def get_telegram_integration_status(
                 "dedicated_staff_bot_token_readiness_contract",
                 "staff_read_only_menu_contract",
                 "staff_role_linking_contract",
+                "staff_role_linking_runtime",
                 "staff_server_side_authorization_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",
