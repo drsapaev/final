@@ -61,6 +61,7 @@ const TelegramManager = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [registeringCommands, setRegisteringCommands] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState({
     name: '',
@@ -125,6 +126,26 @@ const TelegramManager = () => {
 
   const handleCreateTemplate = async () => {
     setError('В этой сборке доступен просмотр Telegram шаблонов. Создание шаблонов через UI пока не опубликовано в backend contract.');
+  };
+
+  const registerPatientCommands = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      setRegisteringCommands(true);
+      const response = await api.post('/admin/telegram/register-patient-commands');
+      const languages = Array.isArray(response?.data?.registered_languages) ?
+      response.data.registered_languages.join(', ') :
+      'ru, uz';
+      setSuccess(`Команды пациентского бота зарегистрированы: ${languages}`);
+      await loadTelegramData();
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
+      setError(message || e?.message || 'Не удалось зарегистрировать команды Telegram');
+    } finally {
+      setRegisteringCommands(false);
+    }
   };
 
   const resetForm = () => {
@@ -338,6 +359,15 @@ const TelegramManager = () => {
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Settings size={16} />
                   Настроить бота
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  disabled={!botStatus?.configured || registeringCommands}
+                  onClick={registerPatientCommands}
+                  style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <CheckCircle size={16} />
+                  {registeringCommands ? 'Регистрация команд...' : 'Зарегистрировать команды'}
                 </Button>
                 <Button
                   fullWidth
