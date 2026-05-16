@@ -72,9 +72,19 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
             event.preventDefault();
             action();
         }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            action();
+        }
     };
     const handleTriggerKeyDown = (event) => {
         if (event.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
+    const handleDropdownKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            event.stopPropagation();
             setIsOpen(false);
         }
     };
@@ -114,7 +124,7 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {selectedIcon ? (
                             <>
-                                <selectedIcon.icon aria-hidden="true" size={20} />
+                                <selectedIcon.icon aria-hidden="true" focusable="false" size={20} />
                                 <span>{selectedIcon.label}</span>
                             </>
                         ) : (
@@ -143,7 +153,7 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                             onClick={() => setIsOpen(false)}
                             onKeyDown={(event) => handleActivationKeyDown(event, () => setIsOpen(false))}
                         />
-                        <div id={dropdownId} role="dialog" aria-label={`Выбор иконки: ${label}`} style={{
+                        <div id={dropdownId} role="dialog" aria-label={`Выбор иконки: ${label}`} onKeyDown={handleDropdownKeyDown} style={{
                             position: 'absolute',
                             top: '100%',
                             left: 0,
@@ -158,7 +168,7 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                             maxHeight: '300px',
                             overflowY: 'auto'
                         }}>
-                            <div style={{
+                            <div role="group" aria-label="Доступные иконки" style={{
                                 display: 'grid',
                                 gridTemplateColumns: 'repeat(3, 1fr)',
                                 gap: '8px'
@@ -205,7 +215,7 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                                                 }
                                             }}
                                         >
-                                            <IconComponent aria-hidden="true" size={24} />
+                                            <IconComponent aria-hidden="true" focusable="false" size={24} />
                                             <span style={{
                                                 fontSize: '11px',
                                                 color: 'var(--mac-text-secondary)',
