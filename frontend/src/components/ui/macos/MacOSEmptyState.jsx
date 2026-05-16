@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import PropTypes from 'prop-types';
 const MacOSEmptyState = ({
   icon: Icon,
@@ -9,6 +10,9 @@ const MacOSEmptyState = ({
   className,
   style
 }) => {
+  const descriptionId = useId();
+  const hasDescription = Boolean(description);
+
   const sizeStyles = {
     sm: {
       padding: '24px',
@@ -96,13 +100,20 @@ const MacOSEmptyState = ({
   };
 
   return (
-    <div className={className} style={containerStyle}>
-      {Icon && <Icon style={iconStyle} />}
-      
+    <div
+      className={className}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-describedby={hasDescription ? descriptionId : undefined}
+      style={containerStyle}
+    >
+      {Icon && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
+
       <h3 style={titleStyle}>{title}</h3>
-      
-      {description && (
-        <p style={descriptionStyle}>{description}</p>
+
+      {hasDescription && (
+        <p id={descriptionId} style={descriptionStyle}>{description}</p>
       )}
       
       {action && (
