@@ -182,6 +182,13 @@ const TelegramManager = () => {
     return count + items.length;
   }, 0);
   const staffRoleSummary = staffRoles.length ? staffRoles.join(', ') : 'none';
+  const staffLinkingContract = staffBot.linking_contract || staffBot.role_linking || {};
+  const staffLinkingMethods = Array.isArray(staffLinkingContract.accepted_methods) ?
+  staffLinkingContract.accepted_methods :
+  [];
+  const staffLinkingMethodNames = staffLinkingMethods.
+  map((method) => method?.label || method?.key || method).
+  filter(Boolean);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -358,6 +365,23 @@ const TelegramManager = () => {
                     `${readyStaffControls.length}/${staffBotReadiness.length} готово; роли: ${staffRoleSummary}` :
                     'Требуется отдельный staff/admin contract'} />
 
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff linking foundation"
+                    secondary={staffLinkingMethodNames.length ?
+                    `${staffLinkingMethodNames.join(', ')}; до включения: ${staffLinkingContract.required_before_enablement ? 'обязательно' : 'не требуется'}` :
+                    'Контракт привязки сотрудников не опубликован'} />
+
+                  <Badge
+                    variant={staffLinkingContract.enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffLinkingContract.enabled ? 'Enabled' : 'Planned'}
+                  </Badge>
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
