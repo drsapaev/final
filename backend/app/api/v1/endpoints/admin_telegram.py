@@ -384,6 +384,26 @@ STAFF_BOT_AUDIT_CONTRACT = {
     ],
 }
 
+STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
+    "contract_version": "staff-role-menu-enablement-v1",
+    "enabled": False,
+    "runtime_menu_enabled": False,
+    "read_only_contract_published": True,
+    "required_before_enablement": True,
+    "state_changing_menu_items_enabled": False,
+    "allowed_until_enabled": [
+        "read_status_contract",
+        "read_only_menu_preview",
+    ],
+    "required_server_checks": [
+        "dedicated_staff_bot_token",
+        "role_based_staff_linking",
+        "server_side_authorization",
+        "audit_logging",
+        "state_change_confirmations",
+    ],
+}
+
 
 def _build_staff_role_menus_summary() -> Dict[str, Any]:
     menu_roles = [
@@ -410,7 +430,19 @@ def _build_staff_role_menus_summary() -> Dict[str, Any]:
     }
 
 
+def _build_staff_role_menu_enablement_contract(
+    role_menus: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {
+        **STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT,
+        "roles_covered": role_menus["roles"],
+        "role_count": role_menus["role_count"],
+        "menu_item_count": role_menus["item_count"],
+    }
+
+
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
+    role_menus = _build_staff_role_menus_summary()
     return {
         "version": "planning",
         "contract_version": "staff-menu-read-only-v1",
@@ -447,7 +479,10 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
-        "role_menus": _build_staff_role_menus_summary(),
+        "role_menus": role_menus,
+        "role_menu_enablement_contract": (
+            _build_staff_role_menu_enablement_contract(role_menus)
+        ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
         "next_slice": "staff_role_linking_runtime",
@@ -902,6 +937,7 @@ def get_telegram_integration_status(
             "planned_functions": [
                 "dedicated_staff_bot_token_readiness_contract",
                 "staff_read_only_menu_contract",
+                "staff_role_menu_enablement_status",
                 "staff_role_linking_contract",
                 "staff_role_linking_runtime",
                 "staff_server_side_authorization_contract",

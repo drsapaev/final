@@ -218,6 +218,13 @@ const TelegramManager = () => {
   const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
   staffAuditContract.event_types :
   [];
+  const staffRoleMenuEnablementContract = staffBot.role_menu_enablement_contract || {};
+  const staffRoleMenuEnablementRoleCount = typeof staffRoleMenuEnablementContract.role_count === 'number' ?
+  staffRoleMenuEnablementContract.role_count :
+  staffMenuContract.length;
+  const staffRoleMenuEnablementItemCount = typeof staffRoleMenuEnablementContract.menu_item_count === 'number' ?
+  staffRoleMenuEnablementContract.menu_item_count :
+  staffMenuItemCount;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -461,6 +468,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffBot.state_changing_actions_enabled ? 'Actions' : 'Read-only'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff role menu enablement"
+                    secondary={staffRoleMenuEnablementContract.contract_version ?
+                    `${staffRoleMenuEnablementRoleCount} roles, ${staffRoleMenuEnablementItemCount} items; runtime menu: ${staffRoleMenuEnablementContract.runtime_menu_enabled ? 'enabled' : 'disabled'}` :
+                    'Role menu enablement contract not published'} />
+
+                  <Badge
+                    variant={staffRoleMenuEnablementContract.runtime_menu_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffRoleMenuEnablementContract.required_before_enablement ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
