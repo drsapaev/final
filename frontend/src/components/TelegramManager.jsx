@@ -190,6 +190,10 @@ const TelegramManager = () => {
   const staffLinkingMethodNames = staffLinkingMethods.
   map((method) => method?.label || method?.key || method).
   filter(Boolean);
+  const staffAuthorizationContract = staffBot.authorization_contract || staffBot.authorization || {};
+  const staffAuthorizationRoles = Array.isArray(staffAuthorizationContract.role_checks) ?
+  staffAuthorizationContract.role_checks :
+  [];
   const staffCommandContract = staffBot.command_registration_contract || staffBot.command_contract || {};
   const staffCommandList = Array.isArray(staffCommandContract.commands) ?
   staffCommandContract.commands :
@@ -414,6 +418,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffLinkingContract.enabled ? 'Enabled' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff authorization"
+                    secondary={staffAuthorizationRoles.length ?
+                    `${staffAuthorizationRoles.length} role checks; default: ${staffAuthorizationContract.default_decision || 'deny'}` :
+                    'Authorization contract не опубликован'} />
+
+                  <Badge
+                    variant={staffAuthorizationContract.enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffAuthorizationContract.server_side_required ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
