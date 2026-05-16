@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
-import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
+import { AppEmpty, AppError, AppLoading, Button, Select } from '../components/ui/macos';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,6 +13,12 @@ export default function Activation() {void
   const [rows, setRows] = useState([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [err, setErr] = useState('');
+  const statusFilterOptions = [
+    { value: '', label: 'Все статусы' },
+    { value: 'active', label: 'Активные' },
+    { value: 'pending', label: 'Ожидают' },
+    { value: 'disabled', label: 'Отключены' },
+  ];
 
   const filtered = useMemo(() => {
     if (!filterStatus) return rows;
@@ -57,19 +63,23 @@ export default function Activation() {void
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-semibold">Активация</h1>
           <div className="flex items-center gap-2">
-            <select
+            <Select
+              id="activation-status-filter"
+              label="Статус записи"
+              options={statusFilterOptions}
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="border rounded px-2 py-1 text-sm">
-              
-              <option value="">Все</option>
-              <option value="active">Активные</option>
-              <option value="pending">Ожидают</option>
-              <option value="disabled">Отключены</option>
-            </select>
-            <button onClick={loadAll} className="px-3 py-1.5 border rounded text-sm bg-white hover:bg-gray-50">
+              onChange={setFilterStatus}
+              size="small"
+              style={{ minWidth: 180 }}
+            />
+            <Button
+              onClick={loadAll}
+              disabled={loading}
+              loading={loading}
+              size="small"
+              variant="outline">
               Обновить
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -77,6 +87,11 @@ export default function Activation() {void
         <AppError
           title="Ошибка загрузки"
           description={err}
+          action={
+            <Button onClick={loadAll} disabled={loading} loading={loading} size="small" variant="outline">
+              Повторить
+            </Button>
+          }
           style={{ marginBottom: '16px' }}
         />
         }
@@ -135,8 +150,12 @@ export default function Activation() {void
               </div> :
 
             <AppEmpty
-              title="Нет данных"
-              description="Записи активации появятся здесь после загрузки."
+              title={filterStatus ? 'Нет записей с выбранным статусом' : 'Нет данных'}
+              description={
+                filterStatus ?
+                  'Поменяйте фильтр статуса или обновите список.' :
+                  'Записи активации появятся здесь после загрузки.'
+              }
             />
             }
           </section>
