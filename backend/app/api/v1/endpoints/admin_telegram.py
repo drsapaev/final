@@ -265,6 +265,62 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     ],
 }
 
+STAFF_BOT_AUDIT_CONTRACT = {
+    "contract_version": "staff-audit-v1",
+    "enabled": False,
+    "record_writer_enabled": False,
+    "required_before_enablement": True,
+    "event_types": [
+        {
+            "key": "staff_link_created",
+            "label": "Привязка сотрудника к Telegram",
+            "required": True,
+        },
+        {
+            "key": "staff_command_received",
+            "label": "Команда сотрудника получена",
+            "required": True,
+        },
+        {
+            "key": "staff_action_confirmation_requested",
+            "label": "Запрошено подтверждение действия",
+            "required": True,
+        },
+        {
+            "key": "staff_action_confirmed",
+            "label": "Действие подтверждено сотрудником",
+            "required": True,
+        },
+        {
+            "key": "staff_action_denied",
+            "label": "Действие запрещено серверной проверкой",
+            "required": True,
+        },
+        {
+            "key": "staff_action_failed",
+            "label": "Действие завершилось ошибкой",
+            "required": True,
+        },
+    ],
+    "required_fields": [
+        "actor_user_id",
+        "actor_role",
+        "telegram_user_id_hash",
+        "action_key",
+        "target_type",
+        "target_reference_hash",
+        "result",
+        "timestamp",
+        "request_id",
+    ],
+    "redaction_rules": [
+        "no_bot_tokens",
+        "no_raw_telegram_payload",
+        "no_plain_medical_details",
+        "no_raw_internal_identifiers_in_chat_text",
+    ],
+}
+
 
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     return {
@@ -289,6 +345,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
+        "audit_contract": STAFF_BOT_AUDIT_CONTRACT,
         "authorization": {
             "source": "application_rbac",
             "server_side_required": True,
@@ -302,7 +359,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "readiness": STAFF_BOT_READINESS,
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_state_change_confirmation_contract",
+        "next_slice": "staff_audit_logging_contract",
     }
 
 
@@ -756,6 +813,7 @@ def get_telegram_integration_status(
                 "staff_role_linking_contract",
                 "staff_command_registration_contract",
                 "staff_state_change_confirmation_contract",
+                "staff_audit_logging_contract",
                 "staff_role_menus",
                 "staff_action_confirmations",
                 "staff_audit_logging",
