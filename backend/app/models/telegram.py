@@ -51,7 +51,7 @@ class TelegramUser(Base):
     username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    language_code: Mapped[str] = mapped_column(String(10), default="ru")
+    language_code: Mapped[str] = mapped_column(String(16), default="ru")
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
