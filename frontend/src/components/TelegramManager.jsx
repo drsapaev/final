@@ -200,6 +200,10 @@ const TelegramManager = () => {
   const staffConfirmationOperations = Array.isArray(staffConfirmationContract.operations) ?
   staffConfirmationContract.operations :
   [];
+  const staffAuditContract = staffBot.audit_contract || {};
+  const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
+  staffAuditContract.event_types :
+  [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -443,6 +447,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffConfirmationContract.required_for_state_changes ? 'Required' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff audit logging"
+                    secondary={staffAuditEvents.length ?
+                    `${staffAuditEvents.length} required events; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}` :
+                    'Audit contract не опубликован'} />
+
+                  <Badge
+                    variant={staffAuditContract.record_writer_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffAuditContract.required_before_enablement ? 'Required' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
