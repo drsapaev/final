@@ -101,7 +101,7 @@ def get_telegram_settings(
             "lab_results_notifications": True,
             "payment_notifications": True,
             "default_language": "ru",
-            "supported_languages": ["ru", "uz", "en"],
+            "supported_languages": ["ru", "uz-Latn"],
         }
 
         # Применяем сохраненные настройки
@@ -416,10 +416,58 @@ def get_telegram_integration_status(
             "supported_functions": [
                 "ticket_qr_link",
                 "contact_phone_link",
+                "patient_queue",
+                "patient_payments_debt",
                 "patient_status",
-                "results_ready_notice",
+                "lab_results_pdf",
                 "admin_notifications",
             ],
+            "patient_bot": {
+                "version": "v1",
+                "transport": "polling" if not webhook_set else "webhook",
+                "supported_languages": [
+                    {"code": "ru", "label": "Русский"},
+                    {"code": "uz-Latn", "label": "O'zbekcha"},
+                ],
+                "default_language": "ru",
+                "onboarding": "language_choice_then_contact_link",
+                "commands": [
+                    {"command": "/queue", "label": "Моя очередь"},
+                    {"command": "/payments", "label": "Оплаты и долг"},
+                    {"command": "/results", "label": "PDF-результаты"},
+                    {"command": "/profile", "label": "Мой статус"},
+                    {"command": "/help", "label": "Помощь"},
+                ],
+                "features": [
+                    {
+                        "key": "ticket_qr_link",
+                        "label": "Привязка через QR чека",
+                        "enabled": bool(bot_username),
+                    },
+                    {
+                        "key": "contact_phone_link",
+                        "label": "Привязка через номер телефона",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_queue",
+                        "label": "Очередь пациента на сегодня",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_payments_debt",
+                        "label": "Оплаты и долг по визиту",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "lab_results_pdf",
+                        "label": "PDF-результаты лаборатории",
+                        "enabled": bool(bot_token),
+                    },
+                ],
+                "results_delivery": "telegram_pdf",
+                "max_pdf_reports_per_request": 3,
+            },
             "transition_path": (
                 "Set webhook when a public HTTPS backend URL is available; "
                 "stop polling before webhook is enabled."
