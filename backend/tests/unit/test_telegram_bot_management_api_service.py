@@ -13,6 +13,20 @@ from app.services.telegram_bot_management_api_service import (
 
 @pytest.mark.unit
 class TestTelegramBotManagementApiService:
+    def _staff_link_token(
+        self,
+        *,
+        user_id: int = 42,
+        chat_id: int = 998877,
+        nonce: str = "unitnonce",
+    ) -> str:
+        return admin_telegram.build_staff_link_start_token(
+            user_id=user_id,
+            chat_id=chat_id,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            nonce=nonce,
+        )
+
     def test_get_stats_payload_uses_repository_counts(self):
         repository = SimpleNamespace(
             count_users_with_telegram=lambda: 10,
@@ -152,3 +166,129 @@ class TestTelegramBotManagementApiService:
         assert result["chat_id"] == 998877
         assert result["role"] == "lab"
         assert result["single_use_enforced"] is False
+
+    def test_staff_link_start_token_validator_rejects_chat_mismatch(self):
+        token = self._staff_link_token()
+
+        def fail_query(_model):
+            pytest.fail("chat mismatch should be rejected before user lookup")
+
+        result = admin_telegram.validate_staff_link_start_token(
+            db=SimpleNamespace(query=fail_query),
+            token=token,
+            telegram_chat_id=112233,
+        )
+
+        assert result["valid"] is False
+        assert result["reason"] == "chat_mismatch"
+        assert result["token_hash"].startswith(
+            admin_telegram.STAFF_LINK_TOKEN_HASH_PREFIX
+        )
+
+    @pytest.mark.parametrize(
+        ("user", "expected_reason", "expected_role"),
+        [
+            (
+                SimpleNamespace(id=42, role="doctor", is_active=False),
+                "staff_user_inactive",
+                None,
+            ),
+            (
+                SimpleNamespace(id=42, role="patient", is_active=True),
+                "role_not_allowed",
+                "patient",
+            ),
+        ],
+    )
+    def test_staff_link_start_token_validator_rejects_invalid_staff_user(
+        self, user, expected_reason, expected_role
+    ):
+        token = self._staff_link_token()
+
+        class FakeQuery:
+            def filter(self, *_args, **_kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        result = admin_telegram.validate_staff_link_start_token(
+            db=SimpleNamespace(query=lambda _model: FakeQuery()),
+            token=token,
+            telegram_chat_id=998877,
+        )
+
+        assert result["valid"] is False
+        assert result["reason"] == expected_reason
+        if expected_role is not None:
+            assert result["role"] == expected_role
+        assert result["token_hash"].startswith(
+            admin_telegram.STAFF_LINK_TOKEN_HASH_PREFIX
+        )
+
+    def test_staff_link_start_token_validator_rejects_linked_chat_conflict(
+        self, monkeypatch
+    ):
+        token = self._staff_link_token(nonce="linkedchat")
+        user = SimpleNamespace(id=42, role="doctor", is_active=True)
+
+        class FakeQuery:
+            def filter(self, *_args, **_kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        monkeypatch.setattr(
+            admin_telegram.crud_telegram,
+            "get_telegram_user_by_chat_id",
+            lambda _db, _chat_id: SimpleNamespace(user_id=777),
+        )
+
+        result = admin_telegram.validate_staff_link_start_token(
+            db=SimpleNamespace(query=lambda _model: FakeQuery()),
+            token=token,
+            telegram_chat_id=998877,
+        )
+
+        assert result["valid"] is False
+        assert result["reason"] == "telegram_account_already_linked"
+        assert result["token_hash"].startswith(
+            admin_telegram.STAFF_LINK_TOKEN_HASH_PREFIX
+        )
+
+    def test_staff_link_start_token_validator_rejects_staff_user_conflict(
+        self, monkeypatch
+    ):
+        token = self._staff_link_token(nonce="stafflinked")
+        user = SimpleNamespace(id=42, role="doctor", is_active=True)
+
+        class FakeQuery:
+            def filter(self, *_args, **_kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        monkeypatch.setattr(
+            admin_telegram.crud_telegram,
+            "get_telegram_user_by_chat_id",
+            lambda _db, _chat_id: SimpleNamespace(user_id=42),
+        )
+        monkeypatch.setattr(
+            admin_telegram.crud_telegram,
+            "get_telegram_user_by_linked_user_id",
+            lambda _db, _linked_user_id: SimpleNamespace(chat_id=112233),
+        )
+
+        result = admin_telegram.validate_staff_link_start_token(
+            db=SimpleNamespace(query=lambda _model: FakeQuery()),
+            token=token,
+            telegram_chat_id=998877,
+        )
+
+        assert result["valid"] is False
+        assert result["reason"] == "staff_user_already_linked"
+        assert result["token_hash"].startswith(
+            admin_telegram.STAFF_LINK_TOKEN_HASH_PREFIX
+        )
