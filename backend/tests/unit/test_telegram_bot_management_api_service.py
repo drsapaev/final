@@ -181,6 +181,59 @@ class TestTelegramBotManagementApiService:
             in constraint_names
         )
 
+    def test_staff_bot_status_remains_disabled_until_readiness_gates(self):
+        status = admin_telegram._build_staff_bot_status(webhook_set=False)
+
+        assert status["enabled"] is False
+        assert status["state_changing_actions_enabled"] is False
+        assert status["authorization"]["ready"] is False
+        assert status["audit"]["ready"] is False
+        assert status["role_menus"]["read_only"] is True
+        assert status["role_menus"]["runtime_enabled"] is False
+
+        role_menu_enablement = status["role_menu_enablement_contract"]
+        assert role_menu_enablement["enabled"] is False
+        assert role_menu_enablement["runtime_menu_enabled"] is False
+        assert role_menu_enablement["state_changing_menu_items_enabled"] is False
+
+    @pytest.mark.parametrize(
+        ("webhook_set", "expected_transport"),
+        [
+            (False, "polling"),
+            (True, "webhook"),
+        ],
+    )
+    def test_staff_bot_status_exposes_contract_bundle_and_next_slice(
+        self, webhook_set, expected_transport
+    ):
+        status = admin_telegram._build_staff_bot_status(webhook_set=webhook_set)
+
+        assert status["transport"] == expected_transport
+        assert status["next_slice"] == "staff_link_token_storage_migration"
+        assert status["supported_roles"] == admin_telegram.STAFF_BOT_SUPPORTED_ROLES
+        assert status["read_only_menu_contract"] == (
+            admin_telegram.STAFF_BOT_READ_ONLY_MENU_CONTRACT
+        )
+
+        expected_contract_keys = {
+            "token_contract",
+            "linking_contract",
+            "linking_runtime_contract",
+            "link_token_validation_contract",
+            "link_token_storage_contract",
+            "authorization_contract",
+            "command_registration_contract",
+            "confirmation_contract",
+            "audit_contract",
+        }
+        assert expected_contract_keys <= set(status)
+        assert status["link_token_storage_contract"] == (
+            admin_telegram.STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT
+        )
+        assert status["link_token_validation_contract"]["storage_contract"] == (
+            status["link_token_storage_contract"]
+        )
+
     def test_staff_link_start_token_validator_reports_expired_reason(self):
         token = admin_telegram.build_staff_link_start_token(
             user_id=42,
