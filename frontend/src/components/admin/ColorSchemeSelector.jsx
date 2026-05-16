@@ -64,7 +64,7 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div style={{ display: 'grid', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Icon aria-hidden="true" style={{ width: '18px', height: '18px' }} />
+            <Icon aria-hidden="true" focusable="false" style={{ width: '18px', height: '18px' }} />
             <span style={{ fontSize: '15px', fontWeight: 700 }}>
               {scheme.name}
             </span>
@@ -193,7 +193,7 @@ export default function ColorSchemeSelector() {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Palette aria-hidden="true" style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+          <Palette aria-hidden="true" focusable="false" style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
           <div style={{ display: 'grid', gap: '4px' }}>
             <h3 id={selectorTitleId} style={{
               fontSize: 'var(--mac-font-size-lg)',
@@ -228,7 +228,7 @@ export default function ColorSchemeSelector() {
           fontSize: '12px',
         }}
         >
-          <SwatchBook aria-hidden="true" style={{ width: '14px', height: '14px', color: 'var(--mac-accent-blue)' }} />
+          <SwatchBook aria-hidden="true" focusable="false" style={{ width: '14px', height: '14px', color: 'var(--mac-accent-blue)' }} />
           Accent сейчас: <strong style={{ color: 'var(--mac-text-primary)' }}>{currentAccentLabel}</strong>
         </div>
       </div>
@@ -315,7 +315,7 @@ export default function ColorSchemeSelector() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ActiveIcon aria-hidden="true" style={{ width: '18px', height: '18px' }} />
+              <ActiveIcon aria-hidden="true" focusable="false" style={{ width: '18px', height: '18px' }} />
               <div style={{ display: 'grid', gap: '2px' }}>
                 <strong>{currentScheme.name}</strong>
                 <span style={{ fontSize: '12px', opacity: 0.84 }}>{currentScheme.description}</span>
