@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
-import { AppEmpty, AppError, AppLoading } from '../components/ui/macos';
+import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
 
 /**
  * Аудит: список последних действий пользователей.
@@ -43,6 +43,20 @@ export default function Audit() {
   }, [q, rows]);
 
   const stateCellStyle = { minHeight: '96px', padding: '16px' };
+  const visuallyHiddenStyle = {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0
+  };
+  const limitInputId = 'audit-limit';
+  const searchInputId = 'audit-search';
+  const tableCaptionId = 'audit-table-caption';
 
   return (
     <div>
@@ -51,24 +65,66 @@ export default function Audit() {
           <h2 style={{ margin: 0 }}>Аудит</h2>
 
           <div className="legacy-toolbar">
-            <label>
+            <label htmlFor={limitInputId}>
               Порог:&nbsp;
-              <input className="legacy-input" type="number" min={10} max={1000} value={limit} onChange={(e) => setLimit(Number(e.target.value) || 100)} />
+              <input
+                id={limitInputId}
+                className="legacy-input"
+                type="number"
+                min={10}
+                max={1000}
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value) || 100)}
+                aria-label="Количество записей аудита для загрузки"
+              />
             </label>
-            <input className="legacy-input" placeholder="Поиск по пользователю/действию/сущности" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
-            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <label htmlFor={searchInputId} style={visuallyHiddenStyle}>
+              Поиск по пользователю, действию, сущности или ID
+            </label>
+            <input
+              id={searchInputId}
+              className="legacy-input"
+              placeholder="Поиск по пользователю/действию/сущности"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ minWidth: 260 }}
+              aria-label="Поиск по журналу аудита"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="small"
+              onClick={load}
+              disabled={busy}
+              loading={busy}
+              aria-label="Обновить журнал аудита">
+              Обновить
+            </Button>
           </div>
 
           {err && (
             <AppError
               title="Ошибка загрузки аудита"
               description={String(err)}
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="small"
+                  onClick={load}
+                  disabled={busy}
+                  loading={busy}
+                  aria-label="Повторить загрузку журнала аудита">
+                  Повторить
+                </Button>
+              }
               style={{ marginBottom: 12 }}
             />
           )}
 
-          <div className="legacy-table-wrap">
+          <div className="legacy-table-wrap" aria-busy={busy} aria-describedby={tableCaptionId}>
             <table className="legacy-table">
+              <caption id={tableCaptionId} style={visuallyHiddenStyle}>Журнал аудита</caption>
               <thead>
                 <tr>
                   <th>Время</th>
@@ -84,6 +140,8 @@ export default function Audit() {
                     <td colSpan={5}>
                       <AppLoading
                         title="Загрузка аудита"
+                        description="Получаем последние действия пользователей."
+                        ariaLabel="Загружаем журнал аудита"
                         size="sm"
                         style={stateCellStyle}
                       />
