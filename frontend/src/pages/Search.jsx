@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { AppEmpty, AppError } from '../components/ui/macos';
+import { AppEmpty, AppError, Button } from '../components/ui/macos';
 
 // Modern Search Page with Full Functionality
 export default function Search() {
@@ -183,6 +183,9 @@ export default function Search() {
   // Filtered results based on active tab
   const showPatients = activeTab === 'all' || activeTab === 'patients';
   const showVisits = activeTab === 'all' || activeTab === 'visits';
+  const searchInputId = 'global-search-query';
+  const searchHintId = 'global-search-query-hint';
+  const isSearchDisabled = loading || query.trim().length < 2;
 
   return (
     <div style={styles.container}>
@@ -200,20 +203,28 @@ export default function Search() {
       {/* Search Form */}
       <form onSubmit={handleSearch} style={styles.searchForm}>
         <div style={styles.searchBox}>
+          <label htmlFor={searchInputId} style={styles.visuallyHidden}>
+            Поиск пациентов и визитов
+          </label>
           <input
+            id={searchInputId}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Введите ФИО, телефон, ID пациента или номер визита..."
             style={styles.searchInput}
+            aria-label="Поиск пациентов и визитов"
+            aria-describedby={query.length > 0 && query.length < 2 ? searchHintId : undefined}
             autoFocus
           />
           <button
             type="submit"
-            disabled={loading || query.trim().length < 2}
+            disabled={isSearchDisabled}
+            aria-label={loading ? 'Поиск выполняется' : 'Искать пациентов и визиты'}
+            aria-describedby={query.length > 0 && query.length < 2 ? searchHintId : undefined}
             style={{
               ...styles.searchButton,
-              opacity: loading || query.trim().length < 2 ? 0.6 : 1,
+              opacity: isSearchDisabled ? 0.6 : 1,
             }}
           >
             {loading ? (
@@ -224,7 +235,7 @@ export default function Search() {
           </button>
         </div>
         {query.length > 0 && query.length < 2 && (
-          <p style={styles.hint}>Введите минимум 2 символа для поиска</p>
+          <p id={searchHintId} style={styles.hint}>Введите минимум 2 символа для поиска</p>
         )}
       </form>
 
@@ -233,15 +244,30 @@ export default function Search() {
         <AppError
           title="Ошибка поиска"
           description={error}
+          action={
+            <Button
+              type="button"
+              onClick={() => performSearch(query)}
+              disabled={isSearchDisabled}
+              loading={loading}
+              size="small"
+              variant="outline"
+              aria-label="Повторить поиск с текущим запросом">
+              Повторить поиск
+            </Button>
+          }
           style={styles.errorBox}
         />
       )}
 
       {/* Results Tabs */}
       {searchPerformed && (
-        <div style={styles.tabs}>
+        <div style={styles.tabs} role="group" aria-label="Фильтр результатов поиска">
           <button
+            type="button"
             onClick={() => setActiveTab('all')}
+            aria-pressed={activeTab === 'all'}
+            aria-label="Показать все результаты поиска"
             style={{
               ...styles.tab,
               ...(activeTab === 'all' ? styles.tabActive : {}),
@@ -250,7 +276,10 @@ export default function Search() {
             Все ({patients.length + visits.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('patients')}
+            aria-pressed={activeTab === 'patients'}
+            aria-label="Показать только пациентов"
             style={{
               ...styles.tab,
               ...(activeTab === 'patients' ? styles.tabActive : {}),
@@ -259,7 +288,10 @@ export default function Search() {
             Пациенты ({patients.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('visits')}
+            aria-pressed={activeTab === 'visits'}
+            aria-label="Показать только визиты"
             style={{
               ...styles.tab,
               ...(activeTab === 'visits' ? styles.tabActive : {}),
@@ -286,6 +318,7 @@ export default function Search() {
                   key={patient.id}
                   role="button"
                   tabIndex={0}
+                  aria-label={`Открыть пациента ${[patient.last_name, patient.first_name, patient.middle_name].filter(Boolean).join(' ') || `#${patient.id}`}`}
                   onClick={() => goToPatient(patient)}
                   onKeyDown={(event) => handleActivationKeyDown(event, () => goToPatient(patient))}
                   style={styles.card}
@@ -333,6 +366,7 @@ export default function Search() {
                     key={visit.id}
                     role="button"
                     tabIndex={0}
+                    aria-label={`Открыть визит #${visit.id} пациента ${patientNames[visit.patient_id] || `#${visit.patient_id}`}`}
                     onClick={() => goToVisit(visit)}
                     onKeyDown={(event) => handleActivationKeyDown(event, () => goToVisit(visit))}
                     style={styles.card}
@@ -376,28 +410,28 @@ export default function Search() {
         {searchPerformed && !loading && patients.length === 0 && visits.length === 0 && (
           <AppEmpty
             title="Ничего не найдено"
-            description="Попробуйте изменить запрос или проверьте правильность ввода."
+            description="Проверьте написание ФИО, телефон, ID пациента или номер визита и попробуйте снова."
             style={styles.noResults}
           />
         )}
 
         {/* Initial State */}
         {!searchPerformed && !loading && (
-          <div style={styles.initialState}>
-            <div style={styles.initialIcon}>💡</div>
-            <div style={styles.initialText}>Начните поиск</div>
-            <div style={styles.initialHint}>
-              Введите ФИО пациента, номер телефона, ID или номер визита
-            </div>
-            <div style={styles.tips}>
-              <div style={styles.tip}>
-                <strong>Примеры запросов:</strong>
+          <AppEmpty
+            title="Начните поиск"
+            description="Введите ФИО пациента, номер телефона, ID пациента или номер визита."
+            action={
+              <div style={styles.tips}>
+                <div style={styles.tip}>
+                  <strong>Примеры запросов:</strong>
+                </div>
+                <div style={styles.tip}>• «Иванов» — поиск по фамилии</div>
+                <div style={styles.tip}>• «+998» — поиск по телефону</div>
+                <div style={styles.tip}>• «428» — поиск по ID пациента или визита</div>
               </div>
-              <div style={styles.tip}>• «Иванов» — поиск по фамилии</div>
-              <div style={styles.tip}>• «+998» — поиск по телефону</div>
-              <div style={styles.tip}>• «428» — поиск по ID пациента или визита</div>
-            </div>
-          </div>
+            }
+            style={styles.initialState}
+          />
         )}
       </div>
     </div >
@@ -443,6 +477,17 @@ const styles = {
     gap: 12,
     maxWidth: 800,
     margin: '0 auto',
+  },
+  visuallyHidden: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0,
   },
   searchInput: {
     flex: 1,
