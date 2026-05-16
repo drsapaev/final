@@ -11,6 +11,7 @@ import PropTypes from 'prop-types';
 const DesignValidator = ({ onValidationComplete }) => {
   const { getColor, getSpacing, getFontSize } = useTheme();
   const componentSelectId = useId();
+  const validatorTitleId = useId();
   const resultsRegionId = useId();
   const resultsTitleId = useId();
   const [isValidating, setIsValidating] = useState(false);
@@ -68,15 +69,15 @@ const DesignValidator = ({ onValidationComplete }) => {
   };
 
   return (
-    <Card padding="lg">
-      <div style={{
+    <Card padding="lg" role="region" aria-labelledby={validatorTitleId}>
+      <h2 id={validatorTitleId} style={{
         fontSize: getFontSize('lg'),
         fontWeight: '600',
-        marginBottom: getSpacing('lg'),
+        margin: `0 0 ${getSpacing('lg')} 0`,
         color: getColor('text')
       }}>
         🛠️ Валидация дизайн-системы
-      </div>
+      </h2>
 
       <div style={{ marginBottom: getSpacing('lg') }}>
         <label htmlFor={componentSelectId} style={{
