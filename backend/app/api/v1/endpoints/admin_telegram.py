@@ -121,6 +121,39 @@ STAFF_BOT_GUARDRAILS = [
     "no_queue_fairness_mutation_without_domain_service",
 ]
 
+STAFF_BOT_LINKING_CONTRACT = {
+    "contract_version": "staff-linking-v1",
+    "enabled": False,
+    "required_before_enablement": True,
+    "identity_rule": "telegram_user_id_is_not_application_identity",
+    "accepted_methods": [
+        {
+            "key": "admin_verified_staff_link",
+            "label": "Администратор подтверждает сотрудника",
+            "status": "planned",
+        },
+        {
+            "key": "one_time_signed_staff_token",
+            "label": "Одноразовый подписанный токен",
+            "status": "planned",
+        },
+    ],
+    "required_server_checks": [
+        "active_application_user",
+        "allowed_staff_role",
+        "telegram_user_not_linked_to_another_staff_user",
+        "token_not_expired",
+        "token_not_reused",
+    ],
+    "enablement_gate": [
+        "role_based_staff_linking",
+        "server_side_authorization",
+        "audit_logging",
+        "state_change_confirmations",
+    ],
+    "state_changing_actions_allowed_after_link": False,
+}
+
 
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     return {
@@ -142,6 +175,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
                 "one_time_signed_staff_token",
             ],
         },
+        "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "authorization": {
             "source": "application_rbac",
             "server_side_required": True,
@@ -606,6 +640,7 @@ def get_telegram_integration_status(
             ],
             "planned_functions": [
                 "staff_read_only_menu_contract",
+                "staff_role_linking_contract",
                 "staff_role_menus",
                 "staff_action_confirmations",
                 "staff_audit_logging",
