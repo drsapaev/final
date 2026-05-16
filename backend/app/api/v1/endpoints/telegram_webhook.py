@@ -250,6 +250,26 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "shu yerga keladi. Natija shoshilinch kerak bo'lsa, registraturaga murojaat qiling."
         ),
     },
+    "profile_linked": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Telegram привязан к пациенту: {patient}.\n{visit_summary}"
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Telegram bemorga bog'langan: {patient}.\n{visit_summary}"
+        ),
+    },
+    "recent_visit_none": {
+        TELEGRAM_LANGUAGE_RU: "Последних визитов пока нет.",
+        TELEGRAM_LANGUAGE_UZ: "Hozircha oxirgi tashriflar yo'q.",
+    },
+    "recent_visit_unknown_date": {
+        TELEGRAM_LANGUAGE_RU: "дата не указана",
+        TELEGRAM_LANGUAGE_UZ: "sana ko'rsatilmagan",
+    },
+    "recent_visit_summary": {
+        TELEGRAM_LANGUAGE_RU: "Последний визит: #{visit_id}, {visit_date}, статус: {status}.",
+        TELEGRAM_LANGUAGE_UZ: "Oxirgi tashrif: #{visit_id}, {visit_date}, holat: {status}.",
+    },
 }
 TELEGRAM_WEBHOOK_PUBLIC_ERROR = "Ошибка обработки webhook"
 TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
@@ -486,7 +506,9 @@ def _patient_display_name(patient: Patient | None) -> str:
     return patient.short_name()
 
 
-def _recent_visit_summary(db: Session, patient_id: int) -> str:
+def _recent_visit_summary(
+    db: Session, patient_id: int, language_code: str = TELEGRAM_LANGUAGE_RU
+) -> str:
     visit = (
         db.query(Visit)
         .filter(Visit.patient_id == patient_id)
@@ -494,10 +516,18 @@ def _recent_visit_summary(db: Session, patient_id: int) -> str:
         .first()
     )
     if not visit:
-        return "Последних визитов пока нет."
+        return _localized_text("recent_visit_none", language_code)
 
-    visit_date = visit.visit_date.isoformat() if visit.visit_date else "дата не указана"
-    return f"Последний визит: #{visit.id}, {visit_date}, статус: {visit.status}."
+    visit_date = (
+        visit.visit_date.isoformat()
+        if visit.visit_date
+        else _localized_text("recent_visit_unknown_date", language_code)
+    )
+    return _localized_text("recent_visit_summary", language_code).format(
+        visit_id=visit.id,
+        visit_date=visit_date,
+        status=visit.status,
+    )
 
 
 def _html_text(value: Any) -> str:
@@ -919,9 +949,12 @@ def _clinic_status_message(db: Session, chat_id: int) -> str:
     if not telegram_user or not telegram_user.patient_id:
         return _telegram_chat_text(db, chat_id, "needs_link")
 
-    return (
-        f"Telegram привязан к пациенту: {_html_text(_patient_display_name(patient))}.\n"
-        f"{_html_text(_recent_visit_summary(db, telegram_user.patient_id))}"
+    language = _telegram_chat_language(db, chat_id)
+    return _localized_text("profile_linked", language).format(
+        patient=_html_text(_patient_display_name(patient)),
+        visit_summary=_html_text(
+            _recent_visit_summary(db, telegram_user.patient_id, language)
+        ),
     )
 
 
