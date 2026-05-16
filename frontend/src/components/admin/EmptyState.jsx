@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw } from
 'lucide-react';
+import { useId } from 'react';
 import { Card } from '../ui/native';
 import PropTypes from 'prop-types';
 
@@ -22,8 +23,12 @@ const EmptyState = ({
   className = '',
   ...props
 }) => {
+  const titleId = useId();
+  const descriptionId = useId();
+  const stateRole = type === 'error' ? 'alert' : 'status';
+
   const getIcon = () => {
-    if (CustomIcon) return <CustomIcon className="w-12 h-12" />;
+    if (CustomIcon) return <CustomIcon className="w-12 h-12" aria-hidden="true" />;
 
     const iconMap = {
       default: FileText,
@@ -39,7 +44,7 @@ const EmptyState = ({
     };
 
     const Icon = iconMap[type] || iconMap.default;
-    return <Icon className="w-12 h-12" />;
+    return <Icon className="w-12 h-12" aria-hidden="true" />;
   };
 
   const getColor = () => {
@@ -56,6 +61,10 @@ const EmptyState = ({
 
   return (
     <Card
+      role={stateRole}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       className={`p-8 text-center ${className}`}
       style={{
         background: 'var(--bg-primary)',
@@ -75,13 +84,15 @@ const EmptyState = ({
         </div>
         
         <h3
+          id={titleId}
           className="text-lg font-semibold mb-2"
           style={{ color: 'var(--text-primary)' }}>
-          
+
           {title}
         </h3>
-        
+
         <p
+          id={descriptionId}
           className="text-sm mb-6 max-w-md"
           style={{ color: 'var(--text-secondary)' }}>
           
