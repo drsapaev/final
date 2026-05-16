@@ -16,6 +16,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.user import User
+from app.services.telegram_bot import (
+    PATIENT_BOT_COMMANDS_RU,
+    PATIENT_BOT_COMMANDS_UZ,
+    get_telegram_bot_service,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -225,6 +230,51 @@ def test_telegram_bot(
         raise_admin_telegram_error(
             "test-bot",
             "Ошибка тестирования бота",
+            e,
+        )
+
+
+@router.post("/telegram/register-patient-commands")
+async def register_patient_bot_commands(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Register patient bot commands in Telegram via the configured bot token."""
+    try:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bot token is not configured",
+            )
+
+        bot_service = await get_telegram_bot_service()
+        bot_service.bot_token = bot_token
+        ok, error = await bot_service.set_patient_bot_commands()
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "message": "Telegram patient bot commands were not registered",
+                    "error": error,
+                },
+            )
+
+        return {
+            "success": True,
+            "message": "Telegram patient bot commands registered",
+            "registered_languages": ["ru", "uz"],
+            "commands": {
+                "ru": PATIENT_BOT_COMMANDS_RU,
+                "uz": PATIENT_BOT_COMMANDS_UZ,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise_admin_telegram_error(
+            "register-patient-commands",
+            "Telegram patient bot command registration failed",
             e,
         )
 
