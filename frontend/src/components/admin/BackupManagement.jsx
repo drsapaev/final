@@ -219,6 +219,11 @@ const BackupManagement = () => {
     const matchesType = typeFilter === 'all' || backup.backup_type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
+  const hasBackupFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
+  const backupEmptyTitle = hasBackupFilters ? 'Резервные копии по фильтрам не найдены' : 'Резервные копии ещё не созданы';
+  const backupEmptyDescription = hasBackupFilters ?
+  'Измените поиск, статус или тип, чтобы увидеть другие резервные копии.' :
+  'Создайте первую резервную копию, чтобы зафиксировать состояние системы.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflow: 'hidden' }}>
@@ -633,11 +638,11 @@ const BackupManagement = () => {
       filteredBackups.length === 0 ?
       <MacOSEmptyState
         icon={HardDrive}
-        title="Резервные копии не найдены"
-        description="Создайте первую резервную копию или измените фильтры поиска"
+        title={backupEmptyTitle}
+        description={backupEmptyDescription}
         action={
         <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
-              <Plus aria-hidden="true" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать копию
             </MacOSButton>
         } /> :
