@@ -76,7 +76,7 @@ TELEGRAM_MAIN_MENU = {
     "one_time_keyboard": False,
 }
 TELEGRAM_LANGUAGE_RU = "ru"
-TELEGRAM_LANGUAGE_UZ = "uz"  # Uzbek Latin; kept compact for current language_code column.
+TELEGRAM_LANGUAGE_UZ = "uz-Latn"
 TELEGRAM_LANGUAGE_MENU = {
     "keyboard": [[{"text": "Русский"}, {"text": "O'zbekcha"}]],
     "resize_keyboard": True,

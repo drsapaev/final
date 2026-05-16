@@ -9,6 +9,7 @@ import pytest
 
 from app.api.v1.endpoints import telegram_webhook
 from app.services import telegram_bot
+from app.services.telegram_templates import TelegramTemplatesService
 from app.models.lab import LabReportInstance, LabReportTemplate, LabReportTemplateVersion
 from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
@@ -225,6 +226,50 @@ class TestTelegramWebhookSecurity:
             .first()
             is None
         )
+
+    def test_patient_language_normalization_uses_canonical_uz_latn(self):
+        assert telegram_webhook._normalize_patient_language("uz") == "uz-Latn"
+        assert telegram_webhook._normalize_patient_language("uz_Latn") == "uz-Latn"
+        assert telegram_webhook._normalize_patient_language("uzbek") == "uz-Latn"
+        assert telegram_webhook._normalize_patient_language("ru") == "ru"
+
+    def test_legacy_templates_accept_canonical_uz_latn(self):
+        templates = TelegramTemplatesService()
+
+        template = templates.get_template(
+            "welcome",
+            "uz-Latn",
+            {"first_name": "Ali"},
+        )
+
+        assert "Programma Clinic-ga" in template["text"]
+        assert "Ali" in template["text"]
+        assert "Dobro" not in template["text"]
+
+    @pytest.mark.asyncio
+    async def test_uzbek_language_choice_stores_canonical_uz_latn(self, db_session):
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 102,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7006},
+                "from": {"id": 111, "language_code": "uz"},
+                "text": "O'zbekcha",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7006)
+            .one()
+        )
+        assert telegram_user.language_code == "uz-Latn"
 
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry
