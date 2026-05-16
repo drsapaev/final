@@ -130,6 +130,17 @@ def get_telegram_user_by_chat_id(db: Session, chat_id: int) -> TelegramUser | No
     return db.query(TelegramUser).filter(TelegramUser.chat_id == chat_id).first()
 
 
+def get_telegram_user_by_linked_user_id(
+    db: Session, linked_user_id: int
+) -> TelegramUser | None:
+    """Get a Telegram account linked to an application user."""
+    return (
+        db.query(TelegramUser)
+        .filter(TelegramUser.user_id == linked_user_id)
+        .first()
+    )
+
+
 def get_telegram_users(
     db: Session, active_only: bool = True, skip: int = 0, limit: int = 100
 ) -> list[TelegramUser]:
@@ -175,6 +186,23 @@ def link_patient_to_telegram(
     user = get_telegram_user_by_chat_id(db, chat_id)
     if user:
         user.patient_id = patient_id
+        db.commit()
+        db.refresh(user)
+        return user
+    return None
+
+
+def link_staff_user_to_telegram(
+    db: Session, chat_id: int, linked_user_id: int
+) -> TelegramUser | None:
+    """Link an application staff user to an existing Telegram account.
+
+    Role authorization and one-time link-token validation must happen before
+    this helper is called. This function only writes telegram_users.user_id.
+    """
+    user = get_telegram_user_by_chat_id(db, chat_id)
+    if user:
+        user.user_id = linked_user_id
         db.commit()
         db.refresh(user)
         return user
