@@ -176,8 +176,17 @@ const TelegramManager = () => {
   const staffBotReadiness = Array.isArray(staffBot.readiness) ? staffBot.readiness : [];
   const readyStaffControls = staffBotReadiness.filter((item) => item?.ready);
   const staffRoles = Array.isArray(staffBot.supported_roles) ? staffBot.supported_roles : [];
-  const staffMenuContract = Array.isArray(staffBot.read_only_menu_contract) ? staffBot.read_only_menu_contract : [];
-  const staffMenuItemCount = staffMenuContract.reduce((count, role) => {
+  const staffMenuContractSource = Array.isArray(staffBot.read_only_menu_contract) ? staffBot.read_only_menu_contract : [];
+  const staffRoleMenus = staffBot.role_menus || {};
+  const staffMenuRoleCount = typeof staffRoleMenus.role_count === 'number' ?
+  staffRoleMenus.role_count :
+  staffMenuContractSource.length;
+  const staffMenuContract = staffMenuRoleCount === staffMenuContractSource.length ?
+  staffMenuContractSource :
+  Array.from({ length: staffMenuRoleCount });
+  const staffMenuItemCount = typeof staffRoleMenus.item_count === 'number' ?
+  staffRoleMenus.item_count :
+  staffMenuContractSource.reduce((count, role) => {
     const items = Array.isArray(role?.items) ? role.items : [];
     return count + items.length;
   }, 0);
