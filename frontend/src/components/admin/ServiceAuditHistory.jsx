@@ -21,12 +21,14 @@ import {
   MacOSButton,
   MacOSBadge,
   AppEmpty,
+  AppError,
   AppLoading
 } from '../ui/macos';
 
 const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
   const [expandedItems, setExpandedItems] = useState(new Set());
 
   useEffect(() => {
@@ -38,9 +40,16 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   const loadHistory = async () => {
     try {
       setLoading(true);
+      setErrorMessage('');
       const response = await servicesService.getServiceHistory(serviceId, { limit: 100 });
       setHistory(response);
     } catch (error) {
+      setErrorMessage(
+        error?.response?.data?.detail ||
+          error?.data?.detail ||
+          error?.message ||
+          'Не удалось загрузить историю изменений.'
+      );
       logger.error('Ошибка загрузки истории:', error);
     } finally {
       setLoading(false);
@@ -146,6 +155,23 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         <AppLoading
           title="Загрузка истории изменений..."
           style={{ minHeight: 200 }}
+        />
+      </MacOSCard>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <MacOSCard variant="default" style={{ padding: '24px' }}>
+        <AppError
+          title="Не удалось загрузить историю изменений"
+          description={errorMessage}
+          action={
+            <MacOSButton variant="outline" size="sm" onClick={loadHistory}>
+              <RefreshCw size={14} style={{ marginRight: '6px' }} />
+              Повторить
+            </MacOSButton>
+          }
         />
       </MacOSCard>
     );

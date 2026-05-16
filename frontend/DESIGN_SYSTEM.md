@@ -25,6 +25,8 @@ This section is the frontend UI layer contract for new clinic operations work. I
 
 When this section conflicts with older examples later in this file or in historical migration reports, follow this section first.
 
+Related audit: [Frontend Function Classification Audit](./FRONTEND_FUNCTION_CLASSIFICATION_AUDIT.md) maps frontend zones, risk levels, CI/CD categories, and safe PR strategy.
+
 ### Canonical UI layer
 
 For role dashboards, clinic operations pages, forms, tables, payment result pages, empty/loading/error states, navigation, sidebar, and app-shell work, use:
