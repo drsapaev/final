@@ -261,7 +261,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
                       }
                     />
                     <ListItemSecondaryAction>
-                      <IconButton onClick={() => handleDeleteStage(stage.id)}>
+                      <IconButton aria-label="Удалить" title="Удалить" onClick={() => handleDeleteStage(stage.id)}>
                         <Delete />
                       </IconButton>
                     </ListItemSecondaryAction>
