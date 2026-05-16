@@ -170,6 +170,10 @@ const TelegramManager = () => {
   const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
   const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
+  const staffBot = botStatus?.staff_bot || {};
+  const staffBotReadiness = Array.isArray(staffBot.readiness) ? staffBot.readiness : [];
+  const readyStaffControls = staffBotReadiness.filter((item) => item?.ready);
+  const staffRoles = Array.isArray(staffBot.supported_roles) ? staffBot.supported_roles : [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -317,6 +321,34 @@ const TelegramManager = () => {
                     secondary={patientBotCommands.length ?
                     patientBotCommands.map((item) => item.command).join(' ') :
                     'Нет данных'} />
+
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <MessageSquare />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`Staff bot ${staffBot.version || 'planning'}`}
+                    secondary={staffBot.enabled ?
+                    'Готов к ролевым действиям' :
+                    'План: роли, audit и подтверждения до включения'} />
+
+                  <Badge
+                    variant={staffBot.enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffBot.enabled ? 'Готов' : 'План'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff guardrails"
+                    secondary={staffBotReadiness.length ?
+                    `${readyStaffControls.length}/${staffBotReadiness.length} готово; роли: ${staffRoles.join(', ')}` :
+                    'Требуется отдельный staff/admin contract'} />
 
                 </ListItem>
                 <ListItem>

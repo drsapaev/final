@@ -470,6 +470,11 @@ def get_telegram_integration_status(
                 "patient_payments_debt",
                 "patient_status",
                 "lab_results_pdf",
+            ],
+            "planned_functions": [
+                "staff_role_menus",
+                "staff_action_confirmations",
+                "staff_audit_logging",
                 "admin_notifications",
             ],
             "patient_bot": {
@@ -517,6 +522,52 @@ def get_telegram_integration_status(
                 ],
                 "results_delivery": "telegram_pdf",
                 "max_pdf_reports_per_request": 3,
+            },
+            "staff_bot": {
+                "version": "planning",
+                "enabled": False,
+                "status": "requires_role_linking_audit_and_confirmations",
+                "transport": "polling" if not webhook_set else "webhook",
+                "supported_languages": [
+                    {"code": "ru", "label": "Русский"},
+                ],
+                "supported_roles": [
+                    "registrar",
+                    "doctor",
+                    "cashier",
+                    "lab",
+                    "admin",
+                    "owner",
+                ],
+                "readiness": [
+                    {
+                        "key": "role_based_staff_linking",
+                        "label": "Ролевая привязка сотрудников",
+                        "ready": False,
+                    },
+                    {
+                        "key": "server_side_authorization",
+                        "label": "Проверка ролей на backend",
+                        "ready": False,
+                    },
+                    {
+                        "key": "audit_logging",
+                        "label": "Аудит действий сотрудников",
+                        "ready": False,
+                    },
+                    {
+                        "key": "state_change_confirmations",
+                        "label": "Подтверждения для операций",
+                        "ready": False,
+                    },
+                ],
+                "guardrails": [
+                    "server_side_authorization",
+                    "audit_logging",
+                    "explicit_confirmation_for_state_changes",
+                    "no_queue_fairness_mutation_without_domain_service",
+                ],
+                "next_slice": "role_linking_and_read_only_staff_menu_contract",
             },
             "transition_path": (
                 "Set webhook when a public HTTPS backend URL is available; "
