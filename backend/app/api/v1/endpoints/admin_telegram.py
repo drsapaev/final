@@ -346,6 +346,31 @@ STAFF_BOT_AUDIT_CONTRACT = {
 }
 
 
+def _build_staff_role_menus_summary() -> Dict[str, Any]:
+    menu_roles = [
+        role_menu["role"] for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT
+    ]
+    menu_item_count = sum(
+        len(role_menu.get("items", []))
+        for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT
+    )
+    return {
+        "contract_published": True,
+        "runtime_enabled": False,
+        "read_only": True,
+        "source": "read_only_menu_contract",
+        "roles": menu_roles,
+        "role_count": len(menu_roles),
+        "item_count": menu_item_count,
+        "blocked_until": [
+            "role_based_staff_linking",
+            "server_side_authorization",
+            "audit_logging",
+            "state_change_confirmations",
+        ],
+    }
+
+
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     return {
         "version": "planning",
@@ -382,6 +407,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
+        "role_menus": _build_staff_role_menus_summary(),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
         "next_slice": "dedicated_staff_bot_token_readiness_contract",
