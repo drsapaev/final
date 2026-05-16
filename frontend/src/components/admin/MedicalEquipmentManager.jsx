@@ -296,6 +296,11 @@ const MedicalEquipmentManager = () => {
     if (filters.location && !device.location.toLowerCase().includes(filters.location.toLowerCase())) return false;
     return true;
   });
+  const hasDeviceFilters = Boolean(filters.device_type || filters.status || filters.location.trim());
+  const devicesEmptyTitle = hasDeviceFilters ? 'Устройства по фильтрам не найдены' : 'Устройства ещё не добавлены';
+  const devicesEmptyDescription = hasDeviceFilters ?
+  'Измените тип, статус или расположение, чтобы увидеть другие устройства.' :
+  'Добавьте первое медицинское устройство, чтобы отслеживать его статус и измерения.';
 
   const renderOverviewTab = () =>
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -637,8 +642,8 @@ const MedicalEquipmentManager = () => {
       {filteredDevices.length === 0 && !loading &&
     <MacOSEmptyState
       icon={Stethoscope}
-      title="Устройства не найдены"
-      description="Попробуйте изменить фильтры или добавить новое устройство" />
+      title={devicesEmptyTitle}
+      description={devicesEmptyDescription} />
 
     }
     </div>;
