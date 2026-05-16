@@ -178,6 +178,28 @@ STAFF_BOT_LINKING_CONTRACT = {
     "state_changing_actions_allowed_after_link": False,
 }
 
+STAFF_BOT_LINKING_RUNTIME_CONTRACT = {
+    "contract_version": "staff-linking-runtime-v1",
+    "enabled": False,
+    "helper_available": True,
+    "runtime_handler_enabled": False,
+    "write_helper": "link_staff_user_to_telegram",
+    "lookup_helpers": [
+        "get_telegram_user_by_chat_id",
+        "get_telegram_user_by_linked_user_id",
+    ],
+    "writes": [
+        "telegram_users.user_id",
+    ],
+    "requires_prevalidated_inputs": [
+        "active_application_user",
+        "allowed_staff_role",
+        "one_time_link_token_validated",
+        "telegram_user_not_linked_to_another_staff_user",
+    ],
+    "state_changing_actions_allowed_after_link": False,
+}
+
 STAFF_BOT_AUTHORIZATION_CONTRACT = {
     "contract_version": "staff-authorization-v1",
     "enabled": False,
@@ -464,6 +486,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         },
         "token_contract": STAFF_BOT_TOKEN_CONTRACT,
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
+        "linking_runtime_contract": STAFF_BOT_LINKING_RUNTIME_CONTRACT,
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -485,7 +508,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_role_linking_runtime",
+        "next_slice": "staff_role_linking_token_validation",
     }
 
 
