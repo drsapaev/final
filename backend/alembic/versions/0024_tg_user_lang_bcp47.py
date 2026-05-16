@@ -1,6 +1,6 @@
 """Store Telegram user language codes as BCP 47 tags.
 
-Revision ID: 0024_telegram_user_language_code_bcp47
+Revision ID: 0024_tg_user_lang_bcp47
 Revises: 0023_ticket_print_qr_default
 Create Date: 2026-05-16 10:55:00.000000
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0024_telegram_user_language_code_bcp47"
+revision = "0024_tg_user_lang_bcp47"
 down_revision = "0023_ticket_print_qr_default"
 branch_labels = None
 depends_on = None
