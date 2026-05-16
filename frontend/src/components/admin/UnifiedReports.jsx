@@ -25,7 +25,7 @@ const UnifiedReports = () => {
     };
 
     return (
-      <div style={{
+      <div role="tablist" aria-label="Reports sections" style={{
         display: 'flex',
         gap: '4px',
         padding: '8px',
@@ -37,6 +37,11 @@ const UnifiedReports = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            id={`reports-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`reports-panel-${tab.id}`}
             onClick={() => onTabChange(tab.id)}
             style={{
               padding: '8px 16px',
@@ -87,7 +92,12 @@ const UnifiedReports = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div
+        id={`reports-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`reports-tab-${activeTab}`}
+        style={{ flex: 1, overflow: 'auto' }}
+      >
         {renderContent()}
       </div>
     </div>
