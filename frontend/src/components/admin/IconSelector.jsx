@@ -3,7 +3,7 @@
  * Компонент для выбора иконки из набора lucide-react иконок
  */
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
     Heart,
     Activity,
@@ -63,17 +63,25 @@ export const iconMetadata = [
 
 const IconSelector = ({ value, onChange, label = 'Выберите иконку' }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const labelId = useId();
+    const dropdownId = useId();
     const selectedIcon = iconMetadata.find(icon => icon.name === value);
+    const selectedLabel = selectedIcon?.label || 'не выбрано';
     const handleActivationKeyDown = (event, action) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             action();
         }
     };
+    const handleTriggerKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{
+        <div role="group" aria-labelledby={labelId} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label id={labelId} style={{
                 fontSize: '14px',
                 fontWeight: '500',
                 color: 'var(--mac-text-primary)'
@@ -84,6 +92,11 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
+                    onKeyDown={handleTriggerKeyDown}
+                    aria-haspopup="dialog"
+                    aria-expanded={isOpen}
+                    aria-controls={isOpen ? dropdownId : undefined}
+                    aria-label={`${label}: ${selectedLabel}`}
                     style={{
                         width: '100%',
                         padding: '10px 12px',
@@ -101,14 +114,14 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {selectedIcon ? (
                             <>
-                                <selectedIcon.icon size={20} />
+                                <selectedIcon.icon aria-hidden="true" size={20} />
                                 <span>{selectedIcon.label}</span>
                             </>
                         ) : (
                             <span style={{ color: 'var(--mac-text-secondary)' }}>Не выбрано</span>
                         )}
                     </div>
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>
+                    <span aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }}>
                         {isOpen ? '▲' : '▼'}
                     </span>
                 </button>
@@ -126,10 +139,11 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                             }}
                             role="button"
                             tabIndex={0}
+                            aria-label="Закрыть выбор иконки"
                             onClick={() => setIsOpen(false)}
                             onKeyDown={(event) => handleActivationKeyDown(event, () => setIsOpen(false))}
                         />
-                        <div style={{
+                        <div id={dropdownId} role="dialog" aria-label={`Выбор иконки: ${label}`} style={{
                             position: 'absolute',
                             top: '100%',
                             left: 0,
@@ -156,6 +170,8 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                                         <button
                                             key={iconMeta.name}
                                             type="button"
+                                            aria-pressed={isSelected}
+                                            aria-label={`${isSelected ? 'Выбрана иконка' : 'Выбрать иконку'} ${iconMeta.label}`}
                                             onClick={() => {
                                                 onChange(iconMeta.name);
                                                 setIsOpen(false);
@@ -189,7 +205,7 @@ const IconSelector = ({ value, onChange, label = 'Выберите иконку'
                                                 }
                                             }}
                                         >
-                                            <IconComponent size={24} />
+                                            <IconComponent aria-hidden="true" size={24} />
                                             <span style={{
                                                 fontSize: '11px',
                                                 color: 'var(--mac-text-secondary)',
