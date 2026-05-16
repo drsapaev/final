@@ -150,15 +150,6 @@ const TelegramManager = () => {
     }
   };
 
-  const resetForm = () => {
-    setTemplateForm({
-      name: '',
-      message_type: 'text',
-      content: '',
-      is_active: true
-    });
-  };
-
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: '400px' }}>
