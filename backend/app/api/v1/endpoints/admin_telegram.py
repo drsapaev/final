@@ -25,6 +25,139 @@ from app.services.telegram_bot import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+STAFF_BOT_SUPPORTED_ROLES = [
+    "registrar",
+    "doctor",
+    "cashier",
+    "lab",
+    "admin",
+    "owner",
+]
+
+STAFF_BOT_READINESS = [
+    {
+        "key": "role_based_staff_linking",
+        "label": "Ролевая привязка сотрудников",
+        "ready": False,
+    },
+    {
+        "key": "server_side_authorization",
+        "label": "Проверка ролей на backend",
+        "ready": False,
+    },
+    {
+        "key": "audit_logging",
+        "label": "Аудит действий сотрудников",
+        "ready": False,
+    },
+    {
+        "key": "state_change_confirmations",
+        "label": "Подтверждения для операций",
+        "ready": False,
+    },
+]
+
+STAFF_BOT_READ_ONLY_MENU_CONTRACT = [
+    {
+        "role": "registrar",
+        "label": "Регистратор",
+        "items": [
+            {"key": "queue_overview", "label": "Очередь", "intent": "read_only"},
+            {"key": "next_patient", "label": "Следующий пациент", "intent": "read_only"},
+            {"key": "payment_status", "label": "Статус оплаты", "intent": "read_only"},
+        ],
+    },
+    {
+        "role": "doctor",
+        "label": "Врач",
+        "items": [
+            {"key": "today_schedule", "label": "Расписание на сегодня", "intent": "read_only"},
+            {"key": "next_patient", "label": "Следующий пациент", "intent": "read_only"},
+            {"key": "emr_reminders", "label": "Напоминания ЭМК", "intent": "read_only"},
+        ],
+    },
+    {
+        "role": "cashier",
+        "label": "Кассир",
+        "items": [
+            {"key": "unpaid_invoices", "label": "Неоплаченные счета", "intent": "read_only"},
+            {"key": "paid_invoices", "label": "Оплаченные счета", "intent": "read_only"},
+            {"key": "reconciliation_alerts", "label": "Сверка оплат", "intent": "read_only"},
+        ],
+    },
+    {
+        "role": "lab",
+        "label": "Лаборатория",
+        "items": [
+            {"key": "ready_reports", "label": "Готовые результаты", "intent": "read_only"},
+            {"key": "pending_reports", "label": "Ожидающие результаты", "intent": "read_only"},
+            {"key": "delivery_status", "label": "Статус доставки", "intent": "read_only"},
+        ],
+    },
+    {
+        "role": "admin",
+        "label": "Администратор",
+        "items": [
+            {"key": "daily_summary", "label": "Дневная сводка", "intent": "read_only"},
+            {"key": "integration_errors", "label": "Ошибки интеграций", "intent": "read_only"},
+            {"key": "staff_readiness", "label": "Готовность staff bot", "intent": "read_only"},
+        ],
+    },
+    {
+        "role": "owner",
+        "label": "Владелец",
+        "items": [
+            {"key": "daily_summary", "label": "Дневная сводка", "intent": "read_only"},
+            {"key": "revenue_summary", "label": "Сводка выручки", "intent": "read_only"},
+            {"key": "integration_errors", "label": "Ошибки интеграций", "intent": "read_only"},
+        ],
+    },
+]
+
+STAFF_BOT_GUARDRAILS = [
+    "server_side_authorization",
+    "audit_logging",
+    "explicit_confirmation_for_state_changes",
+    "no_queue_fairness_mutation_without_domain_service",
+]
+
+
+def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
+    return {
+        "version": "planning",
+        "contract_version": "staff-menu-read-only-v1",
+        "enabled": False,
+        "contract_published": True,
+        "status": "requires_role_linking_audit_and_confirmations",
+        "transport": "polling" if not webhook_set else "webhook",
+        "supported_languages": [
+            {"code": "ru", "label": "Русский"},
+        ],
+        "supported_roles": STAFF_BOT_SUPPORTED_ROLES,
+        "role_linking": {
+            "enabled": False,
+            "required_before_enablement": True,
+            "accepted_methods": [
+                "admin_verified_staff_link",
+                "one_time_signed_staff_token",
+            ],
+        },
+        "authorization": {
+            "source": "application_rbac",
+            "server_side_required": True,
+            "ready": False,
+        },
+        "audit": {
+            "required": True,
+            "ready": False,
+        },
+        "state_changing_actions_enabled": False,
+        "readiness": STAFF_BOT_READINESS,
+        "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
+        "guardrails": STAFF_BOT_GUARDRAILS,
+        "next_slice": "role_linking_and_read_only_staff_menu_contract",
+    }
+
 
 def raise_admin_telegram_error(
     action: str,
@@ -472,6 +605,7 @@ def get_telegram_integration_status(
                 "lab_results_pdf",
             ],
             "planned_functions": [
+                "staff_read_only_menu_contract",
                 "staff_role_menus",
                 "staff_action_confirmations",
                 "staff_audit_logging",
@@ -523,52 +657,7 @@ def get_telegram_integration_status(
                 "results_delivery": "telegram_pdf",
                 "max_pdf_reports_per_request": 3,
             },
-            "staff_bot": {
-                "version": "planning",
-                "enabled": False,
-                "status": "requires_role_linking_audit_and_confirmations",
-                "transport": "polling" if not webhook_set else "webhook",
-                "supported_languages": [
-                    {"code": "ru", "label": "Русский"},
-                ],
-                "supported_roles": [
-                    "registrar",
-                    "doctor",
-                    "cashier",
-                    "lab",
-                    "admin",
-                    "owner",
-                ],
-                "readiness": [
-                    {
-                        "key": "role_based_staff_linking",
-                        "label": "Ролевая привязка сотрудников",
-                        "ready": False,
-                    },
-                    {
-                        "key": "server_side_authorization",
-                        "label": "Проверка ролей на backend",
-                        "ready": False,
-                    },
-                    {
-                        "key": "audit_logging",
-                        "label": "Аудит действий сотрудников",
-                        "ready": False,
-                    },
-                    {
-                        "key": "state_change_confirmations",
-                        "label": "Подтверждения для операций",
-                        "ready": False,
-                    },
-                ],
-                "guardrails": [
-                    "server_side_authorization",
-                    "audit_logging",
-                    "explicit_confirmation_for_state_changes",
-                    "no_queue_fairness_mutation_without_domain_service",
-                ],
-                "next_slice": "role_linking_and_read_only_staff_menu_contract",
-            },
+            "staff_bot": _build_staff_bot_status(webhook_set),
             "transition_path": (
                 "Set webhook when a public HTTPS backend URL is available; "
                 "stop polling before webhook is enabled."
