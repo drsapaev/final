@@ -189,6 +189,13 @@ const TelegramManager = () => {
   const staffLinkingMethodNames = staffLinkingMethods.
   map((method) => method?.label || method?.key || method).
   filter(Boolean);
+  const staffCommandContract = staffBot.command_registration_contract || staffBot.command_contract || {};
+  const staffCommandList = Array.isArray(staffCommandContract.commands) ?
+  staffCommandContract.commands :
+  [];
+  const staffCommandNames = staffCommandList.
+  map((item) => item?.command).
+  filter(Boolean);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -398,6 +405,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffBot.state_changing_actions_enabled ? 'Actions' : 'Read-only'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff command registration"
+                    secondary={staffCommandNames.length ?
+                    `${staffCommandNames.join(' ')}; registration: ${staffCommandContract.registration_enabled ? 'enabled' : 'disabled until staff gates'}` :
+                    'Staff command contract не опубликован'} />
+
+                  <Badge
+                    variant={staffCommandContract.registration_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffCommandContract.registration_enabled ? 'Enabled' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>

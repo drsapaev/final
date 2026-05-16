@@ -154,6 +154,58 @@ STAFF_BOT_LINKING_CONTRACT = {
     "state_changing_actions_allowed_after_link": False,
 }
 
+STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
+    "contract_version": "staff-commands-v1",
+    "registration_enabled": False,
+    "registration_endpoint_published": False,
+    "bot_scope": "staff_bot_only",
+    "commands": [
+        {
+            "command": "/staff",
+            "label": "Статус сотрудника",
+            "intent": "read_only",
+        },
+        {
+            "command": "/queue",
+            "label": "Очередь по роли",
+            "intent": "read_only",
+        },
+        {
+            "command": "/schedule",
+            "label": "Расписание",
+            "intent": "read_only",
+        },
+        {
+            "command": "/payments",
+            "label": "Статусы оплат",
+            "intent": "read_only",
+        },
+        {
+            "command": "/reports",
+            "label": "Готовность результатов",
+            "intent": "read_only",
+        },
+        {
+            "command": "/summary",
+            "label": "Операционная сводка",
+            "intent": "read_only",
+        },
+        {
+            "command": "/help",
+            "label": "Помощь сотруднику",
+            "intent": "read_only",
+        },
+    ],
+    "enablement_gate": [
+        "dedicated_staff_bot_token",
+        "role_based_staff_linking",
+        "server_side_authorization",
+        "audit_logging",
+        "state_change_confirmations",
+    ],
+    "state_changing_commands_registered": False,
+}
+
 
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     return {
@@ -176,6 +228,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
             ],
         },
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
+        "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
         "authorization": {
             "source": "application_rbac",
             "server_side_required": True,
@@ -189,7 +242,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "readiness": STAFF_BOT_READINESS,
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "role_linking_and_read_only_staff_menu_contract",
+        "next_slice": "staff_bot_command_registration_contract",
     }
 
 
@@ -641,6 +694,7 @@ def get_telegram_integration_status(
             "planned_functions": [
                 "staff_read_only_menu_contract",
                 "staff_role_linking_contract",
+                "staff_command_registration_contract",
                 "staff_role_menus",
                 "staff_action_confirmations",
                 "staff_audit_logging",
