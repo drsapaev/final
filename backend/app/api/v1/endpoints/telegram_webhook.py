@@ -316,6 +316,46 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Onlayn to'lov hozircha ulanmagan. To'lov uchun kassaga murojaat qiling."
         ),
     },
+    "queue_empty": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Telegram привязан к пациенту: {patient}.\n"
+            "{visit_summary}\n\n"
+            "На сегодня активной очереди нет."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Telegram bemorga bog'langan: {patient}.\n"
+            "{visit_summary}\n\n"
+            "Bugun faol navbat yo'q."
+        ),
+    },
+    "queue_patient": {
+        TELEGRAM_LANGUAGE_RU: "Пациент: {patient}",
+        TELEGRAM_LANGUAGE_UZ: "Bemor: {patient}",
+    },
+    "queue_title": {
+        TELEGRAM_LANGUAGE_RU: "Ваша очередь на сегодня:",
+        TELEGRAM_LANGUAGE_UZ: "Bugungi navbatingiz:",
+    },
+    "queue_status": {
+        TELEGRAM_LANGUAGE_RU: "статус: {status}",
+        TELEGRAM_LANGUAGE_UZ: "holat: {status}",
+    },
+    "queue_position": {
+        TELEGRAM_LANGUAGE_RU: "позиция: {position}",
+        TELEGRAM_LANGUAGE_UZ: "navbatdagi o'rin: {position}",
+    },
+    "queue_cabinet": {
+        TELEGRAM_LANGUAGE_RU: "Кабинет {cabinet}",
+        TELEGRAM_LANGUAGE_UZ: "{cabinet}-xona",
+    },
+    "queue_more": {
+        TELEGRAM_LANGUAGE_RU: "Еще записей: {count}",
+        TELEGRAM_LANGUAGE_UZ: "Yana yozuvlar: {count}",
+    },
+    "queue_default_name": {
+        TELEGRAM_LANGUAGE_RU: "Очередь",
+        TELEGRAM_LANGUAGE_UZ: "Navbat",
+    },
 }
 TELEGRAM_WEBHOOK_PUBLIC_ERROR = "Ошибка обработки webhook"
 TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
@@ -340,6 +380,31 @@ QUEUE_STATUS_LABELS = {
     "incomplete": "не завершен",
     "no_show": "не явился",
     "cancelled": "отменен",
+}
+QUEUE_TAG_LABELS_BY_LANGUAGE = {
+    TELEGRAM_LANGUAGE_RU: QUEUE_TAG_LABELS,
+    TELEGRAM_LANGUAGE_UZ: {
+        "ecg": "EKG",
+        "cardiology_common": "Kardiologiya",
+        "dermatology": "Dermatologiya",
+        "stomatology": "Stomatologiya",
+        "cosmetology": "Kosmetologiya",
+        "lab": "Laboratoriya",
+        "general": "Umumiy navbat",
+    },
+}
+QUEUE_STATUS_LABELS_BY_LANGUAGE = {
+    TELEGRAM_LANGUAGE_RU: QUEUE_STATUS_LABELS,
+    TELEGRAM_LANGUAGE_UZ: {
+        "waiting": "kutmoqda",
+        "called": "chaqirilgan",
+        "in_service": "qabulda",
+        "diagnostics": "diagnostikada",
+        "served": "yakunlangan",
+        "incomplete": "yakunlanmagan",
+        "no_show": "kelmagan",
+        "cancelled": "bekor qilingan",
+    },
 }
 PAYMENT_PAID_STATUSES = {"paid", "completed"}
 PAYMENT_PENDING_STATUSES = {"pending", "processing"}
@@ -647,25 +712,43 @@ def _queue_entry_position(db: Session, entry: OnlineQueueEntry) -> int | None:
     return None
 
 
-def _queue_entry_name(entry: OnlineQueueEntry) -> str:
+def _queue_entry_name(
+    entry: OnlineQueueEntry, language_code: str = TELEGRAM_LANGUAGE_RU
+) -> str:
     queue = getattr(entry, "queue", None)
     queue_tag = getattr(queue, "queue_tag", None)
     if queue_tag:
-        return QUEUE_TAG_LABELS.get(queue_tag, queue_tag)
+        language = _normalize_patient_language(language_code)
+        labels = QUEUE_TAG_LABELS_BY_LANGUAGE.get(language, QUEUE_TAG_LABELS)
+        return labels.get(queue_tag) or QUEUE_TAG_LABELS.get(queue_tag, queue_tag)
 
     services = entry.services or []
     if services:
         first_service = services[0] or {}
-        return str(first_service.get("name") or first_service.get("title") or "Очередь")
-    return "Очередь"
+        return str(
+            first_service.get("name")
+            or first_service.get("title")
+            or _localized_text("queue_default_name", language_code)
+        )
+    return _localized_text("queue_default_name", language_code)
 
 
-def _queue_entry_cabinet(entry: OnlineQueueEntry) -> str | None:
+def _queue_status_label(status: str, language_code: str = TELEGRAM_LANGUAGE_RU) -> str:
+    language = _normalize_patient_language(language_code)
+    labels = QUEUE_STATUS_LABELS_BY_LANGUAGE.get(language, QUEUE_STATUS_LABELS)
+    return labels.get(status) or QUEUE_STATUS_LABELS.get(status, status)
+
+
+def _queue_entry_cabinet(
+    entry: OnlineQueueEntry, language_code: str = TELEGRAM_LANGUAGE_RU
+) -> str | None:
     queue = getattr(entry, "queue", None)
     cabinet_number = getattr(queue, "cabinet_number", None)
     if not cabinet_number:
         return None
-    return f"Кабинет {_html_text(cabinet_number)}"
+    return _localized_text("queue_cabinet", language_code).format(
+        cabinet=_html_text(cabinet_number)
+    )
 
 
 def _clinic_queue_message(db: Session, chat_id: int) -> str:
@@ -673,35 +756,44 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
     if not telegram_user or not telegram_user.patient_id:
         return _telegram_chat_text(db, chat_id, "needs_link")
 
+    language = _telegram_chat_language(db, chat_id)
+    patient_name = _html_text(_patient_display_name(patient))
     entries = _patient_today_queue_entries(db, telegram_user.patient_id)
     if not entries:
-        return (
-            f"Telegram привязан к пациенту: {_html_text(_patient_display_name(patient))}.\n"
-            f"{_html_text(_recent_visit_summary(db, telegram_user.patient_id))}\n\n"
-            "На сегодня активной очереди нет."
+        return _localized_text("queue_empty", language).format(
+            patient=patient_name,
+            visit_summary=_html_text(
+                _recent_visit_summary(db, telegram_user.patient_id, language)
+            ),
         )
 
     lines = [
-        f"Пациент: {_html_text(_patient_display_name(patient))}",
-        "Ваша очередь на сегодня:",
+        _localized_text("queue_patient", language).format(patient=patient_name),
+        _localized_text("queue_title", language),
     ]
     for entry in entries[:5]:
-        status_label = QUEUE_STATUS_LABELS.get(entry.status, entry.status)
+        status_label = _queue_status_label(entry.status, language)
         position = _queue_entry_position(db, entry)
-        cabinet = _queue_entry_cabinet(entry)
+        cabinet = _queue_entry_cabinet(entry, language)
         details = [
             f"№{entry.number}",
-            _html_text(_queue_entry_name(entry)),
-            f"статус: {_html_text(status_label)}",
+            _html_text(_queue_entry_name(entry, language)),
+            _localized_text("queue_status", language).format(
+                status=_html_text(status_label)
+            ),
         ]
         if position:
-            details.append(f"позиция: {position}")
+            details.append(
+                _localized_text("queue_position", language).format(position=position)
+            )
         if cabinet:
             details.append(cabinet)
         lines.append(" • ".join(details))
 
     if len(entries) > 5:
-        lines.append(f"Еще записей: {len(entries) - 5}")
+        lines.append(
+            _localized_text("queue_more", language).format(count=len(entries) - 5)
+        )
     return "\n".join(lines)
 
 
