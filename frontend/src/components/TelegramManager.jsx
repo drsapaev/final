@@ -190,6 +190,7 @@ const TelegramManager = () => {
   const staffLinkingMethodNames = staffLinkingMethods.
   map((method) => method?.label || method?.key || method).
   filter(Boolean);
+  const staffLinkingRuntimeContract = staffBot.linking_runtime_contract || {};
   const staffAuthorizationContract = staffBot.authorization_contract || staffBot.authorization || {};
   const staffAuthorizationRoles = Array.isArray(staffAuthorizationContract.role_checks) ?
   staffAuthorizationContract.role_checks :
@@ -425,6 +426,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffLinkingContract.enabled ? 'Enabled' : 'Planned'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff linking runtime"
+                    secondary={staffLinkingRuntimeContract.contract_version ?
+                    `${staffLinkingRuntimeContract.write_helper || 'link helper'}; handler: ${staffLinkingRuntimeContract.runtime_handler_enabled ? 'enabled' : 'disabled'}` :
+                    'Staff linking runtime contract not published'} />
+
+                  <Badge
+                    variant={staffLinkingRuntimeContract.runtime_handler_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffLinkingRuntimeContract.helper_available ? 'Helper' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
