@@ -30,6 +30,13 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   const [history, setHistory] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [expandedItems, setExpandedItems] = useState(new Set());
+  const historyRegionLabel = serviceName
+    ? `История изменений услуги: ${serviceName}`
+    : 'История изменений услуги';
+  const refreshHistoryLabel = serviceName
+    ? `Обновить историю изменений услуги ${serviceName}`
+    : 'Обновить историю изменений услуги';
+  const historyTitleId = `service-audit-history-title-${serviceId}`;
 
   useEffect(() => {
     if (serviceId) {
@@ -151,9 +158,16 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
 
   if (loading) {
     return (
-      <MacOSCard variant="default" style={{ padding: '24px' }}>
+      <MacOSCard
+        variant="default"
+        role="region"
+        aria-label={historyRegionLabel}
+        aria-busy={true}
+        style={{ padding: '24px' }}
+      >
         <AppLoading
           title="Загрузка истории изменений..."
+          ariaLabel={historyRegionLabel}
           style={{ minHeight: 200 }}
         />
       </MacOSCard>
@@ -162,12 +176,22 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
 
   if (errorMessage) {
     return (
-      <MacOSCard variant="default" style={{ padding: '24px' }}>
+      <MacOSCard
+        variant="default"
+        role="region"
+        aria-label={historyRegionLabel}
+        style={{ padding: '24px' }}
+      >
         <AppError
           title="Не удалось загрузить историю изменений"
           description={errorMessage}
           action={
-            <MacOSButton variant="outline" size="sm" onClick={loadHistory}>
+            <MacOSButton
+              variant="outline"
+              size="sm"
+              aria-label={`Повторить загрузку. ${refreshHistoryLabel}`}
+              onClick={loadHistory}
+            >
               <RefreshCw size={14} style={{ marginRight: '6px' }} />
               Повторить
             </MacOSButton>
@@ -179,7 +203,12 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
 
   if (history.length === 0) {
     return (
-      <MacOSCard variant="default" style={{ padding: '24px' }}>
+      <MacOSCard
+        variant="default"
+        role="region"
+        aria-label={historyRegionLabel}
+        style={{ padding: '24px' }}
+      >
         <AppEmpty
           icon={History}
           title="История изменений пуста"
@@ -190,7 +219,12 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   }
 
   return (
-    <MacOSCard variant="default" style={{ padding: '0' }}>
+    <MacOSCard
+      variant="default"
+      role="region"
+      aria-labelledby={historyTitleId}
+      style={{ padding: '0' }}
+    >
       <div style={{
         padding: '20px 24px',
         borderBottom: '1px solid var(--mac-border)',
@@ -201,7 +235,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <History size={20} style={{ color: 'var(--mac-accent)' }} />
           <div>
-            <h3 style={{
+            <h3 id={historyTitleId} style={{
               fontSize: '16px',
               fontWeight: '600',
               color: 'var(--mac-text-primary)',
@@ -220,21 +254,36 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
             )}
           </div>
         </div>
-        <MacOSButton variant="outline" size="sm" onClick={loadHistory}>
+        <MacOSButton
+          variant="outline"
+          size="sm"
+          aria-label={refreshHistoryLabel}
+          onClick={loadHistory}
+        >
           <RefreshCw size={14} style={{ marginRight: '6px' }} />
           Обновить
         </MacOSButton>
       </div>
 
-      <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+      <div
+        role="list"
+        aria-label={historyRegionLabel}
+        style={{ maxHeight: '600px', overflowY: 'auto' }}
+      >
         {history.map((item, index) => {
           const ActionIcon = getActionIcon(item.action);
           const isExpanded = expandedItems.has(item.id);
           const hasChanges = item.changes && Object.keys(item.changes).length > 0;
+          const changesPanelId = `service-audit-history-changes-${item.id}`;
+          const changesCount = hasChanges ? Object.keys(item.changes).length : 0;
+          const changesToggleLabel = isExpanded
+            ? `Скрыть изменения записи ${getActionLabel(item.action)}`
+            : `Показать изменения записи ${getActionLabel(item.action)} (${changesCount})`;
 
           return (
             <div
               key={item.id}
+              role="listitem"
               style={{
                 padding: '16px 24px',
                 borderBottom: index < history.length - 1 ? '1px solid var(--mac-border)' : 'none',
@@ -303,7 +352,11 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                   {hasChanges && (
                     <>
                       <button
+                        type="button"
                         onClick={() => toggleExpand(item.id)}
+                        aria-expanded={isExpanded}
+                        aria-controls={isExpanded ? changesPanelId : undefined}
+                        aria-label={changesToggleLabel}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -318,16 +371,21 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                         }}
                       >
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        {isExpanded ? 'Скрыть изменения' : `Показать изменения (${Object.keys(item.changes).length})`}
+                        {isExpanded ? 'Скрыть изменения' : `Показать изменения (${changesCount})`}
                       </button>
 
                       {isExpanded && (
-                        <div style={{
-                          marginTop: '8px',
-                          padding: '12px',
-                          backgroundColor: 'var(--mac-bg-secondary)',
-                          borderRadius: '8px'
-                        }}>
+                        <div
+                          id={changesPanelId}
+                          role="region"
+                          aria-label={changesToggleLabel}
+                          style={{
+                            marginTop: '8px',
+                            padding: '12px',
+                            backgroundColor: 'var(--mac-bg-secondary)',
+                            borderRadius: '8px'
+                          }}
+                        >
                           {Object.entries(item.changes).map(([field, change]) => (
                             <div
                               key={field}
