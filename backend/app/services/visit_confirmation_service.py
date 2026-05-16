@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import re
+import secrets
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from app.core.config import settings
+from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
@@ -26,12 +33,124 @@ CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
     "diagnostics",
 )
 
+TELEGRAM_TICKET_QR_PREFIX = "tq"
+TELEGRAM_TICKET_QR_HASH_PREFIX = "ticket_qr:"
+TELEGRAM_TICKET_QR_SEPARATOR = "_"
+TELEGRAM_TICKET_QR_TTL_HOURS = 24
+TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
+
 
 @dataclass
 class VisitConfirmationDomainError(Exception):
     status_code: int
     detail: str
     headers: dict[str, str] | None = None
+
+
+def _base36_encode(value: int) -> str:
+    if value < 0:
+        raise ValueError("base36 value must be non-negative")
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    result = ""
+    while value:
+        value, remainder = divmod(value, 36)
+        result = alphabet[remainder] + result
+    return result
+
+
+def _base36_decode(value: str) -> int:
+    return int(value, 36)
+
+
+def _as_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _ticket_qr_signature(body: str) -> str:
+    digest = hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return _base36_encode(int.from_bytes(digest[:12], "big"))
+
+
+def _hash_telegram_ticket_start_token(token: str) -> str:
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"{TELEGRAM_TICKET_QR_HASH_PREFIX}{digest}"
+
+
+def build_telegram_ticket_start_token(*, expires_at: datetime, nonce: str | None = None) -> str:
+    """Build a compact signed Telegram /start payload without patient data."""
+    exp = int(_as_utc_naive(expires_at).replace(tzinfo=timezone.utc).timestamp())
+    token_nonce = nonce or _base36_encode(secrets.randbits(48))
+    body = (
+        f"{TELEGRAM_TICKET_QR_PREFIX}{TELEGRAM_TICKET_QR_SEPARATOR}"
+        f"{_base36_encode(exp)}{TELEGRAM_TICKET_QR_SEPARATOR}{token_nonce}"
+    )
+    return (
+        f"{body}{TELEGRAM_TICKET_QR_SEPARATOR}"
+        f"{_ticket_qr_signature(body)}"
+    )
+
+
+def parse_telegram_ticket_start_token(token: str) -> dict[str, Any] | None:
+    parts = (token or "").split(TELEGRAM_TICKET_QR_SEPARATOR)
+    if len(parts) != 4 or parts[0] != TELEGRAM_TICKET_QR_PREFIX:
+        return None
+
+    body = TELEGRAM_TICKET_QR_SEPARATOR.join(parts[:3])
+    if not hmac.compare_digest(parts[3], _ticket_qr_signature(body)):
+        return None
+
+    try:
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[1]), tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+    if expires_at < datetime.now(timezone.utc):
+        return None
+
+    return {
+        "expires_at": expires_at.replace(tzinfo=None),
+        "token_hash": _hash_telegram_ticket_start_token(token),
+    }
+
+
+def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
+    """Mark a valid ticket QR token as consumed in the current transaction."""
+    parsed = parse_telegram_ticket_start_token(token)
+    if not parsed:
+        return None
+
+    now = datetime.utcnow()
+    token_hash = parsed["token_hash"]
+    visit = db.query(Visit).filter(Visit.confirmation_token == token_hash).first()
+    if not visit:
+        return None
+
+    if visit.confirmation_expires_at and _as_utc_naive(visit.confirmation_expires_at) < now:
+        return None
+
+    updated = (
+        db.query(Visit)
+        .filter(Visit.id == visit.id, Visit.confirmation_token == token_hash)
+        .update(
+            {
+                "confirmation_token": None,
+                "confirmation_expires_at": None,
+            },
+            synchronize_session=False,
+        )
+    )
+    if updated != 1:
+        return None
+
+    return visit
 
 
 class VisitConfirmationService:
@@ -491,6 +610,8 @@ class VisitConfirmationService:
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
         patient = self.repository.get_patient(visit.patient_id)
+        telegram_ticket_qr_payload: str | None = None
+        telegram_ticket_qr_resolved = False
 
         for queue_tag in sorted(unique_queue_tags):
             daily_queue: DailyQueue | None = None
@@ -599,6 +720,13 @@ class VisitConfirmationService:
             doctor = self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
             patient = self.repository.get_patient(visit.patient_id)
 
+            ticket_payload_extra: dict[str, Any] = {}
+            if not telegram_ticket_qr_resolved:
+                telegram_ticket_qr_payload = self._build_ticket_telegram_qr_payload(visit)
+                telegram_ticket_qr_resolved = True
+            if telegram_ticket_qr_payload:
+                ticket_payload_extra["qr_payload"] = telegram_ticket_qr_payload
+
             print_tickets.append(
                 {
                     "visit_id": visit.id,
@@ -620,10 +748,54 @@ class VisitConfirmationService:
                     "department": visit.department,
                     "visit_date": visit.visit_date.isoformat(),
                     "visit_time": visit.visit_time,
+                    **ticket_payload_extra,
                 }
             )
 
         return queue_numbers, print_tickets
+
+    def _build_ticket_telegram_qr_payload(self, visit) -> str | None:
+        bot_username = self._resolve_telegram_bot_username()
+        if not bot_username:
+            return None
+
+        expires_at = datetime.utcnow() + timedelta(hours=TELEGRAM_TICKET_QR_TTL_HOURS)
+        token = build_telegram_ticket_start_token(expires_at=expires_at)
+        visit.confirmation_token = _hash_telegram_ticket_start_token(token)
+        visit.confirmation_expires_at = expires_at
+        return f"https://t.me/{bot_username}?start={token}"
+
+    def _resolve_telegram_bot_username(self) -> str | None:
+        candidates: list[Any] = []
+        try:
+            config = crud_telegram.get_telegram_config(self.repository.db)
+            candidates.append(getattr(config, "bot_username", None))
+        except Exception as exc:
+            logger.warning(
+                "Failed to read Telegram config for ticket QR payload error_type=%s",
+                type(exc).__name__,
+            )
+
+        try:
+            clinic_setting = crud_clinic.get_setting_by_key(
+                self.repository.db,
+                "bot_username",
+            )
+            candidates.append(getattr(clinic_setting, "value", None))
+        except Exception as exc:
+            logger.warning(
+                "Failed to read clinic Telegram username setting error_type=%s",
+                type(exc).__name__,
+            )
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+            username = str(candidate).strip().lstrip("@")
+            if TELEGRAM_USERNAME_RE.fullmatch(username):
+                return username
+
+        return None
 
     def _get_active_daily_queue_by_tag(
         self, day: date, queue_tag: str

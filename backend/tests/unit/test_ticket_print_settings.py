@@ -64,6 +64,7 @@ def test_ticket_print_settings_get_is_available_to_active_staff(client, registra
     body = response.json()
     assert body["show_clinic_name"] is True
     assert body["show_queue_number"] is True
+    assert body["show_qr_code"] is True
 
 
 def test_ticket_print_settings_put_remains_admin_only(client, registrar_user):

@@ -50,6 +50,37 @@ def webhook_info_error_response(
 class TelegramWebhookRequest(BaseModel):
     webhook_url: Optional[str] = None
 
+
+def _get_configured_bot_token(db: Session) -> str | None:
+    config = crud_telegram.get_telegram_config(db)
+    if config and config.bot_token:
+        return config.bot_token
+
+    bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
+    return getattr(bot_token_setting, "value", None) if bot_token_setting else None
+
+
+def _get_configured_bot_username(db: Session) -> str | None:
+    config = crud_telegram.get_telegram_config(db)
+    if config and config.bot_username:
+        return config.bot_username
+
+    bot_username_setting = crud_clinic.get_setting_by_key(db, "bot_username")
+    return (
+        getattr(bot_username_setting, "value", None) if bot_username_setting else None
+    )
+
+
+def _fetch_telegram_webhook_info(bot_token: str) -> Dict[str, Any]:
+    response = requests.get(
+        f"https://api.telegram.org/bot{bot_token}/getWebhookInfo", timeout=10
+    )
+    response.raise_for_status()
+    result = response.json()
+    if not result.get("ok"):
+        raise RuntimeError(result.get("description") or "Telegram API error")
+    return result["result"]
+
 # ===================== НАСТРОЙКИ TELEGRAM =====================
 
 
@@ -126,13 +157,11 @@ def test_telegram_bot(
     """Тестировать подключение к Telegram боту"""
     try:
         # Получаем токен бота
-        bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-        if not bot_token_setting or not bot_token_setting.value:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Токен бота не настроен"
             )
-
-        bot_token = bot_token_setting.value
 
         # Тестируем подключение к API Telegram
         response = requests.get(
@@ -154,6 +183,16 @@ def test_telegram_bot(
                     },
                     current_user.id,
                 )
+                config_payload = {
+                    "bot_token": bot_token,
+                    "bot_username": bot_data.get("username"),
+                    "bot_name": bot_data.get("first_name"),
+                    "active": True,
+                }
+                if crud_telegram.get_telegram_config(db):
+                    crud_telegram.update_telegram_config(db, config_payload)
+                else:
+                    crud_telegram.create_telegram_config(db, config_payload)
 
                 return {
                     "success": True,
@@ -207,13 +246,12 @@ def set_telegram_webhook(
             )
 
         # Получаем токен бота
-        bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-        if not bot_token_setting or not bot_token_setting.value:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Токен бота не настроен"
             )
 
-        bot_token = bot_token_setting.value
         secret_token = secrets.token_urlsafe(32)
 
         # Устанавливаем webhook
@@ -232,6 +270,7 @@ def set_telegram_webhook(
                 )
                 config_payload = {
                     "bot_token": bot_token,
+                    "bot_username": _get_configured_bot_username(db),
                     "webhook_url": selected_webhook_url,
                     "webhook_secret": secret_token,
                     "active": True,
@@ -278,11 +317,9 @@ def get_telegram_webhook_info(
     """Получить информацию о webhook"""
     try:
         # Получаем токен бота
-        bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-        if not bot_token_setting or not bot_token_setting.value:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
             return {"webhook_set": False, "message": "Токен бота не настроен"}
-
-        bot_token = bot_token_setting.value
 
         # Получаем информацию о webhook
         response = requests.get(
@@ -317,6 +354,83 @@ def get_telegram_webhook_info(
 
 
 # ===================== ШАБЛОНЫ СООБЩЕНИЙ =====================
+
+
+@router.get("/telegram/integration-status")
+def get_telegram_integration_status(
+    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
+):
+    """Return app-facing Telegram integration status without exposing secrets."""
+    try:
+        config = crud_telegram.get_telegram_config(db)
+        bot_token = _get_configured_bot_token(db)
+        bot_username = _get_configured_bot_username(db)
+        telegram_users = crud_telegram.get_telegram_users(
+            db, active_only=False, limit=100000
+        )
+        linked_users = [user for user in telegram_users if user.patient_id]
+
+        webhook_info = None
+        webhook_error = None
+        if bot_token:
+            try:
+                webhook_info = _fetch_telegram_webhook_info(bot_token)
+            except requests.RequestException as exc:
+                webhook_error = "Telegram API unavailable"
+                logger.warning(
+                    "Admin Telegram integration status request failed error_type=%s",
+                    type(exc).__name__,
+                )
+            except Exception as exc:
+                webhook_error = "Telegram webhook status unavailable"
+                logger.warning(
+                    "Admin Telegram integration status failed error_type=%s",
+                    type(exc).__name__,
+                )
+
+        webhook_set = bool(webhook_info and webhook_info.get("url"))
+        webhook_url = (
+            webhook_info.get("url")
+            if webhook_info
+            else getattr(config, "webhook_url", None)
+        )
+
+        return {
+            "configured": bool(bot_token),
+            "active": bool(getattr(config, "active", False) or bot_token),
+            "bot_username": bot_username,
+            "mode": "webhook" if webhook_set else "polling",
+            "polling_ready": bool(bot_token and not webhook_set),
+            "polling_command": "python -m app.scripts.telegram_polling_worker",
+            "polling_task_name": "KosmedTelegramPollingWorker",
+            "webhook_set": webhook_set,
+            "webhook_url": webhook_url,
+            "webhook_error": webhook_error,
+            "pending_update_count": (
+                webhook_info.get("pending_update_count") if webhook_info else None
+            ),
+            "qr_linking_enabled": bool(bot_username),
+            "contact_linking_enabled": bool(bot_token),
+            "linked_users": len(linked_users),
+            "total_users": len(telegram_users),
+            "supported_functions": [
+                "ticket_qr_link",
+                "contact_phone_link",
+                "patient_status",
+                "results_ready_notice",
+                "admin_notifications",
+            ],
+            "transition_path": (
+                "Set webhook when a public HTTPS backend URL is available; "
+                "stop polling before webhook is enabled."
+            ),
+        }
+    except Exception as e:
+        raise_admin_telegram_error(
+            "integration-status",
+            "Ошибка получения статуса Telegram интеграции",
+            e,
+        )
 
 
 @router.get("/telegram/templates")
@@ -427,13 +541,11 @@ def send_test_message(
     """Отправить тестовое сообщение"""
     try:
         # Получаем токен бота
-        bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-        if not bot_token_setting or not bot_token_setting.value:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Токен бота не настроен"
             )
-
-        bot_token = bot_token_setting.value
 
         # Отправляем сообщение
         response = requests.post(
@@ -543,8 +655,8 @@ def send_broadcast_message(
     """Отправить широковещательное сообщение"""
     try:
         # Получаем токен бота
-        bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-        if not bot_token_setting or not bot_token_setting.value:
+        bot_token = _get_configured_bot_token(db)
+        if not bot_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Токен бота не настроен"
             )

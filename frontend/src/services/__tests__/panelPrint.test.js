@@ -24,7 +24,7 @@ describe('panelPrint ticket renderer', () => {
     vi.clearAllMocks();
   });
 
-  it('uses the default privacy-first ticket layout when settings are absent', async () => {
+  it('uses the default ticket layout with QR enabled when settings are absent', async () => {
     fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
     fetchClinicSettings.mockResolvedValueOnce([
       { key: 'clinic_name', value: 'City Clinic' },
@@ -47,7 +47,7 @@ describe('panelPrint ticket renderer', () => {
     expect(html).not.toContain('Пациент:');
     expect(html).not.toContain('Dr. Smirnova');
     expect(html).not.toContain('15 000 UZS');
-    expect(html).not.toContain('<svg');
+    expect(html).toContain('<svg');
   });
 
   it('renders only the fields enabled in ticket print settings', async () => {
