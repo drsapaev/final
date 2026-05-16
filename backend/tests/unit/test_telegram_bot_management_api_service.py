@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.api.v1.endpoints import admin_telegram
+from app.models.telegram_config import TelegramStaffLinkToken
 from app.services.telegram_bot_management_api_service import (
     TelegramBotManagementApiService,
 )
@@ -101,6 +102,83 @@ class TestTelegramBotManagementApiService:
         assert parsed["chat_id"] == 998877
         assert parsed["token_hash"].startswith(
             admin_telegram.STAFF_LINK_TOKEN_HASH_PREFIX
+        )
+
+    def test_staff_link_token_storage_contract_matches_model_columns(self):
+        contract = admin_telegram.STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffLinkToken.__table__
+
+        assert table.name == contract["table"]
+        assert list(table.columns.keys()) == contract["columns"]
+        assert contract["raw_token_storage_allowed"] is False
+        assert "raw_token" not in table.columns
+        assert "token" not in table.columns
+        assert table.c.token_hash.unique is True
+        assert table.c.token_hash.nullable is False
+        assert table.c.staff_user_id.nullable is False
+        assert table.c.telegram_chat_id.nullable is False
+        assert table.c.expires_at.nullable is False
+
+        staff_fk = next(iter(table.c.staff_user_id.foreign_keys))
+        assert staff_fk.target_fullname == "users.id"
+        assert staff_fk.ondelete == "CASCADE"
+
+    def test_staff_link_token_storage_model_has_required_indexes(self):
+        contract = admin_telegram.STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffLinkToken.__table__
+
+        assert "unique(token_hash)" in contract["required_indexes"]
+        assert "index(staff_user_id)" in contract["required_indexes"]
+        assert "index(telegram_chat_id)" in contract["required_indexes"]
+        assert (
+            "partial_index(expires_at) where consumed_at is null"
+            in contract["required_indexes"]
+        )
+
+        indexes_by_name = {index.name: index for index in table.indexes}
+        assert indexes_by_name["ix_telegram_staff_link_tokens_token_hash"].unique
+        assert [
+            column.name
+            for column in indexes_by_name[
+                "ix_telegram_staff_link_tokens_staff_user_id"
+            ].columns
+        ] == ["staff_user_id"]
+        assert [
+            column.name
+            for column in indexes_by_name[
+                "ix_telegram_staff_link_tokens_telegram_chat_id"
+            ].columns
+        ] == ["telegram_chat_id"]
+
+        partial_index = indexes_by_name[
+            "ix_telegram_staff_link_tokens_unconsumed_expires"
+        ]
+        assert [column.name for column in partial_index.columns] == ["expires_at"]
+        assert (
+            str(partial_index.dialect_options["postgresql"]["where"]).lower()
+            == "consumed_at is null"
+        )
+
+    def test_staff_link_token_storage_model_has_required_constraints(self):
+        contract = admin_telegram.STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffLinkToken.__table__
+
+        assert "expires_at > created_at" in contract["required_constraints"]
+        assert (
+            "consumed_at is null or consumed_at <= expires_at"
+            in contract["required_constraints"]
+        )
+        assert "staff_user_id references users(id)" in contract[
+            "required_constraints"
+        ]
+
+        constraint_names = {
+            constraint.name for constraint in table.constraints if constraint.name
+        }
+        assert "ck_telegram_staff_link_tokens_expires_after_created" in constraint_names
+        assert (
+            "ck_telegram_staff_link_tokens_consumed_before_expiry"
+            in constraint_names
         )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):
