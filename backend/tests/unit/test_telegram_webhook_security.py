@@ -270,6 +270,87 @@ class TestTelegramWebhookSecurity:
             .one()
         )
         assert telegram_user.language_code == "uz-Latn"
+        assert telegram_user.notifications_enabled is False
+        assert telegram_user.appointment_reminders is False
+        assert telegram_user.lab_notifications is False
+        assert "rozimisiz" in fake_service._send_message.await_args.args[1]
+
+    @pytest.mark.asyncio
+    async def test_notification_consent_accept_enables_patient_notifications(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7007,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=False,
+            appointment_reminders=False,
+            lab_notifications=False,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 103,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7007},
+                "from": {"id": 111},
+                "text": "Xabarnomalarga roziman",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.notifications_enabled is True
+        assert telegram_user.appointment_reminders is True
+        assert telegram_user.lab_notifications is True
+        assert fake_service._send_message.await_args.args[1] == "Xabarnomalar yoqildi."
+
+    @pytest.mark.asyncio
+    async def test_notification_consent_decline_disables_patient_notifications(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7008,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="ru",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 104,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7008},
+                "from": {"id": 111},
+                "text": "Без уведомлений",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.notifications_enabled is False
+        assert telegram_user.appointment_reminders is False
+        assert telegram_user.lab_notifications is False
 
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry
