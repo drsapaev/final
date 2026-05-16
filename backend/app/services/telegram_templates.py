@@ -6,6 +6,15 @@
 from typing import Any
 
 
+def _template_language_key(language: str) -> str:
+    value = str(language or "").strip().lower().replace("_", "-")
+    if value == "uz" or value.startswith("uz-"):
+        return "uz"
+    if value == "en" or value.startswith("en-"):
+        return "en"
+    return "ru"
+
+
 class TelegramTemplatesService:
     def __init__(self):
         self.templates = self._load_default_templates()
@@ -349,7 +358,9 @@ class TelegramTemplatesService:
     ) -> dict[str, Any]:
         """Получить шаблон сообщения с подстановкой данных"""
         try:
-            template = self.templates.get(template_key, {}).get(language, {})
+            template = self.templates.get(template_key, {}).get(
+                _template_language_key(language), {}
+            )
 
             if not template:
                 # Fallback на русский язык
@@ -432,7 +443,7 @@ class TelegramTemplatesService:
         self, has_abnormalities: bool, language: str = "ru"
     ) -> str:
         """Получить текст о нарушениях в анализах"""
-        if language == "uz":
+        if _template_language_key(language) == "uz":
             return (
                 "⚠️ <b>E'tibor:</b> Natijalarda og'ishlar aniqlandi. Shifokor bilan maslahatlashingiz tavsiya etiladi."
                 if has_abnormalities
