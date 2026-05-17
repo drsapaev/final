@@ -564,6 +564,103 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
+    async def test_staff_revenue_summary_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "owner"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7215, user_id=admin_user.id)
+        db_session.add_all(
+            [
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=9000,
+                    currency="UZS",
+                    status="paid",
+                    payment_method="cash",
+                    provider="cashier",
+                    provider_payment_id="paid-provider-secret",
+                    provider_transaction_id="paid-transaction-secret",
+                    payment_url="https://pay.example/paid-secret",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=5000,
+                    currency="UZS",
+                    status="pending",
+                    payment_method="click",
+                    provider="click",
+                    provider_payment_id="pending-provider-secret",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=2000,
+                    currency="UZS",
+                    status="processing",
+                    payment_method="payme",
+                    provider="payme",
+                    provider_transaction_id="processing-transaction-secret",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=4000,
+                    currency="UZS",
+                    status="refunded",
+                    payment_method="card",
+                    provider="card",
+                    provider_data={"secret": "refund-provider-secret"},
+                    notes="patient-visible secret note",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 215,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7215},
+                "from": {"id": 7215},
+                "text": "revenue_summary",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Revenue summary" in text
+        assert "Invoices today: 4" in text
+        assert "Gross invoiced: 20 000" in text
+        assert "Collected revenue: 9 000" in text
+        assert "Pending revenue: 7 000" in text
+        assert "Other invoice total: 4 000" in text
+        assert "Mode: read-only revenue aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        if test_patient.phone:
+            assert test_patient.phone not in text
+        assert "paid-provider-secret" not in text
+        assert "paid-transaction-secret" not in text
+        assert "pending-provider-secret" not in text
+        assert "processing-transaction-secret" not in text
+        assert "refund-provider-secret" not in text
+        assert "patient-visible secret note" not in text
+        assert "7215" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "revenue_summary"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
     async def test_staff_reconciliation_alerts_menu_item_returns_safe_aggregate(
         self, db_session, admin_user, monkeypatch
     ):

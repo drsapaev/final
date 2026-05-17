@@ -1333,6 +1333,33 @@ def _staff_payment_status_message(db: Session) -> str:
     )
 
 
+def _staff_revenue_summary_message(db: Session) -> str:
+    rows = _payment_invoice_status_rows(db)
+    invoice_count = sum(count for _status, count, _amount in rows)
+    gross_total = sum((amount for _status, _count, amount in rows), Decimal("0"))
+    collected_total = sum(
+        (amount for status, _count, amount in rows if status in PAID_INVOICE_STATUSES),
+        Decimal("0"),
+    )
+    pending_total = sum(
+        (amount for status, _count, amount in rows if status in UNPAID_INVOICE_STATUSES),
+        Decimal("0"),
+    )
+    other_total = max(gross_total - collected_total - pending_total, Decimal("0"))
+    return "\n".join(
+        [
+            "Revenue summary",
+            f"Date: {date.today().isoformat()}",
+            f"Invoices today: {invoice_count}",
+            f"Gross invoiced: {_format_money(gross_total)}",
+            f"Collected revenue: {_format_money(collected_total)}",
+            f"Pending revenue: {_format_money(pending_total)}",
+            f"Other invoice total: {_format_money(other_total)}",
+            "Mode: read-only revenue aggregate snapshot",
+        ]
+    )
+
+
 def _staff_lab_reports_message(db: Session) -> str:
     counts = _lab_status_counts(db)
     ready = sum(
@@ -1515,6 +1542,8 @@ def _staff_read_only_domain_data_message(
         return _staff_lab_delivery_status_message(db)
     if item_key == "integration_errors":
         return _staff_integration_errors_message(db)
+    if item_key == "revenue_summary":
+        return _staff_revenue_summary_message(db)
     if item_key == "daily_summary":
         return _staff_daily_summary_message(db)
     return None
