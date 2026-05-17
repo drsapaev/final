@@ -567,6 +567,7 @@ class TelegramBotService:
             [
                 {"commands": PATIENT_BOT_COMMANDS_RU},
                 {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
+                {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz-Latn"},
             ],
         )
 
