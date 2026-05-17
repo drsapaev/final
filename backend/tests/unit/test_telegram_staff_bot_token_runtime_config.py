@@ -44,7 +44,18 @@ class TestTelegramStaffBotTokenRuntimeConfig:
             ]
             == []
         )
-        assert status["next_slice"] == "staff_read_only_domain_data_runtime_complete"
+        assert (
+            status["next_slice"]
+            == "staff_state_change_confirmation_token_persistence"
+        )
+        assert (
+            status["confirmation_contract"]["runtime_blocked_by"][0]
+            == "confirmation_token_persistence"
+        )
+        assert (
+            status["confirmations"]["confirmation_token_runtime_enabled"] is False
+        )
+        assert status["confirmations"]["state_changing_actions_enabled"] is False
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )
@@ -75,7 +86,10 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "STAFF_TELEGRAM_BOT_TOKEN"
         assert contract["enabled"] is True
         assert contract["runtime_blocked_by"] == []
-        assert status["next_slice"] == "staff_read_only_domain_data_runtime_complete"
+        assert (
+            status["next_slice"]
+            == "staff_state_change_confirmation_token_persistence"
+        )
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )
