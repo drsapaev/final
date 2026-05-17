@@ -60,7 +60,12 @@ STAFF_BOT_READINESS = [
     {
         "key": "server_side_authorization",
         "label": "Проверка ролей на backend",
-        "ready": False,
+        "ready": True,
+    },
+    {
+        "key": "read_only_menu_runtime",
+        "label": "Read-only staff menu runtime",
+        "ready": True,
     },
     {
         "key": "audit_logging",
@@ -277,7 +282,6 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
     "runtime_blocked_by": [
         "staff_audit_logging_runtime",
-        "staff_read_only_menu_runtime_enablement",
     ],
     "required_before_enablement": True,
     "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
@@ -314,7 +318,8 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
 
 STAFF_BOT_AUTHORIZATION_CONTRACT = {
     "contract_version": "staff-authorization-v1",
-    "enabled": False,
+    "enabled": True,
+    "runtime_read_only_enabled": True,
     "source": "application_rbac",
     "server_side_required": True,
     "default_decision": "deny",
@@ -531,14 +536,17 @@ STAFF_BOT_AUDIT_CONTRACT = {
 
 STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "contract_version": "staff-role-menu-enablement-v1",
-    "enabled": False,
-    "runtime_menu_enabled": False,
+    "enabled": True,
+    "runtime_menu_enabled": True,
     "read_only_contract_published": True,
     "required_before_enablement": True,
     "state_changing_menu_items_enabled": False,
+    "runtime_handler": "_handle_staff_read_only_menu",
+    "domain_data_commands_enabled": False,
+    "state_changing_actions_enabled": False,
     "allowed_until_enabled": [
         "read_status_contract",
-        "read_only_menu_preview",
+        "read_only_menu_runtime",
     ],
     "required_server_checks": [
         "dedicated_staff_bot_token",
@@ -813,15 +821,16 @@ def _build_staff_role_menus_summary() -> Dict[str, Any]:
     )
     return {
         "contract_published": True,
-        "runtime_enabled": False,
+        "runtime_enabled": True,
         "read_only": True,
         "source": "read_only_menu_contract",
         "roles": menu_roles,
         "role_count": len(menu_roles),
         "item_count": menu_item_count,
+        "handler": "_handle_staff_read_only_menu",
+        "domain_data_commands_enabled": False,
+        "state_changing_actions_enabled": False,
         "blocked_until": [
-            "role_based_staff_linking",
-            "server_side_authorization",
             "audit_logging",
             "state_change_confirmations",
         ],
@@ -855,7 +864,8 @@ def _build_staff_bot_status(
         "contract_version": "staff-menu-read-only-v1",
         "enabled": False,
         "contract_published": True,
-        "status": "staff_linking_enabled_actions_disabled",
+        "read_only_runtime_enabled": True,
+        "status": "staff_read_only_menu_enabled_actions_disabled",
         "transport": "polling" if not webhook_set else "webhook",
         "supported_languages": [
             {"code": "ru", "label": "Русский"},
@@ -882,7 +892,9 @@ def _build_staff_bot_status(
         "authorization": {
             "source": "application_rbac",
             "server_side_required": True,
-            "ready": False,
+            "ready": True,
+            "runtime_read_only_enabled": True,
+            "default_decision": "deny",
         },
         "audit": {
             "required": True,
@@ -898,9 +910,9 @@ def _build_staff_bot_status(
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
         "next_slice": (
-            "staff_read_only_menu_runtime_enablement"
-            if token_contract["ready"]
-            else "dedicated_staff_bot_token_runtime_config"
+            "dedicated_staff_bot_token_runtime_config"
+            if not token_contract["ready"]
+            else "staff_audit_logging_runtime"
         ),
     }
 

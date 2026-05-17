@@ -14,8 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
+    STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
+    STAFF_BOT_READ_ONLY_MENU_CONTRACT,
     STAFF_LINK_TOKEN_PREFIX,
     STAFF_LINK_TOKEN_SEPARATOR,
+    _normalize_staff_role,
     validate_staff_link_start_token,
 )
 from app.crud import audit as crud_audit
@@ -54,7 +57,7 @@ TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE = (
 )
 TELEGRAM_STAFF_LINKED_MESSAGE = (
     "Telegram привязан к учетной записи сотрудника. "
-    "Staff-команды пока не включены: действия выполняются только в приложении."
+    "Staff-команды включены в режиме просмотра: действия выполняются только в приложении."
 )
 TELEGRAM_STAFF_LINK_REJECTED_MESSAGE = (
     "Ссылка привязки сотрудника недействительна или уже использована. "
@@ -65,6 +68,15 @@ TELEGRAM_STAFF_LINK_FAILED_MESSAGE = (
     "Попробуйте открыть ссылку еще раз или обратитесь к администратору."
 )
 TELEGRAM_STAFF_LINK_REPLY_MARKUP = {"remove_keyboard": True}
+TELEGRAM_STAFF_MENU_UNLINKED_MESSAGE = (
+    "Staff Telegram menu is available only after staff account linking."
+)
+TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE = (
+    "Staff Telegram menu is not available for this account role."
+)
+TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE = (
+    "Read-only staff data is not connected in Telegram yet. Use the clinic app for live data."
+)
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
     "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
     "\"Поделиться номером\". Номер должен совпадать с номером в регистратуре."
@@ -714,6 +726,142 @@ def _record_staff_link_audit(
     )
 
 
+def _staff_read_only_commands() -> set[str]:
+    return {
+        str(item.get("command") or "").lower()
+        for item in STAFF_BOT_COMMAND_REGISTRATION_CONTRACT.get("commands", [])
+        if item.get("intent") == "read_only" and item.get("command")
+    }
+
+
+def _staff_menu_for_role(role: Any) -> Dict[str, Any] | None:
+    role_key = _normalize_staff_role(role)
+    for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT:
+        if role_menu.get("role") == role_key:
+            return role_menu
+    return None
+
+
+def _staff_menu_keyboard(role_menu: Dict[str, Any]) -> Dict[str, Any]:
+    rows = [
+        [{"text": str(item.get("label") or item.get("key"))}]
+        for item in role_menu.get("items", [])
+        if item.get("intent") == "read_only"
+    ]
+    rows.append([{"text": "/staff"}, {"text": "/help"}])
+    return {
+        "keyboard": rows,
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    }
+
+
+def _staff_menu_message(user: User, role_menu: Dict[str, Any]) -> str:
+    items = [
+        str(item.get("label") or item.get("key"))
+        for item in role_menu.get("items", [])
+        if item.get("intent") == "read_only"
+    ]
+    lines = [
+        "Staff read-only menu",
+        f"Role: {_normalize_staff_role(getattr(user, 'role', None))}",
+        "",
+        "Available:",
+    ]
+    lines.extend(f"- {item}" for item in items)
+    lines.extend(
+        [
+            "",
+            "State-changing actions are disabled in Telegram.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _staff_read_only_item_labels() -> set[str]:
+    labels: set[str] = set()
+    for role_menu in STAFF_BOT_READ_ONLY_MENU_CONTRACT:
+        for item in role_menu.get("items", []):
+            label = str(item.get("label") or "").strip().lower()
+            if label:
+                labels.add(label)
+    return labels
+
+
+def _linked_staff_for_chat(
+    db: Session, chat_id: int
+) -> tuple[TelegramUser | None, User | None, Dict[str, Any] | None]:
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    if not telegram_user or not telegram_user.user_id:
+        return telegram_user, None, None
+
+    user = db.query(User).filter(User.id == telegram_user.user_id).first()
+    if not user or not getattr(user, "is_active", True):
+        return telegram_user, user, None
+
+    return telegram_user, user, _staff_menu_for_role(getattr(user, "role", None))
+
+
+async def _handle_staff_read_only_menu(
+    update: Dict[str, Any], db: Session, bot_service
+) -> bool:
+    message = _message_from_update(update)
+    if not message:
+        return False
+
+    chat_id = _message_chat_id(message)
+    if chat_id is None:
+        return False
+
+    text = _message_text(message)
+    command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
+    normalized_text = text.lower()
+    read_only_commands = _staff_read_only_commands()
+    staff_menu_requested = (
+        command in read_only_commands
+        or command == "/start"
+        or command == "/menu"
+        or normalized_text in _staff_read_only_item_labels()
+    )
+    if not staff_menu_requested:
+        return False
+
+    _telegram_user, user, role_menu = _linked_staff_for_chat(db, chat_id)
+    if not user:
+        if command in {"/staff", "/menu"}:
+            await bot_service._send_message(
+                chat_id,
+                TELEGRAM_STAFF_MENU_UNLINKED_MESSAGE,
+                TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+            )
+            return True
+        return False
+
+    if not role_menu:
+        await bot_service._send_message(
+            chat_id,
+            TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE,
+            TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+        )
+        return True
+
+    menu = _staff_menu_keyboard(role_menu)
+    if command in {"/start", "/staff", "/help", "/menu"}:
+        await bot_service._send_message(
+            chat_id,
+            _staff_menu_message(user, role_menu),
+            menu,
+        )
+        return True
+
+    await bot_service._send_message(
+        chat_id,
+        TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE,
+        menu,
+    )
+    return True
+
+
 async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_service) -> bool:
     extracted = _extract_ticket_qr_start_payload(update)
     if not extracted:
@@ -827,10 +975,16 @@ async def _handle_staff_link_start(
         )
         db.commit()
         logger.info("Telegram staff link created role=%s", role)
+        role_menu = _staff_menu_for_role(role)
+        reply_markup = (
+            _staff_menu_keyboard(role_menu)
+            if role_menu
+            else TELEGRAM_STAFF_LINK_REPLY_MARKUP
+        )
         await bot_service._send_message(
             chat_id,
             f"{TELEGRAM_STAFF_LINKED_MESSAGE}\nРоль: {role}",
-            TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+            reply_markup,
         )
         return True
     except Exception as exc:
@@ -1614,6 +1768,7 @@ async def _handle_clinic_bot_update(
             update,
             db,
             staff_start_handler=_handle_staff_link_start,
+            staff_menu_handler=_handle_staff_read_only_menu,
             ticket_start_handler=_handle_ticket_qr_start,
             contact_handler=_handle_contact_link,
             start_handler=start_handler,
@@ -1622,6 +1777,9 @@ async def _handle_clinic_bot_update(
         )
 
     if await _handle_staff_link_start(update, db, bot_service):
+        return True
+
+    if await _handle_staff_read_only_menu(update, db, bot_service):
         return True
 
     if await _handle_ticket_qr_start(update, db, bot_service):

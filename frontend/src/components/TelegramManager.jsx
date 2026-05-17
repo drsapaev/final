@@ -230,6 +230,12 @@ const TelegramManager = () => {
   staffAuditContract.event_types :
   [];
   const staffRoleMenuEnablementContract = staffBot.role_menu_enablement_contract || {};
+  const staffRoleMenuRuntimeEnabled = Boolean(
+    staffRoleMenuEnablementContract.runtime_menu_enabled || staffBot.read_only_runtime_enabled
+  );
+  const staffRoleMenuDomainDataEnabled = Boolean(
+    staffRoleMenuEnablementContract.domain_data_commands_enabled
+  );
   const staffRoleMenuEnablementRoleCount = typeof staffRoleMenuEnablementContract.role_count === 'number' ?
   staffRoleMenuEnablementContract.role_count :
   staffMenuContract.length;
@@ -539,14 +545,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff role menu enablement"
                     secondary={staffRoleMenuEnablementContract.contract_version ?
-                    `${staffRoleMenuEnablementRoleCount} roles, ${staffRoleMenuEnablementItemCount} items; runtime menu: ${staffRoleMenuEnablementContract.runtime_menu_enabled ? 'enabled' : 'disabled'}` :
+                    `${staffRoleMenuEnablementRoleCount} roles, ${staffRoleMenuEnablementItemCount} items; runtime menu: ${staffRoleMenuRuntimeEnabled ? 'enabled' : 'disabled'}; live data: ${staffRoleMenuDomainDataEnabled ? 'enabled' : 'app only'}` :
                     'Role menu enablement contract not published'} />
 
                   <Badge
-                    variant={staffRoleMenuEnablementContract.runtime_menu_enabled ? 'success' : 'warning'}
+                    variant={staffRoleMenuRuntimeEnabled ? 'success' : 'warning'}
                     size="small">
 
-                    {staffRoleMenuEnablementContract.required_before_enablement ? 'Required' : 'Planned'}
+                    {staffRoleMenuRuntimeEnabled ? 'Enabled' : 'Required'}
                   </Badge>
                 </ListItem>
                 <ListItem>
