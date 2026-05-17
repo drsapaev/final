@@ -772,6 +772,18 @@ class TestTelegramStaffReadOnlyMenuRuntime:
                     last_error="patient phone missing",
                     payload_snapshot={"patient_id": test_patient.id},
                 ),
+                NotificationDelivery(
+                    event_id=event.id,
+                    recipient_type="user",
+                    recipient_id=admin_user.id,
+                    role="lab",
+                    channel="sms",
+                    dedup_key="delivery-status-sms",
+                    sequence_id=4,
+                    delivery_status="delivered",
+                    last_error="sms secret detail",
+                    payload_snapshot={"patient_id": test_patient.id},
+                ),
             ]
         )
         db_session.commit()
@@ -795,7 +807,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         fake_service._send_message.assert_awaited_once()
         text = fake_service._send_message.await_args.args[1]
         assert "Lab result delivery status" in text
-        assert "Deliveries today: 3" in text
+        assert "Telegram deliveries today: 3" in text
         assert "Delivered/seen/read: 1" in text
         assert "Pending/dispatched: 1" in text
         assert "Failed: 1" in text
@@ -803,6 +815,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert test_patient.first_name not in text
         assert "result-77" not in text
         assert "patient phone missing" not in text
+        assert "sms secret detail" not in text
         assert "7213" not in text
         audit_log = (
             db_session.query(AuditLog)

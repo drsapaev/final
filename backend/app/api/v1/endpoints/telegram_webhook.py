@@ -1026,6 +1026,7 @@ def _lab_delivery_status_counts(db: Session) -> Dict[str, int]:
         .join(NotificationEvent, NotificationEvent.id == NotificationDelivery.event_id)
         .filter(
             NotificationDelivery.created_at >= _today_start(),
+            NotificationDelivery.channel == "telegram",
             NotificationEvent.event_type.in_(LAB_RESULT_DELIVERY_EVENT_TYPES),
         )
         .group_by(NotificationDelivery.delivery_status)
@@ -1349,7 +1350,7 @@ def _staff_lab_delivery_status_message(db: Session) -> str:
         [
             "Lab result delivery status",
             f"Date: {date.today().isoformat()}",
-            f"Deliveries today: {total}",
+            f"Telegram deliveries today: {total}",
             f"Delivered/seen/read: {successful}",
             f"Pending/dispatched: {pending}",
             f"Failed: {failed}",
