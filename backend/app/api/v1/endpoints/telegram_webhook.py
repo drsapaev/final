@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any, Dict, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -86,6 +87,19 @@ TELEGRAM_STAFF_ACTION_DENIED_MESSAGE = (
     "State-changing staff actions require confirmation in the clinic app. "
     "Telegram execution is disabled."
 )
+STAFF_COMMAND_DOMAIN_ITEM_KEYS = {
+    "/queue": ("queue_overview",),
+    "/payments": (
+        "payment_status",
+        "unpaid_invoices",
+        "paid_invoices",
+        "reconciliation_alerts",
+        "revenue_summary",
+    ),
+    "/reports": ("ready_reports", "integration_errors"),
+    "/schedule": ("today_schedule",),
+    "/summary": ("daily_summary", "revenue_summary"),
+}
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
     "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
     "\"Поделиться номером\". Номер должен совпадать с номером в регистратуре."
@@ -899,6 +913,171 @@ def _staff_menu_item_for_text(
     return None
 
 
+def _staff_menu_item_for_command(
+    role_menu: Dict[str, Any], command: str
+) -> Dict[str, Any] | None:
+    allowed_keys = set(STAFF_COMMAND_DOMAIN_ITEM_KEYS.get(command, ()))
+    if not allowed_keys:
+        return None
+    for item in role_menu.get("items", []):
+        if str(item.get("key") or "").strip().lower() in allowed_keys:
+            return item
+    return None
+
+
+def _today_start() -> datetime:
+    return datetime.combine(date.today(), datetime.min.time())
+
+
+def _status_counts(rows: list[tuple[Any, Any]]) -> Dict[str, int]:
+    return {str(status or "unknown"): int(count or 0) for status, count in rows}
+
+
+def _format_money(amount: Any) -> str:
+    value = amount if isinstance(amount, Decimal) else Decimal(str(amount or 0))
+    return f"{value.quantize(Decimal('0.01'))} UZS"
+
+
+def _queue_status_counts(db: Session) -> Dict[str, int]:
+    rows = (
+        db.query(OnlineQueueEntry.status, func.count(OnlineQueueEntry.id))
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(DailyQueue.day == date.today())
+        .group_by(OnlineQueueEntry.status)
+        .all()
+    )
+    return _status_counts(rows)
+
+
+def _payment_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
+    return [
+        (str(status or "unknown"), int(count or 0), amount or Decimal("0"))
+        for status, count, amount in (
+            db.query(
+                Payment.status,
+                func.count(Payment.id),
+                func.coalesce(func.sum(Payment.amount), 0),
+            )
+            .filter(Payment.created_at >= _today_start())
+            .group_by(Payment.status)
+            .all()
+        )
+    ]
+
+
+def _lab_status_counts(db: Session) -> Dict[str, int]:
+    rows = (
+        db.query(LabReportInstance.status, func.count(LabReportInstance.id))
+        .filter(LabReportInstance.created_at >= _today_start())
+        .group_by(LabReportInstance.status)
+        .all()
+    )
+    return _status_counts(rows)
+
+
+def _staff_queue_overview_message(db: Session) -> str:
+    counts = _queue_status_counts(db)
+    total = sum(counts.values())
+    active = sum(
+        count for status, count in counts.items() if status not in QUEUE_TERMINAL_STATUSES
+    )
+    in_progress = sum(
+        counts.get(status, 0) for status in ("called", "in_service", "diagnostics")
+    )
+    return "\n".join(
+        [
+            "Queue overview",
+            f"Date: {date.today().isoformat()}",
+            f"Total entries: {total}",
+            f"Active entries: {active}",
+            f"Waiting: {counts.get('waiting', 0)}",
+            f"Called/in service: {in_progress}",
+            "Mode: read-only aggregate snapshot",
+        ]
+    )
+
+
+def _staff_payment_status_message(db: Session) -> str:
+    rows = _payment_status_rows(db)
+    total_count = sum(count for _status, count, _amount in rows)
+    paid_total = sum(
+        (amount for status, _count, amount in rows if status in PAYMENT_PAID_STATUSES),
+        Decimal("0"),
+    )
+    pending_total = sum(
+        (amount for status, _count, amount in rows if status in PAYMENT_PENDING_STATUSES),
+        Decimal("0"),
+    )
+    pending_count = sum(
+        count for status, count, _amount in rows if status in PAYMENT_PENDING_STATUSES
+    )
+    return "\n".join(
+        [
+            "Payment status",
+            f"Date: {date.today().isoformat()}",
+            f"Payments today: {total_count}",
+            f"Pending payments: {pending_count}",
+            f"Paid total: {_format_money(paid_total)}",
+            f"Pending total: {_format_money(pending_total)}",
+            "Mode: read-only aggregate snapshot",
+        ]
+    )
+
+
+def _staff_lab_reports_message(db: Session) -> str:
+    counts = _lab_status_counts(db)
+    ready = sum(
+        counts.get(status, 0)
+        for status in {"READY", "FINALIZED", "PRINTED"} | LAB_REPORT_READY_STATUSES
+    )
+    total = sum(counts.values())
+    return "\n".join(
+        [
+            "Lab report status",
+            f"Date: {date.today().isoformat()}",
+            f"Reports today: {total}",
+            f"Ready reports: {ready}",
+            f"Pending reports: {max(total - ready, 0)}",
+            "Mode: read-only aggregate snapshot",
+        ]
+    )
+
+
+def _staff_daily_summary_message(db: Session) -> str:
+    queue_counts = _queue_status_counts(db)
+    payment_rows = _payment_status_rows(db)
+    lab_counts = _lab_status_counts(db)
+    visits_today = (
+        db.query(func.count(Visit.id))
+        .filter(Visit.visit_date == date.today())
+        .scalar()
+        or 0
+    )
+    paid_total = sum(
+        (
+            amount
+            for status, _count, amount in payment_rows
+            if status in PAYMENT_PAID_STATUSES
+        ),
+        Decimal("0"),
+    )
+    ready_reports = sum(
+        lab_counts.get(status, 0)
+        for status in {"READY", "FINALIZED", "PRINTED"} | LAB_REPORT_READY_STATUSES
+    )
+    return "\n".join(
+        [
+            "Daily clinic summary",
+            f"Date: {date.today().isoformat()}",
+            f"Visits scheduled: {int(visits_today)}",
+            f"Queue entries: {sum(queue_counts.values())}",
+            f"Paid today: {_format_money(paid_total)}",
+            f"Ready lab reports: {ready_reports}",
+            "Mode: read-only aggregate snapshot",
+        ]
+    )
+
+
 def _staff_readiness_message(db: Session) -> str:
     patient_bot_token = _get_configured_bot_token(db)
     token_status = _get_staff_bot_token_runtime_status(
@@ -923,7 +1102,7 @@ def _staff_readiness_message(db: Session) -> str:
                 if command_contract.get("registration_enabled")
                 else "Read-only commands: blocked"
             ),
-            "Live data: staff_readiness only",
+            "Live data: limited read-only aggregates",
             "State-changing actions: disabled",
         ]
     )
@@ -937,6 +1116,14 @@ def _staff_read_only_domain_data_message(
         return None
     if item_key == "staff_readiness":
         return _staff_readiness_message(db)
+    if item_key == "queue_overview":
+        return _staff_queue_overview_message(db)
+    if item_key == "payment_status":
+        return _staff_payment_status_message(db)
+    if item_key == "ready_reports":
+        return _staff_lab_reports_message(db)
+    if item_key == "daily_summary":
+        return _staff_daily_summary_message(db)
     return None
 
 
@@ -1098,7 +1285,30 @@ async def _handle_staff_read_only_menu(
         return True
 
     menu_item = _staff_menu_item_for_text(role_menu, text)
+    if not menu_item and command in read_only_commands:
+        menu_item = _staff_menu_item_for_command(role_menu, command)
+
     command_key = command if command in read_only_commands else "staff_menu_item"
+    if command in read_only_commands and not menu_item:
+        _record_staff_command_audit(
+            db,
+            chat_id=chat_id,
+            request_id=request_id,
+            actor_user_id=int(user.id),
+            telegram_user_id=getattr(_telegram_user, "id", None),
+            role=_normalize_staff_role(getattr(user, "role", None)),
+            command_key=command_key,
+            result="denied",
+            reason="role_not_allowed",
+        )
+        db.commit()
+        await bot_service._send_message(
+            chat_id,
+            TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE,
+            menu,
+        )
+        return True
+
     domain_data_message = _staff_read_only_domain_data_message(db, menu_item)
     _record_staff_command_audit(
         db,
