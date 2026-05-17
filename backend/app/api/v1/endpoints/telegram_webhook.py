@@ -30,6 +30,7 @@ from app.api.v1.endpoints.admin_telegram import (
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
+from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -975,6 +976,26 @@ def _lab_status_counts(db: Session) -> Dict[str, int]:
     return _status_counts(rows)
 
 
+def _visit_status_counts(db: Session, user: User | None = None) -> Dict[str, int]:
+    query = db.query(Visit.status, func.count(Visit.id)).filter(
+        Visit.visit_date == date.today()
+    )
+    if _normalize_staff_role(getattr(user, "role", None)) == "doctor":
+        doctor = (
+            db.query(Doctor)
+            .filter(
+                Doctor.user_id == getattr(user, "id", None),
+                Doctor.active.is_(True),
+            )
+            .first()
+        )
+        if not doctor:
+            return {}
+        query = query.filter(Visit.doctor_id == doctor.id)
+    rows = query.group_by(Visit.status).all()
+    return _status_counts(rows)
+
+
 def _staff_queue_overview_message(db: Session) -> str:
     counts = _queue_status_counts(db)
     total = sum(counts.values())
@@ -1042,6 +1063,38 @@ def _staff_next_patient_message(db: Session) -> str:
         details.append(f"Position: {position}")
     details.append("Mode: read-only queue snapshot")
     return "\n".join(details)
+
+
+def _staff_today_schedule_message(db: Session, user: User | None = None) -> str:
+    counts = _visit_status_counts(db, user)
+    normalized_counts = {
+        str(status or "unknown").lower(): count for status, count in counts.items()
+    }
+    total = sum(counts.values())
+    in_progress = sum(
+        normalized_counts.get(status, 0)
+        for status in ("in_progress", "in_visit", "called")
+    )
+    completed = sum(
+        normalized_counts.get(status, 0)
+        for status in ("completed", "served", "done")
+    )
+    cancelled = sum(
+        normalized_counts.get(status, 0)
+        for status in ("cancelled", "canceled", "no_show")
+    )
+    open_visits = max(total - in_progress - completed - cancelled, 0)
+    return "\n".join(
+        [
+            "Today's schedule",
+            f"Date: {date.today().isoformat()}",
+            f"Visits today: {total}",
+            f"Open visits: {open_visits}",
+            f"In progress: {in_progress}",
+            f"Completed/cancelled: {completed + cancelled}",
+            "Mode: read-only schedule snapshot",
+        ]
+    )
 
 
 def _staff_payment_status_message(db: Session) -> str:
@@ -1156,7 +1209,7 @@ def _staff_readiness_message(db: Session) -> str:
 
 
 def _staff_read_only_domain_data_message(
-    db: Session, menu_item: Dict[str, Any] | None
+    db: Session, menu_item: Dict[str, Any] | None, user: User | None = None
 ) -> str | None:
     item_key = str((menu_item or {}).get("key") or "").strip()
     if item_key not in STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS:
@@ -1167,6 +1220,8 @@ def _staff_read_only_domain_data_message(
         return _staff_queue_overview_message(db)
     if item_key == "next_patient":
         return _staff_next_patient_message(db)
+    if item_key == "today_schedule":
+        return _staff_today_schedule_message(db, user)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
@@ -1358,7 +1413,7 @@ async def _handle_staff_read_only_menu(
         )
         return True
 
-    domain_data_message = _staff_read_only_domain_data_message(db, menu_item)
+    domain_data_message = _staff_read_only_domain_data_message(db, menu_item, user)
     _record_staff_command_audit(
         db,
         chat_id=chat_id,

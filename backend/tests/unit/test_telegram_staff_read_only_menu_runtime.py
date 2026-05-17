@@ -9,6 +9,7 @@ from app.api.v1.endpoints import telegram_webhook
 from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.telegram_config import TelegramUser
+from app.models.visit import Visit
 
 
 class FakeTelegramBotService:
@@ -233,6 +234,92 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             .one()
         )
         assert audit_log.payload["menu_item_key"] == "next_patient"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_today_schedule_command_returns_read_only_visit_snapshot(
+        self, db_session, test_doctor_user, test_doctor, test_patient
+    ):
+        _link_staff_chat(db_session, chat_id=7207, user_id=test_doctor_user.id)
+        test_doctor.user_id = test_doctor_user.id
+        db_session.flush()
+        db_session.add_all(
+            [
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=test_doctor.id,
+                    visit_date=date.today(),
+                    visit_time="09:00",
+                    status="open",
+                ),
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=test_doctor.id,
+                    visit_date=date.today(),
+                    visit_time="10:00",
+                    status="in_progress",
+                ),
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=test_doctor.id,
+                    visit_date=date.today(),
+                    visit_time="11:00",
+                    status="completed",
+                ),
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=test_doctor.id,
+                    visit_date=date.today() - timedelta(days=1),
+                    visit_time="12:00",
+                    status="open",
+                ),
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=None,
+                    visit_date=date.today(),
+                    visit_time="13:00",
+                    status="open",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 207,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7207},
+                "from": {"id": 7207},
+                "text": "/schedule",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Today's schedule" in text
+        assert "Visits today: 3" in text
+        assert "Open visits: 1" in text
+        assert "In progress: 1" in text
+        assert "Completed/cancelled: 1" in text
+        assert "Mode: read-only schedule snapshot" in text
+        assert test_patient.first_name not in text
+        if test_patient.phone:
+            assert test_patient.phone not in text
+        assert "7207" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "/schedule"
+        assert audit_log.payload["menu_item_key"] == "today_schedule"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 
