@@ -147,6 +147,7 @@ STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = [
     "queue_overview",
     "next_patient",
     "today_schedule",
+    "emr_reminders",
     "payment_status",
     "ready_reports",
     "daily_summary",
@@ -585,7 +586,6 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "domain_data_commands_status": "partial",
     "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
     "pending_domain_data_command_keys": [
-        "emr_reminders",
         "unpaid_invoices",
         "paid_invoices",
         "reconciliation_alerts",

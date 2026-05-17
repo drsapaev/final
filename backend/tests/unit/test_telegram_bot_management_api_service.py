@@ -224,6 +224,7 @@ class TestTelegramBotManagementApiService:
             "queue_overview",
             "next_patient",
             "today_schedule",
+            "emr_reminders",
             "payment_status",
             "ready_reports",
             "daily_summary",
