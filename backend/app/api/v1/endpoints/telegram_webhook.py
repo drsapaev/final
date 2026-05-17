@@ -16,9 +16,13 @@ from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
     STAFF_BOT_CONFIRMATION_CONTRACT,
+    STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS,
     STAFF_BOT_READ_ONLY_MENU_CONTRACT,
     STAFF_LINK_TOKEN_PREFIX,
     STAFF_LINK_TOKEN_SEPARATOR,
+    _build_staff_bot_status,
+    _get_configured_bot_token,
+    _get_staff_bot_token_runtime_status,
     _normalize_staff_role,
     validate_staff_link_start_token,
 )
@@ -877,6 +881,9 @@ def _staff_read_only_item_labels() -> set[str]:
             label = str(item.get("label") or "").strip().lower()
             if label:
                 labels.add(label)
+            key = str(item.get("key") or "").strip().lower()
+            if key:
+                labels.add(key)
     return labels
 
 
@@ -889,6 +896,47 @@ def _staff_menu_item_for_text(
         key = str(item.get("key") or "").strip().lower()
         if normalized_text in {label, key}:
             return item
+    return None
+
+
+def _staff_readiness_message(db: Session) -> str:
+    patient_bot_token = _get_configured_bot_token(db)
+    token_status = _get_staff_bot_token_runtime_status(
+        db, patient_bot_token=patient_bot_token
+    )
+    staff_status = _build_staff_bot_status(
+        webhook_set=False,
+        staff_bot_token_status=token_status,
+    )
+    readiness = staff_status.get("readiness", [])
+    ready_count = sum(1 for item in readiness if item.get("ready"))
+    command_contract = staff_status.get("command_registration_contract", {})
+    token_contract = staff_status.get("token_contract", {})
+    return "\n".join(
+        [
+            "Staff bot readiness",
+            f"Ready gates: {ready_count}/{len(readiness)}",
+            f"Dedicated token: {'ready' if token_contract.get('ready') else 'required'}",
+            "Read-only menu: enabled",
+            (
+                "Read-only commands: ready"
+                if command_contract.get("registration_enabled")
+                else "Read-only commands: blocked"
+            ),
+            "Live data: staff_readiness only",
+            "State-changing actions: disabled",
+        ]
+    )
+
+
+def _staff_read_only_domain_data_message(
+    db: Session, menu_item: Dict[str, Any] | None
+) -> str | None:
+    item_key = str((menu_item or {}).get("key") or "").strip()
+    if item_key not in STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS:
+        return None
+    if item_key == "staff_readiness":
+        return _staff_readiness_message(db)
     return None
 
 
@@ -1051,6 +1099,7 @@ async def _handle_staff_read_only_menu(
 
     menu_item = _staff_menu_item_for_text(role_menu, text)
     command_key = command if command in read_only_commands else "staff_menu_item"
+    domain_data_message = _staff_read_only_domain_data_message(db, menu_item)
     _record_staff_command_audit(
         db,
         chat_id=chat_id,
@@ -1064,7 +1113,7 @@ async def _handle_staff_read_only_menu(
     db.commit()
     await bot_service._send_message(
         chat_id,
-        TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE,
+        domain_data_message or TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE,
         menu,
     )
     return True

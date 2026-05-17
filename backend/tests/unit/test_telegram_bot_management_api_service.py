@@ -217,7 +217,11 @@ class TestTelegramBotManagementApiService:
         assert role_menu_enablement["enabled"] is True
         assert role_menu_enablement["runtime_menu_enabled"] is True
         assert role_menu_enablement["state_changing_menu_items_enabled"] is False
-        assert role_menu_enablement["domain_data_commands_enabled"] is False
+        assert role_menu_enablement["domain_data_commands_enabled"] is True
+        assert role_menu_enablement["domain_data_commands_status"] == "partial"
+        assert role_menu_enablement["domain_data_command_keys"] == [
+            "staff_readiness"
+        ]
 
     @pytest.mark.parametrize(
         ("webhook_set", "expected_transport"),
