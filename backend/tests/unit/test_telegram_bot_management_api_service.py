@@ -7,6 +7,9 @@ import pytest
 
 from app.api.v1.endpoints import admin_telegram
 from app.models.telegram_config import TelegramStaffLinkToken
+from app.services.telegram_staff_link_token_service import (
+    TelegramStaffLinkTokenService,
+)
 from app.services.telegram_bot_management_api_service import (
     TelegramBotManagementApiService,
 )
@@ -109,6 +112,10 @@ class TestTelegramBotManagementApiService:
         table = TelegramStaffLinkToken.__table__
 
         assert table.name == contract["table"]
+        assert contract["enabled"] is True
+        assert contract["migration_created"] is True
+        assert contract["runtime_write_enabled"] is True
+        assert contract["migration_revision"] == "0025_telegram_staff_link_tokens"
         assert list(table.columns.keys()) == contract["columns"]
         assert contract["raw_token_storage_allowed"] is False
         assert "raw_token" not in table.columns
@@ -209,7 +216,7 @@ class TestTelegramBotManagementApiService:
         status = admin_telegram._build_staff_bot_status(webhook_set=webhook_set)
 
         assert status["transport"] == expected_transport
-        assert status["next_slice"] == "staff_link_token_storage_migration"
+        assert status["next_slice"] == "staff_bot_runtime_handler_enablement"
         assert status["supported_roles"] == admin_telegram.STAFF_BOT_SUPPORTED_ROLES
         assert status["read_only_menu_contract"] == (
             admin_telegram.STAFF_BOT_READ_ONLY_MENU_CONTRACT
@@ -232,6 +239,15 @@ class TestTelegramBotManagementApiService:
         )
         assert status["link_token_validation_contract"]["storage_contract"] == (
             status["link_token_storage_contract"]
+        )
+        assert (
+            status["link_token_validation_contract"]["single_use_enforcement_enabled"]
+            is True
+        )
+        assert status["link_token_validation_contract"]["token_storage_enabled"] is True
+        assert (
+            status["link_token_validation_contract"]["storage_migration_required"]
+            is False
         )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):
@@ -289,6 +305,7 @@ class TestTelegramBotManagementApiService:
             db=db,
             token=token,
             telegram_chat_id=998877,
+            enforce_single_use=False,
         )
 
         assert result["valid"] is True
@@ -297,6 +314,97 @@ class TestTelegramBotManagementApiService:
         assert result["chat_id"] == 998877
         assert result["role"] == "lab"
         assert result["single_use_enforced"] is False
+
+    def test_staff_link_token_service_issues_hash_only_record(
+        self, db_session, admin_user
+    ):
+        token = self._staff_link_token(user_id=admin_user.id, chat_id=700700)
+        parsed = admin_telegram.parse_staff_link_start_token(token)
+        service = TelegramStaffLinkTokenService(db_session)
+
+        record = service.issue_token(
+            token_hash=parsed["token_hash"],
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700700,
+            expires_at=parsed["expires_at"],
+            issued_by_user_id=admin_user.id,
+            request_id="req-storage-1",
+        )
+        db_session.commit()
+
+        stored = (
+            db_session.query(TelegramStaffLinkToken)
+            .filter(TelegramStaffLinkToken.id == record.id)
+            .one()
+        )
+        assert stored.token_hash == parsed["token_hash"]
+        assert stored.token_hash != token
+        assert stored.consumed_at is None
+        assert stored.request_id == "req-storage-1"
+
+    def test_staff_link_token_service_consumes_record_once(
+        self, db_session, admin_user
+    ):
+        token = self._staff_link_token(user_id=admin_user.id, chat_id=700701)
+        parsed = admin_telegram.parse_staff_link_start_token(token)
+        service = TelegramStaffLinkTokenService(db_session)
+        service.issue_token(
+            token_hash=parsed["token_hash"],
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700701,
+            expires_at=parsed["expires_at"],
+        )
+        db_session.commit()
+
+        first = service.consume_for_validation(
+            token_hash=parsed["token_hash"],
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700701,
+        )
+        second = service.consume_for_validation(
+            token_hash=parsed["token_hash"],
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700701,
+        )
+
+        assert first["valid"] is True
+        assert first["single_use_enforced"] is True
+        assert second == {"valid": False, "reason": "already_used"}
+
+    def test_staff_link_start_token_validator_consumes_storage_record(
+        self, db_session, admin_user
+    ):
+        token = admin_telegram.issue_staff_link_start_token(
+            db_session,
+            user_id=admin_user.id,
+            chat_id=700702,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            issued_by_user_id=admin_user.id,
+            request_id="req-validator-consume",
+            nonce="consumeonce",
+        )
+
+        result = admin_telegram.validate_staff_link_start_token(
+            db=db_session,
+            token=token,
+            telegram_chat_id=700702,
+        )
+        replay = admin_telegram.validate_staff_link_start_token(
+            db=db_session,
+            token=token,
+            telegram_chat_id=700702,
+        )
+
+        record = (
+            db_session.query(TelegramStaffLinkToken)
+            .filter(TelegramStaffLinkToken.token_hash == result["token_hash"])
+            .one()
+        )
+        assert result["valid"] is True
+        assert result["single_use_enforced"] is True
+        assert record.consumed_at is not None
+        assert replay["valid"] is False
+        assert replay["reason"] == "already_used"
 
     def test_staff_link_start_token_validator_rejects_chat_mismatch(self):
         token = self._staff_link_token()
