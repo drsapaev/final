@@ -156,6 +156,7 @@ STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = [
     "pending_reports",
     "delivery_status",
     "integration_errors",
+    "revenue_summary",
     "daily_summary",
 ]
 
@@ -589,11 +590,9 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "state_changing_menu_items_enabled": False,
     "runtime_handler": "_handle_staff_read_only_menu",
     "domain_data_commands_enabled": True,
-    "domain_data_commands_status": "partial",
+    "domain_data_commands_status": "complete",
     "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
-    "pending_domain_data_command_keys": [
-        "revenue_summary",
-    ],
+    "pending_domain_data_command_keys": [],
     "state_changing_actions_enabled": False,
     "allowed_until_enabled": [
         "read_status_contract",
@@ -880,12 +879,10 @@ def _build_staff_role_menus_summary() -> Dict[str, Any]:
         "item_count": menu_item_count,
         "handler": "_handle_staff_read_only_menu",
         "domain_data_commands_enabled": True,
-        "domain_data_commands_status": "partial",
+        "domain_data_commands_status": "complete",
         "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
         "state_changing_actions_enabled": False,
-        "blocked_until": [
-            "role_specific_domain_read_models",
-        ],
+        "blocked_until": [],
     }
 
 
