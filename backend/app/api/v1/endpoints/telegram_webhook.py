@@ -997,6 +997,57 @@ def _staff_queue_overview_message(db: Session) -> str:
     )
 
 
+def _staff_next_patient_entry(db: Session) -> OnlineQueueEntry | None:
+    return (
+        db.query(OnlineQueueEntry)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(
+            DailyQueue.day == date.today(),
+            DailyQueue.active.is_(True),
+            OnlineQueueEntry.status.in_(QUEUE_WAITING_STATUSES),
+        )
+        .order_by(
+            OnlineQueueEntry.priority.desc(),
+            func.coalesce(
+                OnlineQueueEntry.queue_time, OnlineQueueEntry.created_at
+            ).asc(),
+            OnlineQueueEntry.id.asc(),
+        )
+        .first()
+    )
+
+
+def _staff_next_patient_message(db: Session) -> str:
+    entry = _staff_next_patient_entry(db)
+    if not entry:
+        return "\n".join(
+            [
+                "Next patient",
+                f"Date: {date.today().isoformat()}",
+                "Waiting patients: 0",
+                "Mode: read-only queue snapshot",
+            ]
+        )
+
+    queue_time = entry.queue_time.isoformat() if entry.queue_time else "not set"
+    patient_name = str(entry.patient_name or "").strip() or "Patient name unavailable"
+    queue_name = _queue_entry_name(entry)
+    position = _queue_entry_position(db, entry)
+    details = [
+        "Next patient",
+        f"Date: {date.today().isoformat()}",
+        f"Queue: {queue_name}",
+        f"Queue number: {entry.number}",
+        f"Patient: {patient_name}",
+        f"Status: {entry.status}",
+        f"Queue time: {queue_time}",
+    ]
+    if position:
+        details.append(f"Position: {position}")
+    details.append("Mode: read-only queue snapshot")
+    return "\n".join(details)
+
+
 def _staff_payment_status_message(db: Session) -> str:
     rows = _payment_status_rows(db)
     total_count = sum(count for _status, count, _amount in rows)
@@ -1118,6 +1169,8 @@ def _staff_read_only_domain_data_message(
         return _staff_readiness_message(db)
     if item_key == "queue_overview":
         return _staff_queue_overview_message(db)
+    if item_key == "next_patient":
+        return _staff_next_patient_message(db)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
