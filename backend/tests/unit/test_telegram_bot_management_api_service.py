@@ -223,6 +223,7 @@ class TestTelegramBotManagementApiService:
             "staff_readiness",
             "queue_overview",
             "next_patient",
+            "today_schedule",
             "payment_status",
             "ready_reports",
             "daily_summary",
