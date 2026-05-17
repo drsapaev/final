@@ -86,9 +86,13 @@ class TelegramBotService:
         start_handler: Callable[[int, dict[str, Any]], Awaitable[None]],
         command_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
         text_handlers: Mapping[str, Callable[[int], Awaitable[None]]],
+        staff_menu_handler: Callable[..., Awaitable[bool]] | None = None,
     ) -> bool:
         """Dispatch clinic patient bot updates above webhook/polling transports."""
         if await staff_start_handler(update, db, self):
+            return True
+
+        if staff_menu_handler and await staff_menu_handler(update, db, self):
             return True
 
         if await ticket_start_handler(update, db, self):

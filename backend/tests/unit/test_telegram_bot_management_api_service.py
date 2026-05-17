@@ -195,16 +195,19 @@ class TestTelegramBotManagementApiService:
         assert status["state_changing_actions_enabled"] is False
         assert status["role_linking"]["enabled"] is True
         assert status["role_linking"]["runtime_handler_enabled"] is True
-        assert status["authorization"]["ready"] is False
+        assert status["authorization"]["ready"] is True
+        assert status["authorization"]["runtime_read_only_enabled"] is True
         assert status["audit"]["ready"] is False
         assert status["audit"]["linking_events_ready"] is True
         assert status["role_menus"]["read_only"] is True
-        assert status["role_menus"]["runtime_enabled"] is False
+        assert status["role_menus"]["runtime_enabled"] is True
+        assert status["role_menus"]["state_changing_actions_enabled"] is False
 
         role_menu_enablement = status["role_menu_enablement_contract"]
-        assert role_menu_enablement["enabled"] is False
-        assert role_menu_enablement["runtime_menu_enabled"] is False
+        assert role_menu_enablement["enabled"] is True
+        assert role_menu_enablement["runtime_menu_enabled"] is True
         assert role_menu_enablement["state_changing_menu_items_enabled"] is False
+        assert role_menu_enablement["domain_data_commands_enabled"] is False
 
     @pytest.mark.parametrize(
         ("webhook_set", "expected_transport"),

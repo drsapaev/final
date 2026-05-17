@@ -468,10 +468,10 @@ class TestTelegramWebhookSecurity:
             fake_service._send_message.await_args.args[1]
             == f"{telegram_webhook.TELEGRAM_STAFF_LINKED_MESSAGE}\nРоль: admin"
         )
-        assert (
-            fake_service._send_message.await_args.args[2]
-            == telegram_webhook.TELEGRAM_STAFF_LINK_REPLY_MARKUP
-        )
+        reply_markup = fake_service._send_message.await_args.args[2]
+        assert "keyboard" in reply_markup
+        assert reply_markup["resize_keyboard"] is True
+        assert reply_markup["keyboard"][-1] == [{"text": "/staff"}, {"text": "/help"}]
 
     @pytest.mark.asyncio
     async def test_staff_start_token_replay_is_rejected_before_patient_onboarding(
