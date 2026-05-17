@@ -93,6 +93,17 @@ For code changes:
 - For multi-step work, express the implementation as a short goal-driven loop: `step -> verify`, then execute against that loop.
 - If success is not mechanically checkable yet, tighten the validation target before editing instead of coding against a vague goal.
 
+## Dev-Brain Usage Policy
+
+The local dev-brain is an advisory memory, retrieval, guardrail, and evidence layer. It is not an absolute blocker or a replacement for the active model's reasoning.
+
+- Use direct execution for narrow, local, known-root-cause tasks with no risky domain, ownership ambiguity, or canonical/legacy ambiguity.
+- Use dossier-style repo grounding for graph-heavy context building when ownership or SSOT discovery matters but a strict execution gate would be too heavy.
+- Use handoff/gate only for risky execution tasks, multi-file contract changes, or domains listed under Strict Mode Triggers.
+- If `agent_gate.py` misroutes or excludes a confirmed root-cause file, retry at most once with `--known-root-cause`, then use `narrow_override` instead of looping on the gate.
+- Treat repeated gate misroutes as a dev-brain rule bug to fix, not as a reason to keep blocking the product task.
+- Keep durable project memory in concise repo rules, runbooks, evidence logs, and canonical source/test anchors rather than expanding `AGENTS.md` into a full history dump.
+
 ## Execution Mode Selection
 
 Before any execution task, first choose exactly one mode:
@@ -101,6 +112,8 @@ Before any execution task, first choose exactly one mode:
 - `gate`: risky task, unclear root cause, likely multi-file impact, frontend/backend ownership ambiguity, canonical/legacy ambiguity, scope-creep risk, or handoff-style brief needed.
 - `gate_known_root_cause`: risky task with a confirmed root-cause file; use the gate but anchor it with `--known-root-cause`.
 - `narrow_override`: only after `agent_gate.py` misroutes, one retry still misses the confirmed root-cause file, and there is explicit human or repo-approved basis for a narrow bypass.
+
+DB/Alembic/SQLAlchemy migration work is always a risky domain and must use `gate` or `gate_known_root_cause`. If the gate classifies the task as `Mode: migration`, treat the Alembic revision as the first-touch owner even when the task text also mentions Telegram, queue, status, webhook, endpoint, or UI files.
 
 Always start execution work with this pre-work block:
 
@@ -168,6 +181,7 @@ Automatically move to `plan`, `dossier`, or `handoff` before `execute` when a ta
 - Queue fairness, specialist/profile/doctor mapping, or `queue_time`.
 - Frontend/backend contract alignment.
 - Telegram integration.
+- DB schema, Alembic revisions, SQLAlchemy models, table creation, storage migrations, or Postgres SSOT.
 - EMR, lab, rollout, evidence packs, go/no-go, or production-sensitive behavior.
 - Any canonical vs legacy ambiguity.
 
@@ -207,6 +221,16 @@ For completed `execute` tasks, answer with:
 For risky tasks that should not execute yet, output `plan`, `dossier`, or `handoff` instead.
 
 ## Domain Guardrails
+
+DB / Alembic / SQLAlchemy migrations:
+
+- Use the ownership chain `model -> schema -> migration -> tests`.
+- SQLAlchemy model without a matching table/migration is migration ownership, not endpoint, webhook, status, queue, or UI ownership.
+- If the root cause is a missing table for an existing SQLAlchemy model, the first-touch patch must include a new Alembic revision under `backend/alembic/versions/`.
+- Treat the existing SQLAlchemy model and the previous Alembic revision as read-only references unless the user explicitly changes the model contract.
+- Never edit an already-applied migration as a substitute for creating a new revision.
+- Migration validation must include Alembic chain checks such as heads/history review and, when a disposable/test Postgres database is available, upgrade validation.
+- Stop on multi-head ambiguity, existing target table, destructive migration requirements, or model/table mismatch.
 
 Routing:
 

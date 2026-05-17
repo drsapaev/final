@@ -19,6 +19,7 @@ from app.api.deps import get_db, require_roles
 from app.core.config import settings
 from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.user import User
+from app.services.telegram_staff_link_token_service import TelegramStaffLinkTokenService
 from app.services.telegram_bot import (
     PATIENT_BOT_COMMANDS_RU,
     PATIENT_BOT_COMMANDS_UZ,
@@ -209,11 +210,14 @@ STAFF_BOT_LINKING_RUNTIME_CONTRACT = {
 
 STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT = {
     "contract_version": "staff-link-token-storage-v1",
-    "enabled": False,
-    "migration_created": False,
-    "runtime_write_enabled": False,
+    "enabled": True,
+    "migration_created": True,
+    "runtime_write_enabled": True,
     "table": "telegram_staff_link_tokens",
     "raw_token_storage_allowed": False,
+    "migration_revision": "0025_telegram_staff_link_tokens",
+    "repository": "TelegramStaffLinkTokenRepository",
+    "service": "TelegramStaffLinkTokenService",
     "columns": [
         "id",
         "token_hash",
@@ -250,21 +254,22 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "signature_validator_available": True,
     "expiry_validator_available": True,
     "binding_parser_available": True,
-    "stateless_validator_enabled": True,
-    "single_use_enforcement_enabled": False,
-    "token_storage_enabled": False,
+    "stateless_validator_enabled": False,
+    "single_use_enforcement_enabled": True,
+    "token_storage_enabled": True,
     "handler_enabled": False,
-    "storage_migration_required": True,
+    "storage_migration_required": False,
     "storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
     "runtime_blocked_by": [
-        "staff_link_token_storage_migration",
-        "staff_link_token_validator_service",
+        "staff_bot_runtime_handler_enablement",
     ],
     "required_before_enablement": True,
     "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
     "builder": "build_staff_link_start_token",
+    "issuer": "issue_staff_link_start_token",
     "parser": "parse_staff_link_start_token",
     "validator": "validate_staff_link_start_token",
+    "consumer": "TelegramStaffLinkTokenService.consume_for_validation",
     "token_hash_prefix": STAFF_LINK_TOKEN_HASH_PREFIX,
     "token_properties": [
         "signed",
@@ -277,6 +282,8 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
         "expired",
         "signature_invalid",
         "already_used",
+        "token_not_issued",
+        "token_binding_mismatch",
         "staff_user_inactive",
         "role_not_allowed",
         "telegram_account_already_linked",
@@ -580,6 +587,39 @@ def build_staff_link_start_token(
     return f"{body}{STAFF_LINK_TOKEN_SEPARATOR}{signature}"
 
 
+def issue_staff_link_start_token(
+    db: Session,
+    *,
+    user_id: int,
+    chat_id: int,
+    expires_at: datetime,
+    issued_by_user_id: int | None = None,
+    request_id: str | None = None,
+    nonce: str | None = None,
+) -> str:
+    token = build_staff_link_start_token(
+        user_id=user_id,
+        chat_id=chat_id,
+        expires_at=expires_at,
+        nonce=nonce,
+    )
+    token_hash = _hash_staff_link_start_token(token)
+    TelegramStaffLinkTokenService(db).issue_token(
+        token_hash=token_hash,
+        staff_user_id=user_id,
+        telegram_chat_id=chat_id,
+        expires_at=expires_at,
+        issued_by_user_id=issued_by_user_id,
+        request_id=request_id,
+    )
+    logger.info(
+        "Issued stored Telegram staff link token user_id=%s chat_id=%s",
+        user_id,
+        chat_id,
+    )
+    return token
+
+
 def _decode_staff_link_start_token(
     token: str,
 ) -> tuple[Dict[str, Any] | None, str | None]:
@@ -640,7 +680,11 @@ def _normalize_staff_role(role: Any) -> str:
 
 
 def validate_staff_link_start_token(
-    db: Session, token: str, telegram_chat_id: int
+    db: Session,
+    token: str,
+    telegram_chat_id: int,
+    *,
+    enforce_single_use: bool = True,
 ) -> Dict[str, Any]:
     parsed, rejection_reason = _decode_staff_link_start_token(token)
     if not parsed:
@@ -699,8 +743,25 @@ def validate_staff_link_start_token(
             "token_hash": parsed["token_hash"],
         }
 
+    single_use_enforced = False
+    consumed_at = None
+    if enforce_single_use:
+        consume_result = TelegramStaffLinkTokenService(db).consume_for_validation(
+            token_hash=parsed["token_hash"],
+            staff_user_id=int(user.id),
+            telegram_chat_id=int(parsed["chat_id"]),
+        )
+        if not consume_result.get("valid"):
+            return {
+                "valid": False,
+                "reason": consume_result.get("reason", "already_used"),
+                "token_hash": parsed["token_hash"],
+            }
+        single_use_enforced = bool(consume_result.get("single_use_enforced"))
+        consumed_at = consume_result.get("consumed_at")
+
     logger.info("Staff Telegram link token validated role=%s", role_key)
-    return {
+    result = {
         "valid": True,
         "reason": "ok",
         "token_hash": parsed["token_hash"],
@@ -708,8 +769,11 @@ def validate_staff_link_start_token(
         "chat_id": int(parsed["chat_id"]),
         "role": role_key,
         "expires_at": parsed["expires_at"].isoformat(),
-        "single_use_enforced": False,
+        "single_use_enforced": single_use_enforced,
     }
+    if consumed_at:
+        result["consumed_at"] = consumed_at
+    return result
 
 
 def _build_staff_role_menus_summary() -> Dict[str, Any]:
@@ -795,7 +859,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_link_token_storage_migration",
+        "next_slice": "staff_bot_runtime_handler_enablement",
     }
 
 
