@@ -39,6 +39,15 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "profile", "description": "Mening holatim"},
     {"command": "help", "description": "Yordam"},
 ]
+STAFF_BOT_COMMANDS_DEFAULT = [
+    {"command": "staff", "description": "Staff status"},
+    {"command": "queue", "description": "Role queue"},
+    {"command": "schedule", "description": "Schedule"},
+    {"command": "payments", "description": "Payment statuses"},
+    {"command": "reports", "description": "Report readiness"},
+    {"command": "summary", "description": "Operational summary"},
+    {"command": "help", "description": "Staff help"},
+]
 
 
 class TelegramBotService:
@@ -512,17 +521,14 @@ class TelegramBotService:
         message_id = (payload.get("result") or {}).get("message_id")
         return True, int(message_id) if message_id is not None else None, None
 
-    async def set_patient_bot_commands(self) -> tuple[bool, str | None]:
-        """Register patient bot command menu in Telegram."""
-        if not self.bot_token:
+    async def _set_bot_commands(
+        self, bot_token: str | None, payloads: list[dict[str, Any]]
+    ) -> tuple[bool, str | None]:
+        if not bot_token:
             logger.error("Bot token is not configured for Telegram command registration")
             return False, "bot_token_not_configured"
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/setMyCommands"
-        payloads = [
-            {"commands": PATIENT_BOT_COMMANDS_RU},
-            {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
-        ]
+        url = f"https://api.telegram.org/bot{bot_token}/setMyCommands"
         for payload in payloads:
             try:
                 response = requests.post(url, json=payload, timeout=10)
@@ -551,6 +557,27 @@ class TelegramBotService:
                 return False, "telegram_api_error"
 
         return True, None
+
+    async def set_patient_bot_commands(self) -> tuple[bool, str | None]:
+        """Register patient bot command menu in Telegram."""
+        return await self._set_bot_commands(
+            self.bot_token,
+            [
+                {"commands": PATIENT_BOT_COMMANDS_RU},
+                {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
+            ],
+        )
+
+    async def set_staff_bot_commands(
+        self,
+        staff_bot_token: str | None,
+        commands: list[dict[str, str]] | None = None,
+    ) -> tuple[bool, str | None]:
+        """Register read-only staff bot commands with the dedicated staff bot."""
+        return await self._set_bot_commands(
+            staff_bot_token,
+            [{"commands": commands or STAFF_BOT_COMMANDS_DEFAULT}],
+        )
 
     async def _answer_callback_query(self, callback_query_id: str, text: str = ""):
         """Ответ на callback запрос"""

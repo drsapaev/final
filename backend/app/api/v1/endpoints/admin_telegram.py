@@ -357,8 +357,16 @@ STAFF_BOT_AUTHORIZATION_CONTRACT = {
 STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
     "contract_version": "staff-commands-v1",
     "registration_enabled": False,
-    "registration_endpoint_published": False,
+    "registration_endpoint_published": True,
+    "runtime_registration_enabled": True,
+    "registration_endpoint": "POST /api/v1/admin/telegram/register-staff-commands",
+    "runtime_handler": "register_staff_bot_commands",
+    "telegram_api_method": "setMyCommands",
     "bot_scope": "staff_bot_only",
+    "registered_command_scope": "read_only_staff_commands_only",
+    "patient_bot_token_allowed": False,
+    "uses_dedicated_staff_bot_token": True,
+    "token_returned_to_frontend": False,
     "commands": [
         {
             "command": "/staff",
@@ -396,6 +404,7 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
             "intent": "read_only",
         },
     ],
+    "read_only_commands_registered": False,
     "enablement_gate": [
         "dedicated_staff_bot_token",
         "role_based_staff_linking",
@@ -880,6 +889,9 @@ def _build_staff_bot_status(
         "source_key": None,
     }
     token_contract = _build_staff_bot_token_contract(token_status)
+    command_registration_contract = _build_staff_command_registration_contract(
+        token_contract
+    )
     return {
         "version": "linking-runtime",
         "contract_version": "staff-menu-read-only-v1",
@@ -907,7 +919,7 @@ def _build_staff_bot_status(
         "link_token_validation_contract": STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT,
         "link_token_storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
-        "command_registration_contract": STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
+        "command_registration_contract": command_registration_contract,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
         "audit_contract": STAFF_BOT_AUDIT_CONTRACT,
         "authorization": {
@@ -949,7 +961,7 @@ def _build_staff_bot_status(
         "next_slice": (
             "dedicated_staff_bot_token_runtime_config"
             if not token_contract["ready"]
-            else "staff_command_registration_runtime"
+            else "staff_read_only_domain_data_runtime"
         ),
     }
 
@@ -1055,6 +1067,24 @@ def _get_staff_bot_token_runtime_status(
     }
 
 
+def _get_configured_staff_bot_token(
+    db: Session, patient_bot_token: str | None = None
+) -> str | None:
+    patient_token_text = str(patient_bot_token or "").strip()
+    for env_key in STAFF_BOT_TOKEN_ENV_KEYS:
+        token_text = str(os.getenv(env_key) or "").strip()
+        if token_text and token_text != patient_token_text:
+            return token_text
+
+    for setting_key in STAFF_BOT_TOKEN_SETTING_KEYS:
+        setting = crud_clinic.get_setting_by_key(db, setting_key)
+        token_text = str(getattr(setting, "value", None) or "").strip()
+        if token_text and token_text != patient_token_text:
+            return token_text
+
+    return None
+
+
 def _build_staff_bot_token_contract(token_status: Dict[str, Any]) -> Dict[str, Any]:
     configured = bool(token_status.get("configured"))
     ready = bool(token_status.get("ready"))
@@ -1096,6 +1126,44 @@ def _build_staff_bot_token_contract(token_status: Dict[str, Any]) -> Dict[str, A
                 "ready": True,
             },
         ],
+    }
+
+
+def _staff_bot_read_only_command_payload() -> list[Dict[str, str]]:
+    commands = []
+    for item in STAFF_BOT_COMMAND_REGISTRATION_CONTRACT.get("commands", []):
+        if item.get("intent") != "read_only":
+            continue
+        command = str(item.get("command") or "").strip().lstrip("/")
+        description = str(item.get("label") or command).strip()
+        if command:
+            commands.append(
+                {
+                    "command": command,
+                    "description": description[:256],
+                }
+            )
+    return commands
+
+
+def _build_staff_command_registration_contract(
+    token_contract: Dict[str, Any],
+) -> Dict[str, Any]:
+    token_ready = bool(token_contract.get("ready"))
+    return {
+        **STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
+        "registration_enabled": token_ready,
+        "runtime_registration_enabled": True,
+        "registration_endpoint_published": True,
+        "read_only_command_registration_available": token_ready,
+        "read_only_commands_registered": False,
+        "registered_command_scope": "read_only_staff_commands_only",
+        "patient_bot_token_allowed": False,
+        "state_changing_commands_registered": False,
+        "runtime_blocked_by": (
+            [] if token_ready else list(token_contract["runtime_blocked_by"])
+        ),
+        "telegram_payload_commands": _staff_bot_read_only_command_payload(),
     }
 
 
@@ -1309,6 +1377,64 @@ async def register_patient_bot_commands(
         raise_admin_telegram_error(
             "register-patient-commands",
             "Telegram patient bot command registration failed",
+            e,
+        )
+
+
+@router.post("/telegram/register-staff-commands")
+async def register_staff_bot_commands(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Register read-only staff bot commands with a dedicated staff bot token."""
+    try:
+        patient_bot_token = _get_configured_bot_token(db)
+        token_status = _get_staff_bot_token_runtime_status(
+            db, patient_bot_token=patient_bot_token
+        )
+        staff_bot_token = _get_configured_staff_bot_token(
+            db, patient_bot_token=patient_bot_token
+        )
+        if not staff_bot_token or not token_status.get("ready"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Dedicated staff bot token is not configured",
+                    "source": token_status.get("source"),
+                    "source_key": token_status.get("source_key"),
+                    "patient_bot_token_reused": bool(
+                        token_status.get("patient_bot_token_reused")
+                    ),
+                },
+            )
+
+        commands = _staff_bot_read_only_command_payload()
+        bot_service = await get_telegram_bot_service()
+        ok, error = await bot_service.set_staff_bot_commands(
+            staff_bot_token, commands=commands
+        )
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "message": "Telegram staff bot commands were not registered",
+                    "error": error,
+                },
+            )
+
+        return {
+            "success": True,
+            "message": "Telegram staff bot read-only commands registered",
+            "registered_commands": [item["command"] for item in commands],
+            "state_changing_commands_registered": False,
+            "token_returned_to_frontend": False,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise_admin_telegram_error(
+            "register-staff-commands",
+            "Telegram staff bot command registration failed",
             e,
         )
 

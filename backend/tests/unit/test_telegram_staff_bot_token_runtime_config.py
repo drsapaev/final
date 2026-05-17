@@ -6,6 +6,7 @@ import pytest
 
 from app.api.v1.endpoints import admin_telegram
 from app.models.clinic import ClinicSettings
+from app.services import telegram_bot
 
 
 @pytest.mark.unit
@@ -37,7 +38,14 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "TELEGRAM_STAFF_BOT_TOKEN"
         assert contract["token_returned_to_frontend"] is False
         assert contract["patient_bot_token_reused"] is False
-        assert status["next_slice"] == "staff_command_registration_runtime"
+        assert status["next_slice"] == "staff_read_only_domain_data_runtime"
+        assert (
+            status["command_registration_contract"]["registration_enabled"] is True
+        )
+        assert (
+            status["command_registration_contract"]["state_changing_commands_registered"]
+            is False
+        )
         assert secret_value not in str(status)
 
     def test_reads_legacy_env_without_secret_leak(self, monkeypatch, db_session):
@@ -61,7 +69,10 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "STAFF_TELEGRAM_BOT_TOKEN"
         assert contract["enabled"] is True
         assert contract["runtime_blocked_by"] == []
-        assert status["next_slice"] == "staff_command_registration_runtime"
+        assert status["next_slice"] == "staff_read_only_domain_data_runtime"
+        assert (
+            status["command_registration_contract"]["registration_enabled"] is True
+        )
         assert secret_value not in str(status)
         assert "patient-token" not in str(status)
 
@@ -113,3 +124,50 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert "separate_staff_bot_token_configured" in contract["runtime_blocked_by"]
         assert status["next_slice"] == "dedicated_staff_bot_token_runtime_config"
         assert secret_value not in str(status)
+
+    @pytest.mark.asyncio
+    async def test_register_staff_commands_uses_read_only_payload_without_secret(
+        self, monkeypatch, db_session
+    ):
+        secret_value = "999999:staff-secret"
+        calls = []
+        self._clear_staff_bot_token_sources(monkeypatch)
+        monkeypatch.setenv("TELEGRAM_STAFF_BOT_TOKEN", secret_value)
+
+        class FakeResponse:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {"ok": True}
+
+        def fake_post(url, json, timeout):
+            calls.append({"url": url, "json": json, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr(telegram_bot.requests, "post", fake_post)
+
+        result = await admin_telegram.register_staff_bot_commands(
+            db_session,
+            SimpleNamespace(id=1),
+        )
+
+        registered = result["registered_commands"]
+        assert result["success"] is True
+        assert result["state_changing_commands_registered"] is False
+        assert result["token_returned_to_frontend"] is False
+        assert registered == [
+            "staff",
+            "queue",
+            "schedule",
+            "payments",
+            "reports",
+            "summary",
+            "help",
+        ]
+        assert "refund" not in registered
+        assert "call" not in registered
+        assert secret_value not in str(result)
+        assert calls[0]["json"]["commands"] == (
+            admin_telegram._staff_bot_read_only_command_payload()
+        )

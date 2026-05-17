@@ -62,6 +62,7 @@ const TelegramManager = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [registeringCommands, setRegisteringCommands] = useState(false);
+  const [registeringStaffCommands, setRegisteringStaffCommands] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateForm, setTemplateForm] = useState({
     name: '',
@@ -150,6 +151,26 @@ const TelegramManager = () => {
     }
   };
 
+  const registerStaffCommands = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      setRegisteringStaffCommands(true);
+      const response = await api.post('/admin/telegram/register-staff-commands');
+      const commands = Array.isArray(response?.data?.registered_commands) ?
+      response.data.registered_commands.join(', ') :
+      'read-only staff commands';
+      setSuccess(`Staff-команды зарегистрированы: ${commands}`);
+      await loadTelegramData();
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
+      setError(message || e?.message || 'Не удалось зарегистрировать staff-команды Telegram');
+    } finally {
+      setRegisteringStaffCommands(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" sx={{ minHeight: '400px' }}>
@@ -221,6 +242,11 @@ const TelegramManager = () => {
   const staffCommandNames = staffCommandList.
   map((item) => item?.command).
   filter(Boolean);
+  const staffCommandEndpointReady = Boolean(
+    staffCommandContract.registration_endpoint_published ||
+    staffCommandContract.runtime_registration_enabled
+  );
+  const staffCommandRegistrationEnabled = Boolean(staffCommandContract.registration_enabled);
   const staffConfirmationContract = staffBot.confirmation_contract || {};
   const staffConfirmationRuntime = staffBot.confirmations || {};
   const staffConfirmationOperations = Array.isArray(staffConfirmationContract.operations) ?
@@ -591,14 +617,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff command registration"
                     secondary={staffCommandNames.length ?
-                    `${staffCommandNames.join(' ')}; registration: ${staffCommandContract.registration_enabled ? 'enabled' : 'disabled until staff gates'}` :
+                    `${staffCommandNames.join(' ')}; registration: ${staffCommandRegistrationEnabled ? 'ready' : 'blocked until staff token'}; endpoint: ${staffCommandEndpointReady ? 'published' : 'planned'}` :
                     'Staff command contract не опубликован'} />
 
                   <Badge
-                    variant={staffCommandContract.registration_enabled ? 'success' : 'warning'}
+                    variant={staffCommandRegistrationEnabled ? 'success' : 'warning'}
                     size="small">
 
-                    {staffCommandContract.registration_enabled ? 'Enabled' : 'Planned'}
+                    {staffCommandRegistrationEnabled ? 'Ready' : staffCommandEndpointReady ? 'Endpoint' : 'Planned'}
                   </Badge>
                 </ListItem>
                 <ListItem>
@@ -684,6 +710,15 @@ const TelegramManager = () => {
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <CheckCircle size={16} />
                   {registeringCommands ? 'Регистрация команд...' : 'Зарегистрировать команды'}
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  disabled={!staffCommandRegistrationEnabled || registeringStaffCommands}
+                  onClick={registerStaffCommands}
+                  style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <CheckCircle size={16} />
+                  {registeringStaffCommands ? 'Регистрация staff-команд...' : 'Зарегистрировать staff-команды'}
                 </Button>
                 <Button
                   fullWidth
