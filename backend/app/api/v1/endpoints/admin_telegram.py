@@ -75,7 +75,7 @@ STAFF_BOT_READINESS = [
     {
         "key": "state_change_confirmations",
         "label": "Подтверждения для операций",
-        "ready": False,
+        "ready": True,
     },
 ]
 
@@ -408,55 +408,73 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
 
 STAFF_BOT_CONFIRMATION_CONTRACT = {
     "contract_version": "staff-confirmations-v1",
-    "enabled": False,
+    "enabled": True,
     "required_for_state_changes": True,
+    "runtime_guard_enabled": True,
+    "deny_only_runtime_enabled": True,
+    "state_change_command_guard_enabled": True,
+    "confirmation_token_runtime_enabled": False,
     "state_changing_actions_enabled": False,
     "confirmation_window_seconds": 120,
+    "default_state_change_decision": "deny_until_explicit_confirmation_runtime",
     "operations": [
         {
             "key": "queue_call_or_skip_patient",
             "label": "Вызвать или пропустить пациента",
             "roles": ["registrar"],
             "domain_service_required": "queue",
+            "telegram_commands": ["/call", "/skip"],
         },
         {
             "key": "visit_cancel_or_move",
             "label": "Отменить или перенести визит",
             "roles": ["registrar", "admin"],
             "domain_service_required": "visit",
+            "telegram_commands": ["/cancel_visit", "/move_visit"],
         },
         {
             "key": "payment_status_change",
             "label": "Изменить статус оплаты",
             "roles": ["cashier", "admin"],
             "domain_service_required": "payment",
+            "telegram_commands": ["/payment_status"],
         },
         {
             "key": "refund_issue",
             "label": "Оформить возврат",
             "roles": ["cashier", "admin", "owner"],
             "domain_service_required": "payment",
+            "telegram_commands": ["/refund"],
         },
         {
             "key": "medical_document_publish",
             "label": "Закрыть ЭМК или опубликовать документ",
             "roles": ["doctor", "lab", "admin"],
             "domain_service_required": "emr_or_lab",
+            "telegram_commands": ["/publish_document"],
         },
         {
             "key": "doctor_schedule_change",
             "label": "Изменить расписание врача",
             "roles": ["admin", "owner"],
             "domain_service_required": "schedule",
+            "telegram_commands": ["/change_schedule"],
         },
     ],
     "required_server_checks": [
         "staff_linked_to_active_application_user",
         "role_allowed_for_operation",
+        "state_changing_action_registered",
         "fresh_confirmation_token",
         "idempotency_key_present",
         "domain_service_authorizes_target",
         "audit_log_write_succeeds",
+    ],
+    "runtime_blocked_by": [
+        "confirmation_token_persistence",
+        "idempotency_runtime",
+        "domain_service_action_adapters",
+        "explicit_action_enablement",
     ],
     "telegram_payload_rules": [
         "no_raw_internal_ids",
@@ -471,16 +489,17 @@ STAFF_BOT_AUDIT_CONTRACT = {
     "record_writer_enabled": True,
     "runtime_read_only_enabled": True,
     "read_only_menu_events_enabled": True,
+    "state_change_denial_events_enabled": True,
     "state_change_events_enabled": False,
     "recorded_event_types": [
         "staff_link_created",
         "staff_link_token_rejected",
         "staff_command_received",
+        "staff_action_denied",
     ],
     "pending_event_types": [
         "staff_action_confirmation_requested",
         "staff_action_confirmed",
-        "staff_action_denied",
         "staff_action_failed",
     ],
     "required_before_enablement": True,
@@ -904,7 +923,20 @@ def _build_staff_bot_status(
             "linking_events_ready": True,
             "staff_command_events_ready": True,
             "read_only_menu_events_ready": True,
+            "state_change_denial_events_ready": True,
             "state_change_events_ready": False,
+        },
+        "confirmations": {
+            "required": True,
+            "ready": True,
+            "runtime_guard_enabled": True,
+            "deny_only_runtime_enabled": True,
+            "state_change_command_guard_enabled": True,
+            "confirmation_token_runtime_enabled": False,
+            "state_changing_actions_enabled": False,
+            "default_state_change_decision": (
+                "deny_until_explicit_confirmation_runtime"
+            ),
         },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
@@ -917,7 +949,7 @@ def _build_staff_bot_status(
         "next_slice": (
             "dedicated_staff_bot_token_runtime_config"
             if not token_contract["ready"]
-            else "staff_state_change_confirmation_runtime"
+            else "staff_command_registration_runtime"
         ),
     }
 

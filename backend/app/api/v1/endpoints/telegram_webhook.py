@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
+    STAFF_BOT_CONFIRMATION_CONTRACT,
     STAFF_BOT_READ_ONLY_MENU_CONTRACT,
     STAFF_LINK_TOKEN_PREFIX,
     STAFF_LINK_TOKEN_SEPARATOR,
@@ -76,6 +77,10 @@ TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE = (
 )
 TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE = (
     "Read-only staff data is not connected in Telegram yet. Use the clinic app for live data."
+)
+TELEGRAM_STAFF_ACTION_DENIED_MESSAGE = (
+    "State-changing staff actions require confirmation in the clinic app. "
+    "Telegram execution is disabled."
 )
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
     "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
@@ -768,6 +773,51 @@ def _record_staff_command_audit(
     )
 
 
+def _staff_action_reference_hash(operation_key: str) -> str:
+    digest = hashlib.sha256(f"staff_action:{operation_key}".encode()).hexdigest()
+    return f"staff_action:{digest[:24]}"
+
+
+def _record_staff_action_denied_audit(
+    db: Session,
+    *,
+    chat_id: int,
+    request_id: str | None,
+    actor_user_id: int,
+    telegram_user_id: int | None,
+    role: str,
+    operation_key: str,
+    command_key: str,
+    reason: str,
+) -> None:
+    payload = {
+        "actor_role": role,
+        "telegram_user_id_hash": _staff_telegram_reference_hash(chat_id),
+        "action_key": "staff_action_denied",
+        "target_type": "telegram_staff_action",
+        "target_reference_hash": _staff_action_reference_hash(operation_key),
+        "result": "denied",
+        "timestamp": datetime.utcnow().isoformat(),
+        "request_id": request_id,
+        "operation_key": operation_key,
+        "command_key": command_key,
+        "confirmation_required": True,
+        "telegram_execution_enabled": False,
+        "domain_mutation": False,
+        "state_changing_action": True,
+        "redacted": True,
+        "reason": reason,
+    }
+    crud_audit.log(
+        db,
+        action="staff_action_denied",
+        entity_type="telegram_user",
+        entity_id=telegram_user_id,
+        actor_user_id=actor_user_id,
+        payload=payload,
+    )
+
+
 def _staff_read_only_commands() -> set[str]:
     return {
         str(item.get("command") or "").lower()
@@ -842,6 +892,22 @@ def _staff_menu_item_for_text(
     return None
 
 
+def _staff_state_change_operations_by_command() -> Dict[str, Dict[str, Any]]:
+    operations: Dict[str, Dict[str, Any]] = {}
+    for operation in STAFF_BOT_CONFIRMATION_CONTRACT.get("operations", []):
+        for command in operation.get("telegram_commands", []):
+            command_key = str(command or "").strip().lower()
+            if command_key:
+                operations[command_key] = operation
+    return operations
+
+
+def _staff_state_change_operation_for_command(
+    command: str,
+) -> Dict[str, Any] | None:
+    return _staff_state_change_operations_by_command().get(command)
+
+
 def _linked_staff_for_chat(
     db: Session, chat_id: int
 ) -> tuple[TelegramUser | None, User | None, Dict[str, Any] | None]:
@@ -873,10 +939,12 @@ async def _handle_staff_read_only_menu(
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
     normalized_text = text.lower()
     read_only_commands = _staff_read_only_commands()
+    state_change_operation = _staff_state_change_operation_for_command(command)
     staff_menu_requested = (
         command in read_only_commands
         or command == "/start"
         or command == "/menu"
+        or state_change_operation is not None
         or normalized_text in _staff_read_only_item_labels()
     )
     if not staff_menu_requested:
@@ -927,6 +995,41 @@ async def _handle_staff_read_only_menu(
         return True
 
     menu = _staff_menu_keyboard(role_menu)
+    role = _normalize_staff_role(getattr(user, "role", None))
+    if state_change_operation is not None:
+        operation_key = str(state_change_operation.get("key") or "staff_action")
+        allowed_roles = {
+            _normalize_staff_role(role_key)
+            for role_key in state_change_operation.get("roles", [])
+        }
+        reason = (
+            "telegram_state_changes_disabled"
+            if role in allowed_roles
+            else "role_not_allowed"
+        )
+        _record_staff_action_denied_audit(
+            db,
+            chat_id=chat_id,
+            request_id=request_id,
+            actor_user_id=int(user.id),
+            telegram_user_id=getattr(_telegram_user, "id", None),
+            role=role,
+            operation_key=operation_key,
+            command_key=command,
+            reason=reason,
+        )
+        db.commit()
+        await bot_service._send_message(
+            chat_id,
+            (
+                TELEGRAM_STAFF_ACTION_DENIED_MESSAGE
+                if role in allowed_roles
+                else TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE
+            ),
+            menu,
+        )
+        return True
+
     if command in {"/start", "/staff", "/help", "/menu"}:
         _record_staff_command_audit(
             db,

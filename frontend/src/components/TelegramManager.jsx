@@ -222,9 +222,23 @@ const TelegramManager = () => {
   map((item) => item?.command).
   filter(Boolean);
   const staffConfirmationContract = staffBot.confirmation_contract || {};
+  const staffConfirmationRuntime = staffBot.confirmations || {};
   const staffConfirmationOperations = Array.isArray(staffConfirmationContract.operations) ?
   staffConfirmationContract.operations :
   [];
+  const staffConfirmationGuardReady = Boolean(
+    staffConfirmationContract.runtime_guard_enabled ||
+    staffConfirmationRuntime.runtime_guard_enabled ||
+    staffConfirmationRuntime.ready
+  );
+  const staffConfirmationActionsEnabled = Boolean(
+    staffConfirmationContract.state_changing_actions_enabled ||
+    staffBot.state_changing_actions_enabled
+  );
+  const staffConfirmationDenyOnly = Boolean(
+    staffConfirmationContract.deny_only_runtime_enabled ||
+    staffConfirmationRuntime.deny_only_runtime_enabled
+  );
   const staffAuditContract = staffBot.audit_contract || {};
   const staffAuditRuntime = staffBot.audit || {};
   const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
@@ -594,14 +608,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff action confirmations"
                     secondary={staffConfirmationOperations.length ?
-                    `${staffConfirmationOperations.length} state-changing actions require confirmation; actions: ${staffConfirmationContract.state_changing_actions_enabled ? 'enabled' : 'disabled'}` :
+                    `${staffConfirmationOperations.length} state-changing actions require confirmation; guard: ${staffConfirmationGuardReady ? 'ready' : 'pending'}; mode: ${staffConfirmationDenyOnly ? 'deny-only' : 'planned'}; actions: ${staffConfirmationActionsEnabled ? 'enabled' : 'disabled'}` :
                     'Confirmation contract не опубликован'} />
 
                   <Badge
-                    variant={staffConfirmationContract.state_changing_actions_enabled ? 'error' : 'warning'}
+                    variant={staffConfirmationGuardReady ? 'success' : 'warning'}
                     size="small">
 
-                    {staffConfirmationContract.required_for_state_changes ? 'Required' : 'Planned'}
+                    {staffConfirmationGuardReady ? 'Guard' : 'Required'}
                   </Badge>
                 </ListItem>
                 <ListItem>
