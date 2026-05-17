@@ -7,10 +7,12 @@ import pytest
 
 from app.api.v1.endpoints import telegram_webhook
 from app.models.audit import AuditLog
+from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit
+from app.services.lab_reporting_service import LabReportingService
 
 
 class FakeTelegramBotService:
@@ -629,6 +631,85 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         )
         assert audit_log.payload["command_key"] == "staff_menu_item"
         assert audit_log.payload["menu_item_key"] == "reconciliation_alerts"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_pending_reports_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "lab"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7212, user_id=admin_user.id)
+        template = LabReportingService(db_session).list_templates()[0]
+        version = template.versions[-1]
+        db_session.add_all(
+            [
+                LabReportInstance(
+                    patient_id=test_patient.id,
+                    template_id=template.id,
+                    template_version_id=version.id,
+                    status="DRAFT",
+                    patient_snapshot={"name": test_patient.first_name},
+                    branding_snapshot={},
+                    signer_snapshot={},
+                ),
+                LabReportInstance(
+                    patient_id=test_patient.id,
+                    template_id=template.id,
+                    template_version_id=version.id,
+                    status="IN_PROGRESS",
+                    patient_snapshot={"name": test_patient.first_name},
+                    branding_snapshot={},
+                    signer_snapshot={},
+                ),
+                LabReportInstance(
+                    patient_id=test_patient.id,
+                    template_id=template.id,
+                    template_version_id=version.id,
+                    status="READY",
+                    patient_snapshot={"name": test_patient.first_name},
+                    branding_snapshot={},
+                    signer_snapshot={},
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 212,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7212},
+                "from": {"id": 7212},
+                "text": "pending_reports",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Pending lab reports" in text
+        assert "Reports today: 3" in text
+        assert "Pending reports: 2" in text
+        assert "Draft reports: 1" in text
+        assert "In progress: 1" in text
+        assert "Ready/final: 1" in text
+        assert "Mode: read-only lab aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        assert "7212" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "pending_reports"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 

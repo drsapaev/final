@@ -525,6 +525,7 @@ UNPAID_INVOICE_STATUSES = {"pending", "processing"}
 PAID_INVOICE_STATUSES = {"paid"}
 RECONCILIATION_ALERT_THRESHOLD = Decimal("1000")
 LAB_REPORT_READY_STATUSES = {"FINALIZED", "PRINTED"}
+LAB_REPORT_PENDING_STATUSES = {"DRAFT", "IN_PROGRESS"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 
 
@@ -1284,6 +1285,32 @@ def _staff_lab_reports_message(db: Session) -> str:
     )
 
 
+def _staff_pending_lab_reports_message(db: Session) -> str:
+    counts = _lab_status_counts(db)
+    pending = sum(
+        counts.get(status, 0) for status in LAB_REPORT_PENDING_STATUSES
+    )
+    draft = counts.get("DRAFT", 0)
+    in_progress = counts.get("IN_PROGRESS", 0)
+    ready_or_done = sum(
+        counts.get(status, 0)
+        for status in {"READY", "FINALIZED", "PRINTED"} | LAB_REPORT_READY_STATUSES
+    )
+    total = sum(counts.values())
+    return "\n".join(
+        [
+            "Pending lab reports",
+            f"Date: {date.today().isoformat()}",
+            f"Reports today: {total}",
+            f"Pending reports: {pending}",
+            f"Draft reports: {draft}",
+            f"In progress: {in_progress}",
+            f"Ready/final: {ready_or_done}",
+            "Mode: read-only lab aggregate snapshot",
+        ]
+    )
+
+
 def _staff_daily_summary_message(db: Session) -> str:
     queue_counts = _queue_status_counts(db)
     payment_rows = _payment_status_rows(db)
@@ -1375,6 +1402,8 @@ def _staff_read_only_domain_data_message(
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
         return _staff_lab_reports_message(db)
+    if item_key == "pending_reports":
+        return _staff_pending_lab_reports_message(db)
     if item_key == "daily_summary":
         return _staff_daily_summary_message(db)
     return None
