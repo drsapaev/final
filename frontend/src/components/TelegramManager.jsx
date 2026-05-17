@@ -183,6 +183,22 @@ const TelegramManager = () => {
   }, 0);
   const staffRoleSummary = staffRoles.length ? staffRoles.join(', ') : 'none';
   const staffTokenContract = staffBot.token_contract || {};
+  const staffTokenReady = Boolean(staffTokenContract.ready || staffTokenContract.enabled);
+  const staffTokenBlockedBy = Array.isArray(staffTokenContract.runtime_blocked_by)
+    ? staffTokenContract.runtime_blocked_by
+    : [];
+  const staffTokenSource = staffTokenContract.source_key
+    ? `${staffTokenContract.source || 'source'}: ${staffTokenContract.source_key}`
+    : staffTokenContract.source || 'not_configured';
+  let staffTokenIssue = 'separate token configured';
+  if (staffTokenContract.patient_bot_token_reused) {
+    staffTokenIssue = 'patient token reused';
+  } else if (staffTokenBlockedBy.length) {
+    staffTokenIssue = `blocked: ${staffTokenBlockedBy.join(', ')}`;
+  }
+  const staffTokenSecretVisibility = staffTokenContract.token_returned_to_frontend
+    ? 'secret exposed to frontend'
+    : 'secret hidden from frontend';
   const staffLinkingContract = staffBot.linking_contract || staffBot.role_linking || {};
   const staffLinkingMethods = Array.isArray(staffLinkingContract.accepted_methods) ?
   staffLinkingContract.accepted_methods :
@@ -328,14 +344,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff token separation"
                     secondary={staffTokenContract.contract_version ?
-                    `scope: ${staffTokenContract.scope || 'staff'}; runtime read: ${staffTokenContract.runtime_read_enabled ? 'enabled' : 'disabled'}` :
+                    `${staffTokenSource}; ${staffTokenIssue}; ${staffTokenSecretVisibility}` :
                     'Dedicated staff bot token contract не опубликован'} />
 
                   <Badge
-                    variant={staffTokenContract.runtime_read_enabled ? 'success' : 'warning'}
+                    variant={staffTokenReady ? 'success' : 'warning'}
                     size="small">
 
-                    {staffTokenContract.required_before_enablement ? 'Required' : 'Planned'}
+                    {staffTokenReady ? 'Ready' : 'Required'}
                   </Badge>
                 </ListItem>
                 <ListItem>
