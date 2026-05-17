@@ -205,6 +205,13 @@ class TestTelegramBotManagementApiService:
         assert status["role_menus"]["read_only"] is True
         assert status["role_menus"]["runtime_enabled"] is True
         assert status["role_menus"]["state_changing_actions_enabled"] is False
+        assert status["confirmations"]["ready"] is True
+        assert status["confirmations"]["runtime_guard_enabled"] is True
+        assert status["confirmations"]["deny_only_runtime_enabled"] is True
+        assert (
+            status["confirmations"]["confirmation_token_runtime_enabled"] is False
+        )
+        assert status["confirmations"]["state_changing_actions_enabled"] is False
 
         role_menu_enablement = status["role_menu_enablement_contract"]
         assert role_menu_enablement["enabled"] is True
@@ -282,6 +289,14 @@ class TestTelegramBotManagementApiService:
             "staff_command_received"
             not in status["audit_contract"]["pending_event_types"]
         )
+        assert status["confirmation_contract"]["enabled"] is True
+        assert status["confirmation_contract"]["runtime_guard_enabled"] is True
+        assert status["confirmation_contract"]["deny_only_runtime_enabled"] is True
+        assert (
+            status["confirmation_contract"]["confirmation_token_runtime_enabled"]
+            is False
+        )
+        assert status["confirmation_contract"]["state_changing_actions_enabled"] is False
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):
         token = admin_telegram.build_staff_link_start_token(

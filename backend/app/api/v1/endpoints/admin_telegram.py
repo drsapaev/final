@@ -75,7 +75,7 @@ STAFF_BOT_READINESS = [
     {
         "key": "state_change_confirmations",
         "label": "Подтверждения для операций",
-        "ready": False,
+        "ready": True,
     },
 ]
 
@@ -408,10 +408,14 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
 
 STAFF_BOT_CONFIRMATION_CONTRACT = {
     "contract_version": "staff-confirmations-v1",
-    "enabled": False,
+    "enabled": True,
     "required_for_state_changes": True,
+    "runtime_guard_enabled": True,
+    "deny_only_runtime_enabled": True,
+    "confirmation_token_runtime_enabled": False,
     "state_changing_actions_enabled": False,
     "confirmation_window_seconds": 120,
+    "default_state_change_decision": "deny_until_explicit_confirmation_runtime",
     "operations": [
         {
             "key": "queue_call_or_skip_patient",
@@ -453,10 +457,17 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     "required_server_checks": [
         "staff_linked_to_active_application_user",
         "role_allowed_for_operation",
+        "state_changing_action_registered",
         "fresh_confirmation_token",
         "idempotency_key_present",
         "domain_service_authorizes_target",
         "audit_log_write_succeeds",
+    ],
+    "runtime_blocked_by": [
+        "confirmation_token_persistence",
+        "idempotency_runtime",
+        "domain_service_action_adapters",
+        "explicit_action_enablement",
     ],
     "telegram_payload_rules": [
         "no_raw_internal_ids",
@@ -906,6 +917,17 @@ def _build_staff_bot_status(
             "read_only_menu_events_ready": True,
             "state_change_events_ready": False,
         },
+        "confirmations": {
+            "required": True,
+            "ready": True,
+            "runtime_guard_enabled": True,
+            "deny_only_runtime_enabled": True,
+            "confirmation_token_runtime_enabled": False,
+            "state_changing_actions_enabled": False,
+            "default_state_change_decision": (
+                "deny_until_explicit_confirmation_runtime"
+            ),
+        },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
         "role_menus": role_menus,
@@ -917,7 +939,7 @@ def _build_staff_bot_status(
         "next_slice": (
             "dedicated_staff_bot_token_runtime_config"
             if not token_contract["ready"]
-            else "staff_state_change_confirmation_runtime"
+            else "staff_command_registration_runtime"
         ),
     }
 
