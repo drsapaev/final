@@ -242,6 +242,8 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         self, db_session, test_doctor_user, test_doctor, test_patient
     ):
         _link_staff_chat(db_session, chat_id=7207, user_id=test_doctor_user.id)
+        test_doctor.user_id = test_doctor_user.id
+        db_session.flush()
         db_session.add_all(
             [
                 Visit(
@@ -270,6 +272,13 @@ class TestTelegramStaffReadOnlyMenuRuntime:
                     doctor_id=test_doctor.id,
                     visit_date=date.today() - timedelta(days=1),
                     visit_time="12:00",
+                    status="open",
+                ),
+                Visit(
+                    patient_id=test_patient.id,
+                    doctor_id=None,
+                    visit_date=date.today(),
+                    visit_time="13:00",
                     status="open",
                 ),
             ]
