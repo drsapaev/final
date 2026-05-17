@@ -220,7 +220,11 @@ class TestTelegramBotManagementApiService:
         assert role_menu_enablement["domain_data_commands_enabled"] is True
         assert role_menu_enablement["domain_data_commands_status"] == "partial"
         assert role_menu_enablement["domain_data_command_keys"] == [
-            "staff_readiness"
+            "staff_readiness",
+            "queue_overview",
+            "payment_status",
+            "ready_reports",
+            "daily_summary",
         ]
 
     @pytest.mark.parametrize(

@@ -83,9 +83,9 @@ class TestTelegramStaffReadOnlyMenuRuntime:
 
     @pytest.mark.asyncio
     async def test_staff_read_only_command_does_not_execute_patient_queue(
-        self, db_session, admin_user
+        self, db_session, registrar_user
     ):
-        _link_staff_chat(db_session, chat_id=7202, user_id=admin_user.id)
+        _link_staff_chat(db_session, chat_id=7202, user_id=registrar_user.id)
         fake_service = FakeTelegramBotService()
         update = {
             "update_id": 202,
@@ -103,17 +103,18 @@ class TestTelegramStaffReadOnlyMenuRuntime:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        assert (
-            fake_service._send_message.await_args.args[1]
-            == telegram_webhook.TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE
-        )
+        text = fake_service._send_message.await_args.args[1]
+        assert "Queue overview" in text
+        assert "Mode: read-only aggregate snapshot" in text
+        assert "7202" not in text
         audit_log = (
             db_session.query(AuditLog)
             .filter(AuditLog.action == "staff_command_received")
             .one()
         )
-        assert audit_log.actor_user_id == admin_user.id
+        assert audit_log.actor_user_id == registrar_user.id
         assert audit_log.payload["command_key"] == "/queue"
+        assert audit_log.payload["menu_item_key"] == "queue_overview"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 
@@ -141,7 +142,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         fake_service._send_message.assert_awaited_once()
         text = fake_service._send_message.await_args.args[1]
         assert "Staff bot readiness" in text
-        assert "Live data: staff_readiness only" in text
+        assert "Live data: limited read-only aggregates" in text
         assert "State-changing actions: disabled" in text
         assert "7205" not in text
         audit_log = (

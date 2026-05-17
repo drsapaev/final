@@ -142,7 +142,13 @@ STAFF_BOT_GUARDRAILS = [
     "explicit_confirmation_for_state_changes",
     "no_queue_fairness_mutation_without_domain_service",
 ]
-STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = ["staff_readiness"]
+STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = [
+    "staff_readiness",
+    "queue_overview",
+    "payment_status",
+    "ready_reports",
+    "daily_summary",
+]
 
 STAFF_BOT_TOKEN_CONTRACT = {
     "contract_version": "staff-token-v1",
@@ -577,18 +583,14 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "domain_data_commands_status": "partial",
     "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
     "pending_domain_data_command_keys": [
-        "queue_overview",
         "next_patient",
-        "payment_status",
         "today_schedule",
         "emr_reminders",
         "unpaid_invoices",
         "paid_invoices",
         "reconciliation_alerts",
-        "ready_reports",
         "pending_reports",
         "delivery_status",
-        "daily_summary",
         "integration_errors",
         "revenue_summary",
     ],
