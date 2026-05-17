@@ -329,6 +329,8 @@ const UserManagement = () => {
     render: (_, user) =>
     <div onClick={(e) => e.stopPropagation()}>
           <IconButton
+        aria-label="Действия"
+        title="Действия"
         onClick={(e) => {
           e.stopPropagation();
           setAnchorEl(e.currentTarget);

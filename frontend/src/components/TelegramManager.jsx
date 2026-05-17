@@ -783,10 +783,10 @@ const TelegramManager = () => {
                           </Badge>
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton>
+                          <IconButton aria-label="Редактировать" title="Редактировать">
                             <Edit />
                           </IconButton>
-                          <IconButton>
+                          <IconButton aria-label="Удалить" title="Удалить">
                             <Trash2 />
                           </IconButton>
                         </TableCell>

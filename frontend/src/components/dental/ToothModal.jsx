@@ -250,7 +250,7 @@ const ToothModal = ({
                   <ListItem
                     key={procedure.id}
                     secondaryAction={
-                      <IconButton edge="end" onClick={() => removeProcedure(procedure.id)}>
+                      <IconButton edge="end" aria-label="Удалить" title="Удалить" onClick={() => removeProcedure(procedure.id)}>
                         <Delete />
                       </IconButton>
                     }
