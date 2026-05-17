@@ -8,6 +8,7 @@ import pytest
 from app.api.v1.endpoints import telegram_webhook
 from app.models.audit import AuditLog
 from app.models.lab import LabReportInstance
+from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice
 from app.models.telegram_config import TelegramUser
@@ -710,6 +711,119 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         )
         assert audit_log.payload["command_key"] == "staff_menu_item"
         assert audit_log.payload["menu_item_key"] == "pending_reports"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_delivery_status_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "lab"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7213, user_id=admin_user.id)
+        event = NotificationEvent(
+            event_type="lab_results",
+            dedup_key="lab-results-delivery-status-test",
+            source_module="lab",
+            entity_type="lab_result",
+            entity_id="result-77",
+            severity="info",
+            priority="high",
+            title="Lab results ready",
+            message=f"Results for {test_patient.first_name}",
+            payload_snapshot={"patient_id": test_patient.id},
+            deep_link="/lab/results",
+        )
+        db_session.add(event)
+        db_session.flush()
+        db_session.add_all(
+            [
+                NotificationDelivery(
+                    event_id=event.id,
+                    recipient_type="user",
+                    recipient_id=admin_user.id,
+                    role="lab",
+                    channel="telegram",
+                    dedup_key="delivery-status-delivered",
+                    sequence_id=1,
+                    delivery_status="delivered",
+                    payload_snapshot={"patient_id": test_patient.id},
+                ),
+                NotificationDelivery(
+                    event_id=event.id,
+                    recipient_type="user",
+                    recipient_id=admin_user.id,
+                    role="lab",
+                    channel="telegram",
+                    dedup_key="delivery-status-pending",
+                    sequence_id=2,
+                    delivery_status="pending",
+                    payload_snapshot={"patient_id": test_patient.id},
+                ),
+                NotificationDelivery(
+                    event_id=event.id,
+                    recipient_type="user",
+                    recipient_id=admin_user.id,
+                    role="lab",
+                    channel="telegram",
+                    dedup_key="delivery-status-failed",
+                    sequence_id=3,
+                    delivery_status="failed",
+                    last_error="patient phone missing",
+                    payload_snapshot={"patient_id": test_patient.id},
+                ),
+                NotificationDelivery(
+                    event_id=event.id,
+                    recipient_type="user",
+                    recipient_id=admin_user.id,
+                    role="lab",
+                    channel="sms",
+                    dedup_key="delivery-status-sms",
+                    sequence_id=4,
+                    delivery_status="delivered",
+                    last_error="sms secret detail",
+                    payload_snapshot={"patient_id": test_patient.id},
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 213,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7213},
+                "from": {"id": 7213},
+                "text": "delivery_status",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Lab result delivery status" in text
+        assert "Telegram deliveries today: 3" in text
+        assert "Delivered/seen/read: 1" in text
+        assert "Pending/dispatched: 1" in text
+        assert "Failed: 1" in text
+        assert "Mode: read-only delivery aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        assert "result-77" not in text
+        assert "patient phone missing" not in text
+        assert "sms secret detail" not in text
+        assert "7213" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "delivery_status"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 

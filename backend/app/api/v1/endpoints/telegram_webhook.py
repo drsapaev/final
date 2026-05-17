@@ -32,6 +32,7 @@ from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
 from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
+from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
@@ -526,6 +527,13 @@ PAID_INVOICE_STATUSES = {"paid"}
 RECONCILIATION_ALERT_THRESHOLD = Decimal("1000")
 LAB_REPORT_READY_STATUSES = {"FINALIZED", "PRINTED"}
 LAB_REPORT_PENDING_STATUSES = {"DRAFT", "IN_PROGRESS"}
+LAB_RESULT_DELIVERY_EVENT_TYPES = {
+    "lab_results",
+    "lab_result_sent_confirmation",
+    "lab_critical_result",
+}
+SUCCESSFUL_DELIVERY_STATUSES = {"delivered", "seen", "read", "archived"}
+PENDING_DELIVERY_STATUSES = {"pending", "dispatched"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 
 
@@ -1009,6 +1017,24 @@ def _lab_status_counts(db: Session) -> Dict[str, int]:
     return _status_counts(rows)
 
 
+def _lab_delivery_status_counts(db: Session) -> Dict[str, int]:
+    rows = (
+        db.query(
+            NotificationDelivery.delivery_status,
+            func.count(NotificationDelivery.id),
+        )
+        .join(NotificationEvent, NotificationEvent.id == NotificationDelivery.event_id)
+        .filter(
+            NotificationDelivery.created_at >= _today_start(),
+            NotificationDelivery.channel == "telegram",
+            NotificationEvent.event_type.in_(LAB_RESULT_DELIVERY_EVENT_TYPES),
+        )
+        .group_by(NotificationDelivery.delivery_status)
+        .all()
+    )
+    return _status_counts(rows)
+
+
 def _visit_status_counts(db: Session, user: User | None = None) -> Dict[str, int]:
     query = db.query(Visit.status, func.count(Visit.id)).filter(
         Visit.visit_date == date.today()
@@ -1311,6 +1337,29 @@ def _staff_pending_lab_reports_message(db: Session) -> str:
     )
 
 
+def _staff_lab_delivery_status_message(db: Session) -> str:
+    counts = _lab_delivery_status_counts(db)
+    total = sum(counts.values())
+    successful = sum(
+        counts.get(status, 0) for status in SUCCESSFUL_DELIVERY_STATUSES
+    )
+    pending = sum(counts.get(status, 0) for status in PENDING_DELIVERY_STATUSES)
+    failed = counts.get("failed", 0)
+    other = max(total - successful - pending - failed, 0)
+    return "\n".join(
+        [
+            "Lab result delivery status",
+            f"Date: {date.today().isoformat()}",
+            f"Telegram deliveries today: {total}",
+            f"Delivered/seen/read: {successful}",
+            f"Pending/dispatched: {pending}",
+            f"Failed: {failed}",
+            f"Other: {other}",
+            "Mode: read-only delivery aggregate snapshot",
+        ]
+    )
+
+
 def _staff_daily_summary_message(db: Session) -> str:
     queue_counts = _queue_status_counts(db)
     payment_rows = _payment_status_rows(db)
@@ -1404,6 +1453,8 @@ def _staff_read_only_domain_data_message(
         return _staff_lab_reports_message(db)
     if item_key == "pending_reports":
         return _staff_pending_lab_reports_message(db)
+    if item_key == "delivery_status":
+        return _staff_lab_delivery_status_message(db)
     if item_key == "daily_summary":
         return _staff_daily_summary_message(db)
     return None
