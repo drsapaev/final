@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
 
 from app.api.v1.endpoints import telegram_webhook
 from app.models.audit import AuditLog
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.telegram_config import TelegramUser
 
 
@@ -151,6 +153,86 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             .one()
         )
         assert audit_log.payload["menu_item_key"] == "staff_readiness"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_next_patient_menu_item_returns_read_only_queue_snapshot(
+        self, db_session, registrar_user, test_doctor, test_patient
+    ):
+        _link_staff_chat(db_session, chat_id=7206, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        next_queue_time = datetime.utcnow().replace(microsecond=0) - timedelta(
+            minutes=20
+        )
+        later_queue_time = next_queue_time + timedelta(minutes=10)
+        next_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=8,
+            patient_id=test_patient.id,
+            patient_name="Queue Alpha",
+            phone="+998901234567",
+            source="desk",
+            status="waiting",
+            queue_time=next_queue_time,
+        )
+        later_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=9,
+            patient_id=test_patient.id,
+            patient_name="Queue Beta",
+            phone="+998901234568",
+            source="desk",
+            status="waiting",
+            queue_time=later_queue_time,
+        )
+        db_session.add_all([later_entry, next_entry])
+        db_session.commit()
+        db_session.refresh(next_entry)
+        original_queue_time = next_entry.queue_time
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 206,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7206},
+                "from": {"id": 7206},
+                "text": "next_patient",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Next patient" in text
+        assert "Queue number: 8" in text
+        assert "Mode: read-only queue snapshot" in text
+        assert "Queue Alpha" not in text
+        assert "+998901234567" not in text
+        assert "7206" not in text
+        db_session.refresh(next_entry)
+        assert next_entry.status == "waiting"
+        assert next_entry.queue_time == original_queue_time
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["menu_item_key"] == "next_patient"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 

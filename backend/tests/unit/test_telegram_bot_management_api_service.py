@@ -222,6 +222,7 @@ class TestTelegramBotManagementApiService:
         assert role_menu_enablement["domain_data_command_keys"] == [
             "staff_readiness",
             "queue_overview",
+            "next_patient",
             "payment_status",
             "ready_reports",
             "daily_summary",
