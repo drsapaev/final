@@ -896,10 +896,15 @@ class TestTelegramWebhookSecurity:
 
         assert ok is True
         assert error is None
-        assert [item["json"].get("language_code") for item in captured] == [None, "uz"]
+        assert [item["json"].get("language_code") for item in captured] == [
+            None,
+            "uz",
+            "uz-Latn",
+        ]
         assert captured[0]["url"].endswith("/setMyCommands")
         assert captured[0]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_RU
         assert captured[1]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_UZ
+        assert captured[2]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_UZ
         assert {command["command"] for command in captured[0]["json"]["commands"]} == {
             "start",
             "queue",
