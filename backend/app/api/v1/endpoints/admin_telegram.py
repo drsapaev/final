@@ -907,6 +907,12 @@ def _build_staff_bot_next_slice(token_contract: Dict[str, Any]) -> str:
     if pending_domain_keys:
         return f"staff_read_only_{pending_domain_keys[0]}_runtime"
 
+    confirmation_blockers = (
+        STAFF_BOT_CONFIRMATION_CONTRACT.get("runtime_blocked_by") or []
+    )
+    if confirmation_blockers:
+        return f"staff_state_change_{confirmation_blockers[0]}"
+
     return "staff_read_only_domain_data_runtime_complete"
 
 
