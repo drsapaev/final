@@ -566,8 +566,9 @@ class TelegramBotService:
             self.bot_token,
             [
                 {"commands": PATIENT_BOT_COMMANDS_RU},
+                # Telegram Bot API rejects "uz-Latn" here; keep app storage canonical
+                # as "uz-Latn", but register the command menu with Telegram's "uz".
                 {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
-                {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz-Latn"},
             ],
         )
 
