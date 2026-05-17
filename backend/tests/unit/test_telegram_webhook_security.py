@@ -1,20 +1,26 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.v1.endpoints import telegram_webhook
+from app.api.v1.endpoints import admin_telegram, telegram_webhook
+from app.models.audit import AuditLog
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
 from app.models.lab import LabReportInstance, LabReportTemplate, LabReportTemplateVersion
 from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
-from app.models.telegram_config import TelegramConfig, TelegramMessage, TelegramUser
+from app.models.telegram_config import (
+    TelegramConfig,
+    TelegramMessage,
+    TelegramStaffLinkToken,
+    TelegramUser,
+)
 
 
 class FakeTelegramBotService:
@@ -388,6 +394,224 @@ class TestTelegramWebhookSecurity:
             telegram_webhook._localized_text("settings", "uz-Latn"),
             telegram_webhook._localized_settings_menu("uz-Latn"),
         )
+
+    @pytest.mark.asyncio
+    async def test_staff_start_token_links_user_and_writes_audit(
+        self, db_session, admin_user
+    ):
+        token = admin_telegram.issue_staff_link_start_token(
+            db_session,
+            user_id=admin_user.id,
+            chat_id=7010,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            issued_by_user_id=admin_user.id,
+            request_id="staff-link-webhook-test",
+            nonce="staffwebhook",
+        )
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 106,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7010},
+                "from": {
+                    "id": 7010,
+                    "username": "staff_chat",
+                    "first_name": "Staff",
+                    "language_code": "ru",
+                },
+                "text": f"/start {token}",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7010)
+            .one()
+        )
+        assert telegram_user.user_id == admin_user.id
+        assert telegram_user.patient_id is None
+        assert telegram_user.notifications_enabled is False
+
+        token_record = (
+            db_session.query(TelegramStaffLinkToken)
+            .filter(
+                TelegramStaffLinkToken.staff_user_id == admin_user.id,
+                TelegramStaffLinkToken.telegram_chat_id == 7010,
+            )
+            .one()
+        )
+        assert token_record.consumed_at is not None
+
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == "staff_link_created",
+                AuditLog.actor_user_id == admin_user.id,
+                AuditLog.entity_id == telegram_user.id,
+            )
+            .one()
+        )
+        payload_text = str(audit_log.payload)
+        assert audit_log.payload["result"] == "success"
+        assert audit_log.payload["actor_role"] == "admin"
+        assert "telegram_chat:" in audit_log.payload["telegram_user_id_hash"]
+        assert "7010" not in payload_text
+        assert token not in payload_text
+        fake_service._send_message.assert_awaited_once()
+        assert (
+            fake_service._send_message.await_args.args[1]
+            == f"{telegram_webhook.TELEGRAM_STAFF_LINKED_MESSAGE}\nРоль: admin"
+        )
+        assert (
+            fake_service._send_message.await_args.args[2]
+            == telegram_webhook.TELEGRAM_STAFF_LINK_REPLY_MARKUP
+        )
+
+    @pytest.mark.asyncio
+    async def test_staff_start_token_replay_is_rejected_before_patient_onboarding(
+        self, db_session, admin_user
+    ):
+        token = admin_telegram.issue_staff_link_start_token(
+            db_session,
+            user_id=admin_user.id,
+            chat_id=7011,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+            issued_by_user_id=admin_user.id,
+            nonce="staffreplay",
+        )
+        update = {
+            "update_id": 107,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7011},
+                "from": {"id": 7011, "first_name": "Staff"},
+                "text": f"/start {token}",
+            },
+        }
+
+        first_service = FakeTelegramBotService(active=True)
+        second_service = FakeTelegramBotService(active=True)
+        first = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, first_service
+        )
+        replay = await telegram_webhook._handle_clinic_bot_update(
+            {**update, "update_id": 108}, db_session, second_service
+        )
+
+        assert first is True
+        assert replay is True
+        second_service._send_message.assert_awaited_once_with(
+            7011,
+            telegram_webhook.TELEGRAM_STAFF_LINK_REJECTED_MESSAGE,
+            telegram_webhook.TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+        )
+        assert second_service._send_message.await_args.args[1] != (
+            telegram_webhook._localized_text("language_prompt", "ru")
+        )
+        rejection_audit = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_link_token_rejected")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert rejection_audit is not None
+        assert rejection_audit.payload["reason"] == "already_used"
+        assert "7011" not in str(rejection_audit.payload)
+
+    @pytest.mark.asyncio
+    async def test_invalid_staff_start_token_does_not_create_telegram_user(
+        self, db_session
+    ):
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 109,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7013},
+                "from": {"id": 7013, "first_name": "Staff"},
+                "text": "/start stl_invalid",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        assert (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7013)
+            .first()
+            is None
+        )
+        fake_service._send_message.assert_awaited_once_with(
+            7013,
+            telegram_webhook.TELEGRAM_STAFF_LINK_REJECTED_MESSAGE,
+            telegram_webhook.TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+        )
+        rejection_audit = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_link_token_rejected")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert rejection_audit is not None
+        assert rejection_audit.payload["reason"] == "signature_invalid"
+        assert "7013" not in str(rejection_audit.payload)
+
+    @pytest.mark.asyncio
+    async def test_patient_dispatch_routes_staff_start_before_generic_start(
+        self, db_session
+    ):
+        service = telegram_bot.TelegramBotService()
+        calls = []
+        update = {
+            "update_id": 110,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7012},
+                "from": {"id": 7012},
+                "text": "/start stl_test",
+            },
+        }
+
+        async def staff_start_handler(update_arg, db_arg, bot_arg):
+            assert update_arg is update
+            assert db_arg is db_session
+            assert bot_arg is service
+            calls.append("staff")
+            return True
+
+        async def ticket_start_handler(_update, _db, _bot):
+            calls.append("ticket")
+            return False
+
+        async def contact_handler(_message, _db, _bot):
+            calls.append("contact")
+            return False
+
+        async def start_handler(_chat_id, _message):
+            calls.append("start")
+
+        handled = await service.process_patient_bot_update(
+            update,
+            db_session,
+            staff_start_handler=staff_start_handler,
+            ticket_start_handler=ticket_start_handler,
+            contact_handler=contact_handler,
+            start_handler=start_handler,
+            command_handlers={},
+            text_handlers={},
+        )
+
+        assert handled is True
+        assert calls == ["staff"]
 
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry

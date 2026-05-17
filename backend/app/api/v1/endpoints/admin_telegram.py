@@ -46,7 +46,7 @@ STAFF_BOT_READINESS = [
     {
         "key": "role_based_staff_linking",
         "label": "Ролевая привязка сотрудников",
-        "ready": False,
+        "ready": True,
     },
     {
         "key": "server_side_authorization",
@@ -155,7 +155,7 @@ STAFF_BOT_TOKEN_CONTRACT = {
 
 STAFF_BOT_LINKING_CONTRACT = {
     "contract_version": "staff-linking-v1",
-    "enabled": False,
+    "enabled": True,
     "required_before_enablement": True,
     "identity_rule": "telegram_user_id_is_not_application_identity",
     "accepted_methods": [
@@ -167,7 +167,7 @@ STAFF_BOT_LINKING_CONTRACT = {
         {
             "key": "one_time_signed_staff_token",
             "label": "Одноразовый подписанный токен",
-            "status": "planned",
+            "status": "runtime_enabled",
         },
     ],
     "required_server_checks": [
@@ -188,17 +188,20 @@ STAFF_BOT_LINKING_CONTRACT = {
 
 STAFF_BOT_LINKING_RUNTIME_CONTRACT = {
     "contract_version": "staff-linking-runtime-v1",
-    "enabled": False,
+    "enabled": True,
     "helper_available": True,
-    "runtime_handler_enabled": False,
-    "write_helper": "link_staff_user_to_telegram",
+    "runtime_handler_enabled": True,
+    "write_helper": "_upsert_staff_link_telegram_user",
+    "legacy_write_helper": "link_staff_user_to_telegram",
     "lookup_helpers": [
         "get_telegram_user_by_chat_id",
         "get_telegram_user_by_linked_user_id",
     ],
     "writes": [
         "telegram_users.user_id",
+        "audit_logs",
     ],
+    "runtime_handler": "_handle_staff_link_start",
     "requires_prevalidated_inputs": [
         "active_application_user",
         "allowed_staff_role",
@@ -248,7 +251,7 @@ STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT = {
 
 STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "contract_version": "staff-link-token-validation-v1",
-    "enabled": False,
+    "enabled": True,
     "validator_enabled": True,
     "runtime_helper_available": True,
     "signature_validator_available": True,
@@ -257,11 +260,12 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "stateless_validator_enabled": False,
     "single_use_enforcement_enabled": True,
     "token_storage_enabled": True,
-    "handler_enabled": False,
+    "handler_enabled": True,
     "storage_migration_required": False,
     "storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
     "runtime_blocked_by": [
-        "staff_bot_runtime_handler_enablement",
+        "staff_audit_logging_runtime",
+        "staff_read_only_menu_runtime_enablement",
     ],
     "required_before_enablement": True,
     "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
@@ -449,7 +453,18 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
 STAFF_BOT_AUDIT_CONTRACT = {
     "contract_version": "staff-audit-v1",
     "enabled": False,
-    "record_writer_enabled": False,
+    "record_writer_enabled": True,
+    "recorded_event_types": [
+        "staff_link_created",
+        "staff_link_token_rejected",
+    ],
+    "pending_event_types": [
+        "staff_command_received",
+        "staff_action_confirmation_requested",
+        "staff_action_confirmed",
+        "staff_action_denied",
+        "staff_action_failed",
+    ],
     "required_before_enablement": True,
     "event_types": [
         {
@@ -815,19 +830,20 @@ def _build_staff_role_menu_enablement_contract(
 def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
     role_menus = _build_staff_role_menus_summary()
     return {
-        "version": "planning",
+        "version": "linking-runtime",
         "contract_version": "staff-menu-read-only-v1",
         "enabled": False,
         "contract_published": True,
-        "status": "requires_role_linking_audit_and_confirmations",
+        "status": "staff_linking_enabled_actions_disabled",
         "transport": "polling" if not webhook_set else "webhook",
         "supported_languages": [
             {"code": "ru", "label": "Русский"},
         ],
         "supported_roles": STAFF_BOT_SUPPORTED_ROLES,
         "role_linking": {
-            "enabled": False,
+            "enabled": True,
             "required_before_enablement": True,
+            "runtime_handler_enabled": True,
             "accepted_methods": [
                 "admin_verified_staff_link",
                 "one_time_signed_staff_token",
@@ -850,6 +866,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         "audit": {
             "required": True,
             "ready": False,
+            "linking_events_ready": True,
         },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
@@ -859,7 +876,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "staff_bot_runtime_handler_enablement",
+        "next_slice": "dedicated_staff_bot_token_runtime_config",
     }
 
 
@@ -1308,6 +1325,7 @@ def get_telegram_integration_status(
                 "patient_status",
                 "patient_language_notification_settings",
                 "lab_results_pdf",
+                "staff_link_start_token_handler",
             ],
             "planned_functions": [
                 "dedicated_staff_bot_token_readiness_contract",
