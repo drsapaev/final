@@ -498,7 +498,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
                     patient_id=test_patient.id,
                     total_amount=4000,
                     currency="UZS",
-                    status="completed",
+                    status="refunded",
                     payment_method="click",
                     provider="click",
                 ),
@@ -534,8 +534,8 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         text = fake_service._send_message.await_args.args[1]
         assert "Paid invoices" in text
         assert "Invoices today: 3" in text
-        assert "Paid invoices: 2" in text
-        assert "Paid total: 13 000" in text
+        assert "Paid invoices: 1" in text
+        assert "Paid total: 9 000" in text
         assert "Mode: read-only invoice aggregate snapshot" in text
         assert test_patient.first_name not in text
         if test_patient.phone:
