@@ -232,6 +232,7 @@ class TestTelegramBotManagementApiService:
             "ready_reports",
             "pending_reports",
             "delivery_status",
+            "integration_errors",
             "daily_summary",
         ]
 

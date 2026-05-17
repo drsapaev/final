@@ -37,9 +37,11 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
 from app.models.payment_invoice import PaymentInvoice
+from app.models.payment_webhook import PaymentWebhook
 from app.models.telegram_config import TelegramMessage, TelegramUser
 from app.models.user import User
 from app.models.visit import Visit
+from app.models.webhook import WebhookCall, WebhookCallStatus, WebhookEvent
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import LabReportingService
 from app.services.payment_reconciliation_api_service import (
@@ -1035,6 +1037,45 @@ def _lab_delivery_status_counts(db: Session) -> Dict[str, int]:
     return _status_counts(rows)
 
 
+def _integration_error_counts(db: Session) -> Dict[str, int]:
+    failed_webhook_calls_today = (
+        db.query(func.count(WebhookCall.id))
+        .filter(
+            WebhookCall.created_at >= _today_start(),
+            WebhookCall.status == WebhookCallStatus.FAILED,
+        )
+        .scalar()
+        or 0
+    )
+    retrying_webhook_calls = (
+        db.query(func.count(WebhookCall.id))
+        .filter(WebhookCall.status == WebhookCallStatus.RETRYING)
+        .scalar()
+        or 0
+    )
+    unprocessed_webhook_events = (
+        db.query(func.count(WebhookEvent.id))
+        .filter(WebhookEvent.processed.is_(False))
+        .scalar()
+        or 0
+    )
+    failed_payment_webhooks_today = (
+        db.query(func.count(PaymentWebhook.id))
+        .filter(
+            PaymentWebhook.created_at >= _today_start(),
+            PaymentWebhook.status == "failed",
+        )
+        .scalar()
+        or 0
+    )
+    return {
+        "failed_webhook_calls_today": int(failed_webhook_calls_today),
+        "retrying_webhook_calls": int(retrying_webhook_calls),
+        "unprocessed_webhook_events": int(unprocessed_webhook_events),
+        "failed_payment_webhooks_today": int(failed_payment_webhooks_today),
+    }
+
+
 def _visit_status_counts(db: Session, user: User | None = None) -> Dict[str, int]:
     query = db.query(Visit.status, func.count(Visit.id)).filter(
         Visit.visit_date == date.today()
@@ -1360,6 +1401,23 @@ def _staff_lab_delivery_status_message(db: Session) -> str:
     )
 
 
+def _staff_integration_errors_message(db: Session) -> str:
+    counts = _integration_error_counts(db)
+    total = sum(counts.values())
+    return "\n".join(
+        [
+            "Integration errors",
+            f"Date: {date.today().isoformat()}",
+            f"Total attention items: {total}",
+            f"Failed webhook calls today: {counts['failed_webhook_calls_today']}",
+            f"Retrying webhook calls: {counts['retrying_webhook_calls']}",
+            f"Unprocessed webhook events: {counts['unprocessed_webhook_events']}",
+            f"Failed payment webhooks today: {counts['failed_payment_webhooks_today']}",
+            "Mode: read-only integration aggregate snapshot",
+        ]
+    )
+
+
 def _staff_daily_summary_message(db: Session) -> str:
     queue_counts = _queue_status_counts(db)
     payment_rows = _payment_status_rows(db)
@@ -1455,6 +1513,8 @@ def _staff_read_only_domain_data_message(
         return _staff_pending_lab_reports_message(db)
     if item_key == "delivery_status":
         return _staff_lab_delivery_status_message(db)
+    if item_key == "integration_errors":
+        return _staff_integration_errors_message(db)
     if item_key == "daily_summary":
         return _staff_daily_summary_message(db)
     return None

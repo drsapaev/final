@@ -11,8 +11,17 @@ from app.models.lab import LabReportInstance
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice
+from app.models.payment_webhook import PaymentWebhook
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit
+from app.models.webhook import (
+    Webhook,
+    WebhookCall,
+    WebhookCallStatus,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookStatus,
+)
 from app.services.lab_reporting_service import LabReportingService
 
 
@@ -824,6 +833,127 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         )
         assert audit_log.payload["command_key"] == "staff_menu_item"
         assert audit_log.payload["menu_item_key"] == "delivery_status"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_integration_errors_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "admin"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7214, user_id=admin_user.id)
+        webhook = Webhook(
+            name="Provider sync",
+            url="https://integrations.example/secret-hook",
+            events=[WebhookEventType.PAYMENT_COMPLETED.value],
+            headers={"Authorization": "secret-token"},
+            status=WebhookStatus.ACTIVE,
+            is_active=True,
+            created_by=admin_user.id,
+        )
+        db_session.add(webhook)
+        db_session.flush()
+        now = datetime.utcnow()
+        db_session.add_all(
+            [
+                WebhookCall(
+                    webhook_id=webhook.id,
+                    event_type=WebhookEventType.PAYMENT_COMPLETED,
+                    event_data={"patient": test_patient.first_name},
+                    url="https://integrations.example/secret-call",
+                    method="POST",
+                    headers={"Authorization": "secret-token"},
+                    payload={"patient_id": test_patient.id},
+                    status=WebhookCallStatus.FAILED,
+                    response_status_code=500,
+                    response_body="private provider response",
+                    error_message="provider rejected patient payload",
+                    attempt_number=1,
+                    max_attempts=3,
+                    created_at=now,
+                ),
+                WebhookCall(
+                    webhook_id=webhook.id,
+                    event_type=WebhookEventType.PAYMENT_FAILED,
+                    event_data={"transaction": "secret-transaction"},
+                    url="https://integrations.example/retry-call",
+                    method="POST",
+                    headers={},
+                    payload={"secret": "retry-payload"},
+                    status=WebhookCallStatus.RETRYING,
+                    response_status_code=503,
+                    error_message="retry later secret",
+                    attempt_number=2,
+                    max_attempts=3,
+                    created_at=now,
+                ),
+                WebhookEvent(
+                    event_type=WebhookEventType.PAYMENT_COMPLETED,
+                    event_data={"patient_id": test_patient.id},
+                    source="provider-secret",
+                    source_id="source-77",
+                    processed=False,
+                    failed_webhooks=[webhook.id],
+                    created_at=now,
+                ),
+                PaymentWebhook(
+                    provider="payme",
+                    webhook_id="payment-webhook-secret",
+                    transaction_id="transaction-secret",
+                    status="failed",
+                    amount=120000,
+                    raw_data={"patient": test_patient.first_name},
+                    signature="signature-secret",
+                    visit_id=1001,
+                    patient_id=test_patient.id,
+                    created_at=now,
+                    error_message="signature mismatch secret",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 214,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7214},
+                "from": {"id": 7214},
+                "text": "integration_errors",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Integration errors" in text
+        assert "Total attention items: 4" in text
+        assert "Failed webhook calls today: 1" in text
+        assert "Retrying webhook calls: 1" in text
+        assert "Unprocessed webhook events: 1" in text
+        assert "Failed payment webhooks today: 1" in text
+        assert "Mode: read-only integration aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        assert "secret-token" not in text
+        assert "secret-hook" not in text
+        assert "private provider response" not in text
+        assert "provider rejected patient payload" not in text
+        assert "transaction-secret" not in text
+        assert "signature mismatch secret" not in text
+        assert "7214" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "integration_errors"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 
