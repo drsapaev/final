@@ -118,6 +118,42 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
+    async def test_staff_readiness_menu_item_returns_safe_live_status(
+        self, db_session, admin_user
+    ):
+        _link_staff_chat(db_session, chat_id=7205, user_id=admin_user.id)
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 205,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7205},
+                "from": {"id": 7205},
+                "text": "staff_readiness",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Staff bot readiness" in text
+        assert "Live data: staff_readiness only" in text
+        assert "State-changing actions: disabled" in text
+        assert "7205" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["menu_item_key"] == "staff_readiness"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
     async def test_staff_state_change_command_is_denied_without_domain_mutation(
         self, db_session, admin_user
     ):

@@ -142,6 +142,7 @@ STAFF_BOT_GUARDRAILS = [
     "explicit_confirmation_for_state_changes",
     "no_queue_fairness_mutation_without_domain_service",
 ]
+STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = ["staff_readiness"]
 
 STAFF_BOT_TOKEN_CONTRACT = {
     "contract_version": "staff-token-v1",
@@ -572,7 +573,25 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "required_before_enablement": True,
     "state_changing_menu_items_enabled": False,
     "runtime_handler": "_handle_staff_read_only_menu",
-    "domain_data_commands_enabled": False,
+    "domain_data_commands_enabled": True,
+    "domain_data_commands_status": "partial",
+    "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
+    "pending_domain_data_command_keys": [
+        "queue_overview",
+        "next_patient",
+        "payment_status",
+        "today_schedule",
+        "emr_reminders",
+        "unpaid_invoices",
+        "paid_invoices",
+        "reconciliation_alerts",
+        "ready_reports",
+        "pending_reports",
+        "delivery_status",
+        "daily_summary",
+        "integration_errors",
+        "revenue_summary",
+    ],
     "state_changing_actions_enabled": False,
     "allowed_until_enabled": [
         "read_status_contract",
@@ -858,11 +877,12 @@ def _build_staff_role_menus_summary() -> Dict[str, Any]:
         "role_count": len(menu_roles),
         "item_count": menu_item_count,
         "handler": "_handle_staff_read_only_menu",
-        "domain_data_commands_enabled": False,
+        "domain_data_commands_enabled": True,
+        "domain_data_commands_status": "partial",
+        "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
         "state_changing_actions_enabled": False,
         "blocked_until": [
-            "audit_logging",
-            "state_change_confirmations",
+            "role_specific_domain_read_models",
         ],
     }
 
@@ -961,7 +981,7 @@ def _build_staff_bot_status(
         "next_slice": (
             "dedicated_staff_bot_token_runtime_config"
             if not token_contract["ready"]
-            else "staff_read_only_domain_data_runtime"
+            else "staff_read_only_queue_summary_runtime"
         ),
     }
 

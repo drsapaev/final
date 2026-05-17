@@ -38,7 +38,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "TELEGRAM_STAFF_BOT_TOKEN"
         assert contract["token_returned_to_frontend"] is False
         assert contract["patient_bot_token_reused"] is False
-        assert status["next_slice"] == "staff_read_only_domain_data_runtime"
+        assert status["next_slice"] == "staff_read_only_queue_summary_runtime"
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )
@@ -69,7 +69,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "STAFF_TELEGRAM_BOT_TOKEN"
         assert contract["enabled"] is True
         assert contract["runtime_blocked_by"] == []
-        assert status["next_slice"] == "staff_read_only_domain_data_runtime"
+        assert status["next_slice"] == "staff_read_only_queue_summary_runtime"
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )

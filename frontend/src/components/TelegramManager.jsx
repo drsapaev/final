@@ -291,6 +291,12 @@ const TelegramManager = () => {
   const staffRoleMenuDomainDataEnabled = Boolean(
     staffRoleMenuEnablementContract.domain_data_commands_enabled
   );
+  const staffRoleMenuDomainDataStatus =
+  staffRoleMenuEnablementContract.domain_data_commands_status ||
+  (staffRoleMenuDomainDataEnabled ? 'enabled' : 'app only');
+  const staffRoleMenuDomainDataKeys = Array.isArray(staffRoleMenuEnablementContract.domain_data_command_keys) ?
+  staffRoleMenuEnablementContract.domain_data_command_keys :
+  [];
   const staffRoleMenuEnablementRoleCount = typeof staffRoleMenuEnablementContract.role_count === 'number' ?
   staffRoleMenuEnablementContract.role_count :
   staffMenuContract.length;
@@ -600,7 +606,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff role menu enablement"
                     secondary={staffRoleMenuEnablementContract.contract_version ?
-                    `${staffRoleMenuEnablementRoleCount} roles, ${staffRoleMenuEnablementItemCount} items; runtime menu: ${staffRoleMenuRuntimeEnabled ? 'enabled' : 'disabled'}; live data: ${staffRoleMenuDomainDataEnabled ? 'enabled' : 'app only'}` :
+                    `${staffRoleMenuEnablementRoleCount} roles, ${staffRoleMenuEnablementItemCount} items; runtime menu: ${staffRoleMenuRuntimeEnabled ? 'enabled' : 'disabled'}; live data: ${staffRoleMenuDomainDataStatus}${staffRoleMenuDomainDataKeys.length ? ` (${staffRoleMenuDomainDataKeys.join(', ')})` : ''}` :
                     'Role menu enablement contract not published'} />
 
                   <Badge
