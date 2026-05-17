@@ -8,6 +8,7 @@ import pytest
 from app.api.v1.endpoints import telegram_webhook
 from app.models.audit import AuditLog
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.payment_invoice import PaymentInvoice
 from app.models.telegram_config import TelegramUser
 from app.models.visit import Visit
 
@@ -399,6 +400,80 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         )
         assert audit_log.payload["command_key"] == "staff_menu_item"
         assert audit_log.payload["menu_item_key"] == "emr_reminders"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
+    async def test_staff_unpaid_invoices_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "cashier"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7209, user_id=admin_user.id)
+        db_session.add_all(
+            [
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=7000,
+                    currency="UZS",
+                    status="pending",
+                    payment_method="click",
+                    provider="click",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=5000,
+                    currency="UZS",
+                    status="processing",
+                    payment_method="payme",
+                    provider="payme",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=3000,
+                    currency="UZS",
+                    status="paid",
+                    payment_method="cash",
+                    provider=None,
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 209,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7209},
+                "from": {"id": 7209},
+                "text": "unpaid_invoices",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Unpaid invoices" in text
+        assert "Invoices today: 3" in text
+        assert "Unpaid invoices: 2" in text
+        assert "Unpaid total: 12 000" in text
+        assert "Mode: read-only invoice aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        if test_patient.phone:
+            assert test_patient.phone not in text
+        assert "7209" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "unpaid_invoices"
         assert audit_log.payload["read_only"] is True
         assert audit_log.payload["state_changing_action"] is False
 

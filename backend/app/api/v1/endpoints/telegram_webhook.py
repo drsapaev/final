@@ -35,6 +35,7 @@ from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment, PaymentVisit
+from app.models.payment_invoice import PaymentInvoice
 from app.models.telegram_config import TelegramMessage, TelegramUser
 from app.models.user import User
 from app.models.visit import Visit
@@ -517,6 +518,7 @@ QUEUE_STATUS_LABELS_BY_LANGUAGE = {
 }
 PAYMENT_PAID_STATUSES = {"paid", "completed"}
 PAYMENT_PENDING_STATUSES = {"pending", "processing"}
+UNPAID_INVOICE_STATUSES = {"pending", "processing"}
 LAB_REPORT_READY_STATUSES = {"FINALIZED", "PRINTED"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 
@@ -975,6 +977,22 @@ def _payment_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
     ]
 
 
+def _payment_invoice_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
+    return [
+        (str(status or "unknown"), int(count or 0), amount or Decimal("0"))
+        for status, count, amount in (
+            db.query(
+                PaymentInvoice.status,
+                func.count(PaymentInvoice.id),
+                func.coalesce(func.sum(PaymentInvoice.total_amount), 0),
+            )
+            .filter(PaymentInvoice.created_at >= _today_start())
+            .group_by(PaymentInvoice.status)
+            .all()
+        )
+    ]
+
+
 def _lab_status_counts(db: Session) -> Dict[str, int]:
     rows = (
         db.query(LabReportInstance.status, func.count(LabReportInstance.id))
@@ -1134,6 +1152,28 @@ def _staff_emr_reminders_message(db: Session, user: User | None = None) -> str:
     )
 
 
+def _staff_unpaid_invoices_message(db: Session) -> str:
+    rows = _payment_invoice_status_rows(db)
+    total_count = sum(count for _status, count, _amount in rows)
+    unpaid_count = sum(
+        count for status, count, _amount in rows if status in UNPAID_INVOICE_STATUSES
+    )
+    unpaid_total = sum(
+        (amount for status, _count, amount in rows if status in UNPAID_INVOICE_STATUSES),
+        Decimal("0"),
+    )
+    return "\n".join(
+        [
+            "Unpaid invoices",
+            f"Date: {date.today().isoformat()}",
+            f"Invoices today: {total_count}",
+            f"Unpaid invoices: {unpaid_count}",
+            f"Unpaid total: {_format_money(unpaid_total)}",
+            "Mode: read-only invoice aggregate snapshot",
+        ]
+    )
+
+
 def _staff_payment_status_message(db: Session) -> str:
     rows = _payment_status_rows(db)
     total_count = sum(count for _status, count, _amount in rows)
@@ -1261,6 +1301,8 @@ def _staff_read_only_domain_data_message(
         return _staff_today_schedule_message(db, user)
     if item_key == "emr_reminders":
         return _staff_emr_reminders_message(db, user)
+    if item_key == "unpaid_invoices":
+        return _staff_unpaid_invoices_message(db)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
