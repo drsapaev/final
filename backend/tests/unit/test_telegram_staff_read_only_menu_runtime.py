@@ -118,6 +118,49 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
+    async def test_staff_state_change_command_is_denied_without_domain_mutation(
+        self, db_session, admin_user
+    ):
+        _link_staff_chat(db_session, chat_id=7204, user_id=admin_user.id)
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 204,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7204},
+                "from": {"id": 7204},
+                "text": "/refund",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        assert (
+            fake_service._send_message.await_args.args[1]
+            == telegram_webhook.TELEGRAM_STAFF_ACTION_DENIED_MESSAGE
+        )
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_denied")
+            .one()
+        )
+        assert audit_log.actor_user_id == admin_user.id
+        assert audit_log.payload["actor_role"] == "admin"
+        assert audit_log.payload["operation_key"] == "refund_issue"
+        assert audit_log.payload["command_key"] == "/refund"
+        assert audit_log.payload["reason"] == "telegram_state_changes_disabled"
+        assert audit_log.payload["confirmation_required"] is True
+        assert audit_log.payload["telegram_execution_enabled"] is False
+        assert audit_log.payload["domain_mutation"] is False
+        assert audit_log.payload["state_changing_action"] is True
+        assert "staff_action:" in audit_log.payload["target_reference_hash"]
+        assert "7204" not in str(audit_log.payload)
+
+    @pytest.mark.asyncio
     async def test_unlinked_staff_menu_request_does_not_create_patient_link(
         self, db_session
     ):
