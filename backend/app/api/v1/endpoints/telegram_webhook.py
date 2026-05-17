@@ -1029,8 +1029,6 @@ def _staff_next_patient_message(db: Session) -> str:
             ]
         )
 
-    queue_time = entry.queue_time.isoformat() if entry.queue_time else "not set"
-    patient_name = str(entry.patient_name or "").strip() or "Patient name unavailable"
     queue_name = _queue_entry_name(entry)
     position = _queue_entry_position(db, entry)
     details = [
@@ -1038,9 +1036,7 @@ def _staff_next_patient_message(db: Session) -> str:
         f"Date: {date.today().isoformat()}",
         f"Queue: {queue_name}",
         f"Queue number: {entry.number}",
-        f"Patient: {patient_name}",
         f"Status: {entry.status}",
-        f"Queue time: {queue_time}",
     ]
     if position:
         details.append(f"Position: {position}")

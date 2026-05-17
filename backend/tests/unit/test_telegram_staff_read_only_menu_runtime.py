@@ -220,8 +220,8 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         text = fake_service._send_message.await_args.args[1]
         assert "Next patient" in text
         assert "Queue number: 8" in text
-        assert "Patient: Queue Alpha" in text
         assert "Mode: read-only queue snapshot" in text
+        assert "Queue Alpha" not in text
         assert "+998901234567" not in text
         assert "7206" not in text
         db_session.refresh(next_entry)
