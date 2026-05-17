@@ -102,6 +102,8 @@ Before any execution task, first choose exactly one mode:
 - `gate_known_root_cause`: risky task with a confirmed root-cause file; use the gate but anchor it with `--known-root-cause`.
 - `narrow_override`: only after `agent_gate.py` misroutes, one retry still misses the confirmed root-cause file, and there is explicit human or repo-approved basis for a narrow bypass.
 
+DB/Alembic/SQLAlchemy migration work is always a risky domain and must use `gate` or `gate_known_root_cause`. If the gate classifies the task as `Mode: migration`, treat the Alembic revision as the first-touch owner even when the task text also mentions Telegram, queue, status, webhook, endpoint, or UI files.
+
 Always start execution work with this pre-work block:
 
 ```text
@@ -168,6 +170,7 @@ Automatically move to `plan`, `dossier`, or `handoff` before `execute` when a ta
 - Queue fairness, specialist/profile/doctor mapping, or `queue_time`.
 - Frontend/backend contract alignment.
 - Telegram integration.
+- DB schema, Alembic revisions, SQLAlchemy models, table creation, storage migrations, or Postgres SSOT.
 - EMR, lab, rollout, evidence packs, go/no-go, or production-sensitive behavior.
 - Any canonical vs legacy ambiguity.
 
@@ -207,6 +210,16 @@ For completed `execute` tasks, answer with:
 For risky tasks that should not execute yet, output `plan`, `dossier`, or `handoff` instead.
 
 ## Domain Guardrails
+
+DB / Alembic / SQLAlchemy migrations:
+
+- Use the ownership chain `model -> schema -> migration -> tests`.
+- SQLAlchemy model without a matching table/migration is migration ownership, not endpoint, webhook, status, queue, or UI ownership.
+- If the root cause is a missing table for an existing SQLAlchemy model, the first-touch patch must include a new Alembic revision under `backend/alembic/versions/`.
+- Treat the existing SQLAlchemy model and the previous Alembic revision as read-only references unless the user explicitly changes the model contract.
+- Never edit an already-applied migration as a substitute for creating a new revision.
+- Migration validation must include Alembic chain checks such as heads/history review and, when a disposable/test Postgres database is available, upgrade validation.
+- Stop on multi-head ambiguity, existing target table, destructive migration requirements, or model/table mismatch.
 
 Routing:
 

@@ -39,6 +39,21 @@ EXPLICIT_PATH_RE = re.compile(
     r"(?:py|js|jsx|ts|tsx|json|md|yml|yaml|toml|sh|ps1|bat|txt))"
 )
 
+MIGRATION_TASK_RE = re.compile(
+    r"\b("
+    r"alembic|migration|migrations|model exists|table missing|"
+    r"sqlalchemy model|postgres ssot|storage migration|create table|revision"
+    r")\b",
+    re.IGNORECASE,
+)
+
+MIGRATION_STOP_CONDITIONS = (
+    "multi-head ambiguity in Alembic revision chain",
+    "existing table detected for the requested storage table",
+    "destructive migration operation is needed",
+    "model/table mismatch between SQLAlchemy model and migration DDL",
+)
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -192,6 +207,18 @@ def unique_existing(repo_root: Path, tracked: set[str], paths: list[str]) -> lis
     return result
 
 
+def unique_paths(paths: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for path in paths:
+        rel = normalize_rel_path(path)
+        if rel in seen:
+            continue
+        seen.add(rel)
+        result.append(rel)
+    return result
+
+
 def explicit_paths(task: str, repo_root: Path, tracked: set[str]) -> list[str]:
     candidates = [match.group("path") for match in EXPLICIT_PATH_RE.finditer(task)]
     return unique_existing(repo_root, tracked, candidates)
@@ -205,6 +232,91 @@ def rule_matches(task: str, repo_root: Path, tracked: set[str]) -> tuple[list[st
             found.extend(rule.files)
             reasons.append(rule.reason)
     return unique_existing(repo_root, tracked, found), reasons
+
+
+def is_migration_task(task: str) -> bool:
+    return bool(MIGRATION_TASK_RE.search(task))
+
+
+def latest_numeric_migration(tracked: set[str]) -> str | None:
+    candidates: list[tuple[int, str]] = []
+    for rel in tracked:
+        if not rel.startswith("backend/alembic/versions/") or not rel.endswith(".py"):
+            continue
+        match = re.match(r"^backend/alembic/versions/(\d{4})_", rel)
+        if not match:
+            continue
+        candidates.append((int(match.group(1)), rel))
+    if not candidates:
+        return None
+    return sorted(candidates)[-1][1]
+
+
+def next_migration_pattern(tracked: set[str]) -> str:
+    latest = latest_numeric_migration(tracked)
+    next_number = 1
+    if latest:
+        match = re.match(r"backend/alembic/versions/(\d{4})_", latest)
+        if match:
+            next_number = int(match.group(1)) + 1
+    return f"backend/alembic/versions/{next_number:04d}_*.py"
+
+
+def model_references_for_task(task: str, repo_root: Path, tracked: set[str]) -> list[str]:
+    task_lower = task.lower()
+    references: list[str] = []
+    model_files = sorted(
+        path
+        for path in tracked
+        if path.startswith("backend/app/models/") and path.endswith(".py")
+    )
+    for rel_path in model_files:
+        try:
+            text = (repo_root / rel_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        class_names = re.findall(r"^class\s+([A-Za-z_][A-Za-z0-9_]*)", text, re.MULTILINE)
+        table_names = re.findall(r"__tablename__\s*=\s*[\"']([^\"']+)[\"']", text)
+        class_hits = [
+            name
+            for name in class_names
+            if len(name) >= 5
+            and re.search(rf"\b{re.escape(name.lower())}\b", task_lower)
+        ]
+        table_hits = [
+            name for name in table_names if len(name) >= 6 and name.lower() in task_lower
+        ]
+        if class_hits or table_hits:
+            references.append(rel_path)
+    return unique_existing(repo_root, tracked, references)
+
+
+def migration_read_only_references(
+    task: str,
+    repo_root: Path,
+    tracked: set[str],
+    known_root_cause: str | None,
+) -> list[str]:
+    references: list[str] = [
+        "backend/alembic/env.py",
+    ]
+    latest = latest_numeric_migration(tracked)
+    if latest:
+        references.append(latest)
+    references.extend(model_references_for_task(task, repo_root, tracked))
+    if known_root_cause:
+        references.insert(0, known_root_cause)
+    return unique_existing(repo_root, tracked, references)
+
+
+def migration_validation_targets(new_revision_pattern: str) -> list[str]:
+    placeholder = new_revision_pattern.replace("*", "<slug>")
+    return [
+        f"python -m py_compile {placeholder}",
+        "cd backend; alembic heads",
+        "cd backend; alembic history --verbose",
+        "cd backend; alembic upgrade head  # against a disposable/test Postgres database",
+    ]
 
 
 def validation_targets(files: list[str]) -> list[str]:
@@ -263,8 +375,10 @@ def render_prompt(
     *,
     task: str,
     model: str,
+    mode: str,
     first_touch: list[str],
     references: list[str],
+    read_only_references: list[str],
     validations: list[str],
     stops: list[str],
     reasons: list[str],
@@ -276,7 +390,7 @@ def render_prompt(
     known = known_root_cause or "none"
     return f"""Result: {'narrow override' if override_used else 'gate ok'}
 Model target: {model}
-Mode: execute
+Mode: {mode}
 Handoff required: yes
 Reason: {reason_text}
 Known root cause: {known}
@@ -288,6 +402,9 @@ Canonical anchors:
 
 First-touch files:
 {render_list(first_touch)}
+
+Read-only reference files:
+{render_list(read_only_references)}
 
 Validation targets:
 {render_list(validations)}
@@ -360,6 +477,44 @@ def main(argv: list[str] | None = None) -> int:
         if not path_exists(repo_root, known, tracked):
             print(f"Result: stop\nReason: known root cause does not exist: {known}")
             return 2
+
+    if is_migration_task(task):
+        new_revision = next_migration_pattern(tracked)
+        first_touch = unique_paths([new_revision])
+        read_only_references = migration_read_only_references(
+            task, repo_root, tracked, known
+        )
+        references = unique_existing(
+            repo_root,
+            tracked,
+            list(REFERENCE_FILES) + read_only_references,
+        )
+        validations = migration_validation_targets(new_revision)
+        stops = unique_paths(
+            stop_conditions(first_touch) + list(MIGRATION_STOP_CONDITIONS)
+        )
+        print(
+            render_prompt(
+                task=task,
+                model=model,
+                mode="migration",
+                first_touch=first_touch,
+                references=references,
+                read_only_references=read_only_references,
+                validations=validations,
+                stops=stops,
+                reasons=[
+                    "DB migration ownership",
+                    "SQLAlchemy model/table storage gap starts with a new Alembic revision",
+                ],
+                known_root_cause=known,
+                gate_misroute=False,
+                override_used=False,
+            ).rstrip()
+        )
+        return 0
+
+    if known:
         if known not in initial_first_touch:
             gate_misroute = bool(initial_first_touch)
             override_used = True
@@ -383,8 +538,10 @@ def main(argv: list[str] | None = None) -> int:
         render_prompt(
             task=task,
             model=model,
+            mode="execute",
             first_touch=first_touch,
             references=references,
+            read_only_references=[],
             validations=validations,
             stops=stops,
             reasons=reasons,
