@@ -478,6 +478,80 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
+    async def test_staff_paid_invoices_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, test_patient
+    ):
+        admin_user.role = "cashier"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7210, user_id=admin_user.id)
+        db_session.add_all(
+            [
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=9000,
+                    currency="UZS",
+                    status="paid",
+                    payment_method="cash",
+                    provider=None,
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=4000,
+                    currency="UZS",
+                    status="completed",
+                    payment_method="click",
+                    provider="click",
+                ),
+                PaymentInvoice(
+                    patient_id=test_patient.id,
+                    total_amount=3000,
+                    currency="UZS",
+                    status="pending",
+                    payment_method="payme",
+                    provider="payme",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 210,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7210},
+                "from": {"id": 7210},
+                "text": "paid_invoices",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Paid invoices" in text
+        assert "Invoices today: 3" in text
+        assert "Paid invoices: 2" in text
+        assert "Paid total: 13 000" in text
+        assert "Mode: read-only invoice aggregate snapshot" in text
+        assert test_patient.first_name not in text
+        if test_patient.phone:
+            assert test_patient.phone not in text
+        assert "7210" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "paid_invoices"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
     async def test_staff_state_change_command_is_denied_without_domain_mutation(
         self, db_session, admin_user
     ):
