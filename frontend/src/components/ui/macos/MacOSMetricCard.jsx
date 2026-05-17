@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import PropTypes from 'prop-types';
 
@@ -16,6 +17,9 @@ const MacOSMetricCard = ({
   className,
   style
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
   const sizeStyles = {
     sm: {
       padding: '12px',
@@ -77,11 +81,14 @@ const MacOSMetricCard = ({
     background: currentVariant.background,
     border: currentVariant.border,
     borderRadius: currentVariant.borderRadius,
-    boxShadow: currentVariant.boxShadow,
+    boxShadow: (isHovered || isFocused) && onClick ? '0 4px 12px rgba(0, 0, 0, 0.15)' : (currentVariant.boxShadow || 'none'),
     cursor: onClick ? 'pointer' : 'default',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     position: 'relative',
     overflow: 'hidden',
+    transform: (isHovered || isFocused) && onClick ? 'translateY(-2px)' : 'translateY(0)',
+    outline: isFocused ? '2px solid var(--mac-accent-blue)' : 'none',
+    outlineOffset: '2px',
     ...style
   };
 
@@ -185,18 +192,12 @@ const MacOSMetricCard = ({
     }
   };
 
-  const handleMouseEnter = (e) => {
-    if (onClick) {
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-    }
+  const handleMouseEnter = () => {
+    setIsHovered(true);
   };
 
-  const handleMouseLeave = (e) => {
-    if (onClick) {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.boxShadow = currentVariant.boxShadow || 'none';
-    }
+  const handleMouseLeave = () => {
+    setIsHovered(false);
   };
 
   const renderLoading = () =>
@@ -258,7 +259,9 @@ const MacOSMetricCard = ({
         style={cardStyle}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
+        onFocus={() => setIsFocused(true)}
         onMouseLeave={handleMouseLeave}
+        onBlur={() => setIsFocused(false)}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
