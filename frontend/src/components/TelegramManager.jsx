@@ -265,6 +265,17 @@ const TelegramManager = () => {
     staffConfirmationContract.deny_only_runtime_enabled ||
     staffConfirmationRuntime.deny_only_runtime_enabled
   );
+  const staffNextSlice = staffBot.next_slice || 'none';
+  const staffConfirmationTokenRuntimeEnabled = Boolean(
+    staffConfirmationContract.confirmation_token_runtime_enabled ||
+    staffConfirmationRuntime.confirmation_token_runtime_enabled
+  );
+  const staffConfirmationBlockedBy = Array.isArray(staffConfirmationContract.runtime_blocked_by) ?
+  staffConfirmationContract.runtime_blocked_by :
+  [];
+  const staffConfirmationBlockerSummary = staffConfirmationBlockedBy.length ?
+  staffConfirmationBlockedBy.join(', ') :
+  'none';
   const staffAuditContract = staffBot.audit_contract || {};
   const staffAuditRuntime = staffBot.audit || {};
   const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
@@ -648,6 +659,21 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffConfirmationGuardReady ? 'Guard' : 'Required'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff next runtime slice"
+                    secondary={`${staffNextSlice}; token runtime: ${staffConfirmationTokenRuntimeEnabled ? 'enabled' : 'blocked'}; blockers: ${staffConfirmationBlockerSummary}`} />
+
+                  <Badge
+                    variant={staffConfirmationBlockedBy.length ? 'warning' : 'success'}
+                    size="small">
+
+                    {staffConfirmationBlockedBy.length ? 'Blocked' : 'Ready'}
                   </Badge>
                 </ListItem>
                 <ListItem>
