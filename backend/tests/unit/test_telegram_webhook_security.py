@@ -906,5 +906,6 @@ class TestTelegramWebhookSecurity:
             "payments",
             "results",
             "profile",
+            "settings",
             "help",
         }

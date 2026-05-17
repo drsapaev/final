@@ -29,6 +29,7 @@ PATIENT_BOT_COMMANDS_RU = [
     {"command": "payments", "description": "Оплаты и долг"},
     {"command": "results", "description": "Результаты"},
     {"command": "profile", "description": "Мой статус"},
+    {"command": "settings", "description": "Язык и уведомления"},
     {"command": "help", "description": "Помощь"},
 ]
 PATIENT_BOT_COMMANDS_UZ = [
@@ -37,6 +38,7 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "payments", "description": "To'lovlar va qarz"},
     {"command": "results", "description": "Natijalar"},
     {"command": "profile", "description": "Mening holatim"},
+    {"command": "settings", "description": "Til va xabarnomalar"},
     {"command": "help", "description": "Yordam"},
 ]
 STAFF_BOT_COMMANDS_DEFAULT = [
