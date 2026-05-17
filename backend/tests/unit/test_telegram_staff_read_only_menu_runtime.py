@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.api.v1.endpoints import telegram_webhook
+from app.models.audit import AuditLog
 from app.models.telegram_config import TelegramUser
 
 
@@ -65,6 +66,20 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert ["/staff", "/help"] == [
             item["text"] for item in reply_markup["keyboard"][-1]
         ]
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.actor_user_id == admin_user.id
+        assert audit_log.entity_id is not None
+        assert audit_log.payload["actor_role"] == "admin"
+        assert audit_log.payload["command_key"] == "/staff"
+        assert audit_log.payload["menu_item_key"] == "staff_menu"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+        assert "telegram_chat:" in audit_log.payload["telegram_user_id_hash"]
+        assert "7201" not in str(audit_log.payload)
 
     @pytest.mark.asyncio
     async def test_staff_read_only_command_does_not_execute_patient_queue(
@@ -92,6 +107,15 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             fake_service._send_message.await_args.args[1]
             == telegram_webhook.TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE
         )
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.actor_user_id == admin_user.id
+        assert audit_log.payload["command_key"] == "/queue"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
     async def test_unlinked_staff_menu_request_does_not_create_patient_link(
@@ -124,3 +148,16 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             .first()
             is None
         )
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.actor_user_id is None
+        assert audit_log.entity_id is None
+        assert audit_log.payload["actor_role"] == "unlinked"
+        assert audit_log.payload["command_key"] == "/staff"
+        assert audit_log.payload["result"] == "denied"
+        assert audit_log.payload["reason"] == "staff_not_linked"
+        assert "telegram_chat:" in audit_log.payload["telegram_user_id_hash"]
+        assert "7203" not in str(audit_log.payload)

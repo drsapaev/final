@@ -731,12 +731,13 @@ def _record_staff_command_audit(
     *,
     chat_id: int,
     request_id: str | None,
-    actor_user_id: int,
+    actor_user_id: int | None,
     telegram_user_id: int | None,
     role: str,
     command_key: str,
     menu_item_key: str | None = None,
     result: str = "handled",
+    reason: str | None = None,
 ) -> None:
     payload = {
         "actor_role": role,
@@ -750,9 +751,12 @@ def _record_staff_command_audit(
         "command_key": command_key,
         "read_only": True,
         "state_changing_action": False,
+        "redacted": True,
     }
     if menu_item_key:
         payload["menu_item_key"] = menu_item_key
+    if reason:
+        payload["reason"] = reason
 
     crud_audit.log(
         db,
@@ -881,6 +885,18 @@ async def _handle_staff_read_only_menu(
     _telegram_user, user, role_menu = _linked_staff_for_chat(db, chat_id)
     if not user:
         if command in {"/staff", "/menu"}:
+            _record_staff_command_audit(
+                db,
+                chat_id=chat_id,
+                request_id=request_id,
+                actor_user_id=None,
+                telegram_user_id=getattr(_telegram_user, "id", None),
+                role="unlinked",
+                command_key=command,
+                result="denied",
+                reason="staff_not_linked",
+            )
+            db.commit()
             await bot_service._send_message(
                 chat_id,
                 TELEGRAM_STAFF_MENU_UNLINKED_MESSAGE,
@@ -900,6 +916,7 @@ async def _handle_staff_read_only_menu(
                 role=_normalize_staff_role(getattr(user, "role", None)),
                 command_key=command if command.startswith("/") else "staff_menu_item",
                 result="denied",
+                reason="role_not_allowed",
             )
             db.commit()
         await bot_service._send_message(

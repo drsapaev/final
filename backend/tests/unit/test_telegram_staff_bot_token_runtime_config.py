@@ -37,7 +37,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "TELEGRAM_STAFF_BOT_TOKEN"
         assert contract["token_returned_to_frontend"] is False
         assert contract["patient_bot_token_reused"] is False
-        assert status["next_slice"] == "staff_audit_logging_runtime"
+        assert status["next_slice"] == "staff_state_change_confirmation_runtime"
         assert secret_value not in str(status)
 
     def test_reads_legacy_env_without_secret_leak(self, monkeypatch, db_session):
@@ -61,7 +61,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "STAFF_TELEGRAM_BOT_TOKEN"
         assert contract["enabled"] is True
         assert contract["runtime_blocked_by"] == []
-        assert status["next_slice"] == "staff_audit_logging_runtime"
+        assert status["next_slice"] == "staff_state_change_confirmation_runtime"
         assert secret_value not in str(status)
         assert "patient-token" not in str(status)
 

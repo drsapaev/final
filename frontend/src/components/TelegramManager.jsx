@@ -236,6 +236,10 @@ const TelegramManager = () => {
   const staffAuditPendingEvents = Array.isArray(staffAuditContract.pending_event_types) ?
   staffAuditContract.pending_event_types :
   [];
+  const staffAuditReady = Boolean(
+    staffAuditContract.enabled ||
+    staffAuditRuntime.ready
+  );
   const staffAuditReadOnlyReady = Boolean(
     staffAuditContract.read_only_menu_events_enabled ||
     staffAuditRuntime.read_only_menu_events_ready
@@ -607,14 +611,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff audit logging"
                     secondary={staffAuditEvents.length ?
-                    `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; read-only menu: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
+                    `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}; read-only commands: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
                     'Audit contract не опубликован'} />
 
                   <Badge
-                    variant={staffAuditReadOnlyReady ? 'success' : 'warning'}
+                    variant={staffAuditReady ? 'success' : 'warning'}
                     size="small">
 
-                    {staffAuditReadOnlyReady ? 'Read-only' : 'Required'}
+                    {staffAuditReady ? 'Ready' : 'Required'}
                   </Badge>
                 </ListItem>
                 <ListItem>
