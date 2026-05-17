@@ -960,9 +960,56 @@ def _staff_menu_for_role(role: Any) -> Dict[str, Any] | None:
     return None
 
 
+STAFF_MENU_ITEM_ICONS = {
+    "queue_overview": "📋",
+    "next_patient": "➡️",
+    "payment_status": "💳",
+    "today_schedule": "📅",
+    "emr_reminders": "🩺",
+    "unpaid_invoices": "🧾",
+    "paid_invoices": "✅",
+    "reconciliation_alerts": "🔁",
+    "ready_reports": "📄",
+    "pending_reports": "⏳",
+    "delivery_status": "📬",
+    "daily_summary": "📊",
+    "integration_errors": "⚠️",
+    "staff_readiness": "🛠️",
+    "revenue_summary": "💰",
+}
+
+STAFF_MENU_BUTTON_ICON_PREFIXES = tuple(
+    dict.fromkeys(
+        [
+            *STAFF_MENU_ITEM_ICONS.values(),
+            "🏠",
+            "❓",
+        ]
+    )
+)
+
+
+def _staff_menu_item_label(item: Dict[str, Any]) -> str:
+    key = str(item.get("key") or "").strip()
+    label = str(item.get("label") or key).strip()
+    icon = STAFF_MENU_ITEM_ICONS.get(key)
+    return f"{icon} {label}" if icon else label
+
+
+def _normalize_staff_button_text(text: Any) -> str:
+    value = " ".join(str(text or "").strip().lower().split())
+    value = value.replace("\ufe0f", "").strip()
+    for prefix in STAFF_MENU_BUTTON_ICON_PREFIXES:
+        normalized_prefix = prefix.replace("\ufe0f", "").strip().lower()
+        if normalized_prefix and value.startswith(normalized_prefix):
+            value = value[len(normalized_prefix):].strip()
+            break
+    return value
+
+
 def _staff_menu_keyboard(role_menu: Dict[str, Any]) -> Dict[str, Any]:
     rows = [
-        [{"text": str(item.get("label") or item.get("key"))}]
+        [{"text": _staff_menu_item_label(item)}]
         for item in role_menu.get("items", [])
         if item.get("intent") == "read_only"
     ]
@@ -976,20 +1023,25 @@ def _staff_menu_keyboard(role_menu: Dict[str, Any]) -> Dict[str, Any]:
 
 def _staff_menu_message(user: User, role_menu: Dict[str, Any]) -> str:
     items = [
-        str(item.get("label") or item.get("key"))
+        _staff_menu_item_label(item)
         for item in role_menu.get("items", [])
         if item.get("intent") == "read_only"
     ]
+    role_key = _normalize_staff_role(getattr(user, "role", None))
+    role_label = str(role_menu.get("label") or role_key).strip()
     lines = [
+        "👥 Меню сотрудника (только просмотр)",
         "Staff read-only menu",
-        f"Role: {_normalize_staff_role(getattr(user, 'role', None))}",
+        f"Роль: {role_label} ({role_key})",
+        f"Role: {role_key}",
         "",
-        "Available:",
+        "Доступно:",
     ]
     lines.extend(f"- {item}" for item in items)
     lines.extend(
         [
             "",
+            "Действия, которые меняют данные, в Telegram отключены.",
             "State-changing actions are disabled in Telegram.",
         ]
     )
@@ -1003,20 +1055,25 @@ def _staff_read_only_item_labels() -> set[str]:
             label = str(item.get("label") or "").strip().lower()
             if label:
                 labels.add(label)
+                labels.add(_normalize_staff_button_text(label))
             key = str(item.get("key") or "").strip().lower()
             if key:
                 labels.add(key)
+            display_label = _staff_menu_item_label(item)
+            if display_label:
+                labels.add(_normalize_staff_button_text(display_label))
     return labels
 
 
 def _staff_menu_item_for_text(
     role_menu: Dict[str, Any], text: str
 ) -> Dict[str, Any] | None:
-    normalized_text = text.strip().lower()
+    normalized_text = _normalize_staff_button_text(text)
     for item in role_menu.get("items", []):
         label = str(item.get("label") or "").strip().lower()
         key = str(item.get("key") or "").strip().lower()
-        if normalized_text in {label, key}:
+        display_label = _normalize_staff_button_text(_staff_menu_item_label(item))
+        if normalized_text in {label, key, display_label}:
             return item
     return None
 
@@ -1674,7 +1731,7 @@ async def _handle_staff_read_only_menu(
     request_id = f"telegram-update:{update_id}" if update_id is not None else None
     text = _message_text(message)
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-    normalized_text = text.lower()
+    normalized_text = _normalize_staff_button_text(text)
     read_only_commands = _staff_read_only_commands()
     state_change_operation = _staff_state_change_operation_for_command(command)
     staff_menu_requested = (
