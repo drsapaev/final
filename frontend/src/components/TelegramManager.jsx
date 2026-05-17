@@ -226,9 +226,20 @@ const TelegramManager = () => {
   staffConfirmationContract.operations :
   [];
   const staffAuditContract = staffBot.audit_contract || {};
+  const staffAuditRuntime = staffBot.audit || {};
   const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
   staffAuditContract.event_types :
   [];
+  const staffAuditRecordedEvents = Array.isArray(staffAuditContract.recorded_event_types) ?
+  staffAuditContract.recorded_event_types :
+  [];
+  const staffAuditPendingEvents = Array.isArray(staffAuditContract.pending_event_types) ?
+  staffAuditContract.pending_event_types :
+  [];
+  const staffAuditReadOnlyReady = Boolean(
+    staffAuditContract.read_only_menu_events_enabled ||
+    staffAuditRuntime.read_only_menu_events_ready
+  );
   const staffRoleMenuEnablementContract = staffBot.role_menu_enablement_contract || {};
   const staffRoleMenuRuntimeEnabled = Boolean(
     staffRoleMenuEnablementContract.runtime_menu_enabled || staffBot.read_only_runtime_enabled
@@ -596,14 +607,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff audit logging"
                     secondary={staffAuditEvents.length ?
-                    `${staffAuditEvents.length} required events; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}` :
+                    `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; read-only menu: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
                     'Audit contract не опубликован'} />
 
                   <Badge
-                    variant={staffAuditContract.record_writer_enabled ? 'success' : 'warning'}
+                    variant={staffAuditReadOnlyReady ? 'success' : 'warning'}
                     size="small">
 
-                    {staffAuditContract.required_before_enablement ? 'Required' : 'Planned'}
+                    {staffAuditReadOnlyReady ? 'Read-only' : 'Required'}
                   </Badge>
                 </ListItem>
                 <ListItem>
