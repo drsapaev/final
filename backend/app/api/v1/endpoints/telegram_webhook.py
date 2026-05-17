@@ -462,6 +462,15 @@ TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
 TELEGRAM_BOT_INFO_PUBLIC_MESSAGE = "Ошибка получения информации о боте"
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
+EMR_CLOSED_VISIT_STATUSES = {
+    "closed",
+    "completed",
+    "served",
+    "done",
+    "cancelled",
+    "canceled",
+    "no_show",
+}
 QUEUE_TAG_LABELS = {
     "ecg": "ЭКГ",
     "cardiology_common": "Кардиология",
@@ -1097,6 +1106,34 @@ def _staff_today_schedule_message(db: Session, user: User | None = None) -> str:
     )
 
 
+def _staff_emr_reminders_message(db: Session, user: User | None = None) -> str:
+    counts = _visit_status_counts(db, user)
+    normalized_counts = {
+        str(status or "unknown").lower(): count for status, count in counts.items()
+    }
+    total = sum(counts.values())
+    closed = sum(
+        normalized_counts.get(status, 0) for status in EMR_CLOSED_VISIT_STATUSES
+    )
+    needs_closure = max(total - closed, 0)
+    in_progress = sum(
+        normalized_counts.get(status, 0)
+        for status in ("in_progress", "in_visit", "called")
+    )
+    open_visits = max(needs_closure - in_progress, 0)
+    return "\n".join(
+        [
+            "EMR reminders",
+            f"Date: {date.today().isoformat()}",
+            f"Visits needing EMR closure: {needs_closure}",
+            f"Open visits: {open_visits}",
+            f"In progress: {in_progress}",
+            f"Closed/cancelled: {closed}",
+            "Mode: read-only EMR reminder snapshot",
+        ]
+    )
+
+
 def _staff_payment_status_message(db: Session) -> str:
     rows = _payment_status_rows(db)
     total_count = sum(count for _status, count, _amount in rows)
@@ -1222,6 +1259,8 @@ def _staff_read_only_domain_data_message(
         return _staff_next_patient_message(db)
     if item_key == "today_schedule":
         return _staff_today_schedule_message(db, user)
+    if item_key == "emr_reminders":
+        return _staff_emr_reminders_message(db, user)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
