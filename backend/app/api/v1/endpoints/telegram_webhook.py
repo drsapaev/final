@@ -130,10 +130,10 @@ TELEGRAM_NEEDS_LINK_MESSAGE = (
 )
 TELEGRAM_MAIN_MENU = {
     "keyboard": [
-        [{"text": "Поделиться номером", "request_contact": True}],
-        [{"text": "Моя очередь"}, {"text": "Оплаты и долг"}],
-        [{"text": "Мой статус"}, {"text": "Результаты"}],
-        [{"text": "Настройки"}, {"text": "Помощь"}],
+        [{"text": "📱 Поделиться номером", "request_contact": True}],
+        [{"text": "🎫 Моя очередь"}, {"text": "💳 Оплаты и долг"}],
+        [{"text": "👤 Мой статус"}, {"text": "📄 Результаты"}],
+        [{"text": "⚙️ Настройки"}, {"text": "❓ Помощь"}],
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False,
@@ -141,18 +141,18 @@ TELEGRAM_MAIN_MENU = {
 TELEGRAM_LANGUAGE_RU = "ru"
 TELEGRAM_LANGUAGE_UZ = "uz-Latn"
 TELEGRAM_LANGUAGE_MENU = {
-    "keyboard": [[{"text": "Русский"}, {"text": "O'zbekcha"}]],
+    "keyboard": [[{"text": "🇷🇺 Русский"}, {"text": "🇺🇿 O'zbekcha"}]],
     "resize_keyboard": True,
     "one_time_keyboard": True,
 }
 TELEGRAM_NOTIFICATION_CONSENT_MENUS = {
     TELEGRAM_LANGUAGE_RU: {
-        "keyboard": [[{"text": "Разрешить уведомления"}, {"text": "Без уведомлений"}]],
+        "keyboard": [[{"text": "🔔 Разрешить уведомления"}, {"text": "🔕 Без уведомлений"}]],
         "resize_keyboard": True,
         "one_time_keyboard": True,
     },
     TELEGRAM_LANGUAGE_UZ: {
-        "keyboard": [[{"text": "Xabarnomalarga roziman"}, {"text": "Xabarnomasiz"}]],
+        "keyboard": [[{"text": "🔔 Xabarnomalarga roziman"}, {"text": "🔕 Xabarnomasiz"}]],
         "resize_keyboard": True,
         "one_time_keyboard": True,
     },
@@ -161,10 +161,10 @@ TELEGRAM_MAIN_MENUS = {
     TELEGRAM_LANGUAGE_RU: TELEGRAM_MAIN_MENU,
     TELEGRAM_LANGUAGE_UZ: {
         "keyboard": [
-            [{"text": "Telefon raqamni ulashish", "request_contact": True}],
-            [{"text": "Mening navbatim"}, {"text": "To'lovlar va qarz"}],
-            [{"text": "Mening holatim"}, {"text": "Natijalar"}],
-            [{"text": "Sozlamalar"}, {"text": "Yordam"}],
+            [{"text": "📱 Telefon raqamni ulashish", "request_contact": True}],
+            [{"text": "🎫 Mening navbatim"}, {"text": "💳 To'lovlar va qarz"}],
+            [{"text": "👤 Mening holatim"}, {"text": "📄 Natijalar"}],
+            [{"text": "⚙️ Sozlamalar"}, {"text": "❓ Yordam"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -173,18 +173,18 @@ TELEGRAM_MAIN_MENUS = {
 TELEGRAM_SETTINGS_MENUS = {
     TELEGRAM_LANGUAGE_RU: {
         "keyboard": [
-            [{"text": "Русский"}, {"text": "O'zbekcha"}],
-            [{"text": "Разрешить уведомления"}, {"text": "Без уведомлений"}],
-            [{"text": "Моя очередь"}, {"text": "Помощь"}],
+            [{"text": "🇷🇺 Русский"}, {"text": "🇺🇿 O'zbekcha"}],
+            [{"text": "🔔 Разрешить уведомления"}, {"text": "🔕 Без уведомлений"}],
+            [{"text": "🎫 Моя очередь"}, {"text": "❓ Помощь"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
     },
     TELEGRAM_LANGUAGE_UZ: {
         "keyboard": [
-            [{"text": "Русский"}, {"text": "O'zbekcha"}],
-            [{"text": "Xabarnomalarga roziman"}, {"text": "Xabarnomasiz"}],
-            [{"text": "Mening navbatim"}, {"text": "Yordam"}],
+            [{"text": "🇷🇺 Русский"}, {"text": "🇺🇿 O'zbekcha"}],
+            [{"text": "🔔 Xabarnomalarga roziman"}, {"text": "🔕 Xabarnomasiz"}],
+            [{"text": "🎫 Mening navbatim"}, {"text": "❓ Yordam"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -262,6 +262,10 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Bot orqali Telegramni bemor kartasiga bog'lash, klinika xabarnomalarini olish "
             "va natijalar tayyor bo'lganda ularni ochish mumkin."
         ),
+    },
+    "language_selected": {
+        TELEGRAM_LANGUAGE_RU: "Язык изменён на русский. Главное меню обновлено.",
+        TELEGRAM_LANGUAGE_UZ: "Til O'zbekchaga o'zgartirildi. Asosiy menyu yangilandi.",
     },
     "notification_consent": {
         TELEGRAM_LANGUAGE_RU: (
@@ -633,6 +637,82 @@ def _telegram_chat_text(db: Session, chat_id: int, key: str) -> str:
 
 def _telegram_chat_menu(db: Session, chat_id: int) -> Dict[str, Any]:
     return _localized_main_menu(_telegram_chat_language(db, chat_id))
+
+
+TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
+    "📱",
+    "🎫",
+    "💳",
+    "👤",
+    "📄",
+    "⚙",
+    "❓",
+    "🔔",
+    "🔕",
+    "🇷🇺",
+    "🇺🇿",
+)
+
+
+def _normalize_patient_button_text(text: Any) -> str:
+    value = " ".join(str(text or "").strip().lower().split())
+    value = value.replace("\ufe0f", "").strip()
+    for prefix in TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES:
+        if value.startswith(prefix):
+            value = value[len(prefix):].strip()
+            break
+    return value
+
+
+def _patient_text_handler_aliases(pairs: list[tuple[str, Any]]) -> Dict[str, Any]:
+    aliases: Dict[str, Any] = {}
+    for label, handler in pairs:
+        raw_original = " ".join(str(label or "").strip().lower().split())
+        if raw_original:
+            aliases[raw_original] = handler
+        raw = raw_original.replace("\ufe0f", "").strip()
+        if raw:
+            aliases[raw] = handler
+        normalized = _normalize_patient_button_text(label)
+        if normalized:
+            aliases[normalized] = handler
+    return aliases
+
+
+async def _send_patient_bot_reply(
+    db: Session,
+    bot_service,
+    chat_id: int,
+    text: str,
+    reply_markup: Dict[str, Any],
+    template_key: str,
+) -> bool:
+    sent = bool(await bot_service._send_message(chat_id, text, reply_markup))
+    try:
+        db.add(
+            TelegramMessage(
+                chat_id=chat_id,
+                message_type="patient_bot_reply",
+                template_key=template_key,
+                message_text=str(text or ""),
+                status="sent" if sent else "failed",
+                sent_at=datetime.utcnow() if sent else None,
+            )
+        )
+        db.commit()
+        logger.info(
+            "Telegram patient bot reply recorded template_key=%s status=%s",
+            template_key,
+            "sent" if sent else "failed",
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "Telegram patient bot reply log failed template_key=%s error_type=%s",
+            template_key,
+            type(exc).__name__,
+        )
+    return sent
 
 
 def _upsert_ticket_qr_telegram_user(
@@ -2339,26 +2419,35 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     language = _telegram_chat_language(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "needs_link"),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_results_needs_link",
         )
         return
 
     instances = _latest_ready_lab_report_instances(db, telegram_user.patient_id)
     if not instances:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _localized_text("lab_results_empty", language),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_lab_results_empty",
         )
         return
 
-    await bot_service._send_message(
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         _localized_text("lab_results_found", language).format(count=len(instances)),
         _telegram_chat_menu(db, chat_id),
+        "telegram_patient_lab_results_found",
     )
     sent_count = 0
     for instance in instances:
@@ -2409,10 +2498,13 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
             )
 
     if sent_count == 0:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _localized_text("lab_results_send_failed", language),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_lab_results_send_failed",
         )
 
 
@@ -2438,31 +2530,46 @@ def _clinic_results_message(db: Session, chat_id: int) -> str:
     return _telegram_chat_text(db, chat_id, "results_hint")
 
 
-async def _send_language_choice(bot_service, chat_id: int) -> None:
-    await bot_service._send_message(
+async def _send_language_choice(db: Session, bot_service, chat_id: int) -> None:
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         _localized_text("language_prompt", TELEGRAM_LANGUAGE_RU),
         TELEGRAM_LANGUAGE_MENU,
+        "telegram_patient_language_prompt",
     )
 
 
 async def _send_clinic_welcome(
-    bot_service, chat_id: int, language_code: str = TELEGRAM_LANGUAGE_RU
+    db: Session,
+    bot_service,
+    chat_id: int,
+    language_code: str = TELEGRAM_LANGUAGE_RU,
 ) -> None:
-    await bot_service._send_message(
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         _localized_text("welcome", language_code),
         _localized_main_menu(language_code),
+        "telegram_patient_welcome",
     )
 
 
 async def _send_notification_consent(
-    bot_service, chat_id: int, language_code: str = TELEGRAM_LANGUAGE_RU
+    db: Session,
+    bot_service,
+    chat_id: int,
+    language_code: str = TELEGRAM_LANGUAGE_RU,
 ) -> None:
-    await bot_service._send_message(
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         _localized_text("notification_consent", language_code),
         _localized_notification_consent_menu(language_code),
+        "telegram_patient_notification_consent",
     )
 
 
@@ -2479,10 +2586,13 @@ async def _set_notification_consent(
         db.commit()
 
     result_key = "notifications_enabled" if enabled else "notifications_disabled"
-    await bot_service._send_message(
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         _localized_text(result_key, language),
         _localized_main_menu(language),
+        f"telegram_patient_{result_key}",
     )
 
 
@@ -2500,19 +2610,25 @@ async def _handle_contact_link(
         return True
 
     if from_user_id is None or contact_user_id != from_user_id:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "contact_rejected"),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_contact_rejected",
         )
         return True
 
     patient = _find_patient_by_phone(db, str(contact.get("phone_number") or ""))
     if not patient:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "patient_not_found"),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_not_found",
         )
         return True
 
@@ -2525,19 +2641,25 @@ async def _handle_contact_link(
             "Telegram contact link failed error_type=%s",
             type(exc).__name__,
         )
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "ticket_qr_link_failed"),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_ticket_qr_link_failed",
         )
         return True
 
     language = _telegram_chat_language(db, chat_id)
     patient_label = "Bemor" if language == TELEGRAM_LANGUAGE_UZ else "Пациент"
-    await bot_service._send_message(
+    await _send_patient_bot_reply(
+        db,
+        bot_service,
         chat_id,
         f"{_localized_text('contact_linked', language)}\n{patient_label}: {_patient_display_name(patient)}",
         _localized_main_menu(language),
+        "telegram_patient_contact_linked",
     )
     return True
 
@@ -2546,64 +2668,97 @@ async def _handle_clinic_bot_update(
     update: Dict[str, Any], db: Session, bot_service
 ) -> bool:
     async def start_handler(chat_id: int, message: Dict[str, Any]) -> None:
-        _upsert_ticket_qr_telegram_user(db, message)
+        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
         db.commit()
-        await _send_language_choice(bot_service, chat_id)
+        await _send_language_choice(db, bot_service, chat_id)
 
     async def language_handler(chat_id: int, language_code: str) -> None:
         message = _message_from_update(update)
+        telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
         _upsert_ticket_qr_telegram_user(
             db,
             message,
             language_code=language_code,
-            notifications_enabled=False,
+            notifications_enabled=False if telegram_user is None else None,
         )
         db.commit()
+        language = _normalize_patient_language(language_code)
         logger.info(
             "Telegram patient bot language selected",
-            extra={"language_code": _normalize_patient_language(language_code)},
+            extra={"language_code": language},
         )
-        await _send_notification_consent(bot_service, chat_id, language_code)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("language_selected", language),
+            _localized_main_menu(language),
+            "telegram_patient_language_selected",
+        )
 
     async def help_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _localized_text("help", language),
             _localized_main_menu(language),
+            "telegram_patient_help",
         )
 
     async def settings_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _localized_text("settings", language),
             _localized_settings_menu(language),
+            "telegram_patient_settings",
         )
 
     async def queue_handler(chat_id: int) -> None:
-        await bot_service._send_message(
-            chat_id, _clinic_queue_message(db, chat_id), _telegram_chat_menu(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _clinic_queue_message(db, chat_id),
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_queue",
         )
 
     async def payments_handler(chat_id: int) -> None:
-        await bot_service._send_message(
-            chat_id, _clinic_payments_message(db, chat_id), _telegram_chat_menu(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _clinic_payments_message(db, chat_id),
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_payments",
         )
 
     async def profile_handler(chat_id: int) -> None:
-        await bot_service._send_message(
-            chat_id, _clinic_status_message(db, chat_id), _telegram_chat_menu(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _clinic_status_message(db, chat_id),
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_profile",
         )
 
     async def results_handler(chat_id: int) -> None:
         await _send_clinic_lab_results(db, bot_service, chat_id)
 
     async def share_contact_handler(chat_id: int) -> None:
-        await bot_service._send_message(
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "share_contact"),
             _telegram_chat_menu(db, chat_id),
+            "telegram_patient_share_contact",
         )
 
     async def enable_notifications_handler(chat_id: int) -> None:
@@ -2626,30 +2781,32 @@ async def _handle_clinic_bot_update(
         "/results": results_handler,
         "/settings": settings_handler,
     }
-    text_handlers = {
-        "помощь": help_handler,
-        "настройки": settings_handler,
-        "моя очередь": queue_handler,
-        "оплаты и долг": payments_handler,
-        "мой статус": profile_handler,
-        "результаты": results_handler,
-        "поделиться номером": share_contact_handler,
-        "русский": russian_language_handler,
-        "o'zbekcha": uzbek_language_handler,
-        "ozbekcha": uzbek_language_handler,
-        "uzbekcha": uzbek_language_handler,
-        "разрешить уведомления": enable_notifications_handler,
-        "без уведомлений": disable_notifications_handler,
-        "xabarnomalarga roziman": enable_notifications_handler,
-        "xabarnomasiz": disable_notifications_handler,
-        "yordam": help_handler,
-        "sozlamalar": settings_handler,
-        "mening navbatim": queue_handler,
-        "to'lovlar va qarz": payments_handler,
-        "mening holatim": profile_handler,
-        "natijalar": results_handler,
-        "telefon raqamni ulashish": share_contact_handler,
-    }
+    text_handlers = _patient_text_handler_aliases(
+        [
+            ("❓ Помощь", help_handler),
+            ("⚙️ Настройки", settings_handler),
+            ("🎫 Моя очередь", queue_handler),
+            ("💳 Оплаты и долг", payments_handler),
+            ("👤 Мой статус", profile_handler),
+            ("📄 Результаты", results_handler),
+            ("📱 Поделиться номером", share_contact_handler),
+            ("🇷🇺 Русский", russian_language_handler),
+            ("🇺🇿 O'zbekcha", uzbek_language_handler),
+            ("ozbekcha", uzbek_language_handler),
+            ("uzbekcha", uzbek_language_handler),
+            ("🔔 Разрешить уведомления", enable_notifications_handler),
+            ("🔕 Без уведомлений", disable_notifications_handler),
+            ("🔔 Xabarnomalarga roziman", enable_notifications_handler),
+            ("🔕 Xabarnomasiz", disable_notifications_handler),
+            ("❓ Yordam", help_handler),
+            ("⚙️ Sozlamalar", settings_handler),
+            ("🎫 Mening navbatim", queue_handler),
+            ("💳 To'lovlar va qarz", payments_handler),
+            ("👤 Mening holatim", profile_handler),
+            ("📄 Natijalar", results_handler),
+            ("📱 Telefon raqamni ulashish", share_contact_handler),
+        ]
+    )
 
     dispatch = getattr(bot_service, "process_patient_bot_update", None)
     if callable(dispatch):
@@ -2687,7 +2844,9 @@ async def _handle_clinic_bot_update(
 
     text = _message_text(message)
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
-    handler = command_handlers.get(command) or text_handlers.get(text.lower())
+    handler = command_handlers.get(command) or text_handlers.get(
+        _normalize_patient_button_text(text)
+    )
     if command == "/start":
         await start_handler(chat_id, message)
         return True

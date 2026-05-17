@@ -261,7 +261,7 @@ class TestTelegramWebhookSecurity:
                 "message_id": 1,
                 "chat": {"id": 7006},
                 "from": {"id": 111, "language_code": "uz"},
-                "text": "O'zbekcha",
+                "text": "🇺🇿 O'zbekcha",
             },
         }
 
@@ -279,7 +279,58 @@ class TestTelegramWebhookSecurity:
         assert telegram_user.notifications_enabled is False
         assert telegram_user.appointment_reminders is False
         assert telegram_user.lab_notifications is False
-        assert "rozimisiz" in fake_service._send_message.await_args.args[1]
+        assert "O'zbekchaga" in fake_service._send_message.await_args.args[1]
+        reply_markup = fake_service._send_message.await_args.args[2]
+        assert reply_markup["keyboard"][0][0]["text"].startswith("📱")
+        assert reply_markup["keyboard"][1][0]["text"].startswith("🎫")
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7006)
+            .one()
+        )
+        assert log.template_key == "telegram_patient_language_selected"
+        assert log.message_type == "patient_bot_reply"
+        assert log.status == "sent"
+
+    @pytest.mark.asyncio
+    async def test_language_choice_preserves_existing_notification_consent(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7015,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 109,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7015},
+                "from": {"id": 111, "language_code": "uz"},
+                "text": "🇷🇺 Русский",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.language_code == "ru"
+        assert telegram_user.notifications_enabled is True
+        assert telegram_user.appointment_reminders is True
+        assert telegram_user.lab_notifications is True
+        assert "русский" in fake_service._send_message.await_args.args[1]
 
     @pytest.mark.asyncio
     async def test_notification_consent_accept_enables_patient_notifications(
@@ -305,7 +356,7 @@ class TestTelegramWebhookSecurity:
                 "message_id": 1,
                 "chat": {"id": 7007},
                 "from": {"id": 111},
-                "text": "Xabarnomalarga roziman",
+                "text": "🔔 Xabarnomalarga roziman",
             },
         }
 
