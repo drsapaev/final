@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, NoReturn, Optional
@@ -32,6 +33,14 @@ logger = logging.getLogger(__name__)
 STAFF_LINK_TOKEN_PREFIX = "stl"
 STAFF_LINK_TOKEN_HASH_PREFIX = "staff_link_token:"
 STAFF_LINK_TOKEN_SEPARATOR = "_"
+STAFF_BOT_TOKEN_ENV_KEYS = (
+    "TELEGRAM_STAFF_BOT_TOKEN",
+    "STAFF_TELEGRAM_BOT_TOKEN",
+)
+STAFF_BOT_TOKEN_SETTING_KEYS = (
+    "staff_bot_token",
+    "telegram_staff_bot_token",
+)
 
 STAFF_BOT_SUPPORTED_ROLES = [
     "registrar",
@@ -132,11 +141,14 @@ STAFF_BOT_GUARDRAILS = [
 STAFF_BOT_TOKEN_CONTRACT = {
     "contract_version": "staff-token-v1",
     "enabled": False,
-    "runtime_read_enabled": False,
+    "runtime_read_enabled": True,
     "required_before_enablement": True,
     "scope": "dedicated_staff_bot",
     "must_not_share_patient_bot_token": True,
     "secret_source": "environment_or_secret_store",
+    "env_keys": list(STAFF_BOT_TOKEN_ENV_KEYS),
+    "setting_keys": list(STAFF_BOT_TOKEN_SETTING_KEYS),
+    "token_returned_to_frontend": False,
     "required_server_checks": [
         "separate_staff_bot_token_configured",
         "token_not_logged",
@@ -827,8 +839,17 @@ def _build_staff_role_menu_enablement_contract(
     }
 
 
-def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
+def _build_staff_bot_status(
+    webhook_set: bool, staff_bot_token_status: Dict[str, Any] | None = None
+) -> Dict[str, Any]:
     role_menus = _build_staff_role_menus_summary()
+    token_status = staff_bot_token_status or {
+        "configured": False,
+        "ready": False,
+        "source": "not_configured",
+        "source_key": None,
+    }
+    token_contract = _build_staff_bot_token_contract(token_status)
     return {
         "version": "linking-runtime",
         "contract_version": "staff-menu-read-only-v1",
@@ -849,7 +870,7 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
                 "one_time_signed_staff_token",
             ],
         },
-        "token_contract": STAFF_BOT_TOKEN_CONTRACT,
+        "token_contract": token_contract,
         "linking_contract": STAFF_BOT_LINKING_CONTRACT,
         "linking_runtime_contract": STAFF_BOT_LINKING_RUNTIME_CONTRACT,
         "link_token_validation_contract": STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT,
@@ -876,7 +897,11 @@ def _build_staff_bot_status(webhook_set: bool) -> Dict[str, Any]:
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": "dedicated_staff_bot_token_runtime_config",
+        "next_slice": (
+            "staff_read_only_menu_runtime_enablement"
+            if token_contract["ready"]
+            else "dedicated_staff_bot_token_runtime_config"
+        ),
     }
 
 
@@ -910,6 +935,10 @@ class TelegramWebhookRequest(BaseModel):
     webhook_url: Optional[str] = None
 
 
+def _has_secret_value(value: Any) -> bool:
+    return bool(str(value or "").strip())
+
+
 def _get_configured_bot_token(db: Session) -> str | None:
     config = crud_telegram.get_telegram_config(db)
     if config and config.bot_token:
@@ -917,6 +946,108 @@ def _get_configured_bot_token(db: Session) -> str | None:
 
     bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
     return getattr(bot_token_setting, "value", None) if bot_token_setting else None
+
+
+def _build_staff_bot_token_status(
+    *,
+    token_value: Any,
+    source: str,
+    source_key: str,
+    patient_bot_token: str | None,
+) -> Dict[str, Any]:
+    token_text = str(token_value or "").strip()
+    patient_token_text = str(patient_bot_token or "").strip()
+    token_present = bool(token_text)
+    patient_bot_token_reused = bool(
+        token_present and patient_token_text and token_text == patient_token_text
+    )
+    ready = token_present and not patient_bot_token_reused
+    return {
+        "configured": token_present,
+        "ready": ready,
+        "source": source,
+        "source_key": source_key,
+        "separate_staff_bot_token_configured": ready,
+        "patient_bot_token_reused": patient_bot_token_reused,
+    }
+
+
+def _get_staff_bot_token_runtime_status(
+    db: Session, patient_bot_token: str | None = None
+) -> Dict[str, Any]:
+    for env_key in STAFF_BOT_TOKEN_ENV_KEYS:
+        token_value = os.getenv(env_key)
+        if _has_secret_value(token_value):
+            return _build_staff_bot_token_status(
+                token_value=token_value,
+                source="environment",
+                source_key=env_key,
+                patient_bot_token=patient_bot_token,
+            )
+
+    for setting_key in STAFF_BOT_TOKEN_SETTING_KEYS:
+        setting = crud_clinic.get_setting_by_key(db, setting_key)
+        token_value = getattr(setting, "value", None)
+        if _has_secret_value(token_value):
+            return _build_staff_bot_token_status(
+                token_value=token_value,
+                source="clinic_settings",
+                source_key=setting_key,
+                patient_bot_token=patient_bot_token,
+            )
+
+    return {
+        "configured": False,
+        "ready": False,
+        "source": "not_configured",
+        "source_key": None,
+        "separate_staff_bot_token_configured": False,
+        "patient_bot_token_reused": False,
+    }
+
+
+def _build_staff_bot_token_contract(token_status: Dict[str, Any]) -> Dict[str, Any]:
+    configured = bool(token_status.get("configured"))
+    ready = bool(token_status.get("ready"))
+    blocked_by = []
+    if not configured:
+        blocked_by.append("dedicated_staff_bot_token")
+    elif not ready:
+        blocked_by.append("separate_staff_bot_token_configured")
+    return {
+        **STAFF_BOT_TOKEN_CONTRACT,
+        "enabled": ready,
+        "runtime_read_enabled": True,
+        "configured": configured,
+        "ready": ready,
+        "separate_staff_bot_token_configured": ready,
+        "token_returned_to_frontend": False,
+        "patient_bot_token_reused": bool(token_status.get("patient_bot_token_reused")),
+        "patient_bot_transport_unchanged": True,
+        "source": token_status.get("source") or "not_configured",
+        "source_key": token_status.get("source_key"),
+        "accepted_env_keys": list(STAFF_BOT_TOKEN_ENV_KEYS),
+        "accepted_setting_keys": list(STAFF_BOT_TOKEN_SETTING_KEYS),
+        "runtime_blocked_by": blocked_by,
+        "checks": [
+            {
+                "key": "dedicated_staff_bot_token",
+                "ready": configured,
+            },
+            {
+                "key": "separate_staff_bot_token_configured",
+                "ready": ready,
+            },
+            {
+                "key": "token_not_returned_to_frontend",
+                "ready": True,
+            },
+            {
+                "key": "patient_bot_transport_unchanged",
+                "ready": True,
+            },
+        ],
+    }
 
 
 def _get_configured_bot_username(db: Session) -> str | None:
@@ -1269,6 +1400,9 @@ def get_telegram_integration_status(
         config = crud_telegram.get_telegram_config(db)
         bot_token = _get_configured_bot_token(db)
         bot_username = _get_configured_bot_username(db)
+        staff_bot_token_status = _get_staff_bot_token_runtime_status(
+            db, patient_bot_token=bot_token
+        )
         telegram_users = crud_telegram.get_telegram_users(
             db, active_only=False, limit=100000
         )
@@ -1397,7 +1531,7 @@ def get_telegram_integration_status(
                 "results_delivery": "telegram_pdf",
                 "max_pdf_reports_per_request": 3,
             },
-            "staff_bot": _build_staff_bot_status(webhook_set),
+            "staff_bot": _build_staff_bot_status(webhook_set, staff_bot_token_status),
             "transition_path": (
                 "Set webhook when a public HTTPS backend URL is available; "
                 "stop polling before webhook is enabled."
