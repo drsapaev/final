@@ -900,6 +900,19 @@ def _build_staff_role_menu_enablement_contract(
     }
 
 
+def _build_staff_bot_next_slice(token_contract: Dict[str, Any]) -> str:
+    if not token_contract["ready"]:
+        return "dedicated_staff_bot_token_runtime_config"
+
+    pending_domain_keys = STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT.get(
+        "pending_domain_data_command_keys"
+    ) or []
+    if pending_domain_keys:
+        return f"staff_read_only_{pending_domain_keys[0]}_runtime"
+
+    return "staff_read_only_domain_data_runtime_complete"
+
+
 def _build_staff_bot_status(
     webhook_set: bool, staff_bot_token_status: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
@@ -980,11 +993,7 @@ def _build_staff_bot_status(
         ),
         "read_only_menu_contract": STAFF_BOT_READ_ONLY_MENU_CONTRACT,
         "guardrails": STAFF_BOT_GUARDRAILS,
-        "next_slice": (
-            "dedicated_staff_bot_token_runtime_config"
-            if not token_contract["ready"]
-            else "staff_read_only_queue_summary_runtime"
-        ),
+        "next_slice": _build_staff_bot_next_slice(token_contract),
     }
 
 
