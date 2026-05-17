@@ -226,6 +226,7 @@ class TestTelegramBotManagementApiService:
             "today_schedule",
             "emr_reminders",
             "unpaid_invoices",
+            "paid_invoices",
             "payment_status",
             "ready_reports",
             "daily_summary",

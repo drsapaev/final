@@ -519,6 +519,7 @@ QUEUE_STATUS_LABELS_BY_LANGUAGE = {
 PAYMENT_PAID_STATUSES = {"paid", "completed"}
 PAYMENT_PENDING_STATUSES = {"pending", "processing"}
 UNPAID_INVOICE_STATUSES = {"pending", "processing"}
+PAID_INVOICE_STATUSES = {"paid", "completed"}
 LAB_REPORT_READY_STATUSES = {"FINALIZED", "PRINTED"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 
@@ -1174,6 +1175,28 @@ def _staff_unpaid_invoices_message(db: Session) -> str:
     )
 
 
+def _staff_paid_invoices_message(db: Session) -> str:
+    rows = _payment_invoice_status_rows(db)
+    total_count = sum(count for _status, count, _amount in rows)
+    paid_count = sum(
+        count for status, count, _amount in rows if status in PAID_INVOICE_STATUSES
+    )
+    paid_total = sum(
+        (amount for status, _count, amount in rows if status in PAID_INVOICE_STATUSES),
+        Decimal("0"),
+    )
+    return "\n".join(
+        [
+            "Paid invoices",
+            f"Date: {date.today().isoformat()}",
+            f"Invoices today: {total_count}",
+            f"Paid invoices: {paid_count}",
+            f"Paid total: {_format_money(paid_total)}",
+            "Mode: read-only invoice aggregate snapshot",
+        ]
+    )
+
+
 def _staff_payment_status_message(db: Session) -> str:
     rows = _payment_status_rows(db)
     total_count = sum(count for _status, count, _amount in rows)
@@ -1303,6 +1326,8 @@ def _staff_read_only_domain_data_message(
         return _staff_emr_reminders_message(db, user)
     if item_key == "unpaid_invoices":
         return _staff_unpaid_invoices_message(db)
+    if item_key == "paid_invoices":
+        return _staff_paid_invoices_message(db)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":

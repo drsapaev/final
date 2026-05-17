@@ -42,9 +42,9 @@ class TestTelegramStaffBotTokenRuntimeConfig:
             status["role_menu_enablement_contract"][
                 "pending_domain_data_command_keys"
             ][0]
-            == "paid_invoices"
+            == "reconciliation_alerts"
         )
-        assert status["next_slice"] == "staff_read_only_paid_invoices_runtime"
+        assert status["next_slice"] == "staff_read_only_reconciliation_alerts_runtime"
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )
@@ -75,7 +75,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["source_key"] == "STAFF_TELEGRAM_BOT_TOKEN"
         assert contract["enabled"] is True
         assert contract["runtime_blocked_by"] == []
-        assert status["next_slice"] == "staff_read_only_paid_invoices_runtime"
+        assert status["next_slice"] == "staff_read_only_reconciliation_alerts_runtime"
         assert (
             status["command_registration_contract"]["registration_enabled"] is True
         )
