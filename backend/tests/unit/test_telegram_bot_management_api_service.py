@@ -230,6 +230,7 @@ class TestTelegramBotManagementApiService:
             "reconciliation_alerts",
             "payment_status",
             "ready_reports",
+            "pending_reports",
             "daily_summary",
         ]
 

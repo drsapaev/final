@@ -153,6 +153,7 @@ STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS = [
     "reconciliation_alerts",
     "payment_status",
     "ready_reports",
+    "pending_reports",
     "daily_summary",
 ]
 
@@ -589,7 +590,6 @@ STAFF_BOT_ROLE_MENU_ENABLEMENT_CONTRACT = {
     "domain_data_commands_status": "partial",
     "domain_data_command_keys": list(STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS),
     "pending_domain_data_command_keys": [
-        "pending_reports",
         "delivery_status",
         "integration_errors",
         "revenue_summary",
