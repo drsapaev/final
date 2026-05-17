@@ -16,10 +16,11 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 
 ## Skill Routing Policy
 
-Installed repo skills live in `.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
+Installed repo skills live in `.agents/skills`. User-level skills may live under `$HOME/.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
 
 - Codex/Superpowers local SSOT: use `docs/runbooks/CODEX_SUPERPOWERS_GUARD.md` together with this file. The external Superpowers plugin is a manual workflow guard, not repo runtime code, and must not be vendored into this repository.
 - Skill discovery/setup: use `find-skills` only when searching for or installing new skills.
+- Telegram bot work: use `telegram-bot-builder` for Telegram Bot API, command/menu UX, inline keyboards, webhook architecture, and bot interaction design, but only after this file and `agent_gate.py` have established the execution mode, canonical anchors, and first-touch boundaries. Treat the skill as advisory; it must not override DB/Alembic routing, Postgres SSOT, token/security handling, or canonical backend/frontend ownership.
 - Clinic frontend UI/UX: `clinic-frontend-design` is mandatory first for Admin, Doctor, Registrar, Cashier, Lab, dashboard, route view, form, table, empty/loading/error, accessibility, responsive, or visual consistency work.
 - React implementation: use `vercel-react-best-practices` for performance, bundle, data-fetching, and rerender concerns; add `vercel-composition-patterns` when component APIs, contexts, providers, or boolean-prop-heavy components are involved.
 - UI audit: use `web-design-guidelines` only as a secondary accessibility/interface audit after `clinic-frontend-design`; do not let it override clinic workflow readability or the existing design system.
@@ -248,6 +249,10 @@ Telegram:
 
 - Consider both frontend manager files and backend Telegram endpoint/service contracts.
 - Do not infer integration behavior from frontend text alone.
+- Use `telegram-bot-builder` only as a Bot API, bot UX, command/menu, inline keyboard, and webhook design helper after confirming the task is not primarily DB/storage/migration ownership.
+- If a Telegram task mentions Alembic, SQLAlchemy model, table missing, Postgres SSOT, storage migration, create table, link token storage, or revision, apply the DB/Alembic/SQLAlchemy migration guardrail first. The first-touch owner is the new Alembic revision when a table is missing for an existing model.
+- Do not let Telegram bot skill guidance route migration/root-cause work into Telegram status, webhook, endpoint, or UI files.
+- Treat bot tokens, staff link tokens, webhook secrets, and one-time token storage as security-sensitive; do not hardcode secrets, expose tokens in logs, or weaken expiry/single-use guarantees.
 - Keep the first patch slice narrow even for mixed frontend/backend changes.
 
 EMR, Lab, Rollout-sensitive areas:
