@@ -93,6 +93,17 @@ For code changes:
 - For multi-step work, express the implementation as a short goal-driven loop: `step -> verify`, then execute against that loop.
 - If success is not mechanically checkable yet, tighten the validation target before editing instead of coding against a vague goal.
 
+## Dev-Brain Usage Policy
+
+The local dev-brain is an advisory memory, retrieval, guardrail, and evidence layer. It is not an absolute blocker or a replacement for the active model's reasoning.
+
+- Use direct execution for narrow, local, known-root-cause tasks with no risky domain, ownership ambiguity, or canonical/legacy ambiguity.
+- Use dossier-style repo grounding for graph-heavy context building when ownership or SSOT discovery matters but a strict execution gate would be too heavy.
+- Use handoff/gate only for risky execution tasks, multi-file contract changes, or domains listed under Strict Mode Triggers.
+- If `agent_gate.py` misroutes or excludes a confirmed root-cause file, retry at most once with `--known-root-cause`, then use `narrow_override` instead of looping on the gate.
+- Treat repeated gate misroutes as a dev-brain rule bug to fix, not as a reason to keep blocking the product task.
+- Keep durable project memory in concise repo rules, runbooks, evidence logs, and canonical source/test anchors rather than expanding `AGENTS.md` into a full history dump.
+
 ## Execution Mode Selection
 
 Before any execution task, first choose exactly one mode:
