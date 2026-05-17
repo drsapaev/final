@@ -552,6 +552,87 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
+    async def test_staff_reconciliation_alerts_menu_item_returns_safe_aggregate(
+        self, db_session, admin_user, monkeypatch
+    ):
+        admin_user.role = "cashier"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7211, user_id=admin_user.id)
+
+        class FakeReconciliationApiService:
+            def __init__(self, db):
+                self.db = db
+
+            def get_reconciliation_alerts(self, *, threshold):
+                assert threshold == 1000.0
+                return {
+                    "alerts": [
+                        {
+                            "severity": "high",
+                            "provider": "click",
+                            "message": "transaction 123 mismatch",
+                        },
+                        {
+                            "severity": "medium",
+                            "provider": "payme",
+                            "message": "payment 456 missing",
+                        },
+                        {
+                            "severity": "error",
+                            "provider": "kaspi",
+                            "message": "provider secret failed",
+                        },
+                    ],
+                    "alert_count": 3,
+                    "high_severity_count": 1,
+                }
+
+        monkeypatch.setattr(
+            telegram_webhook,
+            "PaymentReconciliationApiService",
+            FakeReconciliationApiService,
+        )
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 211,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7211},
+                "from": {"id": 7211},
+                "text": "reconciliation_alerts",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Reconciliation alerts" in text
+        assert "Alerts: 3" in text
+        assert "High severity: 1" in text
+        assert "Medium severity: 1" in text
+        assert "Error severity: 1" in text
+        assert "Providers: click, kaspi, payme" in text
+        assert "Mode: read-only reconciliation aggregate snapshot" in text
+        assert "transaction 123" not in text
+        assert "payment 456" not in text
+        assert "secret" not in text
+        assert "7211" not in text
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_command_received")
+            .one()
+        )
+        assert audit_log.payload["command_key"] == "staff_menu_item"
+        assert audit_log.payload["menu_item_key"] == "reconciliation_alerts"
+        assert audit_log.payload["read_only"] is True
+        assert audit_log.payload["state_changing_action"] is False
+
+    @pytest.mark.asyncio
     async def test_staff_state_change_command_is_denied_without_domain_mutation(
         self, db_session, admin_user
     ):
