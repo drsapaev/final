@@ -726,6 +726,48 @@ def _record_staff_link_audit(
     )
 
 
+def _record_staff_command_audit(
+    db: Session,
+    *,
+    chat_id: int,
+    request_id: str | None,
+    actor_user_id: int | None,
+    telegram_user_id: int | None,
+    role: str,
+    command_key: str,
+    menu_item_key: str | None = None,
+    result: str = "handled",
+    reason: str | None = None,
+) -> None:
+    payload = {
+        "actor_role": role,
+        "telegram_user_id_hash": _staff_telegram_reference_hash(chat_id),
+        "action_key": "staff_command_received",
+        "target_type": "telegram_user",
+        "target_reference_hash": _staff_telegram_reference_hash(chat_id),
+        "result": result,
+        "timestamp": datetime.utcnow().isoformat(),
+        "request_id": request_id,
+        "command_key": command_key,
+        "read_only": True,
+        "state_changing_action": False,
+        "redacted": True,
+    }
+    if menu_item_key:
+        payload["menu_item_key"] = menu_item_key
+    if reason:
+        payload["reason"] = reason
+
+    crud_audit.log(
+        db,
+        action="staff_command_received",
+        entity_type="telegram_user",
+        entity_id=telegram_user_id,
+        actor_user_id=actor_user_id,
+        payload=payload,
+    )
+
+
 def _staff_read_only_commands() -> set[str]:
     return {
         str(item.get("command") or "").lower()
@@ -788,6 +830,18 @@ def _staff_read_only_item_labels() -> set[str]:
     return labels
 
 
+def _staff_menu_item_for_text(
+    role_menu: Dict[str, Any], text: str
+) -> Dict[str, Any] | None:
+    normalized_text = text.strip().lower()
+    for item in role_menu.get("items", []):
+        label = str(item.get("label") or "").strip().lower()
+        key = str(item.get("key") or "").strip().lower()
+        if normalized_text in {label, key}:
+            return item
+    return None
+
+
 def _linked_staff_for_chat(
     db: Session, chat_id: int
 ) -> tuple[TelegramUser | None, User | None, Dict[str, Any] | None]:
@@ -813,6 +867,8 @@ async def _handle_staff_read_only_menu(
     if chat_id is None:
         return False
 
+    update_id = update.get("update_id")
+    request_id = f"telegram-update:{update_id}" if update_id is not None else None
     text = _message_text(message)
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
     normalized_text = text.lower()
@@ -829,6 +885,18 @@ async def _handle_staff_read_only_menu(
     _telegram_user, user, role_menu = _linked_staff_for_chat(db, chat_id)
     if not user:
         if command in {"/staff", "/menu"}:
+            _record_staff_command_audit(
+                db,
+                chat_id=chat_id,
+                request_id=request_id,
+                actor_user_id=None,
+                telegram_user_id=getattr(_telegram_user, "id", None),
+                role="unlinked",
+                command_key=command,
+                result="denied",
+                reason="staff_not_linked",
+            )
+            db.commit()
             await bot_service._send_message(
                 chat_id,
                 TELEGRAM_STAFF_MENU_UNLINKED_MESSAGE,
@@ -838,6 +906,19 @@ async def _handle_staff_read_only_menu(
         return False
 
     if not role_menu:
+        if user:
+            _record_staff_command_audit(
+                db,
+                chat_id=chat_id,
+                request_id=request_id,
+                actor_user_id=int(user.id),
+                telegram_user_id=getattr(_telegram_user, "id", None),
+                role=_normalize_staff_role(getattr(user, "role", None)),
+                command_key=command if command.startswith("/") else "staff_menu_item",
+                result="denied",
+                reason="role_not_allowed",
+            )
+            db.commit()
         await bot_service._send_message(
             chat_id,
             TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE,
@@ -847,6 +928,17 @@ async def _handle_staff_read_only_menu(
 
     menu = _staff_menu_keyboard(role_menu)
     if command in {"/start", "/staff", "/help", "/menu"}:
+        _record_staff_command_audit(
+            db,
+            chat_id=chat_id,
+            request_id=request_id,
+            actor_user_id=int(user.id),
+            telegram_user_id=getattr(_telegram_user, "id", None),
+            role=_normalize_staff_role(getattr(user, "role", None)),
+            command_key=command,
+            menu_item_key="staff_menu",
+        )
+        db.commit()
         await bot_service._send_message(
             chat_id,
             _staff_menu_message(user, role_menu),
@@ -854,6 +946,19 @@ async def _handle_staff_read_only_menu(
         )
         return True
 
+    menu_item = _staff_menu_item_for_text(role_menu, text)
+    command_key = command if command in read_only_commands else "staff_menu_item"
+    _record_staff_command_audit(
+        db,
+        chat_id=chat_id,
+        request_id=request_id,
+        actor_user_id=int(user.id),
+        telegram_user_id=getattr(_telegram_user, "id", None),
+        role=_normalize_staff_role(getattr(user, "role", None)),
+        command_key=command_key,
+        menu_item_key=str(menu_item.get("key")) if menu_item else None,
+    )
+    db.commit()
     await bot_service._send_message(
         chat_id,
         TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE,

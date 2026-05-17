@@ -197,8 +197,11 @@ class TestTelegramBotManagementApiService:
         assert status["role_linking"]["runtime_handler_enabled"] is True
         assert status["authorization"]["ready"] is True
         assert status["authorization"]["runtime_read_only_enabled"] is True
-        assert status["audit"]["ready"] is False
+        assert status["audit"]["ready"] is True
         assert status["audit"]["linking_events_ready"] is True
+        assert status["audit"]["staff_command_events_ready"] is True
+        assert status["audit"]["read_only_menu_events_ready"] is True
+        assert status["audit"]["state_change_events_ready"] is False
         assert status["role_menus"]["read_only"] is True
         assert status["role_menus"]["runtime_enabled"] is True
         assert status["role_menus"]["state_changing_actions_enabled"] is False
@@ -265,10 +268,19 @@ class TestTelegramBotManagementApiService:
             is False
         )
         assert status["audit_contract"]["record_writer_enabled"] is True
+        assert status["audit_contract"]["runtime_read_only_enabled"] is True
         assert "staff_link_created" in status["audit_contract"]["recorded_event_types"]
         assert (
             "staff_link_token_rejected"
             in status["audit_contract"]["recorded_event_types"]
+        )
+        assert (
+            "staff_command_received"
+            in status["audit_contract"]["recorded_event_types"]
+        )
+        assert (
+            "staff_command_received"
+            not in status["audit_contract"]["pending_event_types"]
         )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):

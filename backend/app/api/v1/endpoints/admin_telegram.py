@@ -70,7 +70,7 @@ STAFF_BOT_READINESS = [
     {
         "key": "audit_logging",
         "label": "Аудит действий сотрудников",
-        "ready": False,
+        "ready": True,
     },
     {
         "key": "state_change_confirmations",
@@ -280,9 +280,7 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     "handler_enabled": True,
     "storage_migration_required": False,
     "storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
-    "runtime_blocked_by": [
-        "staff_audit_logging_runtime",
-    ],
+    "runtime_blocked_by": [],
     "required_before_enablement": True,
     "token_format": "stl_<user_id>_<chat_id>_<expires_at>_<nonce>_<signature>",
     "builder": "build_staff_link_start_token",
@@ -469,14 +467,17 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
 
 STAFF_BOT_AUDIT_CONTRACT = {
     "contract_version": "staff-audit-v1",
-    "enabled": False,
+    "enabled": True,
     "record_writer_enabled": True,
+    "runtime_read_only_enabled": True,
+    "read_only_menu_events_enabled": True,
+    "state_change_events_enabled": False,
     "recorded_event_types": [
         "staff_link_created",
         "staff_link_token_rejected",
+        "staff_command_received",
     ],
     "pending_event_types": [
-        "staff_command_received",
         "staff_action_confirmation_requested",
         "staff_action_confirmed",
         "staff_action_denied",
@@ -529,6 +530,7 @@ STAFF_BOT_AUDIT_CONTRACT = {
     "redaction_rules": [
         "no_bot_tokens",
         "no_raw_telegram_payload",
+        "no_raw_staff_command_text",
         "no_plain_medical_details",
         "no_raw_internal_identifiers_in_chat_text",
     ],
@@ -898,8 +900,11 @@ def _build_staff_bot_status(
         },
         "audit": {
             "required": True,
-            "ready": False,
+            "ready": True,
             "linking_events_ready": True,
+            "staff_command_events_ready": True,
+            "read_only_menu_events_ready": True,
+            "state_change_events_ready": False,
         },
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
@@ -912,7 +917,7 @@ def _build_staff_bot_status(
         "next_slice": (
             "dedicated_staff_bot_token_runtime_config"
             if not token_contract["ready"]
-            else "staff_audit_logging_runtime"
+            else "staff_state_change_confirmation_runtime"
         ),
     }
 
