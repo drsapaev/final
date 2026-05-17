@@ -193,8 +193,11 @@ class TestTelegramBotManagementApiService:
 
         assert status["enabled"] is False
         assert status["state_changing_actions_enabled"] is False
+        assert status["role_linking"]["enabled"] is True
+        assert status["role_linking"]["runtime_handler_enabled"] is True
         assert status["authorization"]["ready"] is False
         assert status["audit"]["ready"] is False
+        assert status["audit"]["linking_events_ready"] is True
         assert status["role_menus"]["read_only"] is True
         assert status["role_menus"]["runtime_enabled"] is False
 
@@ -216,7 +219,7 @@ class TestTelegramBotManagementApiService:
         status = admin_telegram._build_staff_bot_status(webhook_set=webhook_set)
 
         assert status["transport"] == expected_transport
-        assert status["next_slice"] == "staff_bot_runtime_handler_enablement"
+        assert status["next_slice"] == "dedicated_staff_bot_token_runtime_config"
         assert status["supported_roles"] == admin_telegram.STAFF_BOT_SUPPORTED_ROLES
         assert status["read_only_menu_contract"] == (
             admin_telegram.STAFF_BOT_READ_ONLY_MENU_CONTRACT
@@ -240,6 +243,15 @@ class TestTelegramBotManagementApiService:
         assert status["link_token_validation_contract"]["storage_contract"] == (
             status["link_token_storage_contract"]
         )
+        assert status["linking_contract"]["enabled"] is True
+        assert (
+            status["linking_runtime_contract"]["runtime_handler"]
+            == "_handle_staff_link_start"
+        )
+        assert status["linking_runtime_contract"]["runtime_handler_enabled"] is True
+        assert "audit_logs" in status["linking_runtime_contract"]["writes"]
+        assert status["link_token_validation_contract"]["enabled"] is True
+        assert status["link_token_validation_contract"]["handler_enabled"] is True
         assert (
             status["link_token_validation_contract"]["single_use_enforcement_enabled"]
             is True
@@ -248,6 +260,12 @@ class TestTelegramBotManagementApiService:
         assert (
             status["link_token_validation_contract"]["storage_migration_required"]
             is False
+        )
+        assert status["audit_contract"]["record_writer_enabled"] is True
+        assert "staff_link_created" in status["audit_contract"]["recorded_event_types"]
+        assert (
+            "staff_link_token_rejected"
+            in status["audit_contract"]["recorded_event_types"]
         )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):

@@ -2,6 +2,7 @@
 Webhook endpoint для обработки входящих сообщений от Telegram
 """
 
+import hashlib
 import html
 import logging
 from datetime import date, datetime
@@ -12,6 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.v1.endpoints.admin_telegram import (
+    STAFF_LINK_TOKEN_PREFIX,
+    STAFF_LINK_TOKEN_SEPARATOR,
+    validate_staff_link_start_token,
+)
+from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
 from app.models.lab import LabReportInstance
@@ -45,6 +52,19 @@ TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE = (
     "Не удалось привязать Telegram к чеку. "
     "Попробуйте открыть QR еще раз."
 )
+TELEGRAM_STAFF_LINKED_MESSAGE = (
+    "Telegram привязан к учетной записи сотрудника. "
+    "Staff-команды пока не включены: действия выполняются только в приложении."
+)
+TELEGRAM_STAFF_LINK_REJECTED_MESSAGE = (
+    "Ссылка привязки сотрудника недействительна или уже использована. "
+    "Запросите новую ссылку у администратора."
+)
+TELEGRAM_STAFF_LINK_FAILED_MESSAGE = (
+    "Не удалось привязать Telegram сотрудника. "
+    "Попробуйте открыть ссылку еще раз или обратитесь к администратору."
+)
+TELEGRAM_STAFF_LINK_REPLY_MARKUP = {"remove_keyboard": True}
 TELEGRAM_SHARE_CONTACT_MESSAGE = (
     "Чтобы привязать Telegram к карте пациента, нажмите кнопку "
     "\"Поделиться номером\". Номер должен совпадать с номером в регистратуре."
@@ -485,6 +505,27 @@ def _extract_ticket_qr_start_payload(
     return payload, message
 
 
+def _extract_staff_link_start_payload(
+    update: Dict[str, Any],
+) -> tuple[str, Dict[str, Any]] | None:
+    message = update.get("message") or {}
+    text = str(message.get("text") or "").strip()
+    parts = text.split(maxsplit=1)
+    if len(parts) != 2:
+        return None
+
+    command = parts[0].split("@", 1)[0].lower()
+    payload = parts[1].strip()
+    if command != "/start":
+        return None
+
+    staff_prefix = f"{STAFF_LINK_TOKEN_PREFIX}{STAFF_LINK_TOKEN_SEPARATOR}"
+    if not payload.startswith(staff_prefix):
+        return None
+
+    return payload, message
+
+
 def _normalize_patient_language(language_code: Any) -> str:
     value = str(language_code or "").strip().lower().replace("_", "-")
     if value in {"uz", "uz-latn", "uzbek", "o'zbekcha", "ozbekcha"} or value.startswith("uz-"):
@@ -588,6 +629,91 @@ def _upsert_ticket_qr_telegram_user(
     db.flush()
 
 
+def _staff_telegram_reference_hash(chat_id: int) -> str:
+    digest = hashlib.sha256(f"staff-telegram-chat:{chat_id}".encode("utf-8")).hexdigest()
+    return f"telegram_chat:{digest[:24]}"
+
+
+def _upsert_staff_link_telegram_user(
+    db: Session,
+    message: Dict[str, Any],
+    *,
+    linked_user_id: int,
+) -> TelegramUser | None:
+    chat = message.get("chat") or {}
+    from_user = message.get("from") or {}
+    chat_id = chat.get("id")
+    if chat_id is None:
+        return None
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, int(chat_id))
+    payload = {
+        "user_id": linked_user_id,
+        "username": from_user.get("username"),
+        "first_name": from_user.get("first_name"),
+        "last_name": from_user.get("last_name"),
+        "active": True,
+        "blocked": False,
+        "last_activity": datetime.utcnow(),
+    }
+
+    if telegram_user:
+        for field, value in payload.items():
+            if hasattr(telegram_user, field):
+                setattr(telegram_user, field, value)
+        db.flush()
+        return telegram_user
+
+    telegram_user = TelegramUser(
+        **payload,
+        chat_id=int(chat_id),
+        language_code=_normalize_patient_language(
+            from_user.get("language_code") or TELEGRAM_LANGUAGE_RU
+        ),
+        notifications_enabled=False,
+        appointment_reminders=False,
+        lab_notifications=False,
+    )
+    db.add(telegram_user)
+    db.flush()
+    return telegram_user
+
+
+def _record_staff_link_audit(
+    db: Session,
+    *,
+    action: str,
+    chat_id: int,
+    request_id: str | None,
+    actor_user_id: int | None = None,
+    telegram_user_id: int | None = None,
+    role: str | None = None,
+    reason: str | None = None,
+) -> None:
+    result = "success" if action == "staff_link_created" else "rejected"
+    payload = {
+        "actor_role": role,
+        "telegram_user_id_hash": _staff_telegram_reference_hash(chat_id),
+        "action_key": action,
+        "target_type": "telegram_user",
+        "target_reference_hash": _staff_telegram_reference_hash(chat_id),
+        "result": result,
+        "timestamp": datetime.utcnow().isoformat(),
+        "request_id": request_id,
+    }
+    if reason:
+        payload["reason"] = reason
+
+    crud_audit.log(
+        db,
+        action=action,
+        entity_type="telegram_user",
+        entity_id=telegram_user_id,
+        actor_user_id=actor_user_id,
+        payload=payload,
+    )
+
+
 async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_service) -> bool:
     extracted = _extract_ticket_qr_start_payload(update)
     if not extracted:
@@ -635,6 +761,90 @@ async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_servi
 
     return True
 
+
+async def _handle_staff_link_start(
+    update: Dict[str, Any], db: Session, bot_service
+) -> bool:
+    extracted = _extract_staff_link_start_payload(update)
+    if not extracted:
+        return False
+
+    token, message = extracted
+    chat_id = _message_chat_id(message)
+    if chat_id is None:
+        return True
+
+    update_id = update.get("update_id")
+    request_id = f"telegram-update:{update_id}" if update_id is not None else None
+
+    try:
+        validation = validate_staff_link_start_token(
+            db, token, telegram_chat_id=chat_id
+        )
+        if not validation.get("valid"):
+            logger.info(
+                "Telegram staff link token rejected reason=%s",
+                validation.get("reason"),
+            )
+            _record_staff_link_audit(
+                db,
+                action="staff_link_token_rejected",
+                chat_id=chat_id,
+                request_id=request_id,
+                reason=str(validation.get("reason") or "invalid"),
+            )
+            db.commit()
+            await bot_service._send_message(
+                chat_id,
+                TELEGRAM_STAFF_LINK_REJECTED_MESSAGE,
+                TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+            )
+            return True
+
+        linked_user = _upsert_staff_link_telegram_user(
+            db,
+            message,
+            linked_user_id=int(validation["user_id"]),
+        )
+        if not linked_user:
+            logger.warning("Telegram staff link failed because chat row was missing")
+            await bot_service._send_message(
+                chat_id,
+                TELEGRAM_STAFF_LINK_FAILED_MESSAGE,
+                TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+            )
+            return True
+
+        role = validation.get("role") or "staff"
+        _record_staff_link_audit(
+            db,
+            action="staff_link_created",
+            chat_id=chat_id,
+            request_id=request_id,
+            actor_user_id=int(validation["user_id"]),
+            telegram_user_id=getattr(linked_user, "id", None),
+            role=str(role),
+        )
+        db.commit()
+        logger.info("Telegram staff link created role=%s", role)
+        await bot_service._send_message(
+            chat_id,
+            f"{TELEGRAM_STAFF_LINKED_MESSAGE}\nРоль: {role}",
+            TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+        )
+        return True
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "Telegram staff link handler failed error_type=%s",
+            type(exc).__name__,
+        )
+        await bot_service._send_message(
+            chat_id,
+            TELEGRAM_STAFF_LINK_FAILED_MESSAGE,
+            TELEGRAM_STAFF_LINK_REPLY_MARKUP,
+        )
+        return True
 
 def _message_from_update(update: Dict[str, Any]) -> Dict[str, Any]:
     return update.get("message") or {}
@@ -1403,12 +1613,16 @@ async def _handle_clinic_bot_update(
         return await dispatch(
             update,
             db,
+            staff_start_handler=_handle_staff_link_start,
             ticket_start_handler=_handle_ticket_qr_start,
             contact_handler=_handle_contact_link,
             start_handler=start_handler,
             command_handlers=command_handlers,
             text_handlers=text_handlers,
         )
+
+    if await _handle_staff_link_start(update, db, bot_service):
+        return True
 
     if await _handle_ticket_qr_start(update, db, bot_service):
         return True
