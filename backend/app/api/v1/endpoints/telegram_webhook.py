@@ -41,6 +41,9 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import LabReportingService
+from app.services.payment_reconciliation_api_service import (
+    PaymentReconciliationApiService,
+)
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.visit_confirmation_service import (
     TELEGRAM_TICKET_QR_PREFIX,
@@ -520,6 +523,7 @@ PAYMENT_PAID_STATUSES = {"paid", "completed"}
 PAYMENT_PENDING_STATUSES = {"pending", "processing"}
 UNPAID_INVOICE_STATUSES = {"pending", "processing"}
 PAID_INVOICE_STATUSES = {"paid"}
+RECONCILIATION_ALERT_THRESHOLD = Decimal("1000")
 LAB_REPORT_READY_STATUSES = {"FINALIZED", "PRINTED"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 
@@ -1197,6 +1201,43 @@ def _staff_paid_invoices_message(db: Session) -> str:
     )
 
 
+def _staff_reconciliation_alerts_message(db: Session) -> str:
+    result = PaymentReconciliationApiService(db).get_reconciliation_alerts(
+        threshold=float(RECONCILIATION_ALERT_THRESHOLD)
+    )
+    alerts = result.get("alerts") or []
+    severity_counts = {
+        "error": sum(1 for alert in alerts if alert.get("severity") == "error"),
+        "high": int(
+            result.get("high_severity_count")
+            or sum(1 for alert in alerts if alert.get("severity") == "high")
+        ),
+        "medium": sum(1 for alert in alerts if alert.get("severity") == "medium"),
+    }
+    providers = sorted(
+        {
+            str(alert.get("provider") or "unknown")
+            for alert in alerts
+            if alert.get("provider")
+        }
+    )
+    provider_summary = ", ".join(providers[:3]) if providers else "none"
+    if len(providers) > 3:
+        provider_summary = f"{provider_summary} +{len(providers) - 3}"
+    return "\n".join(
+        [
+            "Reconciliation alerts",
+            f"Date: {date.today().isoformat()}",
+            f"Alerts: {int(result.get('alert_count') or len(alerts))}",
+            f"High severity: {severity_counts['high']}",
+            f"Medium severity: {severity_counts['medium']}",
+            f"Error severity: {severity_counts['error']}",
+            f"Providers: {provider_summary}",
+            "Mode: read-only reconciliation aggregate snapshot",
+        ]
+    )
+
+
 def _staff_payment_status_message(db: Session) -> str:
     rows = _payment_status_rows(db)
     total_count = sum(count for _status, count, _amount in rows)
@@ -1328,6 +1369,8 @@ def _staff_read_only_domain_data_message(
         return _staff_unpaid_invoices_message(db)
     if item_key == "paid_invoices":
         return _staff_paid_invoices_message(db)
+    if item_key == "reconciliation_alerts":
+        return _staff_reconciliation_alerts_message(db)
     if item_key == "payment_status":
         return _staff_payment_status_message(db)
     if item_key == "ready_reports":
