@@ -54,7 +54,6 @@ async def send_appointment_reminder(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone,
             }
 
         # Получаем сервис бота
@@ -92,8 +91,6 @@ async def send_appointment_reminder(
             return {
                 "success": True,
                 "message": "Напоминание отправлено",
-                "chat_id": telegram_user.chat_id,
-                "patient": patient.full_name,
                 "appointment_id": appointment.id,
             }
         else:
