@@ -293,6 +293,59 @@ class TestTelegramWebhookSecurity:
         assert log.status == "sent"
 
     @pytest.mark.asyncio
+    async def test_plain_uzbek_button_switches_next_visible_menu(self, db_session):
+        fake_service = FakeTelegramBotService(active=True)
+        language_update = {
+            "update_id": 120,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7020},
+                "from": {"id": 111, "language_code": "ru"},
+                "text": "O'zbekcha",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            language_update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7020)
+            .one()
+        )
+        assert telegram_user.language_code == "uz-Latn"
+        assert fake_service._send_message.await_args.args[1] == (
+            telegram_webhook._localized_text("language_selected", "uz-Latn")
+        )
+        assert fake_service._send_message.await_args.args[2] == (
+            telegram_webhook._localized_main_menu("uz-Latn")
+        )
+
+        fake_service._send_message.reset_mock()
+        help_update = {
+            "update_id": 121,
+            "message": {
+                "message_id": 2,
+                "chat": {"id": 7020},
+                "from": {"id": 111, "language_code": "ru"},
+                "text": "Yordam",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            help_update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            7020,
+            telegram_webhook._localized_text("help", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+
+    @pytest.mark.asyncio
     async def test_language_choice_preserves_existing_notification_consent(
         self, db_session
     ):
