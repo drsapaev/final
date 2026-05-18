@@ -20,6 +20,29 @@ class TestTelegramStaffBotTokenRuntimeConfig:
             SimpleNamespace(model_config={}),
         )
 
+    def test_admin_settings_masks_patient_bot_token_without_length_leak(
+        self, db_session
+    ):
+        secret_value = "123456789:patient-bot-secret-value"
+        db_session.add(
+            ClinicSettings(
+                key="bot_token",
+                value=secret_value,
+                category="telegram",
+            )
+        )
+        db_session.commit()
+
+        response = admin_telegram.get_telegram_settings(
+            db_session,
+            SimpleNamespace(id=1),
+        )
+
+        assert response["bot_token"] != secret_value
+        assert response["bot_token_masked"]
+        assert "bot_token_length" not in response
+        assert secret_value not in str(response)
+
     def test_reads_env_without_exposing_secret(self, monkeypatch, db_session):
         secret_value = "999999:staff-secret"
         self._clear_staff_bot_token_sources(monkeypatch)
