@@ -6,7 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from app.api.v1.endpoints import admin_telegram
-from app.models.telegram_config import TelegramStaffLinkToken
+from app.models.telegram_config import (
+    TelegramStaffConfirmationToken,
+    TelegramStaffLinkToken,
+)
 from app.services.telegram_staff_link_token_service import (
     TelegramStaffLinkTokenService,
 )
@@ -188,6 +191,113 @@ class TestTelegramBotManagementApiService:
             in constraint_names
         )
 
+    def test_staff_confirmation_token_storage_contract_matches_model_columns(self):
+        contract = admin_telegram.STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffConfirmationToken.__table__
+
+        assert table.name == contract["table"]
+        assert contract["enabled"] is True
+        assert contract["migration_created"] is True
+        assert contract["model_registered"] is True
+        assert contract["runtime_write_enabled"] is False
+        assert contract["runtime_consume_enabled"] is False
+        assert contract["migration_revision"] == "0026_tg_staff_confirm_tokens"
+        assert list(table.columns.keys()) == contract["columns"]
+        assert contract["raw_token_storage_allowed"] is False
+        assert "raw_token" not in table.columns
+        assert "token" not in table.columns
+        assert table.c.token_hash.unique is True
+        assert table.c.token_hash.nullable is False
+        assert table.c.staff_user_id.nullable is False
+        assert table.c.telegram_chat_id.nullable is False
+        assert table.c.operation_key.nullable is False
+        assert table.c.action_payload_hash.nullable is False
+        assert table.c.expires_at.nullable is False
+
+        staff_fk = next(iter(table.c.staff_user_id.foreign_keys))
+        assert staff_fk.target_fullname == "users.id"
+        assert staff_fk.ondelete == "CASCADE"
+
+    def test_staff_confirmation_token_storage_model_has_required_indexes(self):
+        contract = admin_telegram.STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffConfirmationToken.__table__
+
+        assert "unique(token_hash)" in contract["required_indexes"]
+        assert "index(staff_user_id)" in contract["required_indexes"]
+        assert "index(telegram_chat_id)" in contract["required_indexes"]
+        assert "index(operation_key)" in contract["required_indexes"]
+        assert (
+            "partial_index(expires_at) where consumed_at is null"
+            in contract["required_indexes"]
+        )
+
+        indexes_by_name = {index.name: index for index in table.indexes}
+        assert indexes_by_name[
+            "ix_telegram_staff_confirmation_tokens_token_hash"
+        ].unique
+        assert [
+            column.name
+            for column in indexes_by_name[
+                "ix_telegram_staff_confirmation_tokens_staff_user_id"
+            ].columns
+        ] == ["staff_user_id"]
+        assert [
+            column.name
+            for column in indexes_by_name[
+                "ix_telegram_staff_confirmation_tokens_telegram_chat_id"
+            ].columns
+        ] == ["telegram_chat_id"]
+        assert [
+            column.name
+            for column in indexes_by_name[
+                "ix_telegram_staff_confirmation_tokens_operation_key"
+            ].columns
+        ] == ["operation_key"]
+
+        partial_index = indexes_by_name[
+            "ix_telegram_staff_confirmation_tokens_unconsumed_expires"
+        ]
+        assert [column.name for column in partial_index.columns] == ["expires_at"]
+        assert (
+            str(partial_index.dialect_options["postgresql"]["where"]).lower()
+            == "consumed_at is null"
+        )
+
+    def test_staff_confirmation_token_storage_model_has_required_constraints(self):
+        contract = admin_telegram.STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT
+        table = TelegramStaffConfirmationToken.__table__
+
+        assert "expires_at > created_at" in contract["required_constraints"]
+        assert (
+            "consumed_at is null or consumed_at <= expires_at"
+            in contract["required_constraints"]
+        )
+        assert "operation_key is not empty" in contract["required_constraints"]
+        assert "action_payload_hash is not empty" in contract["required_constraints"]
+        assert "staff_user_id references users(id)" in contract[
+            "required_constraints"
+        ]
+
+        constraint_names = {
+            constraint.name for constraint in table.constraints if constraint.name
+        }
+        assert (
+            "ck_telegram_staff_confirmation_tokens_expires_after_created"
+            in constraint_names
+        )
+        assert (
+            "ck_telegram_staff_confirmation_tokens_consumed_before_expiry"
+            in constraint_names
+        )
+        assert (
+            "ck_telegram_staff_confirmation_tokens_operation_not_empty"
+            in constraint_names
+        )
+        assert (
+            "ck_telegram_staff_confirmation_tokens_payload_hash_not_empty"
+            in constraint_names
+        )
+
     def test_staff_bot_status_remains_disabled_until_readiness_gates(self):
         status = admin_telegram._build_staff_bot_status(webhook_set=False)
 
@@ -262,6 +372,7 @@ class TestTelegramBotManagementApiService:
             "linking_runtime_contract",
             "link_token_validation_contract",
             "link_token_storage_contract",
+            "confirmation_token_storage_contract",
             "authorization_contract",
             "command_registration_contract",
             "confirmation_contract",
@@ -273,6 +384,12 @@ class TestTelegramBotManagementApiService:
         )
         assert status["link_token_validation_contract"]["storage_contract"] == (
             status["link_token_storage_contract"]
+        )
+        assert status["confirmation_token_storage_contract"] == (
+            admin_telegram.STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT
+        )
+        assert status["confirmation_contract"]["token_storage_contract"] == (
+            status["confirmation_token_storage_contract"]
         )
         assert status["linking_contract"]["enabled"] is True
         assert (

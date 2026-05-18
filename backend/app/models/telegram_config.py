@@ -215,6 +215,86 @@ class TelegramStaffLinkToken(Base):
     )
 
 
+class TelegramStaffConfirmationToken(Base):
+    """Hash-only storage shape for one-time staff action confirmation tokens."""
+
+    __tablename__ = "telegram_staff_confirmation_tokens"
+    __table_args__ = (
+        CheckConstraint(
+            "expires_at > created_at",
+            name="ck_telegram_staff_confirmation_tokens_expires_after_created",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR consumed_at <= expires_at",
+            name="ck_telegram_staff_confirmation_tokens_consumed_before_expiry",
+        ),
+        CheckConstraint(
+            "operation_key <> ''",
+            name="ck_telegram_staff_confirmation_tokens_operation_not_empty",
+        ),
+        CheckConstraint(
+            "action_payload_hash <> ''",
+            name="ck_telegram_staff_confirmation_tokens_payload_hash_not_empty",
+        ),
+        Index(
+            "ix_telegram_staff_confirmation_tokens_staff_user_id",
+            "staff_user_id",
+        ),
+        Index(
+            "ix_telegram_staff_confirmation_tokens_telegram_chat_id",
+            "telegram_chat_id",
+        ),
+        Index(
+            "ix_telegram_staff_confirmation_tokens_operation_key",
+            "operation_key",
+        ),
+        Index(
+            "ix_telegram_staff_confirmation_tokens_unconsumed_expires",
+            "expires_at",
+            postgresql_where=text("consumed_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    token_hash: Mapped[str] = mapped_column(
+        String(96), unique=True, nullable=False, index=True
+    )
+    staff_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    telegram_chat_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    operation_key: Mapped[str] = mapped_column(String(96), nullable=False)
+    command_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action_payload_hash: Mapped[str] = mapped_column(String(96), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    target_reference_hash: Mapped[str | None] = mapped_column(
+        String(96), nullable=True
+    )
+    idempotency_key_hash: Mapped[str | None] = mapped_column(
+        String(96), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    staff_user: Mapped[User] = relationship("User", foreign_keys=[staff_user_id])
+
+
 class TelegramMessage(Base):
     """Лог отправленных сообщений"""
 

@@ -331,6 +331,54 @@ STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT = {
     ],
 }
 
+STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT = {
+    "contract_version": "staff-confirmation-token-storage-v1",
+    "enabled": True,
+    "migration_created": True,
+    "model_registered": True,
+    "runtime_write_enabled": False,
+    "runtime_consume_enabled": False,
+    "table": "telegram_staff_confirmation_tokens",
+    "raw_token_storage_allowed": False,
+    "migration_revision": "0026_tg_staff_confirm_tokens",
+    "repository": None,
+    "service": None,
+    "columns": [
+        "id",
+        "token_hash",
+        "staff_user_id",
+        "telegram_chat_id",
+        "operation_key",
+        "command_key",
+        "action_payload_hash",
+        "target_type",
+        "target_reference_hash",
+        "idempotency_key_hash",
+        "expires_at",
+        "consumed_at",
+        "created_at",
+        "request_id",
+    ],
+    "required_indexes": [
+        "unique(token_hash)",
+        "index(staff_user_id)",
+        "index(telegram_chat_id)",
+        "index(operation_key)",
+        "partial_index(expires_at) where consumed_at is null",
+    ],
+    "required_constraints": [
+        "expires_at > created_at",
+        "consumed_at is null or consumed_at <= expires_at",
+        "operation_key is not empty",
+        "action_payload_hash is not empty",
+        "staff_user_id references users(id)",
+    ],
+    "retention_policy": {
+        "expired_token_ttl_days": 7,
+        "consumed_token_ttl_days": 30,
+    },
+}
+
 STAFF_BOT_AUTHORIZATION_CONTRACT = {
     "contract_version": "staff-authorization-v1",
     "enabled": True,
@@ -443,6 +491,7 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     "state_changing_actions_enabled": False,
     "confirmation_window_seconds": 120,
     "default_state_change_decision": "deny_until_explicit_confirmation_runtime",
+    "token_storage_contract": STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT,
     "operations": [
         {
             "key": "queue_call_or_skip_patient",
@@ -956,6 +1005,9 @@ def _build_staff_bot_status(
         "linking_runtime_contract": STAFF_BOT_LINKING_RUNTIME_CONTRACT,
         "link_token_validation_contract": STAFF_BOT_LINK_TOKEN_VALIDATION_CONTRACT,
         "link_token_storage_contract": STAFF_BOT_LINK_TOKEN_STORAGE_CONTRACT,
+        "confirmation_token_storage_contract": (
+            STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT
+        ),
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": command_registration_contract,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
