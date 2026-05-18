@@ -131,9 +131,10 @@ TELEGRAM_NEEDS_LINK_MESSAGE = (
 TELEGRAM_MAIN_MENU = {
     "keyboard": [
         [{"text": "📱 Поделиться номером", "request_contact": True}],
-        [{"text": "🎫 Моя очередь"}, {"text": "💳 Оплаты и долг"}],
-        [{"text": "👤 Мой статус"}, {"text": "📄 Результаты"}],
-        [{"text": "⚙️ Настройки"}, {"text": "❓ Помощь"}],
+        [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
+        [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
+        [{"text": "👤 Мой статус"}, {"text": "⚙️ Настройки"}],
+        [{"text": "❓ Помощь"}],
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False,
@@ -162,9 +163,10 @@ TELEGRAM_MAIN_MENUS = {
     TELEGRAM_LANGUAGE_UZ: {
         "keyboard": [
             [{"text": "📱 Telefon raqamni ulashish", "request_contact": True}],
-            [{"text": "🎫 Mening navbatim"}, {"text": "💳 To'lovlar va qarz"}],
-            [{"text": "👤 Mening holatim"}, {"text": "📄 Natijalar"}],
-            [{"text": "⚙️ Sozlamalar"}, {"text": "❓ Yordam"}],
+            [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
+            [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
+            [{"text": "👤 Mening holatim"}, {"text": "⚙️ Sozlamalar"}],
+            [{"text": "❓ Yordam"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -175,7 +177,8 @@ TELEGRAM_SETTINGS_MENUS = {
         "keyboard": [
             [{"text": "🇷🇺 Русский"}, {"text": "🇺🇿 O'zbekcha"}],
             [{"text": "🔔 Разрешить уведомления"}, {"text": "🔕 Без уведомлений"}],
-            [{"text": "🎫 Моя очередь"}, {"text": "❓ Помощь"}],
+            [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
+            [{"text": "❓ Помощь"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -184,7 +187,8 @@ TELEGRAM_SETTINGS_MENUS = {
         "keyboard": [
             [{"text": "🇷🇺 Русский"}, {"text": "🇺🇿 O'zbekcha"}],
             [{"text": "🔔 Xabarnomalarga roziman"}, {"text": "🔕 Xabarnomasiz"}],
-            [{"text": "🎫 Mening navbatim"}, {"text": "❓ Yordam"}],
+            [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
+            [{"text": "❓ Yordam"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -288,11 +292,12 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Kosmed Clinic bot\n\n"
             "Для пациента:\n"
             "🎫 Моя очередь - номер, кабинет, статус и позиция ожидания.\n"
+            "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
             "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
             "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
             "⚙️ Настройки - язык и уведомления.\n\n"
-            "Команды: /start, /queue, /payments, /results, /profile, /settings.\n\n"
+            "Команды: /start, /queue, /visits, /payments, /results, /profile, /settings, /help.\n\n"
             "Для привязки отсканируйте QR с чека или нажмите "
             "\"Поделиться номером\".\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
@@ -303,11 +308,12 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Kosmed Clinic bot\n\n"
             "Bemor uchun:\n"
             "🎫 Mening navbatim - raqam, kabinet, holat va kutishdagi o'rin.\n"
+            "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
             "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
             "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
             "⚙️ Sozlamalar - til va xabarnomalar.\n\n"
-            "Buyruqlar: /start, /queue, /payments, /results, /profile, /settings.\n\n"
+            "Buyruqlar: /start, /queue, /visits, /payments, /results, /profile, /settings, /help.\n\n"
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
@@ -392,6 +398,26 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "recent_visit_summary": {
         TELEGRAM_LANGUAGE_RU: "Последний визит: #{visit_id}, {visit_date}, статус: {status}.",
         TELEGRAM_LANGUAGE_UZ: "Oxirgi tashrif: #{visit_id}, {visit_date}, holat: {status}.",
+    },
+    "visits_empty": {
+        TELEGRAM_LANGUAGE_RU: "У пациента {patient} пока нет активных или недавних визитов.",
+        TELEGRAM_LANGUAGE_UZ: "Bemor {patient} uchun faol yoki oxirgi tashriflar yo'q.",
+    },
+    "visits_patient": {
+        TELEGRAM_LANGUAGE_RU: "Пациент: {patient}",
+        TELEGRAM_LANGUAGE_UZ: "Bemor: {patient}",
+    },
+    "visits_title": {
+        TELEGRAM_LANGUAGE_RU: "Мои визиты:",
+        TELEGRAM_LANGUAGE_UZ: "Mening tashriflarim:",
+    },
+    "visits_line": {
+        TELEGRAM_LANGUAGE_RU: "{index}. Визит #{visit_id} - {visit_date}, статус: {status}",
+        TELEGRAM_LANGUAGE_UZ: "{index}. Tashrif #{visit_id} - {visit_date}, holat: {status}",
+    },
+    "visits_privacy_note": {
+        TELEGRAM_LANGUAGE_RU: "В Telegram показываются только номер, дата и статус визита.",
+        TELEGRAM_LANGUAGE_UZ: "Telegramda faqat tashrif raqami, sanasi va holati ko'rsatiladi.",
     },
     "payments_empty": {
         TELEGRAM_LANGUAGE_RU: (
@@ -654,6 +680,7 @@ def _telegram_chat_menu(db: Session, chat_id: int) -> Dict[str, Any]:
 TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
     "📱",
     "🎫",
+    "📅",
     "💳",
     "👤",
     "📄",
@@ -2104,6 +2131,18 @@ def _recent_visit_summary(
     )
 
 
+def _patient_recent_visits(
+    db: Session, patient_id: int, limit: int = 3
+) -> list[Visit]:
+    return (
+        db.query(Visit)
+        .filter(Visit.patient_id == patient_id)
+        .order_by(Visit.visit_date.desc(), Visit.created_at.desc(), Visit.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def _html_text(value: Any) -> str:
     return html.escape(str(value or ""), quote=False)
 
@@ -2257,6 +2296,39 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
         lines.append(
             _localized_text("queue_more", language).format(count=len(entries) - 5)
         )
+    return "\n".join(lines)
+
+
+def _clinic_visits_message(db: Session, chat_id: int) -> str:
+    telegram_user, patient = _patient_for_telegram_chat(db, chat_id)
+    if not telegram_user or not telegram_user.patient_id:
+        return _telegram_chat_text(db, chat_id, "needs_link")
+
+    language = _telegram_chat_language(db, chat_id)
+    patient_name = _html_text(_patient_display_name(patient))
+    visits = _patient_recent_visits(db, telegram_user.patient_id)
+    if not visits:
+        return _localized_text("visits_empty", language).format(patient=patient_name)
+
+    lines = [
+        _localized_text("visits_patient", language).format(patient=patient_name),
+        _localized_text("visits_title", language),
+    ]
+    for index, visit in enumerate(visits, start=1):
+        visit_date = (
+            visit.visit_date.isoformat()
+            if visit.visit_date
+            else _localized_text("recent_visit_unknown_date", language)
+        )
+        lines.append(
+            _localized_text("visits_line", language).format(
+                index=index,
+                visit_id=visit.id,
+                visit_date=_html_text(visit_date),
+                status=_html_text(visit.status),
+            )
+        )
+    lines.append(_localized_text("visits_privacy_note", language))
     return "\n".join(lines)
 
 
@@ -2807,6 +2879,16 @@ async def _handle_clinic_bot_update(
             "telegram_patient_queue",
         )
 
+    async def visits_handler(chat_id: int) -> None:
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _clinic_visits_message(db, chat_id),
+            _telegram_chat_menu(db, chat_id),
+            "telegram_patient_visits",
+        )
+
     async def payments_handler(chat_id: int) -> None:
         await _send_patient_bot_reply(
             db,
@@ -2855,6 +2937,7 @@ async def _handle_clinic_bot_update(
     command_handlers = {
         "/help": help_handler,
         "/queue": queue_handler,
+        "/visits": visits_handler,
         "/payments": payments_handler,
         "/profile": profile_handler,
         "/results": results_handler,
@@ -2865,6 +2948,7 @@ async def _handle_clinic_bot_update(
             ("❓ Помощь", help_handler),
             ("⚙️ Настройки", settings_handler),
             ("🎫 Моя очередь", queue_handler),
+            ("📅 Мои визиты", visits_handler),
             ("💳 Оплаты и долг", payments_handler),
             ("👤 Мой статус", profile_handler),
             ("📄 Результаты", results_handler),
@@ -2880,6 +2964,7 @@ async def _handle_clinic_bot_update(
             ("❓ Yordam", help_handler),
             ("⚙️ Sozlamalar", settings_handler),
             ("🎫 Mening navbatim", queue_handler),
+            ("📅 Mening tashriflarim", visits_handler),
             ("💳 To'lovlar va qarz", payments_handler),
             ("👤 Mening holatim", profile_handler),
             ("📄 Natijalar", results_handler),
