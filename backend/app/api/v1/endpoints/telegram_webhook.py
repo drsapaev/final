@@ -3217,7 +3217,7 @@ async def send_message_to_user(
         )
 
         if success:
-            return {"status": "sent", "chat_id": chat_id}
+            return {"status": "sent"}
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

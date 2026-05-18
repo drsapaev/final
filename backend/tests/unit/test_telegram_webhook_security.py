@@ -201,6 +201,33 @@ class TestTelegramWebhookSecurity:
         assert response.status_code in {401, 403}
 
     @pytest.mark.asyncio
+    async def test_send_message_response_hides_chat_id(self, monkeypatch):
+        fake_service = FakeTelegramBotService(active=True)
+        monkeypatch.setattr(
+            telegram_webhook,
+            "get_telegram_bot_service",
+            AsyncMock(return_value=fake_service),
+        )
+
+        response = await telegram_webhook.send_message_to_user(
+            chat_id=123456,
+            message="Private follow-up",
+            parse_mode="HTML",
+            reply_markup=None,
+            db=object(),
+            current_user=SimpleNamespace(role="Admin"),
+        )
+
+        assert response == {"status": "sent"}
+        assert "chat_id" not in response
+        assert "123456" not in str(response)
+        fake_service._send_message.assert_awaited_once_with(
+            chat_id=123456,
+            text="Private follow-up",
+            reply_markup=None,
+        )
+
+    @pytest.mark.asyncio
     async def test_contact_spoof_is_rejected(self, db_session):
         fake_service = FakeTelegramBotService(active=True)
         update = {
