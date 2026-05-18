@@ -282,7 +282,8 @@ class TestTelegramWebhookSecurity:
         assert "O'zbekchaga" in fake_service._send_message.await_args.args[1]
         reply_markup = fake_service._send_message.await_args.args[2]
         assert reply_markup["keyboard"][0][0]["text"].startswith("📱")
-        assert reply_markup["keyboard"][1][0]["text"].startswith("🎫")
+        assert reply_markup["keyboard"][1][0]["text"].startswith("🏥")
+        assert reply_markup["keyboard"][2][0]["text"].startswith("🎫")
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == 7006)
@@ -543,6 +544,51 @@ class TestTelegramWebhookSecurity:
             .one()
         )
         assert log.template_key == "telegram_patient_support"
+
+    @pytest.mark.asyncio
+    async def test_book_command_returns_localized_safe_booking_entrypoint(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7022,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 126,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7022},
+                "from": {"id": 111},
+                "text": "/book",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            7022,
+            telegram_webhook._localized_text("book", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7022)
+            .one()
+        )
+        assert log.template_key == "telegram_patient_book"
 
     @pytest.mark.asyncio
     async def test_staff_start_token_links_user_and_writes_audit(
@@ -1062,6 +1108,7 @@ class TestTelegramWebhookSecurity:
         assert len(uz_command_names) == len(set(uz_command_names))
         assert {command["command"] for command in captured[0]["json"]["commands"]} == {
             "start",
+            "book",
             "queue",
             "visits",
             "payments",
@@ -1073,6 +1120,7 @@ class TestTelegramWebhookSecurity:
         }
         assert {command["command"] for command in captured[1]["json"]["commands"]} == {
             "start",
+            "book",
             "queue",
             "visits",
             "payments",

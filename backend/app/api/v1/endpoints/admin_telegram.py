@@ -1749,6 +1749,7 @@ def get_telegram_integration_status(
                 "default_language": "ru",
                 "onboarding": "language_choice_then_contact_link",
                 "commands": [
+                    {"command": "/book", "label": "Записаться на приём"},
                     {"command": "/queue", "label": "Моя очередь"},
                     {"command": "/payments", "label": "Оплаты и долг"},
                     {"command": "/results", "label": "PDF-результаты"},
@@ -1766,6 +1767,11 @@ def get_telegram_integration_status(
                     {
                         "key": "contact_phone_link",
                         "label": "Привязка через номер телефона",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_booking_entrypoint",
+                        "label": "Безопасная подсказка для записи",
                         "enabled": bool(bot_token),
                     },
                     {
