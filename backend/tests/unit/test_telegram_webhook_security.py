@@ -763,6 +763,42 @@ class TestTelegramWebhookSecurity:
         if test_patient.phone:
             assert test_patient.phone not in message
 
+    @pytest.mark.asyncio
+    async def test_profile_command_returns_linked_patient_status_without_medical_details(
+        self, db_session, test_patient, test_visit
+    ):
+        _link_patient_to_chat(db_session, chat_id=7022, patient_id=test_patient.id)
+        test_visit.status = "open"
+        test_visit.notes = "diagnosis: private clinical note"
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 122,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7022},
+                "from": {"id": 111},
+                "text": "/profile",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7022
+        assert test_patient.first_name in message
+        assert f"#{test_visit.id}" in message
+        assert "open" in message
+        assert reply_markup == telegram_webhook._localized_main_menu("ru")
+        assert "diagnosis" not in message
+        assert "private clinical note" not in message
+        if test_patient.phone:
+            assert test_patient.phone not in message
+
     def test_payments_message_calculates_debt_from_queue_total_and_payments(
         self, db_session, test_patient, test_visit, test_queue_entry
     ):
