@@ -496,9 +496,12 @@ class TestTelegramWebhookSecurity:
         assert handled is True
         fake_service._send_message.assert_awaited_once_with(
             7009,
-            telegram_webhook._localized_text("settings", "uz-Latn"),
+            telegram_webhook._telegram_settings_message(db_session, 7009),
             telegram_webhook._localized_settings_menu("uz-Latn"),
         )
+        settings_message = fake_service._send_message.await_args.args[1]
+        assert "Joriy til: O'zbekcha" in settings_message
+        assert "Xabarnomalar: yoqilgan" in settings_message
 
     @pytest.mark.asyncio
     async def test_support_command_returns_localized_safe_contact_guidance(
