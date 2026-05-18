@@ -285,34 +285,46 @@ TELEGRAM_LOCALIZED_TEXTS = {
     },
     "help": {
         TELEGRAM_LANGUAGE_RU: (
-            "Команды бота:\n"
-            "/start - главное меню\n"
-            "/queue - моя очередь\n"
-            "/payments - оплаты и долг\n"
-            "/profile - статус привязки\n"
-            "/settings - язык и уведомления\n"
-            "/results - получить готовые PDF-результаты\n\n"
-            "Для привязки можно отсканировать QR с чека или нажать "
-            "\"Поделиться номером\"."
+            "Kosmed Clinic bot\n\n"
+            "Для пациента:\n"
+            "🎫 Моя очередь - номер, кабинет, статус и позиция ожидания.\n"
+            "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
+            "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
+            "👤 Мой статус - привязка Telegram к карте пациента.\n"
+            "⚙️ Настройки - язык и уведомления.\n\n"
+            "Команды: /start, /queue, /payments, /results, /profile, /settings.\n\n"
+            "Для привязки отсканируйте QR с чека или нажмите "
+            "\"Поделиться номером\".\n\n"
+            "Для сотрудников: доступ отдельно через персональную ссылку администратора "
+            "или /staff после привязки. В Telegram режим сотрудника только для просмотра; "
+            "действия выполняются в приложении клиники."
         ),
         TELEGRAM_LANGUAGE_UZ: (
-            "Bot buyruqlari:\n"
-            "/start - asosiy menyu\n"
-            "/queue - mening navbatim\n"
-            "/payments - to'lovlar va qarz\n"
-            "/profile - bog'lanish holati\n"
-            "/settings - til va xabarnomalar\n"
-            "/results - tayyor PDF natijalarni olish\n\n"
+            "Kosmed Clinic bot\n\n"
+            "Bemor uchun:\n"
+            "🎫 Mening navbatim - raqam, kabinet, holat va kutishdagi o'rin.\n"
+            "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
+            "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
+            "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
+            "⚙️ Sozlamalar - til va xabarnomalar.\n\n"
+            "Buyruqlar: /start, /queue, /payments, /results, /profile, /settings.\n\n"
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
-            "\"Telefon raqamni ulashish\" tugmasini bosing."
+            "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
+            "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
+            "yoki bog'langandan keyin /staff orqali. Telegramdagi xodim rejimi faqat "
+            "ko'rish uchun; amallar klinika ilovasida bajariladi."
         ),
     },
     "settings": {
         TELEGRAM_LANGUAGE_RU: (
-            "Настройки Telegram: выберите язык обслуживания или режим уведомлений."
+            "Настройки Telegram\n\n"
+            "Выберите язык обслуживания или режим уведомлений. После смены языка "
+            "главное меню сразу обновится."
         ),
         TELEGRAM_LANGUAGE_UZ: (
-            "Telegram sozlamalari: xizmat tilini yoki xabarnoma rejimini tanlang."
+            "Telegram sozlamalari\n\n"
+            "Xizmat tilini yoki xabarnoma rejimini tanlang. Til o'zgarganda "
+            "asosiy menyu darhol yangilanadi."
         ),
     },
     "lab_results_empty": {
