@@ -1077,6 +1077,19 @@ def webhook_info_error_response(
     return {"webhook_set": False, "error": public_error}
 
 
+def _sanitize_telegram_webhook_info(webhook_info: Dict[str, Any]) -> Dict[str, Any]:
+    pending_update_count = webhook_info.get("pending_update_count")
+    if isinstance(pending_update_count, bool) or not isinstance(
+        pending_update_count, int
+    ):
+        pending_update_count = 0
+
+    return {
+        "url": str(webhook_info.get("url") or ""),
+        "pending_update_count": pending_update_count,
+    }
+
+
 class TelegramWebhookRequest(BaseModel):
     webhook_url: Optional[str] = None
 
@@ -1626,7 +1639,7 @@ def get_telegram_webhook_info(
                 webhook_info = result["result"]
                 return {
                     "webhook_set": bool(webhook_info.get("url")),
-                    "webhook_info": webhook_info,
+                    "webhook_info": _sanitize_telegram_webhook_info(webhook_info),
                 }
             else:
                 raise Exception(f"Ошибка API: {result.get('description')}")
