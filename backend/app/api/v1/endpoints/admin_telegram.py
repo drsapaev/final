@@ -336,13 +336,13 @@ STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT = {
     "enabled": True,
     "migration_created": True,
     "model_registered": True,
-    "runtime_write_enabled": False,
-    "runtime_consume_enabled": False,
+    "runtime_write_enabled": True,
+    "runtime_consume_enabled": True,
     "table": "telegram_staff_confirmation_tokens",
     "raw_token_storage_allowed": False,
     "migration_revision": "0026_tg_staff_confirm_tokens",
-    "repository": None,
-    "service": None,
+    "repository": "TelegramStaffConfirmationTokenRepository",
+    "service": "TelegramStaffConfirmationTokenService",
     "columns": [
         "id",
         "token_hash",
@@ -487,10 +487,10 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     "runtime_guard_enabled": True,
     "deny_only_runtime_enabled": True,
     "state_change_command_guard_enabled": True,
-    "confirmation_token_runtime_enabled": False,
+    "confirmation_token_runtime_enabled": True,
     "state_changing_actions_enabled": False,
     "confirmation_window_seconds": 120,
-    "default_state_change_decision": "deny_until_explicit_confirmation_runtime",
+    "default_state_change_decision": "deny_until_idempotency_and_action_enablement",
     "token_storage_contract": STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT,
     "operations": [
         {
@@ -546,7 +546,6 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
         "audit_log_write_succeeds",
     ],
     "runtime_blocked_by": [
-        "confirmation_token_persistence",
         "idempotency_runtime",
         "domain_service_action_adapters",
         "explicit_action_enablement",
@@ -1034,10 +1033,10 @@ def _build_staff_bot_status(
             "runtime_guard_enabled": True,
             "deny_only_runtime_enabled": True,
             "state_change_command_guard_enabled": True,
-            "confirmation_token_runtime_enabled": False,
+            "confirmation_token_runtime_enabled": True,
             "state_changing_actions_enabled": False,
             "default_state_change_decision": (
-                "deny_until_explicit_confirmation_runtime"
+                "deny_until_idempotency_and_action_enablement"
             ),
         },
         "state_changing_actions_enabled": False,

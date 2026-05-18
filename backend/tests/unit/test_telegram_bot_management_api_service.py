@@ -13,6 +13,9 @@ from app.models.telegram_config import (
 from app.services.telegram_staff_link_token_service import (
     TelegramStaffLinkTokenService,
 )
+from app.services.telegram_staff_confirmation_token_service import (
+    TelegramStaffConfirmationTokenService,
+)
 from app.services.telegram_bot_management_api_service import (
     TelegramBotManagementApiService,
 )
@@ -199,9 +202,11 @@ class TestTelegramBotManagementApiService:
         assert contract["enabled"] is True
         assert contract["migration_created"] is True
         assert contract["model_registered"] is True
-        assert contract["runtime_write_enabled"] is False
-        assert contract["runtime_consume_enabled"] is False
+        assert contract["runtime_write_enabled"] is True
+        assert contract["runtime_consume_enabled"] is True
         assert contract["migration_revision"] == "0026_tg_staff_confirm_tokens"
+        assert contract["repository"] == "TelegramStaffConfirmationTokenRepository"
+        assert contract["service"] == "TelegramStaffConfirmationTokenService"
         assert list(table.columns.keys()) == contract["columns"]
         assert contract["raw_token_storage_allowed"] is False
         assert "raw_token" not in table.columns
@@ -319,7 +324,7 @@ class TestTelegramBotManagementApiService:
         assert status["confirmations"]["runtime_guard_enabled"] is True
         assert status["confirmations"]["deny_only_runtime_enabled"] is True
         assert (
-            status["confirmations"]["confirmation_token_runtime_enabled"] is False
+            status["confirmations"]["confirmation_token_runtime_enabled"] is True
         )
         assert status["confirmations"]["state_changing_actions_enabled"] is False
 
@@ -429,9 +434,17 @@ class TestTelegramBotManagementApiService:
         assert status["confirmation_contract"]["deny_only_runtime_enabled"] is True
         assert (
             status["confirmation_contract"]["confirmation_token_runtime_enabled"]
-            is False
+            is True
         )
         assert status["confirmation_contract"]["state_changing_actions_enabled"] is False
+        assert (
+            "confirmation_token_persistence"
+            not in status["confirmation_contract"]["runtime_blocked_by"]
+        )
+        assert (
+            status["confirmation_contract"]["runtime_blocked_by"][0]
+            == "idempotency_runtime"
+        )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):
         token = admin_telegram.build_staff_link_start_token(
@@ -553,6 +566,111 @@ class TestTelegramBotManagementApiService:
         assert first["valid"] is True
         assert first["single_use_enforced"] is True
         assert second == {"valid": False, "reason": "already_used"}
+
+    def test_staff_confirmation_token_service_issues_hash_only_record(
+        self, db_session, admin_user
+    ):
+        raw_token = "plain-confirm-token"
+        service = TelegramStaffConfirmationTokenService(db_session)
+
+        record = service.issue_token(
+            token_hash="staff_confirmation_token:" + ("a" * 64),
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700800,
+            operation_key="payment_status_change",
+            command_key="/payment_status",
+            action_payload_hash="payload:" + ("b" * 64),
+            target_type="payment",
+            target_reference_hash="target:" + ("c" * 64),
+            idempotency_key_hash="idempotency:" + ("d" * 64),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+            request_id="req-confirm-1",
+        )
+
+        stored = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(TelegramStaffConfirmationToken.id == record.id)
+            .one()
+        )
+        assert stored.token_hash.startswith("staff_confirmation_token:")
+        assert stored.token_hash != raw_token
+        assert stored.operation_key == "payment_status_change"
+        assert stored.command_key == "/payment_status"
+        assert stored.action_payload_hash.startswith("payload:")
+        assert stored.target_reference_hash.startswith("target:")
+        assert stored.idempotency_key_hash.startswith("idempotency:")
+        assert stored.consumed_at is None
+        assert stored.request_id == "req-confirm-1"
+
+    def test_staff_confirmation_token_service_consumes_record_once(
+        self, db_session, admin_user
+    ):
+        service = TelegramStaffConfirmationTokenService(db_session)
+        token_hash = "staff_confirmation_token:" + ("e" * 64)
+        payload_hash = "payload:" + ("f" * 64)
+        idempotency_hash = "idempotency:" + ("1" * 64)
+        service.issue_token(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700801,
+            operation_key="queue_call_or_skip_patient",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash=idempotency_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+        )
+
+        first = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700801,
+            operation_key="queue_call_or_skip_patient",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash=idempotency_hash,
+        )
+        second = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700801,
+            operation_key="queue_call_or_skip_patient",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash=idempotency_hash,
+        )
+
+        assert first["valid"] is True
+        assert first["reason"] == "ok"
+        assert first["single_use_enforced"] is True
+        assert first["operation_key"] == "queue_call_or_skip_patient"
+        assert second == {"valid": False, "reason": "already_used"}
+
+    def test_staff_confirmation_token_service_rejects_action_mismatch(
+        self, db_session, admin_user
+    ):
+        service = TelegramStaffConfirmationTokenService(db_session)
+        token_hash = "staff_confirmation_token:" + ("9" * 64)
+        service.issue_token(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700802,
+            operation_key="visit_cancel_or_move",
+            action_payload_hash="payload:" + ("2" * 64),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+        )
+
+        result = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700802,
+            operation_key="visit_cancel_or_move",
+            action_payload_hash="payload:" + ("3" * 64),
+        )
+        stored = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(TelegramStaffConfirmationToken.token_hash == token_hash)
+            .one()
+        )
+
+        assert result == {"valid": False, "reason": "action_binding_mismatch"}
+        assert stored.consumed_at is None
 
     def test_staff_link_start_token_validator_consumes_storage_record(
         self, db_session, admin_user
