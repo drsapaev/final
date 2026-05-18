@@ -374,6 +374,68 @@ class TestTelegramWebhookSecurity:
         )
 
     @pytest.mark.asyncio
+    async def test_settings_language_choice_keeps_localized_settings_menu(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7021,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="ru",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.add(
+            TelegramMessage(
+                chat_id=7021,
+                message_type="patient_bot_reply",
+                template_key="telegram_patient_settings",
+                message_text="settings",
+                status="sent",
+                sent_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        language_update = {
+            "update_id": 122,
+            "message": {
+                "message_id": 3,
+                "chat": {"id": 7021},
+                "from": {"id": 111, "language_code": "ru"},
+                "text": "O'zbekcha",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            language_update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.language_code == "uz-Latn"
+        reply_text = fake_service._send_message.await_args.args[1]
+        assert (
+            telegram_webhook._localized_text("language_selected", "uz-Latn")
+            in reply_text
+        )
+        assert "Joriy til: O'zbekcha" in reply_text
+        assert fake_service._send_message.await_args.args[2] == (
+            telegram_webhook._localized_settings_menu("uz-Latn")
+        )
+        latest_log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7021)
+            .order_by(TelegramMessage.id.desc())
+            .first()
+        )
+        assert latest_log.template_key == "telegram_patient_settings_language_selected"
+
+    @pytest.mark.asyncio
     async def test_language_choice_preserves_existing_notification_consent(
         self, db_session
     ):
