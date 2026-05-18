@@ -43,6 +43,22 @@ class TelegramStaffConfirmationTokenService:
             raise ValueError(f"{field_name} is required")
         return normalized
 
+    def already_used_result(
+        self, record: TelegramStaffConfirmationToken
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "valid": False,
+            "reason": "already_used",
+            "single_use_enforced": True,
+            "operation_key": record.operation_key,
+            "command_key": record.command_key,
+            "target_type": record.target_type,
+            "request_id": record.request_id,
+        }
+        if record.consumed_at is not None:
+            result["consumed_at"] = self.as_utc(record.consumed_at).isoformat()
+        return result
+
     def issue_token(
         self,
         *,
@@ -134,7 +150,7 @@ class TelegramStaffConfirmationTokenService:
             return {"valid": False, "reason": "action_binding_mismatch"}
 
         if record.consumed_at is not None:
-            return {"valid": False, "reason": "already_used"}
+            return self.already_used_result(record)
 
         expires_at = self.as_utc(record.expires_at)
         if expires_at <= now_utc:
@@ -152,7 +168,7 @@ class TelegramStaffConfirmationTokenService:
         if updated != 1:
             refreshed = self.repository.get_by_token_hash(token_hash)
             if refreshed and refreshed.consumed_at is not None:
-                return {"valid": False, "reason": "already_used"}
+                return self.already_used_result(refreshed)
             return {"valid": False, "reason": "token_consume_conflict"}
 
         self.repository.commit()
