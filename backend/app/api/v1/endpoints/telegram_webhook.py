@@ -1047,14 +1047,24 @@ def _staff_menu_message(user: User, role_menu: Dict[str, Any]) -> str:
         f"Роль: {role_label} ({role_key})",
         f"Role: {role_key}",
         "",
-        "Доступно:",
+        "Что можно смотреть в Telegram:",
     ]
     lines.extend(f"- {item}" for item in items)
     lines.extend(
         [
             "",
+            "Команды:",
+            "/staff или /help - открыть это меню",
+            "/queue - очередь по роли",
+            "/schedule - расписание",
+            "/payments - статусы оплат",
+            "/reports - готовность результатов",
+            "/summary - операционная сводка",
+            "",
             "Действия, которые меняют данные, в Telegram отключены.",
             "State-changing actions are disabled in Telegram.",
+            "Для вызова пациента, изменения очереди, оплаты или EMR откройте приложение клиники.",
+            "No patient names, phone numbers, diagnoses, or full EMR content are shown here.",
         ]
     )
     return "\n".join(lines)
