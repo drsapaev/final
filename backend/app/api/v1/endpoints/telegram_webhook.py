@@ -198,6 +198,32 @@ TELEGRAM_SETTINGS_MENUS = {
         "one_time_keyboard": False,
     },
 }
+TELEGRAM_SETTINGS_STATUS_LABELS = {
+    TELEGRAM_LANGUAGE_RU: {
+        "language": {
+            TELEGRAM_LANGUAGE_RU: "Русский",
+            TELEGRAM_LANGUAGE_UZ: "O'zbekcha",
+        },
+        "notifications_on": "включены",
+        "notifications_off": "отключены",
+        "template": (
+            "\n\nТекущий язык: {language_label}\n"
+            "Уведомления: {notification_label}"
+        ),
+    },
+    TELEGRAM_LANGUAGE_UZ: {
+        "language": {
+            TELEGRAM_LANGUAGE_RU: "Rus tili",
+            TELEGRAM_LANGUAGE_UZ: "O'zbekcha",
+        },
+        "notifications_on": "yoqilgan",
+        "notifications_off": "o'chirilgan",
+        "template": (
+            "\n\nJoriy til: {language_label}\n"
+            "Xabarnomalar: {notification_label}"
+        ),
+    },
+}
 TELEGRAM_LOCALIZED_TEXTS = {
     "language_prompt": {
         TELEGRAM_LANGUAGE_RU: "Выберите язык обслуживания.\n\nTilni tanlang.",
@@ -720,6 +746,23 @@ def _telegram_chat_text(db: Session, chat_id: int, key: str) -> str:
 
 def _telegram_chat_menu(db: Session, chat_id: int) -> Dict[str, Any]:
     return _localized_main_menu(_telegram_chat_language(db, chat_id))
+
+
+def _telegram_settings_message(db: Session, chat_id: int) -> str:
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    language = _normalize_patient_language(getattr(telegram_user, "language_code", None))
+    labels = TELEGRAM_SETTINGS_STATUS_LABELS.get(
+        language, TELEGRAM_SETTINGS_STATUS_LABELS[TELEGRAM_LANGUAGE_RU]
+    )
+    language_label = labels["language"].get(language, labels["language"][TELEGRAM_LANGUAGE_RU])
+    notifications_enabled = bool(getattr(telegram_user, "notifications_enabled", False))
+    notification_label = (
+        labels["notifications_on"] if notifications_enabled else labels["notifications_off"]
+    )
+    return _localized_text("settings", language) + labels["template"].format(
+        language_label=language_label,
+        notification_label=notification_label,
+    )
 
 
 TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
@@ -2911,7 +2954,7 @@ async def _handle_clinic_bot_update(
             db,
             bot_service,
             chat_id,
-            _localized_text("settings", language),
+            _telegram_settings_message(db, chat_id),
             _localized_settings_menu(language),
             "telegram_patient_settings",
         )
