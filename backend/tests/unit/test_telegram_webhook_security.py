@@ -81,6 +81,57 @@ def _create_lab_report_instance(
 
 @pytest.mark.unit
 class TestTelegramWebhookSecurity:
+    def test_admin_webhook_info_response_hides_raw_telegram_payload(
+        self, db_session, monkeypatch
+    ):
+        db_session.add(
+            TelegramConfig(
+                bot_token="bot-token",
+                webhook_secret="topsecret",
+                active=True,
+            )
+        )
+        db_session.commit()
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {
+                    "ok": True,
+                    "result": {
+                        "url": "https://clinic.example/api/v1/telegram/webhook",
+                        "pending_update_count": 3,
+                        "last_error_message": "provider-secret-detail",
+                        "ip_address": "203.0.113.10",
+                        "allowed_updates": ["message"],
+                        "unexpected_secret": "raw-provider-secret",
+                    },
+                }
+
+        monkeypatch.setattr(
+            admin_telegram.requests,
+            "get",
+            lambda *_args, **_kwargs: FakeResponse(),
+        )
+
+        response = admin_telegram.get_telegram_webhook_info(
+            db_session,
+            SimpleNamespace(id=1),
+        )
+
+        assert response == {
+            "webhook_set": True,
+            "webhook_info": {
+                "url": "https://clinic.example/api/v1/telegram/webhook",
+                "pending_update_count": 3,
+            },
+        }
+        assert "last_error_message" not in str(response)
+        assert "ip_address" not in str(response)
+        assert "allowed_updates" not in str(response)
+        assert "raw-provider-secret" not in str(response)
+
     def test_webhook_rejects_missing_secret_configuration(
         self, client, monkeypatch
     ):
