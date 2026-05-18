@@ -500,6 +500,51 @@ class TestTelegramWebhookSecurity:
         )
 
     @pytest.mark.asyncio
+    async def test_support_command_returns_localized_safe_contact_guidance(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7019,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 125,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7019},
+                "from": {"id": 111},
+                "text": "/support",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            7019,
+            telegram_webhook._localized_text("support", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7019)
+            .one()
+        )
+        assert log.template_key == "telegram_patient_support"
+
+    @pytest.mark.asyncio
     async def test_staff_start_token_links_user_and_writes_audit(
         self, db_session, admin_user
     ):
@@ -1023,6 +1068,7 @@ class TestTelegramWebhookSecurity:
             "results",
             "profile",
             "settings",
+            "support",
             "help",
         }
         assert {command["command"] for command in captured[1]["json"]["commands"]} == {
@@ -1033,5 +1079,6 @@ class TestTelegramWebhookSecurity:
             "results",
             "profile",
             "settings",
+            "support",
             "help",
         }

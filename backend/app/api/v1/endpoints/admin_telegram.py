@@ -1754,6 +1754,7 @@ def get_telegram_integration_status(
                     {"command": "/results", "label": "PDF-результаты"},
                     {"command": "/profile", "label": "Мой статус"},
                     {"command": "/settings", "label": "Язык и уведомления"},
+                    {"command": "/support", "label": "Связаться с клиникой"},
                     {"command": "/help", "label": "Помощь"},
                 ],
                 "features": [
@@ -1785,6 +1786,11 @@ def get_telegram_integration_status(
                     {
                         "key": "patient_language_notification_settings",
                         "label": "Настройки языка и уведомлений",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_support_contact",
+                        "label": "Безопасная связь с клиникой",
                         "enabled": bool(bot_token),
                     },
                 ],
