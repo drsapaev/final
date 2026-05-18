@@ -40,7 +40,16 @@ import {
   MessageSquare,
   Settings,
   RefreshCw,
-  CheckCircle } from
+  CheckCircle,
+  Calendar,
+  CreditCard,
+  FileText,
+  Languages,
+  Phone,
+  ShieldCheck,
+  Ticket,
+  UserCheck,
+  Users } from
 
 
 'lucide-react';
@@ -314,6 +323,95 @@ const TelegramManager = () => {
   const staffRoleMenuEnablementItemCount = typeof staffRoleMenuEnablementContract.menu_item_count === 'number' ?
   staffRoleMenuEnablementContract.menu_item_count :
   staffMenuItemCount;
+  const patientCommandLabel = (commandName, fallback) => {
+    const command = patientBotCommands.find((item) => item?.command === commandName);
+    return command?.label || fallback;
+  };
+  const patientLanguageSummary = patientBotLanguages.length ?
+  patientBotLanguages.map((item) => item.label).join(', ') :
+  'Русский';
+  const patientCapabilities = [
+    {
+      key: 'book',
+      icon: Calendar,
+      menu: '🏥 Записаться на приём',
+      command: '/book',
+      label: patientCommandLabel('/book', 'Записаться на приём'),
+      detail: 'Показывает безопасный путь через регистратуру; визит из свободного текста не создаёт.'
+    },
+    {
+      key: 'queue',
+      icon: Ticket,
+      menu: '🎫 Моя очередь',
+      command: '/queue',
+      label: patientCommandLabel('/queue', 'Моя очередь'),
+      detail: 'Номер, кабинет, статус и позиция ожидания без изменения очереди.'
+    },
+    {
+      key: 'payments',
+      icon: CreditCard,
+      menu: '💳 Оплаты и долг',
+      command: '/payments',
+      label: patientCommandLabel('/payments', 'Оплаты и долг'),
+      detail: 'Начислено, оплачено, долг и незавершённые платежи по визиту.'
+    },
+    {
+      key: 'results',
+      icon: FileText,
+      menu: '📄 Результаты',
+      command: '/results',
+      label: patientCommandLabel('/results', 'PDF-результаты'),
+      detail: `До ${patientBot.max_pdf_reports_per_request || 3} готовых PDF только для привязанного пациента.`
+    },
+    {
+      key: 'profile',
+      icon: UserCheck,
+      menu: '👤 Мой статус',
+      command: '/profile',
+      label: patientCommandLabel('/profile', 'Мой статус'),
+      detail: 'Показывает привязку Telegram к карте пациента и последний визит.'
+    },
+    {
+      key: 'settings',
+      icon: Languages,
+      menu: '⚙️ Настройки',
+      command: '/settings',
+      label: patientCommandLabel('/settings', 'Язык и уведомления'),
+      detail: `Языки v1: ${patientLanguageSummary}. После выбора меню сразу обновляется.`
+    },
+    {
+      key: 'support',
+      icon: Phone,
+      menu: '☎️ Связаться с клиникой',
+      command: '/support',
+      label: patientCommandLabel('/support', 'Связаться с клиникой'),
+      detail: 'Подсказка для записи, кассы и срочных вопросов без медицинских данных в чате.'
+    }
+  ];
+  const staffCapabilitySummary = [
+    {
+      key: 'roles',
+      icon: Users,
+      label: 'Ролевые меню',
+      detail: `${staffRoleMenuEnablementRoleCount || staffRoles.length || 0} ролей, ${staffRoleMenuEnablementItemCount || staffMenuItemCount || 0} read-only пунктов.`
+    },
+    {
+      key: 'commands',
+      icon: MessageSquare,
+      label: 'Staff-команды',
+      detail: staffCommandNames.length ?
+      `${staffCommandNames.join(' ')}; действия изменения состояния выключены.` :
+      'Команды появятся после staff token и регистрации.'
+    },
+    {
+      key: 'safety',
+      icon: ShieldCheck,
+      label: 'Безопасность',
+      detail: staffAuditReady ?
+      'RBAC, audit и подтверждения включены для read-only режима.' :
+      'RBAC, audit и подтверждения обязательны перед действиями.'
+    }
+  ];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -341,6 +439,133 @@ const TelegramManager = () => {
       }
 
       <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="flex-start"
+                gap={2}
+                mb={2}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Что умеет Telegram-бот
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Patient bot работает с пациентом, staff/admin bot остаётся безопасным read-only слоем для сотрудников.
+                  </Typography>
+                </Box>
+                <Badge variant={botStatus?.bot_active ? 'success' : 'warning'} size="small">
+                  {botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'}
+                </Badge>
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={8}>
+                  <Box
+                    sx={{
+                      border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
+                      borderRadius: 8,
+                      p: 2
+                    }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                      <Typography variant="subtitle1">
+                        Пациентский бот
+                      </Typography>
+                      <Badge variant={enabledPatientFeatures.length ? 'success' : 'warning'} size="small">
+                        {patientBot.version || 'v1'}
+                      </Badge>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: 1.25
+                      }}>
+                      {patientCapabilities.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Box
+                            key={item.key}
+                            sx={{
+                              border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
+                              borderRadius: 6,
+                              p: 1.25,
+                              minHeight: 128,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1
+                            }}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Icon size={16} />
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.menu}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.detail}
+                            </Typography>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mt="auto" gap={1}>
+                              <Typography variant="caption" color="text.secondary">
+                                {item.label}
+                              </Typography>
+                              <Badge variant="info" size="small">
+                                {item.command}
+                              </Badge>
+                            </Box>
+                          </Box>);
+                      })}
+                    </Box>
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <Box
+                    sx={{
+                      border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
+                      borderRadius: 8,
+                      p: 2,
+                      height: '100%'
+                    }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                      <Typography variant="subtitle1">
+                        Staff/admin bot
+                      </Typography>
+                      <Badge variant={staffRoleMenuRuntimeEnabled ? 'success' : 'warning'} size="small">
+                        Read-only
+                      </Badge>
+                    </Box>
+                    <Box display="flex" flexDirection="column" gap={1.25}>
+                      {staffCapabilitySummary.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Box
+                            key={item.key}
+                            sx={{
+                              border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
+                              borderRadius: 6,
+                              p: 1.25
+                            }}>
+                            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                              <Icon size={16} />
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.label}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.detail}
+                            </Typography>
+                          </Box>);
+                      })}
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
