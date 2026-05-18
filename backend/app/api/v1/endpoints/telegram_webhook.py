@@ -844,6 +844,19 @@ async def _send_patient_bot_reply(
     return sent
 
 
+def _latest_patient_bot_template_key(db: Session, chat_id: int) -> str | None:
+    row = (
+        db.query(TelegramMessage.template_key)
+        .filter(
+            TelegramMessage.chat_id == chat_id,
+            TelegramMessage.message_type == "patient_bot_reply",
+        )
+        .order_by(TelegramMessage.id.desc())
+        .first()
+    )
+    return str(row[0]) if row and row[0] else None
+
+
 def _upsert_ticket_qr_telegram_user(
     db: Session,
     message: Dict[str, Any],
@@ -2916,6 +2929,7 @@ async def _handle_clinic_bot_update(
     async def language_handler(chat_id: int, language_code: str) -> None:
         message = _message_from_update(update)
         telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+        previous_template_key = _latest_patient_bot_template_key(db, chat_id)
         _upsert_ticket_qr_telegram_user(
             db,
             message,
@@ -2928,13 +2942,24 @@ async def _handle_clinic_bot_update(
             "Telegram patient bot language selected",
             extra={"language_code": language},
         )
+        settings_context = previous_template_key in {
+            "telegram_patient_settings",
+            "telegram_patient_settings_language_selected",
+        }
+        reply_text = _localized_text("language_selected", language)
+        reply_markup = _localized_main_menu(language)
+        template_key = "telegram_patient_language_selected"
+        if settings_context:
+            reply_text = f"{reply_text}\n\n{_telegram_settings_message(db, chat_id)}"
+            reply_markup = _localized_settings_menu(language)
+            template_key = "telegram_patient_settings_language_selected"
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
-            _localized_text("language_selected", language),
-            _localized_main_menu(language),
-            "telegram_patient_language_selected",
+            reply_text,
+            reply_markup,
+            template_key,
         )
 
     async def help_handler(chat_id: int) -> None:
