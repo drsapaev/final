@@ -971,6 +971,14 @@ class TestTelegramWebhookSecurity:
         assert captured[0]["url"].endswith("/setMyCommands")
         assert captured[0]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_RU
         assert captured[1]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_UZ
+        ru_command_names = [
+            command["command"] for command in captured[0]["json"]["commands"]
+        ]
+        uz_command_names = [
+            command["command"] for command in captured[1]["json"]["commands"]
+        ]
+        assert len(ru_command_names) == len(set(ru_command_names))
+        assert len(uz_command_names) == len(set(uz_command_names))
         assert {command["command"] for command in captured[0]["json"]["commands"]} == {
             "start",
             "queue",
