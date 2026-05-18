@@ -1,6 +1,6 @@
 """Create Telegram staff confirmation token storage.
 
-Revision ID: 0026_telegram_staff_confirmation_tokens
+Revision ID: 0026_tg_staff_confirm_tokens
 Revises: 0025_telegram_staff_link_tokens
 Create Date: 2026-05-18 00:00:00.000000
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0026_telegram_staff_confirmation_tokens"
+revision = "0026_tg_staff_confirm_tokens"
 down_revision = "0025_telegram_staff_link_tokens"
 branch_labels = None
 depends_on = None
