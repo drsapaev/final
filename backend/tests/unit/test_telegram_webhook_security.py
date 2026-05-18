@@ -745,6 +745,24 @@ class TestTelegramWebhookSecurity:
         assert "Кабинет 205" in message
         assert "Кардиология" in message
 
+    def test_visits_message_lists_linked_patient_visits_without_medical_details(
+        self, db_session, test_patient, test_visit
+    ):
+        _link_patient_to_chat(db_session, chat_id=7005, patient_id=test_patient.id)
+        test_visit.status = "open"
+        test_visit.notes = "diagnosis: private clinical note"
+        db_session.commit()
+
+        message = telegram_webhook._clinic_visits_message(db_session, 7005)
+
+        assert f"#{test_visit.id}" in message
+        assert test_visit.visit_date.isoformat() in message
+        assert "open" in message
+        assert "diagnosis" not in message
+        assert "private clinical note" not in message
+        if test_patient.phone:
+            assert test_patient.phone not in message
+
     def test_payments_message_calculates_debt_from_queue_total_and_payments(
         self, db_session, test_patient, test_visit, test_queue_entry
     ):
