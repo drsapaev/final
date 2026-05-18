@@ -134,7 +134,6 @@ async def send_lab_results(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone,
             }
 
         # Получаем данные анализов
@@ -195,8 +194,6 @@ async def send_lab_results(
             return {
                 "success": True,
                 "message": "Результаты анализов отправлены",
-                "chat_id": telegram_user.chat_id,
-                "patient": patient.full_name,
                 "lab_results_count": len(lab_results),
             }
         else:
