@@ -31,6 +31,7 @@ PATIENT_BOT_COMMANDS_RU = [
     {"command": "results", "description": "Результаты"},
     {"command": "profile", "description": "Мой статус"},
     {"command": "settings", "description": "Язык и уведомления"},
+    {"command": "support", "description": "Связаться с клиникой"},
     {"command": "help", "description": "Помощь"},
 ]
 PATIENT_BOT_COMMANDS_UZ = [
@@ -41,6 +42,7 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "results", "description": "Natijalar"},
     {"command": "profile", "description": "Mening holatim"},
     {"command": "settings", "description": "Til va xabarnomalar"},
+    {"command": "support", "description": "Klinika bilan aloqa"},
     {"command": "help", "description": "Yordam"},
 ]
 STAFF_BOT_COMMANDS_DEFAULT = [
