@@ -129,3 +129,103 @@ async def test_send_lab_results_unregistered_response_hides_patient_phone(
     assert "patient_phone" not in response
     assert "+998901234567" not in str(response)
     assert "Sensitive Patient" not in str(response)
+
+
+@pytest.mark.asyncio
+async def test_send_payment_confirmation_response_hides_patient_contact_metadata(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    telegram_user = SimpleNamespace(chat_id=998877, language_code="ru")
+    bot_service = SimpleNamespace(
+        active=True,
+        initialize=AsyncMock(),
+        _send_message=AsyncMock(return_value=True),
+    )
+    templates_service = FakeTelegramTemplatesService()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        AsyncMock(return_value=bot_service),
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_templates_service",
+        lambda: templates_service,
+    )
+
+    response = await telegram_notifications.send_payment_confirmation(
+        patient_id=123,
+        payment_data={"amount": 125000, "transaction_id": "txn-secret"},
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Cashier"),
+    )
+
+    assert response == {
+        "success": True,
+        "message": "Подтверждение платежа отправлено",
+        "amount": 125000,
+    }
+    assert "+998901234567" not in str(response)
+    assert "Sensitive Patient" not in str(response)
+    assert "998877" not in str(response)
+    bot_service._send_message.assert_awaited_once_with(
+        chat_id=998877,
+        text="Lab results are ready",
+        reply_markup=None,
+    )
+    assert templates_service.template_data["patient_name"] == "Sensitive Patient"
+    assert templates_service.template_data["amount"] == 125000
+
+
+@pytest.mark.asyncio
+async def test_send_payment_confirmation_unregistered_response_hides_patient_phone(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: None,
+        raising=False,
+    )
+
+    response = await telegram_notifications.send_payment_confirmation(
+        patient_id=123,
+        payment_data={"amount": 125000},
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Cashier"),
+    )
+
+    assert response["success"] is False
+    assert "patient_phone" not in response
+    assert "+998901234567" not in str(response)
+    assert "Sensitive Patient" not in str(response)

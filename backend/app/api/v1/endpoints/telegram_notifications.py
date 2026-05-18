@@ -234,7 +234,6 @@ async def send_payment_confirmation(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone,
             }
 
         # Получаем сервис бота
@@ -270,8 +269,6 @@ async def send_payment_confirmation(
             return {
                 "success": True,
                 "message": "Подтверждение платежа отправлено",
-                "chat_id": telegram_user.chat_id,
-                "patient": patient.full_name,
                 "amount": payment_data.get("amount"),
             }
         else:
