@@ -974,6 +974,17 @@ class TestTelegramWebhookSecurity:
         assert {command["command"] for command in captured[0]["json"]["commands"]} == {
             "start",
             "queue",
+            "visits",
+            "payments",
+            "results",
+            "profile",
+            "settings",
+            "help",
+        }
+        assert {command["command"] for command in captured[1]["json"]["commands"]} == {
+            "start",
+            "queue",
+            "visits",
             "payments",
             "results",
             "profile",

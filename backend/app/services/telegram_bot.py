@@ -26,6 +26,8 @@ MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
 PATIENT_BOT_COMMANDS_RU = [
     {"command": "start", "description": "Начать"},
     {"command": "queue", "description": "Моя очередь"},
+    {"command": "visits", "description": "Мои визиты"},
+    {"command": "visits", "description": "Мои визиты"},
     {"command": "payments", "description": "Оплаты и долг"},
     {"command": "results", "description": "Результаты"},
     {"command": "profile", "description": "Мой статус"},
@@ -35,6 +37,8 @@ PATIENT_BOT_COMMANDS_RU = [
 PATIENT_BOT_COMMANDS_UZ = [
     {"command": "start", "description": "Boshlash"},
     {"command": "queue", "description": "Mening navbatim"},
+    {"command": "visits", "description": "Mening tashriflarim"},
+    {"command": "visits", "description": "Mening tashriflarim"},
     {"command": "payments", "description": "To'lovlar va qarz"},
     {"command": "results", "description": "Natijalar"},
     {"command": "profile", "description": "Mening holatim"},
