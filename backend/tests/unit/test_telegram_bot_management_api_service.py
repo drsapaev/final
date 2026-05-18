@@ -609,14 +609,19 @@ class TestTelegramBotManagementApiService:
         token_hash = "staff_confirmation_token:" + ("e" * 64)
         payload_hash = "payload:" + ("f" * 64)
         idempotency_hash = "idempotency:" + ("1" * 64)
+        issued_at = datetime.now(timezone.utc)
+        consumed_at = issued_at + timedelta(seconds=1)
         service.issue_token(
             token_hash=token_hash,
             staff_user_id=admin_user.id,
             telegram_chat_id=700801,
             operation_key="queue_call_or_skip_patient",
+            command_key="/queue",
             action_payload_hash=payload_hash,
+            target_type="queue",
             idempotency_key_hash=idempotency_hash,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+            expires_at=issued_at + timedelta(minutes=2),
+            request_id="req-confirm-once",
         )
 
         first = service.consume_for_confirmation(
@@ -626,6 +631,7 @@ class TestTelegramBotManagementApiService:
             operation_key="queue_call_or_skip_patient",
             action_payload_hash=payload_hash,
             idempotency_key_hash=idempotency_hash,
+            now=consumed_at,
         )
         second = service.consume_for_confirmation(
             token_hash=token_hash,
@@ -634,13 +640,23 @@ class TestTelegramBotManagementApiService:
             operation_key="queue_call_or_skip_patient",
             action_payload_hash=payload_hash,
             idempotency_key_hash=idempotency_hash,
+            now=consumed_at + timedelta(seconds=5),
         )
 
         assert first["valid"] is True
         assert first["reason"] == "ok"
         assert first["single_use_enforced"] is True
         assert first["operation_key"] == "queue_call_or_skip_patient"
-        assert second == {"valid": False, "reason": "already_used"}
+        assert second == {
+            "valid": False,
+            "reason": "already_used",
+            "single_use_enforced": True,
+            "operation_key": "queue_call_or_skip_patient",
+            "command_key": "/queue",
+            "target_type": "queue",
+            "request_id": "req-confirm-once",
+            "consumed_at": consumed_at.isoformat(),
+        }
 
     def test_staff_confirmation_token_service_rejects_action_mismatch(
         self, db_session, admin_user
