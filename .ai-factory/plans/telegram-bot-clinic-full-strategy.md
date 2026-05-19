@@ -316,6 +316,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Scope Mini App sessions to the linked patient or authenticated staff user: `backend/app/services/telegram_mini_app_init_data.py` resolves validated `initData` only through existing active `telegram_users` links, returns explicit patient/staff scopes, rejects direct URL or unlinked identity, blocks inactive staff links, and `backend/tests/unit/test_telegram_mini_app_init_data.py` covers wrong-patient scope rejection.
 - [ ] Implement appointment booking inside the protected Mini App flow.
   - [x] First backend-only booking policy slice: `backend/app/services/telegram_mini_app_init_data.py` builds a non-mutating safe appointment draft only from linked patient Mini App scope, forces scheduled/cash/UZS defaults, rejects staff scope, wrong patient scope, past dates, and invalid times, with focused coverage in `backend/tests/unit/test_telegram_mini_app_init_data.py`.
+  - [x] Backend preview response contract: `backend/app/services/telegram_mini_app_init_data.py` now wraps the patient-scoped booking draft in a preview-only Mini App payload with mutation disabled, no appointment id, and no payment provider/transaction/webhook values, with focused coverage in `backend/tests/unit/test_telegram_mini_app_init_data.py`.
 - [ ] Implement patient forms inside the protected Mini App flow.
 - [ ] Implement patient cabinet inside the protected Mini App flow.
 - [ ] Implement payment details inside the protected Mini App flow.
