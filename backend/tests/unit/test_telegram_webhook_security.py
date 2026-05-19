@@ -1777,7 +1777,7 @@ class TestTelegramWebhookSecurity:
             "command",
             "text_key",
             "button_key",
-            "tab",
+            "mini_app_section",
             "template_key",
             "chat_id",
         ),
@@ -1794,7 +1794,7 @@ class TestTelegramWebhookSecurity:
                 "/documents",
                 "patient_documents",
                 "patient_documents_entry_button",
-                "documents",
+                "results",
                 "telegram_patient_documents_placeholder",
                 7024,
             ),
@@ -1802,7 +1802,7 @@ class TestTelegramWebhookSecurity:
                 "/doctors",
                 "doctor_schedule",
                 "doctor_schedule_entry_button",
-                "doctors",
+                "appointments",
                 "telegram_patient_doctor_schedule_placeholder",
                 7025,
             ),
@@ -1825,7 +1825,7 @@ class TestTelegramWebhookSecurity:
         command,
         text_key,
         button_key,
-        tab,
+        mini_app_section,
         template_key,
         chat_id,
     ):
@@ -1861,12 +1861,18 @@ class TestTelegramWebhookSecurity:
                 [
                     {
                         "text": telegram_webhook._localized_text(button_key, "ru"),
-                        "url": f"https://clinic.example/patient?tab={tab}",
+                        "web_app": {
+                            "url": (
+                                "https://clinic.example/telegram/mini-app/patient"
+                                f"?section={mini_app_section}"
+                            )
+                        },
                     }
                 ]
             ]
         }
         assert str(test_patient.id) not in str(reply_markup)
+        assert "/patient?tab=" not in str(reply_markup)
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == chat_id)
