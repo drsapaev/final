@@ -328,6 +328,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Implement payment details inside the protected Mini App flow.
   - [x] First backend-only payment manifest slice: `POST /api/v1/telegram/mini-app/payments/manifest` in `backend/app/api/v1/endpoints/telegram_webhook.py` validates Mini App `initData`, resolves linked patient scope, returns payment/read/capture-disabled status without amounts, invoices, transactions, provider payloads, or payment records, rejects forged/staff/unlinked access, and is covered by `backend/tests/unit/test_telegram_webhook_security.py`.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
+  - [x] First backend-only result/report manifest slice: `POST /api/v1/telegram/mini-app/results/manifest` in `backend/app/api/v1/endpoints/telegram_webhook.py` validates Mini App `initData`, resolves linked patient scope, returns view/download-disabled status without medical results, lab values, report IDs, file URLs, PDFs, diagnoses, or records, rejects forged/staff/unlinked access, and is covered by `backend/tests/unit/test_telegram_webhook_security.py`.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
 ### Phase 6: AI assistant approval flows

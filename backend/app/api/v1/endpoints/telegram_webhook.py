@@ -874,6 +874,44 @@ TELEGRAM_MINI_APP_PATIENT_PAYMENTS_MANIFEST = (
         "contains_provider_payloads": False,
     },
 )
+TELEGRAM_MINI_APP_PATIENT_RESULTS_MANIFEST = (
+    {
+        "key": "lab_reports",
+        "title": "Lab reports",
+        "status": "planned",
+        "view_enabled": False,
+        "download_enabled": False,
+        "contains_medical_results": False,
+        "contains_lab_values": False,
+        "contains_report_records": False,
+        "contains_file_urls": False,
+        "contains_diagnoses": False,
+    },
+    {
+        "key": "visit_summaries",
+        "title": "Visit summaries",
+        "status": "planned",
+        "view_enabled": False,
+        "download_enabled": False,
+        "contains_medical_results": False,
+        "contains_lab_values": False,
+        "contains_report_records": False,
+        "contains_file_urls": False,
+        "contains_diagnoses": False,
+    },
+    {
+        "key": "attachments",
+        "title": "Attachments",
+        "status": "planned",
+        "view_enabled": False,
+        "download_enabled": False,
+        "contains_medical_results": False,
+        "contains_lab_values": False,
+        "contains_report_records": False,
+        "contains_file_urls": False,
+        "contains_diagnoses": False,
+    },
+)
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
 EMR_CLOSED_VISIT_STATUSES = {
@@ -4083,6 +4121,29 @@ def _build_mini_app_patient_payments_manifest_response(scope):
     }
 
 
+def _build_mini_app_patient_results_manifest_response(scope):
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": int(scope.patient_id),
+        },
+        "status": "manifest_only",
+        "results_enabled": False,
+        "view_enabled": False,
+        "download_enabled": False,
+        "contains_medical_results": False,
+        "contains_lab_values": False,
+        "contains_report_records": False,
+        "contains_file_urls": False,
+        "contains_pdfs": False,
+        "contains_diagnoses": False,
+        "message_key": "telegram_mini_app_patient_results_manifest_only",
+        "sections": [
+            dict(section) for section in TELEGRAM_MINI_APP_PATIENT_RESULTS_MANIFEST
+        ],
+    }
+
+
 def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
     db: Session,
@@ -4160,6 +4221,23 @@ def get_mini_app_patient_payments_manifest(
         db,
     )
     return _build_mini_app_patient_payments_manifest_response(scope)
+
+
+@router.post(
+    "/mini-app/results/manifest",
+    operation_id="telegram_mini_app_patient_results_manifest",
+)
+def get_mini_app_patient_results_manifest(
+    request_body: TelegramMiniAppPatientScopeRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe patient result/report status for a trusted Mini App session."""
+
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        request_body.init_data,
+        db,
+    )
+    return _build_mini_app_patient_results_manifest_response(scope)
 
 
 @router.post(
