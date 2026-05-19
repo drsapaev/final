@@ -4144,6 +4144,67 @@ def _build_mini_app_patient_results_manifest_response(scope):
     }
 
 
+def _build_mini_app_patient_manifest_response(scope):
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": int(scope.patient_id),
+        },
+        "status": "manifest_only",
+        "message_key": "telegram_mini_app_patient_manifest_only",
+        "capabilities": {
+            "appointments": {
+                "status": "booking_enabled",
+                "preview_endpoint": "/api/v1/telegram/mini-app/appointments/preview",
+                "create_endpoint": "/api/v1/telegram/mini-app/appointments",
+                "preview_enabled": True,
+                "create_enabled": True,
+                "contains_medical_data": False,
+                "contains_payment_provider_data": False,
+            },
+            "forms": {
+                "status": "manifest_only",
+                "manifest_endpoint": "/api/v1/telegram/mini-app/forms/manifest",
+                "capture_enabled": False,
+                "submission_enabled": False,
+                "contains_medical_data": False,
+                "contains_passport_data": False,
+            },
+            "cabinet": {
+                "status": "manifest_only",
+                "manifest_endpoint": "/api/v1/telegram/mini-app/cabinet/manifest",
+                "read_enabled": False,
+                "mutation_enabled": False,
+                "contains_medical_data": False,
+                "contains_passport_data": False,
+                "contains_billing_records": False,
+            },
+            "payments": {
+                "status": "manifest_only",
+                "manifest_endpoint": "/api/v1/telegram/mini-app/payments/manifest",
+                "read_enabled": False,
+                "payment_capture_enabled": False,
+                "provider_redirect_enabled": False,
+                "contains_amounts": False,
+                "contains_payment_records": False,
+                "contains_provider_payloads": False,
+            },
+            "results": {
+                "status": "manifest_only",
+                "manifest_endpoint": "/api/v1/telegram/mini-app/results/manifest",
+                "view_enabled": False,
+                "download_enabled": False,
+                "contains_medical_results": False,
+                "contains_lab_values": False,
+                "contains_report_records": False,
+                "contains_file_urls": False,
+                "contains_pdfs": False,
+                "contains_diagnoses": False,
+            },
+        },
+    }
+
+
 def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
     db: Session,
@@ -4170,6 +4231,23 @@ def _build_mini_app_appointment_booking_preview_from_request(
         ) from exc
 
     return preview
+
+
+@router.post(
+    "/mini-app/patient/manifest",
+    operation_id="telegram_mini_app_patient_manifest",
+)
+def get_mini_app_patient_manifest(
+    request_body: TelegramMiniAppPatientScopeRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe aggregate patient Mini App status for a trusted session."""
+
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        request_body.init_data,
+        db,
+    )
+    return _build_mini_app_patient_manifest_response(scope)
 
 
 @router.post(
