@@ -1106,6 +1106,137 @@ class TestTelegramWebhookSecurity:
             "uz-Latn"
         )
 
+    @pytest.mark.asyncio
+    async def test_patient_onboarding_contact_consent_reaches_localized_menu(
+        self, db_session, test_patient
+    ):
+        chat_id = 7026
+        fake_service = FakeTelegramBotService(active=True)
+        start_update = {
+            "update_id": 129,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": chat_id},
+                "from": {"id": chat_id, "language_code": "ru"},
+                "text": "/start",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            start_update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            chat_id,
+            telegram_webhook._localized_text("language_prompt", "ru"),
+            telegram_webhook.TELEGRAM_LANGUAGE_MENU,
+        )
+        fake_service._send_message.reset_mock()
+
+        language_update = {
+            "update_id": 130,
+            "message": {
+                "message_id": 2,
+                "chat": {"id": chat_id},
+                "from": {"id": chat_id, "language_code": "ru"},
+                "text": "O'zbekcha",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            language_update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == chat_id)
+            .one()
+        )
+        assert telegram_user.language_code == "uz-Latn"
+        assert telegram_user.patient_id is None
+        assert telegram_user.notifications_enabled is False
+        fake_service._send_message.assert_awaited_once_with(
+            chat_id,
+            telegram_webhook._localized_text("language_selected", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+        fake_service._send_message.reset_mock()
+
+        contact_update = {
+            "update_id": 131,
+            "message": {
+                "message_id": 3,
+                "chat": {"id": chat_id},
+                "from": {"id": chat_id, "language_code": "uz"},
+                "contact": {
+                    "user_id": chat_id,
+                    "phone_number": test_patient.phone,
+                },
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            contact_update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.notifications_enabled is False
+        chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
+        assert chat_arg == chat_id
+        assert telegram_webhook._localized_text("contact_linked", "uz-Latn") in text_arg
+        assert (
+            telegram_webhook._localized_text("notification_consent", "uz-Latn")
+            in text_arg
+        )
+        assert reply_markup == telegram_webhook._localized_notification_consent_menu(
+            "uz-Latn"
+        )
+        fake_service._send_message.reset_mock()
+
+        consent_update = {
+            "update_id": 132,
+            "message": {
+                "message_id": 4,
+                "chat": {"id": chat_id},
+                "from": {"id": chat_id, "language_code": "uz"},
+                "text": "Xabarnomalarga roziman",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            consent_update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.notifications_enabled is True
+        assert telegram_user.appointment_reminders is True
+        assert telegram_user.lab_notifications is True
+        fake_service._send_message.assert_awaited_once_with(
+            chat_id,
+            telegram_webhook._localized_text("notifications_enabled", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+        template_keys = [
+            row.template_key
+            for row in (
+                db_session.query(TelegramMessage)
+                .filter(TelegramMessage.chat_id == chat_id)
+                .order_by(TelegramMessage.id.asc())
+                .all()
+            )
+        ]
+        assert template_keys == [
+            "telegram_patient_language_prompt",
+            "telegram_patient_language_selected",
+            "telegram_patient_contact_linked",
+            "telegram_patient_notifications_enabled",
+        ]
+
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry
     ):
