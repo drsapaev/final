@@ -184,6 +184,62 @@ class PatientTelegramEventMessagesTest(unittest.TestCase):
         self.assertNotIn("<b>1000</b>", message)
         self.assertNotIn("UZS<script>", message)
 
+    def test_patient_telegram_payment_messages_redact_internal_identifiers(
+        self,
+    ) -> None:
+        sensitive_metadata = {
+            "amount": "150000",
+            "currency": "UZS",
+            "status": "paid",
+            "service_label": "Consultation",
+            "invoice_id": "invoice-internal-778899",
+            "payment_id": "payment-internal-112233",
+            "visit_id": "visit-internal-445566",
+            "patient_id": "patient-internal-987654",
+            "provider_payment_id": "payme-provider-payment-abc",
+            "provider_transaction_id": "click-provider-transaction-def",
+            "receipt_no": "receipt-internal-2026-001",
+        }
+
+        for event_type in (
+            "payment_created",
+            "payment_notification",
+            "payment_paid",
+        ):
+            message = notification_service_module._patient_telegram_event_message(
+                event_type,
+                "ru",
+                sensitive_metadata,
+            )
+
+            self.assertIsNotNone(message)
+            self.assertNotIn("invoice-internal-778899", message)
+            self.assertNotIn("payment-internal-112233", message)
+            self.assertNotIn("visit-internal-445566", message)
+            self.assertNotIn("patient-internal-987654", message)
+            self.assertNotIn("payme-provider-payment-abc", message)
+            self.assertNotIn("click-provider-transaction-def", message)
+            self.assertNotIn("receipt-internal-2026-001", message)
+            self.assertNotIn("invoice_id", message)
+            self.assertNotIn("payment_id", message)
+
+        created_message = notification_service_module._patient_telegram_event_message(
+            "payment_created",
+            "ru",
+            sensitive_metadata,
+        )
+        notification_message = (
+            notification_service_module._patient_telegram_event_message(
+                "payment_notification",
+                "ru",
+                sensitive_metadata,
+            )
+        )
+        self.assertIn("150000", created_message)
+        self.assertIn("UZS", created_message)
+        self.assertIn("150000", notification_message)
+        self.assertIn("UZS", notification_message)
+
 
 @pytest.mark.asyncio
 async def test_patient_telegram_event_helper_sends_safe_localized_message(
