@@ -285,7 +285,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 4: Staff bot
 
-- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, hash-only idempotency binding for replay protection, the required confirmed/completed/failed audit event contract, queue adapter readiness metadata, and queue `/call` + `/skip` domain adapter methods are implemented; confirmed state-changing actions remain disabled until remaining domain adapters and explicit action enablement are complete.
+- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, hash-only idempotency binding for replay protection, the required confirmed/completed/failed audit event contract, queue adapter readiness metadata, queue `/call` + `/skip` domain adapter methods, and `/cancel_visit` + `/move_visit` queue-link adapter methods are implemented; confirmed state-changing actions remain disabled until full visit/payment/schedule domain mutation adapters and explicit action enablement are complete.
 - [x] Role-based read-only menus exist for registrar, doctor, cashier, lab, admin, and owner/admin style users.
 - [x] Staff bot token is configured separately from the patient bot token.
 - [x] Staff linking is protected by server-side token validation.
@@ -297,7 +297,8 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit.
   - [x] `/call` and `/skip` queue-domain adapter methods are available in `backend/app/services/queue_service.py` as `QueueBusinessService.staff_call_next_patient(...)` and `QueueBusinessService.staff_skip_queue_entry(...)`; focused coverage in `backend/tests/unit/test_queue_time_window.py` verifies server-side selection/status updates preserve `queue_time`.
   - [x] Staff bot contract now marks the `/call` + `/skip` queue adapter runtime as available while keeping `explicit_action_enablement` blocked in `backend/app/api/v1/endpoints/admin_telegram.py`.
-  - [ ] `/cancel_visit` and `/move_visit` remain pending because full visit mutation/queue-link ownership needs a separate gate slice beyond the current queue-service adapter boundary.
+  - [x] `/cancel_visit` and `/move_visit` queue-link adapter methods are available in `backend/app/services/queue_service.py` as `QueueBusinessService.staff_cancel_visit_queue_link(...)` and `QueueBusinessService.staff_move_visit_queue_link(...)`; focused coverage verifies queue entry status changes preserve `queue_time`.
+  - [ ] Full protected visit-record mutation remains pending: the current `/cancel_visit` + `/move_visit` adapter scope is queue-link status only, with `visit_record_mutation_adapter` still blocked before Telegram action enablement.
 - [ ] Add domain service adapters for confirmed payment actions: status change, refund where policy allows it.
 - [ ] Add domain service adapters for confirmed schedule actions.
 - [ ] Add remaining audit events for confirmed, failed, and completed state-changing actions; confirmation-requested audit is implemented with `staff_action_confirmation_requested`, and the required future event taxonomy is published as `staff_action_confirmed`, `staff_action_completed`, and `staff_action_failed` in `backend/app/api/v1/endpoints/admin_telegram.py`, but action execution is still disabled.

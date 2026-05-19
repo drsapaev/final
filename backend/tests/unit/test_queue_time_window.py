@@ -202,3 +202,55 @@ def test_staff_skip_queue_entry_preserves_queue_time(db_session):
     assert result["queue_time_preserved"] is True
     assert first.status == "no_show"
     assert first.queue_time == datetime(2026, 1, 1, 7, 30)
+
+
+def test_staff_cancel_visit_queue_link_preserves_queue_time(db_session):
+    target_day = date(2026, 1, 1)
+    _daily_queue, first, _second = _queue_with_entries(
+        db_session,
+        target_day=target_day,
+    )
+    first.visit_id = 1001
+    db_session.flush()
+
+    result = QueueBusinessService().staff_cancel_visit_queue_link(
+        db_session,
+        visit_id=1001,
+        actor_user_id=42,
+        commit=False,
+    )
+
+    assert result["success"] is True
+    assert result["action"] == "staff_cancel_visit_queue_link"
+    assert result["visit_id"] == 1001
+    assert result["previous_status"] == "waiting"
+    assert result["status"] == "cancelled"
+    assert result["queue_time_preserved"] is True
+    assert first.status == "cancelled"
+    assert first.queue_time == datetime(2026, 1, 1, 7, 30)
+
+
+def test_staff_move_visit_queue_link_preserves_queue_time(db_session):
+    target_day = date(2026, 1, 1)
+    _daily_queue, first, _second = _queue_with_entries(
+        db_session,
+        target_day=target_day,
+    )
+    first.visit_id = 1002
+    db_session.flush()
+
+    result = QueueBusinessService().staff_move_visit_queue_link(
+        db_session,
+        visit_id=1002,
+        actor_user_id=42,
+        commit=False,
+    )
+
+    assert result["success"] is True
+    assert result["action"] == "staff_move_visit_queue_link"
+    assert result["visit_id"] == 1002
+    assert result["previous_status"] == "waiting"
+    assert result["status"] == "rescheduled"
+    assert result["queue_time_preserved"] is True
+    assert first.status == "rescheduled"
+    assert first.queue_time == datetime(2026, 1, 1, 7, 30)
