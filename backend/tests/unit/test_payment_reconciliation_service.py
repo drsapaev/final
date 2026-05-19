@@ -6,7 +6,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.services.payment_reconciliation import PaymentReconciliationService
+from app.services.payment_reconciliation import (
+    SUPPORTED_RECONCILIATION_PROVIDERS,
+    PaymentReconciliationService,
+)
 
 
 class _RepositoryStub:
@@ -51,6 +54,39 @@ class _ManagerStub:
 
 @pytest.mark.unit
 class TestPaymentReconciliationService:
+    def test_supported_reconciliation_providers_match_runtime_inventory(self):
+        assert SUPPORTED_RECONCILIATION_PROVIDERS == ("click", "payme", "kaspi")
+        assert "apelsin" not in SUPPORTED_RECONCILIATION_PROVIDERS
+
+    def test_reconcile_all_providers_uses_supported_inventory_without_apelsin(self):
+        service = PaymentReconciliationService(
+            db=Mock(),
+            repository=_RepositoryStub(),
+            payment_manager=_ManagerStub(None),
+        )
+        calls = []
+
+        def fake_reconcile_provider(provider_name, start_date, end_date):
+            calls.append(provider_name)
+            return {
+                "provider": provider_name,
+                "summary": {
+                    "discrepancy_count": 0,
+                    "difference": 0,
+                },
+            }
+
+        service.reconcile_provider = fake_reconcile_provider
+
+        result = service.reconcile_all_providers(
+            date(2026, 2, 1),
+            date(2026, 2, 2),
+        )
+
+        assert tuple(result["providers"].keys()) == SUPPORTED_RECONCILIATION_PROVIDERS
+        assert tuple(calls) == SUPPORTED_RECONCILIATION_PROVIDERS
+        assert "apelsin" not in result["providers"]
+
     def test_reconcile_provider_detects_discrepancies(self):
         repository = _RepositoryStub(
             transactions=[
@@ -89,6 +125,40 @@ class TestPaymentReconciliationService:
         assert result["summary"]["missing_in_provider_count"] == 0
         assert result["summary"]["missing_internal_count"] == 1
         assert result["summary"]["difference"] == 350
+
+    def test_alerts_include_supported_provider_names_for_staff_summary(self):
+        service = PaymentReconciliationService(
+            db=Mock(),
+            repository=_RepositoryStub(),
+            payment_manager=_ManagerStub(None),
+        )
+
+        alerts = service.alert_on_discrepancies(
+            {
+                "providers": {
+                    "click": {
+                        "summary": {
+                            "difference": 2500,
+                            "missing_in_provider_count": 0,
+                            "missing_internal_count": 0,
+                        },
+                        "discrepancies": [],
+                    },
+                    "payme": {
+                        "summary": {
+                            "difference": 0,
+                            "missing_in_provider_count": 0,
+                            "missing_internal_count": 1,
+                        },
+                        "discrepancies": [],
+                    },
+                    "kaspi": {"error": "statement unavailable"},
+                }
+            }
+        )
+
+        assert {alert["provider"] for alert in alerts} == {"click", "payme", "kaspi"}
+        assert "apelsin" not in {alert["provider"] for alert in alerts}
 
     def test_detect_missing_payments_returns_only_unresolved(self):
         now = datetime.utcnow()
