@@ -437,6 +437,8 @@ const DoctorPanel = () => {
     padding: getSpacing('xs'),
     borderRadius: '8px',
     border: 'none',
+    outline: '2px solid transparent',
+    outlineOffset: '2px',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     display: 'inline-flex',
@@ -487,6 +489,35 @@ const DoctorPanel = () => {
     };
     return statusMap[status] || status;
   };
+
+  const getQueuePatientContext = (entry) => {
+    const queueNumber = entry?.number || entry?.id || 'unknown';
+    const patientName = entry?.patient_name || 'unknown patient';
+    return `queue entry ${queueNumber} for ${patientName}`;
+  };
+
+  const getCurrentVisitMeta = (entry) => {
+    const statusMap = {
+      called: { label: 'Текущий прием', variant: 'primary' },
+      in_service: { label: 'На приеме', variant: 'info' },
+      diagnostics: { label: 'На диагностике', variant: 'info' }
+    };
+
+    return statusMap[entry?.status] || null;
+  };
+
+  const getQueueActionA11yProps = (action, entry) => ({
+    type: 'button',
+    'aria-label': `${action} for ${getQueuePatientContext(entry)}`,
+    onFocus: (event) => {
+      event.currentTarget.style.outline = `2px solid ${primaryColor}`;
+      event.currentTarget.style.boxShadow = '0 0 0 4px color-mix(in srgb, var(--mac-accent), transparent 72%)';
+    },
+    onBlur: (event) => {
+      event.currentTarget.style.outline = '2px solid transparent';
+      event.currentTarget.style.boxShadow = 'none';
+    }
+  });
 
   const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
     const color = tone === 'error' ? dangerColor : getColor('secondary', 500);
@@ -1164,6 +1195,7 @@ const DoctorPanel = () => {
                   <div style={{ display: 'flex', gap: getSpacing('sm') }}>
                     <Button
                     variant="primary"
+                    aria-label="Call next queue patient"
                     onClick={async () => {
                       try {
                         await callNext();
@@ -1179,7 +1211,8 @@ const DoctorPanel = () => {
                     </Button>
                     <Button
                     variant="ghost"
-                    onClick={loadQueue}>
+                    onClick={loadQueue}
+                    aria-label="Refresh doctor queue">
 
                       <RotateCcw size={16} />
                     </Button>
@@ -1215,13 +1248,17 @@ const DoctorPanel = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {queueEntries.map((entry, index) =>
+                      {queueEntries.map((entry, index) => {
+                    const currentVisitMeta = getCurrentVisitMeta(entry);
+
+                    return (
                   <tr
                     key={entry.id}
                     style={{
-                      background: entry.priority > 0 ? `${warningColor}10` : 'transparent',
-                      borderLeft: entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
-                    }}>
+                      background: currentVisitMeta ? 'color-mix(in srgb, var(--mac-accent), transparent 92%)' : entry.priority > 0 ? `${warningColor}10` : 'transparent',
+                      borderLeft: currentVisitMeta ? `3px solid ${primaryColor}` : entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
+                    }}
+                    aria-label={currentVisitMeta ? `Current patient ${getQueuePatientContext(entry)}` : undefined}>
 
                           <td style={tdStyle}>
                             <Badge variant={entry.priority > 0 ? 'warning' : 'default'}>
@@ -1229,8 +1266,24 @@ const DoctorPanel = () => {
                             </Badge>
                           </td>
                           <td style={tdStyle}>
-                            <strong>{entry.patient_name}</strong>
-                            {entry.priority > 0 && <span style={{ marginLeft: '4px', fontSize: '10px', color: warningColor }}>⚡ Следующий</span>}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
+                              <strong>{entry.patient_name}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), flexWrap: 'wrap' }}>
+                                {currentVisitMeta &&
+                                <Badge
+                                  variant={currentVisitMeta.variant}
+                                  role="status"
+                                  aria-label={`Current patient context: ${currentVisitMeta.label} for ${getQueuePatientContext(entry)}`}>
+                                  {currentVisitMeta.label}
+                                </Badge>
+                                }
+                                {entry.priority > 0 &&
+                                <span style={{ fontSize: '10px', color: warningColor }}>
+                                  ⚡ Следующий
+                                </span>
+                                }
+                              </div>
+                            </div>
                           </td>
                           <td style={tdStyle}>{entry.phone || '—'}</td>
                           <td style={tdStyle}>
@@ -1270,6 +1323,7 @@ const DoctorPanel = () => {
                             {entry.status === 'waiting' &&
                       <>
                                 <button
+                          {...getQueueActionA11yProps('Mark no-show', entry)}
                           style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                           onClick={() => markNoShow(entry.id)}
                           title="Отметить неявку">
@@ -1281,6 +1335,7 @@ const DoctorPanel = () => {
                             {entry.status === 'called' &&
                       <>
                                 <button
+                          {...getQueueActionA11yProps('Send to diagnostics', entry)}
                           style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
                           onClick={() => sendToDiagnostics(entry.id)}
                           title="На обследование">
@@ -1288,6 +1343,7 @@ const DoctorPanel = () => {
                                   <Stethoscope size={16} />
                                 </button>
                                 <button
+                          {...getQueueActionA11yProps('Complete visit', entry)}
                           style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
@@ -1295,6 +1351,7 @@ const DoctorPanel = () => {
                                   <CheckCircle size={16} />
                                 </button>
                                 <button
+                          {...getQueueActionA11yProps('Mark no-show', entry)}
                           style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                           onClick={() => markNoShow(entry.id)}
                           title="Не явился">
@@ -1306,6 +1363,7 @@ const DoctorPanel = () => {
                             {entry.status === 'diagnostics' &&
                       <>
                                 <button
+                          {...getQueueActionA11yProps('Call back from diagnostics', entry)}
                           style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
                           onClick={() => callFromDiagnostics(entry.id)}
                           title="Вернуть с диагностики (Push)">
@@ -1313,6 +1371,7 @@ const DoctorPanel = () => {
                                   <Bell size={16} />
                                 </button>
                                 <button
+                          {...getQueueActionA11yProps('Complete visit', entry)}
                           style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
@@ -1320,6 +1379,7 @@ const DoctorPanel = () => {
                                   <CheckCircle size={16} />
                                 </button>
                                 <button
+                          {...getQueueActionA11yProps('Mark visit incomplete', entry)}
                           style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
                           onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
                           title="Не вернулся">
@@ -1330,6 +1390,7 @@ const DoctorPanel = () => {
                       }
                             {entry.status === 'no_show' &&
                       <button
+                        {...getQueueActionA11yProps('Restore as next patient', entry)}
                         style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
                         onClick={() => restoreToNext(entry.id)}
                         title="Восстановить следующим">
@@ -1339,7 +1400,8 @@ const DoctorPanel = () => {
                       }
                           </td>
                         </tr>
-                  )}
+                    );
+                  })}
                     </tbody>
                   </table>
               }
