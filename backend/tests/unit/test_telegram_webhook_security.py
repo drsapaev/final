@@ -23,6 +23,7 @@ from app.models.payment import Payment
 from app.models.telegram_config import (
     TelegramConfig,
     TelegramMessage,
+    TelegramPatientFormSubmission,
     TelegramStaffLinkToken,
     TelegramUser,
 )
@@ -464,7 +465,7 @@ class TestTelegramWebhookSecurity:
         assert payload["policy"] == {
             "plain_telegram_chat_allowed": False,
             "medical_details_in_chat": False,
-            "storage_enabled": False,
+            "storage_enabled": True,
         }
         assert payload["forms"][0]["id"] == "patient_intake"
         assert {field["key"] for field in payload["forms"][0]["fields"]} == {
@@ -530,6 +531,135 @@ class TestTelegramWebhookSecurity:
         assert wrong_patient_response.status_code == 403
         assert wrong_patient_response.json()["detail"] == {"reason": "patient_scope_mismatch"}
         assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_patient_form_submission_endpoint_creates_and_updates_submission(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880214
+        telegram_user = _link_patient_to_chat(
+            db_session,
+            chat_id=chat_id,
+            patient_id=test_patient.id,
+        )
+
+        create_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "status": "draft",
+                "answers": {
+                    "chief_complaint": "  Headache  ",
+                    "allergies": "None",
+                    "consent_to_contact": True,
+                },
+            },
+        )
+
+        assert create_response.status_code == 200
+        created_payload = create_response.json()
+        assert created_payload["stored"] is True
+        assert created_payload["created"] is True
+        assert created_payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert created_payload["submission"]["form_id"] == "patient_intake"
+        assert created_payload["submission"]["status"] == "draft"
+        assert created_payload["submission"]["answers"] == {
+            "chief_complaint": "Headache",
+            "allergies": "None",
+            "consent_to_contact": True,
+        }
+        assert "telegram_chat_id" not in created_payload["submission"]
+        assert "telegram_user_id" not in created_payload["submission"]
+
+        submission = db_session.query(TelegramPatientFormSubmission).one()
+        assert submission.patient_id == test_patient.id
+        assert submission.telegram_user_id == telegram_user.id
+        assert submission.telegram_chat_id == chat_id
+        assert submission.status == "draft"
+        assert submission.submitted_at is None
+
+        update_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "status": "submitted",
+                "answers": {
+                    "chief_complaint": "Headache improved",
+                    "allergies": "",
+                    "current_medications": "Ibuprofen",
+                    "medical_history": "No chronic conditions",
+                    "consent_to_contact": False,
+                },
+            },
+        )
+
+        assert update_response.status_code == 200
+        updated_payload = update_response.json()
+        assert updated_payload["created"] is False
+        assert updated_payload["submission"]["id"] == created_payload["submission"]["id"]
+        assert updated_payload["submission"]["status"] == "submitted"
+        assert updated_payload["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert updated_payload["submission"]["submitted_at"] is not None
+        assert db_session.query(TelegramPatientFormSubmission).count() == 1
+
+    def test_mini_app_patient_form_submission_endpoint_rejects_invalid_answers(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880215
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+
+        unknown_field_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "answers": {"diagnosis": "do not accept"},
+            },
+        )
+        bool_type_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "answers": {"consent_to_contact": "yes"},
+            },
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id + 1,
+                "formId": "patient_intake",
+                "answers": {"chief_complaint": "Headache"},
+            },
+        )
+
+        assert unknown_field_response.status_code == 400
+        assert unknown_field_response.json()["detail"] == {
+            "reason": "patient_form_answer_unknown_field"
+        }
+        assert bool_type_response.status_code == 400
+        assert bool_type_response.json()["detail"] == {
+            "reason": "patient_form_answer_type_invalid"
+        }
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {
+            "reason": "patient_scope_mismatch"
+        }
+        assert db_session.query(TelegramPatientFormSubmission).count() == 0
 
     def test_mini_app_booking_create_endpoint_creates_safe_appointment(
         self,

@@ -157,6 +157,7 @@ from .setting import Setting
 from .telegram_config import (
     TelegramConfig,
     TelegramMessage,
+    TelegramPatientFormSubmission,
     TelegramTemplate,
     TelegramUser,
 )
@@ -284,6 +285,7 @@ __all__ = [
     "TelegramTemplate",
     "TelegramUser",
     "TelegramMessage",
+    "TelegramPatientFormSubmission",
     "DoctorPriceOverride",
     "DoctorPhraseHistory",
     "DoctorTreatmentTemplate",

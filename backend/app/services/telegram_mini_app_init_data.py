@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import telegram_config as crud_telegram
 from app.models.patient import Patient
-from app.models.telegram_config import TelegramUser
+from app.models.telegram_config import TelegramPatientFormSubmission, TelegramUser
 from app.models.user import User
 
 
@@ -23,6 +23,7 @@ DEFAULT_MAX_FUTURE_SKEW_SECONDS = 60
 _HASH_FIELD = "hash"
 _AUTH_DATE_FIELD = "auth_date"
 _VALID_MINI_APP_SCOPES = {"patient", "staff"}
+_VALID_PATIENT_FORM_STATUSES = {"draft", "submitted"}
 _STAFF_MINI_APP_SUPPORTED_ROLES = frozenset(
     {"admin", "owner", "doctor", "cashier", "lab", "registrar"}
 )
@@ -208,7 +209,42 @@ class TelegramMiniAppPatientFormsPreview:
             "policy": {
                 "plain_telegram_chat_allowed": False,
                 "medical_details_in_chat": False,
-                "storage_enabled": False,
+                "storage_enabled": True,
+            },
+        }
+
+
+@dataclass(frozen=True)
+class TelegramMiniAppPatientFormSubmissionResult:
+    """Persisted patient form response scoped to the protected Mini App."""
+
+    scope: TelegramMiniAppSessionScope
+    submission: TelegramPatientFormSubmission
+    created: bool
+    message_key: str = "telegram_mini_app_patient_form_saved"
+
+    def to_response_payload(self) -> dict[str, Any]:
+        return {
+            "stored": True,
+            "created": self.created,
+            "message_key": self.message_key,
+            "scope": {
+                "type": self.scope.scope_type,
+                "patient_id": self.scope.patient_id,
+            },
+            "submission": {
+                "id": int(self.submission.id),
+                "form_id": self.submission.form_id,
+                "schema_version": self.submission.schema_version,
+                "status": self.submission.status,
+                "answers": self.submission.answers or {},
+                "submitted_at": _serialize_datetime(self.submission.submitted_at),
+                "updated_at": _serialize_datetime(self.submission.updated_at),
+            },
+            "policy": {
+                "plain_telegram_chat_allowed": False,
+                "medical_details_in_chat": False,
+                "storage_enabled": True,
             },
         }
 
@@ -251,6 +287,12 @@ TELEGRAM_MINI_APP_PATIENT_FORMS: tuple[TelegramMiniAppPatientFormDefinition, ...
         ),
     ),
 )
+
+
+def _serialize_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
 
 
 def _utc_now() -> datetime:
@@ -350,6 +392,65 @@ def _normalize_appointment_time(value: str | None) -> str | None:
     except ValueError as exc:
         raise TelegramMiniAppSessionScopeError("appointment_time_invalid") from exc
     return f"{parsed.hour:02d}:{parsed.minute:02d}"
+
+
+def _patient_form_definition(form_id: str) -> TelegramMiniAppPatientFormDefinition:
+    normalized = str(form_id or "").strip()
+    if not normalized:
+        raise TelegramMiniAppSessionScopeError("patient_form_id_required")
+
+    for form_definition in TELEGRAM_MINI_APP_PATIENT_FORMS:
+        if form_definition.form_id == normalized:
+            return form_definition
+
+    raise TelegramMiniAppSessionScopeError("patient_form_unknown")
+
+
+def _normalize_patient_form_status(status: str | None) -> str:
+    normalized = str(status or "submitted").strip().lower()
+    if normalized not in _VALID_PATIENT_FORM_STATUSES:
+        raise TelegramMiniAppSessionScopeError("patient_form_status_invalid")
+    return normalized
+
+
+def _normalize_patient_form_answers(
+    form_definition: TelegramMiniAppPatientFormDefinition,
+    answers: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(answers, dict):
+        raise TelegramMiniAppSessionScopeError("patient_form_answers_invalid")
+
+    fields_by_key = {field.key: field for field in form_definition.fields}
+    normalized: dict[str, Any] = {}
+
+    for key, value in answers.items():
+        field_key = str(key or "").strip()
+        if field_key not in fields_by_key:
+            raise TelegramMiniAppSessionScopeError("patient_form_answer_unknown_field")
+
+        field = fields_by_key[field_key]
+        if field.field_type == "boolean":
+            if not isinstance(value, bool):
+                raise TelegramMiniAppSessionScopeError("patient_form_answer_type_invalid")
+            normalized[field_key] = value
+            continue
+
+        if value is None:
+            normalized[field_key] = ""
+            continue
+        if not isinstance(value, str):
+            raise TelegramMiniAppSessionScopeError("patient_form_answer_type_invalid")
+
+        text = value.strip()
+        if field.max_length is not None and len(text) > field.max_length:
+            raise TelegramMiniAppSessionScopeError("patient_form_answer_too_long")
+        normalized[field_key] = text
+
+    for field in form_definition.fields:
+        if field.required and field.key not in normalized:
+            raise TelegramMiniAppSessionScopeError("patient_form_answer_required")
+
+    return normalized
 
 
 def _normalize_staff_role(role: Any) -> str:
@@ -658,4 +759,64 @@ def build_telegram_mini_app_patient_forms_preview(
     return TelegramMiniAppPatientFormsPreview(
         scope=scope,
         forms=TELEGRAM_MINI_APP_PATIENT_FORMS,
+    )
+
+
+def save_telegram_mini_app_patient_form_submission(
+    db: Session,
+    scope: TelegramMiniAppSessionScope,
+    *,
+    form_id: str,
+    answers: dict[str, Any],
+    status: str = "submitted",
+    patient_id: int | None = None,
+) -> TelegramMiniAppPatientFormSubmissionResult:
+    """Create or update one protected patient form submission for a linked patient."""
+
+    if scope.patient_id is None:
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+    if patient_id is not None:
+        require_telegram_mini_app_patient_scope(scope, patient_id=patient_id)
+    elif scope.scope_type != "patient":
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+
+    form_definition = _patient_form_definition(form_id)
+    normalized_status = _normalize_patient_form_status(status)
+    normalized_answers = _normalize_patient_form_answers(form_definition, answers)
+    now = _utc_now()
+
+    submission = (
+        db.query(TelegramPatientFormSubmission)
+        .filter(
+            TelegramPatientFormSubmission.patient_id == int(scope.patient_id),
+            TelegramPatientFormSubmission.form_id == form_definition.form_id,
+        )
+        .first()
+    )
+    created = submission is None
+    if submission is None:
+        submission = TelegramPatientFormSubmission(
+            patient_id=int(scope.patient_id),
+            telegram_user_id=int(scope.telegram_user_id),
+            telegram_chat_id=int(scope.telegram_chat_id),
+            form_id=form_definition.form_id,
+            schema_version=1,
+            source="telegram_mini_app",
+        )
+        db.add(submission)
+
+    submission.telegram_user_id = int(scope.telegram_user_id)
+    submission.telegram_chat_id = int(scope.telegram_chat_id)
+    submission.status = normalized_status
+    submission.answers = normalized_answers
+    submission.updated_at = now
+    submission.submitted_at = now if normalized_status == "submitted" else None
+
+    db.commit()
+    db.refresh(submission)
+
+    return TelegramMiniAppPatientFormSubmissionResult(
+        scope=scope,
+        submission=submission,
+        created=created,
     )
