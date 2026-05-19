@@ -427,9 +427,15 @@ class TestTelegramBotManagementApiService:
         assert queue_adapter["adapter_key"] == "staff_queue_call_or_skip_adapter"
         assert queue_adapter["domain"] == "queue"
         assert queue_adapter["telegram_commands"] == ["/call", "/skip"]
-        assert queue_adapter["runtime_enabled"] is False
+        assert queue_adapter["runtime_enabled"] is True
+        assert queue_adapter["runtime_owner"] == "QueueBusinessService"
+        assert queue_adapter["runtime_methods"] == [
+            "staff_call_next_patient",
+            "staff_skip_queue_entry",
+        ]
         assert "queue_time_not_rewritten" in queue_adapter["required_runtime_checks"]
-        assert "queue_domain_mutation_adapter" in queue_adapter["blocked_by"]
+        assert "queue_domain_mutation_adapter" not in queue_adapter["blocked_by"]
+        assert "explicit_action_enablement" in queue_adapter["blocked_by"]
         visit_adapter = adapters_by_operation["visit_cancel_or_move"]
         assert (
             visit_adapter["adapter_key"] == "staff_queue_visit_cancel_or_move_adapter"
@@ -525,7 +531,7 @@ class TestTelegramBotManagementApiService:
             == "domain_service_action_adapters"
         )
         assert status["confirmations"]["domain_adapter_runtime_enabled"] is False
-        assert status["confirmations"]["queue_action_adapter_runtime_enabled"] is False
+        assert status["confirmations"]["queue_action_adapter_runtime_enabled"] is True
         assert status["confirmations"]["domain_adapter_blockers"] == (
             admin_telegram.STAFF_BOT_DOMAIN_ADAPTER_CONTRACT["blocked_by"]
         )

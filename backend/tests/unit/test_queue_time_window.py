@@ -6,6 +6,8 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import app.services.queue_service as queue_service
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.queue_service import QueueBusinessService
 
 
@@ -112,3 +114,91 @@ def test_assign_queue_token_enforces_sensitive_qr_ttl_floor(monkeypatch):
     now = frozen.replace(tzinfo=ZoneInfo("Asia/Tashkent"))
     assert metadata["expires_at"] - now == timedelta(minutes=5)
     assert metadata["ttl_minutes"] == 5
+
+
+def _queue_with_entries(db_session, *, target_day: date):
+    doctor = Doctor(specialty="cardiology", cabinet="101")
+    db_session.add(doctor)
+    db_session.flush()
+
+    daily_queue = DailyQueue(
+        day=target_day,
+        specialist_id=doctor.id,
+        queue_tag="cardio",
+        active=True,
+    )
+    db_session.add(daily_queue)
+    db_session.flush()
+
+    first_time = datetime(2026, 1, 1, 7, 30)
+    second_time = datetime(2026, 1, 1, 8, 0)
+    first = OnlineQueueEntry(
+        queue_id=daily_queue.id,
+        number=1,
+        patient_name="First Patient",
+        status="waiting",
+        queue_time=first_time,
+        source="desk",
+    )
+    second = OnlineQueueEntry(
+        queue_id=daily_queue.id,
+        number=2,
+        patient_name="Second Patient",
+        status="waiting",
+        queue_time=second_time,
+        source="desk",
+    )
+    db_session.add_all([first, second])
+    db_session.flush()
+    return daily_queue, first, second
+
+
+def test_staff_call_next_patient_preserves_queue_time(db_session, monkeypatch):
+    target_day = date(2026, 1, 1)
+    _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 9, 0))
+    daily_queue, first, second = _queue_with_entries(
+        db_session,
+        target_day=target_day,
+    )
+
+    result = QueueBusinessService().staff_call_next_patient(
+        db_session,
+        queue_id=daily_queue.id,
+        target_date=target_day,
+        actor_user_id=42,
+        commit=False,
+    )
+
+    assert result["success"] is True
+    assert result["action"] == "staff_call_next_patient"
+    assert result["entry_id"] == first.id
+    assert result["previous_status"] == "waiting"
+    assert result["status"] == "called"
+    assert result["queue_time_preserved"] is True
+    assert first.status == "called"
+    assert first.queue_time == datetime(2026, 1, 1, 7, 30)
+    assert first.called_at is not None
+    assert second.status == "waiting"
+
+
+def test_staff_skip_queue_entry_preserves_queue_time(db_session):
+    target_day = date(2026, 1, 1)
+    _daily_queue, first, _second = _queue_with_entries(
+        db_session,
+        target_day=target_day,
+    )
+
+    result = QueueBusinessService().staff_skip_queue_entry(
+        db_session,
+        entry_id=first.id,
+        actor_user_id=42,
+        commit=False,
+    )
+
+    assert result["success"] is True
+    assert result["action"] == "staff_skip_queue_entry"
+    assert result["previous_status"] == "waiting"
+    assert result["status"] == "no_show"
+    assert result["queue_time_preserved"] is True
+    assert first.status == "no_show"
+    assert first.queue_time == datetime(2026, 1, 1, 7, 30)
