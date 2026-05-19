@@ -1771,6 +1771,7 @@ class TestTelegramWebhookSecurity:
         assert len(uz_command_names) == len(set(uz_command_names))
         assert {command["command"] for command in captured[0]["json"]["commands"]} == {
             "start",
+            "menu",
             "book",
             "queue",
             "visits",
@@ -1783,6 +1784,7 @@ class TestTelegramWebhookSecurity:
         }
         assert {command["command"] for command in captured[1]["json"]["commands"]} == {
             "start",
+            "menu",
             "book",
             "queue",
             "visits",

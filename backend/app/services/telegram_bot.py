@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
 PATIENT_BOT_COMMANDS_RU = [
     {"command": "start", "description": "Начать"},
+    {"command": "menu", "description": "Главное меню"},
     {"command": "book", "description": "Записаться на приём"},
     {"command": "queue", "description": "Моя очередь"},
     {"command": "visits", "description": "Мои визиты"},
@@ -37,6 +38,7 @@ PATIENT_BOT_COMMANDS_RU = [
 ]
 PATIENT_BOT_COMMANDS_UZ = [
     {"command": "start", "description": "Boshlash"},
+    {"command": "menu", "description": "Asosiy menyu"},
     {"command": "book", "description": "Qabulga yozilish"},
     {"command": "queue", "description": "Mening navbatim"},
     {"command": "visits", "description": "Mening tashriflarim"},
