@@ -620,6 +620,7 @@ class VisitPaymentIntegrationService:
 
             # Обновляем статус вебхука
             repo.update_webhook_status(webhook_id=webhook.id, status="appointment_updated")
+            db.commit()
 
             patient_id = VisitPaymentIntegrationService._resolve_appointment_patient_id(
                 db, appointment_id, webhook

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -176,6 +176,70 @@ class TestVisitPaymentIntegrationService:
         )
 
         assert patient_id == 88
+
+    def test_process_payment_for_appointment_sends_safe_patient_telegram_status(self):
+        webhook = SimpleNamespace(
+            id=55,
+            amount=1234500,
+            currency="UZS",
+            provider="click",
+            transaction_id="trx-55",
+        )
+        repo = SimpleNamespace(
+            update_appointment_status=lambda **_: True,
+            update_appointment_fields=lambda **_: True,
+            update_webhook_status=lambda **_: None,
+        )
+        db = SimpleNamespace(commit=Mock())
+        send_event = AsyncMock(return_value=True)
+
+        with (
+            patch(
+                "app.services.visit_payment_integration.VisitPaymentIntegrationRepository",
+                return_value=repo,
+            ),
+            patch.object(
+                VisitPaymentIntegrationService,
+                "_resolve_appointment_patient_id",
+                return_value=88,
+            ),
+            patch(
+                "app.services.notifications.notification_sender_service.send_patient_telegram_event_notification",
+                send_event,
+            ),
+        ):
+            success, message = VisitPaymentIntegrationService.process_payment_for_appointment(
+                db,
+                appointment_id=42,
+                webhook=webhook,
+            )
+
+        assert success is True
+        assert "42" in message
+        db.commit.assert_called_once()
+        send_event.assert_awaited_once()
+        _, kwargs = send_event.await_args
+        assert kwargs["db"] is db
+        assert kwargs["patient_id"] == 88
+        assert kwargs["event_type"] == "payment_paid"
+        assert kwargs["metadata"] == {
+            "status": "paid",
+            "amount": "12345",
+            "currency": "UZS",
+            "provider": "click",
+        }
+        assert "trx-55" not in kwargs["metadata"].values()
+        for internal_key in (
+            "appointment_id",
+            "invoice_id",
+            "payment_id",
+            "visit_id",
+            "patient_id",
+            "webhook_id",
+            "transaction_id",
+            "provider_transaction_id",
+        ):
+            assert internal_key not in kwargs["metadata"]
 
     def test_process_payment_for_appointment_updates_repository(self, db_session):
         webhook = SimpleNamespace(
