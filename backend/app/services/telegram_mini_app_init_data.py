@@ -119,6 +119,29 @@ class TelegramMiniAppAppointmentBookingDraft:
         }
 
 
+@dataclass(frozen=True)
+class TelegramMiniAppAppointmentBookingPreview:
+    """Preview-only booking response prepared before any appointment mutation."""
+
+    scope: TelegramMiniAppSessionScope
+    draft: TelegramMiniAppAppointmentBookingDraft
+    preview_only: bool = True
+    mutation_allowed: bool = False
+    message_key: str = "telegram_mini_app_booking_preview_ready"
+
+    def to_response_payload(self) -> dict[str, Any]:
+        return {
+            "preview_only": self.preview_only,
+            "mutation_allowed": self.mutation_allowed,
+            "message_key": self.message_key,
+            "scope": {
+                "type": self.scope.scope_type,
+                "patient_id": self.draft.patient_id,
+            },
+            "appointment": self.draft.to_appointment_create_payload(),
+        }
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -473,4 +496,35 @@ def build_telegram_mini_app_appointment_booking_draft(
             reason="notes_too_long",
         ),
         services=_normalize_services(services),
+    )
+
+
+def build_telegram_mini_app_appointment_booking_preview(
+    scope: TelegramMiniAppSessionScope,
+    *,
+    appointment_date: date,
+    appointment_time: str | None = None,
+    doctor_id: int | None = None,
+    department: str | None = None,
+    notes: str | None = None,
+    services: list[str] | tuple[str, ...] | None = None,
+    patient_id: int | None = None,
+    today: date | None = None,
+) -> TelegramMiniAppAppointmentBookingPreview:
+    """Prepare a Mini App booking preview without creating an appointment."""
+
+    draft = build_telegram_mini_app_appointment_booking_draft(
+        scope,
+        appointment_date=appointment_date,
+        appointment_time=appointment_time,
+        doctor_id=doctor_id,
+        department=department,
+        notes=notes,
+        services=services,
+        patient_id=patient_id,
+        today=today,
+    )
+    return TelegramMiniAppAppointmentBookingPreview(
+        scope=scope,
+        draft=draft,
     )

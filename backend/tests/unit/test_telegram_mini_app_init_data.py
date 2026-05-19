@@ -12,6 +12,7 @@ from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScopeError,
     build_telegram_mini_app_appointment_booking_draft,
+    build_telegram_mini_app_appointment_booking_preview,
     require_telegram_mini_app_patient_scope,
     require_telegram_mini_app_staff_scope,
     resolve_telegram_mini_app_session_scope,
@@ -355,6 +356,49 @@ def test_build_telegram_mini_app_appointment_booking_draft_uses_patient_scope(
     assert payload["services"] == ["Consultation"]
 
 
+def test_build_telegram_mini_app_appointment_booking_preview_is_non_mutating(
+    db_session,
+    test_patient,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880110
+    db_session.add(_telegram_user(chat_id, patient_id=test_patient.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="patient",
+    )
+
+    preview = build_telegram_mini_app_appointment_booking_preview(
+        scope,
+        patient_id=test_patient.id,
+        doctor_id=12,
+        appointment_date=date(2026, 5, 20),
+        appointment_time="09:30",
+        department="Cardiology",
+        notes="Mini App request",
+        services=["Consultation"],
+        today=date(2026, 5, 19),
+    )
+
+    payload = preview.to_response_payload()
+    appointment = payload["appointment"]
+    assert payload["preview_only"] is True
+    assert payload["mutation_allowed"] is False
+    assert payload["message_key"] == "telegram_mini_app_booking_preview_ready"
+    assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+    assert "appointment_id" not in appointment
+    assert appointment["patient_id"] == test_patient.id
+    assert appointment["status"] == "scheduled"
+    assert appointment["payment_type"] == "cash"
+    assert appointment["payment_currency"] == "UZS"
+    assert appointment["payment_provider"] is None
+    assert appointment["payment_transaction_id"] is None
+    assert appointment["payment_webhook_id"] is None
+
+
 def test_build_telegram_mini_app_appointment_booking_draft_rejects_staff_scope(
     db_session,
     admin_user,
@@ -372,6 +416,31 @@ def test_build_telegram_mini_app_appointment_booking_draft_rejects_staff_scope(
 
     with pytest.raises(TelegramMiniAppSessionScopeError) as excinfo:
         build_telegram_mini_app_appointment_booking_draft(
+            scope,
+            appointment_date=date(2026, 5, 20),
+            today=date(2026, 5, 19),
+        )
+
+    assert excinfo.value.reason == "patient_scope_required"
+
+
+def test_build_telegram_mini_app_appointment_booking_preview_rejects_staff_scope(
+    db_session,
+    admin_user,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880111
+    db_session.add(_telegram_user(chat_id, user_id=admin_user.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="staff",
+    )
+
+    with pytest.raises(TelegramMiniAppSessionScopeError) as excinfo:
+        build_telegram_mini_app_appointment_booking_preview(
             scope,
             appointment_date=date(2026, 5, 20),
             today=date(2026, 5, 19),
