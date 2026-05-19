@@ -293,6 +293,19 @@ const TelegramManager = () => {
   const staffConfirmationBlockerSummary = staffConfirmationBlockedBy.length ?
   staffConfirmationBlockedBy.join(', ') :
   'none';
+  const staffDomainAdapterContract =
+  staffBot.domain_adapter_contract || staffConfirmationContract.domain_adapter_contract || {};
+  const staffDomainAdapters = Array.isArray(staffDomainAdapterContract.adapters) ?
+  staffDomainAdapterContract.adapters :
+  [];
+  const staffQueueDomainAdapters = staffDomainAdapters.filter((adapter) => adapter?.domain === 'queue');
+  const readyStaffDomainAdapters = staffDomainAdapters.filter((adapter) => adapter?.runtime_enabled);
+  const staffDomainAdapterBlockedBy = Array.isArray(staffDomainAdapterContract.blocked_by) ?
+  staffDomainAdapterContract.blocked_by :
+  [];
+  const staffQueueAdapterCommands = staffQueueDomainAdapters.flatMap((adapter) =>
+  Array.isArray(adapter?.telegram_commands) ? adapter.telegram_commands : []
+  );
   const staffAuditContract = staffBot.audit_contract || {};
   const staffAuditRuntime = staffBot.audit || {};
   const staffAuditEvents = Array.isArray(staffAuditContract.event_types) ?
@@ -900,6 +913,23 @@ const TelegramManager = () => {
                     size="small">
 
                     {staffConfirmationGuardReady ? 'Guard' : 'Required'}
+                  </Badge>
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Staff queue action adapters"
+                    secondary={staffQueueDomainAdapters.length ?
+                    `${readyStaffDomainAdapters.length}/${staffDomainAdapters.length} adapters enabled; queue commands: ${staffQueueAdapterCommands.join(' ') || 'none'}; blockers: ${staffDomainAdapterBlockedBy.join(', ') || 'none'}` :
+                    'Queue action adapter contract not published'} />
+
+                  <Badge
+                    variant={staffDomainAdapterContract.runtime_enabled ? 'success' : 'warning'}
+                    size="small">
+
+                    {staffDomainAdapterContract.runtime_enabled ? 'Enabled' : 'Blocked'}
                   </Badge>
                 </ListItem>
                 <ListItem>
