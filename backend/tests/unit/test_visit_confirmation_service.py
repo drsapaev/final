@@ -12,6 +12,8 @@ from app.services.visit_confirmation_service import (
     TELEGRAM_TICKET_QR_TTL_MINUTES,
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    build_telegram_ticket_start_token,
+    consume_telegram_ticket_start_token,
     parse_telegram_ticket_start_token,
 )
 
@@ -156,3 +158,65 @@ class TestVisitConfirmationService:
             )
             <= 1
         )
+
+    def test_ticket_telegram_qr_rollout_rejects_expired_and_malformed_tokens(
+        self,
+    ):
+        expired_token = build_telegram_ticket_start_token(
+            expires_at=datetime.utcnow() - timedelta(minutes=1),
+            nonce="expiredcase",
+        )
+        future_token = build_telegram_ticket_start_token(
+            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            nonce="futurecase",
+        )
+        tampered_token = f"{future_token[:-1]}x"
+
+        assert parse_telegram_ticket_start_token(expired_token) is None
+        assert parse_telegram_ticket_start_token("") is None
+        assert parse_telegram_ticket_start_token("not-a-ticket-token") is None
+        assert parse_telegram_ticket_start_token("tq_notbase36_nonce_sig") is None
+        assert parse_telegram_ticket_start_token(tampered_token) is None
+
+    def test_ticket_telegram_qr_rollout_rejects_expired_stored_token(
+        self, db_session, test_visit
+    ):
+        token = build_telegram_ticket_start_token(
+            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            nonce="storeexpired",
+        )
+        parsed = parse_telegram_ticket_start_token(token)
+        assert parsed is not None
+        test_visit.confirmation_token = parsed["token_hash"]
+        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(minutes=1)
+        db_session.commit()
+
+        consumed = consume_telegram_ticket_start_token(db_session, token)
+
+        assert consumed is None
+        db_session.refresh(test_visit)
+        assert test_visit.confirmation_token == parsed["token_hash"]
+
+    def test_ticket_telegram_qr_rollout_consumes_once_and_blocks_replay(
+        self, db_session, test_visit
+    ):
+        token = build_telegram_ticket_start_token(
+            expires_at=datetime.utcnow() + timedelta(minutes=5),
+            nonce="replaycase",
+        )
+        parsed = parse_telegram_ticket_start_token(token)
+        assert parsed is not None
+        test_visit.confirmation_token = parsed["token_hash"]
+        test_visit.confirmation_expires_at = parsed["expires_at"]
+        db_session.commit()
+
+        first = consume_telegram_ticket_start_token(db_session, token)
+        db_session.flush()
+        second = consume_telegram_ticket_start_token(db_session, token)
+
+        assert first is not None
+        assert first.id == test_visit.id
+        assert second is None
+        db_session.refresh(test_visit)
+        assert test_visit.confirmation_token is None
+        assert test_visit.confirmation_expires_at is None
