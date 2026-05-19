@@ -327,6 +327,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
   - [ ] Implement patient forms inside the protected Mini App flow.
   - [x] Add backend protected forms preview/schema endpoint: `POST /api/v1/telegram/mini-app/forms/preview` validates Telegram Mini App `initData`, resolves linked patient scope, rejects forged/staff/wrong-patient access, returns non-mutating patient intake form metadata, and keeps storage disabled until capture/edit persistence is implemented; focused coverage is in `backend/tests/unit/test_telegram_webhook_security.py`.
   - [x] Route `/patient?tab=forms` to a dedicated patient section view (`frontend/src/pages/PatientPanel.jsx`) so the Telegram button lands on a separate functional screen instead of the generic patient home.
+  - [x] Connect the patient forms tab to the protected Mini App preview/schema endpoint: `frontend/src/pages/PatientPanel.jsx` reads `window.Telegram.WebApp.initData`, calls `/telegram/mini-app/forms/preview`, renders returned intake fields read-only, and refuses to collect medical text outside trusted Mini App identity or before storage is enabled.
   - [ ] Add patient forms capture/edit flow in Mini App runtime with linked-patient validation.
 - [ ] Implement patient cabinet inside the protected Mini App flow.
 - [ ] Implement payment details inside the protected Mini App flow.

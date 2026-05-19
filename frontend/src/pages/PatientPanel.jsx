@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge, Icon } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { api } from '../api/client';
 
 const PanelEmptyState = ({ icon: EmptyIcon, title, description }) => (
   <div className="p-6 border border-dashed border-gray-300 rounded-lg text-center bg-white/60">
@@ -49,11 +50,112 @@ const normalizeSection = (value) => {
   return patientSections[String(value).toLowerCase()] ? String(value).toLowerCase() : 'home';
 };
 
+const readTelegramMiniAppInitData = () => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  const initData = window.Telegram?.WebApp?.initData;
+  return typeof initData === 'string' ? initData.trim() : '';
+};
+
+const PatientFormsPreview = ({ status, preview, error }) => {
+  if (status === 'missing-init-data') {
+    return (
+      <PanelEmptyState
+        icon={ClipboardList}
+        title="Open from Telegram"
+        description="Protected forms require Telegram Mini App identity before patient data can be shown."
+      />
+    );
+  }
+
+  if (status === 'loading') {
+    return (
+      <PanelEmptyState
+        icon={ClipboardList}
+        title="Loading forms"
+        description="Checking protected Telegram Mini App identity."
+      />
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <PanelEmptyState
+        icon={ClipboardList}
+        title="Forms unavailable"
+        description={error || 'Protected patient forms could not be loaded.'}
+      />
+    );
+  }
+
+  const forms = Array.isArray(preview?.forms) ? preview.forms : [];
+  if (forms.length === 0) {
+    return (
+      <PanelEmptyState
+        icon={ClipboardList}
+        title="No forms available"
+        description="No protected patient intake forms are configured yet."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {forms.map((form) => (
+        <div key={form.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="font-medium text-gray-900">{form.title}</div>
+            <p className="mt-1 text-sm text-gray-500">{form.description}</p>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(form.fields || []).map((field) => (
+              <label key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                <span className="block text-sm font-medium text-gray-700">{field.label}</span>
+                {field.type === 'boolean' ? (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                    <input type="checkbox" disabled className="h-4 w-4 rounded border-gray-300" />
+                    <span>Not selected</span>
+                  </div>
+                ) : (
+                  <textarea
+                    disabled
+                    rows={field.type === 'textarea' ? 3 : 1}
+                    maxLength={field.max_length || undefined}
+                    className="mt-2 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+                    placeholder="Protected entry is disabled until secure storage is enabled."
+                  />
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+PatientFormsPreview.propTypes = {
+  status: PropTypes.string.isRequired,
+  preview: PropTypes.shape({
+    forms: PropTypes.array,
+  }),
+  error: PropTypes.string,
+};
+
+PatientFormsPreview.defaultProps = {
+  preview: null,
+  error: '',
+};
+
 const PatientPanel = () => {
   useBreakpoint();
   const [query, setQuery] = useState('');
   const [searchParams] = useSearchParams();
   const activeSection = normalizeSection(searchParams.get('tab'));
+  const [formsPreview, setFormsPreview] = useState(null);
+  const [formsStatus, setFormsStatus] = useState('idle');
+  const [formsError, setFormsError] = useState('');
   const appointments = [];
   const results = [];
   const hasPatientData = appointments.length > 0 || results.length > 0;
@@ -61,6 +163,49 @@ const PatientPanel = () => {
   const sectionConfig = patientSections[activeSection];
   const isSectionMode = Boolean(sectionConfig);
   const sectionTitle = sectionConfig?.title || 'Patient Home';
+
+  useEffect(() => {
+    if (activeSection !== 'forms') {
+      setFormsStatus('idle');
+      setFormsPreview(null);
+      setFormsError('');
+      return undefined;
+    }
+
+    const initData = readTelegramMiniAppInitData();
+    if (!initData) {
+      setFormsStatus('missing-init-data');
+      setFormsPreview(null);
+      setFormsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setFormsStatus('loading');
+    setFormsError('');
+    setFormsPreview(null);
+
+    api.post('/telegram/mini-app/forms/preview', { initData })
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        setFormsPreview(response.data);
+        setFormsStatus('ready');
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return;
+        }
+        const reason = err?.response?.data?.detail?.reason || 'forms_preview_failed';
+        setFormsError(reason);
+        setFormsStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   return (
     <div
@@ -141,11 +286,19 @@ const PatientPanel = () => {
               <h3 className="font-medium text-gray-900">{sectionTitle}</h3>
             </div>
             <div className="p-4">
-              <PanelEmptyState
-                icon={sectionConfig.icon}
-                title={sectionConfig.title}
-                description={sectionConfig.description}
-              />
+              {activeSection === 'forms' ? (
+                <PatientFormsPreview
+                  status={formsStatus}
+                  preview={formsPreview}
+                  error={formsError}
+                />
+              ) : (
+                <PanelEmptyState
+                  icon={sectionConfig.icon}
+                  title={sectionConfig.title}
+                  description={sectionConfig.description}
+                />
+              )}
             </div>
           </Card>
         ) : (
