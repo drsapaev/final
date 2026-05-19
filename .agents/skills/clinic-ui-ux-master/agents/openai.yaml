@@ -1,0 +1,7 @@
+interface:
+  display_name: "Clinic UI/UX Master"
+  short_description: "Project-specific clinic UI/UX audit, design-system convergence, and visual QA workflow"
+  default_prompt: "Use $clinic-ui-ux-master to audit or improve this clinic frontend UI safely."
+
+policy:
+  allow_implicit_invocation: true
