@@ -231,6 +231,16 @@ const adminSectionShellStyle = {
   backdropFilter: 'var(--mac-blur-light)',
   WebkitBackdropFilter: 'var(--mac-blur-light)'
 };
+const adminKpiGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: 'var(--mac-spacing-6)'
+};
+const adminKpiCardStyle = {
+  minHeight: '112px',
+  background: adminSurfaceStrong,
+  border: adminBorder
+};
 
 const AdminPanel = () => {
   const location = useLocation();
@@ -1225,17 +1235,58 @@ const AdminPanel = () => {
     }
   }
 
+  const dashboardKpis = [
+    {
+      key: 'users',
+      title: 'Всего пользователей',
+      value: stats.totalUsers || 0,
+      icon: Users,
+      color: 'blue'
+    },
+    {
+      key: 'doctors',
+      title: 'Врачи',
+      value: stats.totalDoctors || 0,
+      icon: Stethoscope,
+      color: 'green'
+    },
+    {
+      key: 'patients',
+      title: 'Пациенты',
+      value: stats.totalPatients || 0,
+      icon: Users,
+      color: 'purple'
+    },
+    {
+      key: 'revenue',
+      title: 'Доход',
+      value: formatCurrency(stats.totalRevenue || 0),
+      icon: TrendingUp,
+      color: 'green'
+    },
+    {
+      key: 'appointments-today',
+      title: 'Записи сегодня',
+      value: stats.appointmentsToday || 0,
+      icon: Calendar,
+      color: 'orange'
+    },
+    {
+      key: 'pending-approvals',
+      title: 'Ожидают подтверждения',
+      value: stats.pendingApprovals || 0,
+      icon: Clock,
+      color: 'red'
+    }
+  ];
+
   const renderDashboard = () =>
   <ErrorBoundary>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <AdminRouteSwitcher current="dashboard" />
         {/* Красивые KPI карточки */}
         {statsLoading ?
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '24px'
-      }}>
+      <div style={adminKpiGridStyle} aria-label="Загрузка ключевых показателей администратора" aria-busy="true">
             <MacOSLoadingSkeleton type="card" count={6} />
           </div> :
       statsError ?
@@ -1251,58 +1302,18 @@ const AdminPanel = () => {
         } /> :
 
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '24px'
-      }}>
-            <MacOSStatCard
-          title="Всего пользователей"
-          value={stats.totalUsers || 0}
-          icon={Users}
-          color="blue"
-          loading={statsLoading} />
-
-
-            <MacOSStatCard
-          title="Врачи"
-          value={stats.totalDoctors || 0}
-          icon={Stethoscope}
-          color="green"
-          loading={statsLoading} />
-
-
-            <MacOSStatCard
-          title="Пациенты"
-          value={stats.totalPatients || 0}
-          icon={Users}
-          color="purple"
-          loading={statsLoading} />
-
-
-            <MacOSStatCard
-          title="Доход"
-          value={formatCurrency(stats.totalRevenue || 0)}
-          icon={TrendingUp}
-          color="green"
-          loading={statsLoading} />
-
-
-            <MacOSStatCard
-          title="Записи сегодня"
-          value={stats.appointmentsToday || 0}
-          icon={Calendar}
-          color="orange"
-          loading={statsLoading} />
-
-
-            <MacOSStatCard
-          title="Ожидают подтверждения"
-          value={stats.pendingApprovals || 0}
-          icon={Clock}
-          color="red"
-          loading={statsLoading} />
-
+      <div style={adminKpiGridStyle} role="list" aria-label="Ключевые показатели администратора">
+            {dashboardKpis.map((kpi) => (
+            <div key={kpi.key} role="listitem">
+                <MacOSStatCard
+              title={kpi.title}
+              value={kpi.value}
+              icon={kpi.icon}
+              color={kpi.color}
+              loading={statsLoading}
+              style={adminKpiCardStyle} />
+              </div>
+            ))}
           </div>
       }
 
