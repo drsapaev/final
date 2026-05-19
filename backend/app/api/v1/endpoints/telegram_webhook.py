@@ -790,6 +790,26 @@ MINI_APP_BOOKING_REQUEST_ERROR_REASONS = frozenset(
         "notes_too_long",
     }
 )
+TELEGRAM_MINI_APP_PATIENT_FORMS_MANIFEST = (
+    {
+        "key": "patient_intake",
+        "title": "Patient intake",
+        "status": "planned",
+        "capture_enabled": False,
+        "submission_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+    },
+    {
+        "key": "treatment_consent",
+        "title": "Treatment consent",
+        "status": "planned",
+        "capture_enabled": False,
+        "submission_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+    },
+)
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
 EMR_CLOSED_VISIT_STATUSES = {
@@ -3845,6 +3865,12 @@ async def _handle_clinic_bot_update(
     return False
 
 
+class TelegramMiniAppPatientScopeRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str = Field(..., alias="initData", min_length=1)
+
+
 class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -3905,10 +3931,7 @@ def _mini_app_booking_scope_status_code(reason: str) -> int:
     return status.HTTP_403_FORBIDDEN
 
 
-def _build_mini_app_appointment_booking_preview_from_request(
-    request_body: TelegramMiniAppAppointmentPreviewRequest,
-    db: Session,
-):
+def _resolve_mini_app_patient_scope_from_init_data(init_data_value: str, db: Session):
     bot_token = _get_configured_bot_token(db)
     if not bot_token:
         raise HTTPException(
@@ -3918,14 +3941,52 @@ def _build_mini_app_appointment_booking_preview_from_request(
 
     try:
         init_data = validate_telegram_mini_app_init_data(
-            request_body.init_data,
+            init_data_value,
             bot_token=bot_token,
         )
-        scope = resolve_telegram_mini_app_session_scope(
+        return resolve_telegram_mini_app_session_scope(
             db,
             init_data,
             expected_scope="patient",
         )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+
+def _build_mini_app_patient_forms_manifest_response(scope):
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": int(scope.patient_id),
+        },
+        "status": "manifest_only",
+        "forms_enabled": False,
+        "capture_enabled": False,
+        "submission_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+        "message_key": "telegram_mini_app_patient_forms_manifest_only",
+        "forms": [dict(form) for form in TELEGRAM_MINI_APP_PATIENT_FORMS_MANIFEST],
+    }
+
+
+def _build_mini_app_appointment_booking_preview_from_request(
+    request_body: TelegramMiniAppAppointmentPreviewRequest,
+    db: Session,
+):
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        request_body.init_data,
+        db,
+    )
+    try:
         preview = build_telegram_mini_app_appointment_booking_preview(
             scope,
             patient_id=request_body.patient_id,
@@ -3936,11 +3997,6 @@ def _build_mini_app_appointment_booking_preview_from_request(
             notes=request_body.notes,
             services=request_body.services,
         )
-    except TelegramMiniAppInitDataError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": exc.reason},
-        ) from exc
     except TelegramMiniAppSessionScopeError as exc:
         raise HTTPException(
             status_code=_mini_app_booking_scope_status_code(exc.reason),
@@ -3948,6 +4004,23 @@ def _build_mini_app_appointment_booking_preview_from_request(
         ) from exc
 
     return preview
+
+
+@router.post(
+    "/mini-app/forms/manifest",
+    operation_id="telegram_mini_app_patient_forms_manifest",
+)
+def get_mini_app_patient_forms_manifest(
+    request_body: TelegramMiniAppPatientScopeRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe patient forms status for a trusted Mini App session."""
+
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        request_body.init_data,
+        db,
+    )
+    return _build_mini_app_patient_forms_manifest_response(scope)
 
 
 @router.post(
