@@ -44,6 +44,29 @@ class QueuePositionNotificationService:
         self.db = db
         self.fcm_service = get_fcm_service()
 
+    @staticmethod
+    def _patient_telegram_event_type(data: dict[str, Any]) -> str | None:
+        event_type = str((data or {}).get("type") or "").strip().lower()
+        if event_type == "queue_call":
+            return "PatientCalled"
+        if event_type == "queue_position":
+            return "QueueStatusChanged"
+        return None
+
+    @staticmethod
+    def _patient_telegram_metadata(
+        entry: OnlineQueueEntry,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "queue_number": data.get("queue_number") or getattr(entry, "number", ""),
+            "cabinet": data.get("cabinet") or data.get("cabinet_number") or "",
+        }
+        status_value = data.get("status")
+        if status_value:
+            metadata["status"] = status_value
+        return metadata
+
     async def notify_patient_called(
         self,
         entry: OnlineQueueEntry,
@@ -74,6 +97,7 @@ class QueuePositionNotificationService:
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
             "cabinet": cabinet_number or "",
+            "status": "called",
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -129,6 +153,7 @@ class QueuePositionNotificationService:
             "entry_id": str(entry.id),
             "queue_number": str(entry.number),
             "people_ahead": str(people_ahead),
+            "status": entry.status or "waiting",
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -322,6 +347,24 @@ class QueuePositionNotificationService:
         from app.services.notifications import notification_sender_service
 
         user_id = None
+        telegram_sent = False
+
+        telegram_event_type = self._patient_telegram_event_type(data)
+        if entry.patient_id and telegram_event_type:
+            try:
+                telegram_sent = (
+                    await notification_sender_service.send_patient_telegram_event_notification(
+                        db=self.db,
+                        patient_id=entry.patient_id,
+                        event_type=telegram_event_type,
+                        metadata=self._patient_telegram_metadata(entry, data),
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Queue patient Telegram notification failed",
+                    extra={"error_type": type(exc).__name__},
+                )
 
         # Определяем user_id
         # Способ 1: Через patient_id
@@ -355,8 +398,16 @@ class QueuePositionNotificationService:
 
             return {
                 "success": True, # Считаем успешным если сервис принял (он сам ошибки логирует)
-                "sent": success,
+                "sent": bool(success or telegram_sent),
+                "telegram_sent": telegram_sent,
                 "user_id": user_id
+            }
+
+        if telegram_sent:
+            return {
+                "success": True,
+                "sent": True,
+                "telegram_sent": True,
             }
 
         return {
