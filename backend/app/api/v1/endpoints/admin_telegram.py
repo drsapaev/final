@@ -33,6 +33,17 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 PATIENT_PAYMENT_ENTRY_ROUTE = "/patient/payments"
+PATIENT_BOOKING_ENTRY_ROUTE = "/patient/bookings"
+PATIENT_BOOKING_ENTRY_CONTRACT = {
+    "contract_version": "patient-booking-entrypoint-v1",
+    "route": PATIENT_BOOKING_ENTRY_ROUTE,
+    "surface": "protected_app",
+    "auth": "authenticated",
+    "required_role": None,
+    "contains_internal_identifiers": False,
+    "telegram_url_parameters_allowed": False,
+    "entrypoint_type": "mini_app_booking_preview",
+}
 PATIENT_PAYMENT_ENTRY_CONTRACT = {
     "contract_version": "patient-payment-entry-v1",
     "route": PATIENT_PAYMENT_ENTRY_ROUTE,
@@ -1905,6 +1916,7 @@ def get_telegram_integration_status(
                         "key": "patient_booking_entrypoint",
                         "label": "Безопасная подсказка для записи",
                         "enabled": bool(bot_token),
+                        "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
                     {
                         "key": "patient_services_menu",

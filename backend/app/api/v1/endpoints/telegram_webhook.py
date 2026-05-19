@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
+    PATIENT_BOOKING_ENTRY_ROUTE,
     PATIENT_PAYMENT_ENTRY_ROUTE,
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
     STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -718,6 +719,10 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Открыть оплату в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda to'lovni ochish",
     },
+    "booking_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "ÐŸÐµÑ€ÐµÐ¹Ñ‚Ð¸ Ð² Ð²Ñ€Ð°Ð¼ÐµÐ¼Ð½Ð¾Ð´ÐµÐ¹ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
+    },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
             "Telegram привязан к пациенту: {patient}.\n"
@@ -919,6 +924,16 @@ def _patient_payment_entry_url() -> str | None:
     return f"{frontend_url.rstrip('/')}{route}"
 
 
+def _patient_booking_entry_url() -> str | None:
+    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    if not frontend_url:
+        return None
+    route = PATIENT_BOOKING_ENTRY_ROUTE
+    if not route.startswith("/"):
+        route = f"/{route}"
+    return f"{frontend_url.rstrip('/')}{route}"
+
+
 def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
@@ -934,6 +949,28 @@ def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
             [
                 {
                     "text": _localized_text("payments_entry_button", language),
+                    "url": entry_url,
+                }
+            ]
+        ]
+    }
+
+
+def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+    if not telegram_user or not telegram_user.patient_id:
+        return None
+
+    entry_url = _patient_booking_entry_url()
+    if not entry_url:
+        return None
+
+    language = _telegram_chat_language(db, chat_id)
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _localized_text("booking_entry_button", language),
                     "url": entry_url,
                 }
             ]
@@ -3557,12 +3594,13 @@ async def _handle_clinic_bot_update(
 
     async def book_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = _telegram_booking_entry_markup(db, chat_id) or _localized_main_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("book", language),
-            _localized_main_menu(language),
+            reply_markup,
             "telegram_patient_book",
         )
 

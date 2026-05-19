@@ -75,13 +75,19 @@ def _add_mini_app_telegram_config(db_session) -> None:
     db_session.commit()
 
 
-def _link_patient_to_chat(db_session, *, chat_id: int, patient_id: int) -> TelegramUser:
+def _link_patient_to_chat(
+    db_session,
+    *,
+    chat_id: int,
+    patient_id: int,
+    language_code: str = "ru",
+) -> TelegramUser:
     telegram_user = TelegramUser(
         chat_id=chat_id,
         patient_id=patient_id,
         username="patient_chat",
         first_name="Patient",
-        language_code="ru",
+        language_code=language_code,
         notifications_enabled=True,
         appointment_reminders=True,
         lab_notifications=True,
@@ -1086,21 +1092,20 @@ class TestTelegramWebhookSecurity:
 
     @pytest.mark.asyncio
     async def test_book_command_returns_localized_safe_booking_entrypoint(
-        self, db_session
+        self, db_session, test_patient, monkeypatch
     ):
-        telegram_user = TelegramUser(
+        _link_patient_to_chat(
+            db_session,
             chat_id=7022,
-            username="patient_chat",
-            first_name="Patient",
+            patient_id=test_patient.id,
             language_code="uz-Latn",
-            notifications_enabled=True,
-            appointment_reminders=True,
-            lab_notifications=True,
-            active=True,
-            blocked=False,
         )
-        db_session.add(telegram_user)
-        db_session.commit()
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "https://clinic.example",
+            raising=False,
+        )
         fake_service = FakeTelegramBotService(active=True)
         update = {
             "update_id": 126,
@@ -1117,14 +1122,69 @@ class TestTelegramWebhookSecurity:
         )
 
         assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7022
+        assert message == telegram_webhook._localized_text("book", "uz-Latn")
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text("booking_entry_button", "uz-Latn"),
+                        "url": "https://clinic.example" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
+                    }
+                ]
+            ]
+        }
+        assert str(test_patient.id) not in str(reply_markup)
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7022)
+            .one()
+        )
+        assert log.template_key == "telegram_patient_book"
+
+    @pytest.mark.asyncio
+    async def test_book_command_without_link_or_frontend_falls_back_to_main_menu(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7030,
+            username="unlinked_patient",
+            first_name="NoLink",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 127,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7030},
+                "from": {"id": 111},
+                "text": "/book",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
         fake_service._send_message.assert_awaited_once_with(
-            7022,
+            7030,
             telegram_webhook._localized_text("book", "uz-Latn"),
             telegram_webhook._localized_main_menu("uz-Latn"),
         )
         log = (
             db_session.query(TelegramMessage)
-            .filter(TelegramMessage.chat_id == 7022)
+            .filter(TelegramMessage.chat_id == 7030)
             .one()
         )
         assert log.template_key == "telegram_patient_book"
