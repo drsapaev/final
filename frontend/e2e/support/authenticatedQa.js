@@ -1,0 +1,159 @@
+const API_PREFIX = '/api/v1';
+
+export const AUTHENTICATED_ROLE_QA_ROUTES = [
+  {
+    key: 'admin',
+    role: 'Admin',
+    path: '/admin',
+    routeId: 'admin-dashboard',
+  },
+  {
+    key: 'registrar',
+    role: 'Registrar',
+    path: '/registrar',
+    routeId: 'registrar-home',
+  },
+  {
+    key: 'doctor',
+    role: 'Doctor',
+    path: '/doctor',
+    routeId: 'doctor-home',
+  },
+  {
+    key: 'cashier',
+    role: 'Cashier',
+    path: '/cashier',
+    routeId: 'cashier-home',
+  },
+  {
+    key: 'lab',
+    role: 'Lab',
+    path: '/lab',
+    routeId: 'lab-home',
+  },
+  {
+    key: 'patient',
+    role: 'Patient',
+    path: '/patient/payments',
+    routeId: 'patient-payment-entry',
+  },
+];
+
+function base64UrlEncode(value) {
+  return Buffer.from(JSON.stringify(value))
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function createQaJwt(profile) {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const header = { alg: 'none', typ: 'JWT' };
+  const payload = {
+    sub: profile.username,
+    role: profile.role,
+    roles: profile.roles,
+    iat: nowSeconds,
+    exp: nowSeconds + 60 * 60,
+  };
+
+  return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.qa`;
+}
+
+export function createAuthenticatedQaProfile(role) {
+  const normalizedRole = String(role || 'Admin');
+  const isAdmin = normalizedRole === 'Admin';
+  const username = `qa_${normalizedRole.toLowerCase()}`;
+
+  return {
+    id: `qa-${normalizedRole.toLowerCase()}`,
+    username,
+    email: `${username}@clinic.local`,
+    full_name: `QA ${normalizedRole}`,
+    first_name: 'QA',
+    last_name: normalizedRole,
+    role: normalizedRole,
+    role_name: normalizedRole,
+    roles: [normalizedRole],
+    permissions: isAdmin ? ['*'] : [],
+    is_admin: isAdmin,
+    is_superuser: isAdmin,
+    qa_harness: true,
+  };
+}
+
+function collectionPayload() {
+  return {
+    items: [],
+    results: [],
+    data: [],
+    total: 0,
+    count: 0,
+    success: true,
+  };
+}
+
+function buildQaApiPayload(pathname, profile, method) {
+  const path = pathname.replace(API_PREFIX, '') || '/';
+  const lowerPath = path.toLowerCase();
+
+  if (lowerPath === '/setup/status') {
+    return { initialized: true };
+  }
+
+  if (lowerPath === '/auth/me' || lowerPath === '/authentication/profile') {
+    return profile;
+  }
+
+  if (method !== 'GET') {
+    return { success: true, id: 'qa-write-disabled' };
+  }
+
+  if (lowerPath.includes('summary') || lowerPath.includes('stats') || lowerPath.includes('dashboard')) {
+    return {
+      success: true,
+      total: 0,
+      pending: 0,
+      completed: 0,
+      cancelled: 0,
+      by_status: {},
+      ...collectionPayload(),
+    };
+  }
+
+  if (lowerPath.includes('settings') || lowerPath.includes('config') || lowerPath.includes('profile')) {
+    return { success: true, ...collectionPayload() };
+  }
+
+  return collectionPayload();
+}
+
+export async function installAuthenticatedQaHarness(page, { role }) {
+  const profile = createAuthenticatedQaProfile(role);
+  const token = createQaJwt(profile);
+
+  await page.route('**/api/v1/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const payload = buildQaApiPayload(url.pathname, profile, request.method());
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.addInitScript(({ authToken, authProfile }) => {
+    window.localStorage.setItem('auth_token', authToken);
+    window.localStorage.setItem('auth_profile', JSON.stringify(authProfile));
+    window.localStorage.setItem('user', JSON.stringify(authProfile));
+    window.localStorage.setItem('theme', 'light');
+    window.localStorage.setItem('language', 'ru');
+    window.localStorage.removeItem('clinic_api_rate_limit_until');
+    window.sessionStorage.clear();
+  }, { authToken: token, authProfile: profile });
+
+  return { token, profile };
+}
