@@ -23,6 +23,9 @@ from app.services.telegram_templates import get_telegram_templates_service
 
 router = APIRouter()
 
+PROTECTED_PAYMENT_HISTORY_URL = "https://clinic.example.com/patient/payments"
+PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
+
 
 def _telegram_notification_allowed(telegram_user: Any, *preference_fields: str) -> bool:
     if not bool(getattr(telegram_user, "notifications_enabled", True)):
@@ -34,6 +37,17 @@ def _telegram_notifications_disabled_response() -> Dict[str, Any]:
     return {
         "success": False,
         "message": "Telegram notifications disabled by patient preference",
+    }
+
+
+def _safe_payment_template_data(payment_data: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "amount": payment_data.get("amount", 0),
+        "currency": payment_data.get("currency", "UZS"),
+        "payment_method": payment_data.get("payment_method", "Карта"),
+        "payment_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
+        "transaction_id": PROTECTED_PAYMENT_REFERENCE,
+        "receipt_link": PROTECTED_PAYMENT_HISTORY_URL,
     }
 
 
@@ -263,15 +277,7 @@ async def send_payment_confirmation(
             await bot_service.initialize(db)
 
         # Формируем данные для шаблона
-        template_data = {
-            "patient_name": patient.full_name,
-            "amount": payment_data.get("amount", 0),
-            "currency": payment_data.get("currency", "UZS"),
-            "payment_method": payment_data.get("payment_method", "Карта"),
-            "payment_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
-            "transaction_id": payment_data.get("transaction_id", "N/A"),
-            "receipt_link": f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}",
-        }
+        template_data = _safe_payment_template_data(payment_data)
 
         # Получаем шаблон
         templates_service = get_telegram_templates_service()
