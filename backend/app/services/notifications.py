@@ -3,6 +3,7 @@ import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 from typing import Any
 
 import httpx
@@ -34,10 +35,17 @@ NOTIFICATION_EVENT_TYPE_ALIASES = {
     "queue_status": "queue_status_changed",
     "payment_update": "payment_notification",
     "payment_success": "payment_notification",
+    "paymentcreated": "payment_created",
+    "paymentpaid": "payment_paid",
     "result_ready": "lab_results",
     "lab_result_ready": "lab_results",
+    "labresultready": "lab_results",
     "appointment_rescheduled": "schedule_change",
     "appointment_cancelled": "schedule_change",
+    "visitcreated": "visit_created",
+    "queueticketissued": "queue_ticket_issued",
+    "queuestatuschanged": "queue_status_changed",
+    "patientcalled": "patient_called",
     "all_free_pending": "all_free_requested",
     "all_free_declined": "all_free_rejected",
     "allfree_requested": "all_free_requested",
@@ -77,11 +85,60 @@ REGISTRAR_NOTIFICATION_EVENT_TYPES = {
 }
 
 QUEUE_NOTIFICATION_EVENT_TYPES = {
+    "patient_called",
     "queue_call",
+    "queue_status_changed",
     "queue_position",
     "queue_reminder",
+    "queue_ticket_issued",
     "diagnostics_return_needed",
     "queue_update",
+}
+
+PATIENT_TELEGRAM_EVENT_PREFERENCES = {
+    "visit_created": "appointment_reminders",
+    "queue_ticket_issued": "appointment_reminders",
+    "queue_status_changed": "appointment_reminders",
+    "patient_called": "appointment_reminders",
+    "payment_created": "notifications_enabled",
+    "payment_notification": "notifications_enabled",
+    "payment_paid": "notifications_enabled",
+    "lab_results": "lab_notifications",
+}
+
+PATIENT_TELEGRAM_EVENT_MESSAGES = {
+    "visit_created": {
+        "ru": "Запись создана. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Qabul yaratildi. Sana: {date}. Shifokor: {doctor}.",
+    },
+    "queue_ticket_issued": {
+        "ru": "Талон очереди готов. Номер: {queue_number}. Кабинет: {cabinet}.",
+        "uz-Latn": "Navbat taloni tayyor. Raqam: {queue_number}. Xona: {cabinet}.",
+    },
+    "queue_status_changed": {
+        "ru": "Статус очереди обновлен. Номер: {queue_number}. Статус: {status}.",
+        "uz-Latn": "Navbat holati yangilandi. Raqam: {queue_number}. Holat: {status}.",
+    },
+    "patient_called": {
+        "ru": "Вас приглашают. Номер: {queue_number}. Кабинет: {cabinet}.",
+        "uz-Latn": "Sizni chaqirishmoqda. Raqam: {queue_number}. Xona: {cabinet}.",
+    },
+    "payment_created": {
+        "ru": "Сформирована оплата. Сумма: {amount} {currency}.",
+        "uz-Latn": "To'lov yaratildi. Summa: {amount} {currency}.",
+    },
+    "payment_notification": {
+        "ru": "Статус оплаты обновлен. Сумма: {amount} {currency}.",
+        "uz-Latn": "To'lov holati yangilandi. Summa: {amount} {currency}.",
+    },
+    "payment_paid": {
+        "ru": "Оплата получена. Квитанция доступна в защищенном кабинете.",
+        "uz-Latn": "To'lov qabul qilindi. Kvitansiya himoyalangan kabinetda mavjud.",
+    },
+    "lab_results": {
+        "ru": "Результаты готовы. Откройте защищенный кабинет.",
+        "uz-Latn": "Natijalar tayyor. Himoyalangan kabinetni oching.",
+    },
 }
 
 
@@ -94,6 +151,59 @@ def _normalize_notification_event_type(
     if not normalized:
         return fallback
     return NOTIFICATION_EVENT_TYPE_ALIASES.get(normalized, normalized)
+
+
+def _normalize_patient_telegram_language(language_code: Any) -> str:
+    value = str(language_code or "").strip().lower().replace("_", "-")
+    if value in {"uz", "uz-latn", "uzbek", "o'zbekcha"}:
+        return "uz-Latn"
+    return "ru"
+
+
+def _safe_patient_telegram_value(value: Any, fallback: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = fallback
+    return escape(text[:80])
+
+
+def _patient_telegram_event_message(
+    event_type: str,
+    language_code: Any,
+    metadata: dict[str, Any] | None = None,
+) -> str | None:
+    templates = PATIENT_TELEGRAM_EVENT_MESSAGES.get(event_type)
+    if not templates:
+        return None
+
+    language = _normalize_patient_telegram_language(language_code)
+    template = templates.get(language) or templates["ru"]
+    data = metadata or {}
+    safe_data = {
+        "date": _safe_patient_telegram_value(
+            data.get("date") or data.get("visit_date") or data.get("appointment_date"),
+            "-" if language == "ru" else "-",
+        ),
+        "doctor": _safe_patient_telegram_value(
+            data.get("doctor") or data.get("doctor_name"),
+            "уточняется" if language == "ru" else "aniqlanmoqda",
+        ),
+        "queue_number": _safe_patient_telegram_value(
+            data.get("queue_number") or data.get("number"),
+            "-" if language == "ru" else "-",
+        ),
+        "cabinet": _safe_patient_telegram_value(
+            data.get("cabinet") or data.get("cabinet_number"),
+            "уточняется" if language == "ru" else "aniqlanmoqda",
+        ),
+        "status": _safe_patient_telegram_value(
+            data.get("status"),
+            "обновлен" if language == "ru" else "yangilandi",
+        ),
+        "amount": _safe_patient_telegram_value(data.get("amount"), "0"),
+        "currency": _safe_patient_telegram_value(data.get("currency"), "UZS"),
+    }
+    return template.format(**safe_data)
 
 
 class NotificationSenderService:
@@ -119,6 +229,63 @@ class NotificationSenderService:
 
     def _platform_service(self, db: Session):
         return get_notification_platform_service(db)
+
+    async def send_patient_telegram_event_notification(
+        self,
+        *,
+        db: Session,
+        patient_id: int,
+        event_type: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Send a safe patient Telegram message for a canonical business event."""
+        normalized_event_type = _normalize_notification_event_type(
+            event_type,
+            fallback="notification",
+        )
+        preference_field = PATIENT_TELEGRAM_EVENT_PREFERENCES.get(normalized_event_type)
+        if not preference_field:
+            logger.warning(
+                "Patient Telegram event skipped: unsupported event type",
+                extra={"event_type": normalized_event_type},
+            )
+            return False
+
+        from app.models.telegram_config import TelegramUser
+
+        telegram_user = (
+            db.query(TelegramUser)
+            .filter(
+                TelegramUser.patient_id == patient_id,
+                TelegramUser.active.is_(True),
+                TelegramUser.blocked.is_(False),
+            )
+            .order_by(TelegramUser.id.desc())
+            .first()
+        )
+        if not telegram_user:
+            logger.info(
+                "Patient Telegram event skipped: linked chat not found",
+                extra={"event_type": normalized_event_type},
+            )
+            return False
+
+        if not bool(getattr(telegram_user, "notifications_enabled", False)):
+            return False
+        if preference_field != "notifications_enabled" and not bool(
+            getattr(telegram_user, preference_field, False)
+        ):
+            return False
+
+        message = _patient_telegram_event_message(
+            normalized_event_type,
+            getattr(telegram_user, "language_code", None),
+            metadata,
+        )
+        if not message:
+            return False
+
+        return await self.send_telegram(message, chat_id=str(telegram_user.chat_id))
 
     @staticmethod
     def _extract_prefixed_user_id(actor_ref: str | None, prefix: str) -> int | None:

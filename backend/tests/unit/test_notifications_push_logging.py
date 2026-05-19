@@ -3,6 +3,14 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 import unittest
+from unittest.mock import AsyncMock
+
+import pytest
+
+from app.models.telegram_config import TelegramUser
+from app.services.notifications import NotificationSenderService
+
+from app.services import notifications as notification_service_module
 
 
 SOURCE_PATH = (
@@ -146,6 +154,113 @@ class NotificationsPushLoggingTest(unittest.TestCase):
         self.assertNotIn(
             "Пациент не найден:", payment_notification_source
         )
+
+
+class PatientTelegramEventMessagesTest(unittest.TestCase):
+    def test_patient_telegram_event_alias_normalizes_camel_case(self) -> None:
+        self.assertEqual(
+            notification_service_module._normalize_notification_event_type(
+                "PaymentPaid"
+            ),
+            "payment_paid",
+        )
+        self.assertEqual(
+            notification_service_module._normalize_notification_event_type(
+                "QueueTicketIssued"
+            ),
+            "queue_ticket_issued",
+        )
+
+    def test_patient_telegram_event_message_escapes_template_values(self) -> None:
+        message = notification_service_module._patient_telegram_event_message(
+            "payment_created",
+            "uz",
+            {"amount": "<b>1000</b>", "currency": "UZS<script>"},
+        )
+
+        self.assertIsNotNone(message)
+        self.assertIn("&lt;b&gt;1000&lt;/b&gt;", message)
+        self.assertIn("UZS&lt;script&gt;", message)
+        self.assertNotIn("<b>1000</b>", message)
+        self.assertNotIn("UZS<script>", message)
+
+
+@pytest.mark.asyncio
+async def test_patient_telegram_event_helper_sends_safe_localized_message(
+    db_session,
+    test_patient,
+):
+    telegram_user = TelegramUser(
+        chat_id=8101,
+        patient_id=test_patient.id,
+        username="patient_chat",
+        first_name="Patient",
+        language_code="ru",
+        notifications_enabled=True,
+        appointment_reminders=True,
+        lab_notifications=True,
+        active=True,
+        blocked=False,
+    )
+    db_session.add(telegram_user)
+    db_session.commit()
+
+    service = NotificationSenderService()
+    service.send_telegram = AsyncMock(return_value=True)
+
+    sent = await service.send_patient_telegram_event_notification(
+        db=db_session,
+        patient_id=test_patient.id,
+        event_type="VisitCreated",
+        metadata={
+            "appointment_date": "2026-06-01 09:00",
+            "doctor_name": "<Cardio & Team>",
+            "visit_id": "internal-visit-998877",
+            "patient_id": f"internal-patient-{test_patient.id}",
+        },
+    )
+
+    assert sent is True
+    service.send_telegram.assert_awaited_once()
+    message = service.send_telegram.await_args.args[0]
+    assert service.send_telegram.await_args.kwargs["chat_id"] == "8101"
+    assert "&lt;Cardio &amp; Team&gt;" in message
+    assert "internal-visit-998877" not in message
+    assert f"internal-patient-{test_patient.id}" not in message
+
+
+@pytest.mark.asyncio
+async def test_patient_telegram_event_helper_respects_patient_consent(
+    db_session,
+    test_patient,
+):
+    telegram_user = TelegramUser(
+        chat_id=8102,
+        patient_id=test_patient.id,
+        username="patient_chat",
+        first_name="Patient",
+        language_code="uz-Latn",
+        notifications_enabled=False,
+        appointment_reminders=True,
+        lab_notifications=True,
+        active=True,
+        blocked=False,
+    )
+    db_session.add(telegram_user)
+    db_session.commit()
+
+    service = NotificationSenderService()
+    service.send_telegram = AsyncMock(return_value=True)
+
+    sent = await service.send_patient_telegram_event_notification(
+        db=db_session,
+        patient_id=test_patient.id,
+        event_type="LabResultReady",
+        metadata={"result_id": "internal-result-445566"},
+    )
+
+    assert sent is False
+    service.send_telegram.assert_not_awaited()
 
 
 if __name__ == "__main__":
