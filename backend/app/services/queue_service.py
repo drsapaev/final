@@ -58,6 +58,8 @@ class QueueBusinessService:
 
     # Лимиты по умолчанию
     DEFAULT_MAX_SLOTS = 15
+    QUEUE_QR_TOKEN_MIN_TTL_MINUTES = 5
+    QUEUE_QR_TOKEN_MAX_TTL_MINUTES = 15
 
     def __init__(self) -> None:
         self._cached_settings: dict[str, Any] | None = None
@@ -71,6 +73,22 @@ class QueueBusinessService:
         else:
             current = getattr(queue_token, "current_uses", 0) or 0
             queue_token.current_uses = current + 1
+
+    @classmethod
+    def _bounded_queue_token_ttl_minutes(cls, expires_hours: int | None) -> int:
+        try:
+            requested_minutes = (
+                int(expires_hours) * 60
+                if expires_hours is not None
+                else cls.QUEUE_QR_TOKEN_MAX_TTL_MINUTES
+            )
+        except (TypeError, ValueError):
+            requested_minutes = cls.QUEUE_QR_TOKEN_MAX_TTL_MINUTES
+
+        return min(
+            max(requested_minutes, cls.QUEUE_QR_TOKEN_MIN_TTL_MINUTES),
+            cls.QUEUE_QR_TOKEN_MAX_TTL_MINUTES,
+        )
 
     def _load_queue_settings(self, db: Session) -> dict[str, Any]:
         if self._cached_settings is None:
@@ -564,8 +582,8 @@ class QueueBusinessService:
                 },
             )
 
-        expires_delta = max(1, int(expires_hours))
-        expires_at = now_local + timedelta(hours=expires_delta)
+        expires_minutes = self._bounded_queue_token_ttl_minutes(expires_hours)
+        expires_at = now_local + timedelta(minutes=expires_minutes)
 
         token_value = secrets.token_urlsafe(32)
         queue_token = QueueToken(
@@ -623,6 +641,7 @@ class QueueBusinessService:
             "max_slots": max_slots,
             "current_count": current_count,
             "expires_at": queue_token.expires_at,
+            "ttl_minutes": expires_minutes,
             "is_clinic_wide": is_clinic_wide,
         }
 
