@@ -18,6 +18,8 @@ from app.services.payment_providers.manager import PaymentProviderManager
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_RECONCILIATION_PROVIDERS = ("click", "payme", "kaspi")
+
 
 class PaymentReconciliationService:
     """Service for payment reconciliation"""
@@ -167,10 +169,9 @@ class PaymentReconciliationService:
         Returns:
             Combined reconciliation report for all providers
         """
-        providers = ["click", "payme", "kaspi"]
         results = {}
 
-        for provider in providers:
+        for provider in SUPPORTED_RECONCILIATION_PROVIDERS:
             results[provider] = self.reconcile_provider(provider, start_date, end_date)
 
         # Calculate overall summary
@@ -259,8 +260,11 @@ class PaymentReconciliationService:
         reconciliation = self.reconcile_all_providers(start_date, end_date)
 
         # Add missing payments detection
-        for provider in ["click", "payme", "kaspi"]:
-            missing = self.detect_missing_payments(provider, days=(end_date - start_date).days)
+        for provider in SUPPORTED_RECONCILIATION_PROVIDERS:
+            missing = self.detect_missing_payments(
+                provider,
+                days=(end_date - start_date).days,
+            )
             if provider in reconciliation.get("providers", {}):
                 reconciliation["providers"][provider]["missing_payments"] = missing
 

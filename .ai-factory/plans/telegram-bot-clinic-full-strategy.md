@@ -14,6 +14,36 @@ Patient bot v1 supports two patient-facing languages:
 
 Default language is Russian when no preference is saved. The staff/admin bot remains Russian-first in the initial strategy unless a later rollout explicitly adds staff localization.
 
+## Implementation Status Legend
+
+Use checkbox state as the implementation contract:
+
+- [x] Implemented and backed by a current runtime path or testable contract.
+- [ ] Not implemented yet, or only present as design text, placeholder, legacy helper, or disconnected UI.
+- [ ] Partially closed items stay unchecked at the parent level until every required child item is complete; completed child items are checked below them.
+- [ ] Needs verification means the behavior may exist, but it has not yet been confirmed against the canonical runtime path and targeted validation.
+
+Status updates must name the canonical runtime file or test that justifies a checked item. Do not mark a Telegram feature complete from overview docs, stale reports, or legacy helper files alone.
+
+## Current Implementation Snapshot
+
+Current evidence to re-check before changing runtime behavior:
+
+- patient bot runtime: `backend/app/api/v1/endpoints/telegram_webhook.py`
+- staff/admin Telegram contracts and management: `backend/app/api/v1/endpoints/admin_telegram.py`
+- ticket QR/start token generation and consumption: `backend/app/services/visit_confirmation_service.py`
+- Telegram notification endpoints: `backend/app/api/v1/endpoints/telegram_notifications.py`
+- bot adapter and command registration: `backend/app/services/telegram_bot.py`
+- current focused tests: `backend/tests/unit/test_telegram_webhook_security.py`, `backend/tests/unit/test_visit_confirmation_service.py`, `backend/tests/unit/test_queue_position_notifications_telegram.py`, `backend/tests/unit/test_queue_time_window.py`, `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py`, `backend/tests/unit/test_telegram_staff_bot_token_runtime_config.py`, `backend/tests/unit/test_telegram_bot_management_api_service.py`, `backend/tests/unit/test_telegram_notifications_privacy.py`, `frontend/src/routing/__tests__/routeContract.test.js`
+
+Partially closed areas as of the latest static audit:
+
+- Patient bot MVP is closed for the Phase 1 backend slice: notification consent is shown after successful contact or QR/start patient linking, the full start -> language -> link -> consent path has targeted test coverage, the canonical notification sender has a tested safe patient Telegram event mapping helper, and appointment reminders now use the linked-patient Telegram event path when `db` and `patient_id` are provided.
+- QR queue Phase 2 is closed for the current backend/security slice: linking, status reads, sensitive QR/start token TTL, event-driven next/called Telegram notifications, queue ordering/`queue_time` refresh validation, and expired/malformed/replayed/consumed token rollout checks are present.
+- Payments can show status/debt summaries, send confirmation-style notifications, emit a safe patient Telegram unpaid bill notification from payment invoice creation, link the patient `/payments` bot reply to the protected `/patient/payments` app route, send safe patient Telegram `payment_paid` updates after successful provider webhook visit/appointment integration, and expose read-only staff reconciliation alerts for the supported Click/PayMe/Kaspi provider inventory. Public provider callbacks and internal demo routes must not be used as Telegram entry buttons.
+- Staff bot has role-based read-only menus, authorization, token separation, and audit for denied actions, but confirmed state-changing actions remain disabled by design.
+- Telegram Mini App and AI approval flows are still planning items, not implemented runtime flows.
+
 ## Product Model
 
 Use two separate Telegram bots.
@@ -70,7 +100,7 @@ QR queue flow:
 Payments:
 
 - Telegram shows short payment notifications and links into the approved payment flow
-- payment providers remain PayMe, Click, Apelsin, or the existing application payment layer
+- payment providers remain PayMe, Click, Kaspi, or the existing application payment layer
 - Telegram can show amount, status, and generic service label, but detailed invoices remain in the protected app
 - paid/completed payments trigger short confirmation and receipt availability notice
 
@@ -199,64 +229,141 @@ Owner examples:
 
 AI workflow engines such as LangGraph orchestrate steps; they do not train the model by themselves. Adaptation requires feedback loops, RAG, historical decisions, and explicit accepted/rejected outcomes.
 
-## Rollout Roadmap
+## Checkbox Rollout Roadmap
 
-Phase 1: Patient bot MVP with language choice
+### Phase 1: Patient bot MVP with language choice
 
-- `/start`
-- Russian and Uzbek Latin onboarding
-- contact-based linking
-- patient profile status
-- current queue status
-- current visit/payment summary
-- basic notifications
+- [x] Status: Phase 1 patient bot MVP backend slice is complete. Additional notification types continue in later phase-specific slices.
+- [x] `/start` entrypoint exists for the patient bot.
+- [x] Patient-facing language set is exactly `ru` and `uz-Latn`, with Russian fallback.
+- [x] Language selection can be saved for the Telegram account/session.
+- [x] Telegram contact linking rejects spoofed contacts when `contact.user_id` does not match the sender.
+- [x] Linked patient profile status can be shown without medical details.
+- [x] Current queue status can be shown without changing queue fairness or `queue_time`.
+- [x] Current visit summary can be shown without exposing internal identifiers.
+- [x] Current payment/debt summary can be shown.
+- [x] Show notification consent as part of onboarding after contact or QR/start patient linking, not only later from settings/menu.
+- [x] Map basic patient business event names to safe Telegram messages through the canonical notification sender path.
+- [x] Wire the first real notification call-site to the patient Telegram event helper: appointment reminders with `db` and `patient_id`.
+- [x] Add or confirm targeted tests for the completed onboarding path: start -> language -> contact/token link -> consent -> localized main menu.
+- [x] Keep full appointment booking out of plain chat unless routed to the future protected Mini App or protected web app.
 
-Phase 2: QR queue
+### Phase 2: QR queue
 
-- one-time signed QR/start token
-- queue ticket linking
-- queue number and cabinet
-- position/status refresh
-- next/called notifications
+- [x] Status: Phase 2 QR queue backend/security slice is complete for the current rollout checklist.
+- [x] One-time signed QR/start token exists.
+- [x] QR/start token resolves server-side to queue/visit/patient context.
+- [x] Token does not expose raw patient, visit, queue, doctor, or branch identifiers in open text.
+- [x] Token consumption is one-time-use for sensitive linking.
+- [x] Bot can show queue number, cabinet, and status when safely available.
+- [x] Bot can show position/status refresh without mutating queue state.
+- [x] Align sensitive QR/start token expiry with the security target of 5 to 15 minutes: `QueueBusinessService.assign_queue_token()` now caps legacy `expires_hours` input to a 5-15 minute runtime TTL and exposes `ttl_minutes` metadata.
+- [x] Wire `QueueStatusChanged` and `PatientCalled` style events to Telegram next/called notifications: `QueuePositionNotificationService` maps `queue_position` to `QueueStatusChanged` and `queue_call` to `PatientCalled`, with focused coverage in `backend/tests/unit/test_queue_position_notifications_telegram.py`.
+- [x] Add targeted validation that status refresh never changes queue ordering, fairness, or `queue_time`: `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_queue_status_refresh_preserves_ordering_and_queue_time`.
+- [x] Add a rollout check for expired, replayed, malformed, and already-consumed QR tokens: `backend/tests/unit/test_visit_confirmation_service.py` covers expired/malformed parser rejection, expired stored token rejection, and consume-once replay blocking; `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_ticket_qr_link_new_user_prompts_notification_consent` keeps the live webhook link path covered.
 
-Phase 3: Payments
+### Phase 3: Payments
 
-- unpaid bill notification
-- payment entry button
-- payment status update
-- receipt availability notice
-- PayMe/Click/Apelsin reconciliation alerts for staff
+- [x] Status: complete for the current payment provider inventory. Read-only summaries, confirmation-style notifications, unpaid bill Telegram notification from payment invoice creation, protected app payment entry, safe protected receipt/payment URL replacement, direct webhook button regression coverage, safe provider webhook `payment_paid` patient Telegram updates, and read-only staff reconciliation alerts for Click/PayMe/Kaspi are verified.
+- [x] Telegram can show current amount/debt/payment summary for a linked patient.
+- [x] Telegram notification templates/endpoints can express payment confirmation and receipt availability.
+- [x] Emit unpaid bill notifications from the canonical billing/payment event path: `PaymentInvoiceService.create_invoice()` emits a safe patient Telegram `payment_created` event for linked patient invoices, with focused coverage in `backend/tests/unit/test_payment_invoice_service.py`.
+- [x] Add a payment entry button that links only to the approved payment flow or protected app.
+  - [x] Audit current candidate routes before adding the button: `frontend/src/routing/routeRegistry.js` exposes `/payment/success` and `/payment/cancel` as public provider callbacks, `/internal-demo/payment-test` as an internal demo, and `/patient` is not a clearly approved patient payment entry contract for Telegram.
+  - [x] Define the protected patient payment entry route contract: `frontend/src/routing/routeRegistry.js` registers role-scoped `/patient/payments`, `frontend/src/routing/routeSelectors.js` exposes `getProtectedPatientPaymentEntryPath()`, and `backend/app/api/v1/endpoints/admin_telegram.py` publishes `patient_payments_protected_entry`.
+  - [x] Add the Telegram button after the protected route contract exists: `backend/app/api/v1/endpoints/telegram_webhook.py` sends an inline URL button built from `FRONTEND_URL + /patient/payments` and does not add invoice/payment/patient identifiers to the URL.
+  - [x] Remove raw visit identifiers from the Telegram payment summary by showing only the count of linked visits in `backend/app/api/v1/endpoints/telegram_webhook.py`.
+  - [x] Add a direct regression test that the webhook `/payments` reply markup uses `/patient/payments` and does not include invoice, payment, patient, or visit identifiers: `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_payments_command_sends_protected_entry_button_without_internal_ids`.
+- [x] Replace placeholder receipt/payment URLs with real protected routes or provider-approved links: `backend/app/api/v1/endpoints/telegram_notifications.py` now builds receipt links from `settings.FRONTEND_URL + PATIENT_PAYMENT_ENTRY_ROUTE`, with focused privacy coverage in `backend/tests/unit/test_telegram_notifications_privacy.py`.
+- [x] Wire payment status updates from payment reconciliation or transaction events to Telegram notifications: `backend/app/services/visit_payment_integration.py` now emits best-effort patient Telegram `payment_paid` events after successful provider webhook visit/appointment payment integration, with metadata limited to safe `amount`, `currency`, `status`, and `provider` values.
+- [x] Add PayMe reconciliation alerts for staff if PayMe remains a supported provider in this clinic rollout: `PaymentReconciliationService.SUPPORTED_RECONCILIATION_PROVIDERS` includes `payme`, `PaymentReconciliationApiService.get_reconciliation_alerts()` feeds the staff Telegram `reconciliation_alerts` read-only menu, and `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_reconciliation_alerts_menu_item_returns_safe_aggregate` verifies the safe staff summary.
+- [x] Add Click reconciliation alerts for staff if Click remains a supported provider in this clinic rollout: `PaymentReconciliationService.SUPPORTED_RECONCILIATION_PROVIDERS` includes `click`, reconciliation alerts preserve provider names without raw transaction details, and `backend/tests/unit/test_payment_reconciliation_service.py::TestPaymentReconciliationService::test_alerts_include_supported_provider_names_for_staff_summary` covers the provider alert path.
+- [x] Explicitly remove Apelsin from the supported reconciliation provider list because the application payment layer exposes Click, PayMe, and Kaspi settings/runtime paths, not Apelsin; `backend/tests/unit/test_payment_reconciliation_service.py::TestPaymentReconciliationService::test_supported_reconciliation_providers_match_runtime_inventory` guards the inventory.
+- [x] Keep Kaspi covered as the supported non-Apelsin third provider: `PaymentReconciliationService.SUPPORTED_RECONCILIATION_PROVIDERS` includes `kaspi`, and the staff Telegram reconciliation aggregate lists supported providers without internal transaction identifiers.
+- [x] Add tests proving Telegram messages expose only safe amount/status/service labels and no raw invoice/internal IDs: `backend/tests/unit/test_visit_payment_integration_service.py::TestVisitPaymentIntegrationService::test_process_payment_for_existing_visit_sends_safe_patient_telegram_status` checks emitted Telegram metadata, and `backend/tests/unit/test_notifications_push_logging.py::PatientTelegramEventMessagesTest::test_patient_telegram_payment_messages_redact_internal_identifiers` keeps rendered payment messages redacted.
 
-Phase 4: Staff bot
+### Phase 4: Staff bot
 
-- role-based menus for registrar, doctor, cashier, lab, admin/owner
-- server-side authorization
-- audit logging
-- confirmed queue/payment/schedule actions
+- [ ] Status: partially closed. Staff bot read-only operations are implemented; confirmed state-changing actions are still disabled.
+- [x] Role-based read-only menus exist for registrar, doctor, cashier, lab, admin, and owner/admin style users.
+- [x] Staff bot token is configured separately from the patient bot token.
+- [x] Staff linking is protected by server-side token validation.
+- [x] Staff commands check role/authorization server-side.
+- [x] Audit exists for staff link creation, rejected link tokens, received staff commands, and denied staff actions.
+- [x] Runtime guard denies state-changing staff commands until action enablement and idempotency are implemented.
+- [ ] Add confirmation request flow for each state-changing action before mutation.
+- [ ] Add idempotency keys or equivalent replay protection for confirmed staff actions.
+- [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit.
+- [ ] Add domain service adapters for confirmed payment actions: status change, refund where policy allows it.
+- [ ] Add domain service adapters for confirmed schedule actions.
+- [ ] Add audit events for confirmation requested, confirmed, failed, and completed state-changing actions.
+- [ ] Enable state-changing actions one by one behind explicit configuration and tests.
+- [ ] Add negative tests for unauthorized staff, stale confirmations, repeated confirmations, and cross-role action attempts.
 
-Phase 5: Telegram Mini App
+### Phase 5: Telegram Mini App
 
-- appointment booking
-- patient forms
-- patient cabinet
-- payment details
-- protected result/report viewing
-- Telegram `initData` validation
+- [ ] Status: not implemented. Legacy `WebAppInfo` links do not count as completion without protected Mini App identity validation and scoped runtime flows.
+- [ ] Validate Telegram Mini App `initData` server-side before trusting identity.
+- [ ] Scope Mini App sessions to the linked patient or authenticated staff user.
+- [ ] Implement appointment booking inside the protected Mini App flow.
+- [ ] Implement patient forms inside the protected Mini App flow.
+- [ ] Implement patient cabinet inside the protected Mini App flow.
+- [ ] Implement payment details inside the protected Mini App flow.
+- [ ] Implement protected result/report viewing inside the Mini App flow.
+- [ ] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity.
 
-Phase 6: AI assistant approval flows
+### Phase 6: AI assistant approval flows
 
-- doctor draft review
-- queue overload suggestions
-- payment anomaly alerts
-- owner summaries
-- feedback capture for accepted/rejected suggestions
+- [ ] Status: not implemented as Telegram approval runtime. Read-only summaries do not count as AI approval workflows.
+- [ ] Add doctor draft review notification that links to protected EMR, not plain-chat medical content.
+- [ ] Capture doctor accepted/rejected outcome for AI draft feedback.
+- [ ] Add queue overload suggestion alerts for admin/registrar with protected dashboard links.
+- [ ] Add payment anomaly alerts for cashier/admin with protected dashboard links.
+- [ ] Add owner daily AI summary with safe high-level operational metrics only.
+- [ ] Capture accepted/rejected admin outcomes for future workflow quality.
+- [ ] Ensure AI workflow orchestration cannot autonomously mutate medical, queue, payment, or schedule state without human confirmation.
+- [ ] Add tests for no diagnosis/full EMR leakage in AI Telegram messages.
+
+## Continuous Plan Improvement Automation
+
+Use this loop after every Telegram implementation slice:
+
+- [ ] Before editing runtime code, read this plan plus the canonical runtime/test files named in Current Implementation Snapshot.
+- [ ] For each implementation slice, copy the relevant unchecked roadmap item into the task brief as the explicit target.
+- [ ] After implementation, update the checkbox state in this file in the same patch or PR.
+- [ ] A checked item must cite or be traceable to a runtime file, migration if applicable, and targeted validation.
+- [ ] If a feature is discovered in legacy or disconnected code, add a note under the matching phase instead of marking it complete.
+- [ ] If validation exposes a narrower missing piece, replace the broad unchecked item with smaller checkboxes.
+- [ ] Keep provider names, token TTL, identity rules, and supported language list synchronized with runtime configuration.
+- [ ] When Telegram files change without this plan changing, treat that as a plan-drift warning during review.
+
+Future automation backlog:
+
+- [ ] Add a lightweight repository check that warns when Telegram runtime files change without a corresponding update to this plan.
+- [ ] Add a script or CI job that prints all unchecked Telegram roadmap items for release review.
+- [ ] Add a plan drift check that flags stale provider names, unsupported language codes, and hardcoded placeholder URLs.
+- [ ] Add a test inventory check that maps each checked roadmap item to at least one targeted test or smoke command.
+- [ ] Add release-note generation from newly checked items so rollout evidence stays aligned with the plan.
 
 ## Acceptance Criteria
 
-- Plan exists at `.ai-factory/plans/telegram-bot-clinic-full-strategy.md`.
-- Patient bot v1 explicitly supports only Russian and Uzbek Latin.
-- The document names and integrates EMR, registrar, queue, QR queue, payments, notifications, reports, and AI.
-- Telegram is defined as an operational layer, not a medical record store.
-- Security section blocks sensitive medical data in plain Telegram messages.
-- QR/start links use one-time signed tokens and do not expose internal identifiers.
-- Roadmap can be sliced into backend, frontend, test, and rollout tasks without product decisions left open.
+Plan artifact acceptance:
+
+- [x] Plan exists at `.ai-factory/plans/telegram-bot-clinic-full-strategy.md`.
+- [x] Patient bot v1 explicitly supports only Russian and Uzbek Latin.
+- [x] The document names and integrates EMR, registrar, queue, QR queue, payments, notifications, reports, and AI.
+- [x] Telegram is defined as an operational layer, not a medical record store.
+- [x] Security section blocks sensitive medical data in plain Telegram messages.
+- [x] QR/start links use one-time signed tokens and do not expose internal identifiers.
+- [x] Roadmap is now sliced into backend, frontend, test, and rollout tasks with checkbox state.
+- [x] Partially closed phases include completed subitems and open subitems.
+- [x] Continuous plan improvement rules are documented.
+
+Runtime acceptance still open:
+
+- [x] Phase 1 is complete after the first real event-backed patient Telegram notification call-site is wired and verified.
+- [x] Phase 2 is complete after expired/replayed/malformed/consumed token rollout checks are verified.
+- [x] Phase 3 is complete after real payment entry and provider reconciliation alerts are verified.
+- [ ] Phase 4 is complete after confirmed state-changing staff actions are enabled action by action with idempotency and audit.
+- [ ] Phase 5 is complete after Mini App `initData` validation and protected patient flows are implemented.
+- [ ] Phase 6 is complete after AI approval flows capture accepted/rejected outcomes without exposing medical details in plain chat.
