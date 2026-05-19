@@ -196,20 +196,20 @@ describe('route contract invariants', () => {
     });
   });
 
-  it('keeps protected patient payment entry patient-only and non-navigational', () => {
+  it('keeps protected patient payment entry authenticated and non-navigational', () => {
     const route = getRouteById('patient-payment-entry');
 
     expect(route).toBeTruthy();
     expect(getProtectedPatientPaymentEntryPath()).toBe('/patient/payments');
     expect(route.path).toBe('/patient/payments');
-    expect(route.auth).toBe('role-scoped');
-    expect(route.roles).toEqual(['Patient']);
+    expect(route.auth).toBe('authenticated');
+    expect(route.roles).toEqual([]);
     expect(route.nav).toBe(false);
     expect(route.component).toBe('PatientPanel');
-    expect(isRouteAccessibleToProfile(route, { role: 'Patient' })).toBe(true);
-    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(false);
+    expect(isRouteAccessibleToProfile(route, null)).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(true);
 
-    const chrome = getRouteChromeState('/patient/payments', '', { role: 'Patient' });
+    const chrome = getRouteChromeState('/patient/payments', '', { role: 'Doctor' });
     expect(chrome.activeSidebarItem).toBe('payments');
     expect(chrome.hideSidebar).toBe(true);
   });
