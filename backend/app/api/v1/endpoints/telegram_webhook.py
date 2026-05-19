@@ -729,10 +729,22 @@ def _localized_notification_consent_menu(language_code: Any) -> Dict[str, Any]:
 
 
 def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
-    return TELEGRAM_SETTINGS_MENUS.get(
-        _normalize_patient_language(language_code),
+    language = _normalize_patient_language(language_code)
+    settings_menu = TELEGRAM_SETTINGS_MENUS.get(
+        language,
         TELEGRAM_SETTINGS_MENUS[TELEGRAM_LANGUAGE_RU],
     )
+    main_keyboard = _localized_main_menu(language).get("keyboard", [])
+    settings_keyboard = settings_menu.get("keyboard", [])
+    extra_rows = []
+    if len(main_keyboard) > 3:
+        extra_rows.append(main_keyboard[3])
+    if len(main_keyboard) > 4 and main_keyboard[4]:
+        extra_rows.append([main_keyboard[4][0]])
+    return {
+        **settings_menu,
+        "keyboard": settings_keyboard[:4] + extra_rows + settings_keyboard[4:],
+    }
 
 
 def _telegram_chat_language(db: Session, chat_id: int) -> str:
