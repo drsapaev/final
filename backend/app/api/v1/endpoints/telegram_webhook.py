@@ -908,9 +908,9 @@ def _upsert_ticket_qr_telegram_user(
         db.flush()
         return
 
-    create_notifications_enabled = payload.pop("notifications_enabled", True)
-    create_appointment_reminders = payload.pop("appointment_reminders", True)
-    create_lab_notifications = payload.pop("lab_notifications", True)
+    create_notifications_enabled = payload.pop("notifications_enabled", False)
+    create_appointment_reminders = payload.pop("appointment_reminders", False)
+    create_lab_notifications = payload.pop("lab_notifications", False)
     db.add(
         TelegramUser(
             **payload,
@@ -2063,6 +2063,12 @@ async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_servi
             return True
 
         try:
+            existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+                db, int(chat_id)
+            )
+            notifications_already_enabled = bool(
+                getattr(existing_telegram_user, "notifications_enabled", False)
+            )
             _upsert_ticket_qr_telegram_user(db, message, visit.patient_id)
             db.commit()
         except Exception as exc:
@@ -2081,11 +2087,15 @@ async def _handle_ticket_qr_start(update: Dict[str, Any], db: Session, bot_servi
             )
             return True
 
-        await bot_service._send_message(
-            int(chat_id),
-            _telegram_chat_text(db, int(chat_id), "ticket_qr_linked"),
-            _telegram_chat_menu(db, int(chat_id)),
-        )
+        language = _telegram_chat_language(db, int(chat_id))
+        reply_text = _telegram_chat_text(db, int(chat_id), "ticket_qr_linked")
+        reply_markup = _telegram_chat_menu(db, int(chat_id))
+        if not notifications_already_enabled:
+            reply_text = (
+                f"{reply_text}\n\n{_localized_text('notification_consent', language)}"
+            )
+            reply_markup = _localized_notification_consent_menu(language)
+        await bot_service._send_message(int(chat_id), reply_text, reply_markup)
     elif chat_id is not None:
         language = _telegram_chat_language(db, int(chat_id))
         await bot_service._send_message(
@@ -2836,6 +2846,21 @@ async def _send_notification_consent(
     )
 
 
+def _patient_contact_linked_text(
+    language_code: str,
+    patient_label: str,
+    patient_name: str,
+    include_notification_consent: bool,
+) -> str:
+    text = (
+        f"{_localized_text('contact_linked', language_code)}\n"
+        f"{patient_label}: {patient_name}"
+    )
+    if include_notification_consent:
+        return f"{text}\n\n{_localized_text('notification_consent', language_code)}"
+    return text
+
+
 async def _set_notification_consent(
     db: Session, bot_service, chat_id: int, enabled: bool
 ) -> None:
@@ -2905,6 +2930,12 @@ async def _handle_contact_link(
         return True
 
     try:
+        existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+            db, int(chat_id)
+        )
+        notifications_already_enabled = bool(
+            getattr(existing_telegram_user, "notifications_enabled", False)
+        )
         _upsert_ticket_qr_telegram_user(db, message, patient.id)
         db.commit()
     except Exception as exc:
@@ -2924,13 +2955,21 @@ async def _handle_contact_link(
         return True
 
     language = _telegram_chat_language(db, chat_id)
+    reply_markup = _localized_main_menu(language)
+    if not notifications_already_enabled:
+        reply_markup = _localized_notification_consent_menu(language)
     patient_label = "Bemor" if language == TELEGRAM_LANGUAGE_UZ else "Пациент"
     await _send_patient_bot_reply(
         db,
         bot_service,
         chat_id,
-        f"{_localized_text('contact_linked', language)}\n{patient_label}: {_patient_display_name(patient)}",
-        _localized_main_menu(language),
+        _patient_contact_linked_text(
+            language,
+            patient_label,
+            _patient_display_name(patient),
+            not notifications_already_enabled,
+        ),
+        reply_markup,
         "telegram_patient_contact_linked",
     )
     return True

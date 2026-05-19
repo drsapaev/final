@@ -1021,6 +1021,91 @@ class TestTelegramWebhookSecurity:
         assert handled is True
         assert calls == ["staff"]
 
+    @pytest.mark.asyncio
+    async def test_contact_link_new_user_prompts_notification_consent(
+        self, db_session, test_patient
+    ):
+        fake_service = FakeTelegramBotService(active=True)
+        message = {
+            "message_id": 1,
+            "chat": {"id": 7024},
+            "from": {"id": 7024, "language_code": "ru"},
+            "contact": {
+                "user_id": 7024,
+                "phone_number": test_patient.phone,
+            },
+        }
+
+        handled = await telegram_webhook._handle_contact_link(
+            message, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7024)
+            .one()
+        )
+        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.notifications_enabled is False
+        assert telegram_user.appointment_reminders is False
+        assert telegram_user.lab_notifications is False
+        chat_id, text, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7024
+        assert telegram_webhook._localized_text("contact_linked", "ru") in text
+        assert telegram_webhook._localized_text("notification_consent", "ru") in text
+        assert reply_markup == telegram_webhook._localized_notification_consent_menu(
+            "ru"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ticket_qr_link_new_user_prompts_notification_consent(
+        self, db_session, test_patient, monkeypatch
+    ):
+        fake_service = FakeTelegramBotService(active=True)
+        monkeypatch.setattr(
+            telegram_webhook,
+            "consume_telegram_ticket_start_token",
+            lambda _db, _token: SimpleNamespace(patient_id=test_patient.id),
+        )
+        update = {
+            "update_id": 128,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7025},
+                "from": {"id": 7025, "language_code": "uz"},
+                "text": f"/start {telegram_webhook.TELEGRAM_TICKET_QR_PREFIX}_abc",
+            },
+        }
+
+        handled = await telegram_webhook._handle_ticket_qr_start(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7025)
+            .one()
+        )
+        assert telegram_user.patient_id == test_patient.id
+        assert telegram_user.notifications_enabled is False
+        assert telegram_user.appointment_reminders is False
+        assert telegram_user.lab_notifications is False
+        chat_id, text, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7025
+        assert (
+            telegram_webhook._localized_text("ticket_qr_linked", "uz-Latn")
+            in text
+        )
+        assert (
+            telegram_webhook._localized_text("notification_consent", "uz-Latn")
+            in text
+        )
+        assert reply_markup == telegram_webhook._localized_notification_consent_menu(
+            "uz-Latn"
+        )
+
     def test_queue_message_reports_linked_patient_position_and_cabinet(
         self, db_session, test_patient, test_daily_queue, test_queue_entry
     ):
