@@ -48,6 +48,49 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "help", "description": "Yordam"},
 ]
 PATIENT_BOT_MENU_BUTTON = {"type": "commands"}
+PATIENT_BOT_PROFILE_TEXTS = [
+    {"method": "setMyName", "payload": {"name": "KosMed Clinic"}},
+    {
+        "method": "setMyDescription",
+        "payload": {
+            "description": (
+                "KosMed Clinic: запись, очередь, оплаты, уведомления и готовые "
+                "результаты для пациентов. Для привязки используйте QR с чека "
+                "или кнопку телефона."
+            )
+        },
+    },
+    {
+        "method": "setMyShortDescription",
+        "payload": {
+            "short_description": "Очередь, визиты, оплаты и результаты KosMed Clinic."
+        },
+    },
+    {
+        "method": "setMyName",
+        "payload": {"name": "KosMed Clinic", "language_code": "uz"},
+    },
+    {
+        "method": "setMyDescription",
+        "payload": {
+            "description": (
+                "KosMed Clinic: qabul, navbat, to'lovlar, xabarnomalar va tayyor "
+                "natijalar. Bog'lash uchun chekdagi QR kod yoki telefon tugmasidan "
+                "foydalaning."
+            ),
+            "language_code": "uz",
+        },
+    },
+    {
+        "method": "setMyShortDescription",
+        "payload": {
+            "short_description": (
+                "KosMed Clinic navbat, tashriflar, to'lovlar va natijalar."
+            ),
+            "language_code": "uz",
+        },
+    },
+]
 STAFF_BOT_COMMANDS_DEFAULT = [
     {"command": "staff", "description": "Staff status"},
     {"command": "queue", "description": "Role queue"},
@@ -603,6 +646,54 @@ class TelegramBotService:
 
         return True, None
 
+    async def _set_bot_profile_texts(
+        self, bot_token: str | None, profile_texts: list[dict[str, Any]]
+    ) -> tuple[bool, str | None]:
+        if not bot_token:
+            logger.error("Bot token is not configured for Telegram profile setup")
+            return False, "bot_token_not_configured"
+
+        for item in profile_texts:
+            method = str(item.get("method") or "").strip()
+            payload = item.get("payload") or {}
+            if not method or not isinstance(payload, dict):
+                return False, "telegram_profile_payload_invalid"
+
+            url = f"https://api.telegram.org/bot{bot_token}/{method}"
+            try:
+                response = requests.post(url, json=payload, timeout=10)
+            except requests.RequestException as exc:
+                logger.warning(
+                    "Telegram profile setup request failed method=%s error_type=%s",
+                    method,
+                    type(exc).__name__,
+                )
+                return False, type(exc).__name__
+
+            if response.status_code != 200:
+                logger.warning(
+                    "Telegram profile setup failed method=%s status_code=%s",
+                    method,
+                    response.status_code,
+                )
+                return False, f"telegram_http_{response.status_code}"
+
+            try:
+                result = response.json()
+            except ValueError:
+                logger.warning(
+                    "Telegram profile setup returned invalid json method=%s", method
+                )
+                return False, "telegram_invalid_json"
+
+            if not result.get("ok"):
+                logger.warning(
+                    "Telegram profile setup returned not ok method=%s", method
+                )
+                return False, "telegram_api_error"
+
+        return True, None
+
     async def set_patient_bot_commands(self) -> tuple[bool, str | None]:
         """Register patient bot command menu in Telegram."""
         ok, error = await self._set_bot_commands(
@@ -616,7 +707,14 @@ class TelegramBotService:
         )
         if not ok:
             return ok, error
-        return await self._set_chat_menu_button(self.bot_token, PATIENT_BOT_MENU_BUTTON)
+        ok, error = await self._set_chat_menu_button(
+            self.bot_token, PATIENT_BOT_MENU_BUTTON
+        )
+        if not ok:
+            return ok, error
+        return await self._set_bot_profile_texts(
+            self.bot_token, PATIENT_BOT_PROFILE_TEXTS
+        )
 
     async def set_staff_bot_commands(
         self,

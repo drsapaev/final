@@ -1599,7 +1599,7 @@ class TestTelegramWebhookSecurity:
 
         assert ok is True
         assert error is None
-        assert len(captured) == 3
+        assert len(captured) == 3 + len(telegram_bot.PATIENT_BOT_PROFILE_TEXTS)
         assert [item["json"].get("language_code") for item in captured[:2]] == [
             None,
             "uz",
@@ -1612,6 +1612,13 @@ class TestTelegramWebhookSecurity:
         assert captured[2]["json"] == {
             "menu_button": telegram_bot.PATIENT_BOT_MENU_BUTTON
         }
+        profile_calls = captured[3:]
+        assert [item["url"].rsplit("/", 1)[-1] for item in profile_calls] == [
+            item["method"] for item in telegram_bot.PATIENT_BOT_PROFILE_TEXTS
+        ]
+        assert [item["json"] for item in profile_calls] == [
+            item["payload"] for item in telegram_bot.PATIENT_BOT_PROFILE_TEXTS
+        ]
         ru_command_names = [
             command["command"] for command in captured[0]["json"]["commands"]
         ]

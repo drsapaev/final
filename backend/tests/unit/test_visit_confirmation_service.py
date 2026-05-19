@@ -170,12 +170,14 @@ class TestVisitConfirmationService:
             expires_at=datetime.utcnow() + timedelta(minutes=5),
             nonce="futurecase",
         )
-        tampered_token = f"{future_token[:-1]}x"
+        replacement = "x" if future_token[-1] != "x" else "y"
+        tampered_token = f"{future_token[:-1]}{replacement}"
 
         assert parse_telegram_ticket_start_token(expired_token) is None
         assert parse_telegram_ticket_start_token("") is None
         assert parse_telegram_ticket_start_token("not-a-ticket-token") is None
         assert parse_telegram_ticket_start_token("tq_notbase36_nonce_sig") is None
+        assert tampered_token != future_token
         assert parse_telegram_ticket_start_token(tampered_token) is None
 
     def test_ticket_telegram_qr_rollout_rejects_expired_stored_token(
