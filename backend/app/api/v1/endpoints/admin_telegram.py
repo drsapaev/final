@@ -582,6 +582,11 @@ STAFF_BOT_AUDIT_CONTRACT = {
     "state_change_denial_events_enabled": True,
     "confirmation_request_events_enabled": True,
     "state_change_events_enabled": False,
+    "required_state_change_event_types": [
+        "staff_action_confirmed",
+        "staff_action_completed",
+        "staff_action_failed",
+    ],
     "recorded_event_types": [
         "staff_link_created",
         "staff_link_token_rejected",
@@ -591,6 +596,7 @@ STAFF_BOT_AUDIT_CONTRACT = {
     ],
     "pending_event_types": [
         "staff_action_confirmed",
+        "staff_action_completed",
         "staff_action_failed",
     ],
     "required_before_enablement": True,
@@ -613,6 +619,11 @@ STAFF_BOT_AUDIT_CONTRACT = {
         {
             "key": "staff_action_confirmed",
             "label": "Действие подтверждено сотрудником",
+            "required": True,
+        },
+        {
+            "key": "staff_action_completed",
+            "label": "Completed staff action after confirmed domain execution",
             "required": True,
         },
         {
@@ -1044,6 +1055,12 @@ def _build_staff_bot_status(
             "state_change_denial_events_ready": True,
             "confirmation_request_events_ready": True,
             "state_change_events_ready": False,
+            "required_state_change_event_types": list(
+                STAFF_BOT_AUDIT_CONTRACT["required_state_change_event_types"]
+            ),
+            "pending_state_change_event_types": list(
+                STAFF_BOT_AUDIT_CONTRACT["required_state_change_event_types"]
+            ),
         },
         "confirmations": {
             "required": True,

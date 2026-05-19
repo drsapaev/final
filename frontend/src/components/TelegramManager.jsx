@@ -304,6 +304,12 @@ const TelegramManager = () => {
   const staffAuditPendingEvents = Array.isArray(staffAuditContract.pending_event_types) ?
   staffAuditContract.pending_event_types :
   [];
+  const staffAuditRequiredStateEvents = Array.isArray(staffAuditContract.required_state_change_event_types) ?
+  staffAuditContract.required_state_change_event_types :
+  [];
+  const staffAuditPendingStateEvents = Array.isArray(staffAuditRuntime.pending_state_change_event_types) ?
+  staffAuditRuntime.pending_state_change_event_types :
+  staffAuditRequiredStateEvents;
   const staffAuditReady = Boolean(
     staffAuditContract.enabled ||
     staffAuditRuntime.ready
@@ -918,7 +924,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff audit logging"
                     secondary={staffAuditEvents.length ?
-                    `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}; read-only commands: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
+                    `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; state-change pending: ${staffAuditPendingStateEvents.join(', ') || 'none'}; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}; read-only commands: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
                     'Audit contract не опубликован'} />
 
                   <Badge
