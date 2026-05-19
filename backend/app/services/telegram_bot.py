@@ -47,6 +47,7 @@ PATIENT_BOT_COMMANDS_UZ = [
     {"command": "support", "description": "Klinika bilan aloqa"},
     {"command": "help", "description": "Yordam"},
 ]
+PATIENT_BOT_MENU_BUTTON = {"type": "commands"}
 STAFF_BOT_COMMANDS_DEFAULT = [
     {"command": "staff", "description": "Staff status"},
     {"command": "queue", "description": "Role queue"},
@@ -566,9 +567,45 @@ class TelegramBotService:
 
         return True, None
 
+    async def _set_chat_menu_button(
+        self, bot_token: str | None, menu_button: dict[str, Any]
+    ) -> tuple[bool, str | None]:
+        if not bot_token:
+            logger.error("Bot token is not configured for Telegram menu button setup")
+            return False, "bot_token_not_configured"
+
+        url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton"
+        try:
+            response = requests.post(url, json={"menu_button": menu_button}, timeout=10)
+        except requests.RequestException as exc:
+            logger.warning(
+                "Telegram menu button setup request failed error_type=%s",
+                type(exc).__name__,
+            )
+            return False, type(exc).__name__
+
+        if response.status_code != 200:
+            logger.warning(
+                "Telegram menu button setup failed status_code=%s",
+                response.status_code,
+            )
+            return False, f"telegram_http_{response.status_code}"
+
+        try:
+            result = response.json()
+        except ValueError:
+            logger.warning("Telegram menu button setup returned invalid json")
+            return False, "telegram_invalid_json"
+
+        if not result.get("ok"):
+            logger.warning("Telegram menu button setup returned not ok")
+            return False, "telegram_api_error"
+
+        return True, None
+
     async def set_patient_bot_commands(self) -> tuple[bool, str | None]:
         """Register patient bot command menu in Telegram."""
-        return await self._set_bot_commands(
+        ok, error = await self._set_bot_commands(
             self.bot_token,
             [
                 {"commands": PATIENT_BOT_COMMANDS_RU},
@@ -577,6 +614,9 @@ class TelegramBotService:
                 {"commands": PATIENT_BOT_COMMANDS_UZ, "language_code": "uz"},
             ],
         )
+        if not ok:
+            return ok, error
+        return await self._set_chat_menu_button(self.bot_token, PATIENT_BOT_MENU_BUTTON)
 
     async def set_staff_bot_commands(
         self,
