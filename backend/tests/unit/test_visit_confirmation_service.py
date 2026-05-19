@@ -6,10 +6,13 @@ import pytest
 
 from app.models.online_queue import DailyQueue
 from app.models.service import Service
+from app.models.telegram_config import TelegramConfig
 from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
+    TELEGRAM_TICKET_QR_TTL_MINUTES,
     VisitConfirmationDomainError,
     VisitConfirmationService,
+    parse_telegram_ticket_start_token,
 )
 
 
@@ -111,3 +114,45 @@ class TestVisitConfirmationService:
         assert daily_queue is not None
         assert daily_queue.specialist_id == test_doctor.id
         assert print_tickets[0]["doctor_cabinet"] == test_doctor.cabinet
+
+    def test_ticket_telegram_qr_payload_uses_short_security_ttl(
+        self, db_session, test_visit
+    ):
+        db_session.add(
+            TelegramConfig(
+                bot_token="bot-token",
+                bot_username="clinic_bot",
+                active=True,
+            )
+        )
+        db_session.commit()
+
+        confirmation_service = VisitConfirmationService(db_session)
+        issued_at = datetime.utcnow()
+
+        payload = confirmation_service._build_ticket_telegram_qr_payload(test_visit)
+
+        assert payload is not None
+        assert payload.startswith("https://t.me/clinic_bot?start=")
+        assert test_visit.confirmation_token is not None
+        assert test_visit.confirmation_expires_at is not None
+        assert 5 <= TELEGRAM_TICKET_QR_TTL_MINUTES <= 15
+        assert (
+            0
+            < (test_visit.confirmation_expires_at - issued_at).total_seconds()
+            <= (TELEGRAM_TICKET_QR_TTL_MINUTES * 60) + 2
+        )
+
+        token = payload.rsplit("start=", 1)[1]
+        parsed = parse_telegram_ticket_start_token(token)
+
+        assert parsed is not None
+        assert parsed["token_hash"] == test_visit.confirmation_token
+        assert (
+            abs(
+                (
+                    parsed["expires_at"] - test_visit.confirmation_expires_at
+                ).total_seconds()
+            )
+            <= 1
+        )

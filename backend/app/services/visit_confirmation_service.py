@@ -36,7 +36,7 @@ CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
 TELEGRAM_TICKET_QR_PREFIX = "tq"
 TELEGRAM_TICKET_QR_HASH_PREFIX = "ticket_qr:"
 TELEGRAM_TICKET_QR_SEPARATOR = "_"
-TELEGRAM_TICKET_QR_TTL_HOURS = 24
+TELEGRAM_TICKET_QR_TTL_MINUTES = 15
 TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
 
 
@@ -759,7 +759,9 @@ class VisitConfirmationService:
         if not bot_username:
             return None
 
-        expires_at = datetime.utcnow() + timedelta(hours=TELEGRAM_TICKET_QR_TTL_HOURS)
+        expires_at = datetime.utcnow() + timedelta(
+            minutes=TELEGRAM_TICKET_QR_TTL_MINUTES
+        )
         token = build_telegram_ticket_start_token(expires_at=expires_at)
         visit.confirmation_token = _hash_telegram_ticket_start_token(token)
         visit.confirmation_expires_at = expires_at
