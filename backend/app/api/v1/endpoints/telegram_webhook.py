@@ -718,6 +718,22 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Открыть оплату в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda to'lovni ochish",
     },
+    "patient_forms_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть анкеты",
+        TELEGRAM_LANGUAGE_UZ: "Anketalarni ochish",
+    },
+    "patient_documents_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть документы",
+        TELEGRAM_LANGUAGE_UZ: "Hujjatlarni ochish",
+    },
+    "doctor_schedule_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть врачей",
+        TELEGRAM_LANGUAGE_UZ: "Shifokorlarni ochish",
+    },
+    "patient_cabinet_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть кабинет",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetni ochish",
+    },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
             "Telegram привязан к пациенту: {patient}.\n"
@@ -919,6 +935,19 @@ def _patient_payment_entry_url() -> str | None:
     return f"{frontend_url.rstrip('/')}{route}"
 
 
+def _patient_protected_section_entry_url(section: str) -> str | None:
+    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    section_key = str(section or "").strip().lower()
+    if not frontend_url or section_key not in {
+        "forms",
+        "documents",
+        "doctors",
+        "cabinet",
+    }:
+        return None
+    return f"{frontend_url.rstrip('/')}/patient?tab={section_key}"
+
+
 def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
     telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
@@ -934,6 +963,34 @@ def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
             [
                 {
                     "text": _localized_text("payments_entry_button", language),
+                    "url": entry_url,
+                }
+            ]
+        ]
+    }
+
+
+def _telegram_patient_section_entry_markup(
+    db: Session,
+    chat_id: int,
+    *,
+    section: str,
+    button_text_key: str,
+) -> Dict[str, Any] | None:
+    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+    if not telegram_user or not telegram_user.patient_id:
+        return None
+
+    entry_url = _patient_protected_section_entry_url(section)
+    if not entry_url:
+        return None
+
+    language = _telegram_chat_language(db, chat_id)
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _localized_text(button_text_key, language),
                     "url": entry_url,
                 }
             ]
@@ -3573,7 +3630,13 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _localized_text("patient_forms", language),
-            _localized_services_menu(language),
+            _telegram_patient_section_entry_markup(
+                db,
+                chat_id,
+                section="forms",
+                button_text_key="patient_forms_entry_button",
+            )
+            or _localized_services_menu(language),
             "telegram_patient_forms_placeholder",
         )
 
@@ -3584,7 +3647,13 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _localized_text("patient_documents", language),
-            _localized_services_menu(language),
+            _telegram_patient_section_entry_markup(
+                db,
+                chat_id,
+                section="documents",
+                button_text_key="patient_documents_entry_button",
+            )
+            or _localized_services_menu(language),
             "telegram_patient_documents_placeholder",
         )
 
@@ -3595,7 +3664,13 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _localized_text("doctor_schedule", language),
-            _localized_services_menu(language),
+            _telegram_patient_section_entry_markup(
+                db,
+                chat_id,
+                section="doctors",
+                button_text_key="doctor_schedule_entry_button",
+            )
+            or _localized_services_menu(language),
             "telegram_patient_doctor_schedule_placeholder",
         )
 
@@ -3606,7 +3681,13 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _localized_text("patient_cabinet", language),
-            _localized_services_menu(language),
+            _telegram_patient_section_entry_markup(
+                db,
+                chat_id,
+                section="cabinet",
+                button_text_key="patient_cabinet_entry_button",
+            )
+            or _localized_services_menu(language),
             "telegram_patient_cabinet_placeholder",
         )
 
