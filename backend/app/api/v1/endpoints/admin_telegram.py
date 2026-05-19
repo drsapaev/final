@@ -42,6 +42,20 @@ PATIENT_PAYMENT_ENTRY_CONTRACT = {
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
 }
+PATIENT_MINI_APP_MANIFEST_ENDPOINT = "/api/v1/telegram/mini-app/patient/manifest"
+PATIENT_MINI_APP_MANIFEST_CONTRACT = {
+    "contract_version": "patient-mini-app-manifest-v1",
+    "endpoint": PATIENT_MINI_APP_MANIFEST_ENDPOINT,
+    "surface": "telegram_mini_app_backend",
+    "auth": "telegram_init_data",
+    "scope": "linked_patient",
+    "status": "manifest_only",
+    "mutation_enabled": False,
+    "contains_medical_data": False,
+    "contains_payment_records": False,
+    "contains_provider_payloads": False,
+    "contains_report_files": False,
+}
 
 STAFF_LINK_TOKEN_PREFIX = "stl"
 STAFF_LINK_TOKEN_HASH_PREFIX = "staff_link_token:"
@@ -1931,6 +1945,12 @@ def get_telegram_integration_status(
                         "label": "Защищенный вход к оплатам пациента",
                         "enabled": bool(bot_token),
                         "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,
+                    },
+                    {
+                        "key": "patient_mini_app_manifest",
+                        "label": "Mini App manifest пациента",
+                        "enabled": bool(bot_token),
+                        "contract": PATIENT_MINI_APP_MANIFEST_CONTRACT,
                     },
                     {
                         "key": "lab_results_pdf",
