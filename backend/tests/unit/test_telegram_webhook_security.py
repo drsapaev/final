@@ -430,6 +430,93 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "appointment_date_in_past"}
         assert db_session.query(Appointment).count() == initial_appointments
 
+    def test_mini_app_booking_create_endpoint_creates_safe_appointment(
+        self,
+        client,
+        db_session,
+        test_patient,
+        test_doctor,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880206
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": "2026-05-20",
+                "appointmentTime": "09:30",
+                "department": "Cardiology",
+                "notes": "Mini App create request",
+                "services": ["Consultation"],
+            },
+        )
+
+        assert response.status_code == 201
+        payload = response.json()
+        created = db_session.get(Appointment, payload["appointment_id"])
+        assert payload["created"] is True
+        assert payload["preview"]["preview_only"] is True
+        assert payload["preview"]["mutation_allowed"] is False
+        assert payload["preview"]["appointment"]["payment_provider"] is None
+        assert created is not None
+        assert created.patient_id == test_patient.id
+        assert created.doctor_id == test_doctor.id
+        assert created.appointment_date == date(2026, 5, 20)
+        assert created.appointment_time == "09:30"
+        assert created.status == "scheduled"
+        assert created.visit_type == "paid"
+        assert created.payment_type == "cash"
+        assert created.payment_currency == "UZS"
+        assert created.payment_provider is None
+        assert created.payment_transaction_id is None
+        assert created.payment_webhook_id is None
+        assert db_session.query(Appointment).count() == initial_appointments + 1
+
+    def test_mini_app_booking_create_endpoint_rejects_occupied_slot(
+        self,
+        client,
+        db_session,
+        test_patient,
+        test_doctor,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880207
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        db_session.add(
+            Appointment(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
+                appointment_date=date(2026, 5, 20),
+                appointment_time="09:30",
+                status="scheduled",
+                visit_type="paid",
+                payment_type="cash",
+                payment_currency="UZS",
+            )
+        )
+        db_session.commit()
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": "2026-05-20",
+                "appointmentTime": "09:30",
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == {"reason": "appointment_time_slot_occupied"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
     def test_send_message_requires_admin_auth(self, client):
         response = client.post(
             "/api/v1/telegram/send-message",
