@@ -246,6 +246,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Map basic patient business event names to safe Telegram messages through the canonical notification sender path.
 - [x] Wire the first real notification call-site to the patient Telegram event helper: appointment reminders with `db` and `patient_id`.
 - [x] Add a patient `/menu` refresh command that redraws the localized main menu without being intercepted by the staff menu guard: `backend/app/api/v1/endpoints/telegram_webhook.py` handles `/menu` and `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_menu_command_refreshes_patient_main_menu_without_staff_intercept` covers the patient path.
+- [x] Expose the visible patient service aliases in Telegram's native command menu: `backend/app/services/telegram_bot.py` now registers `/services`, `/forms`, `/documents`, `/doctors`, and `/cabinet` in both Russian and Uzbek `setMyCommands` payloads, while `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_telegram_bot_service_registers_patient_commands` keeps the exact command registry covered. These aliases still route to safe placeholder/protected-entry guidance until the protected Mini App flows below are complete.
 - [x] Add or confirm targeted tests for the completed onboarding path: start -> language -> contact/token link -> consent -> localized main menu.
 - [x] Keep full appointment booking out of plain chat unless routed to the future protected Mini App or protected web app.
 
