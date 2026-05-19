@@ -736,6 +736,7 @@ def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
     )
     main_keyboard = _localized_main_menu(language).get("keyboard", [])
     settings_keyboard = settings_menu.get("keyboard", [])
+    contact_rows = main_keyboard[:1]
     extra_rows = []
     if len(main_keyboard) > 3:
         extra_rows.append(main_keyboard[3])
@@ -743,7 +744,13 @@ def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
         extra_rows.append([main_keyboard[4][0]])
     return {
         **settings_menu,
-        "keyboard": settings_keyboard[:4] + extra_rows + settings_keyboard[4:],
+        "keyboard": (
+            settings_keyboard[:2]
+            + contact_rows
+            + settings_keyboard[2:4]
+            + extra_rows
+            + settings_keyboard[4:]
+        ),
     }
 
 
