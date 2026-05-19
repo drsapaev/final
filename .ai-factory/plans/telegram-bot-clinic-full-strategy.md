@@ -319,7 +319,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Implement patient cabinet inside the protected Mini App flow.
 - [ ] Implement payment details inside the protected Mini App flow.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
-- [ ] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity.
+- [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
 ### Phase 6: AI assistant approval flows
 
