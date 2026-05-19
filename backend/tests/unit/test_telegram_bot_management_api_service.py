@@ -809,6 +809,40 @@ class TestTelegramBotManagementApiService:
         assert result == {"valid": False, "reason": "action_binding_mismatch"}
         assert stored.consumed_at is None
 
+    def test_staff_confirmation_token_service_rejects_idempotency_mismatch_without_consuming(
+        self, db_session, admin_user
+    ):
+        service = TelegramStaffConfirmationTokenService(db_session)
+        token_hash = "staff_confirmation_token:" + ("4" * 64)
+        payload_hash = "payload:" + ("3" * 64)
+        service.issue_token(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700806,
+            operation_key="payment_status_change",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash="idempotency:" + ("2" * 64),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+            request_id="req-confirm-idempotency",
+        )
+
+        result = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700806,
+            operation_key="payment_status_change",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash="idempotency:" + ("1" * 64),
+        )
+        stored = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(TelegramStaffConfirmationToken.token_hash == token_hash)
+            .one()
+        )
+
+        assert result == {"valid": False, "reason": "action_binding_mismatch"}
+        assert stored.consumed_at is None
+
     def test_staff_link_start_token_validator_consumes_storage_record(
         self, db_session, admin_user
     ):
