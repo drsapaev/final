@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import pytest
@@ -11,6 +11,7 @@ import pytest
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScopeError,
+    build_telegram_mini_app_appointment_booking_draft,
     require_telegram_mini_app_patient_scope,
     require_telegram_mini_app_staff_scope,
     resolve_telegram_mini_app_session_scope,
@@ -311,3 +312,128 @@ def test_resolve_telegram_mini_app_session_scope_rejects_inactive_staff(
         )
 
     assert excinfo.value.reason == "staff_link_inactive"
+
+
+def test_build_telegram_mini_app_appointment_booking_draft_uses_patient_scope(
+    db_session,
+    test_patient,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880106
+    db_session.add(_telegram_user(chat_id, patient_id=test_patient.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="patient",
+    )
+
+    draft = build_telegram_mini_app_appointment_booking_draft(
+        scope,
+        patient_id=test_patient.id,
+        doctor_id=12,
+        appointment_date=date(2026, 5, 20),
+        appointment_time="09:30",
+        department="Cardiology",
+        notes="Mini App request",
+        services=["Consultation"],
+        today=date(2026, 5, 19),
+    )
+
+    payload = draft.to_appointment_create_payload()
+    assert payload["patient_id"] == test_patient.id
+    assert payload["doctor_id"] == 12
+    assert payload["appointment_date"] == date(2026, 5, 20)
+    assert payload["appointment_time"] == "09:30"
+    assert payload["status"] == "scheduled"
+    assert payload["visit_type"] == "paid"
+    assert payload["payment_type"] == "cash"
+    assert payload["payment_currency"] == "UZS"
+    assert payload["payment_provider"] is None
+    assert payload["payment_transaction_id"] is None
+    assert payload["services"] == ["Consultation"]
+
+
+def test_build_telegram_mini_app_appointment_booking_draft_rejects_staff_scope(
+    db_session,
+    admin_user,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880107
+    db_session.add(_telegram_user(chat_id, user_id=admin_user.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="staff",
+    )
+
+    with pytest.raises(TelegramMiniAppSessionScopeError) as excinfo:
+        build_telegram_mini_app_appointment_booking_draft(
+            scope,
+            appointment_date=date(2026, 5, 20),
+            today=date(2026, 5, 19),
+        )
+
+    assert excinfo.value.reason == "patient_scope_required"
+
+
+def test_build_telegram_mini_app_appointment_booking_draft_rejects_wrong_patient(
+    db_session,
+    test_patient,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880108
+    db_session.add(_telegram_user(chat_id, patient_id=test_patient.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="patient",
+    )
+
+    with pytest.raises(TelegramMiniAppSessionScopeError) as excinfo:
+        build_telegram_mini_app_appointment_booking_draft(
+            scope,
+            patient_id=test_patient.id + 1,
+            appointment_date=date(2026, 5, 20),
+            today=date(2026, 5, 19),
+        )
+
+    assert excinfo.value.reason == "patient_scope_mismatch"
+
+
+def test_build_telegram_mini_app_appointment_booking_draft_rejects_unsafe_fields(
+    db_session,
+    test_patient,
+):
+    now = datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    chat_id = 880109
+    db_session.add(_telegram_user(chat_id, patient_id=test_patient.id))
+    db_session.commit()
+    init_data = _validated_init_data(chat_id, now=now)
+    scope = resolve_telegram_mini_app_session_scope(
+        db_session,
+        init_data,
+        expected_scope="patient",
+    )
+
+    with pytest.raises(TelegramMiniAppSessionScopeError) as past_exc:
+        build_telegram_mini_app_appointment_booking_draft(
+            scope,
+            appointment_date=date(2026, 5, 18),
+            today=date(2026, 5, 19),
+        )
+    assert past_exc.value.reason == "appointment_date_in_past"
+
+    with pytest.raises(TelegramMiniAppSessionScopeError) as time_exc:
+        build_telegram_mini_app_appointment_booking_draft(
+            scope,
+            appointment_date=date(2026, 5, 20),
+            appointment_time="25:99",
+            today=date(2026, 5, 19),
+        )
+    assert time_exc.value.reason == "appointment_time_invalid"

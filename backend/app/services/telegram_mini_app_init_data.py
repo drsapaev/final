@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Literal
 from urllib.parse import parse_qsl
 
@@ -82,6 +82,43 @@ class TelegramMiniAppSessionScope:
     staff_role: str | None = None
 
 
+@dataclass(frozen=True)
+class TelegramMiniAppAppointmentBookingDraft:
+    """Safe appointment booking payload prepared from a patient Mini App scope."""
+
+    patient_id: int
+    appointment_date: date
+    appointment_time: str | None = None
+    doctor_id: int | None = None
+    department: str | None = None
+    notes: str | None = None
+    services: tuple[str, ...] = ()
+    status: str = "scheduled"
+    visit_type: str = "paid"
+    payment_type: str = "cash"
+    payment_currency: str = "UZS"
+
+    def to_appointment_create_payload(self) -> dict[str, Any]:
+        return {
+            "patient_id": self.patient_id,
+            "doctor_id": self.doctor_id,
+            "department": self.department,
+            "appointment_date": self.appointment_date,
+            "appointment_time": self.appointment_time,
+            "notes": self.notes,
+            "status": self.status,
+            "visit_type": self.visit_type,
+            "payment_type": self.payment_type,
+            "services": list(self.services),
+            "payment_amount": None,
+            "payment_currency": self.payment_currency,
+            "payment_provider": None,
+            "payment_transaction_id": None,
+            "payment_webhook_id": None,
+            "payment_processed_at": None,
+        }
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -134,6 +171,51 @@ def _parse_user(value: str | None) -> dict[str, Any] | None:
     if not isinstance(parsed, dict):
         raise TelegramMiniAppInitDataError("invalid_user_json")
     return parsed
+
+
+def _trim_optional_text(
+    value: str | None,
+    *,
+    max_length: int,
+    reason: str,
+) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if len(text) > max_length:
+        raise TelegramMiniAppSessionScopeError(reason)
+    return text
+
+
+def _normalize_services(values: list[str] | tuple[str, ...] | None) -> tuple[str, ...]:
+    if not values:
+        return ()
+    services: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            raise TelegramMiniAppSessionScopeError("appointment_service_invalid")
+        if len(text) > 128:
+            raise TelegramMiniAppSessionScopeError("appointment_service_too_long")
+        services.append(text)
+    return tuple(services)
+
+
+def _normalize_appointment_time(value: str | None) -> str | None:
+    text = _trim_optional_text(
+        value,
+        max_length=8,
+        reason="appointment_time_invalid",
+    )
+    if text is None:
+        return None
+    try:
+        parsed = datetime.strptime(text, "%H:%M")
+    except ValueError as exc:
+        raise TelegramMiniAppSessionScopeError("appointment_time_invalid") from exc
+    return f"{parsed.hour:02d}:{parsed.minute:02d}"
 
 
 def _normalize_staff_role(role: Any) -> str:
@@ -337,3 +419,58 @@ def require_telegram_mini_app_staff_scope(
         if scope.staff_role not in normalized_roles:
             raise TelegramMiniAppSessionScopeError("staff_role_denied")
     return scope
+
+
+def build_telegram_mini_app_appointment_booking_draft(
+    scope: TelegramMiniAppSessionScope,
+    *,
+    appointment_date: date,
+    appointment_time: str | None = None,
+    doctor_id: int | None = None,
+    department: str | None = None,
+    notes: str | None = None,
+    services: list[str] | tuple[str, ...] | None = None,
+    patient_id: int | None = None,
+    today: date | None = None,
+) -> TelegramMiniAppAppointmentBookingDraft:
+    """Prepare a non-mutating appointment booking draft for a linked patient."""
+
+    if scope.patient_id is None:
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+    if patient_id is not None:
+        require_telegram_mini_app_patient_scope(scope, patient_id=patient_id)
+    elif scope.scope_type != "patient":
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+
+    if not isinstance(appointment_date, date) or isinstance(appointment_date, datetime):
+        raise TelegramMiniAppSessionScopeError("appointment_date_invalid")
+    current_day = today or date.today()
+    if appointment_date < current_day:
+        raise TelegramMiniAppSessionScopeError("appointment_date_in_past")
+
+    normalized_doctor_id = None
+    if doctor_id is not None:
+        try:
+            normalized_doctor_id = int(doctor_id)
+        except (TypeError, ValueError) as exc:
+            raise TelegramMiniAppSessionScopeError("doctor_id_invalid") from exc
+        if normalized_doctor_id <= 0:
+            raise TelegramMiniAppSessionScopeError("doctor_id_invalid")
+
+    return TelegramMiniAppAppointmentBookingDraft(
+        patient_id=int(scope.patient_id),
+        appointment_date=appointment_date,
+        appointment_time=_normalize_appointment_time(appointment_time),
+        doctor_id=normalized_doctor_id,
+        department=_trim_optional_text(
+            department,
+            max_length=64,
+            reason="department_too_long",
+        ),
+        notes=_trim_optional_text(
+            notes,
+            max_length=1000,
+            reason="notes_too_long",
+        ),
+        services=_normalize_services(services),
+    )
