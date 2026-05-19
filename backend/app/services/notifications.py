@@ -96,6 +96,7 @@ QUEUE_NOTIFICATION_EVENT_TYPES = {
 }
 
 PATIENT_TELEGRAM_EVENT_PREFERENCES = {
+    "appointment_reminder": "appointment_reminders",
     "visit_created": "appointment_reminders",
     "queue_ticket_issued": "appointment_reminders",
     "queue_status_changed": "appointment_reminders",
@@ -107,6 +108,10 @@ PATIENT_TELEGRAM_EVENT_PREFERENCES = {
 }
 
 PATIENT_TELEGRAM_EVENT_MESSAGES = {
+    "appointment_reminder": {
+        "ru": "Напоминание о записи. Дата: {date}. Врач: {doctor}.",
+        "uz-Latn": "Qabul eslatmasi. Sana: {date}. Shifokor: {doctor}.",
+    },
     "visit_created": {
         "ru": "Запись создана. Дата: {date}. Врач: {doctor}.",
         "uz-Latn": "Qabul yaratildi. Sana: {date}. Shifokor: {doctor}.",
@@ -905,7 +910,19 @@ class NotificationSenderService:
         if patient_phone:
             results["sms"] = await self.send_sms(patient_phone, sms_message)
 
-        results["telegram"] = await self.send_telegram(telegram_message)
+        if db and patient_id:
+            results["telegram"] = await self.send_patient_telegram_event_notification(
+                db=db,
+                patient_id=patient_id,
+                event_type="appointment_reminder",
+                metadata={
+                    "appointment_date": appointment_date.strftime("%d.%m.%Y %H:%M"),
+                    "doctor_name": doctor_name,
+                    "department": department,
+                },
+            )
+        else:
+            results["telegram"] = await self.send_telegram(telegram_message)
 
         return results
 

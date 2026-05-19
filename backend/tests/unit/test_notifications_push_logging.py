@@ -263,5 +263,49 @@ async def test_patient_telegram_event_helper_respects_patient_consent(
     service.send_telegram.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_appointment_reminder_uses_patient_telegram_event_call_site(
+    db_session,
+    test_patient,
+):
+    telegram_user = TelegramUser(
+        chat_id=8103,
+        patient_id=test_patient.id,
+        username="patient_chat",
+        first_name="Patient",
+        language_code="ru",
+        notifications_enabled=True,
+        appointment_reminders=True,
+        lab_notifications=True,
+        active=True,
+        blocked=False,
+    )
+    db_session.add(telegram_user)
+    db_session.commit()
+
+    service = NotificationSenderService()
+    service.send_email = AsyncMock(return_value=False)
+    service.send_sms = AsyncMock(return_value=False)
+    service.send_telegram = AsyncMock(return_value=True)
+
+    result = await service.send_appointment_reminder(
+        patient_email="private@example.test",
+        patient_phone="+998901112233",
+        appointment_date=notification_service_module.datetime(2026, 6, 1, 9, 30),
+        doctor_name="<Doctor>",
+        department="Cardiology",
+        db=db_session,
+        patient_id=test_patient.id,
+    )
+
+    assert result["telegram"] is True
+    service.send_telegram.assert_awaited_once()
+    message = service.send_telegram.await_args.args[0]
+    assert service.send_telegram.await_args.kwargs["chat_id"] == "8103"
+    assert "&lt;Doctor&gt;" in message
+    assert "private@example.test" not in message
+    assert "+998901112233" not in message
+
+
 if __name__ == "__main__":
     unittest.main()
