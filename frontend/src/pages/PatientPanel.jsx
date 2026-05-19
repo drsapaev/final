@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Button, Badge, Icon } from '../components/ui/macos';
+import { Card, Button, Badge, Icon, Input, Textarea, Checkbox } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
-import { Calendar, Heart, FileText, ClipboardList } from 'lucide-react';
+import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { api } from '../api/client';
 
@@ -58,7 +58,50 @@ const readTelegramMiniAppInitData = () => {
   return typeof initData === 'string' ? initData.trim() : '';
 };
 
-const PatientFormsPreview = ({ status, preview, error }) => {
+const buildInitialPatientFormAnswers = (form) => {
+  const answers = {};
+  const fields = Array.isArray(form?.fields) ? form.fields : [];
+
+  fields.forEach((field) => {
+    answers[field.key] = field.type === 'boolean' ? false : '';
+  });
+
+  return answers;
+};
+
+const patientFormErrorMessages = {
+  patient_form_answer_unknown_field: 'The form changed. Reload the Mini App and try again.',
+  patient_form_answer_type_invalid: 'One answer has an invalid value. Check the form and try again.',
+  patient_form_answer_too_long: 'One answer is too long. Shorten it and try again.',
+  patient_form_answer_required: 'A required answer is missing.',
+  patient_scope_mismatch: 'This form does not belong to the linked patient.',
+};
+
+const describePatientFormError = (reason) => (
+  patientFormErrorMessages[reason] || 'The form could not be saved. Try again from Telegram.'
+);
+
+const PatientFormsPreview = ({ status, preview, error, initData }) => {
+  const [formState, setFormState] = useState({});
+
+  useEffect(() => {
+    const forms = Array.isArray(preview?.forms) ? preview.forms : [];
+    const nextState = {};
+
+    forms.forEach((form) => {
+      nextState[form.id] = {
+        answers: buildInitialPatientFormAnswers(form),
+        status: 'idle',
+        error: '',
+        message: '',
+        submittedAt: '',
+        updatedAt: '',
+      };
+    });
+
+    setFormState(nextState);
+  }, [preview]);
+
   if (status === 'missing-init-data') {
     return (
       <PanelEmptyState
@@ -90,6 +133,8 @@ const PatientFormsPreview = ({ status, preview, error }) => {
   }
 
   const forms = Array.isArray(preview?.forms) ? preview.forms : [];
+  const storageEnabled = preview?.policy?.storage_enabled === true;
+  const patientId = preview?.scope?.patient_id || null;
   if (forms.length === 0) {
     return (
       <PanelEmptyState
@@ -100,34 +145,169 @@ const PatientFormsPreview = ({ status, preview, error }) => {
     );
   }
 
+  const handleFieldChange = (formId, field, value) => {
+    setFormState((current) => ({
+      ...current,
+      [formId]: {
+        ...(current[formId] || {}),
+        answers: {
+          ...(current[formId]?.answers || {}),
+          [field.key]: field.type === 'boolean' ? Boolean(value) : value,
+        },
+        error: '',
+        message: '',
+      },
+    }));
+  };
+
+  const handleSave = async (form, nextStatus) => {
+    const currentForm = formState[form.id] || {
+      answers: buildInitialPatientFormAnswers(form),
+    };
+
+    setFormState((current) => ({
+      ...current,
+      [form.id]: {
+        ...(current[form.id] || currentForm),
+        status: nextStatus === 'draft' ? 'saving-draft' : 'submitting',
+        error: '',
+        message: '',
+      },
+    }));
+
+    try {
+      const response = await api.post('/telegram/mini-app/forms/submissions', {
+        initData,
+        patientId,
+        formId: form.id,
+        answers: currentForm.answers,
+        status: nextStatus,
+      });
+      const submission = response.data?.submission || {};
+
+      setFormState((current) => ({
+        ...current,
+        [form.id]: {
+          ...(current[form.id] || currentForm),
+          answers: {
+            ...buildInitialPatientFormAnswers(form),
+            ...(submission.answers || currentForm.answers),
+          },
+          status: 'saved',
+          error: '',
+          message: submission.status === 'draft' ? 'Draft saved.' : 'Form submitted.',
+          submittedAt: submission.submitted_at || '',
+          updatedAt: submission.updated_at || '',
+        },
+      }));
+    } catch (err) {
+      const reason = err?.response?.data?.detail?.reason || 'patient_form_save_failed';
+      setFormState((current) => ({
+        ...current,
+        [form.id]: {
+          ...(current[form.id] || currentForm),
+          status: 'error',
+          error: describePatientFormError(reason),
+          message: '',
+        },
+      }));
+    }
+  };
+
   return (
     <div className="space-y-4">
       {forms.map((form) => (
         <div key={form.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="font-medium text-gray-900">{form.title}</div>
-            <p className="mt-1 text-sm text-gray-500">{form.description}</p>
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium text-gray-900">{form.title}</div>
+              <p className="mt-1 text-sm text-gray-500">{form.description}</p>
+            </div>
+            <Badge variant={storageEnabled ? 'success' : 'warning'}>
+              {storageEnabled ? 'Secure storage on' : 'Read only'}
+            </Badge>
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(form.fields || []).map((field) => (
-              <label key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-                <span className="block text-sm font-medium text-gray-700">{field.label}</span>
+            {(form.fields || []).map((field) => {
+              const current = formState[form.id] || { answers: buildInitialPatientFormAnswers(form) };
+              const fieldValue = current.answers?.[field.key];
+
+              return (
+                <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                 {field.type === 'boolean' ? (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-                    <input type="checkbox" disabled className="h-4 w-4 rounded border-gray-300" />
-                    <span>Not selected</span>
-                  </div>
-                ) : (
-                  <textarea
-                    disabled
-                    rows={field.type === 'textarea' ? 3 : 1}
+                  <Checkbox
+                    id={`patient-form-${form.id}-${field.key}`}
+                    checked={Boolean(fieldValue)}
+                    disabled={!storageEnabled}
+                    label={field.label}
+                    description={storageEnabled ? 'Included in protected Mini App submission.' : 'Protected entry is not enabled.'}
+                    onChange={(checked) => handleFieldChange(form.id, field, checked)}
+                  />
+                ) : field.type === 'textarea' ? (
+                  <Textarea
+                    id={`patient-form-${form.id}-${field.key}`}
+                    label={field.label}
+                    value={typeof fieldValue === 'string' ? fieldValue : ''}
+                    disabled={!storageEnabled}
+                    minRows={3}
+                    maxRows={8}
                     maxLength={field.max_length || undefined}
-                    className="mt-2 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
-                    placeholder="Protected entry is disabled until secure storage is enabled."
+                    placeholder="Enter details inside the protected Mini App."
+                    onChange={(event) => handleFieldChange(form.id, field, event.target.value)}
+                  />
+                ) : (
+                  <Input
+                    id={`patient-form-${form.id}-${field.key}`}
+                    label={field.label}
+                    value={typeof fieldValue === 'string' ? fieldValue : ''}
+                    disabled={!storageEnabled}
+                    maxLength={field.max_length || undefined}
+                    placeholder="Enter details inside the protected Mini App."
+                    onChange={(event) => handleFieldChange(form.id, field, event.target.value)}
                   />
                 )}
-              </label>
-            ))}
+                </div>
+              );
+            })}
+            <div className="md:col-span-2 flex flex-col gap-3 border-t border-gray-100 pt-4">
+              {formState[form.id]?.message && (
+                <div className="text-sm text-green-700" role="status">
+                  {formState[form.id].message}
+                </div>
+              )}
+              {formState[form.id]?.error && (
+                <div className="text-sm text-red-700" role="alert">
+                  {formState[form.id].error}
+                </div>
+              )}
+              {formState[form.id]?.updatedAt && (
+                <div className="text-xs text-gray-500">
+                  Last saved: {formState[form.id].updatedAt}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  disabled={!storageEnabled || !initData || formState[form.id]?.status === 'saving-draft' || formState[form.id]?.status === 'submitting'}
+                  loading={formState[form.id]?.status === 'saving-draft'}
+                  onClick={() => handleSave(form, 'draft')}
+                >
+                  <Save className="w-4 h-4" aria-hidden="true" />
+                  Save draft
+                </Button>
+                <Button
+                  variant="primary"
+                  size="small"
+                  disabled={!storageEnabled || !initData || formState[form.id]?.status === 'saving-draft' || formState[form.id]?.status === 'submitting'}
+                  loading={formState[form.id]?.status === 'submitting'}
+                  onClick={() => handleSave(form, 'submitted')}
+                >
+                  <Send className="w-4 h-4" aria-hidden="true" />
+                  Submit form
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       ))}
@@ -139,13 +319,21 @@ PatientFormsPreview.propTypes = {
   status: PropTypes.string.isRequired,
   preview: PropTypes.shape({
     forms: PropTypes.array,
+    policy: PropTypes.shape({
+      storage_enabled: PropTypes.bool,
+    }),
+    scope: PropTypes.shape({
+      patient_id: PropTypes.number,
+    }),
   }),
   error: PropTypes.string,
+  initData: PropTypes.string,
 };
 
 PatientFormsPreview.defaultProps = {
   preview: null,
   error: '',
+  initData: '',
 };
 
 const PatientPanel = () => {
@@ -156,6 +344,7 @@ const PatientPanel = () => {
   const [formsPreview, setFormsPreview] = useState(null);
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
+  const [formsInitData, setFormsInitData] = useState('');
   const appointments = [];
   const results = [];
   const hasPatientData = appointments.length > 0 || results.length > 0;
@@ -169,6 +358,7 @@ const PatientPanel = () => {
       setFormsStatus('idle');
       setFormsPreview(null);
       setFormsError('');
+      setFormsInitData('');
       return undefined;
     }
 
@@ -177,6 +367,7 @@ const PatientPanel = () => {
       setFormsStatus('missing-init-data');
       setFormsPreview(null);
       setFormsError('');
+      setFormsInitData('');
       return undefined;
     }
 
@@ -184,6 +375,7 @@ const PatientPanel = () => {
     setFormsStatus('loading');
     setFormsError('');
     setFormsPreview(null);
+    setFormsInitData(initData);
 
     api.post('/telegram/mini-app/forms/preview', { initData })
       .then((response) => {
@@ -291,6 +483,7 @@ const PatientPanel = () => {
                   status={formsStatus}
                   preview={formsPreview}
                   error={formsError}
+                  initData={formsInitData}
                 />
               ) : (
                 <PanelEmptyState
