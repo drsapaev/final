@@ -6,6 +6,7 @@ import {
   getCompatibilityRedirects,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
+  getProtectedPatientFormsEntryPath,
   getProtectedPatientPaymentEntryPath,
   getProtectedPatientBookingEntryPath,
   getRoleHomeRoute,
@@ -231,6 +232,13 @@ describe('route contract invariants', () => {
     const chrome = getRouteChromeState('/patient/bookings', '', { role: 'Doctor' });
     expect(chrome.activeSidebarItem).toBe('appointments');
     expect(chrome.hideSidebar).toBe(true);
+  });
+
+  it('keeps protected patient forms entry as query-route fallback', () => {
+    const route = getRouteById('patient-forms-entry');
+
+    expect(getProtectedPatientFormsEntryPath()).toBe('/patient?tab=forms');
+    expect(route).toBeFalsy();
   });
 });
 

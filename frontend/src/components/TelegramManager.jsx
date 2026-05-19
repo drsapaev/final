@@ -68,6 +68,7 @@ import {
   FormControlLabel } from
 '@mui/material';
 import { api } from '../api/client.js';
+import { getProtectedPatientFormsEntryPath } from '../routing/routeSelectors.js';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
@@ -199,7 +200,13 @@ const TelegramManager = () => {
   const patientPaymentEntryFeature = patientBotFeatures.find(
     (feature) => feature?.key === 'patient_payments_protected_entry'
   );
+  const patientFormsEntryFeature = patientBotFeatures.find(
+    (feature) =>
+      feature?.key === 'patient_forms_entrypoint' ||
+      feature?.key === 'patient_forms_placeholder'
+  );
   const patientPaymentEntryRoute = patientPaymentEntryFeature?.contract?.route || '/patient/payments';
+  const patientFormsEntryRoute = patientFormsEntryFeature?.contract?.route || getProtectedPatientFormsEntryPath();
   const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
   const staffBot = botStatus?.staff_bot || {};
@@ -419,7 +426,9 @@ const TelegramManager = () => {
       menu: '📋 Анкеты пациента',
       command: '/forms',
       label: patientCommandLabel('/forms', 'Анкеты пациента'),
-      detail: 'Видимая кнопка с безопасной заглушкой до подключения Mini App и защищённого кабинета.'
+      detail: patientFormsEntryFeature?.enabled
+        ? `Запускает пациентские анкеты в защищенном Mini App: ${patientFormsEntryRoute}.`
+        : 'Раздел пока не включен для этого пациента.'
     },
     {
       key: 'documents',
