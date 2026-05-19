@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import tokenManager from '../utils/tokenManager';
 import { roleToRoute } from '../constants/routes';
+import { AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
 
 export default function UserSelect() {
   const [items, setItems] = useState([]);
@@ -28,28 +29,50 @@ export default function UserSelect() {
   }, []);
 
   return (
-    <div className="theme-page-shell" style={{ maxWidth: 860 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Выбор пользователя</h1>
-      <div className="legacy-muted" style={{ marginBottom: 12 }}>Доступно администратору. Нажмите, чтобы перейти к роли.</div>
-      {err && <div className="legacy-error">{err}</div>}
+    <Card style={{ maxWidth: 860 }}>
+      <CardHeader>
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--mac-text-primary)' }}>Выбор пользователя</h1>
+        <div style={{ color: 'var(--mac-text-secondary)', fontSize: 13, marginTop: 8 }}>Доступно администратору. Нажмите, чтобы перейти к роли.</div>
+      </CardHeader>
+      <CardContent>
+      {err && <AppError title="Не удалось загрузить пользователей" description={err} style={{ marginBottom: 12 }} />}
       {loading ? (
-        <div>Загрузка…</div>
+        <AppLoading
+          title="Загрузка пользователей"
+          description="Получаем список доступных пользователей."
+          ariaLabel="Загружаем список пользователей"
+          size="sm"
+        />
       ) : (
-        <div className="legacy-list">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map(u => (
-            <div key={u.id} className="legacy-list-item">
+            <div
+              key={u.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                border: '1px solid var(--mac-card-border)',
+                borderRadius: '8px',
+                background: 'var(--mac-card-bg)'
+              }}>
               <div>
-                <div style={{ fontWeight: 700 }}>{u.full_name || u.username}</div>
-                <div className="legacy-muted" style={{ fontSize: 12 }}>{u.role || '—'} · {u.email || '—'}</div>
+                <div style={{ fontWeight: 700, color: 'var(--mac-text-primary)' }}>{u.full_name || u.username}</div>
+                <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{u.role || '—'} · {u.email || '—'}</div>
               </div>
               <div>
-                <button className="legacy-button" onClick={() => navigate(roleToRoute(u.role))}>Перейти</button>
+                <Button type="button" variant="outline" size="small" onClick={() => navigate(roleToRoute(u.role))}>
+                  Перейти
+                </Button>
               </div>
             </div>
           ))}
-          {items.length === 0 && <div className="legacy-muted">Пользователи не найдены</div>}
+          {items.length === 0 && <AppEmpty title="Пользователи не найдены" description="Нет пользователей, доступных для выбора роли." />}
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
