@@ -810,6 +810,38 @@ TELEGRAM_MINI_APP_PATIENT_FORMS_MANIFEST = (
         "contains_passport_data": False,
     },
 )
+TELEGRAM_MINI_APP_PATIENT_CABINET_MANIFEST = (
+    {
+        "key": "appointments",
+        "title": "Appointments",
+        "status": "planned",
+        "read_enabled": False,
+        "write_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+        "contains_billing_records": False,
+    },
+    {
+        "key": "documents",
+        "title": "Documents",
+        "status": "planned",
+        "read_enabled": False,
+        "write_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+        "contains_billing_records": False,
+    },
+    {
+        "key": "payments",
+        "title": "Payments",
+        "status": "planned",
+        "read_enabled": False,
+        "write_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+        "contains_billing_records": False,
+    },
+)
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
 EMR_CLOSED_VISIT_STATUSES = {
@@ -3978,6 +4010,26 @@ def _build_mini_app_patient_forms_manifest_response(scope):
     }
 
 
+def _build_mini_app_patient_cabinet_manifest_response(scope):
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": int(scope.patient_id),
+        },
+        "status": "manifest_only",
+        "cabinet_enabled": False,
+        "read_enabled": False,
+        "mutation_enabled": False,
+        "contains_medical_data": False,
+        "contains_passport_data": False,
+        "contains_billing_records": False,
+        "message_key": "telegram_mini_app_patient_cabinet_manifest_only",
+        "sections": [
+            dict(section) for section in TELEGRAM_MINI_APP_PATIENT_CABINET_MANIFEST
+        ],
+    }
+
+
 def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
     db: Session,
@@ -4021,6 +4073,23 @@ def get_mini_app_patient_forms_manifest(
         db,
     )
     return _build_mini_app_patient_forms_manifest_response(scope)
+
+
+@router.post(
+    "/mini-app/cabinet/manifest",
+    operation_id="telegram_mini_app_patient_cabinet_manifest",
+)
+def get_mini_app_patient_cabinet_manifest(
+    request_body: TelegramMiniAppPatientScopeRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe patient cabinet status for a trusted Mini App session."""
+
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        request_body.init_data,
+        db,
+    )
+    return _build_mini_app_patient_cabinet_manifest_response(scope)
 
 
 @router.post(
