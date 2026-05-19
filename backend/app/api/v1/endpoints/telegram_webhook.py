@@ -144,6 +144,7 @@ TELEGRAM_MAIN_MENU = {
         [{"text": "🏥 Записаться на приём"}],
         [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
         [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
+        [{"text": "📲 Онлайн-сервисы"}],
         [{"text": "👤 Мой статус"}, {"text": "⚙️ Настройки"}],
         [{"text": "☎️ Связаться с клиникой"}, {"text": "❓ Помощь"}],
     ],
@@ -177,8 +178,33 @@ TELEGRAM_MAIN_MENUS = {
             [{"text": "🏥 Qabulga yozilish"}],
             [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
             [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
+            [{"text": "📲 Onlayn xizmatlar"}],
             [{"text": "👤 Mening holatim"}, {"text": "⚙️ Sozlamalar"}],
             [{"text": "☎️ Klinikaga bog'lanish"}, {"text": "❓ Yordam"}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    },
+}
+TELEGRAM_PATIENT_SERVICES_MENUS = {
+    TELEGRAM_LANGUAGE_RU: {
+        "keyboard": [
+            [{"text": "🏥 Записаться на приём"}],
+            [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
+            [{"text": "📋 Анкеты пациента"}, {"text": "🧾 Документы и чеки"}],
+            [{"text": "🧑‍⚕️ Врачи и расписание"}, {"text": "📲 Кабинет пациента"}],
+            [{"text": "⬅️ Главное меню"}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    },
+    TELEGRAM_LANGUAGE_UZ: {
+        "keyboard": [
+            [{"text": "🏥 Qabulga yozilish"}],
+            [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
+            [{"text": "📋 Bemor anketalari"}, {"text": "🧾 Hujjatlar va cheklar"}],
+            [{"text": "🧑‍⚕️ Shifokorlar jadvali"}, {"text": "📲 Bemor kabineti"}],
+            [{"text": "⬅️ Asosiy menyu"}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -346,10 +372,11 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
             "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
             "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
+            "📲 Онлайн-сервисы - видимые кнопки подключенных и будущих защищенных функций.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
             "⚙️ Настройки - язык и уведомления.\n\n"
             "☎️ Связаться с клиникой - безопасная подсказка, куда обращаться по записи, кассе и срочным вопросам.\n\n"
-            "Команды: /start, /menu, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
+            "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
             "Для привязки отсканируйте QR с чека или нажмите "
             "\"Поделиться номером\".\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
@@ -364,10 +391,11 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
             "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
             "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
+            "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar tugmalari.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
             "⚙️ Sozlamalar - til va xabarnomalar.\n\n"
             "☎️ Klinikaga bog'lanish - yozilish, kassa va shoshilinch savollar bo'yicha xavfsiz yo'l-yo'riq.\n\n"
-            "Buyruqlar: /start, /menu, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
+            "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
@@ -404,6 +432,76 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Bot chat xabaridan tashrif yaratmaydi va erkin matnda tibbiy "
             "ma'lumotlarni qabul qilmaydi. Yozilgandan keyin bu menyuda navbat, "
             "tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
+        ),
+    },
+    "services_menu": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Онлайн-сервисы\n\n"
+            "Здесь собраны видимые кнопки для функций бота. Уже подключённые разделы "
+            "откроют данные из системы, а неподключённые разделы покажут безопасную "
+            "заглушку без создания записи, оплаты или медицинского документа в Telegram."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Onlayn xizmatlar\n\n"
+            "Bu yerda bot funksiyalari uchun ko'rinadigan tugmalar jamlangan. Ulangan "
+            "bo'limlar tizimdagi ma'lumotlarni ko'rsatadi, ulanmagan bo'limlar esa "
+            "Telegramda yozuv, to'lov yoki tibbiy hujjat yaratmasdan xavfsiz izoh beradi."
+        ),
+    },
+    "patient_forms": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Анкеты пациента\n\n"
+            "Анкеты пока не заполняются в Telegram. Этот раздел будет подключён через "
+            "защищённый кабинет или Mini App, чтобы не принимать паспортные, медицинские "
+            "и согласительные данные в обычном чате."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Bemor anketalari\n\n"
+            "Anketalar hozircha Telegramda to'ldirilmaydi. Bu bo'lim keyin himoyalangan "
+            "kabinet yoki Mini App orqali ulanadi, shunda pasport, tibbiy va rozilik "
+            "ma'lumotlari oddiy chatda qabul qilinmaydi."
+        ),
+    },
+    "patient_documents": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Документы и чеки\n\n"
+            "Чеки, направления и медицинские документы будут открываться только через "
+            "защищённый кабинет. В Telegram остаются короткие уведомления и безопасные "
+            "сводки без внутренних номеров."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Hujjatlar va cheklar\n\n"
+            "Cheklar, yo'llanmalar va tibbiy hujjatlar faqat himoyalangan kabinet orqali "
+            "ochiladi. Telegramda ichki raqamlarsiz qisqa xabarnomalar va xavfsiz "
+            "xulosalar qoladi."
+        ),
+    },
+    "doctor_schedule": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Врачи и расписание\n\n"
+            "Просмотр врачей и свободного времени пока не подключён к Telegram. "
+            "Запись и изменение расписания выполняются через регистратуру или защищённое "
+            "приложение клиники."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Shifokorlar jadvali\n\n"
+            "Shifokorlar va bo'sh vaqtlarni ko'rish hozircha Telegramga ulanmagan. "
+            "Yozilish va jadvalni o'zgartirish registratura yoki klinikaning himoyalangan "
+            "ilovasi orqali bajariladi."
+        ),
+    },
+    "patient_cabinet": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Кабинет пациента\n\n"
+            "Общий вход в кабинет пациента для Telegram ещё не включён. Сейчас безопасно "
+            "доступны отдельные разделы меню: очередь, визиты, оплаты и готовые результаты. "
+            "Кнопка оплаты откроет защищённый путь, когда он настроен для клиники."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Bemor kabineti\n\n"
+            "Telegram uchun umumiy bemor kabineti kirishi hali yoqilmagan. Hozir menyuda "
+            "navbat, tashriflar, to'lovlar va tayyor natijalar xavfsiz ko'rsatiladi. "
+            "To'lov tugmasi klinikada sozlanganda himoyalangan yo'lni ochadi."
         ),
     },
     "support": {
@@ -785,6 +883,13 @@ def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
     )
 
 
+def _localized_services_menu(language_code: Any) -> Dict[str, Any]:
+    return TELEGRAM_PATIENT_SERVICES_MENUS.get(
+        _normalize_patient_language(language_code),
+        TELEGRAM_PATIENT_SERVICES_MENUS[TELEGRAM_LANGUAGE_RU],
+    )
+
+
 def _localized_notification_consent_menu(language_code: Any) -> Dict[str, Any]:
     return TELEGRAM_NOTIFICATION_CONSENT_MENUS.get(
         _normalize_patient_language(language_code),
@@ -850,17 +955,22 @@ def _telegram_settings_message(db: Session, chat_id: int) -> str:
 
 TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
     "📱",
+    "📲",
     "🏥",
     "🎫",
     "📅",
     "💳",
     "👤",
     "📄",
+    "📋",
+    "🧾",
+    "🧑‍⚕",
     "⚙",
     "❓",
     "☎",
     "🔔",
     "🔕",
+    "⬅",
     "🇷🇺",
     "🇺🇿",
 )
@@ -3316,6 +3426,17 @@ async def _handle_clinic_bot_update(
             "telegram_patient_main_menu_refreshed",
         )
 
+    async def services_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("services_menu", language),
+            _localized_services_menu(language),
+            "telegram_patient_services_menu",
+        )
+
     async def settings_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
         await _send_patient_bot_reply(
@@ -3392,6 +3513,50 @@ async def _handle_clinic_bot_update(
             "telegram_patient_book",
         )
 
+    async def patient_forms_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("patient_forms", language),
+            _localized_services_menu(language),
+            "telegram_patient_forms_placeholder",
+        )
+
+    async def patient_documents_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("patient_documents", language),
+            _localized_services_menu(language),
+            "telegram_patient_documents_placeholder",
+        )
+
+    async def doctor_schedule_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("doctor_schedule", language),
+            _localized_services_menu(language),
+            "telegram_patient_doctor_schedule_placeholder",
+        )
+
+    async def patient_cabinet_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("patient_cabinet", language),
+            _localized_services_menu(language),
+            "telegram_patient_cabinet_placeholder",
+        )
+
     async def support_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
         await _send_patient_bot_reply(
@@ -3424,6 +3589,11 @@ async def _handle_clinic_bot_update(
         "/payments": payments_handler,
         "/profile": profile_handler,
         "/results": results_handler,
+        "/services": services_handler,
+        "/forms": patient_forms_handler,
+        "/documents": patient_documents_handler,
+        "/doctors": doctor_schedule_handler,
+        "/cabinet": patient_cabinet_handler,
         "/settings": settings_handler,
         "/support": support_handler,
     }
@@ -3438,6 +3608,12 @@ async def _handle_clinic_bot_update(
             ("👤 Мой статус", profile_handler),
             ("📄 Результаты", results_handler),
             ("📱 Поделиться номером", share_contact_handler),
+            ("📲 Онлайн-сервисы", services_handler),
+            ("📋 Анкеты пациента", patient_forms_handler),
+            ("🧾 Документы и чеки", patient_documents_handler),
+            ("🧑‍⚕️ Врачи и расписание", doctor_schedule_handler),
+            ("📲 Кабинет пациента", patient_cabinet_handler),
+            ("⬅️ Главное меню", menu_handler),
             ("☎️ Связаться с клиникой", support_handler),
             ("меню", menu_handler),
             ("menu", menu_handler),
@@ -3459,6 +3635,12 @@ async def _handle_clinic_bot_update(
             ("👤 Mening holatim", profile_handler),
             ("📄 Natijalar", results_handler),
             ("📱 Telefon raqamni ulashish", share_contact_handler),
+            ("📲 Onlayn xizmatlar", services_handler),
+            ("📋 Bemor anketalari", patient_forms_handler),
+            ("🧾 Hujjatlar va cheklar", patient_documents_handler),
+            ("🧑‍⚕️ Shifokorlar jadvali", doctor_schedule_handler),
+            ("📲 Bemor kabineti", patient_cabinet_handler),
+            ("⬅️ Asosiy menyu", menu_handler),
             ("☎️ Klinikaga bog'lanish", support_handler),
             ("Menyu", menu_handler),
             ("Asosiy menyu", menu_handler),
