@@ -26,6 +26,11 @@ const patientSections = {
     title: 'Book a visit',
     description: 'Protected appointment booking opens from Telegram Mini App identity.',
   },
+  payments: {
+    icon: FileText,
+    title: 'Payments and debt',
+    description: 'Protected payment totals open from Telegram Mini App identity.',
+  },
   forms: {
     icon: ClipboardList,
     title: 'Patient Forms',
@@ -296,7 +301,7 @@ const PatientBookingPanel = () => {
   );
 };
 
-const PatientCabinetSummary = () => {
+const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
   const [cabinetStatus, setCabinetStatus] = useState('idle');
   const [cabinetSummary, setCabinetSummary] = useState(null);
   const [cabinetError, setCabinetError] = useState('');
@@ -367,6 +372,7 @@ const PatientCabinetSummary = () => {
     );
   }
 
+  const isPaymentsMode = mode === 'payments';
   const payments = cabinetSummary?.payments || {};
   const appointments = Array.isArray(cabinetSummary?.appointments) ? cabinetSummary.appointments : [];
   const visits = Array.isArray(cabinetSummary?.visits) ? cabinetSummary.visits : [];
@@ -378,8 +384,14 @@ const PatientCabinetSummary = () => {
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="font-medium text-gray-900">{cabinetSummary?.patient?.name || 'Linked patient'}</div>
-            <p className="mt-1 text-sm text-gray-500">Protected cabinet summary from the linked Telegram patient profile.</p>
+            <div className="font-medium text-gray-900">
+              {isPaymentsMode ? 'Payments and debt' : (cabinetSummary?.patient?.name || 'Linked patient')}
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              {isPaymentsMode
+                ? `Protected payment totals for ${cabinetSummary?.patient?.name || 'linked patient'}.`
+                : 'Protected cabinet summary from the linked Telegram patient profile.'}
+            </p>
           </div>
           <Badge variant="success">Mini App protected</Badge>
         </div>
@@ -404,7 +416,21 @@ const PatientCabinetSummary = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {isPaymentsMode && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
+              <div className="font-medium text-gray-900">Linked activity</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>Linked visits: {payments.linked_visit_count ?? 0}</div>
+                <div>Active queue entries: {payments.active_queue_count ?? 0}</div>
+              </div>
+              <div className="mt-2 text-gray-500">
+                Online payment and refund actions stay disabled in Telegram; clinic staff completes payment operations in the clinic app.
+              </div>
+            </div>
+          )}
+
+          {!isPaymentsMode && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-gray-200 bg-white p-3">
               <div className="font-medium text-gray-900">Appointments</div>
               <div className="mt-3 space-y-2">
@@ -467,10 +493,15 @@ const PatientCabinetSummary = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+PatientCabinetSummary.propTypes = {
+  mode: PropTypes.oneOf(['cabinet', 'payments']),
 };
 
 const buildInitialPatientFormAnswers = (form) => {
@@ -777,9 +808,15 @@ const PatientPanel = () => {
   const [query, setQuery] = useState('');
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const activeSection = location.pathname === '/patient/bookings'
-    ? 'booking'
-    : normalizeSection(searchParams.get('tab'));
+  const activeSection = (() => {
+    if (location.pathname === '/patient/bookings') {
+      return 'booking';
+    }
+    if (location.pathname === '/patient/payments') {
+      return 'payments';
+    }
+    return normalizeSection(searchParams.get('tab'));
+  })();
   const [formsPreview, setFormsPreview] = useState(null);
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
@@ -928,6 +965,8 @@ const PatientPanel = () => {
                 <PatientBookingPanel />
               ) : activeSection === 'cabinet' ? (
                 <PatientCabinetSummary />
+              ) : activeSection === 'payments' ? (
+                <PatientCabinetSummary mode="payments" />
               ) : (
                 <PanelEmptyState
                   icon={sectionConfig.icon}

@@ -336,7 +336,8 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Implement patient cabinet inside the protected Mini App flow.
   - [x] Backend protected cabinet summary endpoint exists: `POST /api/v1/telegram/mini-app/cabinet/summary` validates Telegram Mini App `initData`, resolves linked patient scope, rejects wrong-patient scope, and returns safe profile, appointment, visit, queue, payment-total, and ready-report metadata without Telegram chat/user ids or PDF payloads.
   - [x] Frontend `PatientPanel.jsx` cabinet tab renders the protected summary from `/api/v1/telegram/mini-app/cabinet/summary` with profile, payment totals, appointments, visits, queue, and ready-report metadata while keeping PDF and medical details out of plain chat.
-- [ ] Implement payment details inside the protected Mini App flow.
+- [x] Implement payment details inside the protected Mini App flow.
+  - [x] Frontend `/patient/payments` now resolves to a protected payment summary in `frontend/src/pages/PatientPanel.jsx`, requires Telegram Mini App `initData`, reads safe totals from `/api/v1/telegram/mini-app/cabinet/summary`, and keeps online payment/refund actions disabled in Telegram.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
