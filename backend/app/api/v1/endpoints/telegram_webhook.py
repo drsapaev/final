@@ -1057,17 +1057,25 @@ def _patient_payment_entry_url() -> str | None:
     return f"{frontend_url.rstrip('/')}{route}"
 
 
+PATIENT_MINI_APP_ENTRY_ROUTE = "/telegram/mini-app/patient"
+PATIENT_MINI_APP_SECTION_TARGETS = {
+    "forms": "forms",
+    "documents": "results",
+    "doctors": "appointments",
+    "cabinet": "cabinet",
+}
+
+
 def _patient_protected_section_entry_url(section: str) -> str | None:
     frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
     section_key = str(section or "").strip().lower()
-    if not frontend_url or section_key not in {
-        "forms",
-        "documents",
-        "doctors",
-        "cabinet",
-    }:
+    mini_app_section = PATIENT_MINI_APP_SECTION_TARGETS.get(section_key)
+    if not frontend_url or not mini_app_section:
         return None
-    return f"{frontend_url.rstrip('/')}/patient?tab={section_key}"
+    return (
+        f"{frontend_url.rstrip('/')}{PATIENT_MINI_APP_ENTRY_ROUTE}"
+        f"?section={mini_app_section}"
+    )
 
 
 def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
@@ -1113,7 +1121,7 @@ def _telegram_patient_section_entry_markup(
             [
                 {
                     "text": _localized_text(button_text_key, language),
-                    "url": entry_url,
+                    "web_app": {"url": entry_url},
                 }
             ]
         ]
