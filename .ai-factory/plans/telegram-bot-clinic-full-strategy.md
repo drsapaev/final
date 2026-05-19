@@ -306,6 +306,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Add negative tests for unauthorized staff, stale confirmations, repeated confirmations, and cross-role action attempts.
   - [x] Unauthorized/cross-role state-changing command denial is covered by `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_denies_unauthorized_role`.
   - [x] Storage/service-level stale and repeated confirmation protection is covered by `backend/tests/unit/test_telegram_bot_management_api_service.py::TestTelegramBotManagementApiService::test_staff_confirmation_token_service_rejects_expired_record_without_consuming` and `backend/tests/unit/test_telegram_bot_management_api_service.py::TestTelegramBotManagementApiService::test_staff_confirmation_token_service_consumes_record_once`.
+  - [x] Runtime confirmation callbacks remain inert while state-changing execution is disabled: `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_queue_confirmation_callback_is_ignored_until_execution_enabled` proves no queue mutation, token consumption, or confirmed/completed/failed audit event is produced.
   - [ ] Webhook/runtime stale and repeated confirmation execution tests remain pending until confirmed action execution is enabled.
 
 ### Phase 5: Telegram Mini App
@@ -348,7 +349,7 @@ Use this loop after every Telegram implementation slice:
 Future automation backlog:
 
 - [ ] Add a lightweight repository check that warns when Telegram runtime files change without a corresponding update to this plan.
-- [ ] Add a script or CI job that prints all unchecked Telegram roadmap items for release review.
+- [x] Add a script or CI job that prints all unchecked Telegram roadmap items for release review: `scripts/report_unchecked_telegram_plan_items.py` prints each unchecked checkbox with section path and line number via `python scripts/report_unchecked_telegram_plan_items.py`.
 - [ ] Add a plan drift check that flags stale provider names, unsupported language codes, and hardcoded placeholder URLs.
 - [ ] Add a test inventory check that maps each checked roadmap item to at least one targeted test or smoke command.
 - [ ] Add release-note generation from newly checked items so rollout evidence stays aligned with the plan.

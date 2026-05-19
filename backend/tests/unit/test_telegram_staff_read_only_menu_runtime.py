@@ -1216,6 +1216,106 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert "7220" not in str(audit_log.payload)
 
     @pytest.mark.asyncio
+    async def test_staff_queue_confirmation_callback_is_ignored_until_execution_enabled(
+        self, db_session, registrar_user, test_doctor, test_patient
+    ):
+        assert (
+            telegram_webhook.STAFF_BOT_CONFIRMATION_CONTRACT[
+                "state_changing_actions_enabled"
+            ]
+            is False
+        )
+        _link_staff_chat(db_session, chat_id=7221, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+
+        original_queue_time = datetime.utcnow().replace(microsecond=0)
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=15,
+            patient_id=test_patient.id,
+            patient_name="Callback Guard",
+            phone="+998901234571",
+            source="desk",
+            status="waiting",
+            queue_time=original_queue_time,
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        command_update = {
+            "update_id": 221,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7221},
+                "from": {"id": 7221},
+                "text": "/call",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            command_update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        reply_markup = fake_service._send_message.await_args.args[2]
+        assert "callback_data" not in str(reply_markup)
+
+        confirmation_record = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(
+                TelegramStaffConfirmationToken.staff_user_id == registrar_user.id,
+                TelegramStaffConfirmationToken.telegram_chat_id == 7221,
+            )
+            .one()
+        )
+        fake_service._send_message.reset_mock()
+        callback_update = {
+            "update_id": 222,
+            "callback_query": {
+                "id": "staff-confirmation-callback",
+                "from": {"id": 7221},
+                "message": {"message_id": 2, "chat": {"id": 7221}},
+                "data": f"staff_action_confirm:{confirmation_record.token_hash}",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            callback_update, db_session, fake_service
+        )
+
+        assert handled is False
+        fake_service._send_message.assert_not_awaited()
+        db_session.refresh(entry)
+        db_session.refresh(confirmation_record)
+        assert entry.status == "waiting"
+        assert entry.queue_time == original_queue_time
+        assert entry.called_at is None
+        assert confirmation_record.consumed_at is None
+        assert (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action.in_(
+                    [
+                        "staff_action_confirmed",
+                        "staff_action_completed",
+                        "staff_action_failed",
+                    ]
+                )
+            )
+            .count()
+            == 0
+        )
+
+    @pytest.mark.asyncio
     async def test_staff_state_change_command_denies_unauthorized_role(
         self, db_session, admin_user
     ):
