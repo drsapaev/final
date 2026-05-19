@@ -348,7 +348,7 @@ Use this loop after every Telegram implementation slice:
 Future automation backlog:
 
 - [ ] Add a lightweight repository check that warns when Telegram runtime files change without a corresponding update to this plan.
-- [ ] Add a script or CI job that prints all unchecked Telegram roadmap items for release review.
+- [x] Add a script or CI job that prints all unchecked Telegram roadmap items for release review: `scripts/report_unchecked_telegram_plan_items.py` prints each unchecked checkbox with section path and line number via `python scripts/report_unchecked_telegram_plan_items.py`.
 - [ ] Add a plan drift check that flags stale provider names, unsupported language codes, and hardcoded placeholder URLs.
 - [ ] Add a test inventory check that maps each checked roadmap item to at least one targeted test or smoke command.
 - [ ] Add release-note generation from newly checked items so rollout evidence stays aligned with the plan.
