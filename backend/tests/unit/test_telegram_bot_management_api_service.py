@@ -738,6 +738,47 @@ class TestTelegramBotManagementApiService:
         assert result == {"valid": False, "reason": "expired"}
         assert stored.consumed_at is None
 
+    @pytest.mark.parametrize(
+        ("staff_user_delta", "telegram_chat_id"),
+        [
+            (1, 700804),
+            (0, 700805),
+        ],
+    )
+    def test_staff_confirmation_token_service_rejects_binding_mismatch_without_consuming(
+        self, db_session, admin_user, staff_user_delta, telegram_chat_id
+    ):
+        service = TelegramStaffConfirmationTokenService(db_session)
+        token_hash = "staff_confirmation_token:" + ("6" * 64)
+        payload_hash = "payload:" + ("5" * 64)
+        service.issue_token(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700804,
+            operation_key="visit_cancel_or_move",
+            command_key="/move",
+            action_payload_hash=payload_hash,
+            target_type="visit",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
+            request_id="req-confirm-binding",
+        )
+
+        result = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id + staff_user_delta,
+            telegram_chat_id=telegram_chat_id,
+            operation_key="visit_cancel_or_move",
+            action_payload_hash=payload_hash,
+        )
+        stored = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(TelegramStaffConfirmationToken.token_hash == token_hash)
+            .one()
+        )
+
+        assert result == {"valid": False, "reason": "token_binding_mismatch"}
+        assert stored.consumed_at is None
+
     def test_staff_confirmation_token_service_rejects_action_mismatch(
         self, db_session, admin_user
     ):
