@@ -22,6 +22,33 @@ class FakeTelegramTemplatesService:
         return {"text": "Lab results are ready", "keyboard": None}
 
 
+def test_safe_payment_template_data_uses_configured_protected_patient_route(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        telegram_notifications.settings,
+        "FRONTEND_URL",
+        "https://portal.example.com/",
+    )
+
+    template_data = telegram_notifications._safe_payment_template_data(
+        {
+            "amount": 125000,
+            "transaction_id": "txn-secret",
+            "invoice_id": "invoice-secret",
+            "provider_payment_id": "provider-secret",
+            "receipt_link": "https://provider.example.com/receipt/txn-secret",
+        }
+    )
+
+    assert template_data["receipt_link"] == "https://portal.example.com/patient"
+    assert template_data["transaction_id"] == "available-in-protected-account"
+    assert "txn-secret" not in str(template_data)
+    assert "invoice-secret" not in str(template_data)
+    assert "provider-secret" not in str(template_data)
+    assert "provider.example.com" not in str(template_data)
+
+
 @pytest.mark.asyncio
 async def test_send_appointment_reminder_response_hides_patient_contact_metadata(
     monkeypatch,
@@ -448,6 +475,11 @@ async def test_send_payment_confirmation_response_hides_patient_contact_metadata
     templates_service = FakeTelegramTemplatesService()
 
     monkeypatch.setattr(
+        telegram_notifications.settings,
+        "FRONTEND_URL",
+        "https://clinic.example.com",
+    )
+    monkeypatch.setattr(
         telegram_notifications.crud_patient,
         "get_patient",
         lambda _db, _patient_id: patient,
@@ -497,7 +529,7 @@ async def test_send_payment_confirmation_response_hides_patient_contact_metadata
         "available-in-protected-account"
     )
     assert templates_service.template_data["receipt_link"] == (
-        "https://clinic.example.com/patient/payments"
+        "https://clinic.example.com/patient"
     )
     assert "txn-secret" not in str(templates_service.template_data)
 
@@ -517,6 +549,11 @@ async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
         _send_message=AsyncMock(return_value=True),
     )
 
+    monkeypatch.setattr(
+        telegram_notifications.settings,
+        "FRONTEND_URL",
+        "https://clinic.example.com",
+    )
     monkeypatch.setattr(
         telegram_notifications.crud_patient,
         "get_patient",
@@ -558,7 +595,7 @@ async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
     assert "receipt-secret-internal" not in telegram_payload
     assert "/receipt/" not in telegram_payload
     assert "Sensitive Patient" not in telegram_payload
-    assert "https://clinic.example.com/patient/payments" in telegram_payload
+    assert "https://clinic.example.com/patient" in telegram_payload
 
 
 @pytest.mark.asyncio

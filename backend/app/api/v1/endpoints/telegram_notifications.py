@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+from app.core.config import settings
 from app.crud import (
     appointment as crud_appointment,
     lab_result as crud_lab,
@@ -25,7 +26,7 @@ router = APIRouter()
 
 PROTECTED_LAB_RESULTS_URL = "https://clinic.example.com/patient/lab-results"
 PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
-PROTECTED_PAYMENT_HISTORY_URL = "https://clinic.example.com/patient/payments"
+PROTECTED_PAYMENT_HISTORY_PATH = "/patient"
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
 
 
@@ -40,6 +41,19 @@ def _telegram_notifications_disabled_response() -> Dict[str, Any]:
         "success": False,
         "message": "Telegram notifications disabled by patient preference",
     }
+
+
+def _protected_frontend_url(path: str) -> str:
+    base_url = str(
+        getattr(settings, "FRONTEND_URL", None) or "http://localhost:5173"
+    ).strip()
+    normalized_base = base_url.rstrip("/") or "http://localhost:5173"
+    normalized_path = f"/{str(path or '').strip().lstrip('/')}"
+    return f"{normalized_base}{normalized_path}"
+
+
+def _protected_payment_history_url() -> str:
+    return _protected_frontend_url(PROTECTED_PAYMENT_HISTORY_PATH)
 
 
 def _safe_lab_template_data(
@@ -74,7 +88,7 @@ def _safe_payment_template_data(payment_data: Dict[str, Any]) -> Dict[str, Any]:
         "payment_method": payment_data.get("payment_method", "Карта"),
         "payment_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
         "transaction_id": PROTECTED_PAYMENT_REFERENCE,
-        "receipt_link": PROTECTED_PAYMENT_HISTORY_URL,
+        "receipt_link": _protected_payment_history_url(),
     }
 
 
