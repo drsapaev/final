@@ -493,6 +493,63 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
     "state_changing_commands_registered": False,
 }
 
+STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
+    "contract_version": "staff-action-domain-adapters-v1",
+    "enabled": True,
+    "runtime_enabled": False,
+    "required_before_state_change_enablement": True,
+    "adapters": [
+        {
+            "operation_key": "queue_call_or_skip_patient",
+            "adapter_key": "staff_queue_call_or_skip_adapter",
+            "domain": "queue",
+            "domain_service_required": "queue",
+            "telegram_commands": ["/call", "/skip"],
+            "runtime_enabled": False,
+            "required_before_enablement": True,
+            "required_runtime_checks": [
+                "queue_target_resolved_server_side",
+                "queue_domain_service_authorizes_target",
+                "queue_time_not_rewritten",
+                "idempotency_key_consumed_once",
+                "staff_action_confirmed_audit_written",
+                "staff_action_completed_or_failed_audit_written",
+            ],
+            "blocked_by": [
+                "queue_domain_mutation_adapter",
+                "explicit_action_enablement",
+            ],
+        },
+        {
+            "operation_key": "visit_cancel_or_move",
+            "adapter_key": "staff_queue_visit_cancel_or_move_adapter",
+            "domain": "queue",
+            "domain_service_required": "visit",
+            "telegram_commands": ["/cancel_visit", "/move_visit"],
+            "runtime_enabled": False,
+            "required_before_enablement": True,
+            "required_runtime_checks": [
+                "visit_target_resolved_server_side",
+                "queue_entry_resolved_server_side",
+                "visit_domain_service_authorizes_target",
+                "queue_fairness_not_reordered",
+                "queue_time_not_rewritten",
+                "idempotency_key_consumed_once",
+                "staff_action_confirmed_audit_written",
+                "staff_action_completed_or_failed_audit_written",
+            ],
+            "blocked_by": [
+                "visit_queue_domain_mutation_adapter",
+                "explicit_action_enablement",
+            ],
+        },
+    ],
+    "blocked_by": [
+        "domain_service_action_adapters",
+        "explicit_action_enablement",
+    ],
+}
+
 STAFF_BOT_CONFIRMATION_CONTRACT = {
     "contract_version": "staff-confirmations-v1",
     "enabled": True,
@@ -509,6 +566,7 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     "confirmation_window_seconds": 120,
     "default_state_change_decision": "deny_until_domain_adapters_and_action_enablement",
     "token_storage_contract": STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT,
+    "domain_adapter_contract": STAFF_BOT_DOMAIN_ADAPTER_CONTRACT,
     "operations": [
         {
             "key": "queue_call_or_skip_patient",
@@ -1038,6 +1096,7 @@ def _build_staff_bot_status(
         "authorization_contract": STAFF_BOT_AUTHORIZATION_CONTRACT,
         "command_registration_contract": command_registration_contract,
         "confirmation_contract": STAFF_BOT_CONFIRMATION_CONTRACT,
+        "domain_adapter_contract": STAFF_BOT_DOMAIN_ADAPTER_CONTRACT,
         "audit_contract": STAFF_BOT_AUDIT_CONTRACT,
         "authorization": {
             "source": "application_rbac",
@@ -1073,6 +1132,11 @@ def _build_staff_bot_status(
             "confirmation_token_runtime_enabled": True,
             "idempotency_request_hash_runtime_enabled": True,
             "idempotency_key_returned_to_telegram": False,
+            "domain_adapter_runtime_enabled": False,
+            "queue_action_adapter_runtime_enabled": False,
+            "domain_adapter_blockers": list(
+                STAFF_BOT_DOMAIN_ADAPTER_CONTRACT["blocked_by"]
+            ),
             "state_changing_actions_enabled": False,
             "default_state_change_decision": (
                 "deny_until_domain_adapters_and_action_enablement"
