@@ -322,6 +322,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
   - [x] Backend create API slice: `POST /api/v1/telegram/mini-app/appointments` in `backend/app/api/v1/endpoints/telegram_webhook.py` reuses the trusted preview guard, rejects occupied doctor time slots, creates one safe scheduled/cash/UZS appointment through existing appointment CRUD, and is covered by `backend/tests/unit/test_telegram_webhook_security.py`.
 - [x] Add protected patient section entry buttons for `/forms`, `/documents`, `/doctors`, and `/cabinet`: linked patients now receive `FRONTEND_URL` inline buttons to `/patient?tab=<section>`, while unlinked chats or missing frontend URL keep the safe placeholder services menu, with focused coverage in `backend/tests/unit/test_telegram_webhook_security.py`.
 - [ ] Implement patient forms inside the protected Mini App flow.
+  - [x] First backend-only forms manifest slice: `POST /api/v1/telegram/mini-app/forms/manifest` in `backend/app/api/v1/endpoints/telegram_webhook.py` validates Mini App `initData`, resolves linked patient scope, returns capture-disabled manifest/status without medical/passport fields, rejects forged/staff/unlinked access, and is covered by `backend/tests/unit/test_telegram_webhook_security.py`.
 - [ ] Implement patient cabinet inside the protected Mini App flow.
 - [ ] Implement payment details inside the protected Mini App flow.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
