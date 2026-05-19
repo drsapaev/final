@@ -5,6 +5,7 @@ import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } fro
 const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Система'];
 export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 export const PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID = 'patient-booking-entry';
+export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
 
 function isFullPathMatch(routePath, pathname) {
   return Boolean(matchPath({ path: routePath, end: true }, pathname));
@@ -63,6 +64,11 @@ export function getProtectedPatientPaymentEntryPath() {
 export function getProtectedPatientBookingEntryPath() {
   const route = getCanonicalRouteById(PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID);
   return route?.path || '/patient/bookings';
+}
+
+export function getProtectedPatientFormsEntryPath() {
+  const route = getCanonicalRouteById(PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID);
+  return route?.path || '/patient?tab=forms';
 }
 
 export function getLegacyRedirectTarget(pathname) {

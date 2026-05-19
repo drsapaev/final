@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 PATIENT_PAYMENT_ENTRY_ROUTE = "/patient/payments"
 PATIENT_BOOKING_ENTRY_ROUTE = "/patient/bookings"
+PATIENT_FORMS_ENTRY_ROUTE = "/patient?tab=forms"
 PATIENT_BOOKING_ENTRY_CONTRACT = {
     "contract_version": "patient-booking-entrypoint-v1",
     "route": PATIENT_BOOKING_ENTRY_ROUTE,
@@ -52,6 +53,16 @@ PATIENT_PAYMENT_ENTRY_CONTRACT = {
     "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
+}
+PATIENT_FORMS_ENTRY_CONTRACT = {
+    "contract_version": "patient-forms-entrypoint-v1",
+    "route": PATIENT_FORMS_ENTRY_ROUTE,
+    "surface": "protected_app",
+    "auth": "authenticated",
+    "required_role": None,
+    "contains_internal_identifiers": False,
+    "telegram_url_parameters_allowed": False,
+    "entrypoint_type": "mini_app_tab_entry",
 }
 
 STAFF_LINK_TOKEN_PREFIX = "stl"
@@ -1953,6 +1964,7 @@ def get_telegram_integration_status(
                         "key": "patient_forms_placeholder",
                         "label": "Анкеты пациента: безопасная заглушка Mini App",
                         "enabled": bool(bot_token),
+                        "contract": PATIENT_FORMS_ENTRY_CONTRACT,
                     },
                     {
                         "key": "patient_documents_placeholder",
