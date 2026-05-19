@@ -312,7 +312,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 ### Phase 5: Telegram Mini App
 
 - [ ] Status: not implemented. Legacy `WebAppInfo` links do not count as completion without protected Mini App identity validation and scoped runtime flows.
-- [ ] Validate Telegram Mini App `initData` server-side before trusting identity.
+- [x] Validate Telegram Mini App `initData` server-side before trusting identity: `backend/app/services/telegram_mini_app_init_data.py` validates the Telegram Mini App HMAC data-check string, rejects forged hashes and stale/future `auth_date` values, and is covered by `backend/tests/unit/test_telegram_mini_app_init_data.py`.
 - [ ] Scope Mini App sessions to the linked patient or authenticated staff user.
 - [ ] Implement appointment booking inside the protected Mini App flow.
 - [ ] Implement patient forms inside the protected Mini App flow.
