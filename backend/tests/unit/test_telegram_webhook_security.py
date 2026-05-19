@@ -1144,6 +1144,111 @@ class TestTelegramWebhookSecurity:
         )
         assert log.template_key == "telegram_patient_book"
 
+    @pytest.mark.parametrize(
+        "command,text_key,button_key,template_key,section,chat_id,update_id",
+        [
+            (
+                "/forms",
+                "patient_forms",
+                "patient_forms_entry_button",
+                "telegram_patient_forms_placeholder",
+                "forms",
+                7050,
+                1270,
+            ),
+            (
+                "/documents",
+                "patient_documents",
+                "patient_documents_entry_button",
+                "telegram_patient_documents_placeholder",
+                "documents",
+                7051,
+                1271,
+            ),
+            (
+                "/doctors",
+                "doctor_schedule",
+                "patient_doctors_entry_button",
+                "telegram_patient_doctor_schedule_placeholder",
+                "doctors",
+                7052,
+                1272,
+            ),
+            (
+                "/cabinet",
+                "patient_cabinet",
+                "patient_cabinet_entry_button",
+                "telegram_patient_cabinet_placeholder",
+                "cabinet",
+                7053,
+                1273,
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_patient_service_commands_return_protected_section_entry_button(
+        self,
+        db_session,
+        test_patient,
+        monkeypatch,
+        command,
+        text_key,
+        button_key,
+        template_key,
+        section,
+        chat_id,
+        update_id,
+    ):
+        _link_patient_to_chat(
+            db_session,
+            chat_id=chat_id,
+            patient_id=test_patient.id,
+            language_code="uz-Latn",
+        )
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "https://clinic.example",
+            raising=False,
+        )
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": update_id,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": chat_id},
+                "from": {"id": 111},
+                "text": command,
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        reply_chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert reply_chat_id == chat_id
+        assert message == telegram_webhook._localized_text(text_key, "uz-Latn")
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text(button_key, "uz-Latn"),
+                        "url": f"https://clinic.example/patient?tab={section}",
+                    }
+                ]
+            ]
+        }
+        assert str(test_patient.id) not in str(reply_markup)
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == chat_id)
+            .one()
+        )
+        assert log.template_key == template_key
+
     @pytest.mark.asyncio
     async def test_book_command_without_link_or_frontend_falls_back_to_main_menu(
         self, db_session

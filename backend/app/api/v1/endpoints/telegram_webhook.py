@@ -467,6 +467,26 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
         ),
     },
+    "service_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть защищенный раздел",
+        TELEGRAM_LANGUAGE_UZ: "Havfsiz bo'limni ochish",
+    },
+    "patient_forms_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть анкету",
+        TELEGRAM_LANGUAGE_UZ: "Anketani ochish",
+    },
+    "patient_documents_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть документы",
+        TELEGRAM_LANGUAGE_UZ: "Hujjatlarni ochish",
+    },
+    "patient_doctors_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть расписание врачей",
+        TELEGRAM_LANGUAGE_UZ: "Shifokorlar jadvalini ochish",
+    },
+    "patient_cabinet_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть мой кабинет",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetimni ochish",
+    },
     "services_menu": {
         TELEGRAM_LANGUAGE_RU: (
             "Онлайн-сервисы\n\n"
@@ -914,68 +934,112 @@ def _localized_text(key: str, language_code: Any) -> str:
     return values.get(language) or values.get(TELEGRAM_LANGUAGE_RU) or ""
 
 
-def _patient_payment_entry_url() -> str | None:
+def _patient_entry_url(section: str | None = None) -> str | None:
     frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
     if not frontend_url:
         return None
-    route = PATIENT_PAYMENT_ENTRY_ROUTE
+
+    if section == "booking":
+        route = PATIENT_BOOKING_ENTRY_ROUTE
+    elif section == "payment":
+        route = PATIENT_PAYMENT_ENTRY_ROUTE
+    elif section:
+        route = f"/patient?tab={section}"
+    else:
+        route = "/patient"
+
     if not route.startswith("/"):
         route = f"/{route}"
     return f"{frontend_url.rstrip('/')}{route}"
+
+
+def _patient_payment_entry_url() -> str | None:
+    return _patient_entry_url("payment")
 
 
 def _patient_booking_entry_url() -> str | None:
-    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
-    if not frontend_url:
+    return _patient_entry_url("booking")
+
+
+def _telegram_service_entry_markup(
+    db: Session,
+    chat_id: int,
+    section: str,
+    button_text_key: str,
+) -> Dict[str, Any] | None:
+    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+    if not telegram_user or not telegram_user.patient_id:
         return None
-    route = PATIENT_BOOKING_ENTRY_ROUTE
-    if not route.startswith("/"):
-        route = f"/{route}"
-    return f"{frontend_url.rstrip('/')}{route}"
+
+    entry_url = _patient_entry_url(section)
+    if not entry_url:
+        return None
+
+    language = _telegram_chat_language(db, chat_id)
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _localized_text(button_text_key, language),
+                    "url": entry_url,
+                }
+            ]
+        ]
+    }
 
 
 def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
-        return None
-
-    entry_url = _patient_payment_entry_url()
-    if not entry_url:
-        return None
-
-    language = _telegram_chat_language(db, chat_id)
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": _localized_text("payments_entry_button", language),
-                    "url": entry_url,
-                }
-            ]
-        ]
-    }
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "payment",
+        "payments_entry_button",
+    )
 
 
 def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
-        return None
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "booking",
+        "booking_entry_button",
+    )
 
-    entry_url = _patient_booking_entry_url()
-    if not entry_url:
-        return None
 
-    language = _telegram_chat_language(db, chat_id)
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": _localized_text("booking_entry_button", language),
-                    "url": entry_url,
-                }
-            ]
-        ]
-    }
+def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "forms",
+        "patient_forms_entry_button",
+    )
+
+
+def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "documents",
+        "patient_documents_entry_button",
+    )
+
+
+def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "doctors",
+        "patient_doctors_entry_button",
+    )
+
+
+def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "cabinet",
+        "patient_cabinet_entry_button",
+    )
 
 
 def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
@@ -3606,45 +3670,61 @@ async def _handle_clinic_bot_update(
 
     async def patient_forms_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_forms_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_forms", language),
-            _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_forms_placeholder",
         )
 
     async def patient_documents_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_documents_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_documents", language),
-            _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_documents_placeholder",
         )
 
     async def doctor_schedule_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_doctors_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("doctor_schedule", language),
-            _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_doctor_schedule_placeholder",
         )
 
     async def patient_cabinet_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_cabinet_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_cabinet", language),
-            _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_cabinet_placeholder",
         )
 
