@@ -406,6 +406,151 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "bot_token_required"}
         assert db_session.query(Appointment).count() == initial_appointments
 
+    def test_mini_app_patient_manifest_endpoint_returns_aggregate_status(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880228
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/patient/manifest",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["status"] == "manifest_only"
+        capabilities = payload["capabilities"]
+        assert set(capabilities) == {
+            "appointments",
+            "forms",
+            "cabinet",
+            "payments",
+            "results",
+        }
+        assert capabilities["appointments"]["preview_enabled"] is True
+        assert capabilities["appointments"]["create_enabled"] is True
+        assert capabilities["appointments"]["contains_medical_data"] is False
+        assert (
+            capabilities["appointments"]["contains_payment_provider_data"] is False
+        )
+        assert capabilities["forms"]["capture_enabled"] is False
+        assert capabilities["forms"]["submission_enabled"] is False
+        assert capabilities["forms"]["contains_medical_data"] is False
+        assert capabilities["forms"]["contains_passport_data"] is False
+        assert capabilities["cabinet"]["read_enabled"] is False
+        assert capabilities["cabinet"]["mutation_enabled"] is False
+        assert capabilities["cabinet"]["contains_medical_data"] is False
+        assert capabilities["cabinet"]["contains_passport_data"] is False
+        assert capabilities["cabinet"]["contains_billing_records"] is False
+        assert capabilities["payments"]["read_enabled"] is False
+        assert capabilities["payments"]["payment_capture_enabled"] is False
+        assert capabilities["payments"]["provider_redirect_enabled"] is False
+        assert capabilities["payments"]["contains_amounts"] is False
+        assert capabilities["payments"]["contains_payment_records"] is False
+        assert capabilities["payments"]["contains_provider_payloads"] is False
+        assert capabilities["results"]["view_enabled"] is False
+        assert capabilities["results"]["download_enabled"] is False
+        assert capabilities["results"]["contains_medical_results"] is False
+        assert capabilities["results"]["contains_lab_values"] is False
+        assert capabilities["results"]["contains_report_records"] is False
+        assert capabilities["results"]["contains_file_urls"] is False
+        assert capabilities["results"]["contains_pdfs"] is False
+        assert capabilities["results"]["contains_diagnoses"] is False
+        for capability in capabilities.values():
+            assert "records" not in capability
+            assert "report_id" not in capability
+            assert "file_url" not in capability
+            assert "pdf_url" not in capability
+            assert "amount" not in capability
+            assert "provider_payload" not in capability
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_patient_manifest_endpoint_rejects_forged_init_data(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880229
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/patient/manifest",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id).replace(
+                    "hash=",
+                    "hash=forged",
+                    1,
+                )
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "hash_mismatch"}
+
+    def test_mini_app_patient_manifest_endpoint_rejects_staff_scope(
+        self,
+        client,
+        db_session,
+        admin_user,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880230
+        db_session.add(
+            TelegramUser(
+                chat_id=chat_id,
+                user_id=admin_user.id,
+                language_code="ru",
+                active=True,
+                blocked=False,
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/patient/manifest",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "patient_scope_required"}
+
+    def test_mini_app_patient_manifest_endpoint_rejects_unlinked_chat(
+        self,
+        client,
+        db_session,
+    ):
+        _add_mini_app_telegram_config(db_session)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/patient/manifest",
+            json={"initData": _signed_mini_app_init_data(880231)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "telegram_link_required"}
+
+    def test_mini_app_patient_manifest_endpoint_requires_configured_bot_token(
+        self,
+        client,
+        db_session,
+    ):
+        response = client.post(
+            "/api/v1/telegram/mini-app/patient/manifest",
+            json={"initData": _signed_mini_app_init_data(880232)},
+        )
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == {"reason": "bot_token_required"}
+
     def test_mini_app_forms_manifest_endpoint_returns_capture_disabled_status(
         self,
         client,
