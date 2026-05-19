@@ -1008,6 +1008,122 @@ class QueueBusinessService:
 
         return entry
 
+    def _staff_action_result(
+        self,
+        entry: OnlineQueueEntry,
+        *,
+        action: str,
+        previous_status: str,
+        original_queue_time: datetime | None,
+    ) -> dict[str, Any]:
+        return {
+            "success": True,
+            "action": action,
+            "entry_id": entry.id,
+            "queue_id": entry.queue_id,
+            "number": entry.number,
+            "previous_status": previous_status,
+            "status": entry.status,
+            "queue_time": entry.queue_time,
+            "queue_time_preserved": entry.queue_time == original_queue_time,
+            "called_at": entry.called_at,
+        }
+
+    def staff_call_next_patient(
+        self,
+        db: Session,
+        *,
+        queue_id: int | None = None,
+        specialist_id: int | None = None,
+        queue_tag: str | None = None,
+        target_date: date | None = None,
+        actor_user_id: int | None = None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        target_day = target_date or date.today()
+        query = (
+            db.query(OnlineQueueEntry)
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+            .filter(
+                DailyQueue.day == target_day,
+                DailyQueue.active.is_(True),
+                OnlineQueueEntry.status == "waiting",
+            )
+        )
+        if queue_id is not None:
+            query = query.filter(OnlineQueueEntry.queue_id == queue_id)
+        if specialist_id is not None:
+            query = query.filter(DailyQueue.specialist_id == specialist_id)
+        if queue_tag:
+            query = query.filter(DailyQueue.queue_tag == queue_tag)
+
+        entry = (
+            query.order_by(
+                OnlineQueueEntry.priority.desc(),
+                func.coalesce(
+                    OnlineQueueEntry.queue_time,
+                    OnlineQueueEntry.created_at,
+                ).asc(),
+                OnlineQueueEntry.id.asc(),
+            )
+            .first()
+        )
+        if not entry:
+            raise QueueNotFoundError("No waiting queue entry found for staff call")
+
+        original_queue_time = entry.queue_time
+        previous_status = entry.status
+        entry.status = "called"
+        entry.called_at = self.get_local_timestamp(db)
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            db.flush()
+
+        return self._staff_action_result(
+            entry,
+            action="staff_call_next_patient",
+            previous_status=previous_status,
+            original_queue_time=original_queue_time,
+        )
+
+    def staff_skip_queue_entry(
+        self,
+        db: Session,
+        *,
+        entry_id: int,
+        actor_user_id: int | None = None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        entry = (
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.id == entry_id)
+            .first()
+        )
+        if not entry:
+            raise QueueNotFoundError(f"Queue entry {entry_id} not found")
+        if entry.status not in {"waiting", "called"}:
+            raise QueueConflictError(
+                f"Queue entry {entry_id} cannot be skipped from status {entry.status}"
+            )
+
+        original_queue_time = entry.queue_time
+        previous_status = entry.status
+        entry.status = "no_show"
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            db.flush()
+
+        return self._staff_action_result(
+            entry,
+            action="staff_skip_queue_entry",
+            previous_status=previous_status,
+            original_queue_time=original_queue_time,
+        )
+
     def update_queue_status(
         self,
         db: Session,
