@@ -351,7 +351,7 @@ Future automation backlog:
 - [x] Add a lightweight repository check that warns when Telegram runtime files change without a corresponding update to this plan: `scripts/check_telegram_plan_drift.py` inspects changed Telegram runtime files, warns when this plan is absent, and supports `--fail-on-warning` for a later CI gate.
 - [x] Add a script or CI job that prints all unchecked Telegram roadmap items for release review: `scripts/report_unchecked_telegram_plan_items.py` prints each unchecked checkbox with section path and line number via `python scripts/report_unchecked_telegram_plan_items.py`.
 - [x] Add a plan drift check that flags stale provider names, unsupported language codes, and hardcoded placeholder URLs: `scripts/check_telegram_plan_content.py` warns on stale provider names, unsupported patient language codes, and placeholder/local URLs in this strategy plan, with `--fail-on-warning` available for a later CI gate.
-- [ ] Add a test inventory check that maps each checked roadmap item to at least one targeted test or smoke command.
+- [x] Add a test inventory check that maps each checked roadmap item to at least one targeted test or smoke command: `scripts/report_telegram_plan_test_inventory.py` reports checked items with detected test/smoke evidence and can use `--fail-on-missing` once historical roadmap evidence is fully backfilled.
 - [ ] Add release-note generation from newly checked items so rollout evidence stays aligned with the plan.
 
 ## Acceptance Criteria
