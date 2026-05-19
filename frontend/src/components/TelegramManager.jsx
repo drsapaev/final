@@ -191,6 +191,10 @@ const TelegramManager = () => {
   const patientBot = botStatus?.patient_bot || {};
   const patientBotFeatures = Array.isArray(patientBot.features) ? patientBot.features : [];
   const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
+  const patientPaymentEntryFeature = patientBotFeatures.find(
+    (feature) => feature?.key === 'patient_payments_protected_entry'
+  );
+  const patientPaymentEntryRoute = patientPaymentEntryFeature?.contract?.route || '/patient/payments';
   const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
   const staffBot = botStatus?.staff_bot || {};
@@ -353,7 +357,9 @@ const TelegramManager = () => {
       menu: '💳 Оплаты и долг',
       command: '/payments',
       label: patientCommandLabel('/payments', 'Оплаты и долг'),
-      detail: 'Начислено, оплачено, долг и незавершённые платежи по визиту.'
+      detail: patientPaymentEntryFeature?.enabled
+        ? `Начислено, оплачено, долг; кнопка ведет в защищенный кабинет: ${patientPaymentEntryRoute}.`
+        : 'Начислено, оплачено, долг и незавершённые платежи по визиту.'
     },
     {
       key: 'results',

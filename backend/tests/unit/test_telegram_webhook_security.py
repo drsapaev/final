@@ -1426,6 +1426,102 @@ class TestTelegramWebhookSecurity:
         assert "Долг: 70 000 сум" in message
         assert "Ожидает подтверждения: 10 000 сум" in message
 
+    def test_payments_message_uses_protected_entry_without_visit_ids(
+        self, db_session, test_patient, test_visit, test_queue_entry, monkeypatch
+    ):
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "https://clinic.example",
+            raising=False,
+        )
+        _link_patient_to_chat(db_session, chat_id=7023, patient_id=test_patient.id)
+        test_queue_entry.visit_id = test_visit.id
+        test_queue_entry.total_amount = 120000
+        db_session.commit()
+
+        message = telegram_webhook._clinic_payments_message(db_session, 7023)
+
+        assert (
+            telegram_webhook._localized_text("payments_visits", "ru").format(count=1)
+            in message
+        )
+        assert (
+            telegram_webhook._localized_text("payments_protected_entry", "ru")
+            in message
+        )
+        assert (
+            telegram_webhook._localized_text("payments_online_unavailable", "ru")
+            not in message
+        )
+        assert f"#{test_visit.id}" not in message
+
+    @pytest.mark.asyncio
+    async def test_payments_command_sends_protected_entry_button_without_internal_ids(
+        self, db_session, test_patient, test_visit, test_queue_entry, monkeypatch
+    ):
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "https://clinic.example/",
+            raising=False,
+        )
+        _link_patient_to_chat(db_session, chat_id=7024, patient_id=test_patient.id)
+        test_queue_entry.visit_id = test_visit.id
+        test_queue_entry.total_amount = 120000
+        payment = Payment(
+            visit_id=test_visit.id,
+            amount=Decimal("10000"),
+            status="pending",
+            method="cash",
+        )
+        db_session.add(payment)
+        db_session.commit()
+        db_session.refresh(payment)
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 124,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7024},
+                "from": {"id": 111},
+                "text": "/payments",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        chat_id, _message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7024
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text(
+                            "payments_entry_button", "ru"
+                        ),
+                        "url": "https://clinic.example/patient/payments",
+                    }
+                ]
+            ]
+        }
+        assert str(test_patient.id) not in str(reply_markup)
+        assert str(test_visit.id) not in str(reply_markup)
+        assert str(payment.id) not in str(reply_markup)
+        telegram_payload = f"{_message} {reply_markup}"
+        assert f"#{test_visit.id}" not in telegram_payload
+        assert "patient_id" not in telegram_payload
+        assert "visit_id" not in telegram_payload
+        assert "payment_id" not in telegram_payload
+        assert "invoice_id" not in telegram_payload
+        assert "/payment/success" not in telegram_payload
+        assert "/payment/cancel" not in telegram_payload
+        assert "/internal-demo/payment-test" not in telegram_payload
+
     def test_ready_lab_reports_are_filtered_by_patient_status_and_limited(
         self, db_session, test_patient
     ):

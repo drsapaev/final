@@ -6,6 +6,7 @@ import {
   getCompatibilityRedirects,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
+  getProtectedPatientPaymentEntryPath,
   getRoleHomeRoute,
   getRouteDocsSnapshot,
   getRouteChromeState,
@@ -193,6 +194,24 @@ describe('route contract invariants', () => {
       expect(item.to).toBeTruthy();
       expect(canonicalPaths.has(item.to)).toBe(true);
     });
+  });
+
+  it('keeps protected patient payment entry authenticated and non-navigational', () => {
+    const route = getRouteById('patient-payment-entry');
+
+    expect(route).toBeTruthy();
+    expect(getProtectedPatientPaymentEntryPath()).toBe('/patient/payments');
+    expect(route.path).toBe('/patient/payments');
+    expect(route.auth).toBe('authenticated');
+    expect(route.roles).toEqual([]);
+    expect(route.nav).toBe(false);
+    expect(route.component).toBe('PatientPanel');
+    expect(isRouteAccessibleToProfile(route, null)).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(true);
+
+    const chrome = getRouteChromeState('/patient/payments', '', { role: 'Doctor' });
+    expect(chrome.activeSidebarItem).toBe('payments');
+    expect(chrome.hideSidebar).toBe(true);
   });
 });
 

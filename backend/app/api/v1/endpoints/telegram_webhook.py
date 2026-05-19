@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
+    PATIENT_PAYMENT_ENTRY_ROUTE,
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
     STAFF_BOT_CONFIRMATION_CONTRACT,
     STAFF_BOT_READ_ONLY_DOMAIN_DATA_COMMAND_KEYS,
@@ -27,6 +28,7 @@ from app.api.v1.endpoints.admin_telegram import (
     _normalize_staff_role,
     validate_staff_link_start_token,
 )
+from app.core.config import settings
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
@@ -525,8 +527,8 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: "Tasdiqlanishi kutilmoqda: {amount} so'm",
     },
     "payments_visits": {
-        TELEGRAM_LANGUAGE_RU: "Визит: {visits}",
-        TELEGRAM_LANGUAGE_UZ: "Tashrif: {visits}",
+        TELEGRAM_LANGUAGE_RU: "Связанные визиты: {count}",
+        TELEGRAM_LANGUAGE_UZ: "Bog'langan tashriflar: {count}",
     },
     "payments_online_unavailable": {
         TELEGRAM_LANGUAGE_RU: (
@@ -535,6 +537,18 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: (
             "Onlayn to'lov hozircha ulanmagan. To'lov uchun kassaga murojaat qiling."
         ),
+    },
+    "payments_protected_entry": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Для оплаты откройте защищенный кабинет. В Telegram не отправляются номера счетов или платежей."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "To'lov uchun himoyalangan kabinetni oching. Telegramda hisob yoki to'lov raqamlari yuborilmaydi."
+        ),
+    },
+    "payments_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть оплату в кабинете",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetda to'lovni ochish",
     },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
@@ -713,6 +727,38 @@ def _localized_text(key: str, language_code: Any) -> str:
     language = _normalize_patient_language(language_code)
     values = TELEGRAM_LOCALIZED_TEXTS.get(key) or {}
     return values.get(language) or values.get(TELEGRAM_LANGUAGE_RU) or ""
+
+
+def _patient_payment_entry_url() -> str | None:
+    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    if not frontend_url:
+        return None
+    route = PATIENT_PAYMENT_ENTRY_ROUTE
+    if not route.startswith("/"):
+        route = f"/{route}"
+    return f"{frontend_url.rstrip('/')}{route}"
+
+
+def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+    if not telegram_user or not telegram_user.patient_id:
+        return None
+
+    entry_url = _patient_payment_entry_url()
+    if not entry_url:
+        return None
+
+    language = _telegram_chat_language(db, chat_id)
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": _localized_text("payments_entry_button", language),
+                    "url": entry_url,
+                }
+            ]
+        ]
+    }
 
 
 def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
@@ -2610,11 +2656,13 @@ def _clinic_payments_message(db: Session, chat_id: int) -> str:
             )
         )
     if visits:
-        visit_numbers = ", ".join(f"#{visit.id}" for visit in visits[:5])
         lines.append(
-            _localized_text("payments_visits", language).format(visits=visit_numbers)
+            _localized_text("payments_visits", language).format(count=len(visits))
         )
-    lines.append(_localized_text("payments_online_unavailable", language))
+    if _patient_payment_entry_url():
+        lines.append(_localized_text("payments_protected_entry", language))
+    else:
+        lines.append(_localized_text("payments_online_unavailable", language))
     return "\n".join(lines)
 
 
@@ -3087,7 +3135,8 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _clinic_payments_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_payment_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_payments",
         )
 
