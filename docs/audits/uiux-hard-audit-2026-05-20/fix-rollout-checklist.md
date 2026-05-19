@@ -16,7 +16,7 @@ Rules:
 - [x] PR-UX-1: payment cancel semantic status merged.
 - [x] PR-UX-2: queue join recovery states merged.
 - [x] PR-UX-3: authenticated UI QA harness merged.
-- [ ] PR-UX-4: cashier payment accessibility merged.
+- [x] PR-UX-4: cashier payment accessibility merged.
 - [ ] PR-UX-5: doctor current patient workflow merged.
 - [ ] PR-UX-6: admin support legacy cleanup merged.
 - [ ] PR-UX-7: AdminPanel design-system slice merged.
