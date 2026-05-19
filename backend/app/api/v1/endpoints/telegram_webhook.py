@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -3924,6 +3924,14 @@ class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
     patient_id: int | None = Field(default=None, alias="patientId")
 
 
+class TelegramMiniAppPatientReportDownloadRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str = Field(..., alias="initData", min_length=1)
+    patient_id: int | None = Field(default=None, alias="patientId")
+    report_id: int = Field(..., alias="reportId", ge=1)
+
+
 class TelegramMiniAppPatientFormSubmissionRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -4189,6 +4197,72 @@ def _build_mini_app_patient_cabinet_summary_from_request(
     return _mini_app_patient_cabinet_summary_payload(db, scope)
 
 
+def _resolve_mini_app_patient_scope_for_optional_patient(
+    db: Session,
+    init_data_payload: str,
+    patient_id: int | None,
+):
+    scope = _resolve_mini_app_patient_scope_from_init_data(
+        db,
+        init_data_payload,
+    )
+    if patient_id is not None and int(scope.patient_id) != int(patient_id):
+        raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+    return scope
+
+
+def _build_mini_app_patient_report_download_response(
+    request_body: TelegramMiniAppPatientReportDownloadRequest,
+    db: Session,
+) -> Response:
+    try:
+        scope = _resolve_mini_app_patient_scope_for_optional_patient(
+            db,
+            request_body.init_data,
+            request_body.patient_id,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    report = (
+        db.query(LabReportInstance)
+        .filter(
+            LabReportInstance.id == int(request_body.report_id),
+            LabReportInstance.patient_id == int(scope.patient_id),
+            LabReportInstance.status.in_(LAB_REPORT_READY_STATUSES),
+        )
+        .first()
+    )
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"reason": "report_not_ready_or_not_found"},
+        )
+
+    try:
+        filename, pdf_bytes, _caption = _build_lab_report_pdf(db, report)
+    except Exception as exc:
+        _raise_telegram_webhook_internal_error(
+            "mini_app_patient_report_download",
+            "Protected report could not be generated",
+            exc,
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 def _build_mini_app_patient_forms_preview_from_request(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
     db: Session,
@@ -4296,6 +4370,19 @@ def preview_mini_app_patient_cabinet_summary(
         request_body,
         db,
     )
+
+
+@router.post(
+    "/mini-app/reports/download",
+    operation_id="telegram_mini_app_patient_report_download",
+)
+def download_mini_app_patient_report(
+    request_body: TelegramMiniAppPatientReportDownloadRequest,
+    db: Session = Depends(get_db),
+):
+    """Return one protected ready PDF report for the linked Mini App patient."""
+
+    return _build_mini_app_patient_report_download_response(request_body, db)
 
 
 @router.post(

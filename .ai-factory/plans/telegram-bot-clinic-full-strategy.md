@@ -339,6 +339,8 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Implement payment details inside the protected Mini App flow.
   - [x] Frontend `/patient/payments` now resolves to a protected payment summary in `frontend/src/pages/PatientPanel.jsx`, requires Telegram Mini App `initData`, reads safe totals from `/api/v1/telegram/mini-app/cabinet/summary`, and keeps online payment/refund actions disabled in Telegram.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
+  - [x] Backend protected PDF download endpoint exists: `POST /api/v1/telegram/mini-app/reports/download` validates Telegram Mini App `initData`, linked patient scope, report ownership, and ready status before returning a PDF response without Telegram chat/user ids.
+  - [ ] Frontend `PatientPanel.jsx` documents/results tab still needs to list ready reports and call the protected PDF download endpoint.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
 ### Phase 6: AI assistant approval flows

@@ -742,6 +742,88 @@ class TestTelegramWebhookSecurity:
             "reason": "patient_scope_mismatch"
         }
 
+    def test_mini_app_patient_report_download_endpoint_returns_safe_pdf(
+        self,
+        client,
+        db_session,
+        test_patient,
+        monkeypatch,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880217
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        other_patient = Patient(first_name="Other", last_name="Report")
+        template = LabReportTemplate(
+            code="TG_MINI_APP_REPORT",
+            name="Mini App Report",
+            family="test",
+        )
+        db_session.add_all([other_patient, template])
+        db_session.flush()
+        version = LabReportTemplateVersion(
+            template_id=template.id,
+            version_no=1,
+            status="PUBLISHED",
+            layout_preset="default",
+            page_settings={},
+            branding_overrides={},
+            signer_defaults={},
+        )
+        db_session.add(version)
+        db_session.flush()
+        ready_report = _create_lab_report_instance(
+            db_session,
+            patient_id=test_patient.id,
+            template=template,
+            version=version,
+            status_value="FINALIZED",
+            created_at=datetime.utcnow(),
+        )
+        other_report = _create_lab_report_instance(
+            db_session,
+            patient_id=other_patient.id,
+            template=template,
+            version=version,
+            status_value="FINALIZED",
+            created_at=datetime.utcnow(),
+        )
+        db_session.commit()
+        monkeypatch.setattr(
+            telegram_webhook,
+            "_build_lab_report_pdf",
+            lambda db, instance: (
+                f"report-{instance.id}.pdf",
+                b"%PDF-1.4 mini app",
+                "Ready report",
+            ),
+        )
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/reports/download",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "reportId": ready_report.id,
+            },
+        )
+        other_patient_response = client.post(
+            "/api/v1/telegram/mini-app/reports/download",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "reportId": other_report.id,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content == b"%PDF-1.4 mini app"
+        assert f"report-{ready_report.id}.pdf" in response.headers["content-disposition"]
+        assert other_patient_response.status_code == 404
+        assert other_patient_response.json()["detail"] == {
+            "reason": "report_not_ready_or_not_found"
+        }
+
     def test_mini_app_booking_create_endpoint_creates_safe_appointment(
         self,
         client,
