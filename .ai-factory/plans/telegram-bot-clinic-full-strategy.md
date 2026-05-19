@@ -312,7 +312,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 5: Telegram Mini App
 
-- [ ] Status: not implemented. Legacy `WebAppInfo` links do not count as completion without protected Mini App identity validation and scoped runtime flows.
+- [x] Status: implemented for protected patient Mini App v1. Legacy `WebAppInfo` links alone do not count, but this phase now has server-side `initData` validation, linked-patient scope checks, and protected booking/forms/cabinet/payments/report flows.
 - [x] Validate Telegram Mini App `initData` server-side before trusting identity: `backend/app/services/telegram_mini_app_init_data.py` validates the Telegram Mini App HMAC data-check string, rejects forged hashes and stale/future `auth_date` values, and is covered by `backend/tests/unit/test_telegram_mini_app_init_data.py`.
 - [x] Scope Mini App sessions to the linked patient or authenticated staff user: `backend/app/services/telegram_mini_app_init_data.py` resolves validated `initData` only through existing active `telegram_users` links, returns explicit patient/staff scopes, rejects direct URL or unlinked identity, blocks inactive staff links, and `backend/tests/unit/test_telegram_mini_app_init_data.py` covers wrong-patient scope rejection.
 - [x] Implement appointment booking inside the protected Mini App flow.
@@ -338,9 +338,9 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
   - [x] Frontend `PatientPanel.jsx` cabinet tab renders the protected summary from `/api/v1/telegram/mini-app/cabinet/summary` with profile, payment totals, appointments, visits, queue, and ready-report metadata while keeping PDF and medical details out of plain chat.
 - [x] Implement payment details inside the protected Mini App flow.
   - [x] Frontend `/patient/payments` now resolves to a protected payment summary in `frontend/src/pages/PatientPanel.jsx`, requires Telegram Mini App `initData`, reads safe totals from `/api/v1/telegram/mini-app/cabinet/summary`, and keeps online payment/refund actions disabled in Telegram.
-- [ ] Implement protected result/report viewing inside the Mini App flow.
+- [x] Implement protected result/report viewing inside the Mini App flow.
   - [x] Backend protected PDF download endpoint exists: `POST /api/v1/telegram/mini-app/reports/download` validates Telegram Mini App `initData`, linked patient scope, report ownership, and ready status before returning a PDF response without Telegram chat/user ids.
-  - [ ] Frontend `PatientPanel.jsx` documents/results tab still needs to list ready reports and call the protected PDF download endpoint.
+  - [x] Frontend `PatientPanel.jsx` documents/results tab lists ready report metadata from the protected cabinet summary and opens PDFs through `/api/v1/telegram/mini-app/reports/download` with Telegram Mini App `initData`.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
 ### Phase 6: AI assistant approval flows
@@ -396,5 +396,5 @@ Runtime acceptance still open:
 - [x] Phase 2 is complete after expired/replayed/malformed/consumed token rollout checks are verified.
 - [x] Phase 3 is complete after real payment entry and provider reconciliation alerts are verified.
 - [ ] Phase 4 is complete after confirmed state-changing staff actions are enabled action by action with idempotency and audit.
-- [ ] Phase 5 is complete after Mini App `initData` validation and protected patient flows are implemented.
+- [x] Phase 5 is complete after Mini App `initData` validation and protected patient flows are implemented.
 - [ ] Phase 6 is complete after AI approval flows capture accepted/rejected outcomes without exposing medical details in plain chat.

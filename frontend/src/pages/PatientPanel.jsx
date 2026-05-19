@@ -305,6 +305,8 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
   const [cabinetStatus, setCabinetStatus] = useState('idle');
   const [cabinetSummary, setCabinetSummary] = useState(null);
   const [cabinetError, setCabinetError] = useState('');
+  const [cabinetInitData, setCabinetInitData] = useState('');
+  const [reportDownloads, setReportDownloads] = useState({});
 
   useEffect(() => {
     const initData = readTelegramMiniAppInitData();
@@ -312,6 +314,7 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
       setCabinetStatus('missing-init-data');
       setCabinetSummary(null);
       setCabinetError('');
+      setCabinetInitData('');
       return undefined;
     }
 
@@ -319,6 +322,7 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
     setCabinetStatus('loading');
     setCabinetSummary(null);
     setCabinetError('');
+    setCabinetInitData(initData);
 
     api.post('/telegram/mini-app/cabinet/summary', { initData })
       .then((response) => {
@@ -373,11 +377,48 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
   }
 
   const isPaymentsMode = mode === 'payments';
+  const isReportsMode = mode === 'reports';
   const payments = cabinetSummary?.payments || {};
   const appointments = Array.isArray(cabinetSummary?.appointments) ? cabinetSummary.appointments : [];
   const visits = Array.isArray(cabinetSummary?.visits) ? cabinetSummary.visits : [];
   const queue = Array.isArray(cabinetSummary?.queue) ? cabinetSummary.queue : [];
   const reports = Array.isArray(cabinetSummary?.reports) ? cabinetSummary.reports : [];
+
+  const downloadReport = async (report) => {
+    setReportDownloads((current) => ({
+      ...current,
+      [report.id]: 'loading',
+    }));
+
+    try {
+      const response = await api.post(
+        '/telegram/mini-app/reports/download',
+        {
+          initData: cabinetInitData,
+          reportId: report.id,
+        },
+        { responseType: 'blob' },
+      );
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `kosmed-report-${report.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      setReportDownloads((current) => ({
+        ...current,
+        [report.id]: 'ready',
+      }));
+    } catch {
+      setReportDownloads((current) => ({
+        ...current,
+        [report.id]: 'error',
+      }));
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -385,12 +426,18 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="font-medium text-gray-900">
-              {isPaymentsMode ? 'Payments and debt' : (cabinetSummary?.patient?.name || 'Linked patient')}
+              {isPaymentsMode
+                ? 'Payments and debt'
+                : isReportsMode
+                  ? 'Reports and documents'
+                  : (cabinetSummary?.patient?.name || 'Linked patient')}
             </div>
             <p className="mt-1 text-sm text-gray-500">
               {isPaymentsMode
                 ? `Protected payment totals for ${cabinetSummary?.patient?.name || 'linked patient'}.`
-                : 'Protected cabinet summary from the linked Telegram patient profile.'}
+                : isReportsMode
+                  ? `Ready report files for ${cabinetSummary?.patient?.name || 'linked patient'}.`
+                  : 'Protected cabinet summary from the linked Telegram patient profile.'}
             </p>
           </div>
           <Badge variant="success">Mini App protected</Badge>
@@ -429,7 +476,40 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
             </div>
           )}
 
-          {!isPaymentsMode && (
+          {isReportsMode && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="font-medium text-gray-900">Ready reports</div>
+              <div className="mt-3 space-y-3">
+                {reports.length > 0 ? reports.map((report) => (
+                  <div key={report.id} className="flex flex-col gap-3 rounded-lg border border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{report.name || 'Lab report'}</div>
+                      <div className="mt-1 text-sm text-gray-500">{report.ready_at || 'Ready date pending'}</div>
+                      {reportDownloads[report.id] === 'error' && (
+                        <div className="mt-1 text-sm text-red-700" role="alert">
+                          Report could not be opened. Try again from Telegram.
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      loading={reportDownloads[report.id] === 'loading'}
+                      disabled={reportDownloads[report.id] === 'loading'}
+                      onClick={() => downloadReport(report)}
+                    >
+                      <FileText className="w-4 h-4" aria-hidden="true" />
+                      Open PDF
+                    </Button>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No ready reports yet.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isPaymentsMode && !isReportsMode && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-gray-200 bg-white p-3">
               <div className="font-medium text-gray-900">Appointments</div>
@@ -501,7 +581,7 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
 };
 
 PatientCabinetSummary.propTypes = {
-  mode: PropTypes.oneOf(['cabinet', 'payments']),
+  mode: PropTypes.oneOf(['cabinet', 'payments', 'reports']),
 };
 
 const buildInitialPatientFormAnswers = (form) => {
@@ -967,6 +1047,8 @@ const PatientPanel = () => {
                 <PatientCabinetSummary />
               ) : activeSection === 'payments' ? (
                 <PatientCabinetSummary mode="payments" />
+              ) : activeSection === 'documents' ? (
+                <PatientCabinetSummary mode="reports" />
               ) : (
                 <PanelEmptyState
                   icon={sectionConfig.icon}
