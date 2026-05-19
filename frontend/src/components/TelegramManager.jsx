@@ -283,6 +283,10 @@ const TelegramManager = () => {
     staffConfirmationContract.confirmation_token_runtime_enabled ||
     staffConfirmationRuntime.confirmation_token_runtime_enabled
   );
+  const staffConfirmationIdempotencyReady = Boolean(
+    staffConfirmationContract.idempotency_request_hash_runtime_enabled ||
+    staffConfirmationRuntime.idempotency_request_hash_runtime_enabled
+  );
   const staffConfirmationBlockedBy = Array.isArray(staffConfirmationContract.runtime_blocked_by) ?
   staffConfirmationContract.runtime_blocked_by :
   [];
@@ -882,7 +886,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff action confirmations"
                     secondary={staffConfirmationOperations.length ?
-                    `${staffConfirmationOperations.length} state-changing actions require confirmation; guard: ${staffConfirmationGuardReady ? 'ready' : 'pending'}; mode: ${staffConfirmationDenyOnly ? 'deny-only' : 'planned'}; actions: ${staffConfirmationActionsEnabled ? 'enabled' : 'disabled'}` :
+                    `${staffConfirmationOperations.length} state-changing actions require confirmation; guard: ${staffConfirmationGuardReady ? 'ready' : 'pending'}; replay: ${staffConfirmationIdempotencyReady ? 'ready' : 'pending'}; actions: ${staffConfirmationActionsEnabled ? 'enabled' : 'disabled'}` :
                     'Confirmation contract не опубликован'} />
 
                   <Badge

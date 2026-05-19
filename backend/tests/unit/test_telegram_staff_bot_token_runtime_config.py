@@ -69,11 +69,11 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         )
         assert (
             status["next_slice"]
-            == "staff_state_change_idempotency_runtime"
+            == "staff_state_change_domain_service_action_adapters"
         )
         assert (
             status["confirmation_contract"]["runtime_blocked_by"][0]
-            == "idempotency_runtime"
+            == "domain_service_action_adapters"
         )
         assert (
             status["confirmations"]["confirmation_token_runtime_enabled"] is True
@@ -111,7 +111,7 @@ class TestTelegramStaffBotTokenRuntimeConfig:
         assert contract["runtime_blocked_by"] == []
         assert (
             status["next_slice"]
-            == "staff_state_change_idempotency_runtime"
+            == "staff_state_change_domain_service_action_adapters"
         )
         assert (
             status["command_registration_contract"]["registration_enabled"] is True

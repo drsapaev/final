@@ -431,6 +431,52 @@ class TestTelegramWebhookSecurity:
         )
 
     @pytest.mark.asyncio
+    async def test_menu_command_refreshes_patient_main_menu_without_staff_intercept(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7026,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 126,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7026},
+                "from": {"id": 111, "language_code": "uz"},
+                "text": "/menu",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            7026,
+            telegram_webhook._localized_text("main_menu_refreshed", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
+        )
+        latest_log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7026)
+            .order_by(TelegramMessage.id.desc())
+            .first()
+        )
+        assert latest_log.template_key == "telegram_patient_main_menu_refreshed"
+
+    @pytest.mark.asyncio
     async def test_settings_language_choice_keeps_localized_settings_menu(
         self, db_session
     ):
