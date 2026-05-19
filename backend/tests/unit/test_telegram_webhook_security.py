@@ -367,7 +367,7 @@ class TestTelegramWebhookSecurity:
             .filter(TelegramMessage.chat_id == 7006)
             .one()
         )
-        assert log.template_key == "telegram_patient_language_selected"
+        assert log.template_key == "telegram_patient_language_selected_needs_contact"
         assert log.message_type == "patient_bot_reply"
         assert log.status == "sent"
 
@@ -395,8 +395,14 @@ class TestTelegramWebhookSecurity:
             .one()
         )
         assert telegram_user.language_code == "uz-Latn"
-        assert fake_service._send_message.await_args.args[1] == (
+        reply_text = fake_service._send_message.await_args.args[1]
+        assert (
             telegram_webhook._localized_text("language_selected", "uz-Latn")
+            in reply_text
+        )
+        assert (
+            telegram_webhook._localized_text("share_contact", "uz-Latn")
+            in reply_text
         )
         assert fake_service._send_message.await_args.args[2] == (
             telegram_webhook._localized_main_menu("uz-Latn")
@@ -1157,11 +1163,17 @@ class TestTelegramWebhookSecurity:
         assert telegram_user.language_code == "uz-Latn"
         assert telegram_user.patient_id is None
         assert telegram_user.notifications_enabled is False
-        fake_service._send_message.assert_awaited_once_with(
-            chat_id,
-            telegram_webhook._localized_text("language_selected", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
+        chat_arg, text_arg, reply_markup = fake_service._send_message.await_args.args
+        assert chat_arg == chat_id
+        assert (
+            telegram_webhook._localized_text("language_selected", "uz-Latn")
+            in text_arg
         )
+        assert (
+            telegram_webhook._localized_text("share_contact", "uz-Latn")
+            in text_arg
+        )
+        assert reply_markup == telegram_webhook._localized_main_menu("uz-Latn")
         fake_service._send_message.reset_mock()
 
         contact_update = {
@@ -1232,7 +1244,7 @@ class TestTelegramWebhookSecurity:
         ]
         assert template_keys == [
             "telegram_patient_language_prompt",
-            "telegram_patient_language_selected",
+            "telegram_patient_language_selected_needs_contact",
             "telegram_patient_contact_linked",
             "telegram_patient_notifications_enabled",
         ]

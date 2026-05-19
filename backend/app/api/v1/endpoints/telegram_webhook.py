@@ -3015,6 +3015,10 @@ async def _handle_clinic_bot_update(
         reply_text = _localized_text("language_selected", language)
         reply_markup = _localized_main_menu(language)
         template_key = "telegram_patient_language_selected"
+        linked_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+        if not settings_context and not getattr(linked_telegram_user, "patient_id", None):
+            reply_text = f"{reply_text}\n\n{_localized_text('share_contact', language)}"
+            template_key = "telegram_patient_language_selected_needs_contact"
         if settings_context:
             reply_text = f"{reply_text}\n\n{_telegram_settings_message(db, chat_id)}"
             reply_markup = _localized_settings_menu(language)

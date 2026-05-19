@@ -141,6 +141,41 @@ def get_telegram_user_by_linked_user_id(
     )
 
 
+def find_telegram_user_by_phone(db: Session, phone: str | None) -> TelegramUser | None:
+    """Find an active Telegram account linked to the patient with this phone."""
+    if not phone:
+        return None
+
+    try:
+        from app.crud.patient import find_patient
+
+        patient = find_patient(db, phone=phone)
+        if not patient:
+            return None
+
+        active_query = db.query(TelegramUser).filter(
+            and_(
+                TelegramUser.active == True,
+                TelegramUser.blocked == False,
+            )
+        )
+
+        telegram_user = (
+            active_query.filter(TelegramUser.patient_id == patient.id).first()
+        )
+        if telegram_user or not patient.user_id:
+            return telegram_user
+
+        return active_query.filter(TelegramUser.user_id == patient.user_id).first()
+
+    except Exception as e:
+        logger.warning(
+            "Telegram user lookup by phone failed error_type=%s",
+            type(e).__name__,
+        )
+        return None
+
+
 def get_telegram_users(
     db: Session, active_only: bool = True, skip: int = 0, limit: int = 100
 ) -> list[TelegramUser]:
