@@ -219,7 +219,7 @@ Scan the project for patterns:
 **Read ONLY the base SKILL.md files for target skills — not all skills.**
 
 - If evolving a **specific skill** (e.g., `$aif-evolve plan`) → read only that one:
-  `Read: .codex/skills/aif-plan/SKILL.md` (or `skills/aif-plan/SKILL.md` if not installed)
+  `Read: .codex/skills$aif-plan/SKILL.md` (or `skills/aif-plan/SKILL.md` if not installed)
 - If evolving **all skills** (`$aif-evolve` or `$aif-evolve all`) → read all:
   `Glob: .codex/skills/*/SKILL.md` (or `Glob: skills/*/SKILL.md` if not installed)
 

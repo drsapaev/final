@@ -107,11 +107,11 @@ If not found — ask user for path, offer to skip scan (at their risk), or sugge
 ```
 0. Scope check (MANDATORY):
    - Target path MUST be the external skill being evaluated for install.
-   - If path points to built-in AI Factory skills (.codex/skills/aif or .codex/skills/aif-*), this is wrong target selection for install-time security checks.
+   - If path points to built-in AI Factory skills (.codex/skills$aif or .codex/skills$aif-*), this is wrong target selection for install-time security checks.
    - Do not block external-skill installation decisions based on scans of built-in aif* skills.
 1. Download/fetch the skill content
 2. LEVEL 1 — Run automated scan:
-   $PYTHON ~/.codex/skills/aif-skill-generator/scripts/security-scan.py <skill-path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <skill-path>
    (Optional hard mode: add `--strict` to treat markdown code-block examples as real threats)
 3. Check exit code:
    - Exit 0 → proceed to Level 2
@@ -165,7 +165,7 @@ When `$ARGUMENTS` starts with `scan`:
 1. Extract the path (everything after "scan ")
 2. **LEVEL 1** — Run automated scanner:
    ```bash
-   $PYTHON ~/.codex/skills/aif-skill-generator/scripts/security-scan.py <path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <path>
    ```
 3. Capture exit code and full output
 4. **LEVEL 2** — Read ALL files in the skill directory yourself (SKILL.md + references, scripts, templates)
@@ -231,7 +231,7 @@ When `$ARGUMENTS` starts with `validate`:
 
 3. **Security scan — Level 1** (automated):
    ```bash
-   $PYTHON ~/.codex/skills/aif-skill-generator/scripts/security-scan.py <path>
+   $PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <path>
    ```
    Capture exit code and full output.
 4. **Security scan — Level 2** (semantic):
@@ -317,7 +317,7 @@ Or browse https://skills.sh for inspiration. Check if similar skills exist to av
 **If you install an external skill at this step** — immediately scan it:
 ```bash
 npx skills install --agent codex <name>
-$PYTHON ~/.codex/skills/aif-skill-generator/scripts/security-scan.py <installed-path>
+$PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py <installed-path>
 ```
 If BLOCKED → remove and warn. If WARNINGS → show to user.
 
@@ -402,7 +402,7 @@ npx skills-ref validate ./skill-name
 
 **Always run security scan on the generated skill:**
 ```bash
-$PYTHON ~/.codex/skills/aif-skill-generator/scripts/security-scan.py ./skill-name/
+$PYTHON ~/.codex/skills$aif-skill-generator/scripts/security-scan.py ./skill-name/
 ```
 
 This catches any issues introduced during generation (especially in Learn Mode where external content is synthesized).
