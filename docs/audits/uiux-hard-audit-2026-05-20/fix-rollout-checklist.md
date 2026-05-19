@@ -19,7 +19,7 @@ Rules:
 - [x] PR-UX-4: cashier payment accessibility merged.
 - [x] PR-UX-5: doctor current patient workflow merged.
 - [x] PR-UX-6: admin support legacy cleanup merged.
-- [ ] PR-UX-7: AdminPanel design-system slice merged.
+- [x] PR-UX-7: AdminPanel design-system slice merged.
 - [ ] PR-UX-8A: cardiology specialty slice merged.
 - [ ] PR-UX-8B: dermatology specialty slice merged.
 - [ ] PR-UX-8C: dentistry specialty slice merged.
