@@ -1277,6 +1277,70 @@ class TestTelegramWebhookSecurity:
         assert "Кабинет 205" in message
         assert "Кардиология" in message
 
+    def test_queue_status_refresh_preserves_ordering_and_queue_time(
+        self, db_session, test_patient, test_daily_queue, test_queue_entry
+    ):
+        _link_patient_to_chat(db_session, chat_id=7003, patient_id=test_patient.id)
+        test_daily_queue.day = date.today()
+        first_time = datetime.utcnow().replace(microsecond=0) - timedelta(minutes=20)
+        linked_time = first_time + timedelta(minutes=10)
+        later_time = linked_time + timedelta(minutes=10)
+        test_queue_entry.number = 2
+        test_queue_entry.status = "waiting"
+        test_queue_entry.queue_time = linked_time
+        test_queue_entry.patient_id = test_patient.id
+        first_entry = OnlineQueueEntry(
+            queue_id=test_daily_queue.id,
+            number=1,
+            patient_id=None,
+            patient_name="First Patient",
+            source="desk",
+            status="waiting",
+            queue_time=first_time,
+        )
+        later_entry = OnlineQueueEntry(
+            queue_id=test_daily_queue.id,
+            number=3,
+            patient_id=None,
+            patient_name="Later Patient",
+            source="desk",
+            status="waiting",
+            queue_time=later_time,
+        )
+        db_session.add_all([later_entry, first_entry])
+        db_session.commit()
+        db_session.refresh(test_queue_entry)
+        db_session.refresh(first_entry)
+        db_session.refresh(later_entry)
+        original_snapshot = [
+            (entry.id, entry.number, entry.status, entry.queue_time)
+            for entry in [first_entry, test_queue_entry, later_entry]
+        ]
+
+        first_message = telegram_webhook._clinic_queue_message(db_session, 7003)
+        second_message = telegram_webhook._clinic_queue_message(db_session, 7003)
+
+        assert first_message == second_message
+        assert str(test_queue_entry.number) in second_message
+        assert telegram_webhook._queue_entry_position(db_session, test_queue_entry) == 2
+        db_session.refresh(first_entry)
+        db_session.refresh(test_queue_entry)
+        db_session.refresh(later_entry)
+        assert [
+            (entry.id, entry.number, entry.status, entry.queue_time)
+            for entry in [first_entry, test_queue_entry, later_entry]
+        ] == original_snapshot
+        assert (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == test_daily_queue.id)
+            .order_by(
+                OnlineQueueEntry.priority.desc(),
+                OnlineQueueEntry.queue_time.asc(),
+                OnlineQueueEntry.id.asc(),
+            )
+            .all()
+        ) == [first_entry, test_queue_entry, later_entry]
+
     def test_visits_message_lists_linked_patient_visits_without_medical_details(
         self, db_session, test_patient, test_visit
     ):
