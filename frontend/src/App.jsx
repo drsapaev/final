@@ -14,7 +14,7 @@ import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
-import { Sidebar } from './components/ui/macos';
+import { Alert, Badge, Card, CardContent, Sidebar } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
@@ -28,6 +28,7 @@ import TwoFactorManager from './components/security/TwoFactorManager.jsx';
 import FileManager from './components/files/FileManager.jsx';
 import UserManagement from './components/admin/UserManagement.jsx';
 import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
+import { api } from './api/client.js';
 import auth from './stores/auth.js';
 import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards.jsx';
@@ -109,6 +110,7 @@ const ROUTE_COMPONENTS = {
   PaymentTest,
   CSSTestPage,
   ButtonShowcase,
+  TelegramMiniAppPatientShell,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,
@@ -118,6 +120,157 @@ function LoadingScreen() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
       Загрузка...
+    </div>
+  );
+}
+
+const MINI_APP_CAPABILITY_LABELS = {
+  appointments: 'Запись',
+  forms: 'Анкеты',
+  cabinet: 'Кабинет',
+  payments: 'Оплаты',
+  results: 'Результаты',
+};
+
+function getTelegramMiniAppInitData() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return window.Telegram?.WebApp?.initData || '';
+}
+
+function notifyTelegramMiniAppReady() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const webApp = window.Telegram?.WebApp;
+  if (!webApp) {
+    return;
+  }
+
+  try {
+    webApp.ready?.();
+    webApp.expand?.();
+  } catch {
+    // Telegram WebApp helpers are best-effort browser hints.
+  }
+}
+
+function TelegramMiniAppPatientShell() {
+  const [state, setState] = useState({
+    status: 'checking',
+    manifest: null,
+    error: null,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    notifyTelegramMiniAppReady();
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData) {
+      setState({
+        status: 'unavailable',
+        manifest: null,
+        error: null,
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    api.post('/telegram/mini-app/patient/manifest', { initData })
+      .then((response) => {
+        if (!isMounted) return;
+        setState({
+          status: 'ready',
+          manifest: response.data,
+          error: null,
+        });
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setState({
+          status: 'error',
+          manifest: null,
+          error: 'Сессия Mini App не подтверждена',
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const capabilities = state.manifest?.capabilities || {};
+  const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
+
+  return (
+    <div style={miniAppPageStyle}>
+      <main style={miniAppMainStyle}>
+        <section style={miniAppHeroStyle}>
+          <div>
+            <p style={miniAppKickerStyle}>Kosmed Clinic</p>
+            <h1 style={miniAppTitleStyle}>Mini App пациента</h1>
+          </div>
+          <Badge
+            variant={state.status === 'ready' ? 'success' : 'secondary'}
+            size="large"
+            style={miniAppStatusBadgeStyle}
+          >
+            {state.status === 'ready' ? 'Сессия подтверждена' : 'Ожидание сессии'}
+          </Badge>
+        </section>
+
+        {state.status === 'checking' && (
+          <Alert severity="info" style={miniAppNoticeStyle}>Загрузка статуса...</Alert>
+        )}
+
+        {state.status === 'unavailable' && (
+          <Alert severity="info" style={miniAppNoticeStyle}>
+            Сессия Telegram недоступна. Данные пациента не загружаются.
+          </Alert>
+        )}
+
+        {state.status === 'error' && (
+          <Alert severity="error" style={miniAppNoticeStyle}>
+            {state.error}
+          </Alert>
+        )}
+
+        {state.status === 'ready' && (
+          <section style={miniAppGridStyle}>
+            {capabilityEntries.map(([key, label]) => {
+              const capability = capabilities[key] || {};
+              const enabled = Boolean(
+                capability.create_enabled ||
+                capability.preview_enabled ||
+                capability.read_enabled ||
+                capability.view_enabled ||
+                capability.capture_enabled ||
+                capability.payment_capture_enabled
+              );
+              return (
+                <Card key={key} padding="small" shadow="none" style={miniAppCapabilityStyle}>
+                  <CardContent style={miniAppCapabilityContentStyle}>
+                    <div style={miniAppCapabilityHeaderStyle}>
+                      <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
+                      <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
+                        {enabled ? 'Доступно' : 'Только статус'}
+                      </Badge>
+                    </div>
+                    <p style={miniAppCapabilityTextStyle}>
+                      {capability.status || 'manifest_only'}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+        )}
+      </main>
     </div>
   );
 }
@@ -329,4 +482,93 @@ const macOSMainStyle = {
   overflow: 'auto',
   position: 'relative',
   isolation: 'isolate',
+};
+
+const miniAppPageStyle = {
+  minHeight: '100vh',
+  background: 'var(--mac-bg-page, #f5f7fb)',
+  color: 'var(--mac-text-primary, #111827)',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+};
+
+const miniAppMainStyle = {
+  width: '100%',
+  maxWidth: '720px',
+  margin: '0 auto',
+  padding: '20px 16px 28px',
+  boxSizing: 'border-box',
+};
+
+const miniAppHeroStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: '16px',
+  padding: '8px 0 18px',
+};
+
+const miniAppKickerStyle = {
+  margin: '0 0 6px',
+  fontSize: '13px',
+  fontWeight: 700,
+  color: 'var(--mac-text-secondary, #5f6b7a)',
+};
+
+const miniAppTitleStyle = {
+  margin: 0,
+  fontSize: '28px',
+  lineHeight: 1.15,
+  fontWeight: 800,
+  color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppStatusBadgeStyle = {
+  flexShrink: 0,
+  fontWeight: 700,
+};
+
+const miniAppNoticeStyle = {
+  fontSize: '14px',
+  lineHeight: 1.5,
+};
+
+const miniAppGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(156px, 1fr))',
+  gap: '12px',
+};
+
+const miniAppCapabilityStyle = {
+  minHeight: '128px',
+};
+
+const miniAppCapabilityContentStyle = {
+  minHeight: '104px',
+  boxSizing: 'border-box',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  gap: '12px',
+};
+
+const miniAppCapabilityHeaderStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '10px',
+};
+
+const miniAppCapabilityTitleStyle = {
+  margin: 0,
+  fontSize: '16px',
+  lineHeight: 1.25,
+  fontWeight: 750,
+};
+
+const miniAppCapabilityTextStyle = {
+  margin: 0,
+  fontSize: '13px',
+  lineHeight: 1.4,
+  color: 'var(--mac-text-secondary, #5f6b7a)',
+  overflowWrap: 'anywhere',
 };
