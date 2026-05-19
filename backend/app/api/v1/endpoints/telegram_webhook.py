@@ -62,6 +62,7 @@ from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScopeError,
     build_telegram_mini_app_appointment_booking_preview,
+    build_telegram_mini_app_patient_forms_preview,
     resolve_telegram_mini_app_session_scope,
     validate_telegram_mini_app_init_data,
 )
@@ -3895,6 +3896,13 @@ class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     services: list[str] | None = None
 
 
+class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str = Field(..., alias="initData", min_length=1)
+    patient_id: int | None = Field(default=None, alias="patientId")
+
+
 def _validate_webhook_secret(request: Request, db: Session) -> None:
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
@@ -3987,6 +3995,45 @@ def _build_mini_app_appointment_booking_preview_from_request(
     return preview
 
 
+def _build_mini_app_patient_forms_preview_from_request(
+    request_body: TelegramMiniAppPatientFormsPreviewRequest,
+    db: Session,
+):
+    bot_token = _get_configured_bot_token(db)
+    if not bot_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason": "bot_token_required"},
+        )
+
+    try:
+        init_data = validate_telegram_mini_app_init_data(
+            request_body.init_data,
+            bot_token=bot_token,
+        )
+        scope = resolve_telegram_mini_app_session_scope(
+            db,
+            init_data,
+            expected_scope="patient",
+        )
+        preview = build_telegram_mini_app_patient_forms_preview(
+            scope,
+            patient_id=request_body.patient_id,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return preview
+
+
 @router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",
@@ -3998,6 +4045,23 @@ def preview_mini_app_appointment_booking(
     """Return a trusted Mini App appointment preview without creating it."""
 
     preview = _build_mini_app_appointment_booking_preview_from_request(
+        request_body,
+        db,
+    )
+    return preview.to_response_payload()
+
+
+@router.post(
+    "/mini-app/forms/preview",
+    operation_id="telegram_mini_app_preview_patient_forms",
+)
+def preview_mini_app_patient_forms(
+    request_body: TelegramMiniAppPatientFormsPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Return trusted Mini App patient form metadata without storing data."""
+
+    preview = _build_mini_app_patient_forms_preview_from_request(
         request_body,
         db,
     )

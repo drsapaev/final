@@ -142,6 +142,117 @@ class TelegramMiniAppAppointmentBookingPreview:
         }
 
 
+@dataclass(frozen=True)
+class TelegramMiniAppPatientFormField:
+    """Safe patient-facing Mini App form field metadata."""
+
+    key: str
+    label: str
+    field_type: str
+    required: bool = False
+    max_length: int | None = None
+    options: tuple[str, ...] = ()
+
+    def to_response_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "key": self.key,
+            "label": self.label,
+            "type": self.field_type,
+            "required": self.required,
+        }
+        if self.max_length is not None:
+            payload["max_length"] = self.max_length
+        if self.options:
+            payload["options"] = list(self.options)
+        return payload
+
+
+@dataclass(frozen=True)
+class TelegramMiniAppPatientFormDefinition:
+    """Safe patient-facing Mini App form definition."""
+
+    form_id: str
+    title: str
+    description: str
+    fields: tuple[TelegramMiniAppPatientFormField, ...]
+
+    def to_response_payload(self) -> dict[str, Any]:
+        return {
+            "id": self.form_id,
+            "title": self.title,
+            "description": self.description,
+            "fields": [field.to_response_payload() for field in self.fields],
+        }
+
+
+@dataclass(frozen=True)
+class TelegramMiniAppPatientFormsPreview:
+    """Preview-only patient forms response prepared before any form mutation."""
+
+    scope: TelegramMiniAppSessionScope
+    forms: tuple[TelegramMiniAppPatientFormDefinition, ...]
+    preview_only: bool = True
+    mutation_allowed: bool = False
+    message_key: str = "telegram_mini_app_patient_forms_preview_ready"
+
+    def to_response_payload(self) -> dict[str, Any]:
+        return {
+            "preview_only": self.preview_only,
+            "mutation_allowed": self.mutation_allowed,
+            "message_key": self.message_key,
+            "scope": {
+                "type": self.scope.scope_type,
+                "patient_id": self.scope.patient_id,
+            },
+            "forms": [form.to_response_payload() for form in self.forms],
+            "policy": {
+                "plain_telegram_chat_allowed": False,
+                "medical_details_in_chat": False,
+                "storage_enabled": False,
+            },
+        }
+
+
+TELEGRAM_MINI_APP_PATIENT_FORMS: tuple[TelegramMiniAppPatientFormDefinition, ...] = (
+    TelegramMiniAppPatientFormDefinition(
+        form_id="patient_intake",
+        title="Patient intake",
+        description="Basic pre-visit details for protected clinic intake.",
+        fields=(
+            TelegramMiniAppPatientFormField(
+                key="chief_complaint",
+                label="Reason for visit",
+                field_type="textarea",
+                max_length=1000,
+            ),
+            TelegramMiniAppPatientFormField(
+                key="allergies",
+                label="Allergies",
+                field_type="textarea",
+                max_length=1000,
+            ),
+            TelegramMiniAppPatientFormField(
+                key="current_medications",
+                label="Current medications",
+                field_type="textarea",
+                max_length=1000,
+            ),
+            TelegramMiniAppPatientFormField(
+                key="medical_history",
+                label="Important medical history",
+                field_type="textarea",
+                max_length=1500,
+            ),
+            TelegramMiniAppPatientFormField(
+                key="consent_to_contact",
+                label="Allow clinic follow-up",
+                field_type="boolean",
+            ),
+        ),
+    ),
+)
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -527,4 +638,24 @@ def build_telegram_mini_app_appointment_booking_preview(
     return TelegramMiniAppAppointmentBookingPreview(
         scope=scope,
         draft=draft,
+    )
+
+
+def build_telegram_mini_app_patient_forms_preview(
+    scope: TelegramMiniAppSessionScope,
+    *,
+    patient_id: int | None = None,
+) -> TelegramMiniAppPatientFormsPreview:
+    """Prepare protected patient forms metadata without storing submitted data."""
+
+    if scope.patient_id is None:
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+    if patient_id is not None:
+        require_telegram_mini_app_patient_scope(scope, patient_id=patient_id)
+    elif scope.scope_type != "patient":
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+
+    return TelegramMiniAppPatientFormsPreview(
+        scope=scope,
+        forms=TELEGRAM_MINI_APP_PATIENT_FORMS,
     )

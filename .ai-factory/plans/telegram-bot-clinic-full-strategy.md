@@ -325,6 +325,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Add protected patient section entry buttons for `/forms`, `/documents`, `/doctors`, and `/cabinet` to return `https://<frontend>/patient?tab=<section>` for linked patients.
   - [x] Add safe fallback for those commands when `FRONTEND_URL` is not configured: response reverts to service menu with unchanged placeholder template IDs and coverage in `backend/tests/unit/test_telegram_webhook_security.py`.
   - [ ] Implement patient forms inside the protected Mini App flow.
+  - [x] Add backend protected forms preview/schema endpoint: `POST /api/v1/telegram/mini-app/forms/preview` validates Telegram Mini App `initData`, resolves linked patient scope, rejects forged/staff/wrong-patient access, returns non-mutating patient intake form metadata, and keeps storage disabled until capture/edit persistence is implemented; focused coverage is in `backend/tests/unit/test_telegram_webhook_security.py`.
   - [x] Route `/patient?tab=forms` to a dedicated patient section view (`frontend/src/pages/PatientPanel.jsx`) so the Telegram button lands on a separate functional screen instead of the generic patient home.
   - [ ] Add patient forms capture/edit flow in Mini App runtime with linked-patient validation.
 - [ ] Implement patient cabinet inside the protected Mini App flow.

@@ -436,6 +436,101 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "appointment_date_in_past"}
         assert db_session.query(Appointment).count() == initial_appointments
 
+    def test_mini_app_patient_forms_preview_endpoint_returns_safe_schema(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880211
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["preview_only"] is True
+        assert payload["mutation_allowed"] is False
+        assert payload["message_key"] == "telegram_mini_app_patient_forms_preview_ready"
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["policy"] == {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "storage_enabled": False,
+        }
+        assert payload["forms"][0]["id"] == "patient_intake"
+        assert {field["key"] for field in payload["forms"][0]["fields"]} == {
+            "chief_complaint",
+            "allergies",
+            "current_medications",
+            "medical_history",
+            "consent_to_contact",
+        }
+        assert "patient_id" not in payload["forms"][0]
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_patient_forms_preview_endpoint_rejects_untrusted_scope(
+        self,
+        client,
+        db_session,
+        test_patient,
+        admin_user,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        patient_chat_id = 880212
+        staff_chat_id = 880213
+        _link_patient_to_chat(db_session, chat_id=patient_chat_id, patient_id=test_patient.id)
+        db_session.add(
+            TelegramUser(
+                chat_id=staff_chat_id,
+                user_id=admin_user.id,
+                language_code="ru",
+                active=True,
+                blocked=False,
+            )
+        )
+        db_session.commit()
+        initial_appointments = db_session.query(Appointment).count()
+
+        forged_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(patient_chat_id).replace(
+                    "hash=",
+                    "hash=forged",
+                    1,
+                ),
+                "patientId": test_patient.id,
+            },
+        )
+        staff_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={"initData": _signed_mini_app_init_data(staff_chat_id)},
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(patient_chat_id),
+                "patientId": test_patient.id + 1,
+            },
+        )
+
+        assert forged_response.status_code == 403
+        assert forged_response.json()["detail"] == {"reason": "hash_mismatch"}
+        assert staff_response.status_code == 403
+        assert staff_response.json()["detail"] == {"reason": "patient_scope_required"}
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {"reason": "patient_scope_mismatch"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
     def test_mini_app_booking_create_endpoint_creates_safe_appointment(
         self,
         client,
