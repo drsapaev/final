@@ -192,11 +192,21 @@ class TelegramMiniAppPatientFormsPreview:
 
     scope: TelegramMiniAppSessionScope
     forms: tuple[TelegramMiniAppPatientFormDefinition, ...]
+    submissions_by_form_id: dict[str, TelegramPatientFormSubmission] | None = None
     preview_only: bool = True
     mutation_allowed: bool = False
     message_key: str = "telegram_mini_app_patient_forms_preview_ready"
 
     def to_response_payload(self) -> dict[str, Any]:
+        submissions_by_form_id = self.submissions_by_form_id or {}
+        forms_payload: list[dict[str, Any]] = []
+        for form in self.forms:
+            form_payload = form.to_response_payload()
+            submission = submissions_by_form_id.get(form.form_id)
+            if submission is not None:
+                form_payload["submission"] = _patient_form_submission_payload(submission)
+            forms_payload.append(form_payload)
+
         return {
             "preview_only": self.preview_only,
             "mutation_allowed": self.mutation_allowed,
@@ -205,7 +215,7 @@ class TelegramMiniAppPatientFormsPreview:
                 "type": self.scope.scope_type,
                 "patient_id": self.scope.patient_id,
             },
-            "forms": [form.to_response_payload() for form in self.forms],
+            "forms": forms_payload,
             "policy": {
                 "plain_telegram_chat_allowed": False,
                 "medical_details_in_chat": False,
@@ -293,6 +303,20 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def _patient_form_submission_payload(
+    submission: TelegramPatientFormSubmission,
+) -> dict[str, Any]:
+    return {
+        "id": int(submission.id),
+        "form_id": submission.form_id,
+        "schema_version": submission.schema_version,
+        "status": submission.status,
+        "answers": submission.answers or {},
+        "submitted_at": _serialize_datetime(submission.submitted_at),
+        "updated_at": _serialize_datetime(submission.updated_at),
+    }
 
 
 def _utc_now() -> datetime:
@@ -743,11 +767,12 @@ def build_telegram_mini_app_appointment_booking_preview(
 
 
 def build_telegram_mini_app_patient_forms_preview(
+    db: Session,
     scope: TelegramMiniAppSessionScope,
     *,
     patient_id: int | None = None,
 ) -> TelegramMiniAppPatientFormsPreview:
-    """Prepare protected patient forms metadata without storing submitted data."""
+    """Prepare protected patient forms metadata and saved linked-patient answers."""
 
     if scope.patient_id is None:
         raise TelegramMiniAppSessionScopeError("patient_scope_required")
@@ -756,9 +781,23 @@ def build_telegram_mini_app_patient_forms_preview(
     elif scope.scope_type != "patient":
         raise TelegramMiniAppSessionScopeError("patient_scope_required")
 
+    known_form_ids = tuple(form.form_id for form in TELEGRAM_MINI_APP_PATIENT_FORMS)
+    submissions = (
+        db.query(TelegramPatientFormSubmission)
+        .filter(
+            TelegramPatientFormSubmission.patient_id == int(scope.patient_id),
+            TelegramPatientFormSubmission.form_id.in_(known_form_ids),
+        )
+        .all()
+    )
+
     return TelegramMiniAppPatientFormsPreview(
         scope=scope,
         forms=TELEGRAM_MINI_APP_PATIENT_FORMS,
+        submissions_by_form_id={
+            submission.form_id: submission
+            for submission in submissions
+        },
     )
 
 

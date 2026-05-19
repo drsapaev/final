@@ -61,13 +61,31 @@ const readTelegramMiniAppInitData = () => {
 const buildInitialPatientFormAnswers = (form) => {
   const answers = {};
   const fields = Array.isArray(form?.fields) ? form.fields : [];
+  const savedAnswers = form?.submission?.answers && typeof form.submission.answers === 'object'
+    ? form.submission.answers
+    : {};
 
   fields.forEach((field) => {
-    answers[field.key] = field.type === 'boolean' ? false : '';
+    const savedValue = savedAnswers[field.key];
+    if (field.type === 'boolean') {
+      answers[field.key] = typeof savedValue === 'boolean' ? savedValue : false;
+      return;
+    }
+    answers[field.key] = typeof savedValue === 'string' ? savedValue : '';
   });
 
   return answers;
 };
+
+const buildInitialPatientFormState = (form) => ({
+  answers: buildInitialPatientFormAnswers(form),
+  status: 'idle',
+  savedStatus: form?.submission?.status || '',
+  error: '',
+  message: '',
+  submittedAt: form?.submission?.submitted_at || '',
+  updatedAt: form?.submission?.updated_at || '',
+});
 
 const patientFormErrorMessages = {
   patient_form_answer_unknown_field: 'The form changed. Reload the Mini App and try again.',
@@ -89,14 +107,7 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
     const nextState = {};
 
     forms.forEach((form) => {
-      nextState[form.id] = {
-        answers: buildInitialPatientFormAnswers(form),
-        status: 'idle',
-        error: '',
-        message: '',
-        submittedAt: '',
-        updatedAt: '',
-      };
+      nextState[form.id] = buildInitialPatientFormState(form);
     });
 
     setFormState(nextState);
@@ -161,9 +172,7 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
   };
 
   const handleSave = async (form, nextStatus) => {
-    const currentForm = formState[form.id] || {
-      answers: buildInitialPatientFormAnswers(form),
-    };
+    const currentForm = formState[form.id] || buildInitialPatientFormState(form);
 
     setFormState((current) => ({
       ...current,
@@ -194,6 +203,7 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
             ...(submission.answers || currentForm.answers),
           },
           status: 'saved',
+          savedStatus: submission.status || nextStatus,
           error: '',
           message: submission.status === 'draft' ? 'Draft saved.' : 'Form submitted.',
           submittedAt: submission.submitted_at || '',
@@ -216,21 +226,31 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
 
   return (
     <div className="space-y-4">
-      {forms.map((form) => (
+      {forms.map((form) => {
+        const currentFormState = formState[form.id] || buildInitialPatientFormState(form);
+        const isFormBusy = currentFormState.status === 'saving-draft' || currentFormState.status === 'submitting';
+
+        return (
         <div key={form.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="font-medium text-gray-900">{form.title}</div>
               <p className="mt-1 text-sm text-gray-500">{form.description}</p>
             </div>
-            <Badge variant={storageEnabled ? 'success' : 'warning'}>
-              {storageEnabled ? 'Secure storage on' : 'Read only'}
-            </Badge>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {currentFormState.savedStatus && (
+                <Badge variant={currentFormState.savedStatus === 'submitted' ? 'success' : 'info'}>
+                  {currentFormState.savedStatus === 'submitted' ? 'Submitted' : 'Draft saved'}
+                </Badge>
+              )}
+              <Badge variant={storageEnabled ? 'success' : 'warning'}>
+                {storageEnabled ? 'Secure storage on' : 'Read only'}
+              </Badge>
+            </div>
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             {(form.fields || []).map((field) => {
-              const current = formState[form.id] || { answers: buildInitialPatientFormAnswers(form) };
-              const fieldValue = current.answers?.[field.key];
+              const fieldValue = currentFormState.answers?.[field.key];
 
               return (
                 <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
@@ -270,27 +290,27 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
               );
             })}
             <div className="md:col-span-2 flex flex-col gap-3 border-t border-gray-100 pt-4">
-              {formState[form.id]?.message && (
+              {currentFormState.message && (
                 <div className="text-sm text-green-700" role="status">
-                  {formState[form.id].message}
+                  {currentFormState.message}
                 </div>
               )}
-              {formState[form.id]?.error && (
+              {currentFormState.error && (
                 <div className="text-sm text-red-700" role="alert">
-                  {formState[form.id].error}
+                  {currentFormState.error}
                 </div>
               )}
-              {formState[form.id]?.updatedAt && (
+              {currentFormState.updatedAt && (
                 <div className="text-xs text-gray-500">
-                  Last saved: {formState[form.id].updatedAt}
+                  Last saved: {currentFormState.updatedAt}
                 </div>
               )}
               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                 <Button
                   variant="secondary"
                   size="small"
-                  disabled={!storageEnabled || !initData || formState[form.id]?.status === 'saving-draft' || formState[form.id]?.status === 'submitting'}
-                  loading={formState[form.id]?.status === 'saving-draft'}
+                  disabled={!storageEnabled || !initData || isFormBusy}
+                  loading={currentFormState.status === 'saving-draft'}
                   onClick={() => handleSave(form, 'draft')}
                 >
                   <Save className="w-4 h-4" aria-hidden="true" />
@@ -299,8 +319,8 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
                 <Button
                   variant="primary"
                   size="small"
-                  disabled={!storageEnabled || !initData || formState[form.id]?.status === 'saving-draft' || formState[form.id]?.status === 'submitting'}
-                  loading={formState[form.id]?.status === 'submitting'}
+                  disabled={!storageEnabled || !initData || isFormBusy}
+                  loading={currentFormState.status === 'submitting'}
                   onClick={() => handleSave(form, 'submitted')}
                 >
                   <Send className="w-4 h-4" aria-hidden="true" />
@@ -310,7 +330,8 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

@@ -4056,6 +4056,7 @@ def _build_mini_app_patient_forms_preview_from_request(
             request_body.init_data,
         )
         preview = build_telegram_mini_app_patient_forms_preview(
+            db,
             scope,
             patient_id=request_body.patient_id,
         )

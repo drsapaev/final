@@ -476,6 +476,7 @@ class TestTelegramWebhookSecurity:
             "consent_to_contact",
         }
         assert "patient_id" not in payload["forms"][0]
+        assert "submission" not in payload["forms"][0]
         assert db_session.query(Appointment).count() == initial_appointments
 
     def test_mini_app_patient_forms_preview_endpoint_rejects_untrusted_scope(
@@ -608,6 +609,25 @@ class TestTelegramWebhookSecurity:
         assert updated_payload["submission"]["answers"]["chief_complaint"] == "Headache improved"
         assert updated_payload["submission"]["submitted_at"] is not None
         assert db_session.query(TelegramPatientFormSubmission).count() == 1
+
+        preview_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+
+        assert preview_response.status_code == 200
+        hydrated_form = preview_response.json()["forms"][0]
+        assert hydrated_form["id"] == "patient_intake"
+        assert hydrated_form["submission"]["id"] == created_payload["submission"]["id"]
+        assert hydrated_form["submission"]["form_id"] == "patient_intake"
+        assert hydrated_form["submission"]["status"] == "submitted"
+        assert hydrated_form["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert hydrated_form["submission"]["submitted_at"] is not None
+        assert "telegram_chat_id" not in hydrated_form["submission"]
+        assert "telegram_user_id" not in hydrated_form["submission"]
 
     def test_mini_app_patient_form_submission_endpoint_rejects_invalid_answers(
         self,
