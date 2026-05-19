@@ -24,6 +24,7 @@ from app.services.telegram_staff_link_token_service import TelegramStaffLinkToke
 from app.services.telegram_bot import (
     PATIENT_BOT_COMMANDS_RU,
     PATIENT_BOT_COMMANDS_UZ,
+    PATIENT_BOT_MENU_BUTTON,
     get_telegram_bot_service,
 )
 
@@ -1461,8 +1462,9 @@ async def register_patient_bot_commands(
 
         return {
             "success": True,
-            "message": "Telegram patient bot commands registered",
+            "message": "Telegram patient bot commands and menu button registered",
             "registered_languages": ["ru", "uz"],
+            "menu_button": PATIENT_BOT_MENU_BUTTON,
             "commands": {
                 "ru": PATIENT_BOT_COMMANDS_RU,
                 "uz": PATIENT_BOT_COMMANDS_UZ,

@@ -1599,10 +1599,19 @@ class TestTelegramWebhookSecurity:
 
         assert ok is True
         assert error is None
-        assert [item["json"].get("language_code") for item in captured] == [None, "uz"]
+        assert len(captured) == 3
+        assert [item["json"].get("language_code") for item in captured[:2]] == [
+            None,
+            "uz",
+        ]
         assert captured[0]["url"].endswith("/setMyCommands")
+        assert captured[1]["url"].endswith("/setMyCommands")
+        assert captured[2]["url"].endswith("/setChatMenuButton")
         assert captured[0]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_RU
         assert captured[1]["json"]["commands"] == telegram_bot.PATIENT_BOT_COMMANDS_UZ
+        assert captured[2]["json"] == {
+            "menu_button": telegram_bot.PATIENT_BOT_MENU_BUTTON
+        }
         ru_command_names = [
             command["command"] for command in captured[0]["json"]["commands"]
         ]
