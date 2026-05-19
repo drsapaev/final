@@ -313,7 +313,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 - [ ] Status: not implemented. Legacy `WebAppInfo` links do not count as completion without protected Mini App identity validation and scoped runtime flows.
 - [x] Validate Telegram Mini App `initData` server-side before trusting identity: `backend/app/services/telegram_mini_app_init_data.py` validates the Telegram Mini App HMAC data-check string, rejects forged hashes and stale/future `auth_date` values, and is covered by `backend/tests/unit/test_telegram_mini_app_init_data.py`.
-- [ ] Scope Mini App sessions to the linked patient or authenticated staff user.
+- [x] Scope Mini App sessions to the linked patient or authenticated staff user: `backend/app/services/telegram_mini_app_init_data.py` resolves validated `initData` only through existing active `telegram_users` links, returns explicit patient/staff scopes, rejects direct URL or unlinked identity, blocks inactive staff links, and `backend/tests/unit/test_telegram_mini_app_init_data.py` covers wrong-patient scope rejection.
 - [ ] Implement appointment booking inside the protected Mini App flow.
 - [ ] Implement patient forms inside the protected Mini App flow.
 - [ ] Implement patient cabinet inside the protected Mini App flow.
