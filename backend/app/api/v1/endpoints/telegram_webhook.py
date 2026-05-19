@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Any, Dict, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -54,6 +55,13 @@ from app.services.telegram_staff_confirmation_token_service import (
     TelegramStaffConfirmationTokenService,
 )
 from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_mini_app_init_data import (
+    TelegramMiniAppInitDataError,
+    TelegramMiniAppSessionScopeError,
+    build_telegram_mini_app_appointment_booking_preview,
+    resolve_telegram_mini_app_session_scope,
+    validate_telegram_mini_app_init_data,
+)
 from app.services.visit_confirmation_service import (
     TELEGRAM_TICKET_QR_PREFIX,
     consume_telegram_ticket_start_token,
@@ -752,6 +760,18 @@ TELEGRAM_LOCALIZED_TEXTS = {
 TELEGRAM_WEBHOOK_PUBLIC_ERROR = "Ошибка обработки webhook"
 TELEGRAM_SEND_PUBLIC_ERROR = "Ошибка отправки сообщения"
 TELEGRAM_BOT_INFO_PUBLIC_MESSAGE = "Ошибка получения информации о боте"
+MINI_APP_BOOKING_REQUEST_ERROR_REASONS = frozenset(
+    {
+        "appointment_date_invalid",
+        "appointment_date_in_past",
+        "appointment_time_invalid",
+        "appointment_service_invalid",
+        "appointment_service_too_long",
+        "doctor_id_invalid",
+        "department_too_long",
+        "notes_too_long",
+    }
+)
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
 EMR_CLOSED_VISIT_STATUSES = {
@@ -3742,6 +3762,19 @@ async def _handle_clinic_bot_update(
     return False
 
 
+class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str = Field(..., alias="initData", min_length=1)
+    patient_id: int | None = Field(default=None, alias="patientId")
+    appointment_date: date = Field(..., alias="appointmentDate")
+    appointment_time: str | None = Field(default=None, alias="appointmentTime")
+    doctor_id: int | None = Field(default=None, alias="doctorId")
+    department: str | None = None
+    notes: str | None = None
+    services: list[str] | None = None
+
+
 def _validate_webhook_secret(request: Request, db: Session) -> None:
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
@@ -3781,6 +3814,63 @@ def _telegram_bot_info_failure(exc: Exception) -> Dict[str, Any]:
         type(exc).__name__,
     )
     return {"active": False, "message": TELEGRAM_BOT_INFO_PUBLIC_MESSAGE}
+
+
+def _mini_app_booking_scope_status_code(reason: str) -> int:
+    if reason in MINI_APP_BOOKING_REQUEST_ERROR_REASONS:
+        return status.HTTP_400_BAD_REQUEST
+    return status.HTTP_403_FORBIDDEN
+
+
+@router.post(
+    "/mini-app/appointments/preview",
+    operation_id="telegram_mini_app_preview_appointment_booking",
+)
+def preview_mini_app_appointment_booking(
+    request_body: TelegramMiniAppAppointmentPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Return a trusted Mini App appointment preview without creating it."""
+
+    bot_token = _get_configured_bot_token(db)
+    if not bot_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason": "bot_token_required"},
+        )
+
+    try:
+        init_data = validate_telegram_mini_app_init_data(
+            request_body.init_data,
+            bot_token=bot_token,
+        )
+        scope = resolve_telegram_mini_app_session_scope(
+            db,
+            init_data,
+            expected_scope="patient",
+        )
+        preview = build_telegram_mini_app_appointment_booking_preview(
+            scope,
+            patient_id=request_body.patient_id,
+            appointment_date=request_body.appointment_date,
+            appointment_time=request_body.appointment_time,
+            doctor_id=request_body.doctor_id,
+            department=request_body.department,
+            notes=request_body.notes,
+            services=request_body.services,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=_mini_app_booking_scope_status_code(exc.reason),
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return preview.to_response_payload()
 
 
 @router.post("/webhook")
