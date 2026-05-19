@@ -12,7 +12,7 @@ Rules:
 
 ## Rollout Status
 
-- [ ] PR-0: audit baseline and rollout checklist merged.
+- [x] PR-0: audit baseline and rollout checklist merged.
 - [ ] PR-UX-1: payment cancel semantic status merged.
 - [ ] PR-UX-2: queue join recovery states merged.
 - [ ] PR-UX-3: authenticated UI QA harness merged.
