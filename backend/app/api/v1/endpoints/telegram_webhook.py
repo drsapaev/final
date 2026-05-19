@@ -36,6 +36,7 @@ from app.crud.appointment import appointment as appointment_crud
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
+from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
 from app.models.notification import NotificationDelivery, NotificationEvent
@@ -3916,6 +3917,13 @@ class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
     patient_id: int | None = Field(default=None, alias="patientId")
 
 
+class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str = Field(..., alias="initData", min_length=1)
+    patient_id: int | None = Field(default=None, alias="patientId")
+
+
 class TelegramMiniAppPatientFormSubmissionRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -4046,6 +4054,141 @@ def _resolve_mini_app_patient_scope_from_init_data(
     )
 
 
+def _iso_date_value(value: date | datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+
+
+def _iso_datetime_value(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
+
+
+def _mini_app_patient_appointments(
+    db: Session,
+    patient_id: int,
+    *,
+    limit: int = 3,
+) -> list[Appointment]:
+    return (
+        db.query(Appointment)
+        .filter(Appointment.patient_id == patient_id)
+        .order_by(
+            Appointment.appointment_date.desc(),
+            Appointment.created_at.desc(),
+            Appointment.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+
+def _appointment_department_label(appointment: Appointment) -> str | None:
+    department = getattr(appointment, "department", None)
+    return getattr(department, "name", None)
+
+
+def _mini_app_patient_cabinet_summary_payload(
+    db: Session,
+    scope,
+) -> dict[str, Any]:
+    patient_id = int(scope.patient_id)
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    appointments = _mini_app_patient_appointments(db, patient_id)
+    recent_visits = _patient_recent_visits(db, patient_id)
+    queue_entries = _patient_today_queue_entries(db, patient_id)
+    entries, visits_for_billing, expected_total, paid_total, pending_total, debt_total = (
+        _billing_totals(db, patient_id)
+    )
+    reports = _latest_ready_lab_report_instances(db, patient_id)
+
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": patient_id,
+        },
+        "patient": {
+            "name": _patient_display_name(patient),
+        },
+        "appointments": [
+            {
+                "id": int(appointment.id),
+                "date": _iso_date_value(appointment.appointment_date),
+                "time": appointment.appointment_time,
+                "status": appointment.status,
+                "department": _appointment_department_label(appointment),
+            }
+            for appointment in appointments
+        ],
+        "visits": [
+            {
+                "id": int(visit.id),
+                "date": _iso_date_value(visit.visit_date),
+                "status": visit.status,
+            }
+            for visit in recent_visits
+        ],
+        "queue": [
+            {
+                "number": entry.number,
+                "status": entry.status,
+                "cabinet": getattr(getattr(entry, "queue", None), "cabinet_number", None),
+            }
+            for entry in queue_entries[:5]
+        ],
+        "payments": {
+            "billed": _format_money(expected_total),
+            "paid": _format_money(paid_total),
+            "pending": _format_money(pending_total),
+            "debt": _format_money(debt_total),
+            "linked_visit_count": len(visits_for_billing),
+            "active_queue_count": len(entries),
+        },
+        "reports": [
+            {
+                "id": int(report.id),
+                "name": getattr(getattr(report, "template", None), "name", "Lab report"),
+                "ready_at": _iso_datetime_value(report.finalized_at or report.created_at),
+                "status": report.status,
+            }
+            for report in reports
+        ],
+        "policy": {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "pdf_included": False,
+        },
+    }
+
+
+def _build_mini_app_patient_cabinet_summary_from_request(
+    request_body: TelegramMiniAppPatientCabinetSummaryRequest,
+    db: Session,
+) -> dict[str, Any]:
+    try:
+        scope = _resolve_mini_app_patient_scope_from_init_data(
+            db,
+            request_body.init_data,
+        )
+        if request_body.patient_id is not None:
+            if int(scope.patient_id) != int(request_body.patient_id):
+                raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return _mini_app_patient_cabinet_summary_payload(db, scope)
+
+
 def _build_mini_app_patient_forms_preview_from_request(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
     db: Session,
@@ -4137,6 +4280,22 @@ def submit_mini_app_patient_form(
         db,
     )
     return result.to_response_payload()
+
+
+@router.post(
+    "/mini-app/cabinet/summary",
+    operation_id="telegram_mini_app_patient_cabinet_summary",
+)
+def preview_mini_app_patient_cabinet_summary(
+    request_body: TelegramMiniAppPatientCabinetSummaryRequest,
+    db: Session = Depends(get_db),
+):
+    """Return protected patient cabinet summary without exposing Telegram ids."""
+
+    return _build_mini_app_patient_cabinet_summary_from_request(
+        request_body,
+        db,
+    )
 
 
 @router.post(

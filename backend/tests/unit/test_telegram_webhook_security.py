@@ -681,6 +681,67 @@ class TestTelegramWebhookSecurity:
         }
         assert db_session.query(TelegramPatientFormSubmission).count() == 0
 
+    def test_mini_app_patient_cabinet_summary_endpoint_returns_safe_summary(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880216
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        db_session.add(
+            Appointment(
+                patient_id=test_patient.id,
+                appointment_date=date(2026, 5, 20),
+                appointment_time="10:00",
+                status="scheduled",
+                visit_type="paid",
+                payment_type="cash",
+                payment_currency="UZS",
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/cabinet/summary",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/cabinet/summary",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id + 1,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["patient"]["name"] == test_patient.short_name()
+        assert payload["appointments"][0] == {
+            "id": payload["appointments"][0]["id"],
+            "date": "2026-05-20",
+            "time": "10:00",
+            "status": "scheduled",
+            "department": None,
+        }
+        assert payload["payments"]["debt"] == "0"
+        assert payload["policy"] == {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "pdf_included": False,
+        }
+        assert "telegram_chat_id" not in str(payload)
+        assert "telegram_user_id" not in str(payload)
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {
+            "reason": "patient_scope_mismatch"
+        }
+
     def test_mini_app_booking_create_endpoint_creates_safe_appointment(
         self,
         client,
