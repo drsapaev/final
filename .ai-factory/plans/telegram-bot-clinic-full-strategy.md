@@ -333,9 +333,9 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
     - [x] Backend storage-backed capture/edit endpoint exists: migration `backend/alembic/versions/0028_telegram_patient_form_submissions.py` creates `telegram_patient_form_submissions`, `TelegramPatientFormSubmission` maps it, and `POST /api/v1/telegram/mini-app/forms/submissions` validates Mini App `initData`, linked patient scope, known form/field keys, field types, and max lengths before create/update.
     - [x] Frontend forms tab now provides editable textarea/text/checkbox controls from the safe preview schema, supports draft save and final submit, and posts only from trusted Mini App `initData` to `/api/v1/telegram/mini-app/forms/submissions`.
     - [x] Persisted edit reload is closed: `/api/v1/telegram/mini-app/forms/preview` hydrates existing saved submission answers/status into the safe form payload, and `PatientPanel.jsx` seeds the editable UI from that protected payload after reopening the Mini App.
-- [ ] Implement patient cabinet inside the protected Mini App flow.
+- [x] Implement patient cabinet inside the protected Mini App flow.
   - [x] Backend protected cabinet summary endpoint exists: `POST /api/v1/telegram/mini-app/cabinet/summary` validates Telegram Mini App `initData`, resolves linked patient scope, rejects wrong-patient scope, and returns safe profile, appointment, visit, queue, payment-total, and ready-report metadata without Telegram chat/user ids or PDF payloads.
-  - [ ] Frontend `PatientPanel.jsx` cabinet tab still needs to render the protected summary instead of the placeholder.
+  - [x] Frontend `PatientPanel.jsx` cabinet tab renders the protected summary from `/api/v1/telegram/mini-app/cabinet/summary` with profile, payment totals, appointments, visits, queue, and ready-report metadata while keeping PDF and medical details out of plain chat.
 - [ ] Implement payment details inside the protected Mini App flow.
 - [ ] Implement protected result/report viewing inside the Mini App flow.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.

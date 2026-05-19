@@ -98,6 +98,19 @@ const describeBookingError = (reason) => (
   bookingErrorMessages[reason] || 'The booking request could not be processed.'
 );
 
+const cabinetErrorMessages = {
+  auth_date_expired: 'Open the Mini App from Telegram again.',
+  hash_mismatch: 'Open the Mini App from Telegram again.',
+  patient_scope_mismatch: 'This cabinet does not belong to the linked patient.',
+  patient_scope_required: 'Link Telegram to a patient before opening the cabinet.',
+  telegram_link_required: 'Link Telegram to a patient before opening the cabinet.',
+  bot_token_required: 'Telegram Mini App is not configured yet.',
+};
+
+const describeCabinetError = (reason) => (
+  cabinetErrorMessages[reason] || 'The patient cabinet could not be loaded.'
+);
+
 const buildBookingPayload = (initData, bookingForm) => ({
   initData,
   appointmentDate: bookingForm.appointmentDate,
@@ -276,6 +289,183 @@ const PatientBookingPanel = () => {
               <Calendar className="w-4 h-4" aria-hidden="true" />
               Book visit
             </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PatientCabinetSummary = () => {
+  const [cabinetStatus, setCabinetStatus] = useState('idle');
+  const [cabinetSummary, setCabinetSummary] = useState(null);
+  const [cabinetError, setCabinetError] = useState('');
+
+  useEffect(() => {
+    const initData = readTelegramMiniAppInitData();
+    if (!initData) {
+      setCabinetStatus('missing-init-data');
+      setCabinetSummary(null);
+      setCabinetError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setCabinetStatus('loading');
+    setCabinetSummary(null);
+    setCabinetError('');
+
+    api.post('/telegram/mini-app/cabinet/summary', { initData })
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        setCabinetSummary(response.data);
+        setCabinetStatus('ready');
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return;
+        }
+        const reason = err?.response?.data?.detail?.reason || 'cabinet_summary_failed';
+        setCabinetError(describeCabinetError(reason));
+        setCabinetStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (cabinetStatus === 'missing-init-data') {
+    return (
+      <PanelEmptyState
+        icon={FileText}
+        title="Open from Telegram"
+        description="Protected cabinet requires Telegram Mini App identity before patient data can be shown."
+      />
+    );
+  }
+
+  if (cabinetStatus === 'loading') {
+    return (
+      <PanelEmptyState
+        icon={FileText}
+        title="Loading cabinet"
+        description="Checking protected Telegram Mini App identity."
+      />
+    );
+  }
+
+  if (cabinetStatus === 'error') {
+    return (
+      <PanelEmptyState
+        icon={FileText}
+        title="Cabinet unavailable"
+        description={cabinetError || 'Protected patient cabinet could not be loaded.'}
+      />
+    );
+  }
+
+  const payments = cabinetSummary?.payments || {};
+  const appointments = Array.isArray(cabinetSummary?.appointments) ? cabinetSummary.appointments : [];
+  const visits = Array.isArray(cabinetSummary?.visits) ? cabinetSummary.visits : [];
+  const queue = Array.isArray(cabinetSummary?.queue) ? cabinetSummary.queue : [];
+  const reports = Array.isArray(cabinetSummary?.reports) ? cabinetSummary.reports : [];
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="font-medium text-gray-900">{cabinetSummary?.patient?.name || 'Linked patient'}</div>
+            <p className="mt-1 text-sm text-gray-500">Protected cabinet summary from the linked Telegram patient profile.</p>
+          </div>
+          <Badge variant="success">Mini App protected</Badge>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs text-gray-500">Billed</div>
+              <div className="mt-1 font-medium text-gray-900">{payments.billed || '0'} UZS</div>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs text-gray-500">Paid</div>
+              <div className="mt-1 font-medium text-gray-900">{payments.paid || '0'} UZS</div>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs text-gray-500">Pending</div>
+              <div className="mt-1 font-medium text-gray-900">{payments.pending || '0'} UZS</div>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs text-gray-500">Debt</div>
+              <div className="mt-1 font-medium text-gray-900">{payments.debt || '0'} UZS</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="font-medium text-gray-900">Appointments</div>
+              <div className="mt-3 space-y-2">
+                {appointments.length > 0 ? appointments.map((appointment) => (
+                  <div key={appointment.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div>
+                      <div className="text-gray-900">{appointment.date || 'Date pending'}</div>
+                      <div className="text-gray-500">{appointment.time || 'Time pending'} · {appointment.department || 'Department pending'}</div>
+                    </div>
+                    <Badge variant="info">{appointment.status || 'scheduled'}</Badge>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No appointment requests yet.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="font-medium text-gray-900">Visits</div>
+              <div className="mt-3 space-y-2">
+                {visits.length > 0 ? visits.map((visit) => (
+                  <div key={visit.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="text-gray-900">Visit #{visit.id}</div>
+                    <div className="text-gray-500">{visit.date || 'Date pending'} · {visit.status || 'open'}</div>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No recent visits yet.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="font-medium text-gray-900">Today queue</div>
+              <div className="mt-3 space-y-2">
+                {queue.length > 0 ? queue.map((entry) => (
+                  <div key={`${entry.number}-${entry.status}`} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="text-gray-900">#{entry.number}</div>
+                    <div className="text-gray-500">{entry.status}{entry.cabinet ? ` · ${entry.cabinet}` : ''}</div>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No active queue entry today.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="font-medium text-gray-900">Ready reports</div>
+              <div className="mt-3 space-y-2">
+                {reports.length > 0 ? reports.map((report) => (
+                  <div key={report.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div>
+                      <div className="text-gray-900">{report.name || 'Lab report'}</div>
+                      <div className="text-gray-500">{report.ready_at || 'Ready date pending'}</div>
+                    </div>
+                    <Badge variant="success">{report.status || 'ready'}</Badge>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No ready reports yet.</div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -736,6 +926,8 @@ const PatientPanel = () => {
                 />
               ) : activeSection === 'booking' ? (
                 <PatientBookingPanel />
+              ) : activeSection === 'cabinet' ? (
+                <PatientCabinetSummary />
               ) : (
                 <PanelEmptyState
                   icon={sectionConfig.icon}
