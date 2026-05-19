@@ -31,6 +31,7 @@ from app.api.v1.endpoints.admin_telegram import (
     validate_staff_link_start_token,
 )
 from app.core.config import settings
+from app.crud.appointment import appointment as appointment_crud
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
@@ -46,6 +47,7 @@ from app.models.telegram_config import TelegramMessage, TelegramUser
 from app.models.user import User
 from app.models.visit import Visit
 from app.models.webhook import WebhookCall, WebhookCallStatus, WebhookEvent
+from app.schemas import appointment as appointment_schemas
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import LabReportingService
 from app.services.payment_reconciliation_api_service import (
@@ -3822,16 +3824,10 @@ def _mini_app_booking_scope_status_code(reason: str) -> int:
     return status.HTTP_403_FORBIDDEN
 
 
-@router.post(
-    "/mini-app/appointments/preview",
-    operation_id="telegram_mini_app_preview_appointment_booking",
-)
-def preview_mini_app_appointment_booking(
+def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
-    db: Session = Depends(get_db),
+    db: Session,
 ):
-    """Return a trusted Mini App appointment preview without creating it."""
-
     bot_token = _get_configured_bot_token(db)
     if not bot_token:
         raise HTTPException(
@@ -3870,7 +3866,65 @@ def preview_mini_app_appointment_booking(
             detail={"reason": exc.reason},
         ) from exc
 
+    return preview
+
+
+@router.post(
+    "/mini-app/appointments/preview",
+    operation_id="telegram_mini_app_preview_appointment_booking",
+)
+def preview_mini_app_appointment_booking(
+    request_body: TelegramMiniAppAppointmentPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Return a trusted Mini App appointment preview without creating it."""
+
+    preview = _build_mini_app_appointment_booking_preview_from_request(
+        request_body,
+        db,
+    )
     return preview.to_response_payload()
+
+
+@router.post(
+    "/mini-app/appointments",
+    status_code=status.HTTP_201_CREATED,
+    operation_id="telegram_mini_app_create_appointment_booking",
+)
+def create_mini_app_appointment_booking(
+    request_body: TelegramMiniAppAppointmentPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Create one trusted Mini App appointment for a linked patient."""
+
+    preview = _build_mini_app_appointment_booking_preview_from_request(
+        request_body,
+        db,
+    )
+    draft_payload = preview.draft.to_appointment_create_payload()
+
+    if preview.draft.doctor_id is not None and preview.draft.appointment_time:
+        slot_occupied = appointment_crud.is_time_slot_occupied(
+            db,
+            doctor_id=preview.draft.doctor_id,
+            appointment_date=preview.draft.appointment_date,
+            appointment_time=preview.draft.appointment_time,
+        )
+        if slot_occupied:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"reason": "appointment_time_slot_occupied"},
+            )
+
+    appointment_create_payload = dict(draft_payload)
+    appointment_create_payload.pop("department", None)
+    appointment_in = appointment_schemas.AppointmentCreate(**appointment_create_payload)
+    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
+    return {
+        "created": True,
+        "appointment_id": int(appointment.id),
+        "preview": preview.to_response_payload(),
+    }
 
 
 @router.post("/webhook")
