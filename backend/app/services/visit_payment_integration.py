@@ -1,4 +1,5 @@
 # app/services/visit_payment_integration.py
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any
@@ -20,6 +21,171 @@ class VisitPaymentIntegrationService:
     @staticmethod
     def _repo(db: Session) -> VisitPaymentIntegrationRepository:
         return VisitPaymentIntegrationRepository(db)
+
+    @staticmethod
+    def _safe_int(value: Any) -> int | None:
+        try:
+            if value is None:
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _row_value(row: Any, field_name: str) -> Any:
+        if row is None:
+            return None
+        if hasattr(row, field_name):
+            return getattr(row, field_name)
+
+        mapping = getattr(row, "_mapping", None)
+        if mapping is not None:
+            try:
+                if field_name in mapping:
+                    return mapping[field_name]
+            except TypeError:
+                pass
+
+        return None
+
+    @staticmethod
+    def _format_webhook_amount(amount: Any) -> str | None:
+        try:
+            value = float(amount) / 100
+        except (TypeError, ValueError):
+            return None
+
+        if value.is_integer():
+            return str(int(value))
+        return f"{value:.2f}"
+
+    @staticmethod
+    def _payment_status_event_type(payment_status: str) -> str:
+        normalized = str(payment_status or "").strip().lower()
+        if normalized in {"paid", "processed", "success", "completed"}:
+            return "payment_paid"
+        return "payment_notification"
+
+    @staticmethod
+    def _payment_status_metadata(
+        payment_status: str, webhook: PaymentWebhookOut | None
+    ) -> dict[str, str]:
+        metadata = {"status": str(payment_status or "updated")}
+        if webhook is None:
+            return metadata
+
+        amount = VisitPaymentIntegrationService._format_webhook_amount(
+            getattr(webhook, "amount", None)
+        )
+        if amount is not None:
+            metadata["amount"] = amount
+
+        currency = str(getattr(webhook, "currency", "") or "").strip()
+        if currency:
+            metadata["currency"] = currency
+
+        provider = str(getattr(webhook, "provider", "") or "").strip()
+        if provider:
+            metadata["provider"] = provider
+
+        return metadata
+
+    @staticmethod
+    def _dispatch_patient_payment_status_notification(
+        *,
+        db: Session,
+        patient_id: int | None,
+        payment_status: str,
+        webhook: PaymentWebhookOut | None,
+    ) -> None:
+        patient_id = VisitPaymentIntegrationService._safe_int(patient_id)
+        if patient_id is None:
+            return
+
+        event_type = VisitPaymentIntegrationService._payment_status_event_type(
+            payment_status
+        )
+        metadata = VisitPaymentIntegrationService._payment_status_metadata(
+            payment_status, webhook
+        )
+
+        async def _send() -> None:
+            from app.services.notifications import notification_sender_service
+
+            await notification_sender_service.send_patient_telegram_event_notification(
+                db=db,
+                patient_id=patient_id,
+                event_type=event_type,
+                metadata=metadata,
+            )
+
+        def _log_failure(exc: BaseException) -> None:
+            logger.warning(
+                "Patient payment Telegram status notification failed",
+                extra={
+                    "event_type": event_type,
+                    "payment_status": payment_status,
+                    "error_type": type(exc).__name__,
+                },
+            )
+
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(_send())
+            except Exception as exc:
+                _log_failure(exc)
+            return
+
+        async def _send_detached() -> None:
+            from app.db.session import SessionLocal
+            from app.services.notifications import notification_sender_service
+
+            detached_db = SessionLocal()
+            try:
+                await notification_sender_service.send_patient_telegram_event_notification(
+                    db=detached_db,
+                    patient_id=patient_id,
+                    event_type=event_type,
+                    metadata=metadata,
+                )
+            finally:
+                detached_db.close()
+
+        task = running_loop.create_task(_send_detached())
+
+        def _handle_task_result(done_task: asyncio.Task) -> None:
+            try:
+                done_task.result()
+            except Exception as exc:
+                _log_failure(exc)
+
+        task.add_done_callback(_handle_task_result)
+
+    @staticmethod
+    def _resolve_appointment_patient_id(
+        db: Session,
+        appointment_id: int,
+        webhook: PaymentWebhookOut | None,
+    ) -> int | None:
+        try:
+            from app.models.appointment import Appointment
+
+            patient_id = (
+                db.query(Appointment.patient_id)
+                .filter(Appointment.id == appointment_id)
+                .scalar()
+            )
+            return VisitPaymentIntegrationService._safe_int(patient_id)
+        except Exception as exc:
+            logger.warning(
+                "Appointment patient lookup for payment Telegram notification failed",
+                extra={"error_type": type(exc).__name__},
+            )
+            return VisitPaymentIntegrationService._safe_int(
+                getattr(webhook, "patient_id", None)
+            )
 
     @staticmethod
     def create_visit_from_payment(
@@ -88,6 +254,8 @@ class VisitPaymentIntegrationService:
         payment_status: str,
         webhook: PaymentWebhookOut | None = None,
         additional_data: dict[str, Any] | None = None,
+        *,
+        notify_patient: bool = False,
     ) -> tuple[bool, str]:
         """
         Обновление статуса платежа для существующего визита
@@ -136,6 +304,17 @@ class VisitPaymentIntegrationService:
             # Обновляем визит
             repo.update_visit(visit_id, update_data)
             db.commit()
+
+            if notify_patient:
+                patient_id = VisitPaymentIntegrationService._safe_int(
+                    VisitPaymentIntegrationService._row_value(visit, "patient_id")
+                )
+                VisitPaymentIntegrationService._dispatch_patient_payment_status_notification(
+                    db=db,
+                    patient_id=patient_id,
+                    payment_status=payment_status,
+                    webhook=webhook,
+                )
 
             return (
                 True,
@@ -214,7 +393,7 @@ class VisitPaymentIntegrationService:
             # Обновляем статус платежа
             success, message = (
                 VisitPaymentIntegrationService.update_visit_payment_status(
-                    db, visit_id, "paid", webhook
+                    db, visit_id, "paid", webhook, notify_patient=True
                 )
             )
 
@@ -441,6 +620,17 @@ class VisitPaymentIntegrationService:
 
             # Обновляем статус вебхука
             repo.update_webhook_status(webhook_id=webhook.id, status="appointment_updated")
+            db.commit()
+
+            patient_id = VisitPaymentIntegrationService._resolve_appointment_patient_id(
+                db, appointment_id, webhook
+            )
+            VisitPaymentIntegrationService._dispatch_patient_payment_status_notification(
+                db=db,
+                patient_id=patient_id,
+                payment_status="paid",
+                webhook=webhook,
+            )
 
             return True, f"Платёж для записи {appointment_id} обработан успешно"
 
