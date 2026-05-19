@@ -61,7 +61,7 @@ Prefer the exported macOS primitives from `frontend/src/components/ui/macos/inde
 ### Do not
 
 - Do not create a parallel UI framework.
-- Do not add new MUI usage in app pages or clinic workflow panels.
+- Do not add new MUI usage in app pages or clinic workflow panels. Follow `frontend/MUI_RUNTIME_INVENTORY.md` before touching or adding any MUI island.
 - Do not expand `frontend/src/design-system`, `Modern*`, Tailwind-style utility patterns, or page-specific CSS unless the PR explicitly justifies that legacy boundary.
 - Do not add duplicate primitives such as `MacOSButton2`, `ModernCardNew`, or one-off component systems.
 - Do not add large page-local inline style blocks when an existing primitive, token, or small local style is enough.
