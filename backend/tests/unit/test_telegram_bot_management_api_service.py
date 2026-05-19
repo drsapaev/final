@@ -698,6 +698,46 @@ class TestTelegramBotManagementApiService:
             "consumed_at": consumed_at.isoformat(),
         }
 
+    def test_staff_confirmation_token_service_rejects_expired_record_without_consuming(
+        self, db_session, admin_user
+    ):
+        service = TelegramStaffConfirmationTokenService(db_session)
+        token_hash = "staff_confirmation_token:" + ("7" * 64)
+        payload_hash = "payload:" + ("8" * 64)
+        idempotency_hash = "idempotency:" + ("9" * 64)
+        issued_at = datetime.now(timezone.utc)
+        expires_at = issued_at + timedelta(seconds=30)
+        service.issue_token(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700803,
+            operation_key="payment_status_change",
+            command_key="/payment_status",
+            action_payload_hash=payload_hash,
+            target_type="payment",
+            idempotency_key_hash=idempotency_hash,
+            expires_at=expires_at,
+            request_id="req-confirm-expired",
+        )
+
+        result = service.consume_for_confirmation(
+            token_hash=token_hash,
+            staff_user_id=admin_user.id,
+            telegram_chat_id=700803,
+            operation_key="payment_status_change",
+            action_payload_hash=payload_hash,
+            idempotency_key_hash=idempotency_hash,
+            now=expires_at + timedelta(seconds=1),
+        )
+        stored = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(TelegramStaffConfirmationToken.token_hash == token_hash)
+            .one()
+        )
+
+        assert result == {"valid": False, "reason": "expired"}
+        assert stored.consumed_at is None
+
     def test_staff_confirmation_token_service_rejects_action_mismatch(
         self, db_session, admin_user
     ):
