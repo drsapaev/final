@@ -640,6 +640,133 @@ class TestTelegramWebhookSecurity:
         assert response.status_code == 503
         assert response.json()["detail"] == {"reason": "bot_token_required"}
 
+    def test_mini_app_payments_manifest_endpoint_returns_disabled_status(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880218
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/payments/manifest",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["status"] == "manifest_only"
+        assert payload["payments_enabled"] is False
+        assert payload["read_enabled"] is False
+        assert payload["payment_capture_enabled"] is False
+        assert payload["provider_redirect_enabled"] is False
+        assert payload["contains_amounts"] is False
+        assert payload["contains_payment_records"] is False
+        assert payload["contains_provider_payloads"] is False
+        assert payload["sections"]
+        assert all(section["read_enabled"] is False for section in payload["sections"])
+        assert all(
+            section["payment_enabled"] is False for section in payload["sections"]
+        )
+        assert all(
+            section["contains_amounts"] is False for section in payload["sections"]
+        )
+        assert all(
+            section["contains_payment_records"] is False
+            for section in payload["sections"]
+        )
+        assert all(
+            section["contains_provider_payloads"] is False
+            for section in payload["sections"]
+        )
+        assert all("amount" not in section for section in payload["sections"])
+        assert all("records" not in section for section in payload["sections"])
+        assert all("provider_payload" not in section for section in payload["sections"])
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_payments_manifest_endpoint_rejects_forged_init_data(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880219
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/payments/manifest",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id).replace(
+                    "hash=",
+                    "hash=forged",
+                    1,
+                )
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "hash_mismatch"}
+
+    def test_mini_app_payments_manifest_endpoint_rejects_staff_scope(
+        self,
+        client,
+        db_session,
+        admin_user,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880220
+        db_session.add(
+            TelegramUser(
+                chat_id=chat_id,
+                user_id=admin_user.id,
+                language_code="ru",
+                active=True,
+                blocked=False,
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/payments/manifest",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "patient_scope_required"}
+
+    def test_mini_app_payments_manifest_endpoint_rejects_unlinked_chat(
+        self,
+        client,
+        db_session,
+    ):
+        _add_mini_app_telegram_config(db_session)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/payments/manifest",
+            json={"initData": _signed_mini_app_init_data(880221)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "telegram_link_required"}
+
+    def test_mini_app_payments_manifest_endpoint_requires_configured_bot_token(
+        self,
+        client,
+        db_session,
+    ):
+        response = client.post(
+            "/api/v1/telegram/mini-app/payments/manifest",
+            json={"initData": _signed_mini_app_init_data(880222)},
+        )
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == {"reason": "bot_token_required"}
+
     def test_mini_app_booking_preview_endpoint_maps_invalid_booking_field_to_400(
         self,
         client,
