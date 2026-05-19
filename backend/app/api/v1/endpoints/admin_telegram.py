@@ -10,6 +10,7 @@ import os
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from html import escape
 from typing import Any, Dict, List, NoReturn, Optional
 
 import requests
@@ -71,6 +72,121 @@ PATIENT_FORMS_ENTRY_CONTRACT = {
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
     "entrypoint_type": "mini_app_tab_entry",
+}
+
+TELEGRAM_AI_APPROVAL_OUTCOMES = {"accepted", "rejected"}
+TELEGRAM_AI_APPROVAL_REASON_CODES = {
+    "accurate",
+    "incomplete",
+    "unsafe",
+    "not_relevant",
+    "workflow_issue",
+    "other",
+}
+TELEGRAM_AI_APPROVAL_WORKFLOWS = {
+    "doctor_draft_review": {
+        "label": "Doctor AI draft review",
+        "notification_type": "doctor_draft_review",
+        "recipient_roles": ["doctor"],
+        "outcome_roles": ["doctor"],
+        "protected_route": "/doctor?tab=ai",
+        "protected_surface": "EMR",
+        "telegram_title": "AI draft is ready for protected review",
+        "telegram_body": (
+            "Open the protected EMR to review, edit, accept, or reject the AI draft."
+        ),
+        "allowed_metric_keys": ["draft_count"],
+        "medical_workflow": True,
+    },
+    "queue_overload_alert": {
+        "label": "Queue overload suggestion",
+        "notification_type": "queue_overload",
+        "recipient_roles": ["admin", "registrar"],
+        "outcome_roles": ["admin", "registrar"],
+        "protected_route": "/registrar?tab=queue",
+        "protected_surface": "queue_dashboard",
+        "telegram_title": "Queue overload suggestion",
+        "telegram_body": (
+            "Open the protected dashboard to review queue load and decide next steps."
+        ),
+        "allowed_metric_keys": [
+            "waiting_count",
+            "average_wait_minutes",
+            "overloaded_services_count",
+        ],
+        "medical_workflow": False,
+    },
+    "payment_anomaly_alert": {
+        "label": "Payment anomaly alert",
+        "notification_type": "payment_anomaly",
+        "recipient_roles": ["admin", "cashier"],
+        "outcome_roles": ["admin", "cashier"],
+        "protected_route": "/cashier?tab=payments",
+        "protected_surface": "payment_dashboard",
+        "telegram_title": "Payment anomaly needs review",
+        "telegram_body": (
+            "Open the protected dashboard to review payment reconciliation details."
+        ),
+        "allowed_metric_keys": [
+            "unmatched_count",
+            "provider_count",
+            "difference_amount",
+            "currency",
+        ],
+        "medical_workflow": False,
+    },
+    "owner_daily_summary": {
+        "label": "Owner daily AI summary",
+        "notification_type": "owner_daily_summary",
+        "recipient_roles": ["admin", "owner"],
+        "outcome_roles": ["admin", "owner"],
+        "protected_route": "/admin/analytics",
+        "protected_surface": "admin_analytics",
+        "telegram_title": "Daily AI operations summary",
+        "telegram_body": (
+            "Review high-level clinic metrics in the protected dashboard."
+        ),
+        "allowed_metric_keys": [
+            "revenue_total",
+            "average_wait_minutes",
+            "overloaded_services_count",
+            "unpaid_visits_count",
+            "integration_issue_count",
+        ],
+        "medical_workflow": False,
+    },
+}
+TELEGRAM_AI_APPROVAL_CONTRACT = {
+    "contract_version": "telegram-ai-approval-flows-v1",
+    "enabled": True,
+    "notification_runtime_enabled": True,
+    "outcome_capture_enabled": True,
+    "surface": "telegram_staff_notification_to_protected_app",
+    "protected_links_required": True,
+    "plain_chat_medical_content_allowed": False,
+    "telegram_url_parameters_allowed": False,
+    "requires_human_confirmation": True,
+    "autonomous_mutation_allowed": False,
+    "domain_mutations_performed_by_telegram_ai": False,
+    "audit_action": "telegram_ai_approval_outcome_recorded",
+    "notification_audit_action": "telegram_ai_approval_notification_sent",
+    "outcomes": sorted(TELEGRAM_AI_APPROVAL_OUTCOMES),
+    "workflows": [
+        {
+            "key": key,
+            "label": workflow["label"],
+            "notification_type": workflow["notification_type"],
+            "recipient_roles": workflow["recipient_roles"],
+            "outcome_roles": workflow["outcome_roles"],
+            "protected_route": workflow["protected_route"],
+            "protected_surface": workflow["protected_surface"],
+            "allowed_metric_keys": workflow["allowed_metric_keys"],
+            "medical_workflow": workflow["medical_workflow"],
+            "plain_chat_medical_content_allowed": False,
+            "autonomous_mutation_allowed": False,
+        }
+        for key, workflow in TELEGRAM_AI_APPROVAL_WORKFLOWS.items()
+    ],
 }
 
 STAFF_LINK_TOKEN_PREFIX = "stl"
@@ -1316,6 +1432,146 @@ def _staff_runtime_reference_hash(kind: str, value: Any) -> str:
     return f"{kind}:{digest[:24]}"
 
 
+def _telegram_ai_approval_reference_hash(value: Any) -> str:
+    digest = hashlib.sha256(
+        f"telegram_ai_approval:{value}".encode("utf-8")
+    ).hexdigest()
+    return f"telegram_ai_approval:{digest[:24]}"
+
+
+def _telegram_ai_approval_workflow(workflow_key: str) -> Dict[str, Any]:
+    key = str(workflow_key or "").strip().lower()
+    workflow = TELEGRAM_AI_APPROVAL_WORKFLOWS.get(key)
+    if not workflow:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_ai_approval_workflow",
+        )
+    return workflow
+
+
+def _protected_frontend_url(route: str) -> str | None:
+    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    if not frontend_url:
+        return None
+    if not frontend_url.startswith(("https://", "http://")):
+        return None
+    normalized_route = str(route or "").strip()
+    if not normalized_route.startswith("/"):
+        normalized_route = f"/{normalized_route}"
+    return f"{frontend_url.rstrip('/')}{normalized_route}"
+
+
+def _safe_ai_approval_value(value: Any) -> str:
+    if isinstance(value, bool):
+        text = "yes" if value else "no"
+    elif isinstance(value, (int, float, Decimal)):
+        text = str(value)
+    else:
+        text = str(value or "").strip()
+    return escape(text[:80])
+
+
+def _safe_ai_approval_metrics(
+    workflow: Dict[str, Any], metrics: Dict[str, Any] | None
+) -> Dict[str, str]:
+    if not isinstance(metrics, dict):
+        return {}
+    allowed_keys = {str(key) for key in workflow.get("allowed_metric_keys", [])}
+    safe_metrics: Dict[str, str] = {}
+    for key in sorted(allowed_keys):
+        if key in metrics:
+            safe_metrics[key] = _safe_ai_approval_value(metrics.get(key))
+    return safe_metrics
+
+
+def build_telegram_ai_approval_message(
+    workflow_key: str,
+    protected_url: str,
+    metrics: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build a PHI-free Telegram AI approval message with only a protected link."""
+
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    safe_metrics = _safe_ai_approval_metrics(workflow, metrics)
+    lines = [
+        str(workflow["telegram_title"]),
+        "",
+        str(workflow["telegram_body"]),
+        "Telegram does not show diagnosis, EMR text, documents, or internal IDs.",
+    ]
+    if safe_metrics:
+        lines.append("")
+        lines.append("Safe metrics:")
+        for key, value in safe_metrics.items():
+            lines.append(f"- {key}: {value}")
+
+    return {
+        "workflow_key": str(workflow_key).strip().lower(),
+        "text": "\n".join(lines),
+        "reply_markup": {
+            "inline_keyboard": [
+                [{"text": "Open protected clinic app", "url": protected_url}]
+            ]
+        },
+        "protected_route": workflow["protected_route"],
+        "safe_metric_keys": sorted(safe_metrics),
+        "contains_plain_chat_medical_content": False,
+        "autonomous_mutation_allowed": False,
+        "requires_human_confirmation": True,
+    }
+
+
+def _build_telegram_ai_approval_status() -> Dict[str, Any]:
+    return {
+        **TELEGRAM_AI_APPROVAL_CONTRACT,
+        "workflow_count": len(TELEGRAM_AI_APPROVAL_WORKFLOWS),
+        "runtime_guardrails": [
+            "protected_link_only",
+            "safe_metric_allowlist",
+            "hash_only_target_reference",
+            "accepted_rejected_outcome_audit",
+            "no_autonomous_domain_mutation",
+        ],
+    }
+
+
+def _assert_ai_approval_role_allowed(
+    workflow: Dict[str, Any],
+    role: Any,
+    *,
+    role_field: str,
+) -> None:
+    normalized_role = _normalize_staff_role(role)
+    allowed_roles = {
+        _normalize_staff_role(item) for item in workflow.get(role_field, [])
+    }
+    if normalized_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="role_not_allowed_for_ai_approval_workflow",
+        )
+
+
+def _normalize_ai_approval_outcome(outcome: Any) -> str:
+    normalized = str(outcome or "").strip().lower()
+    if normalized not in TELEGRAM_AI_APPROVAL_OUTCOMES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_ai_approval_outcome",
+        )
+    return normalized
+
+
+def _normalize_ai_approval_reason_code(reason_code: Any) -> str | None:
+    normalized = str(reason_code or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in TELEGRAM_AI_APPROVAL_REASON_CODES:
+        return "other"
+    return normalized
+
+
 class StaffActionConfirmRequest(BaseModel):
     entry_id: int | None = None
     visit_id: int | None = None
@@ -1329,6 +1585,20 @@ class StaffActionConfirmRequest(BaseModel):
     end_time: time | None = None
     breaks: list[dict[str, str]] | None = None
     active: bool | None = None
+
+
+class TelegramAiApprovalAlertRequest(BaseModel):
+    workflow_key: str
+    recipient_user_id: int
+    target_reference: str | None = None
+    metrics: Dict[str, Any] | None = None
+
+
+class TelegramAiApprovalOutcomeRequest(BaseModel):
+    workflow_key: str
+    outcome: str
+    target_reference: str | None = None
+    reason_code: str | None = None
 
 
 def _staff_state_change_operation_by_key(operation_key: str) -> Dict[str, Any] | None:
@@ -1420,6 +1690,205 @@ def _validate_staff_action_target_request(
             return "schedule_change_required"
         return None
     return "command_executor_not_supported"
+
+
+@router.post("/telegram/ai-approval-alerts")
+async def send_telegram_ai_approval_alert(
+    request: TelegramAiApprovalAlertRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Owner",
+            "Doctor",
+            "admin",
+            "registrar",
+            "cashier",
+            "owner",
+            "doctor",
+        )
+    ),
+) -> Dict[str, Any]:
+    """Send one safe AI approval alert to a linked staff Telegram chat."""
+
+    workflow_key = str(request.workflow_key or "").strip().lower()
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    recipient_user = db.query(User).filter(User.id == request.recipient_user_id).first()
+    if not recipient_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ai_approval_recipient_not_found",
+        )
+    _assert_ai_approval_role_allowed(
+        workflow,
+        getattr(recipient_user, "role", None),
+        role_field="recipient_roles",
+    )
+
+    telegram_user = crud_telegram.get_telegram_user_by_linked_user_id(
+        db, request.recipient_user_id
+    )
+    if (
+        not telegram_user
+        or not bool(getattr(telegram_user, "active", False))
+        or bool(getattr(telegram_user, "blocked", False))
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="linked_staff_telegram_chat_not_found",
+        )
+
+    protected_url = _protected_frontend_url(str(workflow["protected_route"]))
+    if not protected_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="protected_frontend_url_not_configured",
+        )
+
+    message = build_telegram_ai_approval_message(
+        workflow_key,
+        protected_url,
+        request.metrics,
+    )
+    bot_service = await get_telegram_bot_service()
+    if not bool(getattr(bot_service, "active", False)):
+        await bot_service.initialize(db)
+    if not getattr(bot_service, "bot_token", None):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="telegram_bot_token_not_configured",
+        )
+
+    success = bool(
+        await bot_service._send_message(
+            int(telegram_user.chat_id),
+            message["text"],
+            message["reply_markup"],
+        )
+    )
+    target_reference_hash = (
+        _telegram_ai_approval_reference_hash(request.target_reference)
+        if request.target_reference
+        else None
+    )
+    crud_audit.log(
+        db,
+        action=(
+            "telegram_ai_approval_notification_sent"
+            if success
+            else "telegram_ai_approval_notification_failed"
+        ),
+        entity_type="telegram_ai_approval",
+        entity_id=None,
+        actor_user_id=current_user.id,
+        payload={
+            "workflow_key": workflow_key,
+            "notification_type": workflow["notification_type"],
+            "recipient_user_id": request.recipient_user_id,
+            "recipient_role": _normalize_staff_role(getattr(recipient_user, "role", None)),
+            "target_reference_hash": target_reference_hash,
+            "safe_metric_keys": message["safe_metric_keys"],
+            "telegram_user_id_hash": _staff_runtime_reference_hash(
+                "telegram_chat", telegram_user.chat_id
+            ),
+            "plain_chat_medical_content_allowed": False,
+            "contains_plain_chat_medical_content": False,
+            "autonomous_mutation_allowed": False,
+            "domain_mutation": False,
+            "requires_human_confirmation": True,
+            "protected_route": workflow["protected_route"],
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+    db.commit()
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="telegram_ai_approval_notification_send_failed",
+        )
+
+    return {
+        "success": True,
+        "workflow_key": workflow_key,
+        "recipient_user_id": request.recipient_user_id,
+        "protected_route": workflow["protected_route"],
+        "safe_metric_keys": message["safe_metric_keys"],
+        "plain_chat_medical_content_allowed": False,
+        "autonomous_mutation_allowed": False,
+    }
+
+
+@router.post("/telegram/ai-approval-outcomes")
+def capture_telegram_ai_approval_outcome(
+    request: TelegramAiApprovalOutcomeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Owner",
+            "Doctor",
+            "admin",
+            "registrar",
+            "cashier",
+            "owner",
+            "doctor",
+        )
+    ),
+) -> Dict[str, Any]:
+    """Capture human accepted/rejected feedback without mutating domain state."""
+
+    workflow_key = str(request.workflow_key or "").strip().lower()
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    _assert_ai_approval_role_allowed(
+        workflow,
+        getattr(current_user, "role", None),
+        role_field="outcome_roles",
+    )
+    outcome = _normalize_ai_approval_outcome(request.outcome)
+    reason_code = _normalize_ai_approval_reason_code(request.reason_code)
+    target_reference_hash = (
+        _telegram_ai_approval_reference_hash(request.target_reference)
+        if request.target_reference
+        else None
+    )
+
+    crud_audit.log(
+        db,
+        action="telegram_ai_approval_outcome_recorded",
+        entity_type="telegram_ai_approval",
+        entity_id=None,
+        actor_user_id=current_user.id,
+        payload={
+            "workflow_key": workflow_key,
+            "notification_type": workflow["notification_type"],
+            "outcome": outcome,
+            "reason_code": reason_code,
+            "actor_role": _normalize_staff_role(getattr(current_user, "role", None)),
+            "target_reference_hash": target_reference_hash,
+            "plain_chat_medical_content_allowed": False,
+            "contains_plain_chat_medical_content": False,
+            "autonomous_mutation_allowed": False,
+            "domain_mutation": False,
+            "requires_human_confirmation": True,
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+    db.commit()
+
+    return {
+        "success": True,
+        "workflow_key": workflow_key,
+        "outcome": outcome,
+        "reason_code": reason_code,
+        "target_reference_hash": target_reference_hash,
+        "plain_chat_medical_content_allowed": False,
+        "autonomous_mutation_allowed": False,
+        "domain_mutation": False,
+    }
 
 
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm")
@@ -2388,6 +2857,8 @@ def get_telegram_integration_status(
                 "patient_language_notification_settings",
                 "lab_results_pdf",
                 "staff_link_start_token_handler",
+                "telegram_ai_approval_notifications",
+                "telegram_ai_approval_outcome_capture",
             ],
             "planned_functions": [
                 "dedicated_staff_bot_token_readiness_contract",
@@ -2407,6 +2878,7 @@ def get_telegram_integration_status(
                 "staff_audit_logging",
                 "admin_notifications",
             ],
+            "ai_approval": _build_telegram_ai_approval_status(),
             "patient_bot": {
                 "version": "v1",
                 "transport": "polling" if not webhook_set else "webhook",

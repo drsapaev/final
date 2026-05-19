@@ -349,15 +349,15 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 6: AI assistant approval flows
 
-- [ ] Status: not implemented as Telegram approval runtime. Read-only summaries do not count as AI approval workflows.
-- [ ] Add doctor draft review notification that links to protected EMR, not plain-chat medical content.
-- [ ] Capture doctor accepted/rejected outcome for AI draft feedback.
-- [ ] Add queue overload suggestion alerts for admin/registrar with protected dashboard links.
-- [ ] Add payment anomaly alerts for cashier/admin with protected dashboard links.
-- [ ] Add owner daily AI summary with safe high-level operational metrics only.
-- [ ] Capture accepted/rejected admin outcomes for future workflow quality.
-- [ ] Ensure AI workflow orchestration cannot autonomously mutate medical, queue, payment, or schedule state without human confirmation.
-- [ ] Add tests for no diagnosis/full EMR leakage in AI Telegram messages.
+- [x] Status: complete for the first protected Telegram AI approval runtime. `backend/app/api/v1/endpoints/admin_telegram.py` now publishes a Phase 6 AI approval contract, sends safe staff Telegram approval alerts that link only to protected app routes, captures accepted/rejected outcomes in hash-only audit payloads, and keeps Telegram AI flows non-mutating; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Add doctor draft review notification that links to protected EMR, not plain-chat medical content: `POST /api/v1/admin/telegram/ai-approval-alerts` supports `doctor_draft_review`, sends a safe Telegram alert to the linked doctor chat, and links to the protected doctor AI/EMR surface without diagnosis, EMR text, patient name, documents, or raw target identifiers; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Capture doctor accepted/rejected outcome for AI draft feedback: `POST /api/v1/admin/telegram/ai-approval-outcomes` records `accepted`/`rejected` doctor feedback as `telegram_ai_approval_outcome_recorded` audit data with only safe workflow metadata and target-reference hashes; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Add queue overload suggestion alerts for admin/registrar with protected dashboard links: the `queue_overload_alert` workflow allows only queue aggregate metrics and links to the protected registrar queue dashboard; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Add payment anomaly alerts for cashier/admin with protected dashboard links: the `payment_anomaly_alert` workflow allows only payment aggregate/reconciliation metrics and links to the protected cashier payment dashboard; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Add owner daily AI summary with safe high-level operational metrics only: the `owner_daily_summary` workflow allows only high-level operational counters/totals and links to protected admin analytics; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Capture accepted/rejected admin outcomes for future workflow quality: the shared outcome endpoint accepts admin/registrar/cashier/owner outcomes for non-medical workflows and stores sanitized reason codes without free-text leakage; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Ensure AI workflow orchestration cannot autonomously mutate medical, queue, payment, or schedule state without human confirmation: the contract sets `autonomous_mutation_allowed=false`, the alert endpoint only sends Telegram messages, and the outcome endpoint only writes audit records; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
+- [x] Add tests for no diagnosis/full EMR leakage in AI Telegram messages: `backend/tests/unit/test_telegram_ai_approval_flows.py` covers safe message building, protected alert sending, hash-only audit storage, accepted/rejected outcome capture, and the no-autonomous-mutation contract.
 
 ## Continuous Plan Improvement Automation
 
@@ -401,4 +401,4 @@ Runtime acceptance still open:
 - [x] Phase 3 is complete after real payment entry and provider reconciliation alerts are verified.
 - [x] Phase 4 is complete after confirmed non-medical staff state-changing actions are enabled action by action with idempotency and audit; medical document publishing remains deferred to the protected medical approval workflow.
 - [x] Phase 5 is complete after Mini App `initData` validation and protected patient flows are implemented.
-- [ ] Phase 6 is complete after AI approval flows capture accepted/rejected outcomes without exposing medical details in plain chat.
+- [x] Phase 6 is complete after AI approval flows capture accepted/rejected outcomes without exposing medical details in plain chat; covered by `backend/tests/unit/test_telegram_ai_approval_flows.py`.
