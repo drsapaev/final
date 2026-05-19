@@ -2832,6 +2832,7 @@ async def _set_notification_consent(
 ) -> None:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
     language = _normalize_patient_language(getattr(telegram_user, "language_code", None))
+    previous_template_key = _latest_patient_bot_template_key(db, chat_id)
     if telegram_user:
         telegram_user.notifications_enabled = enabled
         telegram_user.appointment_reminders = enabled
@@ -2840,13 +2841,26 @@ async def _set_notification_consent(
         db.commit()
 
     result_key = "notifications_enabled" if enabled else "notifications_disabled"
+    settings_context = previous_template_key in {
+        "telegram_patient_settings",
+        "telegram_patient_settings_language_selected",
+        "telegram_patient_settings_notifications_enabled",
+        "telegram_patient_settings_notifications_disabled",
+    }
+    reply_text = _localized_text(result_key, language)
+    reply_markup = _localized_main_menu(language)
+    template_key = f"telegram_patient_{result_key}"
+    if settings_context:
+        reply_text = f"{reply_text}\n\n{_telegram_settings_message(db, chat_id)}"
+        reply_markup = _localized_settings_menu(language)
+        template_key = f"telegram_patient_settings_{result_key}"
     await _send_patient_bot_reply(
         db,
         bot_service,
         chat_id,
-        _localized_text(result_key, language),
-        _localized_main_menu(language),
-        f"telegram_patient_{result_key}",
+        reply_text,
+        reply_markup,
+        template_key,
     )
 
 
