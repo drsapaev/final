@@ -57,15 +57,16 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "payload": {
             "description": (
                 "KosMed Clinic: запись, очередь, оплаты, уведомления и готовые "
-                "результаты для пациентов. Для привязки используйте QR с чека "
-                "или кнопку телефона."
+                "результаты для пациентов. В меню также видны будущие безопасные "
+                "разделы: анкеты, документы, врачи и кабинет. Для привязки "
+                "используйте QR с чека или кнопку телефона."
             )
         },
     },
     {
         "method": "setMyShortDescription",
         "payload": {
-            "short_description": "Очередь, визиты, оплаты и результаты KosMed Clinic."
+            "short_description": "Очередь, визиты, оплаты, результаты и сервисы KosMed Clinic."
         },
     },
     {
@@ -77,8 +78,9 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "payload": {
             "description": (
                 "KosMed Clinic: qabul, navbat, to'lovlar, xabarnomalar va tayyor "
-                "natijalar. Bog'lash uchun chekdagi QR kod yoki telefon tugmasidan "
-                "foydalaning."
+                "natijalar. Menyuda kelajakdagi xavfsiz bo'limlar ham ko'rinadi: "
+                "anketalar, hujjatlar, shifokorlar va kabinet. Bog'lash uchun "
+                "chekdagi QR kod yoki telefon tugmasidan foydalaning."
             ),
             "language_code": "uz",
         },
@@ -87,7 +89,7 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "method": "setMyShortDescription",
         "payload": {
             "short_description": (
-                "KosMed Clinic navbat, tashriflar, to'lovlar va natijalar."
+                "KosMed Clinic navbat, tashriflar, to'lovlar, natijalar va servislar."
             ),
             "language_code": "uz",
         },
