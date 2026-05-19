@@ -37,8 +37,8 @@ PATIENT_PAYMENT_ENTRY_CONTRACT = {
     "contract_version": "patient-payment-entry-v1",
     "route": PATIENT_PAYMENT_ENTRY_ROUTE,
     "surface": "protected_app",
-    "auth": "role-scoped",
-    "required_role": "Patient",
+    "auth": "authenticated",
+    "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
 }
