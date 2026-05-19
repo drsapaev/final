@@ -1884,14 +1884,11 @@ def get_telegram_integration_status(
                 "default_language": "ru",
                 "onboarding": "language_choice_then_contact_link",
                 "commands": [
-                    {"command": "/book", "label": "Записаться на приём"},
-                    {"command": "/queue", "label": "Моя очередь"},
-                    {"command": "/payments", "label": "Оплаты и долг"},
-                    {"command": "/results", "label": "PDF-результаты"},
-                    {"command": "/profile", "label": "Мой статус"},
-                    {"command": "/settings", "label": "Язык и уведомления"},
-                    {"command": "/support", "label": "Связаться с клиникой"},
-                    {"command": "/help", "label": "Помощь"},
+                    {
+                        "command": f"/{command['command']}",
+                        "label": command["description"],
+                    }
+                    for command in PATIENT_BOT_COMMANDS_RU
                 ],
                 "features": [
                     {
@@ -1910,8 +1907,18 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
+                        "key": "patient_services_menu",
+                        "label": "Видимая карта функций бота",
+                        "enabled": bool(bot_token),
+                    },
+                    {
                         "key": "patient_queue",
                         "label": "Очередь пациента на сегодня",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_visits",
+                        "label": "Мои визиты без медицинских деталей",
                         "enabled": bool(bot_token),
                     },
                     {
@@ -1931,6 +1938,26 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
+                        "key": "patient_forms_placeholder",
+                        "label": "Анкеты пациента: безопасная заглушка Mini App",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_documents_placeholder",
+                        "label": "Документы и чеки: будущий защищенный кабинет",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "doctor_schedule_placeholder",
+                        "label": "Врачи и расписание: безопасная подсказка",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_cabinet_placeholder",
+                        "label": "Кабинет пациента: будущий защищенный вход",
+                        "enabled": bool(bot_token),
+                    },
+                    {
                         "key": "patient_language_notification_settings",
                         "label": "Настройки языка и уведомлений",
                         "enabled": bool(bot_token),
@@ -1938,6 +1965,11 @@ def get_telegram_integration_status(
                     {
                         "key": "patient_support_contact",
                         "label": "Безопасная связь с клиникой",
+                        "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "staff_entry_placeholder",
+                        "label": "Режим сотрудника: вход по персональной ссылке",
                         "enabled": bool(bot_token),
                     },
                 ],

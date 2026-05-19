@@ -26,27 +26,39 @@ MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
 PATIENT_BOT_COMMANDS_RU = [
     {"command": "start", "description": "Начать"},
     {"command": "menu", "description": "Главное меню"},
+    {"command": "services", "description": "Все функции бота"},
     {"command": "book", "description": "Записаться на приём"},
     {"command": "queue", "description": "Моя очередь"},
     {"command": "visits", "description": "Мои визиты"},
     {"command": "payments", "description": "Оплаты и долг"},
     {"command": "results", "description": "Результаты"},
+    {"command": "forms", "description": "Анкеты пациента"},
+    {"command": "documents", "description": "Документы и чеки"},
+    {"command": "doctors", "description": "Врачи и расписание"},
+    {"command": "cabinet", "description": "Кабинет пациента"},
     {"command": "profile", "description": "Мой статус"},
     {"command": "settings", "description": "Язык и уведомления"},
     {"command": "support", "description": "Связаться с клиникой"},
+    {"command": "staff", "description": "Режим сотрудника"},
     {"command": "help", "description": "Помощь"},
 ]
 PATIENT_BOT_COMMANDS_UZ = [
     {"command": "start", "description": "Boshlash"},
     {"command": "menu", "description": "Asosiy menyu"},
+    {"command": "services", "description": "Bot funksiyalari"},
     {"command": "book", "description": "Qabulga yozilish"},
     {"command": "queue", "description": "Mening navbatim"},
     {"command": "visits", "description": "Mening tashriflarim"},
     {"command": "payments", "description": "To'lovlar va qarz"},
     {"command": "results", "description": "Natijalar"},
+    {"command": "forms", "description": "Bemor anketalari"},
+    {"command": "documents", "description": "Hujjatlar va cheklar"},
+    {"command": "doctors", "description": "Shifokorlar jadvali"},
+    {"command": "cabinet", "description": "Bemor kabineti"},
     {"command": "profile", "description": "Mening holatim"},
     {"command": "settings", "description": "Til va xabarnomalar"},
     {"command": "support", "description": "Klinika bilan aloqa"},
+    {"command": "staff", "description": "Xodim rejimi"},
     {"command": "help", "description": "Yordam"},
 ]
 PATIENT_BOT_MENU_BUTTON = {"type": "commands"}
@@ -57,15 +69,16 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "payload": {
             "description": (
                 "KosMed Clinic: запись, очередь, оплаты, уведомления и готовые "
-                "результаты для пациентов. Для привязки используйте QR с чека "
-                "или кнопку телефона."
+                "результаты для пациентов. В меню также видны будущие безопасные "
+                "разделы: анкеты, документы, врачи и кабинет. Для привязки "
+                "используйте QR с чека или кнопку телефона."
             )
         },
     },
     {
         "method": "setMyShortDescription",
         "payload": {
-            "short_description": "Очередь, визиты, оплаты и результаты KosMed Clinic."
+            "short_description": "Очередь, визиты, оплаты, результаты и сервисы KosMed Clinic."
         },
     },
     {
@@ -77,8 +90,9 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "payload": {
             "description": (
                 "KosMed Clinic: qabul, navbat, to'lovlar, xabarnomalar va tayyor "
-                "natijalar. Bog'lash uchun chekdagi QR kod yoki telefon tugmasidan "
-                "foydalaning."
+                "natijalar. Menyuda kelajakdagi xavfsiz bo'limlar ham ko'rinadi: "
+                "anketalar, hujjatlar, shifokorlar va kabinet. Bog'lash uchun "
+                "chekdagi QR kod yoki telefon tugmasidan foydalaning."
             ),
             "language_code": "uz",
         },
@@ -87,7 +101,7 @@ PATIENT_BOT_PROFILE_TEXTS = [
         "method": "setMyShortDescription",
         "payload": {
             "short_description": (
-                "KosMed Clinic navbat, tashriflar, to'lovlar va natijalar."
+                "KosMed Clinic navbat, tashriflar, to'lovlar, natijalar va servislar."
             ),
             "language_code": "uz",
         },

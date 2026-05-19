@@ -145,6 +145,9 @@ TELEGRAM_MAIN_MENU = {
         [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
         [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
         [{"text": "📲 Онлайн-сервисы"}],
+        [{"text": "📋 Анкеты пациента"}, {"text": "🧾 Документы и чеки"}],
+        [{"text": "🧑‍⚕️ Врачи и расписание"}, {"text": "📲 Кабинет пациента"}],
+        [{"text": "👥 Режим сотрудника"}],
         [{"text": "👤 Мой статус"}, {"text": "⚙️ Настройки"}],
         [{"text": "☎️ Связаться с клиникой"}, {"text": "❓ Помощь"}],
     ],
@@ -179,6 +182,9 @@ TELEGRAM_MAIN_MENUS = {
             [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
             [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
             [{"text": "📲 Onlayn xizmatlar"}],
+            [{"text": "📋 Bemor anketalari"}, {"text": "🧾 Hujjatlar va cheklar"}],
+            [{"text": "🧑‍⚕️ Shifokorlar jadvali"}, {"text": "📲 Bemor kabineti"}],
+            [{"text": "👥 Xodim rejimi"}],
             [{"text": "👤 Mening holatim"}, {"text": "⚙️ Sozlamalar"}],
             [{"text": "☎️ Klinikaga bog'lanish"}, {"text": "❓ Yordam"}],
         ],
@@ -190,9 +196,11 @@ TELEGRAM_PATIENT_SERVICES_MENUS = {
     TELEGRAM_LANGUAGE_RU: {
         "keyboard": [
             [{"text": "🏥 Записаться на приём"}],
+            [{"text": "🎫 Моя очередь"}, {"text": "📅 Мои визиты"}],
             [{"text": "💳 Оплаты и долг"}, {"text": "📄 Результаты"}],
             [{"text": "📋 Анкеты пациента"}, {"text": "🧾 Документы и чеки"}],
             [{"text": "🧑‍⚕️ Врачи и расписание"}, {"text": "📲 Кабинет пациента"}],
+            [{"text": "👥 Режим сотрудника"}],
             [{"text": "⬅️ Главное меню"}],
         ],
         "resize_keyboard": True,
@@ -201,9 +209,11 @@ TELEGRAM_PATIENT_SERVICES_MENUS = {
     TELEGRAM_LANGUAGE_UZ: {
         "keyboard": [
             [{"text": "🏥 Qabulga yozilish"}],
+            [{"text": "🎫 Mening navbatim"}, {"text": "📅 Mening tashriflarim"}],
             [{"text": "💳 To'lovlar va qarz"}, {"text": "📄 Natijalar"}],
             [{"text": "📋 Bemor anketalari"}, {"text": "🧾 Hujjatlar va cheklar"}],
             [{"text": "🧑‍⚕️ Shifokorlar jadvali"}, {"text": "📲 Bemor kabineti"}],
+            [{"text": "👥 Xodim rejimi"}],
             [{"text": "⬅️ Asosiy menyu"}],
         ],
         "resize_keyboard": True,
@@ -372,11 +382,17 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
             "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
             "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
-            "📲 Онлайн-сервисы - видимые кнопки подключенных и будущих защищенных функций.\n"
+            "📲 Онлайн-сервисы - карта подключенных и будущих защищенных функций.\n"
+            "📋 Анкеты пациента - безопасная заглушка до подключения Mini App.\n"
+            "🧾 Документы и чеки - безопасный вход к будущему кабинету документов.\n"
+            "🧑‍⚕️ Врачи и расписание - пока только подсказка, запись через регистратуру.\n"
+            "📲 Кабинет пациента - будущий защищенный вход, без медданных в чате.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
-            "⚙️ Настройки - язык и уведомления.\n\n"
+            "⚙️ Настройки - язык и уведомления.\n"
+            "👥 Режим сотрудника - вход только по персональной ссылке администратора или /staff.\n\n"
             "☎️ Связаться с клиникой - безопасная подсказка, куда обращаться по записи, кассе и срочным вопросам.\n\n"
-            "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
+            "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
+            "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
             "Для привязки отсканируйте QR с чека или нажмите "
             "\"Поделиться номером\".\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
@@ -391,11 +407,17 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
             "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
             "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
-            "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar tugmalari.\n"
+            "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar xaritasi.\n"
+            "📋 Bemor anketalari - Mini App ulanmaguncha xavfsiz izoh.\n"
+            "🧾 Hujjatlar va cheklar - kelajakdagi himoyalangan hujjatlar kabineti kirishi.\n"
+            "🧑‍⚕️ Shifokorlar jadvali - hozircha izoh, yozilish registratura orqali.\n"
+            "📲 Bemor kabineti - kelajakdagi himoyalangan kirish, chatda tibbiy ma'lumotsiz.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
-            "⚙️ Sozlamalar - til va xabarnomalar.\n\n"
+            "⚙️ Sozlamalar - til va xabarnomalar.\n"
+            "👥 Xodim rejimi - faqat administrator bergan shaxsiy havola yoki /staff orqali.\n\n"
             "☎️ Klinikaga bog'lanish - yozilish, kassa va shoshilinch savollar bo'yicha xavfsiz yo'l-yo'riq.\n\n"
-            "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, /profile, /settings, /support, /help.\n\n"
+            "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
+            "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
@@ -502,6 +524,26 @@ TELEGRAM_LOCALIZED_TEXTS = {
             "Telegram uchun umumiy bemor kabineti kirishi hali yoqilmagan. Hozir menyuda "
             "navbat, tashriflar, to'lovlar va tayyor natijalar xavfsiz ko'rsatiladi. "
             "To'lov tugmasi klinikada sozlanganda himoyalangan yo'lni ochadi."
+        ),
+    },
+    "staff_entry": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Режим сотрудника\n\n"
+            "Доступ для регистратора, врача, кассира, лаборатории и администратора "
+            "включается только через персональную ссылку администратора или команду /staff "
+            "после привязки сотрудника.\n\n"
+            "В пациентском чате бот не выполняет внутренние действия клиники. Доступные "
+            "staff-разделы остаются read-only, а вызов пациента, пропуск, перенос визита, "
+            "возвраты и публикация документов требуют отдельного подтверждения в системе."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Xodim rejimi\n\n"
+            "Registrator, shifokor, kassir, laboratoriya va administrator kirishi faqat "
+            "administrator bergan shaxsiy havola yoki xodim bog'langandan keyin /staff "
+            "buyrug'i orqali yoqiladi.\n\n"
+            "Bemor chatida bot klinikaning ichki amallarini bajarmaydi. Mavjud staff "
+            "bo'limlari read-only, bemorni chaqirish, o'tkazib yuborish, tashrifni ko'chirish, "
+            "qaytarim va hujjat chiqarish esa tizimda alohida tasdiq talab qiladi."
         ),
     },
     "support": {
@@ -905,21 +947,9 @@ def _localized_settings_menu(language_code: Any) -> Dict[str, Any]:
     )
     main_keyboard = _localized_main_menu(language).get("keyboard", [])
     settings_keyboard = settings_menu.get("keyboard", [])
-    contact_rows = main_keyboard[:1]
-    extra_rows = []
-    if len(main_keyboard) > 3:
-        extra_rows.append(main_keyboard[3])
-    if len(main_keyboard) > 4 and main_keyboard[4]:
-        extra_rows.append([main_keyboard[4][0]])
     return {
         **settings_menu,
-        "keyboard": (
-            settings_keyboard[:2]
-            + contact_rows
-            + settings_keyboard[2:4]
-            + extra_rows
-            + settings_keyboard[4:]
-        ),
+        "keyboard": settings_keyboard[:2] + main_keyboard,
     }
 
 
@@ -965,6 +995,7 @@ TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES = (
     "📋",
     "🧾",
     "🧑‍⚕",
+    "👥",
     "⚙",
     "❓",
     "☎",
@@ -3557,6 +3588,17 @@ async def _handle_clinic_bot_update(
             "telegram_patient_cabinet_placeholder",
         )
 
+    async def staff_entry_handler(chat_id: int) -> None:
+        language = _telegram_chat_language(db, chat_id)
+        await _send_patient_bot_reply(
+            db,
+            bot_service,
+            chat_id,
+            _localized_text("staff_entry", language),
+            _localized_main_menu(language),
+            "telegram_patient_staff_entry_placeholder",
+        )
+
     async def support_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
         await _send_patient_bot_reply(
@@ -3613,11 +3655,14 @@ async def _handle_clinic_bot_update(
             ("🧾 Документы и чеки", patient_documents_handler),
             ("🧑‍⚕️ Врачи и расписание", doctor_schedule_handler),
             ("📲 Кабинет пациента", patient_cabinet_handler),
+            ("👥 Режим сотрудника", staff_entry_handler),
             ("⬅️ Главное меню", menu_handler),
             ("☎️ Связаться с клиникой", support_handler),
             ("меню", menu_handler),
             ("menu", menu_handler),
             ("menyu", menu_handler),
+            ("staff", staff_entry_handler),
+            ("сотрудник", staff_entry_handler),
             ("🇷🇺 Русский", russian_language_handler),
             ("🇺🇿 O'zbekcha", uzbek_language_handler),
             ("ozbekcha", uzbek_language_handler),
@@ -3640,10 +3685,12 @@ async def _handle_clinic_bot_update(
             ("🧾 Hujjatlar va cheklar", patient_documents_handler),
             ("🧑‍⚕️ Shifokorlar jadvali", doctor_schedule_handler),
             ("📲 Bemor kabineti", patient_cabinet_handler),
+            ("👥 Xodim rejimi", staff_entry_handler),
             ("⬅️ Asosiy menyu", menu_handler),
             ("☎️ Klinikaga bog'lanish", support_handler),
             ("Menyu", menu_handler),
             ("Asosiy menyu", menu_handler),
+            ("xodim", staff_entry_handler),
         ]
     )
 

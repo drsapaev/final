@@ -42,12 +42,17 @@ import {
   RefreshCw,
   CheckCircle,
   Calendar,
+  ClipboardList,
   CreditCard,
   FileText,
   Languages,
   Phone,
+  ReceiptText,
   ShieldCheck,
+  Smartphone,
+  Stethoscope,
   Ticket,
+  UserCog,
   UserCheck,
   Users } from
 
@@ -367,12 +372,28 @@ const TelegramManager = () => {
       detail: 'Показывает безопасный путь через регистратуру; визит из свободного текста не создаёт.'
     },
     {
+      key: 'services',
+      icon: Smartphone,
+      menu: '📲 Онлайн-сервисы',
+      command: '/services',
+      label: patientCommandLabel('/services', 'Все функции бота'),
+      detail: 'Открывает видимую карту подключённых и будущих функций, включая безопасные заглушки.'
+    },
+    {
       key: 'queue',
       icon: Ticket,
       menu: '🎫 Моя очередь',
       command: '/queue',
       label: patientCommandLabel('/queue', 'Моя очередь'),
       detail: 'Номер, кабинет, статус и позиция ожидания без изменения очереди.'
+    },
+    {
+      key: 'visits',
+      icon: Calendar,
+      menu: '📅 Мои визиты',
+      command: '/visits',
+      label: patientCommandLabel('/visits', 'Мои визиты'),
+      detail: 'Показывает последние и сегодняшние визиты без диагнозов, услуг и медицинских деталей.'
     },
     {
       key: 'payments',
@@ -391,6 +412,38 @@ const TelegramManager = () => {
       command: '/results',
       label: patientCommandLabel('/results', 'PDF-результаты'),
       detail: `До ${patientBot.max_pdf_reports_per_request || 3} готовых PDF только для привязанного пациента.`
+    },
+    {
+      key: 'forms',
+      icon: ClipboardList,
+      menu: '📋 Анкеты пациента',
+      command: '/forms',
+      label: patientCommandLabel('/forms', 'Анкеты пациента'),
+      detail: 'Видимая кнопка с безопасной заглушкой до подключения Mini App и защищённого кабинета.'
+    },
+    {
+      key: 'documents',
+      icon: ReceiptText,
+      menu: '🧾 Документы и чеки',
+      command: '/documents',
+      label: patientCommandLabel('/documents', 'Документы и чеки'),
+      detail: 'Будущий защищённый вход к чекам и документам; внутренние номера не отправляются в Telegram.'
+    },
+    {
+      key: 'doctors',
+      icon: Stethoscope,
+      menu: '🧑‍⚕️ Врачи и расписание',
+      command: '/doctors',
+      label: patientCommandLabel('/doctors', 'Врачи и расписание'),
+      detail: 'Пока показывает безопасную подсказку; запись и расписание остаются через регистратуру.'
+    },
+    {
+      key: 'cabinet',
+      icon: Smartphone,
+      menu: '📲 Кабинет пациента',
+      command: '/cabinet',
+      label: patientCommandLabel('/cabinet', 'Кабинет пациента'),
+      detail: 'Будущий защищённый вход к Mini App/кабинету, без приёма медицинских данных в чате.'
     },
     {
       key: 'profile',
@@ -415,6 +468,14 @@ const TelegramManager = () => {
       command: '/support',
       label: patientCommandLabel('/support', 'Связаться с клиникой'),
       detail: 'Подсказка для записи, кассы и срочных вопросов без медицинских данных в чате.'
+    },
+    {
+      key: 'staff',
+      icon: UserCog,
+      menu: '👥 Режим сотрудника',
+      command: '/staff',
+      label: patientCommandLabel('/staff', 'Режим сотрудника'),
+      detail: 'Видимый вход для сотрудников: только персональная ссылка администратора или привязанный staff-профиль.'
     }
   ];
   const staffCapabilitySummary = [
