@@ -7,14 +7,41 @@ import hmac
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qsl
+
+from sqlalchemy.orm import Session
+
+from app.crud import telegram_config as crud_telegram
+from app.models.patient import Patient
+from app.models.telegram_config import TelegramUser
+from app.models.user import User
 
 
 DEFAULT_MAX_AUTH_AGE_SECONDS = 24 * 60 * 60
 DEFAULT_MAX_FUTURE_SKEW_SECONDS = 60
 _HASH_FIELD = "hash"
 _AUTH_DATE_FIELD = "auth_date"
+_VALID_MINI_APP_SCOPES = {"patient", "staff"}
+_STAFF_MINI_APP_SUPPORTED_ROLES = frozenset(
+    {"admin", "owner", "doctor", "cashier", "lab", "registrar"}
+)
+_STAFF_ROLE_ALIASES = {
+    "administrator": "admin",
+    "super_admin": "admin",
+    "superadmin": "admin",
+    "admin": "admin",
+    "owner": "owner",
+    "doctor": "doctor",
+    "cashier": "cashier",
+    "lab": "lab",
+    "lab_tech": "lab",
+    "laboratory": "lab",
+    "registrar": "registrar",
+    "receptionist": "registrar",
+}
+
+TelegramMiniAppScopeType = Literal["patient", "staff"]
 
 
 class TelegramMiniAppInitDataError(ValueError):
@@ -33,6 +60,26 @@ class TelegramMiniAppInitData:
     auth_date: datetime
     age_seconds: int
     user: dict[str, Any] | None = None
+
+
+class TelegramMiniAppSessionScopeError(ValueError):
+    """Raised when validated Mini App initData has no trusted application scope."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class TelegramMiniAppSessionScope:
+    """Application identity scope bound to an existing Telegram account link."""
+
+    scope_type: TelegramMiniAppScopeType
+    telegram_user_id: int
+    telegram_chat_id: int
+    patient_id: int | None = None
+    staff_user_id: int | None = None
+    staff_role: str | None = None
 
 
 def _utc_now() -> datetime:
@@ -89,6 +136,83 @@ def _parse_user(value: str | None) -> dict[str, Any] | None:
     return parsed
 
 
+def _normalize_staff_role(role: Any) -> str:
+    role_key = str(role or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return _STAFF_ROLE_ALIASES.get(role_key, role_key)
+
+
+def _telegram_account_id(init_data: TelegramMiniAppInitData) -> int:
+    user = init_data.user
+    if not isinstance(user, dict):
+        raise TelegramMiniAppSessionScopeError("telegram_user_required")
+    try:
+        account_id = int(user.get("id"))
+    except (TypeError, ValueError) as exc:
+        raise TelegramMiniAppSessionScopeError("telegram_user_id_required") from exc
+    if account_id <= 0:
+        raise TelegramMiniAppSessionScopeError("telegram_user_id_required")
+    return account_id
+
+
+def _base_scope(
+    telegram_user: TelegramUser,
+    scope_type: TelegramMiniAppScopeType,
+    *,
+    patient_id: int | None = None,
+    staff_user_id: int | None = None,
+    staff_role: str | None = None,
+) -> TelegramMiniAppSessionScope:
+    return TelegramMiniAppSessionScope(
+        scope_type=scope_type,
+        telegram_user_id=int(telegram_user.id),
+        telegram_chat_id=int(telegram_user.chat_id),
+        patient_id=patient_id,
+        staff_user_id=staff_user_id,
+        staff_role=staff_role,
+    )
+
+
+def _patient_scope(
+    db: Session, telegram_user: TelegramUser
+) -> TelegramMiniAppSessionScope | None:
+    patient_id = getattr(telegram_user, "patient_id", None)
+    if not patient_id:
+        return None
+
+    patient = db.query(Patient).filter(Patient.id == int(patient_id)).first()
+    if not patient or getattr(patient, "is_deleted", False):
+        raise TelegramMiniAppSessionScopeError("patient_link_invalid")
+
+    return _base_scope(
+        telegram_user,
+        "patient",
+        patient_id=int(patient.id),
+    )
+
+
+def _staff_scope(
+    db: Session, telegram_user: TelegramUser
+) -> TelegramMiniAppSessionScope | None:
+    staff_user_id = getattr(telegram_user, "user_id", None)
+    if not staff_user_id:
+        return None
+
+    staff_user = db.query(User).filter(User.id == int(staff_user_id)).first()
+    if not staff_user or not getattr(staff_user, "is_active", False):
+        raise TelegramMiniAppSessionScopeError("staff_link_inactive")
+
+    staff_role = _normalize_staff_role(getattr(staff_user, "role", None))
+    if staff_role not in _STAFF_MINI_APP_SUPPORTED_ROLES:
+        raise TelegramMiniAppSessionScopeError("staff_role_not_allowed")
+
+    return _base_scope(
+        telegram_user,
+        "staff",
+        staff_user_id=int(staff_user.id),
+        staff_role=staff_role,
+    )
+
+
 def validate_telegram_mini_app_init_data(
     init_data: str,
     *,
@@ -135,3 +259,81 @@ def validate_telegram_mini_app_init_data(
         age_seconds=age_seconds,
         user=_parse_user(trusted_fields.get("user")),
     )
+
+
+def resolve_telegram_mini_app_session_scope(
+    db: Session,
+    init_data: TelegramMiniAppInitData,
+    *,
+    expected_scope: TelegramMiniAppScopeType | None = None,
+) -> TelegramMiniAppSessionScope:
+    """Resolve validated Mini App identity to a linked patient or staff account."""
+
+    if expected_scope is not None and expected_scope not in _VALID_MINI_APP_SCOPES:
+        raise TelegramMiniAppSessionScopeError("invalid_expected_scope")
+
+    telegram_account_id = _telegram_account_id(init_data)
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+        db,
+        telegram_account_id,
+    )
+    if not telegram_user:
+        raise TelegramMiniAppSessionScopeError("telegram_link_required")
+    if not getattr(telegram_user, "active", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_inactive")
+    if getattr(telegram_user, "blocked", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_blocked")
+
+    if expected_scope == "patient":
+        scope = _patient_scope(db, telegram_user)
+        if not scope:
+            raise TelegramMiniAppSessionScopeError("patient_scope_required")
+        return scope
+
+    if expected_scope == "staff":
+        scope = _staff_scope(db, telegram_user)
+        if not scope:
+            raise TelegramMiniAppSessionScopeError("staff_scope_required")
+        return scope
+
+    patient_scope = _patient_scope(db, telegram_user)
+    staff_scope = _staff_scope(db, telegram_user)
+    if patient_scope and staff_scope:
+        raise TelegramMiniAppSessionScopeError("ambiguous_scope")
+    if patient_scope:
+        return patient_scope
+    if staff_scope:
+        return staff_scope
+
+    raise TelegramMiniAppSessionScopeError("linked_identity_required")
+
+
+def require_telegram_mini_app_patient_scope(
+    scope: TelegramMiniAppSessionScope,
+    *,
+    patient_id: int,
+) -> TelegramMiniAppSessionScope:
+    """Require that a Mini App scope belongs to one concrete linked patient."""
+
+    if scope.scope_type != "patient" or scope.patient_id is None:
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+    if int(scope.patient_id) != int(patient_id):
+        raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+    return scope
+
+
+def require_telegram_mini_app_staff_scope(
+    scope: TelegramMiniAppSessionScope,
+    *,
+    allowed_roles: set[str] | frozenset[str] | None = None,
+) -> TelegramMiniAppSessionScope:
+    """Require that a Mini App scope belongs to an authenticated staff user."""
+
+    if scope.scope_type != "staff" or scope.staff_user_id is None:
+        raise TelegramMiniAppSessionScopeError("staff_scope_required")
+
+    if allowed_roles:
+        normalized_roles = {_normalize_staff_role(role) for role in allowed_roles}
+        if scope.staff_role not in normalized_roles:
+            raise TelegramMiniAppSessionScopeError("staff_role_denied")
+    return scope
