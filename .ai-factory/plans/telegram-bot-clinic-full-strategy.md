@@ -285,7 +285,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 4: Staff bot
 
-- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, hash-only idempotency binding for replay protection, and the required confirmed/completed/failed audit event contract are implemented; confirmed state-changing actions remain disabled until domain adapters and explicit action enablement are complete.
+- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, hash-only idempotency binding for replay protection, the required confirmed/completed/failed audit event contract, and queue adapter readiness metadata for `/call`, `/skip`, `/cancel_visit`, and `/move_visit` are implemented; confirmed state-changing actions remain disabled until domain adapters and explicit action enablement are complete.
 - [x] Role-based read-only menus exist for registrar, doctor, cashier, lab, admin, and owner/admin style users.
 - [x] Staff bot token is configured separately from the patient bot token.
 - [x] Staff linking is protected by server-side token validation.
@@ -294,7 +294,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Runtime guard blocks Telegram execution of state-changing staff commands until domain adapters and explicit action enablement are implemented.
 - [x] Add confirmation request flow for each state-changing action before mutation: `backend/app/api/v1/endpoints/telegram_webhook.py` now creates a hash-only `TelegramStaffConfirmationToken`, hash-only idempotency binding, and `staff_action_confirmation_requested` audit event for allowed state-changing staff commands, while keeping Telegram execution and domain mutation disabled; focused coverage is in `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_requests_confirmation_without_mutation`.
 - [x] Add idempotency keys or equivalent replay protection for confirmed staff actions: confirmation requests now persist `staff_action_idempotency:*` hash-only bindings, expose `idempotency_request_hash_runtime_enabled` in the staff bot contract, keep raw idempotency material out of Telegram/audit output, and rely on `TelegramStaffConfirmationTokenService.consume_for_confirmation(...)` single-use checks for future confirmed-action replay protection.
-- [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit.
+- [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit. Readiness metadata for `/call`, `/skip`, `/cancel_visit`, and `/move_visit` queue-flow adapters is published in `backend/app/api/v1/endpoints/admin_telegram.py`, but adapter runtime remains disabled and queue/visit mutation is still blocked.
 - [ ] Add domain service adapters for confirmed payment actions: status change, refund where policy allows it.
 - [ ] Add domain service adapters for confirmed schedule actions.
 - [ ] Add remaining audit events for confirmed, failed, and completed state-changing actions; confirmation-requested audit is implemented with `staff_action_confirmation_requested`, and the required future event taxonomy is published as `staff_action_confirmed`, `staff_action_completed`, and `staff_action_failed` in `backend/app/api/v1/endpoints/admin_telegram.py`, but action execution is still disabled.
