@@ -285,7 +285,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 4: Staff bot
 
-- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, and hash-only idempotency binding for replay protection are implemented; confirmed state-changing actions remain disabled until domain adapters and explicit action enablement are complete.
+- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, hash-only idempotency binding for replay protection, and the required confirmed/completed/failed audit event contract are implemented; confirmed state-changing actions remain disabled until domain adapters and explicit action enablement are complete.
 - [x] Role-based read-only menus exist for registrar, doctor, cashier, lab, admin, and owner/admin style users.
 - [x] Staff bot token is configured separately from the patient bot token.
 - [x] Staff linking is protected by server-side token validation.
@@ -297,7 +297,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit.
 - [ ] Add domain service adapters for confirmed payment actions: status change, refund where policy allows it.
 - [ ] Add domain service adapters for confirmed schedule actions.
-- [ ] Add remaining audit events for confirmed, failed, and completed state-changing actions; confirmation-requested audit is implemented with `staff_action_confirmation_requested`, but action execution is still disabled.
+- [ ] Add remaining audit events for confirmed, failed, and completed state-changing actions; confirmation-requested audit is implemented with `staff_action_confirmation_requested`, and the required future event taxonomy is published as `staff_action_confirmed`, `staff_action_completed`, and `staff_action_failed` in `backend/app/api/v1/endpoints/admin_telegram.py`, but action execution is still disabled.
 - [ ] Enable state-changing actions one by one behind explicit configuration and tests.
 - [ ] Add negative tests for unauthorized staff, stale confirmations, repeated confirmations, and cross-role action attempts.
   - [x] Unauthorized/cross-role state-changing command denial is covered by `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_denies_unauthorized_role`.
