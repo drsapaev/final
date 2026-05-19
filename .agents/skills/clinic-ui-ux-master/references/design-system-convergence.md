@@ -130,4 +130,3 @@ Bad component changes:
 4. One state system: empty/loading/error consistency.
 5. One component primitive: extract only after repeated usage is proven.
 6. Browser QA and screenshots.
-

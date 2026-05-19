@@ -30,6 +30,10 @@ Load only the reference needed for the current task:
 - `references/role-workflows.md`: for role-specific Admin, Doctor, Registrar, Cashier, Lab, Patient, queue, payment, EMR, and reporting work.
 - `references/design-system-convergence.md`: for inline-style, legacy-class, MUI, token, or component-layer cleanup.
 - `references/visual-qa-playbook.md`: for browser screenshots, viewport checks, console/network review, and re-verification.
+- `references/accessibility-hardening.md`: for WCAG, keyboard, focus, screen-reader, reduced-motion, and touch target reviews.
+- `references/react-performance-ux.md`: for React render, bundle, effects, state, and interaction performance that affects UX.
+- `references/runtime-performance-qa.md`: for Core Web Vitals, layout shift, network chains, Lighthouse/browser trace, and runtime UX checks.
+- `references/design-token-inventory.md`: for CSS/token extraction, palette/typography/spacing inventory, hardcoded value cleanup, and design-system evidence.
 - `references/implementation-slices.md`: for safe patch sizing, PR boundaries, validation, and stop conditions.
 - `references/anti-patterns.md`: for clinical UI mistakes to actively avoid.
 - `references/report-templates.md`: for audit, implementation, and visual QA report formats.

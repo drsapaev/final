@@ -68,4 +68,3 @@ Before accepting a UI patch, ask:
 - Did we improve clarity without adding a new system?
 - Can this be validated on the affected route?
 - Would a registrar/doctor/cashier/lab user understand the next action immediately?
-

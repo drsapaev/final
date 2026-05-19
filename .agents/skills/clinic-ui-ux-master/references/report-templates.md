@@ -106,4 +106,3 @@ Weak:
 ```markdown
 The admin UI has too much styling.
 ```
-

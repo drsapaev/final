@@ -105,4 +105,3 @@ When explaining why a recommendation exists, name the borrowed behavior:
 - `web-design-reviewer`: browser evidence
 - `design-audit`: phased audit
 - `ui-ux-pro-max`: broad rule matrix
-
