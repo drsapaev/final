@@ -144,6 +144,65 @@ async def test_send_appointment_reminder_unregistered_response_hides_patient_pho
 
 
 @pytest.mark.asyncio
+async def test_send_appointment_reminder_respects_notification_preferences(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    appointment = SimpleNamespace(id=456, patient_id=123)
+    telegram_user = SimpleNamespace(
+        chat_id=998877,
+        language_code="ru",
+        notifications_enabled=True,
+        appointment_reminders=False,
+    )
+    get_bot_service = AsyncMock()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_appointment,
+        "get_appointment",
+        lambda _db, _appointment_id: appointment,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        get_bot_service,
+    )
+
+    response = await telegram_notifications.send_appointment_reminder(
+        appointment_id=456,
+        reminder_type="24h",
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Registrar"),
+    )
+
+    assert response == {
+        "success": False,
+        "message": "Telegram notifications disabled by patient preference",
+    }
+    assert "+998901234567" not in str(response)
+    assert "Sensitive Patient" not in str(response)
+    assert "998877" not in str(response)
+    get_bot_service.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_send_lab_results_response_hides_patient_contact_metadata(monkeypatch):
     patient = SimpleNamespace(
         phone="+998901234567",
@@ -253,6 +312,56 @@ async def test_send_lab_results_unregistered_response_hides_patient_phone(
 
 
 @pytest.mark.asyncio
+async def test_send_lab_results_respects_notification_preferences(monkeypatch):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    telegram_user = SimpleNamespace(
+        chat_id=998877,
+        language_code="ru",
+        notifications_enabled=True,
+        lab_notifications=False,
+    )
+    get_bot_service = AsyncMock()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        get_bot_service,
+    )
+
+    response = await telegram_notifications.send_lab_results(
+        patient_id=123,
+        lab_result_ids=[456],
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Lab"),
+    )
+
+    assert response == {
+        "success": False,
+        "message": "Telegram notifications disabled by patient preference",
+    }
+    assert "+998901234567" not in str(response)
+    assert "Sensitive Patient" not in str(response)
+    assert "998877" not in str(response)
+    get_bot_service.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_send_payment_confirmation_response_hides_patient_contact_metadata(
     monkeypatch,
 ):
@@ -350,3 +459,54 @@ async def test_send_payment_confirmation_unregistered_response_hides_patient_pho
     assert "patient_phone" not in response
     assert "+998901234567" not in str(response)
     assert "Sensitive Patient" not in str(response)
+
+
+@pytest.mark.asyncio
+async def test_send_payment_confirmation_respects_global_notification_preference(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    telegram_user = SimpleNamespace(
+        chat_id=998877,
+        language_code="ru",
+        notifications_enabled=False,
+    )
+    get_bot_service = AsyncMock()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        get_bot_service,
+    )
+
+    response = await telegram_notifications.send_payment_confirmation(
+        patient_id=123,
+        payment_data={"amount": 125000, "transaction_id": "txn-secret"},
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Cashier"),
+    )
+
+    assert response == {
+        "success": False,
+        "message": "Telegram notifications disabled by patient preference",
+    }
+    assert "+998901234567" not in str(response)
+    assert "Sensitive Patient" not in str(response)
+    assert "998877" not in str(response)
+    get_bot_service.assert_not_awaited()
