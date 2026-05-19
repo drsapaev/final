@@ -23,6 +23,8 @@ from app.services.telegram_templates import get_telegram_templates_service
 
 router = APIRouter()
 
+PROTECTED_LAB_RESULTS_URL = "https://clinic.example.com/patient/lab-results"
+PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
 PROTECTED_PAYMENT_HISTORY_URL = "https://clinic.example.com/patient/payments"
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
 
@@ -37,6 +39,31 @@ def _telegram_notifications_disabled_response() -> Dict[str, Any]:
     return {
         "success": False,
         "message": "Telegram notifications disabled by patient preference",
+    }
+
+
+def _safe_lab_template_data(
+    patient: Any,
+    lab_results: List[Any],
+    templates_service: Any,
+    language: str,
+) -> Dict[str, Any]:
+    test_types = [result.test_code for result in lab_results]
+    has_abnormalities = any(
+        result.is_abnormal for result in lab_results if hasattr(result, "is_abnormal")
+    )
+    return {
+        "patient_name": patient.full_name,
+        "test_type": ", ".join(test_types),
+        "collection_date": lab_results[0].created_at.strftime("%d.%m.%Y"),
+        "ready_date": datetime.now().strftime("%d.%m.%Y"),
+        "has_abnormalities": has_abnormalities,
+        "abnormalities_text": templates_service.get_abnormalities_text(
+            has_abnormalities, language
+        ),
+        "download_link": PROTECTED_LAB_RESULTS_URL,
+        "doctor_id": PROTECTED_DOCTOR_CONTACT_REFERENCE,
+        "clinic_address": "г. Ташкент, ул. Медицинская, 15",
     }
 
 
@@ -190,25 +217,12 @@ async def send_lab_results(
         templates_service = get_telegram_templates_service()
 
         # Формируем данные для шаблона
-        test_types = [result.test_code for result in lab_results]
-        has_abnormalities = any(
-            result.is_abnormal
-            for result in lab_results
-            if hasattr(result, 'is_abnormal')
+        template_data = _safe_lab_template_data(
+            patient,
+            lab_results,
+            templates_service,
+            telegram_user.language_code or "ru",
         )
-
-        template_data = {
-            "patient_name": patient.full_name,
-            "test_type": ", ".join(test_types),
-            "collection_date": lab_results[0].created_at.strftime("%d.%m.%Y"),
-            "ready_date": datetime.now().strftime("%d.%m.%Y"),
-            "has_abnormalities": has_abnormalities,
-            "abnormalities_text": templates_service.get_abnormalities_text(
-                has_abnormalities, telegram_user.language_code or "ru"
-            ),
-            "download_link": f"https://clinic.example.com/lab-results/{patient_id}",
-            "doctor_id": lab_results[0].doctor_id,
-        }
 
         # Получаем шаблон
         template = templates_service.get_template(
