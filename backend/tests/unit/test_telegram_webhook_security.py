@@ -387,6 +387,49 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "patient_scope_required"}
         assert db_session.query(Appointment).count() == initial_appointments
 
+    def test_mini_app_booking_preview_endpoint_requires_configured_bot_token(
+        self,
+        client,
+        db_session,
+    ):
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(880204),
+                "appointmentDate": "2026-05-20",
+            },
+        )
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == {"reason": "bot_token_required"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_booking_preview_endpoint_maps_invalid_booking_field_to_400(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880205
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "appointmentDate": "2000-01-01",
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == {"reason": "appointment_date_in_past"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
     def test_send_message_requires_admin_auth(self, client):
         response = client.post(
             "/api/v1/telegram/send-message",
