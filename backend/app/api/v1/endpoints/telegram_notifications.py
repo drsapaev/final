@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+from app.api.v1.endpoints.admin_telegram import PATIENT_PAYMENT_ENTRY_ROUTE
 from app.core.config import settings
 from app.crud import (
     appointment as crud_appointment,
@@ -26,7 +27,7 @@ router = APIRouter()
 
 PROTECTED_LAB_RESULTS_URL = "https://clinic.example.com/patient/lab-results"
 PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
-PROTECTED_PAYMENT_HISTORY_PATH = "/patient"
+PROTECTED_PAYMENT_HISTORY_PATH = PATIENT_PAYMENT_ENTRY_ROUTE
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
 
 
