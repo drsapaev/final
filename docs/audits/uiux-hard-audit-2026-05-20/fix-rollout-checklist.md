@@ -23,8 +23,8 @@ Rules:
 - [x] PR-UX-8A: cardiology specialty slice merged.
 - [x] PR-UX-8B: dermatology specialty slice merged.
 - [x] PR-UX-8C: dentistry specialty slice merged.
-- [ ] PR-UX-9: MUI island policy and inventory merged.
-- [ ] Final: rollout completion summary merged.
+- [x] PR-UX-9: MUI island policy and inventory merged.
+- [x] Final: rollout completion summary merged.
 
 ## Current Defaults
 
@@ -34,8 +34,8 @@ Rules:
 
 ## Validation Baseline
 
-- [ ] `git diff --check`
-- [ ] docs-only diff for PR-0
-- [ ] frontend lint/build for frontend code PRs
-- [ ] targeted browser QA for changed UI routes
-- [ ] GitHub Actions green before merge
+- [x] `git diff --check`
+- [x] docs-only diff for PR-0
+- [x] frontend lint/build for frontend code PRs
+- [x] targeted browser QA for changed UI routes
+- [x] GitHub Actions green before merge
