@@ -200,6 +200,12 @@ const TelegramManager = () => {
     (feature) => feature?.key === 'patient_payments_protected_entry'
   );
   const patientPaymentEntryRoute = patientPaymentEntryFeature?.contract?.route || '/patient/payments';
+  const patientMiniAppManifestFeature = patientBotFeatures.find(
+    (feature) => feature?.key === 'patient_mini_app_manifest'
+  );
+  const patientMiniAppManifestEndpoint =
+    patientMiniAppManifestFeature?.contract?.endpoint ||
+    '/api/v1/telegram/mini-app/patient/manifest';
   const patientBotCommands = Array.isArray(patientBot.commands) ? patientBot.commands : [];
   const patientBotLanguages = Array.isArray(patientBot.supported_languages) ? patientBot.supported_languages : [];
   const staffBot = botStatus?.staff_bot || {};
@@ -377,7 +383,9 @@ const TelegramManager = () => {
       menu: '📲 Онлайн-сервисы',
       command: '/services',
       label: patientCommandLabel('/services', 'Все функции бота'),
-      detail: 'Открывает видимую карту подключённых и будущих функций, включая безопасные заглушки.'
+      detail: patientMiniAppManifestFeature?.enabled
+        ? `Backend Mini App manifest готов: ${patientMiniAppManifestEndpoint}; требует initData и не раскрывает записи.`
+        : 'Открывает видимую карту подключённых и будущих функций, включая безопасные заглушки.'
     },
     {
       key: 'queue',
