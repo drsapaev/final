@@ -24,6 +24,19 @@ from app.services.telegram_templates import get_telegram_templates_service
 router = APIRouter()
 
 
+def _telegram_notification_allowed(telegram_user: Any, *preference_fields: str) -> bool:
+    if not bool(getattr(telegram_user, "notifications_enabled", True)):
+        return False
+    return all(bool(getattr(telegram_user, field, True)) for field in preference_fields)
+
+
+def _telegram_notifications_disabled_response() -> Dict[str, Any]:
+    return {
+        "success": False,
+        "message": "Telegram notifications disabled by patient preference",
+    }
+
+
 @router.post("/send-appointment-reminder")
 async def send_appointment_reminder(
     appointment_id: int,
@@ -55,6 +68,11 @@ async def send_appointment_reminder(
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
             }
+
+        if not _telegram_notification_allowed(
+            telegram_user, "appointment_reminders"
+        ):
+            return _telegram_notifications_disabled_response()
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
@@ -132,6 +150,9 @@ async def send_lab_results(
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
             }
+
+        if not _telegram_notification_allowed(telegram_user, "lab_notifications"):
+            return _telegram_notifications_disabled_response()
 
         # Получаем данные анализов
         lab_results = []
@@ -232,6 +253,9 @@ async def send_payment_confirmation(
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
             }
+
+        if not _telegram_notification_allowed(telegram_user):
+            return _telegram_notifications_disabled_response()
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
