@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.models.payment_invoice import PaymentInvoice
+from app.services import payment_invoice_service as payment_invoice_service_module
 from app.services.payment_invoice_service import (
     PaymentInvoiceDomainError,
     PaymentInvoiceService,
@@ -32,6 +35,64 @@ class TestPaymentInvoiceService:
         assert result["amount"] == 12_500.0
         assert result["description"] == "unit invoice"
         assert invoice.provider_data["created_by_id"] == admin_user.id
+
+    def test_create_invoice_emits_safe_patient_telegram_unpaid_bill_event(
+        self, db_session, admin_user, test_patient, monkeypatch
+    ):
+        telegram_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr(
+            payment_invoice_service_module.notification_sender_service,
+            "send_patient_telegram_event_notification",
+            telegram_mock,
+        )
+
+        service = PaymentInvoiceService(db_session)
+        result = service.create_invoice(
+            amount=18_000.0,
+            currency="UZS",
+            provider="click",
+            description="cardiology invoice",
+            patient_info={"patient_id": test_patient.id},
+            created_by_id=admin_user.id,
+        )
+
+        telegram_mock.assert_awaited_once()
+        kwargs = telegram_mock.await_args.kwargs
+        assert kwargs["db"] is db_session
+        assert kwargs["patient_id"] == test_patient.id
+        assert kwargs["event_type"] == "payment_created"
+        assert kwargs["metadata"] == {
+            "amount": 18_000.0,
+            "currency": "UZS",
+            "status": "pending",
+            "provider": "click",
+        }
+        assert "invoice_id" not in kwargs["metadata"]
+        assert "payment_id" not in kwargs["metadata"]
+        assert "provider_payment_id" not in kwargs["metadata"]
+        assert result["invoice_id"]
+
+    def test_create_invoice_without_patient_skips_patient_telegram_event(
+        self, db_session, admin_user, monkeypatch
+    ):
+        telegram_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr(
+            payment_invoice_service_module.notification_sender_service,
+            "send_patient_telegram_event_notification",
+            telegram_mock,
+        )
+
+        service = PaymentInvoiceService(db_session)
+        service.create_invoice(
+            amount=12_500.0,
+            currency="UZS",
+            provider="click",
+            description="unit invoice",
+            patient_info=None,
+            created_by_id=admin_user.id,
+        )
+
+        telegram_mock.assert_not_awaited()
 
     def test_create_invoice_invalid_patient_id(self, db_session):
         service = PaymentInvoiceService(db_session)
