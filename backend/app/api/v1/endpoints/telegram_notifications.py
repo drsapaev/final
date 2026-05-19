@@ -63,6 +63,7 @@ def _safe_lab_template_data(
         ),
         "download_link": PROTECTED_LAB_RESULTS_URL,
         "doctor_id": PROTECTED_DOCTOR_CONTACT_REFERENCE,
+        "clinic_address": "г. Ташкент, ул. Медицинская, 15",
     }
 
 
