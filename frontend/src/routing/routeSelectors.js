@@ -3,6 +3,7 @@ import { buildRouteDocsSnapshot } from './routeDocsSnapshot.js';
 import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
 
 const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Система'];
+export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 
 function isFullPathMatch(routePath, pathname) {
   return Boolean(matchPath({ path: routePath, end: true }, pathname));
@@ -51,6 +52,11 @@ export function getCanonicalRouteById(routeId) {
 
 export function getCanonicalRouteByPath(pathname) {
   return ROUTE_REGISTRY.find((route) => isFullPathMatch(route.path, pathname)) || null;
+}
+
+export function getProtectedPatientPaymentEntryPath() {
+  const route = getCanonicalRouteById(PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID);
+  return route?.path || '/patient/payments';
 }
 
 export function getLegacyRedirectTarget(pathname) {

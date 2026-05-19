@@ -32,6 +32,17 @@ from app.services.telegram_bot import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+PATIENT_PAYMENT_ENTRY_ROUTE = "/patient/payments"
+PATIENT_PAYMENT_ENTRY_CONTRACT = {
+    "contract_version": "patient-payment-entry-v1",
+    "route": PATIENT_PAYMENT_ENTRY_ROUTE,
+    "surface": "protected_app",
+    "auth": "role-scoped",
+    "required_role": "Patient",
+    "contains_internal_identifiers": False,
+    "telegram_url_parameters_allowed": False,
+}
+
 STAFF_LINK_TOKEN_PREFIX = "stl"
 STAFF_LINK_TOKEN_HASH_PREFIX = "staff_link_token:"
 STAFF_LINK_TOKEN_SEPARATOR = "_"
@@ -1735,6 +1746,7 @@ def get_telegram_integration_status(
                 "contact_phone_link",
                 "patient_queue",
                 "patient_payments_debt",
+                "patient_payments_protected_entry",
                 "patient_status",
                 "patient_language_notification_settings",
                 "lab_results_pdf",
@@ -1802,6 +1814,12 @@ def get_telegram_integration_status(
                         "key": "patient_payments_debt",
                         "label": "Оплаты и долг по визиту",
                         "enabled": bool(bot_token),
+                    },
+                    {
+                        "key": "patient_payments_protected_entry",
+                        "label": "Защищенный вход к оплатам пациента",
+                        "enabled": bool(bot_token),
+                        "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,
                     },
                     {
                         "key": "lab_results_pdf",
