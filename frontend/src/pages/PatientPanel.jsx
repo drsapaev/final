@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge, Icon, Input, Textarea, Checkbox } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
@@ -21,6 +21,11 @@ PanelEmptyState.propTypes = {
 };
 
 const patientSections = {
+  booking: {
+    icon: Calendar,
+    title: 'Book a visit',
+    description: 'Protected appointment booking opens from Telegram Mini App identity.',
+  },
   forms: {
     icon: ClipboardList,
     title: 'Patient Forms',
@@ -56,6 +61,226 @@ const readTelegramMiniAppInitData = () => {
   }
   const initData = window.Telegram?.WebApp?.initData;
   return typeof initData === 'string' ? initData.trim() : '';
+};
+
+const toLocalDateInputValue = (value) => {
+  const localDate = new Date(value.getTime() - (value.getTimezoneOffset() * 60_000));
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getDefaultAppointmentDate = () => {
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + 1);
+  return toLocalDateInputValue(nextDate);
+};
+
+const splitBookingServices = (value) => (
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+);
+
+const bookingErrorMessages = {
+  appointment_date_in_past: 'Choose today or a future date.',
+  appointment_date_invalid: 'Choose a valid appointment date.',
+  appointment_time_invalid: 'Use a valid time value.',
+  appointment_time_slot_occupied: 'This doctor time is already occupied. Choose another time or leave time empty.',
+  auth_date_expired: 'Open the Mini App from Telegram again.',
+  hash_mismatch: 'Open the Mini App from Telegram again.',
+  patient_scope_mismatch: 'This booking request does not belong to the linked patient.',
+  patient_scope_required: 'Link Telegram to a patient before booking.',
+  telegram_link_required: 'Link Telegram to a patient before booking.',
+  bot_token_required: 'Telegram Mini App is not configured yet.',
+};
+
+const describeBookingError = (reason) => (
+  bookingErrorMessages[reason] || 'The booking request could not be processed.'
+);
+
+const buildBookingPayload = (initData, bookingForm) => ({
+  initData,
+  appointmentDate: bookingForm.appointmentDate,
+  appointmentTime: bookingForm.appointmentTime || null,
+  department: bookingForm.department.trim() || null,
+  notes: bookingForm.notes.trim() || null,
+  services: splitBookingServices(bookingForm.servicesText),
+});
+
+const PatientBookingPanel = () => {
+  const [bookingForm, setBookingForm] = useState(() => ({
+    appointmentDate: getDefaultAppointmentDate(),
+    appointmentTime: '',
+    department: '',
+    servicesText: '',
+    notes: '',
+  }));
+  const [bookingStatus, setBookingStatus] = useState('idle');
+  const [bookingPreview, setBookingPreview] = useState(null);
+  const [createdBooking, setCreatedBooking] = useState(null);
+  const [bookingError, setBookingError] = useState('');
+  const initData = readTelegramMiniAppInitData();
+  const isBusy = bookingStatus === 'previewing' || bookingStatus === 'creating';
+  const appointment = bookingPreview?.appointment || createdBooking?.preview?.appointment || null;
+
+  if (!initData) {
+    return (
+      <PanelEmptyState
+        icon={Calendar}
+        title="Open from Telegram"
+        description="Protected booking requires Telegram Mini App identity before a visit can be created."
+      />
+    );
+  }
+
+  const handleChange = (field, value) => {
+    setBookingForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setBookingError('');
+  };
+
+  const previewBooking = async () => {
+    setBookingStatus('previewing');
+    setBookingError('');
+    setCreatedBooking(null);
+
+    try {
+      const response = await api.post('/telegram/mini-app/appointments/preview', buildBookingPayload(initData, bookingForm));
+      setBookingPreview(response.data);
+      setBookingStatus('preview-ready');
+    } catch (err) {
+      const reason = err?.response?.data?.detail?.reason || 'booking_preview_failed';
+      setBookingError(describeBookingError(reason));
+      setBookingStatus('error');
+    }
+  };
+
+  const createBooking = async () => {
+    setBookingStatus('creating');
+    setBookingError('');
+
+    try {
+      const response = await api.post('/telegram/mini-app/appointments', buildBookingPayload(initData, bookingForm));
+      setCreatedBooking(response.data);
+      setBookingPreview(response.data?.preview || null);
+      setBookingStatus('created');
+    } catch (err) {
+      const reason = err?.response?.data?.detail?.reason || 'booking_create_failed';
+      setBookingError(describeBookingError(reason));
+      setBookingStatus('error');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="font-medium text-gray-900">Appointment request</div>
+            <p className="mt-1 text-sm text-gray-500">Create a protected booking request linked to your Telegram patient profile.</p>
+          </div>
+          <Badge variant={createdBooking ? 'success' : 'info'}>
+            {createdBooking ? 'Created' : 'Mini App protected'}
+          </Badge>
+        </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            type="date"
+            label="Date"
+            value={bookingForm.appointmentDate}
+            disabled={isBusy}
+            required
+            onChange={(event) => handleChange('appointmentDate', event.target.value)}
+          />
+          <Input
+            type="time"
+            label="Preferred time"
+            value={bookingForm.appointmentTime}
+            disabled={isBusy}
+            onChange={(event) => handleChange('appointmentTime', event.target.value)}
+          />
+          <Input
+            label="Department"
+            value={bookingForm.department}
+            disabled={isBusy}
+            maxLength={64}
+            placeholder="For example: Cardiology"
+            onChange={(event) => handleChange('department', event.target.value)}
+          />
+          <Input
+            label="Services"
+            value={bookingForm.servicesText}
+            disabled={isBusy}
+            placeholder="Consultation, analysis"
+            onChange={(event) => handleChange('servicesText', event.target.value)}
+          />
+          <div className="md:col-span-2">
+            <Textarea
+              label="Comment"
+              value={bookingForm.notes}
+              disabled={isBusy}
+              minRows={3}
+              maxRows={6}
+              maxLength={1000}
+              placeholder="Optional note for registration"
+              onChange={(event) => handleChange('notes', event.target.value)}
+            />
+          </div>
+
+          {appointment && (
+            <div className="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+              <div className="font-medium text-gray-900">Booking summary</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>Date: {appointment.appointment_date}</div>
+                <div>Time: {appointment.appointment_time || 'Registrar will confirm'}</div>
+                <div>Department: {appointment.department || 'Not specified'}</div>
+                <div>Payment: {appointment.payment_type} / {appointment.payment_currency}</div>
+              </div>
+              {Array.isArray(appointment.services) && appointment.services.length > 0 && (
+                <div className="mt-2">Services: {appointment.services.join(', ')}</div>
+              )}
+            </div>
+          )}
+
+          {createdBooking && (
+            <div className="md:col-span-2 text-sm text-green-700" role="status">
+              Visit request #{createdBooking.appointment_id} created.
+            </div>
+          )}
+          {bookingError && (
+            <div className="md:col-span-2 text-sm text-red-700" role="alert">
+              {bookingError}
+            </div>
+          )}
+
+          <div className="md:col-span-2 flex flex-col sm:flex-row gap-2 sm:justify-end border-t border-gray-100 pt-4">
+            <Button
+              variant="secondary"
+              size="small"
+              disabled={isBusy || !bookingForm.appointmentDate}
+              loading={bookingStatus === 'previewing'}
+              onClick={previewBooking}
+            >
+              <FileText className="w-4 h-4" aria-hidden="true" />
+              Review request
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              disabled={isBusy || !bookingForm.appointmentDate}
+              loading={bookingStatus === 'creating'}
+              onClick={createBooking}
+            >
+              <Calendar className="w-4 h-4" aria-hidden="true" />
+              Book visit
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const buildInitialPatientFormAnswers = (form) => {
@@ -361,7 +586,10 @@ const PatientPanel = () => {
   useBreakpoint();
   const [query, setQuery] = useState('');
   const [searchParams] = useSearchParams();
-  const activeSection = normalizeSection(searchParams.get('tab'));
+  const location = useLocation();
+  const activeSection = location.pathname === '/patient/bookings'
+    ? 'booking'
+    : normalizeSection(searchParams.get('tab'));
   const [formsPreview, setFormsPreview] = useState(null);
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
@@ -506,6 +734,8 @@ const PatientPanel = () => {
                   error={formsError}
                   initData={formsInitData}
                 />
+              ) : activeSection === 'booking' ? (
+                <PatientBookingPanel />
               ) : (
                 <PanelEmptyState
                   icon={sectionConfig.icon}
