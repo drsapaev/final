@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
-import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
+import { AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input } from '../components/ui/macos';
 
 /**
  * Аудит: список последних действий пользователей.
@@ -57,19 +57,50 @@ export default function Audit() {
   const limitInputId = 'audit-limit';
   const searchInputId = 'audit-search';
   const tableCaptionId = 'audit-table-caption';
+  const toolbarStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap'
+  };
+  const fieldStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'var(--mac-text-secondary)',
+    fontSize: 13
+  };
+  const tableWrapStyle = {
+    overflowX: 'auto',
+    border: '1px solid var(--mac-card-border)',
+    borderRadius: 8,
+    background: 'var(--mac-card-bg)',
+    marginTop: 16
+  };
+  const tableStyle = {
+    width: '100%',
+    borderCollapse: 'collapse'
+  };
 
   return (
     <div>
       <RoleGate roles={['Admin']}>
-        <div className="legacy-page-shell">
-          <h2 style={{ margin: 0 }}>Аудит</h2>
+        <Card>
+          <CardHeader>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>Аудит</h2>
+              <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
+                {filtered.length} из {rows.length}
+              </span>
+            </div>
+          </CardHeader>
 
-          <div className="legacy-toolbar">
-            <label htmlFor={limitInputId}>
+          <CardContent>
+          <div style={toolbarStyle}>
+            <label htmlFor={limitInputId} style={fieldStyle}>
               Порог:&nbsp;
-              <input
+              <Input
                 id={limitInputId}
-                className="legacy-input"
                 type="number"
                 min={10}
                 max={1000}
@@ -81,9 +112,8 @@ export default function Audit() {
             <label htmlFor={searchInputId} style={visuallyHiddenStyle}>
               Поиск по пользователю, действию, сущности или ID
             </label>
-            <input
+            <Input
               id={searchInputId}
-              className="legacy-input"
               placeholder="Поиск по пользователю/действию/сущности"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -122,8 +152,8 @@ export default function Audit() {
             />
           )}
 
-          <div className="legacy-table-wrap" aria-busy={busy} aria-describedby={tableCaptionId}>
-            <table className="legacy-table">
+          <div style={tableWrapStyle} aria-busy={busy} aria-describedby={tableCaptionId}>
+            <table style={tableStyle}>
               <caption id={tableCaptionId} style={visuallyHiddenStyle}>Журнал аудита</caption>
               <thead>
                 <tr>
@@ -174,7 +204,8 @@ export default function Audit() {
               </tbody>
             </table>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       </RoleGate>
     </div>);
 

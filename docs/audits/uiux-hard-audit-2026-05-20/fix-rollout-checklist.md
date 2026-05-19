@@ -17,7 +17,7 @@ Rules:
 - [x] PR-UX-2: queue join recovery states merged.
 - [x] PR-UX-3: authenticated UI QA harness merged.
 - [x] PR-UX-4: cashier payment accessibility merged.
-- [ ] PR-UX-5: doctor current patient workflow merged.
+- [x] PR-UX-5: doctor current patient workflow merged.
 - [ ] PR-UX-6: admin support legacy cleanup merged.
 - [ ] PR-UX-7: AdminPanel design-system slice merged.
 - [ ] PR-UX-8A: cardiology specialty slice merged.
