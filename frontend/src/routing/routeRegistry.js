@@ -1046,7 +1046,7 @@ export const ROUTE_REGISTRY = [
     lifecycle: stable,
     shell: 'app-shell',
     auth: 'role-scoped',
-    roles: ['Admin', 'Registrar', 'Doctor', 'Patient'],
+    roles: ['Admin', 'Registrar', 'Doctor'],
     homeForRoles: ['patient'],
     entry: 'direct',
     nav: false,
