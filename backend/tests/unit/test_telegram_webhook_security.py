@@ -655,7 +655,10 @@ class TestTelegramWebhookSecurity:
             telegram_webhook._localized_text("notifications_disabled", "ru")
             in reply_text
         )
-        assert "Уведомления: отключены" in reply_text
+        assert (
+            telegram_webhook._telegram_settings_message(db_session, 7022)
+            in reply_text
+        )
         assert fake_service._send_message.await_args.args[2] == (
             telegram_webhook._localized_settings_menu("ru")
         )
