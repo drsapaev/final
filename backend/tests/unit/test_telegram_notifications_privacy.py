@@ -421,8 +421,74 @@ async def test_send_payment_confirmation_response_hides_patient_contact_metadata
         text="Lab results are ready",
         reply_markup=None,
     )
-    assert templates_service.template_data["patient_name"] == "Sensitive Patient"
     assert templates_service.template_data["amount"] == 125000
+    assert "patient_name" not in templates_service.template_data
+    assert templates_service.template_data["transaction_id"] == (
+        "available-in-protected-account"
+    )
+    assert templates_service.template_data["receipt_link"] == (
+        "https://clinic.example.com/patient/payments"
+    )
+    assert "txn-secret" not in str(templates_service.template_data)
+
+
+@pytest.mark.asyncio
+async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    telegram_user = SimpleNamespace(chat_id=998877, language_code="ru")
+    bot_service = SimpleNamespace(
+        active=True,
+        initialize=AsyncMock(),
+        _send_message=AsyncMock(return_value=True),
+    )
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        AsyncMock(return_value=bot_service),
+    )
+
+    response = await telegram_notifications.send_payment_confirmation(
+        patient_id=123,
+        payment_data={
+            "amount": 125000,
+            "transaction_id": "txn-secret-internal",
+            "invoice_id": "invoice-secret-internal",
+            "receipt_id": "receipt-secret-internal",
+            "receipt_link": "https://clinic.example.com/receipt/txn-secret-internal",
+        },
+        background_tasks=BackgroundTasks(),
+        db=object(),
+        current_user=SimpleNamespace(role="Cashier"),
+    )
+
+    assert response["success"] is True
+    sent_message = bot_service._send_message.await_args.kwargs
+    telegram_payload = f"{sent_message['text']} {sent_message['reply_markup']}"
+    assert "125000" in sent_message["text"]
+    assert "txn-secret-internal" not in telegram_payload
+    assert "invoice-secret-internal" not in telegram_payload
+    assert "receipt-secret-internal" not in telegram_payload
+    assert "/receipt/" not in telegram_payload
+    assert "Sensitive Patient" not in telegram_payload
+    assert "https://clinic.example.com/patient/payments" in telegram_payload
 
 
 @pytest.mark.asyncio
