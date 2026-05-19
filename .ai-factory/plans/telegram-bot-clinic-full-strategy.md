@@ -306,6 +306,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [ ] Add negative tests for unauthorized staff, stale confirmations, repeated confirmations, and cross-role action attempts.
   - [x] Unauthorized/cross-role state-changing command denial is covered by `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_denies_unauthorized_role`.
   - [x] Storage/service-level stale and repeated confirmation protection is covered by `backend/tests/unit/test_telegram_bot_management_api_service.py::TestTelegramBotManagementApiService::test_staff_confirmation_token_service_rejects_expired_record_without_consuming` and `backend/tests/unit/test_telegram_bot_management_api_service.py::TestTelegramBotManagementApiService::test_staff_confirmation_token_service_consumes_record_once`.
+  - [x] Runtime confirmation callbacks remain inert while state-changing execution is disabled: `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_queue_confirmation_callback_is_ignored_until_execution_enabled` proves no queue mutation, token consumption, or confirmed/completed/failed audit event is produced.
   - [ ] Webhook/runtime stale and repeated confirmation execution tests remain pending until confirmed action execution is enabled.
 
 ### Phase 5: Telegram Mini App
