@@ -12,7 +12,7 @@ from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice
 from app.models.payment_webhook import PaymentWebhook
-from app.models.telegram_config import TelegramUser
+from app.models.telegram_config import TelegramStaffConfirmationToken, TelegramUser
 from app.models.visit import Visit
 from app.models.webhook import (
     Webhook,
@@ -1055,7 +1055,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert audit_log.payload["state_changing_action"] is False
 
     @pytest.mark.asyncio
-    async def test_staff_state_change_command_is_denied_without_domain_mutation(
+    async def test_staff_state_change_command_requests_confirmation_without_mutation(
         self, db_session, admin_user
     ):
         _link_staff_chat(db_session, chat_id=7204, user_id=admin_user.id)
@@ -1076,26 +1076,100 @@ class TestTelegramStaffReadOnlyMenuRuntime:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        assert (
-            fake_service._send_message.await_args.args[1]
-            == telegram_webhook.TELEGRAM_STAFF_ACTION_DENIED_MESSAGE
+        text = fake_service._send_message.await_args.args[1]
+        assert "Staff action confirmation requested" in text
+        assert "Action:" in text
+        assert "Domain: payment" in text
+        assert "Telegram execution: disabled" in text
+        assert "Domain mutation: not performed" in text
+        assert "7204" not in text
+        confirmation_record = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(
+                TelegramStaffConfirmationToken.staff_user_id == admin_user.id,
+                TelegramStaffConfirmationToken.telegram_chat_id == 7204,
+            )
+            .one()
         )
+        assert confirmation_record.token_hash.startswith("staff_confirmation_token:")
+        assert confirmation_record.operation_key == "refund_issue"
+        assert confirmation_record.command_key == "/refund"
+        assert confirmation_record.target_type == "telegram_staff_action"
+        assert confirmation_record.target_reference_hash.startswith("staff_action:")
+        assert confirmation_record.idempotency_key_hash.startswith(
+            "staff_action_idempotency:"
+        )
+        assert confirmation_record.consumed_at is None
+        assert confirmation_record.token_hash not in text
+        assert confirmation_record.target_reference_hash not in text
+        assert confirmation_record.idempotency_key_hash not in text
         audit_log = (
             db_session.query(AuditLog)
-            .filter(AuditLog.action == "staff_action_denied")
+            .filter(AuditLog.action == "staff_action_confirmation_requested")
             .one()
         )
         assert audit_log.actor_user_id == admin_user.id
         assert audit_log.payload["actor_role"] == "admin"
         assert audit_log.payload["operation_key"] == "refund_issue"
         assert audit_log.payload["command_key"] == "/refund"
-        assert audit_log.payload["reason"] == "telegram_state_changes_disabled"
+        assert audit_log.payload["result"] == "confirmation_requested"
         assert audit_log.payload["confirmation_required"] is True
+        assert audit_log.payload["confirmation_token_hash_stored"] is True
+        assert audit_log.payload["confirmation_token_returned_to_telegram"] is False
+        assert audit_log.payload["idempotency_key_present"] is True
+        assert audit_log.payload["idempotency_key_hash_stored"] is True
+        assert audit_log.payload["idempotency_key_returned_to_telegram"] is False
         assert audit_log.payload["telegram_execution_enabled"] is False
         assert audit_log.payload["domain_mutation"] is False
         assert audit_log.payload["state_changing_action"] is True
         assert "staff_action:" in audit_log.payload["target_reference_hash"]
+        assert confirmation_record.idempotency_key_hash not in str(audit_log.payload)
         assert "7204" not in str(audit_log.payload)
+
+    @pytest.mark.asyncio
+    async def test_staff_state_change_command_denies_unauthorized_role(
+        self, db_session, admin_user
+    ):
+        admin_user.role = "lab"
+        db_session.flush()
+        _link_staff_chat(db_session, chat_id=7216, user_id=admin_user.id)
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 216,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7216},
+                "from": {"id": 7216},
+                "text": "/refund",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        assert (
+            fake_service._send_message.await_args.args[1]
+            == telegram_webhook.TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE
+        )
+        assert db_session.query(TelegramStaffConfirmationToken).count() == 0
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_denied")
+            .one()
+        )
+        assert audit_log.actor_user_id == admin_user.id
+        assert audit_log.payload["actor_role"] == "lab"
+        assert audit_log.payload["operation_key"] == "refund_issue"
+        assert audit_log.payload["command_key"] == "/refund"
+        assert audit_log.payload["reason"] == "role_not_allowed"
+        assert audit_log.payload["confirmation_required"] is True
+        assert audit_log.payload["telegram_execution_enabled"] is False
+        assert audit_log.payload["domain_mutation"] is False
+        assert audit_log.payload["state_changing_action"] is True
+        assert "7216" not in str(audit_log.payload)
 
     @pytest.mark.asyncio
     async def test_unlinked_staff_menu_request_does_not_create_patient_link(

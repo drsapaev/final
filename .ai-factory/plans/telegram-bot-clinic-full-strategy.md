@@ -41,7 +41,7 @@ Partially closed areas as of the latest static audit:
 - Patient bot MVP is closed for the Phase 1 backend slice: notification consent is shown after successful contact or QR/start patient linking, the full start -> language -> link -> consent path has targeted test coverage, the canonical notification sender has a tested safe patient Telegram event mapping helper, and appointment reminders now use the linked-patient Telegram event path when `db` and `patient_id` are provided.
 - QR queue Phase 2 is closed for the current backend/security slice: linking, status reads, sensitive QR/start token TTL, event-driven next/called Telegram notifications, queue ordering/`queue_time` refresh validation, and expired/malformed/replayed/consumed token rollout checks are present.
 - Payments can show status/debt summaries, send confirmation-style notifications, emit a safe patient Telegram unpaid bill notification from payment invoice creation, link the patient `/payments` bot reply to the protected `/patient/payments` app route, send safe patient Telegram `payment_paid` updates after successful provider webhook visit/appointment integration, and expose read-only staff reconciliation alerts for the supported Click/PayMe/Kaspi provider inventory. Public provider callbacks and internal demo routes must not be used as Telegram entry buttons.
-- Staff bot has role-based read-only menus, authorization, token separation, and audit for denied actions, but confirmed state-changing actions remain disabled by design.
+- Staff bot has role-based read-only menus, authorization, token separation, hash-only confirmation request storage, hash-only idempotency binding for confirmation requests, confirmation-request audit, and denied-action audit, but confirmed state-changing action execution remains disabled by design until domain adapters and explicit action enablement are added.
 - Telegram Mini App and AI approval flows are still planning items, not implemented runtime flows.
 
 ## Product Model
@@ -245,6 +245,7 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Show notification consent as part of onboarding after contact or QR/start patient linking, not only later from settings/menu.
 - [x] Map basic patient business event names to safe Telegram messages through the canonical notification sender path.
 - [x] Wire the first real notification call-site to the patient Telegram event helper: appointment reminders with `db` and `patient_id`.
+- [x] Add a patient `/menu` refresh command that redraws the localized main menu without being intercepted by the staff menu guard: `backend/app/api/v1/endpoints/telegram_webhook.py` handles `/menu` and `backend/tests/unit/test_telegram_webhook_security.py::TestTelegramWebhookSecurity::test_menu_command_refreshes_patient_main_menu_without_staff_intercept` covers the patient path.
 - [x] Add or confirm targeted tests for the completed onboarding path: start -> language -> contact/token link -> consent -> localized main menu.
 - [x] Keep full appointment booking out of plain chat unless routed to the future protected Mini App or protected web app.
 
@@ -284,21 +285,23 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 
 ### Phase 4: Staff bot
 
-- [ ] Status: partially closed. Staff bot read-only operations are implemented; confirmed state-changing actions are still disabled.
+- [ ] Status: partially closed. Staff bot read-only operations, pre-mutation confirmation requests, and hash-only idempotency binding for replay protection are implemented; confirmed state-changing actions remain disabled until domain adapters and explicit action enablement are complete.
 - [x] Role-based read-only menus exist for registrar, doctor, cashier, lab, admin, and owner/admin style users.
 - [x] Staff bot token is configured separately from the patient bot token.
 - [x] Staff linking is protected by server-side token validation.
 - [x] Staff commands check role/authorization server-side.
 - [x] Audit exists for staff link creation, rejected link tokens, received staff commands, and denied staff actions.
-- [x] Runtime guard denies state-changing staff commands until action enablement and idempotency are implemented.
-- [ ] Add confirmation request flow for each state-changing action before mutation.
-- [ ] Add idempotency keys or equivalent replay protection for confirmed staff actions.
+- [x] Runtime guard blocks Telegram execution of state-changing staff commands until domain adapters and explicit action enablement are implemented.
+- [x] Add confirmation request flow for each state-changing action before mutation: `backend/app/api/v1/endpoints/telegram_webhook.py` now creates a hash-only `TelegramStaffConfirmationToken`, hash-only idempotency binding, and `staff_action_confirmation_requested` audit event for allowed state-changing staff commands, while keeping Telegram execution and domain mutation disabled; focused coverage is in `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_requests_confirmation_without_mutation`.
+- [x] Add idempotency keys or equivalent replay protection for confirmed staff actions: confirmation requests now persist `staff_action_idempotency:*` hash-only bindings, expose `idempotency_request_hash_runtime_enabled` in the staff bot contract, keep raw idempotency material out of Telegram/audit output, and rely on `TelegramStaffConfirmationTokenService.consume_for_confirmation(...)` single-use checks for future confirmed-action replay protection.
 - [ ] Add domain service adapters for confirmed queue actions: call patient, skip patient, cancel/move visit.
 - [ ] Add domain service adapters for confirmed payment actions: status change, refund where policy allows it.
 - [ ] Add domain service adapters for confirmed schedule actions.
-- [ ] Add audit events for confirmation requested, confirmed, failed, and completed state-changing actions.
+- [ ] Add remaining audit events for confirmed, failed, and completed state-changing actions; confirmation-requested audit is implemented with `staff_action_confirmation_requested`, but action execution is still disabled.
 - [ ] Enable state-changing actions one by one behind explicit configuration and tests.
 - [ ] Add negative tests for unauthorized staff, stale confirmations, repeated confirmations, and cross-role action attempts.
+  - [x] Unauthorized/cross-role state-changing command denial is covered by `backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py::TestTelegramStaffReadOnlyMenuRuntime::test_staff_state_change_command_denies_unauthorized_role`.
+  - [ ] Stale and repeated confirmation runtime tests remain pending until confirmation execution is enabled.
 
 ### Phase 5: Telegram Mini App
 

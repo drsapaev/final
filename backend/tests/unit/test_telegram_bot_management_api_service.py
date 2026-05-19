@@ -316,17 +316,29 @@ class TestTelegramBotManagementApiService:
         assert status["audit"]["linking_events_ready"] is True
         assert status["audit"]["staff_command_events_ready"] is True
         assert status["audit"]["read_only_menu_events_ready"] is True
+        assert status["audit"]["confirmation_request_events_ready"] is True
         assert status["audit"]["state_change_events_ready"] is False
         assert status["role_menus"]["read_only"] is True
         assert status["role_menus"]["runtime_enabled"] is True
         assert status["role_menus"]["state_changing_actions_enabled"] is False
         assert status["confirmations"]["ready"] is True
         assert status["confirmations"]["runtime_guard_enabled"] is True
-        assert status["confirmations"]["deny_only_runtime_enabled"] is True
+        assert status["confirmations"]["deny_only_runtime_enabled"] is False
+        assert status["confirmations"]["confirmation_request_runtime_enabled"] is True
+        assert status["confirmations"]["confirmation_requests_create_tokens"] is True
         assert (
             status["confirmations"]["confirmation_token_runtime_enabled"] is True
         )
+        assert (
+            status["confirmations"]["idempotency_request_hash_runtime_enabled"]
+            is True
+        )
+        assert status["confirmations"]["idempotency_key_returned_to_telegram"] is False
         assert status["confirmations"]["state_changing_actions_enabled"] is False
+        assert (
+            status["confirmations"]["default_state_change_decision"]
+            == "deny_until_domain_adapters_and_action_enablement"
+        )
 
         role_menu_enablement = status["role_menu_enablement_contract"]
         assert role_menu_enablement["enabled"] is True
@@ -429,12 +441,36 @@ class TestTelegramBotManagementApiService:
             "staff_command_received"
             not in status["audit_contract"]["pending_event_types"]
         )
+        assert (
+            "staff_action_confirmation_requested"
+            in status["audit_contract"]["recorded_event_types"]
+        )
+        assert (
+            "staff_action_confirmation_requested"
+            not in status["audit_contract"]["pending_event_types"]
+        )
         assert status["confirmation_contract"]["enabled"] is True
         assert status["confirmation_contract"]["runtime_guard_enabled"] is True
-        assert status["confirmation_contract"]["deny_only_runtime_enabled"] is True
+        assert status["confirmation_contract"]["deny_only_runtime_enabled"] is False
+        assert (
+            status["confirmation_contract"]["confirmation_request_runtime_enabled"]
+            is True
+        )
+        assert (
+            status["confirmation_contract"]["confirmation_requests_create_tokens"]
+            is True
+        )
         assert (
             status["confirmation_contract"]["confirmation_token_runtime_enabled"]
             is True
+        )
+        assert (
+            status["confirmation_contract"]["idempotency_request_hash_runtime_enabled"]
+            is True
+        )
+        assert (
+            status["confirmation_contract"]["idempotency_key_returned_to_telegram"]
+            is False
         )
         assert status["confirmation_contract"]["state_changing_actions_enabled"] is False
         assert (
@@ -442,8 +478,12 @@ class TestTelegramBotManagementApiService:
             not in status["confirmation_contract"]["runtime_blocked_by"]
         )
         assert (
+            "idempotency_runtime"
+            not in status["confirmation_contract"]["runtime_blocked_by"]
+        )
+        assert (
             status["confirmation_contract"]["runtime_blocked_by"][0]
-            == "idempotency_runtime"
+            == "domain_service_action_adapters"
         )
 
     def test_staff_link_start_token_validator_reports_expired_reason(self):
