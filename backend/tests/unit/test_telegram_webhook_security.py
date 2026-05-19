@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 
 import pytest
 
 from app.api.v1.endpoints import admin_telegram, telegram_webhook
+from app.models.appointment import Appointment
 from app.models.audit import AuditLog
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
@@ -32,6 +37,42 @@ class FakeTelegramBotService:
         self._send_document = AsyncMock(return_value=(True, 77, None))
         self.bot_token = "bot-token"
         self.webhook_url = "https://example.com/webhook"
+
+
+MINI_APP_BOT_TOKEN = "123456:test-mini-app-token"
+
+
+def _signed_mini_app_init_data(
+    telegram_id: int,
+    *,
+    bot_token: str = MINI_APP_BOT_TOKEN,
+    auth_date: datetime | None = None,
+) -> str:
+    checked_at = auth_date or datetime.now(timezone.utc)
+    params = {
+        "auth_date": str(int(checked_at.timestamp())),
+        "query_id": "AAEAAAE",
+        "user": json.dumps({"id": telegram_id}, separators=(",", ":")),
+    }
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(params.items())
+    )
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    payload_hash = hmac.new(
+        secret_key,
+        data_check_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return urlencode({**params, "hash": payload_hash})
+
+
+def _add_mini_app_telegram_config(db_session) -> None:
+    db_session.add(TelegramConfig(bot_token=MINI_APP_BOT_TOKEN, active=True))
+    db_session.commit()
 
 
 def _link_patient_to_chat(db_session, *, chat_id: int, patient_id: int) -> TelegramUser:
@@ -242,6 +283,109 @@ class TestTelegramWebhookSecurity:
         assert response.status_code == 200
         assert "Telegram webhook update accepted" in caplog.text
         assert "Sensitive Patient Diagnosis" not in caplog.text
+
+    def test_mini_app_booking_preview_endpoint_returns_non_mutating_payload(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880201
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": 12,
+                "appointmentDate": "2026-05-20",
+                "appointmentTime": "09:30",
+                "department": "Cardiology",
+                "notes": "Mini App request",
+                "services": ["Consultation"],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        appointment = payload["appointment"]
+        assert payload["preview_only"] is True
+        assert payload["mutation_allowed"] is False
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert "appointment_id" not in appointment
+        assert appointment["patient_id"] == test_patient.id
+        assert appointment["appointment_date"] == "2026-05-20"
+        assert appointment["appointment_time"] == "09:30"
+        assert appointment["status"] == "scheduled"
+        assert appointment["payment_type"] == "cash"
+        assert appointment["payment_currency"] == "UZS"
+        assert appointment["payment_provider"] is None
+        assert appointment["payment_transaction_id"] is None
+        assert appointment["payment_webhook_id"] is None
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_booking_preview_endpoint_rejects_forged_init_data(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880202
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id).replace(
+                    "hash=",
+                    "hash=forged",
+                    1,
+                ),
+                "patientId": test_patient.id,
+                "appointmentDate": "2026-05-20",
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "hash_mismatch"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_booking_preview_endpoint_rejects_staff_scope(
+        self,
+        client,
+        db_session,
+        admin_user,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880203
+        db_session.add(
+            TelegramUser(
+                chat_id=chat_id,
+                user_id=admin_user.id,
+                language_code="ru",
+                active=True,
+                blocked=False,
+            )
+        )
+        db_session.commit()
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "appointmentDate": "2026-05-20",
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == {"reason": "patient_scope_required"}
+        assert db_session.query(Appointment).count() == initial_appointments
 
     def test_send_message_requires_admin_auth(self, client):
         response = client.post(
