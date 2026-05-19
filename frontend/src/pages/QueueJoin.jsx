@@ -636,6 +636,44 @@ const QueueJoin = () => {
     fontWeight: '500'
   };
 
+  const statusActionStackStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  };
+
+  const recoveryButtonBaseStyle = {
+    width: '100%',
+    padding: '16px 24px',
+    borderRadius: '12px',
+    border: 'none',
+    fontSize: '17px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease'
+  };
+
+  const primaryRecoveryButtonStyle = {
+    ...recoveryButtonBaseStyle,
+    background: A11Y_COLORS.primary,
+    color: 'var(--mac-text-on-accent)',
+    boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
+  };
+
+  const dangerRecoveryButtonStyle = {
+    ...recoveryButtonBaseStyle,
+    background: A11Y_COLORS.danger,
+    color: 'var(--mac-text-on-accent)',
+    boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%)'
+  };
+
+  const successRecoveryButtonStyle = {
+    ...recoveryButtonBaseStyle,
+    background: A11Y_COLORS.success,
+    color: 'var(--mac-text-on-accent)',
+    boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%)'
+  };
+
   // Компонент загрузки - macOS стиль
   if (step === 'loading') {
     return (
@@ -654,69 +692,43 @@ const QueueJoin = () => {
   // Компонент ошибки - macOS стиль
   if (step === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
-        <div className="max-w-md w-full text-center" style={glassCardStyle}>
+      <main className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle} aria-labelledby="queue-join-error-title">
+        <div className="max-w-md w-full text-center" style={glassCardStyle} aria-describedby="queue-join-error-message">
           <AlertCircle style={{
             width: '64px',
             height: '64px',
             color: 'var(--mac-error)',
             margin: '0 auto 16px'
-          }} />
-          <h2 style={{
+          }} aria-hidden="true" />
+          <h2 id="queue-join-error-title" style={{
             ...titleStyle,
             marginBottom: '12px',
           }}>Хатолик</h2>
           <p style={{
             ...bodyTextStyle,
             marginBottom: '24px',
-          }} role="alert" aria-live="assertive">{error}</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          }} id="queue-join-error-message" role="alert" aria-live="assertive">{error}</p>
+          <div style={statusActionStackStyle}>
             <button
+              type="button"
               onClick={() => {
                 setError(null);
                 loadTokenInfo();
               }}
-              style={{
-                width: '100%',
-                background: A11Y_COLORS.primary,
-                color: 'var(--mac-text-on-accent)',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                border: 'none',
-                fontSize: '17px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
-              }}
-              onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.primaryHover}
-              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.primary}
+              style={primaryRecoveryButtonStyle}
             >
               Қайта уриниш
             </button>
             <button
+              type="button"
               onClick={() => navigate('/')}
-              style={{
-                width: '100%',
-                background: A11Y_COLORS.danger,
-                color: 'var(--mac-text-on-accent)',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                border: 'none',
-                fontSize: '17px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%)'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-error), black 20%)'}
-              onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.danger}
+              style={dangerRecoveryButtonStyle}
             >
               Асосий саҳифа
             </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -897,15 +909,15 @@ const QueueJoin = () => {
     const departmentName = getDepartmentName(result.entries?.[0]?.department || result.entries?.[0]?.specialty);
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle}>
-        <div className="max-w-md w-full text-center" style={glassCardStyle}>
+      <main className="min-h-screen flex items-center justify-center p-4" style={pageBaseStyle} aria-labelledby="queue-join-success-title">
+        <div className="max-w-md w-full text-center" style={glassCardStyle} role="status" aria-live="polite">
           <CheckCircle style={{
             width: '64px',
             height: '64px',
             color: A11Y_COLORS.success,
             margin: '0 auto 20px'
-          }} />
-          <h2 style={{
+          }} aria-hidden="true" />
+          <h2 id="queue-join-success-title" style={{
             fontSize: '24px',
             fontWeight: '600',
             color: 'var(--mac-text-primary)',
@@ -1071,26 +1083,13 @@ const QueueJoin = () => {
 
           <button
             onClick={() => navigate('/')}
-            style={{
-              width: '100%',
-              background: A11Y_COLORS.success,
-              color: 'var(--mac-text-on-accent)',
-              padding: '16px 24px',
-              borderRadius: '12px',
-              border: 'none',
-              fontSize: '17px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%)'
-            }}
-            onMouseEnter={(e) => e.target.style.background = A11Y_COLORS.successHover}
-            onMouseLeave={(e) => e.target.style.background = A11Y_COLORS.success}
+            type="button"
+            style={successRecoveryButtonStyle}
           >
             Тушунарли
           </button>
         </div>
-      </div>
+      </main>
     );
   }
 
