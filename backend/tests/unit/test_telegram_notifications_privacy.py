@@ -41,7 +41,7 @@ def test_safe_payment_template_data_uses_configured_protected_patient_route(
         }
     )
 
-    assert template_data["receipt_link"] == "https://portal.example.com/patient"
+    assert template_data["receipt_link"] == "https://portal.example.com/patient/payments"
     assert template_data["transaction_id"] == "available-in-protected-account"
     assert "txn-secret" not in str(template_data)
     assert "invoice-secret" not in str(template_data)
@@ -529,7 +529,7 @@ async def test_send_payment_confirmation_response_hides_patient_contact_metadata
         "available-in-protected-account"
     )
     assert templates_service.template_data["receipt_link"] == (
-        "https://clinic.example.com/patient"
+        "https://clinic.example.com/patient/payments"
     )
     assert "txn-secret" not in str(templates_service.template_data)
 
@@ -595,7 +595,7 @@ async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
     assert "receipt-secret-internal" not in telegram_payload
     assert "/receipt/" not in telegram_payload
     assert "Sensitive Patient" not in telegram_payload
-    assert "https://clinic.example.com/patient" in telegram_payload
+    assert "https://clinic.example.com/patient/payments" in telegram_payload
 
 
 @pytest.mark.asyncio
