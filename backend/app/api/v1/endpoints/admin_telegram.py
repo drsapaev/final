@@ -8,7 +8,8 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, NoReturn, Optional
 
 import requests
@@ -663,22 +664,32 @@ STAFF_BOT_ACTION_ENABLEMENT_CONTRACT = {
     "telegram_callback_execution_enabled": False,
     "telegram_message_execution_enabled": False,
     "protected_action_execution_enabled": True,
-    "enabled_commands": ["/call"],
-    "disabled_commands": [
+    "enabled_commands": [
+        "/call",
         "/skip",
         "/cancel_visit",
         "/move_visit",
         "/payment_status",
         "/refund",
-        "/publish_document",
         "/change_schedule",
+    ],
+    "disabled_commands": [
+        "/publish_document",
     ],
     "enablement_rule": (
         "Commands are enabled one by one only after target binding, "
         "idempotency consumption, audit, and focused runtime tests exist."
     ),
     "enabled_runtime_owner": "TelegramStaffActionAdapterService",
-    "enabled_runtime_methods": ["staff_call_next_patient"],
+    "enabled_runtime_methods": [
+        "staff_call_next_patient",
+        "staff_skip_queue_entry",
+        "staff_cancel_visit",
+        "staff_move_visit",
+        "staff_change_payment_status",
+        "staff_refund_payment",
+        "staff_change_doctor_schedule",
+    ],
     "required_before_command_enablement": [
         "domain_adapter_runtime_enabled",
         "role_rechecked_in_protected_app",
@@ -1305,6 +1316,21 @@ def _staff_runtime_reference_hash(kind: str, value: Any) -> str:
     return f"{kind}:{digest[:24]}"
 
 
+class StaffActionConfirmRequest(BaseModel):
+    entry_id: int | None = None
+    visit_id: int | None = None
+    new_visit_date: date | None = None
+    payment_id: int | None = None
+    new_status: str | None = None
+    refund_amount: Decimal | None = None
+    refund_reason: str | None = None
+    schedule_id: int | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    breaks: list[dict[str, str]] | None = None
+    active: bool | None = None
+
+
 def _staff_state_change_operation_by_key(operation_key: str) -> Dict[str, Any] | None:
     for operation in STAFF_BOT_CONFIRMATION_CONTRACT.get("operations", []):
         if str(operation.get("key") or "") == operation_key:
@@ -1357,6 +1383,45 @@ def _record_staff_action_execution_failure(
     )
 
 
+def _validate_staff_action_target_request(
+    command_key: str,
+    request: StaffActionConfirmRequest,
+) -> str | None:
+    command = command_key.lower()
+    if command == "/call":
+        return None
+    if command == "/skip":
+        return None if request.entry_id is not None else "entry_id_required"
+    if command == "/cancel_visit":
+        return None if request.visit_id is not None else "visit_id_required"
+    if command == "/move_visit":
+        if request.visit_id is None:
+            return "visit_id_required"
+        if request.new_visit_date is None:
+            return "new_visit_date_required"
+        return None
+    if command == "/payment_status":
+        if request.payment_id is None:
+            return "payment_id_required"
+        if not str(request.new_status or "").strip():
+            return "new_status_required"
+        return None
+    if command == "/refund":
+        return None if request.payment_id is not None else "payment_id_required"
+    if command == "/change_schedule":
+        if request.schedule_id is None:
+            return "schedule_id_required"
+        if (
+            request.start_time is None
+            and request.end_time is None
+            and request.breaks is None
+            and request.active is None
+        ):
+            return "schedule_change_required"
+        return None
+    return "command_executor_not_supported"
+
+
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm")
 def confirm_staff_action(
     confirmation_id: int,
@@ -1377,9 +1442,12 @@ def confirm_staff_action(
             "lab",
         )
     ),
+    request: StaffActionConfirmRequest | None = Body(default=None),
 ) -> Dict[str, Any]:
     """Confirm one explicitly enabled Telegram staff action in the protected app."""
 
+    if not isinstance(request, StaffActionConfirmRequest):
+        request = StaffActionConfirmRequest()
     record = (
         db.query(TelegramStaffConfirmationToken)
         .filter(TelegramStaffConfirmationToken.id == confirmation_id)
@@ -1447,6 +1515,22 @@ def confirm_staff_action(
             detail="Staff action command is not enabled for protected execution",
         )
 
+    target_error = _validate_staff_action_target_request(command_key, request)
+    if target_error:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason=target_error,
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=target_error,
+        )
+
     consume_result = TelegramStaffConfirmationTokenService(db).consume_for_confirmation(
         token_hash=record.token_hash,
         staff_user_id=int(current_user.id),
@@ -1489,6 +1573,117 @@ def confirm_staff_action(
             "action": action_result.get("action"),
             "status": action_result.get("status"),
             "queue_time_preserved": action_result.get("queue_time_preserved"),
+        }
+
+    if command_key.lower() == "/skip":
+        action_result = TelegramStaffActionAdapterService(db).staff_skip_queue_entry(
+            entry_id=int(request.entry_id),
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+            "queue_time_preserved": action_result.get("queue_time_preserved"),
+        }
+
+    if command_key.lower() == "/cancel_visit":
+        action_result = TelegramStaffActionAdapterService(db).staff_cancel_visit(
+            visit_id=int(request.visit_id),
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "visit_status": action_result.get("visit_status"),
+        }
+
+    if command_key.lower() == "/move_visit":
+        action_result = TelegramStaffActionAdapterService(db).staff_move_visit(
+            visit_id=int(request.visit_id),
+            new_visit_date=request.new_visit_date,
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "visit_date": action_result.get("visit_date").isoformat()
+            if action_result.get("visit_date")
+            else None,
+        }
+
+    if command_key.lower() == "/payment_status":
+        action_result = (
+            TelegramStaffActionAdapterService(db).staff_change_payment_status(
+                payment_id=int(request.payment_id),
+                new_status=str(request.new_status),
+                actor_user_id=int(current_user.id),
+                telegram_chat_id=int(record.telegram_chat_id),
+                commit=True,
+            )
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+        }
+
+    if command_key.lower() == "/refund":
+        action_result = TelegramStaffActionAdapterService(db).staff_refund_payment(
+            payment_id=int(request.payment_id),
+            amount=request.refund_amount,
+            reason=request.refund_reason,
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+        }
+
+    if command_key.lower() == "/change_schedule":
+        action_result = (
+            TelegramStaffActionAdapterService(db).staff_change_doctor_schedule(
+                schedule_id=int(request.schedule_id),
+                start_time=request.start_time,
+                end_time=request.end_time,
+                breaks=request.breaks,
+                active=request.active,
+                actor_user_id=int(current_user.id),
+                telegram_chat_id=int(record.telegram_chat_id),
+                commit=True,
+            )
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "active": action_result.get("active"),
         }
 
     _record_staff_action_execution_failure(

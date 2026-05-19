@@ -1500,7 +1500,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert failed.payload["reason"] == "expired"
 
     @pytest.mark.asyncio
-    async def test_staff_skip_confirmation_stays_disabled_until_target_binding(
+    async def test_staff_skip_confirmation_requires_target_binding(
         self, db_session, registrar_user, test_doctor, test_patient
     ):
         _link_staff_chat(db_session, chat_id=7224, user_id=registrar_user.id)
@@ -1542,7 +1542,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert handled is True
         confirmation_record = db_session.query(TelegramStaffConfirmationToken).one()
 
-        with pytest.raises(HTTPException) as disabled:
+        with pytest.raises(HTTPException) as target_error:
             admin_telegram.confirm_staff_action(
                 confirmation_record.id,
                 db_session,
@@ -1551,7 +1551,8 @@ class TestTelegramStaffReadOnlyMenuRuntime:
 
         db_session.refresh(entry)
         db_session.refresh(confirmation_record)
-        assert disabled.value.status_code == 409
+        assert target_error.value.status_code == 422
+        assert target_error.value.detail == "entry_id_required"
         assert entry.status == "waiting"
         assert confirmation_record.consumed_at is None
         failed = (
@@ -1559,7 +1560,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             .filter(AuditLog.action == "staff_action_failed")
             .one()
         )
-        assert failed.payload["reason"] == "command_not_enabled"
+        assert failed.payload["reason"] == "entry_id_required"
 
     @pytest.mark.asyncio
     async def test_staff_state_change_command_denies_unauthorized_role(
