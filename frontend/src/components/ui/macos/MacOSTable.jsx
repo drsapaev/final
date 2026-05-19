@@ -1,4 +1,4 @@
-import { isValidElement, useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -119,15 +119,30 @@ const MacOSTable = ({
     }
   };
 
-  const handleMouseEnter = (e, isSelected) => {
-    if (hoverable) {
-      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'var(--mac-table-row-hover-bg)';
+  const handleMouseEnter = (e, isSelected, isSortable) => {
+    if (hoverable || isSortable) {
+      const target = e.currentTarget;
+      if (isSortable && target.tagName === 'TH') {
+        target.style.backgroundColor = 'var(--mac-table-header-hover-bg)';
+      } else if (hoverable && target.tagName === 'TR') {
+        target.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'var(--mac-table-row-hover-bg)';
+      }
     }
   };
 
-  const handleMouseLeave = (e, isSelected) => {
-    if (hoverable) {
-      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'transparent';
+  const handleMouseLeave = (e, isSelected, isSortable) => {
+    const target = e.currentTarget;
+    if (isSortable && target.tagName === 'TH') {
+      target.style.backgroundColor = currentVariant.headerBackground;
+    } else if (hoverable && target.tagName === 'TR') {
+      target.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'transparent';
+    }
+  };
+
+  const handleHeaderKeyDown = (e, column) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSort(column);
     }
   };
 
@@ -157,89 +172,66 @@ const MacOSTable = ({
     return row[column.key];
   };
 
-  const renderEmptyState = () => {
-    if (emptyState) {
-      if (isValidElement(emptyState) && typeof emptyState.type === 'string' && emptyState.type === 'tr') {
-        return emptyState;
-      }
+  const renderStatusCell = (content) => (
+    <tr>
+      <td
+        colSpan={columns.length}
+        role="status"
+        aria-live="polite"
+        style={{
+          padding: '48px 16px',
+          textAlign: 'center',
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-base)'
+        }}
+      >
+        {content}
+      </td>
+    </tr>
+  );
 
-      return (
-        <tr>
-          <td
-            colSpan={columns.length}
-            style={{
-              padding: '48px 16px',
-              textAlign: 'center',
-              color: 'var(--mac-text-secondary)',
-              fontSize: 'var(--mac-font-size-base)'
-            }}
-          >
-            {emptyState}
-          </td>
-        </tr>
-      );
-    }
-    
-    return (
+  const renderHeaders = () => (
+    <thead>
       <tr>
-        <td 
-          colSpan={columns.length} 
-          style={{
-            padding: '48px 16px',
-            textAlign: 'center',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-base)'
-          }}
-        >
-          Нет данных для отображения
-        </td>
+        {columns.map((column, index) => {
+          const isSortable = sortable && column.sortable;
+          const isSorted = sortColumn === column.key;
+          return (
+            <th
+              key={column.key || index}
+              style={{
+                ...headerStyle,
+                borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
+              }}
+              onClick={() => handleSort(column)}
+              onKeyDown={(e) => handleHeaderKeyDown(e, column)}
+              tabIndex={isSortable ? 0 : undefined}
+              aria-sort={isSortable ? (isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+              onMouseEnter={(e) => handleMouseEnter(e, false, isSortable)}
+              onMouseLeave={(e) => handleMouseLeave(e, false, isSortable)}
+            >
+              {column.title}
+              {renderSortIcon(column)}
+            </th>
+          );
+        })}
       </tr>
-    );
-  };
-
-  const renderLoadingState = () => {
-    return (
-      <tr>
-        <td 
-          colSpan={columns.length} 
-          style={{
-            padding: '48px 16px',
-            textAlign: 'center',
-            color: 'var(--mac-text-secondary)',
-            fontSize: 'var(--mac-font-size-base)'
-          }}
-        >
-          Загрузка...
-        </td>
-      </tr>
-    );
-  };
+    </thead>
+  );
 
   if (loading) {
     return (
       <div style={{ overflowX: 'auto' }} aria-busy="true">
         <table className={className} style={tableStyle}>
-          <thead>
-            <tr>
-              {columns.map((column, index) => (
-                <th key={column.key || index} style={{
-                  ...headerStyle,
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                }}>
-                  {column.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
+          {renderHeaders()}
           <tbody>
-            {renderLoadingState()}
+            {renderStatusCell('Загрузка...')}
           </tbody>
         </table>
       </div>
     );
   }
 
-  // ✅ Если переданы children, рендерим их напрямую (legacy режим)
   if (children) {
     return (
       <div style={{ overflowX: 'auto' }} aria-busy={loading}>
@@ -254,20 +246,9 @@ const MacOSTable = ({
     return (
       <div style={{ overflowX: 'auto' }} aria-busy={loading}>
         <table className={className} style={tableStyle}>
-          <thead>
-            <tr>
-              {columns.map((column, index) => (
-                <th key={column.key || index} style={{
-                  ...headerStyle,
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                }}>
-                  {column.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
+          {renderHeaders()}
           <tbody>
-            {renderEmptyState()}
+            {renderStatusCell(emptyState || 'Нет данных для отображения')}
           </tbody>
         </table>
       </div>
@@ -277,33 +258,7 @@ const MacOSTable = ({
   return (
     <div style={{ overflowX: 'auto' }} aria-busy={loading}>
       <table className={className} style={tableStyle}>
-        <thead>
-          <tr>
-            {columns.map((column, index) => (
-              <th
-                key={column.key || index}
-                style={{
-                  ...headerStyle,
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                }}
-                onClick={() => handleSort(column)}
-                onMouseEnter={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = 'var(--mac-table-header-hover-bg)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (sortable && column.sortable) {
-                    e.target.style.backgroundColor = currentVariant.headerBackground;
-                  }
-                }}
-              >
-                {column.title}
-                {renderSortIcon(column)}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {renderHeaders()}
         <tbody>
           {data.map((row, rowIndex) => {
             const isSelected = selectedRows.includes(rowIndex);
@@ -312,8 +267,8 @@ const MacOSTable = ({
                 key={rowIndex}
                 style={rowStyle(rowIndex, isSelected)}
                 onClick={() => handleRowClick(row, rowIndex)}
-                onMouseEnter={(e) => handleMouseEnter(e, isSelected)}
-                onMouseLeave={(e) => handleMouseLeave(e, isSelected)}
+                onMouseEnter={(e) => handleMouseEnter(e, isSelected, false)}
+                onMouseLeave={(e) => handleMouseLeave(e, isSelected, false)}
               >
                 {columns.map((column, colIndex) => (
                   <td
