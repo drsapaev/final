@@ -63,6 +63,40 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
 const API_V1_BASE = getApiBaseUrl();
+const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
+const DENTISTRY_CALLED_STATUSES = ['called', 'in_progress'];
+const DENTISTRY_COMPLETED_STATUSES = ['completed', 'done'];
+const dentistryAppointmentsHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 'var(--mac-spacing-4)',
+  marginBottom: 'var(--mac-spacing-4)',
+  flexWrap: 'wrap'
+};
+const dentistryAppointmentsTitleStyle = {
+  fontSize: 'var(--mac-font-size-lg)',
+  fontWeight: 'var(--mac-font-weight-medium)',
+  display: 'flex',
+  alignItems: 'center',
+  color: 'var(--mac-text-primary)',
+  margin: 0,
+  minWidth: 'min(100%, 260px)'
+};
+const dentistryAppointmentsSummaryStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 'var(--mac-spacing-2)',
+  flexWrap: 'wrap',
+  minWidth: 0
+};
+const dentistryRefreshButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--mac-spacing-1)',
+  flexShrink: 0
+};
 
 let dentistAppointmentsCache = null;
 let dentistAppointmentsLoadPromise = null;
@@ -71,6 +105,10 @@ let dentistServicesLoadPromise = null;
 const dentistVisitProtocolsCache = new Map();
 const dentistVisitProtocolsLoadPromises = new Map();
 const dentistFallbackLoggedKeys = new Set();
+
+function countAppointmentsByStatuses(appointments, statuses) {
+  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
+}
 
 function normalizeNumericId(value) {
   const parsed = parseInt(value, 10);
@@ -1483,6 +1521,33 @@ const DentistPanelUnified = () => {
     };
   }, [appointmentsTableData, patients, prosthetics, treatmentPlans]);
 
+  const appointmentSummaryItems = useMemo(() => [
+    {
+      key: 'total',
+      label: 'Всего',
+      value: appointmentsTableData.length,
+      variant: 'info'
+    },
+    {
+      key: 'waiting',
+      label: 'Ожидают',
+      value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_WAITING_STATUSES),
+      variant: 'warning'
+    },
+    {
+      key: 'called',
+      label: 'Вызваны',
+      value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_CALLED_STATUSES),
+      variant: 'primary'
+    },
+    {
+      key: 'completed',
+      label: 'Приняты',
+      value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_COMPLETED_STATUSES),
+      variant: 'success'
+    }
+  ], [appointmentsTableData]);
+
   // Вкладки
   // Рендер дашборда
   const renderDashboard = () =>
@@ -2100,44 +2165,29 @@ const DentistPanelUnified = () => {
       boxSizing: 'border-box',
       overflow: 'hidden'
     }}>
-        <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-          <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          display: 'flex',
-          alignItems: 'center',
-          color: 'var(--mac-text-primary)'
-        }}>
+        <div style={dentistryAppointmentsHeaderStyle}>
+          <h3 style={dentistryAppointmentsTitleStyle}>
             <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-success)' }} />
             Записи к стоматологу
           </h3>
-          <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-            <Badge variant="info">Всего: {appointmentsTableData.length}</Badge>
-            <Badge variant="warning">
-              Ожидают: {appointmentsTableData.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
-            </Badge>
-            <Badge variant="primary">
-              Вызваны: {appointmentsTableData.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
-            </Badge>
-            <Badge variant="success">
-              Приняты: {appointmentsTableData.filter((a) => a.status === 'completed' || a.status === 'done').length}
-            </Badge>
+          <div style={dentistryAppointmentsSummaryStyle} role="list" aria-label="Сводка записей стоматолога">
+            {appointmentSummaryItems.map((item) => (
+              <Badge
+              key={item.key}
+              role="listitem"
+              variant={item.variant}
+              aria-label={`${item.label}: ${item.value}`}>
+                {item.label}: {item.value}
+              </Badge>
+            ))}
             <Button
             variant="secondary"
             size="sm"
             onClick={loadDentistryAppointments}
-            disabled={appointmentsLoading}>
+            disabled={appointmentsLoading}
+            style={dentistryRefreshButtonStyle}>
 
-              <RefreshCw size={16} style={{ marginRight: '4px' }} />
+              <RefreshCw size={16} />
               Обновить
             </Button>
           </div>
