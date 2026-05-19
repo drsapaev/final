@@ -530,7 +530,14 @@ STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
             "domain": "queue",
             "domain_service_required": "visit",
             "telegram_commands": ["/cancel_visit", "/move_visit"],
-            "runtime_enabled": False,
+            "runtime_enabled": True,
+            "runtime_scope": "queue_link_status_only",
+            "runtime_owner": "QueueBusinessService",
+            "runtime_methods": [
+                "staff_cancel_visit_queue_link",
+                "staff_move_visit_queue_link",
+            ],
+            "visit_record_mutation_enabled": False,
             "required_before_enablement": True,
             "required_runtime_checks": [
                 "visit_target_resolved_server_side",
@@ -543,13 +550,13 @@ STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
                 "staff_action_completed_or_failed_audit_written",
             ],
             "blocked_by": [
-                "visit_queue_domain_mutation_adapter",
+                "visit_record_mutation_adapter",
                 "explicit_action_enablement",
             ],
         },
     ],
     "blocked_by": [
-        "visit_queue_domain_mutation_adapter",
+        "visit_record_mutation_adapter",
         "payment_domain_mutation_adapter",
         "schedule_domain_mutation_adapter",
         "explicit_action_enablement",
@@ -1140,6 +1147,7 @@ def _build_staff_bot_status(
             "idempotency_key_returned_to_telegram": False,
             "domain_adapter_runtime_enabled": False,
             "queue_action_adapter_runtime_enabled": True,
+            "visit_queue_link_adapter_runtime_enabled": True,
             "domain_adapter_blockers": list(
                 STAFF_BOT_DOMAIN_ADAPTER_CONTRACT["blocked_by"]
             ),

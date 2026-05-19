@@ -1021,6 +1021,7 @@ class QueueBusinessService:
             "action": action,
             "entry_id": entry.id,
             "queue_id": entry.queue_id,
+            "visit_id": entry.visit_id,
             "number": entry.number,
             "previous_status": previous_status,
             "status": entry.status,
@@ -1120,6 +1121,86 @@ class QueueBusinessService:
         return self._staff_action_result(
             entry,
             action="staff_skip_queue_entry",
+            previous_status=previous_status,
+            original_queue_time=original_queue_time,
+        )
+
+    def _staff_visit_queue_link_entry(
+        self,
+        db: Session,
+        *,
+        visit_id: int,
+    ) -> OnlineQueueEntry:
+        active_statuses = {"waiting", "called", "in_service", "diagnostics"}
+        entries = (
+            db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.visit_id == visit_id,
+                OnlineQueueEntry.status.in_(active_statuses),
+            )
+            .order_by(
+                func.coalesce(
+                    OnlineQueueEntry.queue_time,
+                    OnlineQueueEntry.created_at,
+                ).asc(),
+                OnlineQueueEntry.id.asc(),
+            )
+            .all()
+        )
+        if not entries:
+            raise QueueNotFoundError(f"Active queue link for visit {visit_id} not found")
+        if len(entries) > 1:
+            raise QueueConflictError(
+                f"Visit {visit_id} has multiple active queue links"
+            )
+        return entries[0]
+
+    def staff_cancel_visit_queue_link(
+        self,
+        db: Session,
+        *,
+        visit_id: int,
+        actor_user_id: int | None = None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        entry = self._staff_visit_queue_link_entry(db, visit_id=visit_id)
+        original_queue_time = entry.queue_time
+        previous_status = entry.status
+        entry.status = "cancelled"
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            db.flush()
+
+        return self._staff_action_result(
+            entry,
+            action="staff_cancel_visit_queue_link",
+            previous_status=previous_status,
+            original_queue_time=original_queue_time,
+        )
+
+    def staff_move_visit_queue_link(
+        self,
+        db: Session,
+        *,
+        visit_id: int,
+        actor_user_id: int | None = None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        entry = self._staff_visit_queue_link_entry(db, visit_id=visit_id)
+        original_queue_time = entry.queue_time
+        previous_status = entry.status
+        entry.status = "rescheduled"
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            db.flush()
+
+        return self._staff_action_result(
+            entry,
+            action="staff_move_visit_queue_link",
             previous_status=previous_status,
             original_queue_time=original_queue_time,
         )

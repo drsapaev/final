@@ -445,14 +445,22 @@ class TestTelegramBotManagementApiService:
             "/cancel_visit",
             "/move_visit",
         ]
-        assert visit_adapter["runtime_enabled"] is False
+        assert visit_adapter["runtime_enabled"] is True
+        assert visit_adapter["runtime_scope"] == "queue_link_status_only"
+        assert visit_adapter["runtime_owner"] == "QueueBusinessService"
+        assert visit_adapter["runtime_methods"] == [
+            "staff_cancel_visit_queue_link",
+            "staff_move_visit_queue_link",
+        ]
+        assert visit_adapter["visit_record_mutation_enabled"] is False
         assert "queue_fairness_not_reordered" in visit_adapter[
             "required_runtime_checks"
         ]
         assert "queue_time_not_rewritten" in visit_adapter[
             "required_runtime_checks"
         ]
-        assert "visit_queue_domain_mutation_adapter" in visit_adapter["blocked_by"]
+        assert "visit_record_mutation_adapter" in visit_adapter["blocked_by"]
+        assert "explicit_action_enablement" in visit_adapter["blocked_by"]
         assert status["linking_contract"]["enabled"] is True
         assert (
             status["linking_runtime_contract"]["runtime_handler"]
@@ -532,6 +540,10 @@ class TestTelegramBotManagementApiService:
         )
         assert status["confirmations"]["domain_adapter_runtime_enabled"] is False
         assert status["confirmations"]["queue_action_adapter_runtime_enabled"] is True
+        assert (
+            status["confirmations"]["visit_queue_link_adapter_runtime_enabled"]
+            is True
+        )
         assert status["confirmations"]["domain_adapter_blockers"] == (
             admin_telegram.STAFF_BOT_DOMAIN_ADAPTER_CONTRACT["blocked_by"]
         )

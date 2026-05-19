@@ -1127,6 +1127,95 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         assert "7204" not in str(audit_log.payload)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("command", ["/call", "/skip"])
+    async def test_staff_queue_state_change_command_requests_confirmation_without_queue_mutation(
+        self, db_session, registrar_user, test_doctor, test_patient, command
+    ):
+        _link_staff_chat(db_session, chat_id=7220, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+
+        original_queue_time = datetime.utcnow().replace(microsecond=0)
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=14,
+            patient_id=test_patient.id,
+            patient_name="Queue Mutation Guard",
+            phone="+998901234570",
+            source="desk",
+            status="waiting",
+            queue_time=original_queue_time,
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        fake_service = FakeTelegramBotService()
+        update = {
+            "update_id": 220,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7220},
+                "from": {"id": 7220},
+                "text": command,
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        text = fake_service._send_message.await_args.args[1]
+        assert "Staff action confirmation requested" in text
+        assert "Domain: queue" in text
+        assert "Telegram execution: disabled" in text
+        assert "Domain mutation: not performed" in text
+        assert "Queue Mutation Guard" not in text
+        assert "7220" not in text
+
+        db_session.refresh(entry)
+        assert entry.status == "waiting"
+        assert entry.queue_time == original_queue_time
+        assert entry.called_at is None
+
+        confirmation_record = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(
+                TelegramStaffConfirmationToken.staff_user_id == registrar_user.id,
+                TelegramStaffConfirmationToken.telegram_chat_id == 7220,
+            )
+            .one()
+        )
+        assert confirmation_record.operation_key == "queue_call_or_skip_patient"
+        assert confirmation_record.command_key == command
+        assert confirmation_record.consumed_at is None
+        assert confirmation_record.token_hash not in text
+        assert confirmation_record.idempotency_key_hash not in text
+
+        audit_log = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_confirmation_requested")
+            .one()
+        )
+        assert audit_log.actor_user_id == registrar_user.id
+        assert audit_log.payload["actor_role"] == "registrar"
+        assert audit_log.payload["operation_key"] == "queue_call_or_skip_patient"
+        assert audit_log.payload["command_key"] == command
+        assert audit_log.payload["telegram_execution_enabled"] is False
+        assert audit_log.payload["domain_mutation"] is False
+        assert audit_log.payload["state_changing_action"] is True
+        assert confirmation_record.idempotency_key_hash not in str(audit_log.payload)
+        assert "7220" not in str(audit_log.payload)
+
+    @pytest.mark.asyncio
     async def test_staff_state_change_command_denies_unauthorized_role(
         self, db_session, admin_user
     ):
