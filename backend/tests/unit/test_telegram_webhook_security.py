@@ -604,6 +604,73 @@ class TestTelegramWebhookSecurity:
         assert telegram_user.lab_notifications is False
 
     @pytest.mark.asyncio
+    async def test_settings_notification_choice_keeps_localized_settings_menu(
+        self, db_session
+    ):
+        telegram_user = TelegramUser(
+            chat_id=7022,
+            username="patient_chat",
+            first_name="Patient",
+            language_code="ru",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.add(
+            TelegramMessage(
+                chat_id=7022,
+                message_type="patient_bot_reply",
+                template_key="telegram_patient_settings",
+                message_text="settings",
+                status="sent",
+                sent_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 123,
+            "message": {
+                "message_id": 4,
+                "chat": {"id": 7022},
+                "from": {"id": 111},
+                "text": "Без уведомлений",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        db_session.refresh(telegram_user)
+        assert telegram_user.notifications_enabled is False
+        assert telegram_user.appointment_reminders is False
+        assert telegram_user.lab_notifications is False
+        reply_text = fake_service._send_message.await_args.args[1]
+        assert (
+            telegram_webhook._localized_text("notifications_disabled", "ru")
+            in reply_text
+        )
+        assert "Уведомления: отключены" in reply_text
+        assert fake_service._send_message.await_args.args[2] == (
+            telegram_webhook._localized_settings_menu("ru")
+        )
+        latest_log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7022)
+            .order_by(TelegramMessage.id.desc())
+            .first()
+        )
+        assert (
+            latest_log.template_key
+            == "telegram_patient_settings_notifications_disabled"
+        )
+
+    @pytest.mark.asyncio
     async def test_settings_command_returns_localized_settings_menu(self, db_session):
         telegram_user = TelegramUser(
             chat_id=7009,
