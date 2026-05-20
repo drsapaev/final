@@ -1,73 +1,254 @@
 /**
- * FamilyRelationsCard - Компонент для отображения семейных связей пациента
- * 
- * Функции:
- * - Показывает родственников пациента
- * - Указывает основной контакт (для детей/пожилых без телефона)
- * - Позволяет добавлять/удалять связи (регистраторам и админам)
+ * FamilyRelationsCard - component for patient family relationship display.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
+  Badge,
+  Button,
   Card,
   CardContent,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
-  Chip,
-  Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  FormControlLabel,
-  Checkbox,
-  CircularProgress,
-  Alert,
-  Divider,
-  Box } from
-'@mui/material';
+  DialogContent,
+  DialogTitle
+} from '../ui/macos';
 import {
-  PersonAdd,
-  Delete,
+  Baby,
   Phone,
   Star,
-
-  FamilyRestroom,
-  ChildCare,
-  Elderly,
-  People } from
-'@mui/icons-material';
+  Trash2,
+  UserPlus,
+  UserRoundCog,
+  Users
+} from 'lucide-react';
 import apiClient from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 
-// Типы связей с иконками и названиями
 const RELATION_TYPES = {
-  parent: { label: 'Родитель', icon: <FamilyRestroom /> },
-  child: { label: 'Ребёнок', icon: <ChildCare /> },
-  guardian: { label: 'Опекун', icon: <Elderly /> },
-  spouse: { label: 'Супруг(а)', icon: <People /> },
-  sibling: { label: 'Брат/сестра', icon: <People /> },
-  other: { label: 'Другое', icon: <People /> }
+  parent: { label: 'Родитель', Icon: Users },
+  child: { label: 'Ребёнок', Icon: Baby },
+  guardian: { label: 'Опекун', Icon: UserRoundCog },
+  spouse: { label: 'Супруг(а)', Icon: Users },
+  sibling: { label: 'Брат/сестра', Icon: Users },
+  other: { label: 'Другое', Icon: Users }
 };
 
-/**
- * Карточка семейных связей
- */
+const styles = {
+  card: {
+    marginBottom: '16px'
+  },
+  loading: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '24px 0'
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    marginBottom: '16px'
+  },
+  title: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600
+  },
+  sectionTitle: {
+    margin: '0 0 8px',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '13px',
+    fontWeight: 600
+  },
+  list: {
+    display: 'grid',
+    gap: '8px',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none'
+  },
+  relationItem: {
+    display: 'grid',
+    gridTemplateColumns: '28px minmax(0, 1fr) auto',
+    gap: '10px',
+    alignItems: 'start',
+    padding: '10px 0',
+    borderBottom: '1px solid var(--mac-border)'
+  },
+  relationIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    color: 'var(--mac-accent-blue)',
+    background: 'rgba(0, 122, 255, 0.08)'
+  },
+  relationMain: {
+    display: 'grid',
+    gap: '6px',
+    minWidth: 0
+  },
+  relationName: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    color: 'var(--mac-text-primary)',
+    fontSize: '14px',
+    fontWeight: 600
+  },
+  relationMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '8px',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '13px'
+  },
+  phone: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  description: {
+    color: 'var(--mac-text-tertiary)'
+  },
+  empty: {
+    padding: '16px 0',
+    margin: 0,
+    textAlign: 'center',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '13px'
+  },
+  divider: {
+    height: '1px',
+    margin: '16px 0',
+    background: 'var(--mac-border)'
+  },
+  iconButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    color: 'var(--mac-danger, #ff3b30)',
+    background: 'var(--mac-card-bg)',
+    cursor: 'pointer'
+  },
+  fieldGroup: {
+    display: 'grid',
+    gap: '6px',
+    marginBottom: '14px'
+  },
+  label: {
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px',
+    fontWeight: 600
+  },
+  input: {
+    width: '100%',
+    minHeight: '34px',
+    padding: '7px 10px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    color: 'var(--mac-text-primary)',
+    background: 'var(--mac-card-bg)',
+    font: 'inherit'
+  },
+  textarea: {
+    width: '100%',
+    minHeight: '72px',
+    padding: '8px 10px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    color: 'var(--mac-text-primary)',
+    background: 'var(--mac-card-bg)',
+    font: 'inherit',
+    resize: 'vertical'
+  },
+  searchRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap: '8px',
+    alignItems: 'end',
+    marginBottom: '14px',
+    marginTop: '4px'
+  },
+  searchResults: {
+    display: 'grid',
+    gap: '4px',
+    maxHeight: '200px',
+    overflow: 'auto',
+    margin: '0 0 14px',
+    padding: '6px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    listStyle: 'none'
+  },
+  searchResultButton: {
+    width: '100%',
+    display: 'grid',
+    gap: '2px',
+    padding: '8px',
+    border: '1px solid transparent',
+    borderRadius: 'var(--mac-radius-sm)',
+    color: 'var(--mac-text-primary)',
+    background: 'transparent',
+    textAlign: 'left',
+    cursor: 'pointer'
+  },
+  resultPhone: {
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px'
+  },
+  selectedPatient: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px'
+  },
+  checkboxRow: {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    gap: '10px',
+    alignItems: 'start',
+    marginTop: '4px'
+  },
+  checkboxText: {
+    display: 'grid',
+    gap: '2px',
+    color: 'var(--mac-text-primary)',
+    fontSize: '13px'
+  },
+  helpText: {
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px'
+  },
+  spinner: {
+    width: '24px',
+    height: '24px',
+    border: '3px solid var(--mac-border)',
+    borderTopColor: 'var(--mac-accent-blue)',
+    borderRadius: '50%',
+    animation: 'family-card-spin 0.8s linear infinite'
+  }
+};
+
 export default function FamilyRelationsCard({
   patientId,
   patientName,
-  canEdit = false, // Может ли пользователь редактировать связи
-  onFamilyChange // Callback при изменении связей
+  canEdit = false,
+  onFamilyChange
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -75,7 +256,6 @@ export default function FamilyRelationsCard({
   const [isRelativeOf, setIsRelativeOf] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Загрузка данных о семье
   const loadFamily = useCallback(async () => {
     if (!patientId) return;
 
@@ -98,7 +278,6 @@ export default function FamilyRelationsCard({
     loadFamily();
   }, [loadFamily]);
 
-  // Удаление связи
   const handleDeleteRelation = async (relationId) => {
     if (!window.confirm('Удалить эту семейную связь?')) return;
 
@@ -112,130 +291,105 @@ export default function FamilyRelationsCard({
     }
   };
 
-  // Render relation item
   const renderRelation = (rel, showPatient = false) => {
     const person = showPatient ? rel.patient : rel.related_patient;
     const typeInfo = RELATION_TYPES[rel.relation_type] || RELATION_TYPES.other;
+    const TypeIcon = typeInfo.Icon;
 
     return (
-      <ListItem key={rel.relation_id} divider>
-                <ListItemIcon>
-                    {typeInfo.icon}
-                </ListItemIcon>
-                <ListItemText
-          primary={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span>{person?.full_name || 'Неизвестно'}</span>
-                            {rel.is_primary_contact &&
-            <Chip
-              icon={<Star fontSize="small" />}
-              label="Основной контакт"
-              size="small"
-              color="primary" />
-
-            }
-                        </Box>
-          }
-          secondary={
-          <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Chip label={typeInfo.label} size="small" variant="outlined" />
-                            {person?.phone &&
-            <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Phone fontSize="small" color="action" />
-                                    {person.phone}
-                                </Box>
-            }
-                            {rel.description &&
-            <span style={{ color: '#666' }}>— {rel.description}</span>
-            }
-                        </Box>
-          } />
-        
-                {canEdit &&
-        <ListItemSecondaryAction>
-                        <IconButton
-            edge="end"
+      <li key={rel.relation_id} style={styles.relationItem}>
+        <span style={styles.relationIcon} aria-hidden="true">
+          <TypeIcon size={16} />
+        </span>
+        <div style={styles.relationMain}>
+          <div style={styles.relationName}>
+            <span>{person?.full_name || 'Неизвестно'}</span>
+            {rel.is_primary_contact && (
+              <Badge variant="primary" size="small">
+                <Star size={12} aria-hidden="true" />
+                Основной контакт
+              </Badge>
+            )}
+          </div>
+          <div style={styles.relationMeta}>
+            <Badge variant="outline" size="small">{typeInfo.label}</Badge>
+            {person?.phone && (
+              <span style={styles.phone}>
+                <Phone size={13} aria-hidden="true" />
+                {person.phone}
+              </span>
+            )}
+            {rel.description && <span style={styles.description}>— {rel.description}</span>}
+          </div>
+        </div>
+        {canEdit && (
+          <button
+            type="button"
             aria-label="delete"
+            style={styles.iconButton}
             onClick={() => handleDeleteRelation(rel.relation_id)}
-            size="small">
-            
-                            <Delete fontSize="small" />
-                        </IconButton>
-                    </ListItemSecondaryAction>
-        }
-            </ListItem>);
-
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        )}
+      </li>
+    );
   };
 
   if (loading) {
     return (
-      <Card sx={{ mb: 2 }}>
-                <CardContent sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                    <CircularProgress size={24} />
-                </CardContent>
-            </Card>);
-
+      <Card style={styles.card}>
+        <CardContent style={styles.loading}>
+          <span style={styles.spinner} aria-label="Loading family relationships" />
+          <style>{'@keyframes family-card-spin { to { transform: rotate(360deg); } }'}</style>
+        </CardContent>
+      </Card>
+    );
   }
 
   const hasFamily = family.length > 0 || isRelativeOf.length > 0;
 
   return (
-    <Card sx={{ mb: 2 }}>
-            <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FamilyRestroom color="primary" />
-                        Семья и родственники
-                    </Typography>
-                    {canEdit &&
-          <Button
-            size="small"
-            startIcon={<PersonAdd />}
-            onClick={() => setDialogOpen(true)}>
-            
-                            Добавить
-                        </Button>
-          }
-                </Box>
+    <Card style={styles.card}>
+      <CardContent>
+        <div style={styles.header}>
+          <h2 style={styles.title}>
+            <Users size={19} color="var(--mac-accent-blue)" aria-hidden="true" />
+            Семья и родственники
+          </h2>
+          {canEdit && (
+            <Button size="small" onClick={() => setDialogOpen(true)}>
+              <UserPlus size={14} aria-hidden="true" />
+              Добавить
+            </Button>
+          )}
+        </div>
 
-                {error &&
-        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        }
+        {error && <Alert severity="error" style={{ marginBottom: '14px' }}>{error}</Alert>}
 
-                {!hasFamily ?
-        <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                        Нет связанных родственников
-                    </Typography> :
-
-        <>
-                        {family.length > 0 &&
+        {!hasFamily ? (
+          <p style={styles.empty}>Нет связанных родственников</p>
+        ) : (
           <>
-                                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                                    Родственники пациента:
-                                </Typography>
-                                <List dense>
-                                    {family.map((rel) => renderRelation(rel, false))}
-                                </List>
-                            </>
-          }
+            {family.length > 0 && (
+              <section aria-label="Patient relatives">
+                <h3 style={styles.sectionTitle}>Родственники пациента:</h3>
+                <ul style={styles.list}>{family.map((rel) => renderRelation(rel, false))}</ul>
+              </section>
+            )}
 
-                        {isRelativeOf.length > 0 &&
-          <>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                                    Является родственником для:
-                                </Typography>
-                                <List dense>
-                                    {isRelativeOf.map((rel) => renderRelation(rel, true))}
-                                </List>
-                            </>
-          }
-                    </>
-        }
-            </CardContent>
+            {isRelativeOf.length > 0 && (
+              <section aria-label="Patient is relative of">
+                {family.length > 0 && <div style={styles.divider} />}
+                <h3 style={styles.sectionTitle}>Является родственником для:</h3>
+                <ul style={styles.list}>{isRelativeOf.map((rel) => renderRelation(rel, true))}</ul>
+              </section>
+            )}
+          </>
+        )}
+      </CardContent>
 
-            {/* Dialog for adding new relation */}
-            <AddRelationDialog
+      <AddRelationDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         patientId={patientId}
@@ -244,25 +398,19 @@ export default function FamilyRelationsCard({
           setDialogOpen(false);
           loadFamily();
           onFamilyChange?.();
-        }} />
-      
-        </Card>);
-
+        }}
+      />
+    </Card>
+  );
 }
 
-
 FamilyRelationsCard.propTypes = {
-  ...(FamilyRelationsCard.propTypes || {}),
-  canEdit: PropTypes.any,
-  onFamilyChange: PropTypes.any,
-  patientId: PropTypes.any,
-  patientName: PropTypes.any,
+  canEdit: PropTypes.bool,
+  onFamilyChange: PropTypes.func,
+  patientId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  patientName: PropTypes.string
 };
 
-
-/**
- * Диалог добавления новой связи
- */
 function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -273,7 +421,6 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Поиск пациентов
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
@@ -281,7 +428,6 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
       const response = await apiClient.get('/patients', {
         params: { search: searchQuery, limit: 10 }
       });
-      // Исключаем текущего пациента из результатов
       setSearchResults(
         (response.data || []).filter((p) => p.id !== patientId)
       );
@@ -290,7 +436,6 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
     }
   };
 
-  // Создание связи
   const handleSubmit = async () => {
     if (!selectedPatient) {
       setError('Выберите родственника');
@@ -310,7 +455,6 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         }
       });
 
-      // Reset form
       setSearchQuery('');
       setSearchResults([]);
       setSelectedPatient(null);
@@ -329,123 +473,111 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Добавить родственника для {patientName}</DialogTitle>
-            <DialogContent>
-                {error &&
-        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        }
+      <DialogTitle>Добавить родственника для {patientName}</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" style={{ marginBottom: '14px' }}>{error}</Alert>}
 
-                {/* Поиск пациента */}
-                <Box sx={{ display: 'flex', gap: 1, mb: 2, mt: 1 }}>
-                    <TextField
-            label="Поиск по ФИО или телефону"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            fullWidth
-            size="small" />
-          
-                    <Button variant="outlined" onClick={handleSearch}>
-                        Найти
-                    </Button>
-                </Box>
+        <div style={styles.searchRow}>
+          <label style={styles.fieldGroup}>
+            <span style={styles.label}>Поиск по ФИО или телефону</span>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
+              style={styles.input}
+            />
+          </label>
+          <Button type="button" variant="outline" onClick={handleSearch}>
+            Найти
+          </Button>
+        </div>
 
-                {/* Результаты поиска */}
-                {searchResults.length > 0 && !selectedPatient &&
-        <List dense sx={{ mb: 2, maxHeight: 200, overflow: 'auto', border: '1px solid #ddd', borderRadius: 1 }}>
-                        {searchResults.map((patient) =>
-          <ListItem
-            key={patient.id}
-            button
-            onClick={() => setSelectedPatient(patient)}>
-            
-                                <ListItemText
-              primary={`${patient.last_name} ${patient.first_name} ${patient.middle_name || ''}`}
-              secondary={patient.phone || 'Без телефона'} />
-            
-                            </ListItem>
-          )}
-                    </List>
-        }
+        {searchResults.length > 0 && !selectedPatient && (
+          <ul style={styles.searchResults}>
+            {searchResults.map((patient) => (
+              <li key={patient.id}>
+                <button
+                  type="button"
+                  style={styles.searchResultButton}
+                  onClick={() => setSelectedPatient(patient)}
+                >
+                  <span>{patient.last_name} {patient.first_name} {patient.middle_name || ''}</span>
+                  <span style={styles.resultPhone}>{patient.phone || 'Без телефона'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
-                {/* Выбранный пациент */}
-                {selectedPatient &&
-        <Alert
-          severity="info"
-          sx={{ mb: 2 }}
-          action={
-          <Button color="inherit" size="small" onClick={() => setSelectedPatient(null)}>
-                                Изменить
-                            </Button>
-          }>
-          
-                        Выбран: {selectedPatient.last_name} {selectedPatient.first_name}
-                        {selectedPatient.phone && ` (${selectedPatient.phone})`}
-                    </Alert>
-        }
+        {selectedPatient && (
+          <Alert severity="info" style={{ marginBottom: '14px' }}>
+            <span style={styles.selectedPatient}>
+              <span>
+                Выбран: {selectedPatient.last_name} {selectedPatient.first_name}
+                {selectedPatient.phone && ` (${selectedPatient.phone})`}
+              </span>
+              <Button type="button" variant="link" size="small" onClick={() => setSelectedPatient(null)}>
+                Изменить
+              </Button>
+            </span>
+          </Alert>
+        )}
 
-                {/* Тип связи */}
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Тип связи</InputLabel>
-                    <Select
+        <label style={styles.fieldGroup}>
+          <span style={styles.label}>Тип связи</span>
+          <select
             value={relationType}
-            onChange={(e) => setRelationType(e.target.value)}
-            label="Тип связи">
-            
-                        {Object.entries(RELATION_TYPES).map(([key, { label }]) =>
-            <MenuItem key={key} value={key}>{label}</MenuItem>
-            )}
-                    </Select>
-                </FormControl>
+            onChange={(event) => setRelationType(event.target.value)}
+            style={styles.input}
+          >
+            {Object.entries(RELATION_TYPES).map(([key, { label }]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </label>
 
-                {/* Описание */}
-                <TextField
-          label="Описание (необязательно)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          fullWidth
-          size="small"
-          sx={{ mb: 2 }}
-          placeholder="Например: Бабушка по маминой линии" />
-        
+        <label style={styles.fieldGroup}>
+          <span style={styles.label}>Описание (необязательно)</span>
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            style={styles.textarea}
+            placeholder="Например: Бабушка по маминой линии"
+          />
+        </label>
 
-                {/* Основной контакт */}
-                <FormControlLabel
-          control={
-          <Checkbox
+        <label style={styles.checkboxRow}>
+          <input
+            type="checkbox"
             checked={isPrimaryContact}
-            onChange={(e) => setIsPrimaryContact(e.target.checked)} />
-
-          }
-          label={
-          <Box>
-                            <Typography variant="body2">Основной контакт</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Для пациентов без телефона (дети, пожилые)
-                            </Typography>
-                        </Box>
-          } />
-        
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Отмена</Button>
-                <Button
+            onChange={(event) => setIsPrimaryContact(event.target.checked)}
+          />
+          <span style={styles.checkboxText}>
+            <span>Основной контакт</span>
+            <span style={styles.helpText}>Для пациентов без телефона (дети, пожилые)</span>
+          </span>
+        </label>
+      </DialogContent>
+      <DialogActions>
+        <Button type="button" onClick={onClose}>Отмена</Button>
+        <Button
+          type="button"
+          variant="primary"
+          loading={loading}
+          disabled={loading || !selectedPatient}
           onClick={handleSubmit}
-          variant="contained"
-          disabled={loading || !selectedPatient}>
-          
-                    {loading ? <CircularProgress size={20} /> : 'Добавить'}
-                </Button>
-            </DialogActions>
-        </Dialog>);
-
+        >
+          Добавить
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 AddRelationDialog.propTypes = {
-  ...(AddRelationDialog.propTypes || {}),
-  onClose: PropTypes.any,
-  onSuccess: PropTypes.any,
-  open: PropTypes.any,
-  patientId: PropTypes.any,
-  patientName: PropTypes.any,
+  onClose: PropTypes.func,
+  onSuccess: PropTypes.func,
+  open: PropTypes.bool,
+  patientId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  patientName: PropTypes.string
 };
