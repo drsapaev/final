@@ -75,7 +75,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const panelGates = sourceBetween(
       appSource,
       'const canPreviewAppointments = Boolean(',
-      'const handleAppointmentPreviewFieldChange = (field) => (event) => {'
+      'const handleMiniAppCapabilitySelect = (section) => {'
     );
     const capabilityGrid = sourceBetween(
       appSource,
@@ -96,6 +96,31 @@ describe('Telegram Mini App deep-link guardrails', () => {
     expect(panelGates).not.toContain('location.search');
     expect(capabilityGrid).toContain('const isSelected = key === selectedSection;');
     expect(capabilityGrid).toContain('...(isSelected ? miniAppCapabilitySelectedStyle : {})');
+  });
+
+  it('lets capability cards switch canonical Mini App sections without legacy URLs or raw patient identifiers', () => {
+    const capabilitySelectHandler = sourceBetween(
+      appSource,
+      'const handleMiniAppCapabilitySelect = (section) => {',
+      'const handleAppointmentPreviewFieldChange = (field) => (event) => {'
+    );
+    const capabilityGrid = sourceBetween(
+      appSource,
+      '<section style={miniAppGridStyle}>',
+      '</section>'
+    );
+
+    expect(capabilitySelectHandler).toContain("new URLSearchParams(location.search || '')");
+    expect(capabilitySelectHandler).toContain("params.set('section', section)");
+    expect(capabilitySelectHandler).toContain('navigate({');
+    expect(capabilitySelectHandler).toContain('pathname: location.pathname');
+    expect(capabilitySelectHandler).toContain('search: `?${params.toString()}`');
+    expect(capabilitySelectHandler).not.toContain('/patient?tab=');
+    expect(capabilitySelectHandler).not.toMatch(/patientId|telegramUserId|chatId/);
+    expect(capabilityGrid).toContain('interactive');
+    expect(capabilityGrid).toContain('onClick={() => handleMiniAppCapabilitySelect(key)}');
+    expect(capabilityGrid).toContain('aria-pressed={isSelected}');
+    expect(capabilityGrid).toContain('aria-label={`${t(\'openSection\')}: ${label}`}');
   });
 
   it('keeps the Mini App shell away from legacy patient tab URLs', () => {
