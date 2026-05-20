@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
+  Badge,
   Card,
   CardContent,
   Typography,
@@ -15,19 +16,10 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions } from
+  DialogActions,
+  Select } from
 
 '../ui/macos';
-
-// MUI imports - using MUI Select for compatibility with FormControl/MenuItem
-import {
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip } from
-'@mui/material';
 
 import {
   CreditCard,
@@ -44,6 +36,25 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+
+const dividerStyle = {
+  height: 1,
+  marginBottom: 24,
+  background: 'var(--mac-border)'
+};
+
+const providerOptionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  width: '100%',
+  gap: 8
+};
+
+const providerNameStyle = {
+  textTransform: 'capitalize',
+  flex: '1 1 auto',
+  minWidth: 0
+};
 
 const PaymentWidget = ({
   visitId,
@@ -416,39 +427,39 @@ const PaymentWidget = ({
           </div>
         </Box>
 
-        <Divider style={{ marginBottom: 24 }} />
+        <div style={dividerStyle} />
 
         {/* Выбор провайдера */}
-        <FormControl fullWidth style={{ marginBottom: 24 }}>
-          <InputLabel id="payment-provider-label">Способ оплаты</InputLabel>
-          <Select
-            labelId="payment-provider-label"
-            value={selectedProvider}
-            onChange={(e) => setSelectedProvider(e.target.value)}
-            label="Способ оплаты"
-            disabled={loading}>
-            
-            {providers.map((provider) =>
-            <MenuItem key={provider.code} value={provider.code}>
-                <Box display="flex" alignItems="center">
-                  {providerIcons[provider.code]}
-                  <Typography style={{ marginLeft: 8, textTransform: 'capitalize' }}>
-                    {provider.name}
-                  </Typography>
-                  <Chip
-                  label={provider.supported_currencies.join(', ')}
+        <Select
+          id="payment-provider"
+          label="Способ оплаты"
+          value={selectedProvider}
+          onChange={(value) => setSelectedProvider(value)}
+          disabled={loading}
+          style={{ marginBottom: 24 }}
+          options={providers.map((provider) => ({
+            value: provider.code,
+            label: (
+              <span style={providerOptionStyle}>
+                {providerIcons[provider.code]}
+                <span style={providerNameStyle}>
+                  {provider.name}
+                </span>
+                <Badge
                   size="small"
+                  variant="outline"
                   style={{
                     marginLeft: 'auto',
                     backgroundColor: providerColors[provider.code] + '20',
                     color: providerColors[provider.code]
-                  }} />
-                
-                </Box>
-              </MenuItem>
-            )}
-          </Select>
-        </FormControl>
+                  }}
+                >
+                  {provider.supported_currencies.join(', ')}
+                </Badge>
+              </span>
+            )
+          }))}
+        />
 
         {/* Статус платежа */}
         {renderPaymentStatus()}
