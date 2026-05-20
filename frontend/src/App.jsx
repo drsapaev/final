@@ -142,6 +142,22 @@ const MINI_APP_SECTION_ALIASES = {
   documents: 'results',
 };
 
+const MINI_APP_CAPABILITY_SAFETY_FLAGS = [
+  ['contains_medical_data', 'medical data', 'no medical data'],
+  ['contains_payment_provider_data', 'provider payloads', 'no provider payloads'],
+  ['contains_passport_data', 'passport data', 'no passport data'],
+  ['contains_billing_records', 'billing records', 'no billing records'],
+  ['contains_amounts', 'amounts present', 'no amounts'],
+  ['contains_payment_records', 'payment records', 'no payment records'],
+  ['contains_provider_payloads', 'provider payloads', 'no provider payloads'],
+  ['contains_medical_results', 'medical results', 'no medical results'],
+  ['contains_lab_values', 'lab values', 'no lab values'],
+  ['contains_report_records', 'report records', 'no report records'],
+  ['contains_file_urls', 'file URLs', 'no file URLs'],
+  ['contains_pdfs', 'PDFs present', 'no PDFs'],
+  ['contains_diagnoses', 'diagnoses', 'no diagnoses'],
+];
+
 function getTelegramMiniAppInitData() {
   if (typeof window === 'undefined') {
     return '';
@@ -182,6 +198,23 @@ function isMiniAppCapabilityEnabled(capability) {
     capability?.capture_enabled ||
     capability?.payment_capture_enabled
   );
+}
+
+function getMiniAppCapabilitySafetyBadges(capability) {
+  if (!capability) {
+    return [];
+  }
+
+  return MINI_APP_CAPABILITY_SAFETY_FLAGS
+    .filter(([key]) => Object.prototype.hasOwnProperty.call(capability, key))
+    .map(([key, unsafeLabel, safeLabel]) => {
+      const unsafe = Boolean(capability[key]);
+      return {
+        key,
+        label: unsafe ? unsafeLabel : safeLabel,
+        variant: unsafe ? 'warning' : 'success',
+      };
+    });
 }
 
 function notifyTelegramMiniAppReady() {
@@ -504,6 +537,7 @@ function TelegramMiniAppPatientShell() {
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
   const selectedCapabilityEnabled = isMiniAppCapabilityEnabled(selectedCapability);
+  const selectedCapabilitySafetyBadges = getMiniAppCapabilitySafetyBadges(selectedCapability);
   const canPreviewAppointments = Boolean(
     selectedSection === 'appointments' &&
     selectedCapability?.preview_enabled
@@ -637,6 +671,15 @@ function TelegramMiniAppPatientShell() {
                     <p style={miniAppCapabilityTextStyle}>
                       {selectedCapability?.status || 'manifest_only'}
                     </p>
+                    {selectedCapabilitySafetyBadges.length > 0 && (
+                      <div style={miniAppSelectedSectionSafetyStyle}>
+                        {selectedCapabilitySafetyBadges.map((badge) => (
+                          <Badge key={badge.key} variant={badge.variant} size="small">
+                            {badge.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1364,6 +1407,14 @@ const miniAppSelectedSectionStatusStyle = {
   alignItems: 'flex-end',
   gap: '8px',
   minWidth: '128px',
+};
+
+const miniAppSelectedSectionSafetyStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
+  gap: '6px',
+  maxWidth: '360px',
 };
 
 const miniAppAppointmentPreviewStyle = {
