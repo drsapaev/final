@@ -918,6 +918,9 @@ function TelegramMiniAppPatientShell() {
                               <Badge variant={form.contains_medical_data ? 'warning' : 'success'} size="small">
                                 {form.contains_medical_data ? 'medical data' : 'no medical data'}
                               </Badge>
+                              <Badge variant={form.contains_passport_data ? 'warning' : 'success'} size="small">
+                                {form.contains_passport_data ? 'passport data' : 'no passport data'}
+                              </Badge>
                             </div>
                           </div>
                         ))}
