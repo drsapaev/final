@@ -151,9 +151,15 @@ const MINI_APP_I18N = {
     sessionNotConfirmed: 'Сессия Mini App не подтверждена',
     appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
     appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
+    appointmentCreateFailed: 'Заявка на запись не создана: {reason}',
     appointmentPrecheck: 'Предварительная проверка',
     appointmentDraft: 'Черновик записи',
-    noCreate: 'Без создания',
+    appointmentRequest: 'Заявка',
+    appointmentRequestNote: 'После отправки создается только заявка на запись. Визит, очередь и оплата не создаются автоматически.',
+    confirmAppointmentRequest: 'Отправить заявку',
+    appointmentCreating: 'Заявка отправляется...',
+    appointmentRequestCreated: 'Заявка на запись создана. Номер записи: #{appointmentId}. Регистратура подтвердит детали.',
+    appointmentRequestCreatedNoId: 'Заявка на запись создана. Регистратура подтвердит детали.',
     date: 'Дата',
     time: 'Время',
     department: 'Отделение',
@@ -245,9 +251,15 @@ const MINI_APP_I18N = {
     sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
     appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
     appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
+    appointmentCreateFailed: 'Yozilish so\'rovi yaratilmadi: {reason}',
     appointmentPrecheck: 'Oldindan tekshirish',
     appointmentDraft: 'Yozilish qoralamasi',
-    noCreate: 'Yaratmasdan',
+    appointmentRequest: 'So\'rov',
+    appointmentRequestNote: 'Yuborilganda faqat yozilish so\'rovi yaratiladi. Tashrif, navbat va to\'lov avtomatik yaratilmaydi.',
+    confirmAppointmentRequest: 'Yozilish so\'rovini yuborish',
+    appointmentCreating: 'So\'rov yuborilmoqda...',
+    appointmentRequestCreated: 'Yozilish so\'rovi yaratildi. Yozuv raqami: #{appointmentId}. Registratura ma\'lumotlarni tasdiqlaydi.',
+    appointmentRequestCreatedNoId: 'Yozilish so\'rovi yaratildi. Registratura ma\'lumotlarni tasdiqlaydi.',
     date: 'Sana',
     time: 'Vaqt',
     department: 'Bo\'lim',
@@ -444,6 +456,24 @@ function createMiniAppAppointmentPreviewForm() {
   };
 }
 
+function buildMiniAppAppointmentRequestBody(authPayload, form) {
+  return {
+    ...authPayload,
+    appointmentDate: form.appointmentDate,
+    appointmentTime: form.appointmentTime || undefined,
+    department: form.department.trim() || undefined,
+    notes: form.notes.trim() || undefined,
+  };
+}
+
+function getMiniAppApiErrorReason(error, fallback) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  return detail?.reason || fallback;
+}
+
 function isMiniAppCapabilityEnabled(capability) {
   return Boolean(
     capability?.create_enabled ||
@@ -510,6 +540,11 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [appointmentCreate, setAppointmentCreate] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
   const [cabinetSummary, setCabinetSummary] = useState({
     status: 'idle',
     payload: null,
@@ -564,6 +599,16 @@ function TelegramMiniAppPatientShell() {
     });
     setResultsSummary({
       status: selectedSection === 'results' && authPayload ? 'loading' : 'idle',
+      payload: null,
+      error: null,
+    });
+    setAppointmentPreview({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
+    setAppointmentCreate({
+      status: 'idle',
       payload: null,
       error: null,
     });
@@ -676,6 +721,16 @@ function TelegramMiniAppPatientShell() {
       ...current,
       [field]: event.target.value,
     }));
+    setAppointmentPreview({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
+    setAppointmentCreate({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
   };
 
   const handleAppointmentPreviewSubmit = (event) => {
@@ -691,13 +746,7 @@ function TelegramMiniAppPatientShell() {
       return;
     }
 
-    const requestBody = {
-      ...authPayload,
-      appointmentDate: appointmentPreviewForm.appointmentDate,
-      appointmentTime: appointmentPreviewForm.appointmentTime || undefined,
-      department: appointmentPreviewForm.department.trim() || undefined,
-      notes: appointmentPreviewForm.notes.trim() || undefined,
-    };
+    const requestBody = buildMiniAppAppointmentRequestBody(authPayload, appointmentPreviewForm);
 
     setAppointmentPreview({
       status: 'loading',
@@ -714,11 +763,55 @@ function TelegramMiniAppPatientShell() {
         });
       })
       .catch((error) => {
-        const reason = error?.response?.data?.detail?.reason || 'preview_failed';
+        const reason = getMiniAppApiErrorReason(error, 'preview_failed');
         setAppointmentPreview({
           status: 'error',
           payload: null,
           error: t('appointmentPreviewFailed', { reason }),
+        });
+      });
+  };
+
+  const handleAppointmentCreateSubmit = () => {
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
+    if (!authPayload || !appointmentPreviewForm.appointmentDate) {
+      setAppointmentCreate({
+        status: 'error',
+        payload: null,
+        error: t('appointmentDateRequired'),
+      });
+      return;
+    }
+
+    const requestBody = buildMiniAppAppointmentRequestBody(authPayload, appointmentPreviewForm);
+
+    setAppointmentCreate({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/appointments', requestBody)
+      .then((response) => {
+        setAppointmentCreate({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+        if (response.data?.preview) {
+          setAppointmentPreview({
+            status: 'ready',
+            payload: response.data.preview,
+            error: null,
+          });
+        }
+      })
+      .catch((error) => {
+        const reason = getMiniAppApiErrorReason(error, 'appointment_create_failed');
+        setAppointmentCreate({
+          status: 'error',
+          payload: null,
+          error: t('appointmentCreateFailed', { reason }),
         });
       });
   };
@@ -838,6 +931,7 @@ function TelegramMiniAppPatientShell() {
   };
 
   const previewAppointment = appointmentPreview.payload?.appointment || null;
+  const createdAppointmentId = appointmentCreate.payload?.appointment_id || null;
   const patientForms = (formsPreview.payload?.forms || []).map((form) => (
     localizeMiniAppPatientForm(languageCode, form)
   ));
@@ -1022,7 +1116,7 @@ function TelegramMiniAppPatientShell() {
                       <p style={miniAppKickerStyle}>{t('appointmentPrecheck')}</p>
                       <h2 style={miniAppSelectedSectionTitleStyle}>{t('appointmentDraft')}</h2>
                     </div>
-                    <Badge variant="secondary" size="small">{t('noCreate')}</Badge>
+                    <Badge variant="secondary" size="small">{t('appointmentRequest')}</Badge>
                   </div>
 
                   <form style={miniAppAppointmentFormStyle} onSubmit={handleAppointmentPreviewSubmit}>
@@ -1077,23 +1171,56 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {appointmentPreview.status === 'ready' && previewAppointment && (
-                    <div style={miniAppAppointmentPreviewResultStyle}>
-                      <div>
-                        <p style={miniAppCapabilityTextStyle}>{t('dateTime')}</p>
-                        <strong>{previewAppointment.appointment_date} {previewAppointment.appointment_time || t('timeMissing')}</strong>
+                    <>
+                      <div style={miniAppAppointmentPreviewResultStyle}>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('dateTime')}</p>
+                          <strong>{previewAppointment.appointment_date} {previewAppointment.appointment_time || t('timeMissing')}</strong>
+                        </div>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('status')}</p>
+                          <strong>{previewAppointment.status}</strong>
+                        </div>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('payment')}</p>
+                          <strong>{previewAppointment.payment_type} / {previewAppointment.payment_currency}</strong>
+                        </div>
+                        <Badge variant={appointmentPreview.payload?.mutation_allowed ? 'warning' : 'success'} size="small">
+                          {appointmentPreview.payload?.preview_only ? t('previewOnly') : t('needsCheck')}
+                        </Badge>
                       </div>
-                      <div>
-                        <p style={miniAppCapabilityTextStyle}>{t('status')}</p>
-                        <strong>{previewAppointment.status}</strong>
-                      </div>
-                      <div>
-                        <p style={miniAppCapabilityTextStyle}>{t('payment')}</p>
-                        <strong>{previewAppointment.payment_type} / {previewAppointment.payment_currency}</strong>
-                      </div>
-                      <Badge variant={appointmentPreview.payload?.mutation_allowed ? 'warning' : 'success'} size="small">
-                        {appointmentPreview.payload?.preview_only ? t('previewOnly') : t('needsCheck')}
-                      </Badge>
-                    </div>
+
+                      <Alert severity="info" style={miniAppNoticeStyle}>
+                        {t('appointmentRequestNote')}
+                      </Alert>
+
+                      {appointmentCreate.status === 'error' && (
+                        <Alert severity="error" style={miniAppNoticeStyle}>
+                          {appointmentCreate.error}
+                        </Alert>
+                      )}
+
+                      {appointmentCreate.status === 'ready' && (
+                        <Alert severity="success" style={miniAppNoticeStyle}>
+                          {createdAppointmentId
+                            ? t('appointmentRequestCreated', { appointmentId: createdAppointmentId })
+                            : t('appointmentRequestCreatedNoId')}
+                        </Alert>
+                      )}
+
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="small"
+                        loading={appointmentCreate.status === 'loading'}
+                        disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}
+                        onClick={handleAppointmentCreateSubmit}
+                      >
+                        {appointmentCreate.status === 'loading'
+                          ? t('appointmentCreating')
+                          : t('confirmAppointmentRequest')}
+                      </Button>
+                    </>
                   )}
                 </CardContent>
               </Card>

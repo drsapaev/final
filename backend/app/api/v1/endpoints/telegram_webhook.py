@@ -4773,6 +4773,7 @@ def create_mini_app_appointment_booking(
     preview = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
+        allow_entry_token=True,
     )
     draft_payload = preview.draft.to_appointment_create_payload()
 
