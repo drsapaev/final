@@ -69,7 +69,7 @@ Current local build evidence after PR-PERF-12 review:
   changing runtime UI.
 - [x] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
   MUI islands; do not migrate them in the same PR as the handoff.
-- [ ] Final: summarize third-cycle completion, merged PRs, remaining chunks, MUI
+- [x] Final: summarize third-cycle completion, merged PRs, remaining chunks, MUI
   status, and next backlog.
 
 ## Candidate Performance Slices
