@@ -61,7 +61,7 @@ Current local build evidence after PR-PERF-12 review:
 - [x] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
   with one more optional-view split; stop if the next candidate is
   user/RBAC/payment/queue/Telegram/security-sensitive.
-- [ ] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
+- [x] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
   performance changes and classify remaining runtime/example MUI refs.
 - [ ] PR-MUI-2: migrate exactly one low-risk admin MUI island only if a dedicated
   first-touch file and browser proof are available.
