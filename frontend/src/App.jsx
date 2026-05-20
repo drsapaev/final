@@ -135,7 +135,7 @@ const MINI_APP_I18N = {
     statusLoading: 'Загрузка статуса...',
     sessionUnavailable: 'Сессия Telegram недоступна. Данные пациента не загружаются.',
     openSection: 'Открытый раздел',
-    available: 'Доступно',
+    available: 'Сервис доступен',
     statusOnly: 'Только статус',
     patient: 'Пациент',
     patientFallback: 'Пациент',
@@ -211,6 +211,7 @@ const MINI_APP_I18N = {
     queueStatus: 'Статус очереди',
     queueInactive: 'Нет активной очереди',
     queueEmpty: 'На сегодня активной очереди нет.',
+    queueEmptyRecovery: 'Если вы записаны или ожидаете очередь, обратитесь в регистратуру или откройте ссылку заново из Telegram.',
     queueEntries: 'Записи очереди',
     queuePrivacyNote: 'В Telegram показываются только номер очереди, кабинет и статус. Очередь не меняется из Mini App.',
     visitsTitle: 'Мои визиты',
@@ -260,7 +261,7 @@ const MINI_APP_I18N = {
     statusLoading: 'Holat yuklanmoqda...',
     sessionUnavailable: 'Telegram sessiyasi mavjud emas. Bemor maʼlumotlari yuklanmaydi.',
     openSection: 'Ochiq bo\'lim',
-    available: 'Mavjud',
+    available: 'Xizmat mavjud',
     statusOnly: 'Faqat holat',
     patient: 'Bemor',
     patientFallback: 'Bemor',
@@ -336,6 +337,7 @@ const MINI_APP_I18N = {
     queueStatus: 'Navbat holati',
     queueInactive: 'Faol navbat yo\'q',
     queueEmpty: 'Bugun faol navbat yo\'q.',
+    queueEmptyRecovery: 'Agar siz yozilgan bo\'lsangiz yoki navbat kutayotgan bo\'lsangiz, registraturaga murojaat qiling yoki havolani Telegramdan qayta oching.',
     queueEntries: 'Navbat yozuvlari',
     queuePrivacyNote: 'Telegramda faqat navbat raqami, kabinet va holat ko\'rsatiladi. Mini App navbatni o\'zgartirmaydi.',
     visitsTitle: 'Mening tashriflarim',
@@ -1016,7 +1018,7 @@ function TelegramMiniAppPatientShell() {
           </div>
           <Badge
             variant={state.status === 'ready' ? 'success' : 'secondary'}
-            size="large"
+            size="small"
             style={miniAppStatusBadgeStyle}
           >
             {state.status === 'ready' ? t('sessionReady') : t('sessionWaiting')}
@@ -1185,7 +1187,11 @@ function TelegramMiniAppPatientShell() {
                     </>
                   ) : (
                     <Alert severity="info" style={miniAppNoticeStyle}>
-                      {t('queueEmpty')}
+                      <span style={miniAppQueueEmptyContentStyle}>
+                        <strong>{t('queueInactive')}</strong>
+                        <span>{t('queueEmpty')}</span>
+                        <span>{t('queueEmptyRecovery')}</span>
+                      </span>
                     </Alert>
                   )}
 
@@ -1893,6 +1899,7 @@ const miniAppHeroStyle = {
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   gap: '16px',
+  flexWrap: 'wrap',
   padding: '8px 0 18px',
 };
 
@@ -1914,11 +1921,20 @@ const miniAppTitleStyle = {
 const miniAppStatusBadgeStyle = {
   flexShrink: 0,
   fontWeight: 700,
+  maxWidth: '100%',
+  whiteSpace: 'normal',
+  textAlign: 'center',
 };
 
 const miniAppNoticeStyle = {
   fontSize: '14px',
   lineHeight: 1.5,
+};
+
+const miniAppQueueEmptyContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
 };
 
 const miniAppGridStyle = {
