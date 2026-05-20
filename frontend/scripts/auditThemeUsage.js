@@ -122,7 +122,7 @@ class ThemeAudit {
           file,
           type: 'EXCESSIVE_CSS_CLASSES',
           severity: 'info',
-          message: `Found ${classMatches.length} CSS classes. Consider migrating to sx prop.`,
+          message: `Found ${classMatches.length} CSS classes. Consider canonical macOS primitives or shared tokens.`,
           count: classMatches.length,
         });
       }
@@ -144,7 +144,7 @@ class ThemeAudit {
           file,
           type: 'LEGACY_CSS_FILE',
           severity: 'warning',
-          message: 'Legacy CSS file should be migrated to MUI theme',
+          message: 'Legacy CSS file should be reviewed against the canonical macOS UI layer',
         });
       }
     }
