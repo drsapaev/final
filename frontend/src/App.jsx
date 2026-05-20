@@ -1084,7 +1084,7 @@ function TelegramMiniAppPatientShell() {
     <div style={miniAppPageStyle}>
       <main style={miniAppMainStyle}>
         <section style={miniAppHeroStyle}>
-          <div>
+          <div style={miniAppHeroTitleGroupStyle}>
             <p style={miniAppKickerStyle}>Kosmed Clinic</p>
             <h1 style={miniAppTitleStyle}>{t('title')}</h1>
           </div>
@@ -1979,9 +1979,15 @@ const miniAppHeroStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
-  gap: '16px',
+  columnGap: '16px',
+  rowGap: '10px',
   flexWrap: 'wrap',
   padding: '8px 0 18px',
+};
+
+const miniAppHeroTitleGroupStyle = {
+  flex: '1 1 220px',
+  minWidth: 0,
 };
 
 const miniAppKickerStyle = {
@@ -2002,7 +2008,7 @@ const miniAppTitleStyle = {
 const miniAppStatusBadgeStyle = {
   flexShrink: 0,
   fontWeight: 700,
-  maxWidth: '100%',
+  maxWidth: 'min(100%, 220px)',
   whiteSpace: 'normal',
   textAlign: 'center',
 };
