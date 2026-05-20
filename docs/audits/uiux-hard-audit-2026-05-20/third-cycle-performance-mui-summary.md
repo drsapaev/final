@@ -49,7 +49,7 @@ Current documented local build evidence after PR-PERF-12:
 | `UnifiedReports-*` | `35.25 KiB` |
 | `WaitTimeAnalytics-*` | `19.27 KiB` |
 
-## MUI Status
+## Historical MUI Status
 
 Fresh inventory command:
 
@@ -57,9 +57,9 @@ Fresh inventory command:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current count: 14 files.
+Historical count at third-cycle close: 14 files.
 
-Current classification:
+Historical classification:
 
 - Shared/admin-sensitive:
   - `frontend/src/components/admin/UserManagement.jsx`
@@ -140,7 +140,7 @@ classified, policy-covered, and guarded for future small PRs.
 ## Post-Cycle Continuation Note
 
 Later small PRs reduced the current MUI inventory from the historical third
-cycle count of 14 files to 9 files:
+cycle count of 14 files to 8 files:
 
 - stale `frontend/src/components/dashboard/Dashboard.jsx` removal;
 - gated `frontend/src/components/admin/UserManagement.jsx` actions menu
@@ -149,6 +149,7 @@ cycle count of 14 files to 9 files:
   `frontend/src/components/examples/UnifiedCard.tsx` conversion to
   macOS/native examples;
 - gated `frontend/src/pages/PaymentTest.jsx` internal demo migration.
+- stale caller-free `frontend/src/components/ai/MCPMonitor.jsx` removal.
 
 Current remaining MUI files:
 
@@ -160,4 +161,3 @@ Current remaining MUI files:
 - `frontend/src/components/dental/TreatmentPlanner.jsx`
 - `frontend/src/components/dental/ToothModal.jsx`
 - `frontend/src/components/TelegramManager.jsx`
-- `frontend/src/components/ai/MCPMonitor.jsx`

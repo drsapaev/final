@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 9 files.
+Current post-continuation result: 8 files.
 
 ## Global Rule
 
@@ -149,7 +149,10 @@ Validation:
 Files:
 
 - `frontend/src/components/TelegramManager.jsx`
-- `frontend/src/components/ai/MCPMonitor.jsx`
+
+Note: `frontend/src/components/ai/MCPMonitor.jsx` had no active frontend route
+owner/importer and was removed as stale code. MCP API client and active AI
+assistant surfaces remain outside this handoff and unchanged.
 
 Mode:
 
@@ -240,8 +243,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 9 files across payment
-widget, queue, clinical, Telegram, and AI surfaces.
+migration. The current remaining MUI inventory is 8 files across payment
+widget, queue, clinical, and Telegram surfaces.
 
 ## Next Smallest Step
 
