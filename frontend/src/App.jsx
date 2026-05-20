@@ -228,6 +228,29 @@ function notifyTelegramMiniAppReady() {
   }
 }
 
+function getMiniAppFormsInitialAnswers(forms = []) {
+  return forms.reduce((acc, form) => {
+    acc[form.id] = form.submission?.answers || {};
+    return acc;
+  }, {});
+}
+
+function getMiniAppFormFieldValue(answers, formId, field) {
+  const value = answers?.[formId]?.[field.key];
+  if (field.type === 'boolean') {
+    return Boolean(value);
+  }
+  return value == null ? '' : String(value);
+}
+
+function getMiniAppReportFileName(report) {
+  const safeName = String(report?.name || `report-${report?.id || 'result'}`)
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .slice(0, 80);
+  return `${safeName || 'report'}.pdf`;
+}
+
 function TelegramMiniAppPatientShell() {
   const location = useLocation();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
@@ -247,6 +270,27 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [formsPreview, setFormsPreview] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
+  const [formAnswers, setFormAnswers] = useState({});
+  const [formSubmit, setFormSubmit] = useState({
+    status: 'idle',
+    formId: null,
+    error: null,
+  });
+  const [resultsSummary, setResultsSummary] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
+  const [reportDownload, setReportDownload] = useState({
+    status: 'idle',
+    reportId: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -256,6 +300,26 @@ function TelegramMiniAppPatientShell() {
     setCabinetSummary({
       status: selectedSection === 'cabinet' && authPayload ? 'loading' : 'idle',
       payload: null,
+      error: null,
+    });
+    setFormsPreview({
+      status: selectedSection === 'forms' && authPayload ? 'loading' : 'idle',
+      payload: null,
+      error: null,
+    });
+    setFormSubmit({
+      status: 'idle',
+      formId: null,
+      error: null,
+    });
+    setResultsSummary({
+      status: selectedSection === 'results' && authPayload ? 'loading' : 'idle',
+      payload: null,
+      error: null,
+    });
+    setReportDownload({
+      status: 'idle',
+      reportId: null,
       error: null,
     });
 
@@ -289,6 +353,29 @@ function TelegramMiniAppPatientShell() {
               });
             });
         }
+        if (selectedSection === 'forms') {
+          return api.post('/telegram/mini-app/forms/preview', authPayload)
+            .then((formsResponse) => {
+              if (!isMounted) return;
+              setFormsPreview({
+                status: 'ready',
+                payload: formsResponse.data,
+                error: null,
+              });
+              setFormAnswers(getMiniAppFormsInitialAnswers(formsResponse.data?.forms || []));
+            });
+        }
+        if (selectedSection === 'results') {
+          return api.post('/telegram/mini-app/cabinet/summary', authPayload)
+            .then((summaryResponse) => {
+              if (!isMounted) return;
+              setResultsSummary({
+                status: 'ready',
+                payload: summaryResponse.data,
+                error: null,
+              });
+            });
+        }
         return null;
       })
       .catch(() => {
@@ -297,6 +384,16 @@ function TelegramMiniAppPatientShell() {
           status: selectedSection === 'cabinet' ? 'error' : 'idle',
           payload: null,
           error: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
+        });
+        setFormsPreview({
+          status: selectedSection === 'forms' ? 'error' : 'idle',
+          payload: null,
+          error: 'Анкеты пациента не загрузились. Откройте ссылку заново из Telegram.',
+        });
+        setResultsSummary({
+          status: selectedSection === 'results' ? 'error' : 'idle',
+          payload: null,
+          error: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
         });
         setState({
           status: 'error',
@@ -371,7 +468,123 @@ function TelegramMiniAppPatientShell() {
       });
   };
 
+  const handlePatientFormFieldChange = (formId, field) => (event) => {
+    const value = field.type === 'boolean' ? event.target.checked : event.target.value;
+    setFormAnswers((current) => ({
+      ...current,
+      [formId]: {
+        ...(current[formId] || {}),
+        [field.key]: value,
+      },
+    }));
+  };
+
+  const handlePatientFormSubmit = (form) => (event) => {
+    event.preventDefault();
+
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'forms');
+    if (!authPayload) {
+      setFormSubmit({
+        status: 'error',
+        formId: form.id,
+        error: 'Откройте анкету заново из Telegram.',
+      });
+      return;
+    }
+
+    setFormSubmit({
+      status: 'loading',
+      formId: form.id,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/forms/submissions', {
+      ...authPayload,
+      formId: form.id,
+      answers: formAnswers[form.id] || {},
+      status: 'submitted',
+    })
+      .then((response) => {
+        const submission = response.data?.submission;
+        setFormsPreview((current) => ({
+          ...current,
+          payload: {
+            ...(current.payload || {}),
+            forms: (current.payload?.forms || []).map((item) => (
+              item.id === form.id ? { ...item, submission } : item
+            )),
+          },
+        }));
+        setFormSubmit({
+          status: 'ready',
+          formId: form.id,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        const reason = error?.response?.data?.detail?.reason || 'form_save_failed';
+        setFormSubmit({
+          status: 'error',
+          formId: form.id,
+          error: `Анкета не сохранена: ${reason}`,
+        });
+      });
+  };
+
+  const handleReportDownload = (report) => () => {
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'results');
+    if (!authPayload) {
+      setReportDownload({
+        status: 'error',
+        reportId: report.id,
+        error: 'Откройте документы заново из Telegram.',
+      });
+      return;
+    }
+
+    setReportDownload({
+      status: 'loading',
+      reportId: report.id,
+      error: null,
+    });
+
+    api.post(
+      '/telegram/mini-app/reports/download',
+      {
+        ...authPayload,
+        reportId: report.id,
+      },
+      { responseType: 'blob' }
+    )
+      .then((response) => {
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = getMiniAppReportFileName(report);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        setReportDownload({
+          status: 'ready',
+          reportId: report.id,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        const reason = error?.response?.data?.detail?.reason || 'report_download_failed';
+        setReportDownload({
+          status: 'error',
+          reportId: report.id,
+          error: `Документ не получен: ${reason}`,
+        });
+      });
+  };
+
   const previewAppointment = appointmentPreview.payload?.appointment || null;
+  const patientForms = formsPreview.payload?.forms || [];
+  const patientReports = resultsSummary.payload?.reports || [];
 
   return (
     <div style={miniAppPageStyle}>
@@ -558,6 +771,149 @@ function TelegramMiniAppPatientShell() {
                         {appointmentPreview.payload?.preview_only ? 'Только предпросмотр' : 'Требует проверки'}
                       </Badge>
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedSection === 'forms' && formsPreview.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                Анкеты пациента загружаются...
+              </Alert>
+            )}
+
+            {selectedSection === 'forms' && formsPreview.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {formsPreview.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'forms' && formsPreview.status === 'ready' && patientForms.length === 0 && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                Сейчас нет доступных анкет для заполнения.
+              </Alert>
+            )}
+
+            {selectedSection === 'forms' && formsPreview.status === 'ready' && patientForms.map((form) => (
+              <Card key={form.id} padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Анкета пациента</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{form.title}</h2>
+                      <p style={miniAppCapabilityTextStyle}>{form.description}</p>
+                    </div>
+                    <Badge variant={form.submission ? 'success' : 'secondary'} size="small">
+                      {form.submission ? 'Сохранена' : 'Новая'}
+                    </Badge>
+                  </div>
+
+                  <form style={miniAppAppointmentFormStyle} onSubmit={handlePatientFormSubmit(form)}>
+                    {(form.fields || []).map((field) => (
+                      field.type === 'boolean' ? (
+                        <label key={field.key} style={miniAppCheckboxRowStyle}>
+                          <input
+                            type="checkbox"
+                            checked={getMiniAppFormFieldValue(formAnswers, form.id, field)}
+                            onChange={handlePatientFormFieldChange(form.id, field)}
+                            style={miniAppCheckboxStyle}
+                          />
+                          <span>{field.label}</span>
+                        </label>
+                      ) : (
+                        <Textarea
+                          key={field.key}
+                          label={field.label}
+                          value={getMiniAppFormFieldValue(formAnswers, form.id, field)}
+                          onChange={handlePatientFormFieldChange(form.id, field)}
+                          maxLength={field.max_length || undefined}
+                          minRows={2}
+                        />
+                      )
+                    ))}
+
+                    {formSubmit.status === 'error' && formSubmit.formId === form.id && (
+                      <Alert severity="error" style={miniAppNoticeStyle}>
+                        {formSubmit.error}
+                      </Alert>
+                    )}
+
+                    {formSubmit.status === 'ready' && formSubmit.formId === form.id && (
+                      <Alert severity="success" style={miniAppNoticeStyle}>
+                        Анкета сохранена.
+                      </Alert>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="small"
+                      loading={formSubmit.status === 'loading' && formSubmit.formId === form.id}
+                      disabled={formSubmit.status === 'loading'}
+                    >
+                      Сохранить анкету
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            ))}
+
+            {selectedSection === 'results' && resultsSummary.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                Документы пациента загружаются...
+              </Alert>
+            )}
+
+            {selectedSection === 'results' && resultsSummary.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {resultsSummary.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'results' && resultsSummary.status === 'ready' && patientReports.length === 0 && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                Готовые PDF-результаты пока не найдены.
+              </Alert>
+            )}
+
+            {selectedSection === 'results' && resultsSummary.status === 'ready' && patientReports.length > 0 && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Документы</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>Готовые PDF-результаты</h2>
+                    </div>
+                    <Badge variant="success" size="small">{patientReports.length}</Badge>
+                  </div>
+
+                  <div style={miniAppListStyle}>
+                    {patientReports.map((report) => (
+                      <div key={report.id} style={miniAppListItemStyle}>
+                        <div>
+                          <strong>{report.name}</strong>
+                          <p style={miniAppCapabilityTextStyle}>
+                            {report.ready_at || 'Дата готовности не указана'} · {report.status}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="small"
+                          loading={reportDownload.status === 'loading' && reportDownload.reportId === report.id}
+                          disabled={reportDownload.status === 'loading'}
+                          onClick={handleReportDownload(report)}
+                        >
+                          Получить PDF
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {reportDownload.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {reportDownload.error}
+                    </Alert>
                   )}
                 </CardContent>
               </Card>
@@ -939,6 +1295,44 @@ const miniAppAppointmentPreviewResultStyle = {
   background: 'rgba(52, 199, 89, 0.08)',
   fontSize: '13px',
   color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppCheckboxRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  minHeight: '40px',
+  padding: '10px 12px',
+  border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
+  borderRadius: '8px',
+  background: 'var(--mac-bg-secondary, rgba(255, 255, 255, 0.72))',
+  fontSize: '14px',
+  fontWeight: 650,
+  color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppCheckboxStyle = {
+  width: '18px',
+  height: '18px',
+  flexShrink: 0,
+};
+
+const miniAppListStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+};
+
+const miniAppListItemStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  padding: '12px',
+  border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
+  borderRadius: '8px',
+  background: 'var(--mac-bg-secondary, rgba(255, 255, 255, 0.72))',
+  flexWrap: 'wrap',
 };
 
 const miniAppCapabilityStyle = {
