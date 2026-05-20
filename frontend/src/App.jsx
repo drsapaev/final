@@ -951,6 +951,18 @@ function TelegramMiniAppPatientShell() {
                     <Badge variant="secondary" size="small">Р‘РµР· СЃРѕР·РґР°РЅРёСЏ</Badge>
                   </div>
 
+                  <div style={miniAppFormsSummaryStyle}>
+                    <Badge variant="secondary" size="small">
+                      {selectedCapability?.preview_enabled ? 'preview on' : 'preview off'}
+                    </Badge>
+                    <Badge variant={selectedCapability?.contains_medical_data ? 'warning' : 'success'} size="small">
+                      {selectedCapability?.contains_medical_data ? 'medical data' : 'no medical data'}
+                    </Badge>
+                    <Badge variant={selectedCapability?.contains_payment_provider_data ? 'warning' : 'success'} size="small">
+                      {selectedCapability?.contains_payment_provider_data ? 'provider payloads' : 'no provider payloads'}
+                    </Badge>
+                  </div>
+
                   <form style={miniAppAppointmentFormStyle} onSubmit={handleAppointmentPreviewSubmit}>
                     <div style={miniAppAppointmentFormGridStyle}>
                       <Input
