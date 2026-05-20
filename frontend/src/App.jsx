@@ -150,6 +150,32 @@ function getTelegramMiniAppInitData() {
   return window.Telegram?.WebApp?.initData || '';
 }
 
+function getTelegramMiniAppEntryToken(search) {
+  const token = new URLSearchParams(search || '').get('entryToken') || '';
+  return token.trim();
+}
+
+function getTelegramMiniAppAuthPayload(search, section) {
+  const initData = getTelegramMiniAppInitData();
+  const selectedSection = section || getTelegramMiniAppSelectedSection(search);
+  if (initData) {
+    return {
+      initData,
+      section: selectedSection || undefined,
+    };
+  }
+
+  const entryToken = getTelegramMiniAppEntryToken(search);
+  if (entryToken) {
+    return {
+      entryToken,
+      section: selectedSection || undefined,
+    };
+  }
+
+  return null;
+}
+
 function getTelegramMiniAppSelectedSection(search) {
   const section = new URLSearchParams(search || '').get('section') || '';
   return MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || '';
@@ -216,13 +242,24 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [cabinetSummary, setCabinetSummary] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
     notifyTelegramMiniAppReady();
 
-    const initData = getTelegramMiniAppInitData();
-    if (!initData) {
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
+    setCabinetSummary({
+      status: selectedSection === 'cabinet' && authPayload ? 'loading' : 'idle',
+      payload: null,
+      error: null,
+    });
+
+    if (!authPayload) {
       setState({
         status: 'unavailable',
         manifest: null,
@@ -233,7 +270,7 @@ function TelegramMiniAppPatientShell() {
       };
     }
 
-    api.post('/telegram/mini-app/patient/manifest', { initData })
+    api.post('/telegram/mini-app/patient/manifest', authPayload)
       .then((response) => {
         if (!isMounted) return;
         setState({
@@ -241,9 +278,26 @@ function TelegramMiniAppPatientShell() {
           manifest: response.data,
           error: null,
         });
+        if (selectedSection === 'cabinet') {
+          return api.post('/telegram/mini-app/cabinet/summary', authPayload)
+            .then((summaryResponse) => {
+              if (!isMounted) return;
+              setCabinetSummary({
+                status: 'ready',
+                payload: summaryResponse.data,
+                error: null,
+              });
+            });
+        }
+        return null;
       })
       .catch(() => {
         if (!isMounted) return;
+        setCabinetSummary({
+          status: selectedSection === 'cabinet' ? 'error' : 'idle',
+          payload: null,
+          error: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
+        });
         setState({
           status: 'error',
           manifest: null,
@@ -254,7 +308,7 @@ function TelegramMiniAppPatientShell() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [location.search, selectedSection]);
 
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
@@ -373,6 +427,52 @@ function TelegramMiniAppPatientShell() {
                     <p style={miniAppCapabilityTextStyle}>
                       {selectedCapability?.status || 'manifest_only'}
                     </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedSection === 'cabinet' && cabinetSummary.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                Кабинет пациента загружается...
+              </Alert>
+            )}
+
+            {selectedSection === 'cabinet' && cabinetSummary.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {cabinetSummary.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'cabinet' && cabinetSummary.status === 'ready' && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Пациент</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>
+                        {cabinetSummary.payload?.patient?.name || 'Пациент'}
+                      </h2>
+                    </div>
+                    <Badge variant="success" size="small">Доступ подтверждён</Badge>
+                  </div>
+                  <div style={miniAppAppointmentPreviewResultStyle}>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>Визиты</p>
+                      <strong>{cabinetSummary.payload?.visits?.length || 0}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>Очередь</p>
+                      <strong>{cabinetSummary.payload?.queue?.length || 0}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>Долг</p>
+                      <strong>{cabinetSummary.payload?.payments?.debt || '0'}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>Результаты</p>
+                      <strong>{cabinetSummary.payload?.reports?.length || 0}</strong>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

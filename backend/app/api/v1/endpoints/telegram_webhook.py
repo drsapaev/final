@@ -4,6 +4,7 @@ Webhook endpoint для обработки входящих сообщений �
 
 import hashlib
 import html
+import hmac
 import logging
 import secrets
 from datetime import date, datetime, timedelta, timezone
@@ -65,6 +66,7 @@ from app.services.telegram_bot import (
 )
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
+    TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
     build_telegram_mini_app_appointment_booking_preview,
     build_telegram_mini_app_patient_forms_preview,
@@ -888,6 +890,18 @@ LAB_RESULT_DELIVERY_EVENT_TYPES = {
 SUCCESSFUL_DELIVERY_STATUSES = {"delivered", "seen", "read", "archived"}
 PENDING_DELIVERY_STATUSES = {"pending", "dispatched"}
 MAX_TELEGRAM_LAB_REPORTS = 3
+PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX = "pma"
+PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR = "_"
+PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS = 10 * 60
+PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
+    "appointments",
+    "forms",
+    "cabinet",
+    "payments",
+    "results",
+    "documents",
+    "doctors",
+}
 
 
 def _telegram_update_summary(update: Dict[str, Any]) -> Dict[str, Any]:
@@ -953,6 +967,103 @@ def _localized_text(key: str, language_code: Any) -> str:
     return values.get(language) or values.get(TELEGRAM_LANGUAGE_RU) or ""
 
 
+def _base36_encode(value: int) -> str:
+    if value < 0:
+        raise ValueError("base36 value must be non-negative")
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    result = ""
+    while value:
+        value, remainder = divmod(value, 36)
+        result = alphabet[remainder] + result
+    return result
+
+
+def _base36_decode(value: str) -> int:
+    return int(value, 36)
+
+
+def _patient_mini_app_token_section(section: str | None) -> str:
+    normalized = str(section or "cabinet").strip().lower()
+    if normalized == "booking":
+        return "appointments"
+    if normalized == "payment":
+        return "payments"
+    if normalized in PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS:
+        return normalized
+    return "cabinet"
+
+
+def _patient_mini_app_entry_token_signature(body: str) -> str:
+    digest = hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return _base36_encode(int.from_bytes(digest[:12], "big"))
+
+
+def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
+    expires_at = datetime.utcnow() + timedelta(
+        seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
+    )
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
+        [
+            PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX,
+            _patient_mini_app_token_section(section),
+            _base36_encode(int(chat_id)),
+            _base36_encode(
+                int(expires_at.replace(tzinfo=timezone.utc).timestamp())
+            ),
+            _base36_encode(secrets.randbits(48)),
+        ]
+    )
+    signature = _patient_mini_app_entry_token_signature(body)
+    return f"{body}{PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR}{signature}"
+
+
+def _parse_patient_mini_app_entry_token(
+    token: str,
+    *,
+    expected_section: str | None = None,
+) -> dict[str, Any] | None:
+    parts = str(token or "").split(PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR)
+    if len(parts) != 6 or parts[0] != PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX:
+        return None
+
+    section = _patient_mini_app_token_section(parts[1])
+    if expected_section and section != _patient_mini_app_token_section(expected_section):
+        return None
+
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(parts[:5])
+    if not hmac.compare_digest(
+        parts[5],
+        _patient_mini_app_entry_token_signature(body),
+    ):
+        return None
+
+    try:
+        chat_id = _base36_decode(parts[2])
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+    if expires_at < datetime.now(timezone.utc):
+        return None
+
+    return {
+        "chat_id": chat_id,
+        "section": section,
+        "expires_at": expires_at,
+    }
+
+
+def _append_patient_mini_app_entry_token(entry_url: str, token: str) -> str:
+    separator = "&" if "?" in entry_url else "?"
+    return f"{entry_url}{separator}entryToken={token}"
+
+
 def _patient_entry_url(section: str | None = None) -> str | None:
     frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
     if not frontend_url:
@@ -1002,6 +1113,13 @@ def _telegram_service_entry_markup(
     entry_url = _patient_entry_url(section)
     if not entry_url:
         return None
+
+    if not entry_url.lower().startswith("https://"):
+        entry_token = _build_patient_mini_app_entry_token(
+            chat_id,
+            _patient_mini_app_token_section(section),
+        )
+        entry_url = _append_patient_mini_app_entry_token(entry_url, entry_token)
 
     language = _telegram_chat_language(db, chat_id)
     return {
@@ -3951,6 +4069,14 @@ class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     services: list[str] | None = None
 
 
+class TelegramMiniAppPatientManifestRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    section: str | None = None
+
+
 class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -3961,8 +4087,10 @@ class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
 class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
 
 
 class TelegramMiniAppPatientReportDownloadRequest(BaseModel):
@@ -4103,6 +4231,142 @@ def _resolve_mini_app_patient_scope_from_init_data(
     )
 
 
+def _resolve_mini_app_patient_scope_from_entry_token(
+    db: Session,
+    entry_token: str,
+    *,
+    expected_section: str | None = None,
+) -> TelegramMiniAppSessionScope:
+    parsed = _parse_patient_mini_app_entry_token(
+        entry_token,
+        expected_section=expected_section,
+    )
+    if not parsed:
+        raise TelegramMiniAppSessionScopeError("entry_token_invalid")
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+        db,
+        int(parsed["chat_id"]),
+    )
+    if not telegram_user:
+        raise TelegramMiniAppSessionScopeError("telegram_link_required")
+    if not getattr(telegram_user, "active", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_inactive")
+    if getattr(telegram_user, "blocked", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_blocked")
+    if not getattr(telegram_user, "patient_id", None):
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+
+    return TelegramMiniAppSessionScope(
+        scope_type="patient",
+        telegram_user_id=int(telegram_user.id),
+        telegram_chat_id=int(telegram_user.chat_id),
+        patient_id=int(telegram_user.patient_id),
+    )
+
+
+def _resolve_mini_app_patient_scope_from_auth(
+    db: Session,
+    *,
+    init_data_payload: str | None = None,
+    entry_token: str | None = None,
+    expected_section: str | None = None,
+) -> tuple[TelegramMiniAppSessionScope, str]:
+    normalized_init_data = str(init_data_payload or "").strip()
+    if normalized_init_data:
+        return _resolve_mini_app_patient_scope_from_init_data(
+            db,
+            normalized_init_data,
+        ), "init_data"
+
+    normalized_entry_token = str(entry_token or "").strip()
+    if normalized_entry_token:
+        return _resolve_mini_app_patient_scope_from_entry_token(
+            db,
+            normalized_entry_token,
+            expected_section=expected_section,
+        ), "entry_token"
+
+    raise TelegramMiniAppInitDataError("init_data_required")
+
+
+def _mini_app_patient_manifest_payload(
+    db: Session,
+    scope: TelegramMiniAppSessionScope,
+    *,
+    auth_source: str,
+) -> dict[str, Any]:
+    patient = db.query(Patient).filter(Patient.id == int(scope.patient_id)).first()
+    return {
+        "scope": {
+            "type": scope.scope_type,
+        },
+        "auth": {
+            "source": auth_source,
+            "entry_token_fallback": auth_source == "entry_token",
+        },
+        "patient": {
+            "linked": True,
+            "name": _patient_display_name(patient),
+        },
+        "capabilities": {
+            "appointments": {
+                "status": "preview_enabled",
+                "preview_enabled": True,
+                "create_enabled": False,
+            },
+            "forms": {
+                "status": "preview_enabled",
+                "preview_enabled": True,
+                "capture_enabled": True,
+            },
+            "cabinet": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "payments": {
+                "status": "summary_enabled",
+                "view_enabled": True,
+                "payment_capture_enabled": False,
+            },
+            "results": {
+                "status": "ready_pdf_list_enabled",
+                "read_enabled": True,
+            },
+        },
+        "policy": {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "entry_token_ttl_seconds": PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS,
+        },
+    }
+
+
+def _build_mini_app_patient_manifest_from_request(
+    request_body: TelegramMiniAppPatientManifestRequest,
+    db: Session,
+) -> dict[str, Any]:
+    try:
+        scope, auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return _mini_app_patient_manifest_payload(db, scope, auth_source=auth_source)
+
+
 def _iso_date_value(value: date | datetime | None) -> str | None:
     if value is None:
         return None
@@ -4217,9 +4481,11 @@ def _build_mini_app_patient_cabinet_summary_from_request(
     db: Session,
 ) -> dict[str, Any]:
     try:
-        scope = _resolve_mini_app_patient_scope_from_init_data(
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
-            request_body.init_data,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "cabinet",
         )
         if request_body.patient_id is not None:
             if int(scope.patient_id) != int(request_body.patient_id):
@@ -4424,6 +4690,19 @@ def download_mini_app_patient_report(
     """Return one protected ready PDF report for the linked Mini App patient."""
 
     return _build_mini_app_patient_report_download_response(request_body, db)
+
+
+@router.post(
+    "/mini-app/patient/manifest",
+    operation_id="telegram_mini_app_patient_manifest",
+)
+def preview_mini_app_patient_manifest(
+    request_body: TelegramMiniAppPatientManifestRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe Mini App capability manifest for a linked patient."""
+
+    return _build_mini_app_patient_manifest_from_request(request_body, db)
 
 
 @router.post(
