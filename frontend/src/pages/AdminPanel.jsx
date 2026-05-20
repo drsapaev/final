@@ -113,7 +113,6 @@ import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
 
 
-import ServiceCatalog from '../components/admin/ServiceCatalog';
 // ⭐ DEPRECATED: DepartmentManagement replaced by QueueProfilesManager (SSOT)
 // import DepartmentManagement from '../components/admin/DepartmentManagement';
 
@@ -174,6 +173,7 @@ import '../styles/admin-styles.css';
 
 const LazyGraphQLExplorer = React.lazy(() => import('../components/admin/GraphQLExplorer'));
 const LazyQueueProfilesManager = React.lazy(() => import('../components/admin/QueueProfilesManager'));
+const LazyServiceCatalog = React.lazy(() => import('../components/admin/ServiceCatalog'));
 
 const getAppointmentPatientDisplayName = (appointment) => {
   const rawName =
@@ -2661,7 +2661,11 @@ const AdminPanel = () => {
             </div>
 
             {/* Содержимое вкладок */}
-            {servicesTab === 'catalog' && <ServiceCatalog />}
+            {servicesTab === 'catalog' && (
+              <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+                <LazyServiceCatalog />
+              </React.Suspense>
+            )}
             {servicesTab === 'queue-profiles' && (
               <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
                 <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
