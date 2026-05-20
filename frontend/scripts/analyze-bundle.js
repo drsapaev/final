@@ -247,7 +247,7 @@ function generateOptimizationRecommendations() {
     },
     {
       title: 'Bundle Analysis',
-      description: 'Установите webpack-bundle-analyzer для детального анализа',
+      description: 'Установите rollup-plugin-visualizer для интерактивного Vite/Rollup анализа',
       check: () => {
         const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
         return packageJson.devDependencies && packageJson.devDependencies['rollup-plugin-visualizer'];
