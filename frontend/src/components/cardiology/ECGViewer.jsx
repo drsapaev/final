@@ -3,9 +3,10 @@
  * Просмотр и анализ ЭКГ файлов
  * Согласно MASTER_TODO_LIST строка 247
  */
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box,
+  Alert,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -13,30 +14,19 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  Grid,
-  IconButton,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Typography,
-} from '@mui/material';
-import {
-  Assessment,
-  Analytics,
-  CheckCircle as CheckCircleIcon,
-  Delete,
-  FavoriteBorder,
-  Visibility,
-} from '@mui/icons-material';
-import { Alert, Badge, Progress } from '../ui/macos';
+  Progress,
+} from '../ui/macos';
 import {
   AlertTriangle,
+  BrainCircuit,
+  CheckCircle,
+  ClipboardCheck,
   Clock,
   CloudUpload,
   Download,
+  Eye,
+  HeartPulse,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -45,6 +35,196 @@ import { api } from '../../api/client';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
 import logger from '../../utils/logger';
+
+const iconSize = 16;
+
+const styles = {
+  root: {
+    display: 'grid',
+    gap: '16px',
+  },
+  sectionTitle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: '0 0 16px',
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+  dropzone: (active) => ({
+    marginTop: '16px',
+    padding: '24px',
+    border: '2px dashed',
+    borderColor: active ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
+    borderRadius: 'var(--mac-radius-lg)',
+    background: active ? 'rgba(0, 122, 255, 0.08)' : 'var(--mac-card-bg)',
+    cursor: 'pointer',
+    transition: 'border-color 160ms ease, background 160ms ease',
+    textAlign: 'center',
+  }),
+  mutedText: {
+    margin: 0,
+    color: 'var(--mac-text-secondary)',
+    fontSize: '13px',
+  },
+  caption: {
+    margin: 0,
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px',
+  },
+  uploadProgress: {
+    display: 'grid',
+    gap: '8px',
+    marginTop: '16px',
+  },
+  fileList: {
+    display: 'grid',
+    gap: 0,
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  fileItem: {
+    display: 'grid',
+    gridTemplateColumns: '32px minmax(0, 1fr) auto',
+    gap: '12px',
+    alignItems: 'start',
+    padding: '14px 0',
+    borderTop: '1px solid var(--mac-border)',
+  },
+  fileIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    color: 'var(--mac-danger, #ff3b30)',
+    background: 'rgba(255, 59, 48, 0.08)',
+  },
+  fileHeader: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  fileName: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '14px',
+    fontWeight: 600,
+  },
+  badgeRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  criticalAlert: {
+    marginTop: '10px',
+  },
+  criticalList: {
+    display: 'grid',
+    gap: '3px',
+    marginTop: '6px',
+  },
+  actionRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    justifyContent: 'flex-end',
+  },
+  iconButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    borderRadius: 'var(--mac-radius-md)',
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-card-bg)',
+    color: 'var(--mac-text-primary)',
+    cursor: 'pointer',
+  },
+  iconButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  analysisStatus: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  analysisPanel: {
+    display: 'grid',
+    gap: '16px',
+    padding: '16px',
+    borderRadius: 'var(--mac-radius-lg)',
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-bg-secondary)',
+  },
+  subsectionTitle: {
+    margin: '0 0 8px',
+    color: 'var(--mac-text-primary)',
+    fontSize: '13px',
+    fontWeight: 600,
+  },
+  bodyText: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '13px',
+    lineHeight: 1.5,
+  },
+  dialogHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+  },
+  dialogTitle: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+  dialogContent: {
+    maxHeight: '78vh',
+    overflow: 'auto',
+  },
+  previewArea: {
+    textAlign: 'center',
+  },
+  previewFrame: {
+    width: '100%',
+    height: '600px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+  },
+  previewImage: {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: 'var(--mac-radius-md)',
+  },
+  metricGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: '12px',
+  },
+  metricCard: {
+    padding: '14px',
+    borderRadius: 'var(--mac-radius-lg)',
+    border: '1px solid var(--mac-border)',
+    background: 'var(--mac-card-bg)',
+  },
+  metricValue: {
+    margin: '4px 0 0',
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+};
+
 const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   const [ecgFiles, setEcgFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -287,267 +467,212 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   };
 
   return (
-    <Box>
-      {/* Зона загрузки */}
-      <Card sx={{ mb: 2 }}>
+    <div style={styles.root}>
+      <Card>
         <CardContent>
-          <Typography variant="h6" style={{ marginBottom: 16 }}>
-            <Clock style={{ marginRight: 8, verticalAlign: 'middle' }} />
+          <h3 style={styles.sectionTitle}>
+            <Clock size={iconSize} aria-hidden="true" />
             ЭКГ исследования
-          </Typography>
-          
-          <Box
-            {...getRootProps()}
-            sx={{
-              mt: 2,
-              p: 3,
-              border: '2px dashed',
-              borderColor: isDragActive ? 'primary.main' : 'divider',
-              borderRadius: 2,
-              bgcolor: isDragActive ? 'action.hover' : 'background.paper',
-              cursor: 'pointer',
-              transition: 'all 0.3s',
-              textAlign: 'center',
-            }}
-          >
+          </h3>
+
+          <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
             <input {...getInputProps()} />
-            <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-            <Typography variant="body1" color="text.secondary">
+            <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
+            <p style={{ ...styles.mutedText, marginTop: '8px' }}>
               {isDragActive
                 ? 'Отпустите файлы здесь...'
                 : 'Перетащите ЭКГ файлы или нажмите для выбора'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
+            </p>
+            <p style={{ ...styles.caption, marginTop: '6px' }}>
               Поддерживаются: PDF, SCP, XML, JPG, PNG
-            </Typography>
-          </Box>
-          
+            </p>
+          </div>
+
           {uploadProgress > 0 && uploadProgress < 100 && (
-            <Box sx={{ mt: 2 }}>
-              {/* <LinearProgress variant="determinate" value={uploadProgress} /> */}
-              <Progress variant="determinate" value={uploadProgress} />
-              <Typography variant="caption" color="text.secondary">
-                Загрузка: {uploadProgress}%
-              </Typography>
-            </Box>
+            <div style={styles.uploadProgress}>
+              <Progress variant="primary" value={uploadProgress} />
+              <p style={styles.caption}>Загрузка: {uploadProgress}%</p>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Список загруженных ЭКГ */}
       {ecgFiles.length > 0 && (
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Загруженные ЭКГ ({ecgFiles.length})
-            </Typography>
-            
-            <List>
-              {ecgFiles.map((file, index) => {
-                const criticalParams = file.parameters 
+            <h3 style={styles.sectionTitle}>Загруженные ЭКГ ({ecgFiles.length})</h3>
+
+            <ul style={styles.fileList}>
+              {ecgFiles.map((file) => {
+                const criticalParams = file.parameters
                   ? getCriticalParameters(file.parameters)
                   : [];
-                
+
                 return (
-                  <Fragment key={file.id}>
-                    {index > 0 && <Divider />}
-                    
-                    <ListItem>
-                      <ListItemIcon>
-                        <FavoriteBorder color="error" />
-                      </ListItemIcon>
-                      
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="body1">
-                              {file.name}
-                            </Typography>
-                            {criticalParams.length > 0 && (
-                              // <Chip
-                              //   size="small"
-                              //   label="Внимание"
-                              //   color="warning"
-                              //   icon={<Warning />}
-                              // />
-                              <Badge variant="warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                <AlertTriangle style={{ width: 14, height: 14 }} />
-                                Внимание
-                              </Badge>
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleString()}
-                            </Typography>
-                            
-                            {file.parameters && (
-                              <Box sx={{ mt: 1 }}>
-                                <Grid container spacing={2}>
-                                  <Grid item>
-                                    {/* <Chip size="small" label={`ЧСС: ${file.parameters.heartRate} уд/мин`} /> */}
-                                    <Badge variant={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'info'}>
-                                      ЧСС: {file.parameters.heartRate} уд/мин
-                                    </Badge>
-                                  </Grid>
-                                  <Grid item>
-                                    {/* <Chip size="small" label={`QT: ${file.parameters.qtInterval} мс`} /> */}
-                                    <Badge variant={file.parameters.qtInterval > 450 ? 'warning' : 'info'}>
-                                      QT: {file.parameters.qtInterval} мс
-                                    </Badge>
-                                  </Grid>
-                                  <Grid item>
-                                    {/* <Chip size="small" label={`PR: ${file.parameters.prInterval} мс`} /> */}
-                                    <Badge variant={file.parameters.prInterval > 200 ? 'warning' : 'info'}>
-                                      PR: {file.parameters.prInterval} мс
-                                    </Badge>
-                                  </Grid>
-                                </Grid>
-                                
-                                {criticalParams.length > 0 && (
-                                  <Alert severity="warning" sx={{ mt: 1 }}>
-                                    <Typography variant="caption">
-                                      Обнаружены отклонения:
-                                    </Typography>
-                                    {criticalParams.map((param, i) => (
-                                      <Typography key={i} variant="caption" display="block">
-                                        • {param.name}: {param.value}
-                                      </Typography>
-                                    ))}
-                                  </Alert>
-                                )}
-                              </Box>
-                            )}
-                          </Box>
-                        }
-                      />
-                      
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => openViewer(file)}
-                          title="Просмотр"
-                        >
-                          <Visibility />
-                        </IconButton>
-                        
-                        <IconButton
-                          size="small"
-                          onClick={() => analyzeECG(file)}
-                          disabled={analyzing}
-                          title="AI анализ"
-                        >
-                          <Analytics />
-                        </IconButton>
-                        
-                        <IconButton
-                          size="small"
-                          onClick={() => downloadFile(file)}
-                          title="Скачать"
-                        >
-                          <Download />
-                        </IconButton>
-                        
-                        <IconButton
-                          size="small"
-                          onClick={() => deleteFile(file.id)}
-                          title="Удалить"
-                        >
-                          <Delete />
-                        </IconButton>
-                      </Box>
-                    </ListItem>
-                  </Fragment>
+                  <li key={file.id} style={styles.fileItem}>
+                    <span style={styles.fileIcon} aria-hidden="true">
+                      <HeartPulse size={18} />
+                    </span>
+
+                    <div>
+                      <div style={styles.fileHeader}>
+                        <p style={styles.fileName}>{file.name}</p>
+                        {criticalParams.length > 0 && (
+                          <Badge variant="warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <AlertTriangle style={{ width: 14, height: 14 }} />
+                            Внимание
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p style={{ ...styles.caption, marginTop: '4px' }}>
+                        {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleString()}
+                      </p>
+
+                      {file.parameters && (
+                        <div style={styles.badgeRow}>
+                          <Badge variant={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'info'}>
+                            ЧСС: {file.parameters.heartRate} уд/мин
+                          </Badge>
+                          <Badge variant={file.parameters.qtInterval > 450 ? 'warning' : 'info'}>
+                            QT: {file.parameters.qtInterval} мс
+                          </Badge>
+                          <Badge variant={file.parameters.prInterval > 200 ? 'warning' : 'info'}>
+                            PR: {file.parameters.prInterval} мс
+                          </Badge>
+                        </div>
+                      )}
+
+                      {criticalParams.length > 0 && (
+                        <Alert severity="warning" style={styles.criticalAlert}>
+                          <span style={styles.caption}>Обнаружены отклонения:</span>
+                          <span style={styles.criticalList}>
+                            {criticalParams.map((param, i) => (
+                              <span key={i} style={styles.caption}>
+                                • {param.name}: {param.value}
+                              </span>
+                            ))}
+                          </span>
+                        </Alert>
+                      )}
+                    </div>
+
+                    <div style={styles.actionRow}>
+                      <button
+                        type="button"
+                        style={styles.iconButton}
+                        onClick={() => openViewer(file)}
+                        title="Просмотр"
+                        aria-label="Просмотр"
+                      >
+                        <Eye size={iconSize} aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        style={{ ...styles.iconButton, ...(analyzing ? styles.iconButtonDisabled : {}) }}
+                        onClick={() => analyzeECG(file)}
+                        disabled={analyzing}
+                        title="AI анализ"
+                        aria-label="AI анализ"
+                      >
+                        <BrainCircuit size={iconSize} aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        style={styles.iconButton}
+                        onClick={() => downloadFile(file)}
+                        title="Скачать"
+                        aria-label="Скачать"
+                      >
+                        <Download size={iconSize} aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        style={styles.iconButton}
+                        onClick={() => deleteFile(file.id)}
+                        title="Удалить"
+                        aria-label="Удалить"
+                      >
+                        <Trash2 size={iconSize} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </li>
                 );
               })}
-            </List>
+            </ul>
           </CardContent>
         </Card>
       )}
 
-      {/* AI анализ результат */}
       {analyzing && (
-        <Card sx={{ mt: 2 }}>
+        <Card>
           <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {/* <LinearProgress sx={{ flex: 1 }} /> */}
-              <Progress />
-              <Typography variant="body2">
-                Анализ ЭКГ с помощью AI...
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-      
-      {analysisResult && !analysisResult.error && (
-        <Card sx={{ mt: 2 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              <Assessment sx={{ mr: 1, verticalAlign: 'middle' }} />
-              AI Интерпретация ЭКГ
-            </Typography>
-            
-            <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-              {analysisResult.findings && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Основные находки:
-                  </Typography>
-                  {analysisResult.findings.map((finding, i) => (
-                    // <Chip key={i} label={finding} />
-                    <Badge
-                      key={i}
-                      variant={finding.includes('норма') ? 'success' : 'warning'}
-                      style={{ marginRight: 8, marginBottom: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                    >
-                      {finding.includes('норма') ? (
-                        <CheckCircleIcon style={{ width: 14, height: 14 }} />
-                      ) : (
-                        <AlertTriangle style={{ width: 14, height: 14 }} />
-                      )}
-                      {finding}
-                    </Badge>
-                  ))}
-                </Box>
-              )}
-              
-              {analysisResult.interpretation && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Интерпретация:
-                  </Typography>
-                  <Typography variant="body2">
-                    {analysisResult.interpretation}
-                  </Typography>
-                </Box>
-              )}
-              
-              {analysisResult.recommendations && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Рекомендации:
-                  </Typography>
-                  <Typography variant="body2">
-                    {analysisResult.recommendations}
-                  </Typography>
-                </Box>
-              )}
-              
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="caption">
-                  AI-анализ носит рекомендательный характер. 
-                  Окончательное заключение делает врач.
-                </Typography>
-              </Alert>
-            </Paper>
+            <div style={styles.analysisStatus}>
+              <Progress value={75} variant="primary" style={{ flex: 1 }} />
+              <p style={styles.bodyText}>Анализ ЭКГ с помощью AI...</p>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Диалог просмотра */}
+      {analysisResult && !analysisResult.error && (
+        <Card>
+          <CardContent>
+            <h3 style={styles.sectionTitle}>
+              <ClipboardCheck size={iconSize} aria-hidden="true" />
+              AI Интерпретация ЭКГ
+            </h3>
+
+            <div style={styles.analysisPanel}>
+              {analysisResult.findings && (
+                <section>
+                  <h4 style={styles.subsectionTitle}>Основные находки:</h4>
+                  <div style={styles.badgeRow}>
+                    {analysisResult.findings.map((finding, i) => (
+                      <Badge
+                        key={i}
+                        variant={finding.includes('норма') ? 'success' : 'warning'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        {finding.includes('норма') ? (
+                          <CheckCircle style={{ width: 14, height: 14 }} />
+                        ) : (
+                          <AlertTriangle style={{ width: 14, height: 14 }} />
+                        )}
+                        {finding}
+                      </Badge>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {analysisResult.interpretation && (
+                <section>
+                  <h4 style={styles.subsectionTitle}>Интерпретация:</h4>
+                  <p style={styles.bodyText}>{analysisResult.interpretation}</p>
+                </section>
+              )}
+
+              {analysisResult.recommendations && (
+                <section>
+                  <h4 style={styles.subsectionTitle}>Рекомендации:</h4>
+                  <p style={styles.bodyText}>{analysisResult.recommendations}</p>
+                </section>
+              )}
+
+              <Alert severity="info">
+                <span style={styles.caption}>
+                  AI-анализ носит рекомендательный характер. Окончательное заключение делает врач.
+                </span>
+              </Alert>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog
         open={viewerOpen}
         onClose={closeViewer}
@@ -555,44 +680,39 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         fullWidth
       >
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6">
-              {selectedFile?.name}
-            </Typography>
-            <Button 
-              variant="outline" 
+          <div style={styles.dialogHeader}>
+            <h3 style={styles.dialogTitle}>{selectedFile?.name}</h3>
+            <Button
+              variant="outline"
               onClick={closeViewer}
               style={{ padding: '8px' }}
+              aria-label="Закрыть просмотр ЭКГ"
             >
               <X style={{ width: 16, height: 16 }} />
             </Button>
-          </Box>
+          </div>
         </DialogTitle>
-        
-        <DialogContent>
+
+        <DialogContent style={styles.dialogContent}>
           {selectedFile && (
-            <Box>
-              {/* Для PDF и изображений показываем превью */}
+            <div>
               {viewerLoading ? (
-                <Alert severity="info">
-                  Загрузка предпросмотра...
-                </Alert>
+                <Alert severity="info">Загрузка предпросмотра...</Alert>
               ) : viewerBlobUrl ? (
-                <Box sx={{ textAlign: 'center' }}>
-                  {(selectedFile.type === 'application/pdf' || 
+                <div style={styles.previewArea}>
+                  {(selectedFile.type === 'application/pdf' ||
                     selectedFile.type?.startsWith('image/')) ? (
                     selectedFile.type === 'application/pdf' ? (
                       <iframe
                         src={viewerBlobUrl}
-                        width="100%"
-                        height="600px"
+                        style={styles.previewFrame}
                         title="ECG PDF"
                       />
                     ) : (
                       <img
                         src={viewerBlobUrl}
                         alt="ECG"
-                        style={{ maxWidth: '100%', height: 'auto' }}
+                        style={styles.previewImage}
                       />
                     )
                   ) : (
@@ -600,101 +720,62 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                       Предпросмотр доступен только для PDF и изображений.
                     </Alert>
                   )}
-                </Box>
+                </div>
               ) : viewerError ? (
-                <Alert severity="warning">
-                  {viewerError}
-                </Alert>
+                <Alert severity="warning">{viewerError}</Alert>
               ) : (
-                <Alert severity="info">
-                  Файл готов к скачиванию.
-                </Alert>
+                <Alert severity="info">Файл готов к скачиванию.</Alert>
               )}
-              
-              {/* Параметры ЭКГ */}
+
               {ecgParameters && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Параметры ЭКГ
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Частота сердечных сокращений
-                        </Typography>
-                        <Typography variant="h6">
-                          {ecgParameters.heartRate} уд/мин
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Интервал PR
-                        </Typography>
-                        <Typography variant="h6">
-                          {ecgParameters.prInterval} мс
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Интервал QRS
-                        </Typography>
-                        <Typography variant="h6">
-                          {ecgParameters.qrsInterval} мс
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Интервал QT
-                        </Typography>
-                        <Typography variant="h6">
-                          {ecgParameters.qtInterval} мс
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    
+                <section style={{ marginTop: '16px' }}>
+                  <h3 style={styles.sectionTitle}>Параметры ЭКГ</h3>
+
+                  <div style={styles.metricGrid}>
+                    <div style={styles.metricCard}>
+                      <p style={styles.caption}>Частота сердечных сокращений</p>
+                      <p style={styles.metricValue}>{ecgParameters.heartRate} уд/мин</p>
+                    </div>
+
+                    <div style={styles.metricCard}>
+                      <p style={styles.caption}>Интервал PR</p>
+                      <p style={styles.metricValue}>{ecgParameters.prInterval} мс</p>
+                    </div>
+
+                    <div style={styles.metricCard}>
+                      <p style={styles.caption}>Интервал QRS</p>
+                      <p style={styles.metricValue}>{ecgParameters.qrsInterval} мс</p>
+                    </div>
+
+                    <div style={styles.metricCard}>
+                      <p style={styles.caption}>Интервал QT</p>
+                      <p style={styles.metricValue}>{ecgParameters.qtInterval} мс</p>
+                    </div>
+
                     {ecgParameters.axis && (
-                      <Grid item xs={12}>
-                        <Paper sx={{ p: 2 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Электрическая ось сердца
-                          </Typography>
-                          <Typography variant="h6">
-                            {ecgParameters.axis}°
-                          </Typography>
-                        </Paper>
-                      </Grid>
+                      <div style={styles.metricCard}>
+                        <p style={styles.caption}>Электрическая ось сердца</p>
+                        <p style={styles.metricValue}>{ecgParameters.axis}°</p>
+                      </div>
                     )}
-                  </Grid>
-                </Box>
+                  </div>
+                </section>
               )}
-            </Box>
+            </div>
           )}
         </DialogContent>
-        
+
         <DialogActions>
           <Button onClick={() => analyzeECG(selectedFile)} disabled={analyzing}>
             AI Анализ
           </Button>
-          <Button onClick={() => downloadFile(selectedFile)} variant="contained">
+          <Button onClick={() => downloadFile(selectedFile)} variant="primary">
             Скачать
           </Button>
-          <Button onClick={closeViewer}>
-            Закрыть
-          </Button>
+          <Button onClick={closeViewer}>Закрыть</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 };
 
