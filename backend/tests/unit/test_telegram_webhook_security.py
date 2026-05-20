@@ -101,6 +101,14 @@ def _link_patient_to_chat(
     return telegram_user
 
 
+def _reply_keyboard_texts(reply_markup):
+    return [
+        button["text"]
+        for row in reply_markup.get("keyboard", [])
+        for button in row
+    ]
+
+
 def _create_lab_report_instance(
     db_session,
     *,
@@ -997,6 +1005,64 @@ class TestTelegramWebhookSecurity:
         assert "Programma Clinic-ga" in template["text"]
         assert "Ali" in template["text"]
         assert "Dobro" not in template["text"]
+
+    @pytest.mark.parametrize(
+        "language_code,main_expected,services_expected",
+        [
+            (
+                "ru",
+                [
+                    "📲 Онлайн-сервисы",
+                    "📋 Анкеты пациента",
+                    "🧾 Документы и чеки",
+                    "🧑‍⚕️ Врачи и расписание",
+                    "📲 Кабинет пациента",
+                    "👥 Режим сотрудника",
+                ],
+                [
+                    "📋 Анкеты пациента",
+                    "🧾 Документы и чеки",
+                    "🧑‍⚕️ Врачи и расписание",
+                    "📲 Кабинет пациента",
+                    "👥 Режим сотрудника",
+                    "⬅️ Главное меню",
+                ],
+            ),
+            (
+                "uz-Latn",
+                [
+                    "📲 Onlayn xizmatlar",
+                    "📋 Bemor anketalari",
+                    "🧾 Hujjatlar va cheklar",
+                    "🧑‍⚕️ Shifokorlar jadvali",
+                    "📲 Bemor kabineti",
+                    "👥 Xodim rejimi",
+                ],
+                [
+                    "📋 Bemor anketalari",
+                    "🧾 Hujjatlar va cheklar",
+                    "🧑‍⚕️ Shifokorlar jadvali",
+                    "📲 Bemor kabineti",
+                    "👥 Xodim rejimi",
+                    "⬅️ Asosiy menyu",
+                ],
+            ),
+        ],
+    )
+    def test_patient_visible_reply_menus_expose_service_buttons(
+        self, language_code, main_expected, services_expected
+    ):
+        main_texts = _reply_keyboard_texts(
+            telegram_webhook._localized_main_menu(language_code)
+        )
+        service_texts = _reply_keyboard_texts(
+            telegram_webhook._localized_services_menu(language_code)
+        )
+
+        for expected in main_expected:
+            assert expected in main_texts
+        for expected in services_expected:
+            assert expected in service_texts
 
     @pytest.mark.asyncio
     async def test_uzbek_language_choice_stores_canonical_uz_latn(self, db_session):
