@@ -182,3 +182,24 @@ Current files:
 Decision: do not migrate MUI in PR-MUI-1. The next safe step is PR-MUI-2 only
 if one low-risk admin island can be scoped with browser proof; otherwise move to
 PR-MUI-3 example-only policy.
+
+## PR-MUI-2 Low-Risk Admin Decision
+
+PR-MUI-2 is intentionally decision-only.
+
+Fresh admin/shared review:
+
+- `frontend/src/components/admin/UserManagement.jsx` is not low-risk for a
+  generic cleanup PR. Its remaining MUI usage is the admin actions menu around
+  edit, activate/deactivate, delete, and self-delete guardrail flows.
+- `frontend/src/components/dashboard/Dashboard.jsx` has no confirmed active
+  caller in `frontend/src` from static search, so the required route/browser
+  proof is not available.
+
+Decision: no runtime MUI migration in PR-MUI-2. Do not reduce the MUI count by
+editing an unproven route surface, and do not touch admin destructive-account
+actions without a dedicated admin/RBAC browser proof slice.
+
+Next safe step: PR-MUI-3 example-only policy for
+`frontend/src/components/examples/UnifiedButton.tsx` and
+`frontend/src/components/examples/UnifiedCard.tsx`.

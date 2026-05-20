@@ -63,8 +63,8 @@ Current local build evidence after PR-PERF-12 review:
   user/RBAC/payment/queue/Telegram/security-sensitive.
 - [x] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
   performance changes and classify remaining runtime/example MUI refs.
-- [ ] PR-MUI-2: migrate exactly one low-risk admin MUI island only if a dedicated
-  first-touch file and browser proof are available.
+- [x] PR-MUI-2: decide no low-risk admin MUI island is eligible without
+  route/browser proof and keep runtime UI unchanged.
 - [ ] PR-MUI-3: decide example-only MUI policy for `components/examples` without
   changing runtime UI.
 - [ ] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
