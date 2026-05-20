@@ -172,5 +172,40 @@ Current remaining MUI files:
 - none currently matching `@mui|Mui` in `frontend/src/pages` or
   `frontend/src/components`.
 
-Next smallest MUI-related step is a separate dependency/package audit before
-removing any `@mui/*` packages.
+That dependency/package audit and follow-up cleanup were completed in later
+small PRs.
+
+## Post-Package And Tooling Cleanup Note
+
+Subsequent package/tooling PRs completed the MUI removal tail and aligned the
+local performance analyzer with the current Vite app:
+
+| Slice | PR | Result |
+| --- | ---: | --- |
+| Remove MUI runtime packages | #1000 | Merged |
+| Remove stale MUI global compatibility CSS | #1002 | Merged |
+| Update bundle analyzer dependency inventory after MUI removal | #1003 | Merged |
+| Align theme audit guidance with macOS UI | #1004 | Merged |
+| Clarify local theme token inversion wording | #1005 | Merged |
+| Archive legacy MUI guidance docs | #1006 | Merged |
+| Fix performance analyzer lazy/Vite checks | #1007 | Merged |
+| Align bundle visualizer guidance with Vite/Rollup | #1008 | Merged |
+
+Current package/runtime proof:
+
+- no `@mui/*` runtime packages remain in `frontend/package.json` or
+  `frontend/package-lock.json`;
+- no `@mui|Mui` runtime matches remain in `frontend/src/pages` or
+  `frontend/src/components`;
+- stale generated MUI class compatibility rules were removed from
+  `frontend/src/styles/global-fixes.css`;
+- `npm run analyze` reports `Lazy Loading компонентов` and
+  `Vite оптимизация` as passing.
+
+Remaining performance notes:
+
+- `heic2any-*` remains intentionally isolated as a lazy conversion chunk;
+- `AdminPanel-*` remains below the local `1000 KiB` review target from this
+  cycle;
+- optional `rollup-plugin-visualizer` and image optimization remain future
+  enhancements, not blockers for the completed MUI cleanup.
