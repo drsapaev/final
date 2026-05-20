@@ -216,6 +216,11 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [formsManifest, setFormsManifest] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -256,6 +261,62 @@ function TelegramMiniAppPatientShell() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (state.status !== 'ready' || selectedSection !== 'forms') {
+      setFormsManifest({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData) {
+      setFormsManifest({
+        status: 'error',
+        payload: null,
+        error: 'РЎРµСЃСЃРёСЏ Mini App РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅР°',
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setFormsManifest({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/forms/manifest', { initData })
+      .then((response) => {
+        if (!isMounted) return;
+        setFormsManifest({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        const reason = error?.response?.data?.detail?.reason || 'forms_manifest_failed';
+        setFormsManifest({
+          status: 'error',
+          payload: null,
+          error: `РђРЅРєРµС‚С‹ РЅРµ РґРѕСЃС‚СѓРїРЅС‹: ${reason}`,
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSection, state.status]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
@@ -263,6 +324,10 @@ function TelegramMiniAppPatientShell() {
   const canPreviewAppointments = Boolean(
     selectedSection === 'appointments' &&
     selectedCapability?.preview_enabled
+  );
+  const canShowFormsManifest = Boolean(
+    selectedSection === 'forms' &&
+    selectedCapability?.manifest_endpoint
   );
 
   const handleAppointmentPreviewFieldChange = (field) => (event) => {
@@ -318,6 +383,7 @@ function TelegramMiniAppPatientShell() {
   };
 
   const previewAppointment = appointmentPreview.payload?.appointment || null;
+  const formsManifestItems = formsManifest.payload?.forms || [];
 
   return (
     <div style={miniAppPageStyle}>
@@ -374,6 +440,70 @@ function TelegramMiniAppPatientShell() {
                       {selectedCapability?.status || 'manifest_only'}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {canShowFormsManifest && (
+              <Card padding="small" shadow="none" style={miniAppFormsManifestStyle}>
+                <CardContent style={miniAppFormsManifestContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Р—Р°С‰РёС‰РµРЅРЅС‹Рµ Р°РЅРєРµС‚С‹</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>РЎС‚Р°С‚СѓСЃ С„РѕСЂРј</h2>
+                    </div>
+                    <Badge variant="secondary" size="small">Р‘РµР· РІРІРѕРґР° РґР°РЅРЅС‹С…</Badge>
+                  </div>
+
+                  {formsManifest.status === 'loading' && (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      Р—Р°РіСЂСѓР·РєР° СЃС‚Р°С‚СѓСЃР° Р°РЅРєРµС‚...
+                    </Alert>
+                  )}
+
+                  {formsManifest.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {formsManifest.error}
+                    </Alert>
+                  )}
+
+                  {formsManifest.status === 'ready' && (
+                    <>
+                      <div style={miniAppFormsSummaryStyle}>
+                        <Badge variant={formsManifest.payload?.forms_enabled ? 'primary' : 'secondary'} size="small">
+                          {formsManifest.payload?.forms_enabled ? 'РђРЅРєРµС‚С‹ РґРѕСЃС‚СѓРїРЅС‹' : 'РђРЅРєРµС‚С‹ РїРѕРєР° РїР»Р°РЅРёСЂСѓСЋС‚СЃСЏ'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {formsManifest.payload?.capture_enabled ? 'Р’РІРѕРґ РІРєР»СЋС‡РµРЅ' : 'Р’РІРѕРґ РѕС‚РєР»СЋС‡РµРЅ'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {formsManifest.payload?.submission_enabled ? 'РћС‚РїСЂР°РІРєР° РІРєР»СЋС‡РµРЅР°' : 'РћС‚РїСЂР°РІРєР° РѕС‚РєР»СЋС‡РµРЅР°'}
+                        </Badge>
+                      </div>
+
+                      <section style={miniAppFormsGridStyle}>
+                        {formsManifestItems.map((form) => (
+                          <div key={form.key || form.title} style={miniAppFormManifestItemStyle}>
+                            <div>
+                              <h3 style={miniAppFormManifestTitleStyle}>{form.title || form.key}</h3>
+                              <p style={miniAppCapabilityTextStyle}>{form.status || 'planned'}</p>
+                            </div>
+                            <div style={miniAppFormManifestBadgeRowStyle}>
+                              <Badge variant="secondary" size="small">
+                                {form.capture_enabled ? 'capture on' : 'capture off'}
+                              </Badge>
+                              <Badge variant="secondary" size="small">
+                                {form.submission_enabled ? 'submit on' : 'submit off'}
+                              </Badge>
+                              <Badge variant={form.contains_medical_data ? 'warning' : 'success'} size="small">
+                                {form.contains_medical_data ? 'medical data' : 'no medical data'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -839,6 +969,56 @@ const miniAppAppointmentPreviewResultStyle = {
   background: 'rgba(52, 199, 89, 0.08)',
   fontSize: '13px',
   color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppFormsManifestStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(88, 86, 214, 0.24)',
+};
+
+const miniAppFormsManifestContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '14px',
+};
+
+const miniAppFormsSummaryStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: '8px',
+};
+
+const miniAppFormsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(164px, 1fr))',
+  gap: '12px',
+};
+
+const miniAppFormManifestItemStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  gap: '14px',
+  minHeight: '132px',
+  padding: '12px',
+  border: '1px solid rgba(88, 86, 214, 0.22)',
+  borderRadius: '8px',
+  background: 'rgba(88, 86, 214, 0.07)',
+};
+
+const miniAppFormManifestTitleStyle = {
+  margin: '0 0 6px',
+  fontSize: '15px',
+  lineHeight: 1.25,
+  fontWeight: 750,
+  color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppFormManifestBadgeRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
 };
 
 const miniAppCapabilityStyle = {
