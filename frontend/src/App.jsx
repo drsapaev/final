@@ -750,6 +750,15 @@ function TelegramMiniAppPatientShell() {
                         <Badge variant="secondary" size="small">
                           {paymentsManifest.payload?.provider_redirect_enabled ? 'provider redirect on' : 'provider redirect off'}
                         </Badge>
+                        <Badge variant={paymentsManifest.payload?.contains_amounts ? 'warning' : 'success'} size="small">
+                          {paymentsManifest.payload?.contains_amounts ? 'amounts present' : 'no amounts'}
+                        </Badge>
+                        <Badge variant={paymentsManifest.payload?.contains_payment_records ? 'warning' : 'success'} size="small">
+                          {paymentsManifest.payload?.contains_payment_records ? 'payment records' : 'no payment records'}
+                        </Badge>
+                        <Badge variant={paymentsManifest.payload?.contains_provider_payloads ? 'warning' : 'success'} size="small">
+                          {paymentsManifest.payload?.contains_provider_payloads ? 'provider payloads' : 'no provider payloads'}
+                        </Badge>
                       </div>
 
                       <section style={miniAppFormsGridStyle}>
