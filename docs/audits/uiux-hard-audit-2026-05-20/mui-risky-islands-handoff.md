@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 4 files.
+Current post-continuation result: 3 files.
 
 ## Global Rule
 
@@ -35,12 +35,16 @@ Each future migration PR must:
 
 Files:
 
-- `frontend/src/components/payment/PaymentWidget.jsx`
+- none currently matching `@mui|Mui`
 
 Note: `frontend/src/pages/PaymentTest.jsx` was migrated to macOS/native
 controls in a gate-limited payment demo slice and no longer appears in the MUI
 runtime inventory. Future behavior changes to that page still require payment
 gate review.
+`frontend/src/components/payment/PaymentWidget.jsx` was migrated to
+macOS/native controls in a gate-limited payment widget slice and no longer
+appears in the MUI runtime inventory. Future behavior changes to the widget
+still require payment gate review.
 
 Mode:
 
@@ -256,8 +260,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 4 files across payment
-widget, queue, cardiology, and Telegram surfaces.
+migration. The current remaining MUI inventory is 3 files across queue,
+cardiology, and Telegram surfaces.
 
 ## Next Smallest Step
 
