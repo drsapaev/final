@@ -59,7 +59,10 @@ from app.services.payment_reconciliation_api_service import (
 from app.services.telegram_staff_confirmation_token_service import (
     TelegramStaffConfirmationTokenService,
 )
-from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_bot import (
+    get_telegram_bot_service,
+    telegram_text_corruption_reason,
+)
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
     TelegramMiniAppSessionScopeError,
@@ -1188,6 +1191,34 @@ async def _send_patient_bot_reply(
     reply_markup: Dict[str, Any],
     template_key: str,
 ) -> bool:
+    corruption_reason = telegram_text_corruption_reason(text)
+    if corruption_reason:
+        try:
+            db.add(
+                TelegramMessage(
+                    chat_id=chat_id,
+                    message_type="patient_bot_reply",
+                    template_key=template_key,
+                    message_text="[blocked_corrupted_text]",
+                    status="failed",
+                    error_message=f"blocked_corrupted_text:{corruption_reason}",
+                )
+            )
+            db.commit()
+            logger.warning(
+                "Telegram patient bot reply blocked template_key=%s reason=%s",
+                template_key,
+                corruption_reason,
+            )
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Telegram patient bot reply block log failed template_key=%s error_type=%s",
+                template_key,
+                type(exc).__name__,
+            )
+        return False
+
     sent = bool(await bot_service._send_message(chat_id, text, reply_markup))
     try:
         db.add(

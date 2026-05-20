@@ -1585,7 +1585,9 @@ class TestTelegramWebhookSecurity:
                 [
                     {
                         "text": telegram_webhook._localized_text("booking_entry_button", "uz-Latn"),
-                        "url": "https://clinic.example" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
+                        "web_app": {
+                            "url": "https://clinic.example" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
+                        },
                     }
                 ]
             ]
@@ -1690,7 +1692,12 @@ class TestTelegramWebhookSecurity:
                 [
                     {
                         "text": telegram_webhook._localized_text(button_key, "uz-Latn"),
-                        "url": f"https://clinic.example/patient?tab={section}",
+                        "web_app": {
+                            "url": (
+                                "https://clinic.example"
+                                f"{admin_telegram.PATIENT_MINI_APP_ENTRY_ROUTE}?section={section}"
+                            ),
+                        },
                     }
                 ]
             ]
@@ -2522,7 +2529,10 @@ class TestTelegramWebhookSecurity:
                         "text": telegram_webhook._localized_text(
                             "payments_entry_button", "ru"
                         ),
-                        "url": "https://clinic.example/patient/payments",
+                        "web_app": {
+                            "url": "https://clinic.example"
+                            + admin_telegram.PATIENT_PAYMENT_ENTRY_ROUTE,
+                        },
                     }
                 ]
             ]
@@ -2690,6 +2700,66 @@ class TestTelegramWebhookSecurity:
             "application/pdf",
         )
         assert captured["timeout"] == 20
+
+    @pytest.mark.asyncio
+    async def test_telegram_bot_service_blocks_corrupted_send_message(self, monkeypatch):
+        captured = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"ok": True}
+
+        def fake_post(url, json, timeout):
+            captured.append({"url": url, "json": json, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr(telegram_bot.requests, "post", fake_post)
+        service = telegram_bot.TelegramBotService()
+        service.bot_token = "bot-token"
+
+        assert await service._send_message(7006, "???? Mini App") is False
+        assert captured == []
+
+        valid_ru_text = "\u041a\u0430\u0431\u0438\u043d\u0435\u0442 \u043f\u0430\u0446\u0438\u0435\u043d\u0442\u0430"
+        assert telegram_bot.telegram_text_corruption_reason(valid_ru_text) is None
+        assert await service._send_message(7006, valid_ru_text) is True
+        assert len(captured) == 1
+        assert captured[0]["json"]["text"] == valid_ru_text
+
+    @pytest.mark.asyncio
+    async def test_patient_bot_reply_blocks_corrupted_log_text(self, db_session):
+        fake_service = FakeTelegramBotService(active=True)
+
+        sent = await telegram_webhook._send_patient_bot_reply(
+            db_session,
+            fake_service,
+            7007,
+            "???? Mini App",
+            telegram_webhook._localized_main_menu("ru"),
+            "telegram_patient_help",
+        )
+
+        assert sent is False
+        fake_service._send_message.assert_not_awaited()
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7007)
+            .one()
+        )
+        assert log.status == "failed"
+        assert log.message_text == "[blocked_corrupted_text]"
+        assert log.error_message == "blocked_corrupted_text:question_mark_run"
+
+    def test_patient_facing_localized_templates_have_no_corruption_markers(self):
+        for key, values in telegram_webhook.TELEGRAM_LOCALIZED_TEXTS.items():
+            for language, text in values.items():
+                assert telegram_bot.telegram_text_corruption_reason(text) is None, (
+                    key,
+                    language,
+                    telegram_bot.telegram_text_corruption_reason(text),
+                )
 
     @pytest.mark.asyncio
     async def test_telegram_bot_service_registers_patient_commands(self, monkeypatch):
