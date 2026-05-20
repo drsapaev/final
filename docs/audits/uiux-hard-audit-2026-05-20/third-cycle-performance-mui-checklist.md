@@ -35,24 +35,25 @@ These PRs are already merged before this third-cycle checklist:
 - [x] PR-PERF-7 / #952: lazy-load admin queue profiles view.
 - [x] PR-PERF-8 / #953: lazy-load admin service catalog view.
 
-Current local build evidence after PR #953 and PR-PERF-9 refresh:
+Current local build evidence after PR-PERF-10:
 
 | Asset | Approx size |
 | --- | ---: |
-| `index-*` | `1395.09 KiB` |
+| `index-*` | `1397.95 KiB` |
 | `heic2any-*` | `1320.46 KiB` |
-| `AdminPanel-*` | `1021.80 KiB` |
+| `AdminPanel-*` | `988.91 KiB` |
 | `AnalyticsPage-*` | `245.86 KiB` |
 | `RegistrarPanel-*` | `245.68 KiB` |
 | `DentistPanelUnified-*` | `243.58 KiB` |
 | `ServiceCatalog-*` | `46.51 KiB` |
+| `UnifiedReports-*` | `35.25 KiB` |
 
 ## Third-Cycle Backlog
 
 - [x] PR-3-0: add this third-cycle performance/MUI debt checklist.
 - [x] PR-PERF-9: update Vite performance warning docs with post-PR #953
   baseline and resolved warnings.
-- [ ] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
+- [x] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
   into a lazy boundary.
 - [ ] PR-PERF-11: split one additional low-risk analytics/admin reporting child
   view only if route/RBAC proof stays behavior-identical.
