@@ -397,22 +397,23 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: (
             "Kosmed Clinic bot\n\n"
             "Для пациента:\n"
-            "🏥 Записаться на приём - безопасная подсказка для связи с регистратурой.\n"
+            "🏥 Записаться на приём - отправить заявку через защищенный Mini App.\n"
             "🎫 Моя очередь - номер, кабинет, статус и позиция ожидания.\n"
             "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
             "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
             "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
             "📲 Онлайн-сервисы - карта подключенных и будущих защищенных функций.\n"
-            "📋 Анкеты пациента - безопасная заглушка до подключения Mini App.\n"
+            "📋 Анкеты пациента - защищенное заполнение через Mini App.\n"
             "🧾 Документы и чеки - безопасный вход к будущему кабинету документов.\n"
-            "🧑‍⚕️ Врачи и расписание - пока только подсказка, запись через регистратуру.\n"
-            "📲 Кабинет пациента - будущий защищенный вход, без медданных в чате.\n"
+            "🧑‍⚕️ Врачи и расписание - защищенный просмотр расписания.\n"
+            "📲 Кабинет пациента - защищенный вход без медданных в чате.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
             "⚙️ Настройки - язык и уведомления.\n"
             "👥 Режим сотрудника - вход только по персональной ссылке администратора или /staff.\n\n"
             "☎️ Связаться с клиникой - безопасная подсказка, куда обращаться по записи, кассе и срочным вопросам.\n\n"
             "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
+            "Для записи откройте Mini App из кнопки под сообщением \"Записаться на приём\". "
             "Для привязки отсканируйте QR с чека или нажмите "
             "\"Поделиться номером\".\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
@@ -422,22 +423,23 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: (
             "Kosmed Clinic bot\n\n"
             "Bemor uchun:\n"
-            "🏥 Qabulga yozilish - registratura bilan bog'lanish uchun xavfsiz yo'l-yo'riq.\n"
+            "🏥 Qabulga yozilish - himoyalangan Mini App orqali so'rov yuborish.\n"
             "🎫 Mening navbatim - raqam, kabinet, holat va kutishdagi o'rin.\n"
             "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
             "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
             "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
             "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar xaritasi.\n"
-            "📋 Bemor anketalari - Mini App ulanmaguncha xavfsiz izoh.\n"
+            "📋 Bemor anketalari - Mini App orqali himoyalangan to'ldirish.\n"
             "🧾 Hujjatlar va cheklar - kelajakdagi himoyalangan hujjatlar kabineti kirishi.\n"
-            "🧑‍⚕️ Shifokorlar jadvali - hozircha izoh, yozilish registratura orqali.\n"
-            "📲 Bemor kabineti - kelajakdagi himoyalangan kirish, chatda tibbiy ma'lumotsiz.\n"
+            "🧑‍⚕️ Shifokorlar jadvali - himoyalangan jadval ko'rish.\n"
+            "📲 Bemor kabineti - chatda tibbiy ma'lumotsiz himoyalangan kirish.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
             "⚙️ Sozlamalar - til va xabarnomalar.\n"
             "👥 Xodim rejimi - faqat administrator bergan shaxsiy havola yoki /staff orqali.\n\n"
             "☎️ Klinikaga bog'lanish - yozilish, kassa va shoshilinch savollar bo'yicha xavfsiz yo'l-yo'riq.\n\n"
             "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
+            "Yozilish uchun \"Qabulga yozilish\" xabari ostidagi Mini App tugmasini oching. "
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
@@ -460,20 +462,21 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "book": {
         TELEGRAM_LANGUAGE_RU: (
             "Записаться на приём\n\n"
-            "Пока онлайн-запись через Telegram не подключена. Для записи обратитесь "
-            "в регистратуру или позвоните по номеру, указанному на чеке и в клинике.\n\n"
-            "Бот не создаёт визит из сообщения в чате и не принимает медицинские "
-            "данные в свободном тексте. После записи вы сможете смотреть очередь, "
-            "визиты, оплаты и готовые результаты в этом меню."
+            "Онлайн-заявка на запись уже доступна через защищенный Mini App. "
+            "Нажмите кнопку ниже, выберите дату и время, затем отправьте заявку: "
+            "регистратура подтвердит детали.\n\n"
+            "Бот не создаёт визит, очередь или оплату из свободного сообщения в чате "
+            "и не принимает медицинские данные в тексте. После подтверждения записи "
+            "вы сможете смотреть очередь, визиты, оплаты и готовые результаты в этом меню."
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Qabulga yozilish\n\n"
-            "Telegram orqali onlayn yozilish hozircha ulanmagan. Qabulga yozilish "
-            "uchun registraturaga murojaat qiling yoki chekda va klinikada "
-            "ko'rsatilgan raqamga qo'ng'iroq qiling.\n\n"
-            "Bot chat xabaridan tashrif yaratmaydi va erkin matnda tibbiy "
-            "ma'lumotlarni qabul qilmaydi. Yozilgandan keyin bu menyuda navbat, "
-            "tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
+            "Himoyalangan Mini App orqali yozilish so'rovi allaqachon ishlaydi. "
+            "Quyidagi tugmani bosing, sana va vaqtni tanlang, keyin so'rovni yuboring: "
+            "registratura ma'lumotlarni tasdiqlaydi.\n\n"
+            "Bot chatdagi erkin matndan tashrif, navbat yoki to'lov yaratmaydi "
+            "va tibbiy ma'lumotlarni matn orqali qabul qilmaydi. Yozilish tasdiqlangach, "
+            "bu menyuda navbat, tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
         ),
     },
     "service_entry_button": {
@@ -752,6 +755,10 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Открыть запись в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
     },
+    "queue_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть очередь в кабинете",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetda navbatni ochish",
+    },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
             "Telegram привязан к пациенту: {patient}.\n"
@@ -898,6 +905,7 @@ PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
     "forms",
     "cabinet",
     "visits",
+    "queue",
     "payments",
     "results",
     "documents",
@@ -1152,6 +1160,15 @@ def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
         chat_id,
         "booking",
         "booking_entry_button",
+    )
+
+
+def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "queue",
+        "queue_entry_button",
     )
 
 
@@ -3785,7 +3802,8 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _clinic_queue_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_queue_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_queue",
         )
 
@@ -4351,6 +4369,10 @@ def _mini_app_patient_manifest_payload(
                 "read_enabled": True,
             },
             "visits": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "queue": {
                 "status": "summary_enabled",
                 "read_enabled": True,
             },

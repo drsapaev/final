@@ -150,6 +150,8 @@ const MINI_APP_I18N = {
     documentsLoadFailed: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
     visitsLoading: 'Визиты и записи загружаются...',
     visitsLoadFailed: 'Визиты пациента не загрузились. Откройте ссылку заново из Telegram.',
+    queueLoading: 'Очередь пациента загружается...',
+    queueLoadFailed: 'Очередь пациента не загрузилась. Откройте ссылку заново из Telegram.',
     sessionNotConfirmed: 'Сессия Mini App не подтверждена',
     appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
     appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
@@ -167,6 +169,8 @@ const MINI_APP_I18N = {
     department: 'Отделение',
     departmentMissing: 'Отделение не указано',
     dateMissing: 'Дата не указана',
+    cabinet: 'Кабинет',
+    cabinetMissing: 'Кабинет не указан',
     optional: 'Опционально',
     registrarNote: 'Заметка для регистратуры',
     noMedicalData: 'Без медицинских данных',
@@ -202,6 +206,13 @@ const MINI_APP_I18N = {
     pending: 'Ожидает подтверждения',
     linkedVisits: 'Связанные визиты',
     activeQueue: 'Активная очередь',
+    queueTitle: 'Моя очередь',
+    queueNumber: 'Номер очереди',
+    queueStatus: 'Статус очереди',
+    queueInactive: 'Нет активной очереди',
+    queueEmpty: 'На сегодня активной очереди нет.',
+    queueEntries: 'Записи очереди',
+    queuePrivacyNote: 'В Telegram показываются только номер очереди, кабинет и статус. Очередь не меняется из Mini App.',
     visitsTitle: 'Мои визиты',
     appointmentRequests: 'Заявки на запись',
     recentVisits: 'Последние визиты',
@@ -222,6 +233,7 @@ const MINI_APP_I18N = {
     capabilities: {
       appointments: 'Запись',
       visits: 'Визиты',
+      queue: 'Очередь',
       forms: 'Анкеты',
       cabinet: 'Кабинет',
       payments: 'Оплаты',
@@ -263,6 +275,8 @@ const MINI_APP_I18N = {
     documentsLoadFailed: 'Bemor hujjatlari yuklanmadi. Havolani Telegramdan qayta oching.',
     visitsLoading: 'Tashriflar va yozilishlar yuklanmoqda...',
     visitsLoadFailed: 'Bemor tashriflari yuklanmadi. Havolani Telegramdan qayta oching.',
+    queueLoading: 'Bemor navbati yuklanmoqda...',
+    queueLoadFailed: 'Bemor navbati yuklanmadi. Havolani Telegramdan qayta oching.',
     sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
     appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
     appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
@@ -280,6 +294,8 @@ const MINI_APP_I18N = {
     department: 'Bo\'lim',
     departmentMissing: 'Bo\'lim ko\'rsatilmagan',
     dateMissing: 'Sana ko\'rsatilmagan',
+    cabinet: 'Kabinet',
+    cabinetMissing: 'Kabinet ko\'rsatilmagan',
     optional: 'Ixtiyoriy',
     registrarNote: 'Registratura uchun izoh',
     noMedicalData: 'Tibbiy maʼlumotlarsiz',
@@ -315,6 +331,13 @@ const MINI_APP_I18N = {
     pending: 'Tasdiqlanishi kutilmoqda',
     linkedVisits: 'Bog\'langan tashriflar',
     activeQueue: 'Faol navbat',
+    queueTitle: 'Mening navbatim',
+    queueNumber: 'Navbat raqami',
+    queueStatus: 'Navbat holati',
+    queueInactive: 'Faol navbat yo\'q',
+    queueEmpty: 'Bugun faol navbat yo\'q.',
+    queueEntries: 'Navbat yozuvlari',
+    queuePrivacyNote: 'Telegramda faqat navbat raqami, kabinet va holat ko\'rsatiladi. Mini App navbatni o\'zgartirmaydi.',
     visitsTitle: 'Mening tashriflarim',
     appointmentRequests: 'Yozilish so\'rovlari',
     recentVisits: 'So\'nggi tashriflar',
@@ -335,6 +358,7 @@ const MINI_APP_I18N = {
     capabilities: {
       appointments: 'Yozilish',
       visits: 'Tashriflar',
+      queue: 'Navbat',
       forms: 'Anketalar',
       cabinet: 'Kabinet',
       payments: 'To\'lovlar',
@@ -360,6 +384,8 @@ const MINI_APP_SECTION_ALIASES = {
   appointments: 'appointments',
   doctors: 'appointments',
   visits: 'visits',
+  queue: 'queue',
+  navbat: 'queue',
   forms: 'forms',
   cabinet: 'cabinet',
   payments: 'payments',
@@ -611,7 +637,8 @@ function TelegramMiniAppPatientShell() {
     const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
     const usesCabinetSummary = selectedSection === 'cabinet'
       || selectedSection === 'payments'
-      || selectedSection === 'visits';
+      || selectedSection === 'visits'
+      || selectedSection === 'queue';
     setCabinetSummary({
       status: usesCabinetSummary && authPayload ? 'loading' : 'idle',
       payload: null,
@@ -712,6 +739,8 @@ function TelegramMiniAppPatientShell() {
             effectLanguageCode,
             selectedSection === 'payments'
               ? 'paymentsLoadFailed'
+              : selectedSection === 'queue'
+                ? 'queueLoadFailed'
               : selectedSection === 'visits'
                 ? 'visitsLoadFailed'
                 : 'cabinetLoadFailed'
@@ -973,6 +1002,8 @@ function TelegramMiniAppPatientShell() {
   const paymentsSummary = cabinetSummary.payload?.payments || {};
   const patientAppointments = cabinetSummary.payload?.appointments || [];
   const patientVisits = cabinetSummary.payload?.visits || [];
+  const patientQueueEntries = cabinetSummary.payload?.queue || [];
+  const currentQueueEntry = patientQueueEntries[0] || null;
   const paymentsDebtValue = Number(String(paymentsSummary.debt || '0').replace(/\s/g, ''));
 
   return (
@@ -1076,6 +1107,91 @@ function TelegramMiniAppPatientShell() {
                       <strong>{cabinetSummary.payload?.reports?.length || 0}</strong>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedSection === 'queue' && cabinetSummary.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                {t('queueLoading')}
+              </Alert>
+            )}
+
+            {selectedSection === 'queue' && cabinetSummary.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {cabinetSummary.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'queue' && cabinetSummary.status === 'ready' && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>{t('patient')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('queueTitle')}</h2>
+                      <p style={miniAppCapabilityTextStyle}>
+                        {cabinetSummary.payload?.patient?.name || t('patientFallback')}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={currentQueueEntry ? 'success' : 'secondary'}
+                      size="small"
+                    >
+                      {currentQueueEntry ? t('activeQueue') : t('queueInactive')}
+                    </Badge>
+                  </div>
+
+                  {currentQueueEntry ? (
+                    <>
+                      <div style={miniAppAppointmentPreviewResultStyle}>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('queueNumber')}</p>
+                          <strong>№{currentQueueEntry.number}</strong>
+                        </div>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('cabinet')}</p>
+                          <strong>{currentQueueEntry.cabinet || t('cabinetMissing')}</strong>
+                        </div>
+                        <div>
+                          <p style={miniAppCapabilityTextStyle}>{t('queueStatus')}</p>
+                          <strong>{currentQueueEntry.status || t('status')}</strong>
+                        </div>
+                      </div>
+
+                      {patientQueueEntries.length > 1 && (
+                        <section style={miniAppVisitsSectionStyle}>
+                          <h3 style={miniAppSubsectionTitleStyle}>{t('queueEntries')}</h3>
+                          <div style={miniAppVisitsListStyle}>
+                            {patientQueueEntries.map((entry) => (
+                              <div key={`queue-${entry.number}-${entry.status}`} style={miniAppVisitItemStyle}>
+                                <div style={miniAppVisitItemHeaderStyle}>
+                                  <strong>№{entry.number}</strong>
+                                  <Badge variant="secondary" size="small">
+                                    {entry.status || t('status')}
+                                  </Badge>
+                                </div>
+                                <div style={miniAppAppointmentPreviewResultStyle}>
+                                  <div>
+                                    <p style={miniAppCapabilityTextStyle}>{t('cabinet')}</p>
+                                    <strong>{entry.cabinet || t('cabinetMissing')}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      )}
+                    </>
+                  ) : (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      {t('queueEmpty')}
+                    </Alert>
+                  )}
+
+                  <Alert severity="warning" style={miniAppNoticeStyle}>
+                    {t('queuePrivacyNote')}
+                  </Alert>
                 </CardContent>
               </Card>
             )}
