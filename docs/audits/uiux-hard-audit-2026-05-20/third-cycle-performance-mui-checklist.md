@@ -35,18 +35,19 @@ These PRs are already merged before this third-cycle checklist:
 - [x] PR-PERF-7 / #952: lazy-load admin queue profiles view.
 - [x] PR-PERF-8 / #953: lazy-load admin service catalog view.
 
-Current local build evidence after PR-PERF-10:
+Current local build evidence after PR-PERF-11:
 
 | Asset | Approx size |
 | --- | ---: |
 | `index-*` | `1397.95 KiB` |
 | `heic2any-*` | `1320.46 KiB` |
-| `AdminPanel-*` | `988.91 KiB` |
+| `AdminPanel-*` | `970.11 KiB` |
 | `AnalyticsPage-*` | `245.86 KiB` |
 | `RegistrarPanel-*` | `245.68 KiB` |
 | `DentistPanelUnified-*` | `243.58 KiB` |
 | `ServiceCatalog-*` | `46.51 KiB` |
 | `UnifiedReports-*` | `35.25 KiB` |
+| `WaitTimeAnalytics-*` | `19.27 KiB` |
 
 ## Third-Cycle Backlog
 
@@ -55,7 +56,7 @@ Current local build evidence after PR-PERF-10:
   baseline and resolved warnings.
 - [x] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
   into a lazy boundary.
-- [ ] PR-PERF-11: split one additional low-risk analytics/admin reporting child
+- [x] PR-PERF-11: split one additional low-risk analytics/admin reporting child
   view only if route/RBAC proof stays behavior-identical.
 - [ ] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
   with one more optional-view split; stop if the next candidate is
