@@ -68,7 +68,6 @@ import {
   FormControlLabel } from
 '@mui/material';
 import { api } from '../api/client.js';
-import { getProtectedPatientFormsEntryPath } from '../routing/routeSelectors.js';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
@@ -198,15 +197,21 @@ const TelegramManager = () => {
   const patientBotFeatures = Array.isArray(patientBot.features) ? patientBot.features : [];
   const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
   const patientPaymentEntryFeature = patientBotFeatures.find(
-    (feature) => feature?.key === 'patient_payments_protected_entry'
+    (feature) =>
+      feature?.key === 'patient_payments_mini_app_entry' ||
+      feature?.key === 'patient_payments_protected_entry'
   );
   const patientFormsEntryFeature = patientBotFeatures.find(
     (feature) =>
       feature?.key === 'patient_forms_entrypoint' ||
       feature?.key === 'patient_forms_placeholder'
   );
-  const patientPaymentEntryRoute = patientPaymentEntryFeature?.contract?.route || '/patient/payments';
-  const patientFormsEntryRoute = patientFormsEntryFeature?.contract?.route || getProtectedPatientFormsEntryPath();
+  const patientPaymentEntryRoute =
+    patientPaymentEntryFeature?.contract?.route ||
+    '/telegram/mini-app/patient?section=payments';
+  const patientFormsEntryRoute =
+    patientFormsEntryFeature?.contract?.route ||
+    '/telegram/mini-app/patient?section=forms';
   const patientMiniAppManifestFeature = patientBotFeatures.find(
     (feature) => feature?.key === 'patient_mini_app_manifest'
   );

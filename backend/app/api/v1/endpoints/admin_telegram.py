@@ -41,37 +41,42 @@ from app.services.telegram_bot import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-PATIENT_PAYMENT_ENTRY_ROUTE = "/patient/payments"
-PATIENT_BOOKING_ENTRY_ROUTE = "/patient/bookings"
-PATIENT_FORMS_ENTRY_ROUTE = "/patient?tab=forms"
+PATIENT_MINI_APP_ENTRY_ROUTE = "/telegram/mini-app/patient"
+PATIENT_PAYMENT_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=payments"
+PATIENT_BOOKING_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=appointments"
+PATIENT_FORMS_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=forms"
 PATIENT_BOOKING_ENTRY_CONTRACT = {
     "contract_version": "patient-booking-entrypoint-v1",
     "route": PATIENT_BOOKING_ENTRY_ROUTE,
-    "surface": "protected_app",
-    "auth": "authenticated",
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data",
     "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
-    "entrypoint_type": "mini_app_booking_preview",
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
 }
 PATIENT_PAYMENT_ENTRY_CONTRACT = {
     "contract_version": "patient-payment-entry-v1",
     "route": PATIENT_PAYMENT_ENTRY_ROUTE,
-    "surface": "protected_app",
-    "auth": "authenticated",
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data",
     "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
 }
 PATIENT_FORMS_ENTRY_CONTRACT = {
     "contract_version": "patient-forms-entrypoint-v1",
     "route": PATIENT_FORMS_ENTRY_ROUTE,
-    "surface": "protected_app",
-    "auth": "authenticated",
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data",
     "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
-    "entrypoint_type": "mini_app_tab_entry",
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
 }
 PATIENT_MINI_APP_MANIFEST_ENDPOINT = "/api/v1/telegram/mini-app/patient/manifest"
 PATIENT_MINI_APP_MANIFEST_CONTRACT = {
@@ -2866,7 +2871,7 @@ def get_telegram_integration_status(
                 "contact_phone_link",
                 "patient_queue",
                 "patient_payments_debt",
-                "patient_payments_protected_entry",
+                "patient_payments_mini_app_entry",
                 "patient_status",
                 "patient_language_notification_settings",
                 "lab_results_pdf",
@@ -2947,7 +2952,7 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
-                        "key": "patient_payments_protected_entry",
+                        "key": "patient_payments_mini_app_entry",
                         "label": "Защищенный вход к оплатам пациента",
                         "enabled": bool(bot_token),
                         "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,

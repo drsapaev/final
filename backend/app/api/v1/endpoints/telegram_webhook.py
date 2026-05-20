@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
     PATIENT_BOOKING_ENTRY_ROUTE,
+    PATIENT_MINI_APP_ENTRY_ROUTE,
     PATIENT_PAYMENT_ENTRY_ROUTE,
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
     STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -959,13 +960,22 @@ def _patient_entry_url(section: str | None = None) -> str | None:
     elif section == "payment":
         route = PATIENT_PAYMENT_ENTRY_ROUTE
     elif section:
-        route = f"/patient?tab={section}"
+        route = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section={section}"
     else:
-        route = "/patient"
+        route = PATIENT_MINI_APP_ENTRY_ROUTE
 
     if not route.startswith("/"):
         route = f"/{route}"
     return f"{frontend_url.rstrip('/')}{route}"
+
+
+def _telegram_entry_button(text: str, entry_url: str) -> Dict[str, Any]:
+    button: Dict[str, Any] = {"text": text}
+    if entry_url.lower().startswith("https://"):
+        button["web_app"] = {"url": entry_url}
+    else:
+        button["url"] = entry_url
+    return button
 
 
 def _patient_payment_entry_url() -> str | None:
@@ -994,10 +1004,10 @@ def _telegram_service_entry_markup(
     return {
         "inline_keyboard": [
             [
-                {
-                    "text": _localized_text(button_text_key, language),
-                    "url": entry_url,
-                }
+                _telegram_entry_button(
+                    _localized_text(button_text_key, language),
+                    entry_url,
+                )
             ]
         ]
     }
