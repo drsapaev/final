@@ -22,11 +22,12 @@ admin user management, queue, payment, lab reporting, patient clinical data,
 cardiology, dental, Telegram, AI/MCP, or example-only policy work.
 
 PR-MUI-1 decision refresh after the performance split cycle: 14 files still
-contain runtime or example MUI imports. PR-PERF-9 through PR-PERF-12 did not add
-new MUI islands. The remaining classification is unchanged: every runtime target
-is shared/admin-sensitive, payment/queue-adjacent, clinical-heavy, or
-Telegram/AI-sensitive; the two `components/examples` files remain example-only
-until the example policy is decided.
+contained runtime or example MUI imports. PR-PERF-9 through PR-PERF-12 did not
+add new MUI islands.
+
+Dashboard stale component removal: 13 files now contain runtime or example MUI
+imports after deleting the caller-free `frontend/src/components/dashboard`
+barrel and component.
 
 ## No-New-MUI Island Policy
 
@@ -65,7 +66,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/pwa/ConnectionStatus.jsx` | Low-risk | PWA online/offline/sync status UI; no backend contract ownership. | Migrated in Task 36; no current `@mui` import. |
 | `frontend/src/components/pwa/PWAInstallPrompt.jsx` | Low-risk | PWA install/update/notification prompt UI. | Migrated in Task 37; no current `@mui` import. |
 | `frontend/src/components/admin/UserManagement.jsx` | Shared/admin-sensitive | Legacy actions menu imports MUI. Admin user workflow is role-sensitive. | Do not touch until dedicated admin slice. |
-| `frontend/src/components/dashboard/Dashboard.jsx` | Shared/admin-sensitive | Dashboard summary UI with MUI icons/components. | Leave for later dashboard consolidation. |
+| `frontend/src/components/dashboard/Dashboard.jsx` | Stale/removed | No active route owner or caller found. | Removed after route-owner discovery. |
 | `frontend/src/components/payment/PaymentWidget.jsx` | Payment/queue-adjacent | Payment flow behavior and error handling are payment-sensitive. | Gate/handoff only. |
 | `frontend/src/pages/PaymentTest.jsx` | Payment/queue-adjacent | Internal payment demo/test surface. | Gate/handoff only; do not alter payment semantics. |
 | `frontend/src/components/queue/OnlineQueueManager.jsx` | Payment/queue-adjacent | Queue status, print/download, and queue operations. | Gate/handoff only. |
@@ -113,7 +114,7 @@ $files | Sort-Object
 $files.Count
 ```
 
-Result: 14 files.
+Result after stale dashboard removal: 13 files.
 
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
@@ -151,7 +152,7 @@ classification:
 
 | Category | Files | Decision |
 | --- | ---: | --- |
-| Shared/admin-sensitive | 2 | Requires dedicated admin/dashboard slice. |
+| Shared/admin-sensitive | 1 | Requires dedicated admin user-action slice. |
 | Payment/queue-adjacent | 3 | Gate/handoff only. |
 | Clinical-heavy | 5 | Clinical safety review before migration. |
 | Telegram/AI-sensitive | 2 | Gate/handoff only. |
@@ -161,7 +162,6 @@ Current files:
 
 - Shared/admin-sensitive:
   - `frontend/src/components/admin/UserManagement.jsx`
-  - `frontend/src/components/dashboard/Dashboard.jsx`
 - Payment/queue-adjacent:
   - `frontend/src/components/payment/PaymentWidget.jsx`
   - `frontend/src/pages/PaymentTest.jsx`
@@ -241,7 +241,7 @@ Gate-required groups:
 - Clinical: `LabReportGenerator.jsx`, `ECGViewer.jsx`,
   `TreatmentPlanner.jsx`, `ToothModal.jsx`, `FamilyRelationsCard.jsx`
 - Telegram/AI: `TelegramManager.jsx`, `MCPMonitor.jsx`
-- Admin/shared: `UserManagement.jsx`, `Dashboard.jsx`
+- Admin/shared: `UserManagement.jsx`
 
 Default rule: one risky MUI island per PR, with first-touch boundaries,
 read-only references, browser/auth proof, and stop conditions named before
@@ -253,9 +253,7 @@ editing.
 records a source-based route ownership check for
 `frontend/src/components/dashboard/Dashboard.jsx`.
 
-Current decision: `Dashboard.jsx` has no confirmed active route owner or caller
-in `frontend/src`. Do not spend a runtime MUI migration PR on this file unless
-a caller appears. The next safe step is a dedicated archive/delete PR for
-`frontend/src/components/dashboard/Dashboard.jsx` and its caller-free barrel
-`frontend/src/components/dashboard/index.js`, validated by frontend build and a
-fresh MUI inventory.
+Current decision: `Dashboard.jsx` had no confirmed active route owner or caller
+in `frontend/src`. The stale component and its caller-free barrel were deleted
+in the follow-up removal PR. Keep it out of future runtime MUI handoffs unless a
+new dashboard route owner is intentionally created.
