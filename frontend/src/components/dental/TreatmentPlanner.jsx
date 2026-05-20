@@ -6,7 +6,7 @@
 import { Fragment, useState } from 'react';
 import {
   Alert,
-  Box,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -14,36 +14,193 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  FormControl,
-  Grid,
-  IconButton,
-  InputLabel,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  ListItemText,
-  MenuItem,
+  Input,
   Select,
-  Paper,
-  TextField,
-  Typography,
-  Chip,
-} from '@mui/material';
-import Add from '@mui/icons-material/Add';
-import Assignment from '@mui/icons-material/Assignment';
-import AttachMoney from '@mui/icons-material/AttachMoney';
-import CalendarToday from '@mui/icons-material/CalendarToday';
-import Delete from '@mui/icons-material/Delete';
-import LocalHospital from '@mui/icons-material/LocalHospital';
-import Print from '@mui/icons-material/Print';
+  Textarea,
+} from '../ui/macos';
+import {
+  CalendarDays,
+  ClipboardList,
+  Clock,
+  DollarSign,
+  Hospital,
+  Plus,
+  Printer,
+  Trash2,
+} from 'lucide-react';
 import { openPrintableWindow } from '../../utils/printWindow';
-import Schedule from '@mui/icons-material/Schedule';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+
+const iconSize = 15;
+
+const styles = {
+  panel: {
+    display: 'block',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  title: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+  actions: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  fieldGrid: {
+    display: 'grid',
+    gap: '14px',
+    marginBottom: '20px',
+  },
+  twoColumnGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '14px',
+  },
+  metrics: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: '12px',
+    padding: '14px',
+    marginBottom: '20px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-lg)',
+    background: 'var(--mac-bg-secondary)',
+  },
+  metric: {
+    textAlign: 'center',
+  },
+  metricValue: {
+    display: 'block',
+    color: 'var(--mac-text-primary)',
+    fontSize: '24px',
+    fontWeight: 700,
+    lineHeight: 1.1,
+  },
+  metricLabel: {
+    display: 'block',
+    marginTop: '4px',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px',
+  },
+  stageList: {
+    display: 'grid',
+    gap: '0',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  stageItem: {
+    display: 'grid',
+    gridTemplateColumns: '28px minmax(0, 1fr) auto',
+    gap: '10px',
+    alignItems: 'start',
+    padding: '12px 0',
+  },
+  stageDivider: {
+    borderTop: '1px solid var(--mac-border)',
+  },
+  stageIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    color: 'var(--mac-accent-blue)',
+    background: 'rgba(0, 122, 255, 0.08)',
+  },
+  stageName: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '14px',
+    fontWeight: 600,
+  },
+  stageDescription: {
+    margin: '4px 0 0',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '13px',
+    lineHeight: 1.4,
+  },
+  stageMeta: {
+    display: 'flex',
+    gap: '6px',
+    flexWrap: 'wrap',
+    marginTop: '8px',
+  },
+  iconButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    color: 'var(--mac-danger, #ff3b30)',
+    background: 'var(--mac-card-bg)',
+    cursor: 'pointer',
+  },
+  saveRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '20px',
+  },
+  dialogGrid: {
+    display: 'grid',
+    gap: '14px',
+    marginTop: '4px',
+  },
+  badgeIcon: {
+    width: '13px',
+    height: '13px',
+    marginRight: '4px',
+  },
+};
+
+const priorityBadgeVariant = {
+  high: 'danger',
+  medium: 'warning',
+  low: 'info',
+};
+
+const COPY = {
+  title: 'План лечения',
+  addStageAction: 'Добавить этап',
+  printAction: 'Печать',
+  planNameLabel: 'Название плана',
+  metricStages: 'Этапов',
+  metricVisits: 'Визитов',
+  metricCost: 'Стоимость (сум)',
+  noDate: 'Не назначено',
+  visitSuffix: 'визит',
+  emptyPlan: 'План лечения пуст. Добавьте этапы лечения.',
+  savePlan: 'Сохранить план',
+  dialogTitle: 'Добавить этап лечения',
+  stageNameLabel: 'Название этапа',
+  descriptionLabel: 'Описание',
+  dateLabel: 'Дата',
+  priorityLabel: 'Приоритет',
+  durationLabel: 'Визитов',
+  costLabel: 'Стоимость (сум)',
+  cancelAction: 'Отмена',
+  addDialogAction: 'Добавить',
+  deleteAction: 'Удалить',
+};
 const TreatmentPlanner = ({ visitId, onUpdate }) => {
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
@@ -184,190 +341,175 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
   };
 
   return (
-    <Box>
+    <div style={styles.panel}>
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6">
-              <Assignment sx={{ mr: 1, verticalAlign: 'middle' }} />
-              План лечения
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button size="small" startIcon={<Add />} onClick={() => setStageDialog(true)}>
-                Добавить этап
-              </Button>
-              <Button size="small" startIcon={<Print />} onClick={handlePrint}>
-                Печать
-              </Button>
-            </Box>
-          </Box>
+          <div style={styles.header}>
+            <h2 style={styles.title}>
+              <ClipboardList size={18} aria-hidden="true" />
+              {COPY.title}
+            </h2>
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Название плана"
-                value={treatmentPlan.name}
-                onChange={(e) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
-              />
-            </Grid>
-          </Grid>
+            <div style={styles.actions}>
+              <Button type="button" size="small" onClick={() => setStageDialog(true)}>
+                <Plus size={iconSize} aria-hidden="true" />
+                {COPY.addStageAction}
+              </Button>
+              <Button type="button" size="small" onClick={handlePrint}>
+                <Printer size={iconSize} aria-hidden="true" />
+                {COPY.printAction}
+              </Button>
+            </div>
+          </div>
 
-          <Paper sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4">{treatmentPlan.stages.length}</Typography>
-                  <Typography variant="caption" color="text.secondary">Этапов</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4">{treatmentPlan.totalDuration}</Typography>
-                  <Typography variant="caption" color="text.secondary">Визитов</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4">{(treatmentPlan.totalCost / 1000).toFixed(0)}k</Typography>
-                  <Typography variant="caption" color="text.secondary">Стоимость (сум)</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
+          <div style={styles.fieldGrid}>
+            <Input
+              label={COPY.planNameLabel}
+              value={treatmentPlan.name}
+              onChange={(e) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div style={styles.metrics} aria-label="Treatment plan summary">
+            <div style={styles.metric}>
+              <span style={styles.metricValue}>{treatmentPlan.stages.length}</span>
+              <span style={styles.metricLabel}>{COPY.metricStages}</span>
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.metricValue}>{treatmentPlan.totalDuration}</span>
+              <span style={styles.metricLabel}>{COPY.metricVisits}</span>
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.metricValue}>{(treatmentPlan.totalCost / 1000).toFixed(0)}k</span>
+              <span style={styles.metricLabel}>{COPY.metricCost}</span>
+            </div>
+          </div>
 
           {treatmentPlan.stages.length > 0 ? (
-            <List>
+            <ul style={styles.stageList}>
               {treatmentPlan.stages.map((stage, index) => (
                 <Fragment key={stage.id}>
-                  {index > 0 && <Divider />}
-                  <ListItem>
-                      <ListItemIcon>
-                      <LocalHospital color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={stage.name}
-                      secondary={
-                        <Box>
-                          <Typography variant="body2">{stage.description}</Typography>
-                          <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                            <Chip size="small" icon={<CalendarToday />} label={stage.date || 'Не назначено'} />
-                            <Chip size="small" icon={<Schedule />} label={`${stage.duration} визит`} />
-                            <Chip size="small" icon={<AttachMoney />} label={`${(stage.cost / 1000).toFixed(0)}k`} />
-                            <Chip size="small" label={PRIORITIES[stage.priority].label} color={PRIORITIES[stage.priority].color} />
-                          </Box>
-                        </Box>
-                      }
-                    />
-                    <ListItemSecondaryAction>
-                      <IconButton aria-label="Удалить" title="Удалить" onClick={() => handleDeleteStage(stage.id)}>
-                        <Delete />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
+                  <li style={{ ...styles.stageItem, ...(index > 0 ? styles.stageDivider : {}) }}>
+                    <span style={styles.stageIcon} aria-hidden="true">
+                      <Hospital size={16} />
+                    </span>
+                    <div>
+                      <h3 style={styles.stageName}>{stage.name}</h3>
+                      <p style={styles.stageDescription}>{stage.description}</p>
+                      <div style={styles.stageMeta}>
+                        <Badge size="small" variant="outline">
+                          <CalendarDays style={styles.badgeIcon} aria-hidden="true" />
+                          {stage.date || COPY.noDate}
+                        </Badge>
+                        <Badge size="small" variant="outline">
+                          <Clock style={styles.badgeIcon} aria-hidden="true" />
+                          {`${stage.duration} ${COPY.visitSuffix}`}
+                        </Badge>
+                        <Badge size="small" variant="outline">
+                          <DollarSign style={styles.badgeIcon} aria-hidden="true" />
+                          {`${(stage.cost / 1000).toFixed(0)}k`}
+                        </Badge>
+                        <Badge size="small" variant={priorityBadgeVariant[stage.priority] || 'default'}>
+                          {PRIORITIES[stage.priority]?.label || stage.priority}
+                        </Badge>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={COPY.deleteAction}
+                      title={COPY.deleteAction}
+                      style={styles.iconButton}
+                      onClick={() => handleDeleteStage(stage.id)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </li>
                 </Fragment>
               ))}
-            </List>
+            </ul>
           ) : (
             <Alert severity="info">
-              План лечения пуст. Добавьте этапы лечения.
+              {COPY.emptyPlan}
             </Alert>
           )}
 
           {treatmentPlan.stages.length > 0 && (
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
-              <Button variant="contained" size="large" onClick={savePlan}>
-                Сохранить план
+            <div style={styles.saveRow}>
+              <Button type="button" variant="primary" size="large" onClick={savePlan}>
+                {COPY.savePlan}
               </Button>
-            </Box>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={stageDialog} onClose={() => setStageDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Добавить этап лечения</DialogTitle>
-        
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Название этапа"
-                value={stageForm.name}
-                onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
-              />
-            </Grid>
-            
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Описание"
-                value={stageForm.description}
-                onChange={(e) => setStageForm({ ...stageForm, description: e.target.value })}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
+        <DialogTitle>{COPY.dialogTitle}</DialogTitle>
+
+        <DialogContent style={{ maxHeight: '70vh', overflow: 'auto' }}>
+          <div style={styles.dialogGrid}>
+            <Input
+              label={COPY.stageNameLabel}
+              value={stageForm.name}
+              onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+
+            <Textarea
+              label={COPY.descriptionLabel}
+              value={stageForm.description}
+              onChange={(e) => setStageForm({ ...stageForm, description: e.target.value })}
+              minRows={2}
+              textareaStyle={{ width: '100%', boxSizing: 'border-box' }}
+            />
+
+            <div style={styles.twoColumnGrid}>
+              <Input
                 type="date"
-                label="Дата"
+                label={COPY.dateLabel}
                 value={stageForm.date}
                 onChange={(e) => setStageForm({ ...stageForm, date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                style={{ width: '100%', boxSizing: 'border-box' }}
               />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Приоритет</InputLabel>
-                <Select
-                  value={stageForm.priority}
-                  onChange={(e) => setStageForm({ ...stageForm, priority: e.target.value })}
-                  label="Приоритет"
-                >
-                  {Object.entries(PRIORITIES).map(([key, priority]) => (
-                    <MenuItem key={key} value={key}>
-                      {priority.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
+
+              <Select
+                label={COPY.priorityLabel}
+                value={stageForm.priority}
+                onChange={(value) => setStageForm({ ...stageForm, priority: value })}
+                options={Object.entries(PRIORITIES).map(([key, priority]) => ({
+                  value: key,
+                  label: priority.label,
+                }))}
+              />
+
+              <Input
                 type="number"
-                label="Визитов"
+                label={COPY.durationLabel}
                 value={stageForm.duration}
                 onChange={(e) => setStageForm({ ...stageForm, duration: parseInt(e.target.value) || 1 })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
               />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
+
+              <Input
                 type="number"
-                label="Стоимость (сум)"
+                label={COPY.costLabel}
                 value={stageForm.cost}
                 onChange={(e) => setStageForm({ ...stageForm, cost: parseInt(e.target.value) || 0 })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
               />
-            </Grid>
-          </Grid>
+            </div>
+          </div>
         </DialogContent>
-        
+
         <DialogActions>
-          <Button onClick={() => setStageDialog(false)}>Отмена</Button>
-          <Button variant="contained" onClick={handleSaveStage} disabled={!stageForm.name}>
-            Добавить
+          <Button type="button" onClick={() => setStageDialog(false)}>{COPY.cancelAction}</Button>
+          <Button type="button" variant="primary" onClick={handleSaveStage} disabled={!stageForm.name}>
+            {COPY.addDialogAction}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 };
 
