@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 7 files.
+Current post-continuation result: 6 files.
 
 ## Global Rule
 
@@ -112,11 +112,14 @@ Files:
 - `frontend/src/components/cardiology/ECGViewer.jsx`
 - `frontend/src/components/dental/TreatmentPlanner.jsx`
 - `frontend/src/components/dental/ToothModal.jsx`
-- `frontend/src/components/patient/FamilyRelationsCard.jsx`
 
 Note: `frontend/src/components/laboratory/LabReportGenerator.jsx` had no
 active frontend source importer and was removed as stale code. Active lab
 panel/report/export behavior remains outside this handoff and unchanged.
+`frontend/src/components/patient/FamilyRelationsCard.jsx` was migrated away
+from MUI in a dedicated patient relationship slice; future relationship UI
+changes remain clinical-gated because pickup-role visibility and family API
+behavior are patient-sensitive.
 
 Mode:
 
@@ -246,8 +249,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 7 files across payment
-widget, queue, clinical, and Telegram surfaces.
+migration. The current remaining MUI inventory is 6 files across payment
+widget, queue, cardiology, dental, and Telegram surfaces.
 
 ## Next Smallest Step
 
