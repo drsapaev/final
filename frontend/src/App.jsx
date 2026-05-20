@@ -14,7 +14,7 @@ import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
-import { Alert, Badge, Card, CardContent, Sidebar } from './components/ui/macos';
+import { Alert, Badge, Button, Card, CardContent, Input, Sidebar, Textarea } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
@@ -155,6 +155,24 @@ function getTelegramMiniAppSelectedSection(search) {
   return MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || '';
 }
 
+function getDefaultMiniAppAppointmentDate() {
+  const nextDay = new Date();
+  nextDay.setDate(nextDay.getDate() + 1);
+  const year = nextDay.getFullYear();
+  const month = String(nextDay.getMonth() + 1).padStart(2, '0');
+  const day = String(nextDay.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function createMiniAppAppointmentPreviewForm() {
+  return {
+    appointmentDate: getDefaultMiniAppAppointmentDate(),
+    appointmentTime: '09:30',
+    department: '',
+    notes: '',
+  };
+}
+
 function isMiniAppCapabilityEnabled(capability) {
   return Boolean(
     capability?.create_enabled ||
@@ -190,6 +208,12 @@ function TelegramMiniAppPatientShell() {
   const [state, setState] = useState({
     status: 'checking',
     manifest: null,
+    error: null,
+  });
+  const [appointmentPreviewForm, setAppointmentPreviewForm] = useState(createMiniAppAppointmentPreviewForm);
+  const [appointmentPreview, setAppointmentPreview] = useState({
+    status: 'idle',
+    payload: null,
     error: null,
   });
 
@@ -236,6 +260,64 @@ function TelegramMiniAppPatientShell() {
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
   const selectedCapabilityEnabled = isMiniAppCapabilityEnabled(selectedCapability);
+  const canPreviewAppointments = Boolean(
+    selectedSection === 'appointments' &&
+    selectedCapability?.preview_enabled
+  );
+
+  const handleAppointmentPreviewFieldChange = (field) => (event) => {
+    setAppointmentPreviewForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }));
+  };
+
+  const handleAppointmentPreviewSubmit = (event) => {
+    event.preventDefault();
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData || !appointmentPreviewForm.appointmentDate) {
+      setAppointmentPreview({
+        status: 'error',
+        payload: null,
+        error: 'РЈРєР°Р¶РёС‚Рµ РґР°С‚Сѓ Рё РѕС‚РєСЂРѕР№С‚Рµ Mini App РёР· Telegram.',
+      });
+      return;
+    }
+
+    const requestBody = {
+      initData,
+      appointmentDate: appointmentPreviewForm.appointmentDate,
+      appointmentTime: appointmentPreviewForm.appointmentTime || undefined,
+      department: appointmentPreviewForm.department.trim() || undefined,
+      notes: appointmentPreviewForm.notes.trim() || undefined,
+    };
+
+    setAppointmentPreview({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/appointments/preview', requestBody)
+      .then((response) => {
+        setAppointmentPreview({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        const reason = error?.response?.data?.detail?.reason || 'preview_failed';
+        setAppointmentPreview({
+          status: 'error',
+          payload: null,
+          error: `Р§РµСЂРЅРѕРІРёРє Р·Р°РїРёСЃРё РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅ: ${reason}`,
+        });
+      });
+  };
+
+  const previewAppointment = appointmentPreview.payload?.appointment || null;
 
   return (
     <div style={miniAppPageStyle}>
@@ -292,6 +374,91 @@ function TelegramMiniAppPatientShell() {
                       {selectedCapability?.status || 'manifest_only'}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {canPreviewAppointments && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>РџСЂРµРґРІР°СЂРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР°</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>Р§РµСЂРЅРѕРІРёРє Р·Р°РїРёСЃРё</h2>
+                    </div>
+                    <Badge variant="secondary" size="small">Р‘РµР· СЃРѕР·РґР°РЅРёСЏ</Badge>
+                  </div>
+
+                  <form style={miniAppAppointmentFormStyle} onSubmit={handleAppointmentPreviewSubmit}>
+                    <div style={miniAppAppointmentFormGridStyle}>
+                      <Input
+                        type="date"
+                        label="Р”Р°С‚Р°"
+                        value={appointmentPreviewForm.appointmentDate}
+                        onChange={handleAppointmentPreviewFieldChange('appointmentDate')}
+                        required
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        type="time"
+                        label="Р’СЂРµРјСЏ"
+                        value={appointmentPreviewForm.appointmentTime}
+                        onChange={handleAppointmentPreviewFieldChange('appointmentTime')}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        label="РћС‚РґРµР»РµРЅРёРµ"
+                        value={appointmentPreviewForm.department}
+                        onChange={handleAppointmentPreviewFieldChange('department')}
+                        placeholder="РћРїС†РёРѕРЅР°Р»СЊРЅРѕ"
+                        maxLength={64}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                    </div>
+                    <Textarea
+                      label="Р—Р°РјРµС‚РєР° РґР»СЏ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂС‹"
+                      value={appointmentPreviewForm.notes}
+                      onChange={handleAppointmentPreviewFieldChange('notes')}
+                      placeholder="Р‘РµР· РјРµРґРёС†РёРЅСЃРєРёС… РґР°РЅРЅС‹С…"
+                      maxLength={1000}
+                      minRows={2}
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="small"
+                      loading={appointmentPreview.status === 'loading'}
+                      disabled={appointmentPreview.status === 'loading'}
+                    >
+                      РџСЂРѕРІРµСЂРёС‚СЊ С‡РµСЂРЅРѕРІРёРє
+                    </Button>
+                  </form>
+
+                  {appointmentPreview.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {appointmentPreview.error}
+                    </Alert>
+                  )}
+
+                  {appointmentPreview.status === 'ready' && previewAppointment && (
+                    <div style={miniAppAppointmentPreviewResultStyle}>
+                      <div>
+                        <p style={miniAppCapabilityTextStyle}>Р”Р°С‚Р° Рё РІСЂРµРјСЏ</p>
+                        <strong>{previewAppointment.appointment_date} {previewAppointment.appointment_time || 'РІСЂРµРјСЏ РЅРµ СѓРєР°Р·Р°РЅРѕ'}</strong>
+                      </div>
+                      <div>
+                        <p style={miniAppCapabilityTextStyle}>РЎС‚Р°С‚СѓСЃ</p>
+                        <strong>{previewAppointment.status}</strong>
+                      </div>
+                      <div>
+                        <p style={miniAppCapabilityTextStyle}>РћРїР»Р°С‚Р°</p>
+                        <strong>{previewAppointment.payment_type} / {previewAppointment.payment_currency}</strong>
+                      </div>
+                      <Badge variant={appointmentPreview.payload?.mutation_allowed ? 'warning' : 'success'} size="small">
+                        {appointmentPreview.payload?.preview_only ? 'РўРѕР»СЊРєРѕ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂ' : 'РўСЂРµР±СѓРµС‚ РїСЂРѕРІРµСЂРєРё'}
+                      </Badge>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -623,6 +790,55 @@ const miniAppSelectedSectionStatusStyle = {
   alignItems: 'flex-end',
   gap: '8px',
   minWidth: '128px',
+};
+
+const miniAppAppointmentPreviewStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(52, 199, 89, 0.26)',
+};
+
+const miniAppAppointmentPreviewContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '14px',
+};
+
+const miniAppAppointmentPreviewHeaderStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '14px',
+  flexWrap: 'wrap',
+};
+
+const miniAppAppointmentFormStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+};
+
+const miniAppAppointmentFormGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: '12px',
+};
+
+const miniAppAppointmentInputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
+const miniAppAppointmentPreviewResultStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '12px',
+  border: '1px solid rgba(52, 199, 89, 0.24)',
+  borderRadius: '8px',
+  background: 'rgba(52, 199, 89, 0.08)',
+  fontSize: '13px',
+  color: 'var(--mac-text-primary, #111827)',
 };
 
 const miniAppCapabilityStyle = {
