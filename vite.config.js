@@ -35,9 +35,6 @@ export default defineConfig({
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
             }
-            if (id.includes('@mui')) {
-              return 'mui';
-            }
             return 'vendor';
           }
         }
@@ -46,8 +43,5 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     minify: 'terser',
     sourcemap: process.env.NODE_ENV === 'development'
-  },
-  optimizeDeps: {
-    include: ['@mui/material']
   }
 });
