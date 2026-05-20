@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 2 files.
+Current post-continuation result: 1 file.
 
 ## Global Rule
 
@@ -77,9 +77,16 @@ Validation:
 
 ## Queue Handoff
 
-File:
+Files:
 
-- `frontend/src/components/queue/OnlineQueueManager.jsx`
+- none currently matching `@mui|Mui`
+
+Note: `frontend/src/components/queue/OnlineQueueManager.jsx` was migrated to
+macOS/native controls in a gate-limited queue manager slice and no longer
+appears in the MUI runtime inventory. Future behavior changes to the component
+still require queue gate review because status wording, QR generation,
+print/download behavior, call/open queue actions, and auto-refresh semantics
+are queue-sensitive.
 
 Mode:
 
@@ -265,8 +272,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 2 files across queue and
-Telegram surfaces.
+migration. The current remaining MUI inventory is 1 file in the Telegram
+surface.
 
 ## Next Smallest Step
 
