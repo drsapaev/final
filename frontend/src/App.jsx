@@ -231,6 +231,11 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [resultsManifest, setResultsManifest] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -439,6 +444,62 @@ function TelegramMiniAppPatientShell() {
     };
   }, [selectedSection, state.status]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (state.status !== 'ready' || selectedSection !== 'results') {
+      setResultsManifest({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData) {
+      setResultsManifest({
+        status: 'error',
+        payload: null,
+        error: 'Mini App session is not confirmed.',
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setResultsManifest({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/results/manifest', { initData })
+      .then((response) => {
+        if (!isMounted) return;
+        setResultsManifest({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        const reason = error?.response?.data?.detail?.reason || 'results_manifest_failed';
+        setResultsManifest({
+          status: 'error',
+          payload: null,
+          error: `Patient results are unavailable: ${reason}`,
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSection, state.status]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
@@ -457,6 +518,10 @@ function TelegramMiniAppPatientShell() {
   );
   const canShowPaymentsManifest = Boolean(
     selectedSection === 'payments' &&
+    selectedCapability?.manifest_endpoint
+  );
+  const canShowResultsManifest = Boolean(
+    selectedSection === 'results' &&
     selectedCapability?.manifest_endpoint
   );
 
@@ -516,6 +581,7 @@ function TelegramMiniAppPatientShell() {
   const formsManifestItems = formsManifest.payload?.forms || [];
   const cabinetManifestSections = cabinetManifest.payload?.sections || [];
   const paymentsManifestSections = paymentsManifest.payload?.sections || [];
+  const resultsManifestSections = resultsManifest.payload?.sections || [];
 
   return (
     <div style={miniAppPageStyle}>
@@ -708,6 +774,85 @@ function TelegramMiniAppPatientShell() {
                               </Badge>
                               <Badge variant={section.contains_provider_payloads ? 'warning' : 'success'} size="small">
                                 {section.contains_provider_payloads ? 'provider payloads' : 'no provider payloads'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {canShowResultsManifest && (
+              <Card padding="small" shadow="none" style={miniAppResultsManifestStyle}>
+                <CardContent style={miniAppFormsManifestContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Patient results</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>Manifest only</h2>
+                    </div>
+                    <Badge variant="secondary" size="small">No reports or files</Badge>
+                  </div>
+
+                  {resultsManifest.status === 'loading' && (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      Loading result status...
+                    </Alert>
+                  )}
+
+                  {resultsManifest.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {resultsManifest.error}
+                    </Alert>
+                  )}
+
+                  {resultsManifest.status === 'ready' && (
+                    <>
+                      <div style={miniAppFormsSummaryStyle}>
+                        <Badge variant={resultsManifest.payload?.results_enabled ? 'primary' : 'secondary'} size="small">
+                          {resultsManifest.payload?.results_enabled ? 'results on' : 'results planned'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {resultsManifest.payload?.view_enabled ? 'view on' : 'view off'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {resultsManifest.payload?.download_enabled ? 'download on' : 'download off'}
+                        </Badge>
+                        <Badge variant={resultsManifest.payload?.contains_pdfs ? 'warning' : 'success'} size="small">
+                          {resultsManifest.payload?.contains_pdfs ? 'PDFs present' : 'no PDFs'}
+                        </Badge>
+                      </div>
+
+                      <section style={miniAppFormsGridStyle}>
+                        {resultsManifestSections.map((section) => (
+                          <div key={section.key || section.title} style={miniAppResultsManifestItemStyle}>
+                            <div>
+                              <h3 style={miniAppFormManifestTitleStyle}>{section.title || section.key}</h3>
+                              <p style={miniAppCapabilityTextStyle}>{section.status || 'planned'}</p>
+                            </div>
+                            <div style={miniAppFormManifestBadgeRowStyle}>
+                              <Badge variant="secondary" size="small">
+                                {section.view_enabled ? 'view on' : 'view off'}
+                              </Badge>
+                              <Badge variant="secondary" size="small">
+                                {section.download_enabled ? 'download on' : 'download off'}
+                              </Badge>
+                              <Badge variant={section.contains_medical_results ? 'warning' : 'success'} size="small">
+                                {section.contains_medical_results ? 'medical results' : 'no medical results'}
+                              </Badge>
+                              <Badge variant={section.contains_lab_values ? 'warning' : 'success'} size="small">
+                                {section.contains_lab_values ? 'lab values' : 'no lab values'}
+                              </Badge>
+                              <Badge variant={section.contains_report_records ? 'warning' : 'success'} size="small">
+                                {section.contains_report_records ? 'report records' : 'no report records'}
+                              </Badge>
+                              <Badge variant={section.contains_file_urls ? 'warning' : 'success'} size="small">
+                                {section.contains_file_urls ? 'file URLs' : 'no file URLs'}
+                              </Badge>
+                              <Badge variant={section.contains_diagnoses ? 'warning' : 'success'} size="small">
+                                {section.contains_diagnoses ? 'diagnoses' : 'no diagnoses'}
                               </Badge>
                             </div>
                           </div>
@@ -1261,6 +1406,11 @@ const miniAppPaymentsManifestStyle = {
   borderColor: 'rgba(255, 149, 0, 0.26)',
 };
 
+const miniAppResultsManifestStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(52, 199, 89, 0.26)',
+};
+
 const miniAppFormsManifestContentStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -1302,6 +1452,12 @@ const miniAppPaymentsManifestItemStyle = {
   ...miniAppFormManifestItemStyle,
   border: '1px solid rgba(255, 149, 0, 0.24)',
   background: 'rgba(255, 149, 0, 0.08)',
+};
+
+const miniAppResultsManifestItemStyle = {
+  ...miniAppFormManifestItemStyle,
+  border: '1px solid rgba(52, 199, 89, 0.24)',
+  background: 'rgba(52, 199, 89, 0.08)',
 };
 
 const miniAppFormManifestTitleStyle = {
