@@ -629,6 +629,7 @@ function getMiniAppReportFileName(report) {
 
 function TelegramMiniAppPatientShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
   const [state, setState] = useState({
     status: 'checking',
@@ -830,6 +831,18 @@ function TelegramMiniAppPatientShell() {
     canPreviewAppointments &&
     selectedCapability?.create_enabled
   );
+
+  const handleMiniAppCapabilitySelect = (section) => {
+    if (!section || section === selectedSection) {
+      return;
+    }
+    const params = new URLSearchParams(location.search || '');
+    params.set('section', section);
+    navigate({
+      pathname: location.pathname,
+      search: `?${params.toString()}`,
+    });
+  };
 
   const handleAppointmentPreviewFieldChange = (field) => (event) => {
     setAppointmentPreviewForm((current) => ({
@@ -1705,6 +1718,10 @@ function TelegramMiniAppPatientShell() {
                 return (
                   <Card
                     key={key}
+                    interactive
+                    onClick={() => handleMiniAppCapabilitySelect(key)}
+                    aria-label={`${t('openSection')}: ${label}`}
+                    aria-pressed={isSelected}
                     padding="small"
                     shadow="none"
                     style={{
