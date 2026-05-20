@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 1 file.
+Current post-continuation result: 0 files.
 
 ## Global Rule
 
@@ -177,11 +177,17 @@ Validation:
 
 Files:
 
-- `frontend/src/components/TelegramManager.jsx`
+- none currently matching `@mui|Mui`
 
 Note: `frontend/src/components/ai/MCPMonitor.jsx` had no active frontend route
 owner/importer and was removed as stale code. MCP API client and active AI
 assistant surfaces remain outside this handoff and unchanged.
+`frontend/src/components/TelegramManager.jsx` was migrated away from MUI in a
+gate-limited Telegram integration slice and no longer appears in the MUI
+runtime inventory. Future Telegram UI behavior changes still require Telegram
+gate review because bot status, webhook/polling state, staff link token safety,
+payment/appointment summaries, API payloads, token visibility, and route/RBAC
+semantics are integration-sensitive.
 
 Mode:
 
@@ -271,9 +277,8 @@ Stop if:
 
 ## Result
 
-PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 1 file in the Telegram
-surface.
+PR-MUI-4 created the guardrails used by the follow-up one-island migrations.
+The current remaining MUI inventory is 0 files.
 
 ## Next Smallest Step
 
@@ -282,5 +287,5 @@ Finish the third cycle with a summary PR that lists:
 - merged PRs;
 - current performance baseline;
 - current MUI inventory;
-- blocked/risky MUI handoffs;
+- completed risky MUI handoffs;
 - next backlog.

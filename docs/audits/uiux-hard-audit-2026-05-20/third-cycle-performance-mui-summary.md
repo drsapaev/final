@@ -140,7 +140,7 @@ classified, policy-covered, and guarded for future small PRs.
 ## Post-Cycle Continuation Note
 
 Later small PRs reduced the current MUI inventory from the historical third
-cycle count of 14 files to 1 file:
+cycle count of 14 files to 0 files:
 
 - stale `frontend/src/components/dashboard/Dashboard.jsx` removal;
 - gated `frontend/src/components/admin/UserManagement.jsx` actions menu
@@ -164,7 +164,13 @@ cycle count of 14 files to 1 file:
   migration.
 - gated `frontend/src/components/queue/OnlineQueueManager.jsx` queue manager
   migration.
+- gated `frontend/src/components/TelegramManager.jsx` Telegram integration
+  migration.
 
 Current remaining MUI files:
 
-- `frontend/src/components/TelegramManager.jsx`
+- none currently matching `@mui|Mui` in `frontend/src/pages` or
+  `frontend/src/components`.
+
+Next smallest MUI-related step is a separate dependency/package audit before
+removing any `@mui/*` packages.
