@@ -6,41 +6,177 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Box,
-  Checkbox,
-  Chip,
+  Badge,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  FormControl,
-  FormControlLabel,
-  Grid,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  MenuItem,
+  Input,
   Select,
-  TextField,
-  Typography,
-} from '@mui/material';
-import Add from '@mui/icons-material/Add';
-import CalendarToday from '@mui/icons-material/CalendarToday';
-import CheckCircle from '@mui/icons-material/CheckCircle';
-import Delete from '@mui/icons-material/Delete';
-import Healing from '@mui/icons-material/Healing';
-import History from '@mui/icons-material/History';
-import LocalHospital from '@mui/icons-material/LocalHospital';
+  Textarea,
+} from '../ui/macos';
+import {
+  Activity,
+  CheckCircle,
+  History,
+  Hospital,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+
+const iconSize = 15;
+
+const styles = {
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+  },
+  title: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+  content: {
+    display: 'grid',
+    gap: '20px',
+    maxHeight: '72vh',
+    overflow: 'auto',
+  },
+  section: {
+    display: 'grid',
+    gap: '10px',
+  },
+  sectionTitle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '15px',
+    fontWeight: 600,
+  },
+  buttonGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  twoColumnGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '14px',
+  },
+  list: {
+    display: 'grid',
+    gap: '8px',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  listItem: {
+    display: 'grid',
+    gridTemplateColumns: '28px minmax(0, 1fr) auto',
+    gap: '10px',
+    alignItems: 'center',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--mac-border)',
+  },
+  listItemStatic: {
+    display: 'grid',
+    gridTemplateColumns: '28px minmax(0, 1fr)',
+    gap: '10px',
+    alignItems: 'start',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--mac-border)',
+  },
+  listIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    color: 'var(--mac-accent-blue)',
+    background: 'rgba(0, 122, 255, 0.08)',
+  },
+  itemTitle: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '14px',
+    fontWeight: 600,
+  },
+  itemMeta: {
+    margin: '3px 0 0',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px',
+  },
+  iconButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    color: 'var(--mac-danger, #ff3b30)',
+    background: 'var(--mac-card-bg)',
+    cursor: 'pointer',
+  },
+  checkboxRow: {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    gap: '10px',
+    alignItems: 'center',
+    color: 'var(--mac-text-primary)',
+    fontSize: '13px',
+  },
+  divider: {
+    height: '1px',
+    background: 'var(--mac-border)',
+  },
+  totalTitle: {
+    margin: 0,
+    color: 'var(--mac-text-primary)',
+    fontSize: '17px',
+    fontWeight: 600,
+  },
+  totalCaption: {
+    display: 'block',
+    marginTop: '6px',
+    color: 'var(--mac-text-secondary)',
+    fontSize: '12px',
+  },
+};
+
+const COPY = {
+  toothPrefix: 'Зуб №',
+  quadrantSuffix: 'квадрант',
+  proceduresTitle: 'Процедуры',
+  materialLabel: 'Материал',
+  noMaterial: 'Без материала',
+  nextVisitLabel: 'Следующий визит',
+  notesLabel: 'Примечания',
+  notesPlaceholder: 'Особенности лечения, рекомендации...',
+  followUpLabel: 'Требуется контрольный осмотр',
+  historyTitle: 'История лечения',
+  totalCostLabel: 'Общая стоимость',
+  includesLabel: 'Включает',
+  materialPrefix: 'материал',
+  currencySuffix: 'сум',
+  cancelAction: 'Отмена',
+  saveAction: 'Сохранить',
+  deleteAction: 'Удалить',
+};
 // Процедуры для зуба
 const TOOTH_PROCEDURES = {
   EXAMINATION: { id: 'examination', name: 'Осмотр', price: 20000 },
@@ -206,195 +342,155 @@ const ToothModal = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6">
-            <LocalHospital sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Зуб №{toothNumber} - {getToothName(toothNumber)}
-          </Typography>
-          <Chip 
-            label={`${Math.floor(toothNumber / 10)} квадрант`}
-            size="small"
-            color="primary"
-          />
-        </Box>
+        <div style={styles.header}>
+          <h2 style={styles.title}>
+            <Hospital size={18} aria-hidden="true" />
+            {COPY.toothPrefix}{toothNumber} - {getToothName(toothNumber)}
+          </h2>
+          <Badge variant="primary" size="small">
+            {`${Math.floor(toothNumber / 10)} ${COPY.quadrantSuffix}`}
+          </Badge>
+        </div>
       </DialogTitle>
-      
-      <DialogContent dividers>
-        <Grid container spacing={3}>
-          {/* Процедуры */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" gutterBottom>
-              Процедуры
-            </Typography>
-            
-            <Box sx={{ mb: 2 }}>
-              <Grid container spacing={1}>
-                {Object.entries(TOOTH_PROCEDURES).map(([key, procedure]) => (
-                  <Grid item key={key}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Add />}
-                      onClick={() => addProcedure(key)}
-                    >
-                      {procedure.name}
-                    </Button>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-            
-            {formData.procedures.length > 0 && (
-              <List dense>
-                {formData.procedures.map((procedure) => (
-                  <ListItem
-                    key={procedure.id}
-                    secondaryAction={
-                      <IconButton edge="end" aria-label="Удалить" title="Удалить" onClick={() => removeProcedure(procedure.id)}>
-                        <Delete />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemIcon>
-                      <Healing color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={procedure.name}
-                      secondary={`${(procedure.price / 1000).toFixed(0)}k сум`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Grid>
 
-          {/* Материал */}
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel>Материал</InputLabel>
-              <Select
-                value={formData.material}
-                onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                label="Материал"
+      <DialogContent style={styles.content}>
+        <section style={styles.section}>
+          <h3 style={styles.sectionTitle}>{COPY.proceduresTitle}</h3>
+
+          <div style={styles.buttonGrid}>
+            {Object.entries(TOOTH_PROCEDURES).map(([key, procedure]) => (
+              <Button
+                key={key}
+                type="button"
+                size="small"
+                variant="outline"
+                onClick={() => addProcedure(key)}
               >
-                <MenuItem value="">Без материала</MenuItem>
-                {Object.entries(MATERIALS).map(([key, material]) => (
-                  <MenuItem key={key} value={key}>
-                    {material.name} - {(material.price / 1000).toFixed(0)}k сум
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+                <Plus size={iconSize} aria-hidden="true" />
+                {procedure.name}
+              </Button>
+            ))}
+          </div>
 
-          {/* Следующий визит */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              type="date"
-              label="Следующий визит"
-              value={formData.nextVisitDate}
-              onChange={(e) => setFormData({ ...formData, nextVisitDate: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <CalendarToday />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-
-          {/* Примечания */}
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="Примечания"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Особенности лечения, рекомендации..."
-            />
-          </Grid>
-
-          {/* Требуется контроль */}
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.requiresFollowUp}
-                  onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
-                />
-              }
-              label="Требуется контрольный осмотр"
-            />
-          </Grid>
-
-          {/* История */}
-          {history.length > 0 && (
-            <Grid item xs={12}>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle1" gutterBottom>
-                <History sx={{ mr: 1, verticalAlign: 'middle' }} />
-                История лечения
-              </Typography>
-              
-              <List dense>
-                {history.map((record, index) => (
-                  <ListItem key={index}>
-                    <ListItemIcon>
-                      <CheckCircle color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={record.procedure}
-                      secondary={
-                        <Box>
-                          <Typography variant="caption" display="block">
-                            {new Date(record.date).toLocaleDateString()} - {record.doctor}
-                          </Typography>
-                          {record.notes && (
-                            <Typography variant="caption" color="text.secondary">
-                              {record.notes}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Grid>
+          {formData.procedures.length > 0 && (
+            <ul style={styles.list}>
+              {formData.procedures.map((procedure) => (
+                <li key={procedure.id} style={styles.listItem}>
+                  <span style={styles.listIcon} aria-hidden="true">
+                    <Activity size={16} />
+                  </span>
+                  <div>
+                    <p style={styles.itemTitle}>{procedure.name}</p>
+                    <p style={styles.itemMeta}>{`${(procedure.price / 1000).toFixed(0)}k ${COPY.currencySuffix}`}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={COPY.deleteAction}
+                    title={COPY.deleteAction}
+                    style={styles.iconButton}
+                    onClick={() => removeProcedure(procedure.id)}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
+        </section>
 
-          {/* Стоимость */}
-          <Grid item xs={12}>
-            <Alert severity="info">
-              <Typography variant="h6">
-                Общая стоимость: {(calculateTotalPrice() / 1000).toFixed(0)}k сум
-              </Typography>
-              {formData.procedures.length > 0 && (
-                <Typography variant="caption">
-                  Включает: {formData.procedures.map(p => p.name).join(', ')}
-                  {formData.material && `, материал: ${MATERIALS[formData.material]?.name}`}
-                </Typography>
-              )}
-            </Alert>
-          </Grid>
-        </Grid>
+        <div style={styles.twoColumnGrid}>
+          <Select
+            label={COPY.materialLabel}
+            value={formData.material}
+            onChange={(value) => setFormData({ ...formData, material: value })}
+            options={[
+              { value: '', label: COPY.noMaterial },
+              ...Object.entries(MATERIALS).map(([key, material]) => ({
+                value: key,
+                label: `${material.name} - ${(material.price / 1000).toFixed(0)}k ${COPY.currencySuffix}`,
+              })),
+            ]}
+          />
+
+          <Input
+            type="date"
+            label={COPY.nextVisitLabel}
+            value={formData.nextVisitDate}
+            onChange={(e) => setFormData({ ...formData, nextVisitDate: e.target.value })}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <Textarea
+          label={COPY.notesLabel}
+          value={formData.notes}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          placeholder={COPY.notesPlaceholder}
+          minRows={3}
+          textareaStyle={{ width: '100%', boxSizing: 'border-box' }}
+        />
+
+        <label style={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            checked={formData.requiresFollowUp}
+            onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
+          />
+          <span>{COPY.followUpLabel}</span>
+        </label>
+
+        {history.length > 0 && (
+          <section style={styles.section}>
+            <div style={styles.divider} />
+            <h3 style={styles.sectionTitle}>
+              <History size={16} aria-hidden="true" />
+              {COPY.historyTitle}
+            </h3>
+
+            <ul style={styles.list}>
+              {history.map((record, index) => (
+                <li key={index} style={styles.listItemStatic}>
+                  <span style={styles.listIcon} aria-hidden="true">
+                    <CheckCircle size={15} />
+                  </span>
+                  <div>
+                    <p style={styles.itemTitle}>{record.procedure}</p>
+                    <p style={styles.itemMeta}>
+                      {new Date(record.date).toLocaleDateString()} - {record.doctor}
+                    </p>
+                    {record.notes && <p style={styles.itemMeta}>{record.notes}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <Alert severity="info">
+          <h3 style={styles.totalTitle}>
+            {COPY.totalCostLabel}: {(calculateTotalPrice() / 1000).toFixed(0)}k {COPY.currencySuffix}
+          </h3>
+          {formData.procedures.length > 0 && (
+            <span style={styles.totalCaption}>
+              {COPY.includesLabel}: {formData.procedures.map(p => p.name).join(', ')}
+              {formData.material && `, ${COPY.materialPrefix}: ${MATERIALS[formData.material]?.name}`}
+            </span>
+          )}
+        </Alert>
       </DialogContent>
-      
+
       <DialogActions>
-        <Button onClick={onClose}>
-          Отмена
+        <Button type="button" onClick={onClose}>
+          {COPY.cancelAction}
         </Button>
-        <Button 
-          variant="contained" 
+        <Button
+          type="button"
+          variant="primary"
           onClick={handleSave}
           disabled={loading || formData.procedures.length === 0}
+          loading={loading}
         >
-          Сохранить
+          {COPY.saveAction}
         </Button>
       </DialogActions>
     </Dialog>
