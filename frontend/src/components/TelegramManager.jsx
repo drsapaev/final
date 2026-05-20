@@ -191,9 +191,21 @@ const TelegramManager = () => {
   const patientBotFeatures = Array.isArray(patientBot.features) ? patientBot.features : [];
   const enabledPatientFeatures = patientBotFeatures.filter((feature) => feature?.enabled);
   const patientPaymentEntryFeature = patientBotFeatures.find(
-    (feature) => feature?.key === 'patient_payments_protected_entry'
+    (feature) =>
+      feature?.key === 'patient_payments_mini_app_entry' ||
+      feature?.key === 'patient_payments_protected_entry'
   );
-  const patientPaymentEntryRoute = patientPaymentEntryFeature?.contract?.route || '/patient/payments';
+  const patientFormsEntryFeature = patientBotFeatures.find(
+    (feature) =>
+      feature?.key === 'patient_forms_entrypoint' ||
+      feature?.key === 'patient_forms_placeholder'
+  );
+  const patientPaymentEntryRoute =
+    patientPaymentEntryFeature?.contract?.route ||
+    '/telegram/mini-app/patient?section=payments';
+  const patientFormsEntryRoute =
+    patientFormsEntryFeature?.contract?.route ||
+    '/telegram/mini-app/patient?section=forms';
   const patientMiniAppManifestFeature = patientBotFeatures.find(
     (feature) => feature?.key === 'patient_mini_app_manifest'
   );
@@ -421,7 +433,9 @@ const TelegramManager = () => {
       menu: '📋 Анкеты пациента',
       command: '/forms',
       label: patientCommandLabel('/forms', 'Анкеты пациента'),
-      detail: 'Видимая кнопка с безопасной заглушкой до подключения Mini App и защищённого кабинета.'
+      detail: patientFormsEntryFeature?.enabled
+        ? `Запускает пациентские анкеты в защищенном Mini App: ${patientFormsEntryRoute}.`
+        : 'Раздел пока не включен для этого пациента.'
     },
     {
       key: 'documents',

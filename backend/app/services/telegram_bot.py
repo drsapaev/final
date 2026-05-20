@@ -23,6 +23,16 @@ from app.crud import (
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
+TELEGRAM_CORRUPTED_TEXT_MARKERS: tuple[tuple[str, str], ...] = (
+    ("replacement_character", "\ufffd"),
+    ("cyrillic_mojibake_prefix", "\u0420\u045f"),
+    ("cyrillic_mojibake_a", "\u0420\u0452"),
+    ("cyrillic_mojibake_o", "\u0420\u045b"),
+    ("cyrillic_mojibake_s", "\u0421\u0453"),
+    ("quote_mojibake", "\u0432\u0402"),
+    ("emoji_mojibake", "\u0440\u045f"),
+    ("emoji_variation_mojibake", "\u043f\u0451"),
+)
 PATIENT_BOT_COMMANDS_RU = [
     {"command": "start", "description": "Начать"},
     {"command": "menu", "description": "Главное меню"},
@@ -114,6 +124,19 @@ STAFF_BOT_COMMANDS_DEFAULT = [
     {"command": "summary", "description": "Operational summary"},
     {"command": "help", "description": "Staff help"},
 ]
+
+
+def telegram_text_corruption_reason(text: Any) -> str | None:
+    """Return a safe reason when outgoing Telegram text is visibly corrupted."""
+    value = str(text or "")
+    if "????" in value:
+        return "question_mark_run"
+
+    for reason, marker in TELEGRAM_CORRUPTED_TEXT_MARKERS:
+        if marker in value:
+            return reason
+
+    return None
 
 
 class TelegramBotService:
@@ -516,6 +539,15 @@ class TelegramBotService:
     ):
         """Отправка сообщения в Telegram"""
         try:
+            corruption_reason = telegram_text_corruption_reason(text)
+            if corruption_reason:
+                logger.warning(
+                    "Blocked Telegram sendMessage with corrupted text reason=%s text_length=%s",
+                    corruption_reason,
+                    len(str(text or "")),
+                )
+                return False
+
             if not self.bot_token:
                 logger.error("Bot token не настроен")
                 return False

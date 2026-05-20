@@ -8,7 +8,9 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
+from html import escape
 from typing import Any, Dict, List, NoReturn, Optional
 
 import requests
@@ -18,9 +20,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.config import settings
-from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
+from app.crud import audit as crud_audit, clinic as crud_clinic, telegram_config as crud_telegram
+from app.models.telegram_config import TelegramStaffConfirmationToken
 from app.models.user import User
 from app.services.telegram_staff_link_token_service import TelegramStaffLinkTokenService
+from app.services.telegram_staff_action_adapter_service import (
+    TelegramStaffActionAdapterService,
+)
+from app.services.telegram_staff_confirmation_token_service import (
+    TelegramStaffConfirmationTokenService,
+)
 from app.services.telegram_bot import (
     PATIENT_BOT_COMMANDS_RU,
     PATIENT_BOT_COMMANDS_UZ,
@@ -32,29 +41,176 @@ from app.services.telegram_bot import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-PATIENT_PAYMENT_ENTRY_ROUTE = "/patient/payments"
-PATIENT_PAYMENT_ENTRY_CONTRACT = {
-    "contract_version": "patient-payment-entry-v1",
-    "route": PATIENT_PAYMENT_ENTRY_ROUTE,
-    "surface": "protected_app",
-    "auth": "authenticated",
+PATIENT_MINI_APP_ENTRY_ROUTE = "/telegram/mini-app/patient"
+PATIENT_PAYMENT_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=payments"
+PATIENT_BOOKING_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=appointments"
+PATIENT_FORMS_ENTRY_ROUTE = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section=forms"
+PATIENT_BOOKING_ENTRY_CONTRACT = {
+    "contract_version": "patient-booking-entrypoint-v1",
+    "route": PATIENT_BOOKING_ENTRY_ROUTE,
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data_or_short_lived_entry_token",
     "required_role": None,
     "contains_internal_identifiers": False,
     "telegram_url_parameters_allowed": False,
+    "local_http_fallback": "signed_entry_token_from_bot_button",
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
+}
+PATIENT_PAYMENT_ENTRY_CONTRACT = {
+    "contract_version": "patient-payment-entry-v1",
+    "route": PATIENT_PAYMENT_ENTRY_ROUTE,
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data_or_short_lived_entry_token",
+    "required_role": None,
+    "contains_internal_identifiers": False,
+    "telegram_url_parameters_allowed": False,
+    "local_http_fallback": "signed_entry_token_from_bot_button",
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
+}
+PATIENT_FORMS_ENTRY_CONTRACT = {
+    "contract_version": "patient-forms-entrypoint-v1",
+    "route": PATIENT_FORMS_ENTRY_ROUTE,
+    "surface": "telegram_mini_app_frontend",
+    "auth": "telegram_init_data_or_short_lived_entry_token",
+    "required_role": None,
+    "contains_internal_identifiers": False,
+    "telegram_url_parameters_allowed": False,
+    "local_http_fallback": "signed_entry_token_from_bot_button",
+    "entrypoint_type": "mini_app_web_app_button",
+    "button_transport": "web_app_when_https_url_else_url_fallback",
 }
 PATIENT_MINI_APP_MANIFEST_ENDPOINT = "/api/v1/telegram/mini-app/patient/manifest"
 PATIENT_MINI_APP_MANIFEST_CONTRACT = {
     "contract_version": "patient-mini-app-manifest-v1",
     "endpoint": PATIENT_MINI_APP_MANIFEST_ENDPOINT,
     "surface": "telegram_mini_app_backend",
-    "auth": "telegram_init_data",
+    "auth": "telegram_init_data_or_short_lived_entry_token",
     "scope": "linked_patient",
+    "local_http_fallback": "signed_entry_token_from_bot_button",
+    "entry_token_ttl_seconds": 600,
     "status": "manifest_only",
     "mutation_enabled": False,
     "contains_medical_data": False,
     "contains_payment_records": False,
     "contains_provider_payloads": False,
     "contains_report_files": False,
+}
+
+TELEGRAM_AI_APPROVAL_OUTCOMES = {"accepted", "rejected"}
+TELEGRAM_AI_APPROVAL_REASON_CODES = {
+    "accurate",
+    "incomplete",
+    "unsafe",
+    "not_relevant",
+    "workflow_issue",
+    "other",
+}
+TELEGRAM_AI_APPROVAL_WORKFLOWS = {
+    "doctor_draft_review": {
+        "label": "Doctor AI draft review",
+        "notification_type": "doctor_draft_review",
+        "recipient_roles": ["doctor"],
+        "outcome_roles": ["doctor"],
+        "protected_route": "/doctor?tab=ai",
+        "protected_surface": "EMR",
+        "telegram_title": "AI draft is ready for protected review",
+        "telegram_body": (
+            "Open the protected EMR to review, edit, accept, or reject the AI draft."
+        ),
+        "allowed_metric_keys": ["draft_count"],
+        "medical_workflow": True,
+    },
+    "queue_overload_alert": {
+        "label": "Queue overload suggestion",
+        "notification_type": "queue_overload",
+        "recipient_roles": ["admin", "registrar"],
+        "outcome_roles": ["admin", "registrar"],
+        "protected_route": "/registrar?tab=queue",
+        "protected_surface": "queue_dashboard",
+        "telegram_title": "Queue overload suggestion",
+        "telegram_body": (
+            "Open the protected dashboard to review queue load and decide next steps."
+        ),
+        "allowed_metric_keys": [
+            "waiting_count",
+            "average_wait_minutes",
+            "overloaded_services_count",
+        ],
+        "medical_workflow": False,
+    },
+    "payment_anomaly_alert": {
+        "label": "Payment anomaly alert",
+        "notification_type": "payment_anomaly",
+        "recipient_roles": ["admin", "cashier"],
+        "outcome_roles": ["admin", "cashier"],
+        "protected_route": "/cashier?tab=payments",
+        "protected_surface": "payment_dashboard",
+        "telegram_title": "Payment anomaly needs review",
+        "telegram_body": (
+            "Open the protected dashboard to review payment reconciliation details."
+        ),
+        "allowed_metric_keys": [
+            "unmatched_count",
+            "provider_count",
+            "difference_amount",
+            "currency",
+        ],
+        "medical_workflow": False,
+    },
+    "owner_daily_summary": {
+        "label": "Owner daily AI summary",
+        "notification_type": "owner_daily_summary",
+        "recipient_roles": ["admin", "owner"],
+        "outcome_roles": ["admin", "owner"],
+        "protected_route": "/admin/analytics",
+        "protected_surface": "admin_analytics",
+        "telegram_title": "Daily AI operations summary",
+        "telegram_body": (
+            "Review high-level clinic metrics in the protected dashboard."
+        ),
+        "allowed_metric_keys": [
+            "revenue_total",
+            "average_wait_minutes",
+            "overloaded_services_count",
+            "unpaid_visits_count",
+            "integration_issue_count",
+        ],
+        "medical_workflow": False,
+    },
+}
+TELEGRAM_AI_APPROVAL_CONTRACT = {
+    "contract_version": "telegram-ai-approval-flows-v1",
+    "enabled": True,
+    "notification_runtime_enabled": True,
+    "outcome_capture_enabled": True,
+    "surface": "telegram_staff_notification_to_protected_app",
+    "protected_links_required": True,
+    "plain_chat_medical_content_allowed": False,
+    "telegram_url_parameters_allowed": False,
+    "requires_human_confirmation": True,
+    "autonomous_mutation_allowed": False,
+    "domain_mutations_performed_by_telegram_ai": False,
+    "audit_action": "telegram_ai_approval_outcome_recorded",
+    "notification_audit_action": "telegram_ai_approval_notification_sent",
+    "outcomes": sorted(TELEGRAM_AI_APPROVAL_OUTCOMES),
+    "workflows": [
+        {
+            "key": key,
+            "label": workflow["label"],
+            "notification_type": workflow["notification_type"],
+            "recipient_roles": workflow["recipient_roles"],
+            "outcome_roles": workflow["outcome_roles"],
+            "protected_route": workflow["protected_route"],
+            "protected_surface": workflow["protected_surface"],
+            "allowed_metric_keys": workflow["allowed_metric_keys"],
+            "medical_workflow": workflow["medical_workflow"],
+            "plain_chat_medical_content_allowed": False,
+            "autonomous_mutation_allowed": False,
+        }
+        for key, workflow in TELEGRAM_AI_APPROVAL_WORKFLOWS.items()
+    ],
 }
 
 STAFF_LINK_TOKEN_PREFIX = "stl"
@@ -510,7 +666,7 @@ STAFF_BOT_COMMAND_REGISTRATION_CONTRACT = {
 STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
     "contract_version": "staff-action-domain-adapters-v1",
     "enabled": True,
-    "runtime_enabled": False,
+    "runtime_enabled": True,
     "required_before_state_change_enablement": True,
     "adapters": [
         {
@@ -522,6 +678,11 @@ STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
             "runtime_enabled": True,
             "runtime_owner": "QueueBusinessService",
             "runtime_methods": [
+                "staff_call_next_patient",
+                "staff_skip_queue_entry",
+            ],
+            "protected_confirmation_runtime_owner": "TelegramStaffActionAdapterService",
+            "protected_confirmation_runtime_methods": [
                 "staff_call_next_patient",
                 "staff_skip_queue_entry",
             ],
@@ -545,13 +706,18 @@ STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
             "domain_service_required": "visit",
             "telegram_commands": ["/cancel_visit", "/move_visit"],
             "runtime_enabled": True,
-            "runtime_scope": "queue_link_status_only",
-            "runtime_owner": "QueueBusinessService",
+            "runtime_scope": "visit_record_and_queue_link_status",
+            "runtime_owner": "TelegramStaffActionAdapterService",
             "runtime_methods": [
+                "staff_cancel_visit",
+                "staff_move_visit",
+            ],
+            "queue_link_runtime_owner": "QueueBusinessService",
+            "queue_link_runtime_methods": [
                 "staff_cancel_visit_queue_link",
                 "staff_move_visit_queue_link",
             ],
-            "visit_record_mutation_enabled": False,
+            "visit_record_mutation_enabled": True,
             "required_before_enablement": True,
             "required_runtime_checks": [
                 "visit_target_resolved_server_side",
@@ -564,16 +730,112 @@ STAFF_BOT_DOMAIN_ADAPTER_CONTRACT = {
                 "staff_action_completed_or_failed_audit_written",
             ],
             "blocked_by": [
-                "visit_record_mutation_adapter",
                 "explicit_action_enablement",
             ],
         },
+        {
+            "operation_key": "payment_status_change",
+            "adapter_key": "staff_payment_status_change_adapter",
+            "domain": "payment",
+            "domain_service_required": "payment",
+            "telegram_commands": ["/payment_status"],
+            "runtime_enabled": True,
+            "runtime_owner": "TelegramStaffActionAdapterService",
+            "runtime_methods": ["staff_change_payment_status"],
+            "required_before_enablement": True,
+            "required_runtime_checks": [
+                "payment_target_resolved_in_protected_app",
+                "payment_status_transition_validated_by_billing_service",
+                "idempotency_key_consumed_once",
+                "staff_action_confirmed_audit_written",
+                "staff_action_completed_or_failed_audit_written",
+            ],
+            "blocked_by": ["explicit_action_enablement"],
+        },
+        {
+            "operation_key": "refund_issue",
+            "adapter_key": "staff_payment_refund_adapter",
+            "domain": "payment",
+            "domain_service_required": "payment",
+            "telegram_commands": ["/refund"],
+            "runtime_enabled": True,
+            "runtime_owner": "TelegramStaffActionAdapterService",
+            "runtime_methods": ["staff_refund_payment"],
+            "required_before_enablement": True,
+            "required_runtime_checks": [
+                "payment_target_resolved_in_protected_app",
+                "refund_amount_within_available_balance",
+                "refund_policy_allows_payment_status",
+                "idempotency_key_consumed_once",
+                "staff_action_confirmed_audit_written",
+                "staff_action_completed_or_failed_audit_written",
+            ],
+            "blocked_by": ["explicit_action_enablement"],
+        },
+        {
+            "operation_key": "doctor_schedule_change",
+            "adapter_key": "staff_schedule_change_adapter",
+            "domain": "schedule",
+            "domain_service_required": "schedule",
+            "telegram_commands": ["/change_schedule"],
+            "runtime_enabled": True,
+            "runtime_owner": "TelegramStaffActionAdapterService",
+            "runtime_methods": ["staff_change_doctor_schedule"],
+            "required_before_enablement": True,
+            "required_runtime_checks": [
+                "schedule_target_resolved_in_protected_app",
+                "schedule_time_range_validated",
+                "idempotency_key_consumed_once",
+                "staff_action_confirmed_audit_written",
+                "staff_action_completed_or_failed_audit_written",
+            ],
+            "blocked_by": ["explicit_action_enablement"],
+        },
     ],
     "blocked_by": [
-        "visit_record_mutation_adapter",
-        "payment_domain_mutation_adapter",
-        "schedule_domain_mutation_adapter",
         "explicit_action_enablement",
+    ],
+}
+
+STAFF_BOT_ACTION_ENABLEMENT_CONTRACT = {
+    "contract_version": "staff-action-enablements-v1",
+    "enabled": True,
+    "surface": "protected_app_confirmation_endpoint",
+    "telegram_callback_execution_enabled": False,
+    "telegram_message_execution_enabled": False,
+    "protected_action_execution_enabled": True,
+    "enabled_commands": [
+        "/call",
+        "/skip",
+        "/cancel_visit",
+        "/move_visit",
+        "/payment_status",
+        "/refund",
+        "/change_schedule",
+    ],
+    "disabled_commands": [
+        "/publish_document",
+    ],
+    "enablement_rule": (
+        "Commands are enabled one by one only after target binding, "
+        "idempotency consumption, audit, and focused runtime tests exist."
+    ),
+    "enabled_runtime_owner": "TelegramStaffActionAdapterService",
+    "enabled_runtime_methods": [
+        "staff_call_next_patient",
+        "staff_skip_queue_entry",
+        "staff_cancel_visit",
+        "staff_move_visit",
+        "staff_change_payment_status",
+        "staff_refund_payment",
+        "staff_change_doctor_schedule",
+    ],
+    "required_before_command_enablement": [
+        "domain_adapter_runtime_enabled",
+        "role_rechecked_in_protected_app",
+        "fresh_confirmation_token_consumed_once",
+        "staff_action_confirmed_audit_written",
+        "staff_action_completed_or_failed_audit_written",
     ],
 }
 
@@ -590,6 +852,8 @@ STAFF_BOT_CONFIRMATION_CONTRACT = {
     "idempotency_request_hash_runtime_enabled": True,
     "idempotency_key_returned_to_telegram": False,
     "state_changing_actions_enabled": False,
+    "protected_action_execution_enabled": True,
+    "action_enablement_contract": STAFF_BOT_ACTION_ENABLEMENT_CONTRACT,
     "confirmation_window_seconds": 120,
     "default_state_change_decision": "deny_until_domain_adapters_and_action_enablement",
     "token_storage_contract": STAFF_BOT_CONFIRMATION_TOKEN_STORAGE_CONTRACT,
@@ -666,7 +930,7 @@ STAFF_BOT_AUDIT_CONTRACT = {
     "read_only_menu_events_enabled": True,
     "state_change_denial_events_enabled": True,
     "confirmation_request_events_enabled": True,
-    "state_change_events_enabled": False,
+    "state_change_events_enabled": True,
     "required_state_change_event_types": [
         "staff_action_confirmed",
         "staff_action_completed",
@@ -678,12 +942,11 @@ STAFF_BOT_AUDIT_CONTRACT = {
         "staff_command_received",
         "staff_action_denied",
         "staff_action_confirmation_requested",
-    ],
-    "pending_event_types": [
         "staff_action_confirmed",
         "staff_action_completed",
         "staff_action_failed",
     ],
+    "pending_event_types": [],
     "required_before_enablement": True,
     "event_types": [
         {
@@ -1140,12 +1403,12 @@ def _build_staff_bot_status(
             "read_only_menu_events_ready": True,
             "state_change_denial_events_ready": True,
             "confirmation_request_events_ready": True,
-            "state_change_events_ready": False,
+            "state_change_events_ready": True,
             "required_state_change_event_types": list(
                 STAFF_BOT_AUDIT_CONTRACT["required_state_change_event_types"]
             ),
             "pending_state_change_event_types": list(
-                STAFF_BOT_AUDIT_CONTRACT["required_state_change_event_types"]
+                STAFF_BOT_AUDIT_CONTRACT.get("pending_event_types") or []
             ),
         },
         "confirmations": {
@@ -1159,9 +1422,14 @@ def _build_staff_bot_status(
             "confirmation_token_runtime_enabled": True,
             "idempotency_request_hash_runtime_enabled": True,
             "idempotency_key_returned_to_telegram": False,
-            "domain_adapter_runtime_enabled": False,
+            "domain_adapter_runtime_enabled": True,
             "queue_action_adapter_runtime_enabled": True,
             "visit_queue_link_adapter_runtime_enabled": True,
+            "protected_action_execution_enabled": True,
+            "enabled_commands": list(
+                STAFF_BOT_ACTION_ENABLEMENT_CONTRACT["enabled_commands"]
+            ),
+            "telegram_callback_execution_enabled": False,
             "domain_adapter_blockers": list(
                 STAFF_BOT_DOMAIN_ADAPTER_CONTRACT["blocked_by"]
             ),
@@ -1170,6 +1438,7 @@ def _build_staff_bot_status(
                 "deny_until_domain_adapters_and_action_enablement"
             ),
         },
+        "action_enablement_contract": STAFF_BOT_ACTION_ENABLEMENT_CONTRACT,
         "state_changing_actions_enabled": False,
         "readiness": STAFF_BOT_READINESS,
         "role_menus": role_menus,
@@ -1180,6 +1449,749 @@ def _build_staff_bot_status(
         "guardrails": STAFF_BOT_GUARDRAILS,
         "next_slice": _build_staff_bot_next_slice(token_contract),
     }
+
+
+def _staff_runtime_reference_hash(kind: str, value: Any) -> str:
+    digest = hashlib.sha256(f"{kind}:{value}".encode("utf-8")).hexdigest()
+    return f"{kind}:{digest[:24]}"
+
+
+def _telegram_ai_approval_reference_hash(value: Any) -> str:
+    digest = hashlib.sha256(
+        f"telegram_ai_approval:{value}".encode("utf-8")
+    ).hexdigest()
+    return f"telegram_ai_approval:{digest[:24]}"
+
+
+def _telegram_ai_approval_workflow(workflow_key: str) -> Dict[str, Any]:
+    key = str(workflow_key or "").strip().lower()
+    workflow = TELEGRAM_AI_APPROVAL_WORKFLOWS.get(key)
+    if not workflow:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_ai_approval_workflow",
+        )
+    return workflow
+
+
+def _protected_frontend_url(route: str) -> str | None:
+    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    if not frontend_url:
+        return None
+    if not frontend_url.startswith(("https://", "http://")):
+        return None
+    normalized_route = str(route or "").strip()
+    if not normalized_route.startswith("/"):
+        normalized_route = f"/{normalized_route}"
+    return f"{frontend_url.rstrip('/')}{normalized_route}"
+
+
+def _safe_ai_approval_value(value: Any) -> str:
+    if isinstance(value, bool):
+        text = "yes" if value else "no"
+    elif isinstance(value, (int, float, Decimal)):
+        text = str(value)
+    else:
+        text = str(value or "").strip()
+    return escape(text[:80])
+
+
+def _safe_ai_approval_metrics(
+    workflow: Dict[str, Any], metrics: Dict[str, Any] | None
+) -> Dict[str, str]:
+    if not isinstance(metrics, dict):
+        return {}
+    allowed_keys = {str(key) for key in workflow.get("allowed_metric_keys", [])}
+    safe_metrics: Dict[str, str] = {}
+    for key in sorted(allowed_keys):
+        if key in metrics:
+            safe_metrics[key] = _safe_ai_approval_value(metrics.get(key))
+    return safe_metrics
+
+
+def build_telegram_ai_approval_message(
+    workflow_key: str,
+    protected_url: str,
+    metrics: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build a PHI-free Telegram AI approval message with only a protected link."""
+
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    safe_metrics = _safe_ai_approval_metrics(workflow, metrics)
+    lines = [
+        str(workflow["telegram_title"]),
+        "",
+        str(workflow["telegram_body"]),
+        "Telegram does not show diagnosis, EMR text, documents, or internal IDs.",
+    ]
+    if safe_metrics:
+        lines.append("")
+        lines.append("Safe metrics:")
+        for key, value in safe_metrics.items():
+            lines.append(f"- {key}: {value}")
+
+    return {
+        "workflow_key": str(workflow_key).strip().lower(),
+        "text": "\n".join(lines),
+        "reply_markup": {
+            "inline_keyboard": [
+                [{"text": "Open protected clinic app", "url": protected_url}]
+            ]
+        },
+        "protected_route": workflow["protected_route"],
+        "safe_metric_keys": sorted(safe_metrics),
+        "contains_plain_chat_medical_content": False,
+        "autonomous_mutation_allowed": False,
+        "requires_human_confirmation": True,
+    }
+
+
+def _build_telegram_ai_approval_status() -> Dict[str, Any]:
+    return {
+        **TELEGRAM_AI_APPROVAL_CONTRACT,
+        "workflow_count": len(TELEGRAM_AI_APPROVAL_WORKFLOWS),
+        "runtime_guardrails": [
+            "protected_link_only",
+            "safe_metric_allowlist",
+            "hash_only_target_reference",
+            "accepted_rejected_outcome_audit",
+            "no_autonomous_domain_mutation",
+        ],
+    }
+
+
+def _assert_ai_approval_role_allowed(
+    workflow: Dict[str, Any],
+    role: Any,
+    *,
+    role_field: str,
+) -> None:
+    normalized_role = _normalize_staff_role(role)
+    allowed_roles = {
+        _normalize_staff_role(item) for item in workflow.get(role_field, [])
+    }
+    if normalized_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="role_not_allowed_for_ai_approval_workflow",
+        )
+
+
+def _normalize_ai_approval_outcome(outcome: Any) -> str:
+    normalized = str(outcome or "").strip().lower()
+    if normalized not in TELEGRAM_AI_APPROVAL_OUTCOMES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="unsupported_ai_approval_outcome",
+        )
+    return normalized
+
+
+def _normalize_ai_approval_reason_code(reason_code: Any) -> str | None:
+    normalized = str(reason_code or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in TELEGRAM_AI_APPROVAL_REASON_CODES:
+        return "other"
+    return normalized
+
+
+class StaffActionConfirmRequest(BaseModel):
+    entry_id: int | None = None
+    visit_id: int | None = None
+    new_visit_date: date | None = None
+    payment_id: int | None = None
+    new_status: str | None = None
+    refund_amount: Decimal | None = None
+    refund_reason: str | None = None
+    schedule_id: int | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    breaks: list[dict[str, str]] | None = None
+    active: bool | None = None
+
+
+class TelegramAiApprovalAlertRequest(BaseModel):
+    workflow_key: str
+    recipient_user_id: int
+    target_reference: str | None = None
+    metrics: Dict[str, Any] | None = None
+
+
+class TelegramAiApprovalOutcomeRequest(BaseModel):
+    workflow_key: str
+    outcome: str
+    target_reference: str | None = None
+    reason_code: str | None = None
+
+
+def _staff_state_change_operation_by_key(operation_key: str) -> Dict[str, Any] | None:
+    for operation in STAFF_BOT_CONFIRMATION_CONTRACT.get("operations", []):
+        if str(operation.get("key") or "") == operation_key:
+            return operation
+    return None
+
+
+def _record_staff_action_execution_failure(
+    db: Session,
+    *,
+    record: TelegramStaffConfirmationToken | None,
+    current_user: User,
+    operation_key: str,
+    command_key: str | None,
+    reason: str,
+) -> None:
+    telegram_chat_id = getattr(record, "telegram_chat_id", None)
+    payload = {
+        "actor_user_id": current_user.id,
+        "actor_role": _normalize_staff_role(getattr(current_user, "role", None)),
+        "telegram_user_id_hash": (
+            _staff_runtime_reference_hash("telegram_chat", telegram_chat_id)
+            if telegram_chat_id is not None
+            else None
+        ),
+        "action_key": "staff_action_failed",
+        "operation_key": operation_key,
+        "command_key": command_key,
+        "target_type": "telegram_staff_action",
+        "target_reference_hash": _staff_runtime_reference_hash(
+            "telegram_staff_action",
+            getattr(record, "id", operation_key),
+        ),
+        "result": "failed",
+        "reason": reason,
+        "timestamp": datetime.utcnow().isoformat(),
+        "confirmation_required": True,
+        "telegram_execution_enabled": False,
+        "domain_mutation": False,
+        "state_changing_action": True,
+        "redacted": True,
+    }
+    crud_audit.log(
+        db,
+        action="staff_action_failed",
+        entity_type="telegram_staff_action",
+        entity_id=getattr(record, "id", None),
+        actor_user_id=current_user.id,
+        payload=payload,
+    )
+
+
+def _validate_staff_action_target_request(
+    command_key: str,
+    request: StaffActionConfirmRequest,
+) -> str | None:
+    command = command_key.lower()
+    if command == "/call":
+        return None
+    if command == "/skip":
+        return None if request.entry_id is not None else "entry_id_required"
+    if command == "/cancel_visit":
+        return None if request.visit_id is not None else "visit_id_required"
+    if command == "/move_visit":
+        if request.visit_id is None:
+            return "visit_id_required"
+        if request.new_visit_date is None:
+            return "new_visit_date_required"
+        return None
+    if command == "/payment_status":
+        if request.payment_id is None:
+            return "payment_id_required"
+        if not str(request.new_status or "").strip():
+            return "new_status_required"
+        return None
+    if command == "/refund":
+        return None if request.payment_id is not None else "payment_id_required"
+    if command == "/change_schedule":
+        if request.schedule_id is None:
+            return "schedule_id_required"
+        if (
+            request.start_time is None
+            and request.end_time is None
+            and request.breaks is None
+            and request.active is None
+        ):
+            return "schedule_change_required"
+        return None
+    return "command_executor_not_supported"
+
+
+@router.post("/telegram/ai-approval-alerts")
+async def send_telegram_ai_approval_alert(
+    request: TelegramAiApprovalAlertRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Owner",
+            "Doctor",
+            "admin",
+            "registrar",
+            "cashier",
+            "owner",
+            "doctor",
+        )
+    ),
+) -> Dict[str, Any]:
+    """Send one safe AI approval alert to a linked staff Telegram chat."""
+
+    workflow_key = str(request.workflow_key or "").strip().lower()
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    recipient_user = db.query(User).filter(User.id == request.recipient_user_id).first()
+    if not recipient_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ai_approval_recipient_not_found",
+        )
+    _assert_ai_approval_role_allowed(
+        workflow,
+        getattr(recipient_user, "role", None),
+        role_field="recipient_roles",
+    )
+
+    telegram_user = crud_telegram.get_telegram_user_by_linked_user_id(
+        db, request.recipient_user_id
+    )
+    if (
+        not telegram_user
+        or not bool(getattr(telegram_user, "active", False))
+        or bool(getattr(telegram_user, "blocked", False))
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="linked_staff_telegram_chat_not_found",
+        )
+
+    protected_url = _protected_frontend_url(str(workflow["protected_route"]))
+    if not protected_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="protected_frontend_url_not_configured",
+        )
+
+    message = build_telegram_ai_approval_message(
+        workflow_key,
+        protected_url,
+        request.metrics,
+    )
+    bot_service = await get_telegram_bot_service()
+    if not bool(getattr(bot_service, "active", False)):
+        await bot_service.initialize(db)
+    if not getattr(bot_service, "bot_token", None):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="telegram_bot_token_not_configured",
+        )
+
+    success = bool(
+        await bot_service._send_message(
+            int(telegram_user.chat_id),
+            message["text"],
+            message["reply_markup"],
+        )
+    )
+    target_reference_hash = (
+        _telegram_ai_approval_reference_hash(request.target_reference)
+        if request.target_reference
+        else None
+    )
+    crud_audit.log(
+        db,
+        action=(
+            "telegram_ai_approval_notification_sent"
+            if success
+            else "telegram_ai_approval_notification_failed"
+        ),
+        entity_type="telegram_ai_approval",
+        entity_id=None,
+        actor_user_id=current_user.id,
+        payload={
+            "workflow_key": workflow_key,
+            "notification_type": workflow["notification_type"],
+            "recipient_user_id": request.recipient_user_id,
+            "recipient_role": _normalize_staff_role(getattr(recipient_user, "role", None)),
+            "target_reference_hash": target_reference_hash,
+            "safe_metric_keys": message["safe_metric_keys"],
+            "telegram_user_id_hash": _staff_runtime_reference_hash(
+                "telegram_chat", telegram_user.chat_id
+            ),
+            "plain_chat_medical_content_allowed": False,
+            "contains_plain_chat_medical_content": False,
+            "autonomous_mutation_allowed": False,
+            "domain_mutation": False,
+            "requires_human_confirmation": True,
+            "protected_route": workflow["protected_route"],
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+    db.commit()
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="telegram_ai_approval_notification_send_failed",
+        )
+
+    return {
+        "success": True,
+        "workflow_key": workflow_key,
+        "recipient_user_id": request.recipient_user_id,
+        "protected_route": workflow["protected_route"],
+        "safe_metric_keys": message["safe_metric_keys"],
+        "plain_chat_medical_content_allowed": False,
+        "autonomous_mutation_allowed": False,
+    }
+
+
+@router.post("/telegram/ai-approval-outcomes")
+def capture_telegram_ai_approval_outcome(
+    request: TelegramAiApprovalOutcomeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Owner",
+            "Doctor",
+            "admin",
+            "registrar",
+            "cashier",
+            "owner",
+            "doctor",
+        )
+    ),
+) -> Dict[str, Any]:
+    """Capture human accepted/rejected feedback without mutating domain state."""
+
+    workflow_key = str(request.workflow_key or "").strip().lower()
+    workflow = _telegram_ai_approval_workflow(workflow_key)
+    _assert_ai_approval_role_allowed(
+        workflow,
+        getattr(current_user, "role", None),
+        role_field="outcome_roles",
+    )
+    outcome = _normalize_ai_approval_outcome(request.outcome)
+    reason_code = _normalize_ai_approval_reason_code(request.reason_code)
+    target_reference_hash = (
+        _telegram_ai_approval_reference_hash(request.target_reference)
+        if request.target_reference
+        else None
+    )
+
+    crud_audit.log(
+        db,
+        action="telegram_ai_approval_outcome_recorded",
+        entity_type="telegram_ai_approval",
+        entity_id=None,
+        actor_user_id=current_user.id,
+        payload={
+            "workflow_key": workflow_key,
+            "notification_type": workflow["notification_type"],
+            "outcome": outcome,
+            "reason_code": reason_code,
+            "actor_role": _normalize_staff_role(getattr(current_user, "role", None)),
+            "target_reference_hash": target_reference_hash,
+            "plain_chat_medical_content_allowed": False,
+            "contains_plain_chat_medical_content": False,
+            "autonomous_mutation_allowed": False,
+            "domain_mutation": False,
+            "requires_human_confirmation": True,
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+    db.commit()
+
+    return {
+        "success": True,
+        "workflow_key": workflow_key,
+        "outcome": outcome,
+        "reason_code": reason_code,
+        "target_reference_hash": target_reference_hash,
+        "plain_chat_medical_content_allowed": False,
+        "autonomous_mutation_allowed": False,
+        "domain_mutation": False,
+    }
+
+
+@router.post("/telegram/staff-actions/{confirmation_id}/confirm")
+def confirm_staff_action(
+    confirmation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Owner",
+            "Doctor",
+            "Lab",
+            "admin",
+            "registrar",
+            "cashier",
+            "owner",
+            "doctor",
+            "lab",
+        )
+    ),
+    request: StaffActionConfirmRequest | None = Body(default=None),
+) -> Dict[str, Any]:
+    """Confirm one explicitly enabled Telegram staff action in the protected app."""
+
+    if not isinstance(request, StaffActionConfirmRequest):
+        request = StaffActionConfirmRequest()
+    record = (
+        db.query(TelegramStaffConfirmationToken)
+        .filter(TelegramStaffConfirmationToken.id == confirmation_id)
+        .first()
+    )
+    if not record or int(record.staff_user_id) != int(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff action confirmation not found",
+        )
+
+    operation_key = str(record.operation_key or "")
+    command_key = str(record.command_key or "")
+    operation = _staff_state_change_operation_by_key(operation_key)
+    if not operation:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason="operation_not_registered",
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Staff action operation is not registered",
+        )
+
+    role = _normalize_staff_role(getattr(current_user, "role", None))
+    allowed_roles = {
+        _normalize_staff_role(role_key) for role_key in operation.get("roles", [])
+    }
+    if role not in allowed_roles:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason="role_not_allowed",
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Current role cannot confirm this staff action",
+        )
+
+    enabled_commands = {
+        str(item).strip().lower()
+        for item in STAFF_BOT_ACTION_ENABLEMENT_CONTRACT.get("enabled_commands", [])
+    }
+    if command_key.lower() not in enabled_commands:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason="command_not_enabled",
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Staff action command is not enabled for protected execution",
+        )
+
+    target_error = _validate_staff_action_target_request(command_key, request)
+    if target_error:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason=target_error,
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=target_error,
+        )
+
+    consume_result = TelegramStaffConfirmationTokenService(db).consume_for_confirmation(
+        token_hash=record.token_hash,
+        staff_user_id=int(current_user.id),
+        telegram_chat_id=int(record.telegram_chat_id),
+        operation_key=record.operation_key,
+        action_payload_hash=record.action_payload_hash,
+        idempotency_key_hash=record.idempotency_key_hash,
+    )
+    if not consume_result.get("valid"):
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason=str(consume_result.get("reason") or "confirmation_rejected"),
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": consume_result.get("reason") or "confirmation_rejected",
+                "single_use_enforced": bool(
+                    consume_result.get("single_use_enforced")
+                ),
+            },
+        )
+
+    if command_key.lower() == "/call":
+        action_result = TelegramStaffActionAdapterService(db).staff_call_next_patient(
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+            "queue_time_preserved": action_result.get("queue_time_preserved"),
+        }
+
+    if command_key.lower() == "/skip":
+        action_result = TelegramStaffActionAdapterService(db).staff_skip_queue_entry(
+            entry_id=int(request.entry_id),
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+            "queue_time_preserved": action_result.get("queue_time_preserved"),
+        }
+
+    if command_key.lower() == "/cancel_visit":
+        action_result = TelegramStaffActionAdapterService(db).staff_cancel_visit(
+            visit_id=int(request.visit_id),
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "visit_status": action_result.get("visit_status"),
+        }
+
+    if command_key.lower() == "/move_visit":
+        action_result = TelegramStaffActionAdapterService(db).staff_move_visit(
+            visit_id=int(request.visit_id),
+            new_visit_date=request.new_visit_date,
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "visit_date": action_result.get("visit_date").isoformat()
+            if action_result.get("visit_date")
+            else None,
+        }
+
+    if command_key.lower() == "/payment_status":
+        action_result = (
+            TelegramStaffActionAdapterService(db).staff_change_payment_status(
+                payment_id=int(request.payment_id),
+                new_status=str(request.new_status),
+                actor_user_id=int(current_user.id),
+                telegram_chat_id=int(record.telegram_chat_id),
+                commit=True,
+            )
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+        }
+
+    if command_key.lower() == "/refund":
+        action_result = TelegramStaffActionAdapterService(db).staff_refund_payment(
+            payment_id=int(request.payment_id),
+            amount=request.refund_amount,
+            reason=request.refund_reason,
+            actor_user_id=int(current_user.id),
+            telegram_chat_id=int(record.telegram_chat_id),
+            commit=True,
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "status": action_result.get("status"),
+        }
+
+    if command_key.lower() == "/change_schedule":
+        action_result = (
+            TelegramStaffActionAdapterService(db).staff_change_doctor_schedule(
+                schedule_id=int(request.schedule_id),
+                start_time=request.start_time,
+                end_time=request.end_time,
+                breaks=request.breaks,
+                active=request.active,
+                actor_user_id=int(current_user.id),
+                telegram_chat_id=int(record.telegram_chat_id),
+                commit=True,
+            )
+        )
+        return {
+            "success": True,
+            "confirmation_id": confirmation_id,
+            "operation_key": operation_key,
+            "command_key": command_key,
+            "action": action_result.get("action"),
+            "active": action_result.get("active"),
+        }
+
+    _record_staff_action_execution_failure(
+        db,
+        record=record,
+        current_user=current_user,
+        operation_key=operation_key,
+        command_key=command_key,
+        reason="enabled_command_missing_executor",
+    )
+    db.commit()
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Enabled staff action has no executor",
+    )
 
 
 def raise_admin_telegram_error(
@@ -1864,11 +2876,13 @@ def get_telegram_integration_status(
                 "contact_phone_link",
                 "patient_queue",
                 "patient_payments_debt",
-                "patient_payments_protected_entry",
+                "patient_payments_mini_app_entry",
                 "patient_status",
                 "patient_language_notification_settings",
                 "lab_results_pdf",
                 "staff_link_start_token_handler",
+                "telegram_ai_approval_notifications",
+                "telegram_ai_approval_outcome_capture",
             ],
             "planned_functions": [
                 "dedicated_staff_bot_token_readiness_contract",
@@ -1888,6 +2902,7 @@ def get_telegram_integration_status(
                 "staff_audit_logging",
                 "admin_notifications",
             ],
+            "ai_approval": _build_telegram_ai_approval_status(),
             "patient_bot": {
                 "version": "v1",
                 "transport": "polling" if not webhook_set else "webhook",
@@ -1919,6 +2934,7 @@ def get_telegram_integration_status(
                         "key": "patient_booking_entrypoint",
                         "label": "Безопасная подсказка для записи",
                         "enabled": bool(bot_token),
+                        "contract": PATIENT_BOOKING_ENTRY_CONTRACT,
                     },
                     {
                         "key": "patient_services_menu",
@@ -1941,7 +2957,7 @@ def get_telegram_integration_status(
                         "enabled": bool(bot_token),
                     },
                     {
-                        "key": "patient_payments_protected_entry",
+                        "key": "patient_payments_mini_app_entry",
                         "label": "Защищенный вход к оплатам пациента",
                         "enabled": bool(bot_token),
                         "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,
@@ -1961,6 +2977,7 @@ def get_telegram_integration_status(
                         "key": "patient_forms_placeholder",
                         "label": "Анкеты пациента: безопасная заглушка Mini App",
                         "enabled": bool(bot_token),
+                        "contract": PATIENT_FORMS_ENTRY_CONTRACT,
                     },
                     {
                         "key": "patient_documents_placeholder",

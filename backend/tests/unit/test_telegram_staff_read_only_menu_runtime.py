@@ -4,8 +4,9 @@ from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
-from app.api.v1.endpoints import telegram_webhook
+from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.audit import AuditLog
 from app.models.lab import LabReportInstance
 from app.models.notification import NotificationDelivery, NotificationEvent
@@ -1314,6 +1315,252 @@ class TestTelegramStaffReadOnlyMenuRuntime:
             .count()
             == 0
         )
+
+    @pytest.mark.asyncio
+    async def test_staff_call_confirmation_executes_once_in_protected_app(
+        self, db_session, registrar_user, test_doctor, test_patient
+    ):
+        _link_staff_chat(db_session, chat_id=7222, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+
+        original_queue_time = datetime.utcnow().replace(microsecond=0)
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=16,
+            patient_id=test_patient.id,
+            patient_name="Protected Call",
+            phone="+998901234572",
+            source="desk",
+            status="waiting",
+            queue_time=original_queue_time,
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            {
+                "update_id": 223,
+                "message": {
+                    "message_id": 1,
+                    "chat": {"id": 7222},
+                    "from": {"id": 7222},
+                    "text": "/call",
+                },
+            },
+            db_session,
+            fake_service,
+        )
+        assert handled is True
+        confirmation_record = (
+            db_session.query(TelegramStaffConfirmationToken)
+            .filter(
+                TelegramStaffConfirmationToken.staff_user_id == registrar_user.id,
+                TelegramStaffConfirmationToken.telegram_chat_id == 7222,
+            )
+            .one()
+        )
+
+        result = admin_telegram.confirm_staff_action(
+            confirmation_record.id,
+            db_session,
+            registrar_user,
+        )
+
+        db_session.refresh(entry)
+        db_session.refresh(confirmation_record)
+        assert result["success"] is True
+        assert result["command_key"] == "/call"
+        assert result["status"] == "called"
+        assert result["queue_time_preserved"] is True
+        assert entry.status == "called"
+        assert entry.queue_time == original_queue_time
+        assert entry.called_at is not None
+        assert confirmation_record.consumed_at is not None
+
+        action_logs = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action.in_(
+                    [
+                        "staff_action_confirmation_requested",
+                        "staff_action_confirmed",
+                        "staff_action_completed",
+                    ]
+                )
+            )
+            .order_by(AuditLog.id.asc())
+            .all()
+        )
+        assert [log.action for log in action_logs] == [
+            "staff_action_confirmation_requested",
+            "staff_action_confirmed",
+            "staff_action_completed",
+        ]
+        assert all("7222" not in str(log.payload) for log in action_logs)
+
+        with pytest.raises(HTTPException) as repeated:
+            admin_telegram.confirm_staff_action(
+                confirmation_record.id,
+                db_session,
+                registrar_user,
+            )
+        assert repeated.value.status_code == 409
+        db_session.refresh(entry)
+        assert entry.status == "called"
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_completed")
+            .count()
+            == 1
+        )
+        failed = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_failed")
+            .one()
+        )
+        assert failed.payload["reason"] == "already_used"
+
+    @pytest.mark.asyncio
+    async def test_staff_call_confirmation_rejects_expired_token_without_mutation(
+        self, db_session, registrar_user, test_doctor, test_patient
+    ):
+        _link_staff_chat(db_session, chat_id=7223, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=17,
+            patient_id=test_patient.id,
+            patient_name="Expired Call",
+            phone="+998901234573",
+            source="desk",
+            status="waiting",
+            queue_time=datetime.utcnow().replace(microsecond=0),
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            {
+                "update_id": 224,
+                "message": {
+                    "message_id": 1,
+                    "chat": {"id": 7223},
+                    "from": {"id": 7223},
+                    "text": "/call",
+                },
+            },
+            db_session,
+            fake_service,
+        )
+        assert handled is True
+        confirmation_record = db_session.query(TelegramStaffConfirmationToken).one()
+        confirmation_record.created_at = datetime.utcnow() - timedelta(minutes=5)
+        confirmation_record.expires_at = datetime.utcnow() - timedelta(minutes=1)
+        db_session.commit()
+
+        with pytest.raises(HTTPException) as expired:
+            admin_telegram.confirm_staff_action(
+                confirmation_record.id,
+                db_session,
+                registrar_user,
+            )
+
+        db_session.refresh(entry)
+        db_session.refresh(confirmation_record)
+        assert expired.value.status_code == 409
+        assert entry.status == "waiting"
+        assert confirmation_record.consumed_at is None
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_completed")
+            .count()
+            == 0
+        )
+        failed = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_failed")
+            .one()
+        )
+        assert failed.payload["reason"] == "expired"
+
+    @pytest.mark.asyncio
+    async def test_staff_skip_confirmation_requires_target_binding(
+        self, db_session, registrar_user, test_doctor, test_patient
+    ):
+        _link_staff_chat(db_session, chat_id=7224, user_id=registrar_user.id)
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=18,
+            patient_id=test_patient.id,
+            patient_name="Disabled Skip",
+            phone="+998901234574",
+            source="desk",
+            status="waiting",
+            queue_time=datetime.utcnow().replace(microsecond=0),
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        fake_service = FakeTelegramBotService()
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            {
+                "update_id": 225,
+                "message": {
+                    "message_id": 1,
+                    "chat": {"id": 7224},
+                    "from": {"id": 7224},
+                    "text": "/skip",
+                },
+            },
+            db_session,
+            fake_service,
+        )
+        assert handled is True
+        confirmation_record = db_session.query(TelegramStaffConfirmationToken).one()
+
+        with pytest.raises(HTTPException) as target_error:
+            admin_telegram.confirm_staff_action(
+                confirmation_record.id,
+                db_session,
+                registrar_user,
+            )
+
+        db_session.refresh(entry)
+        db_session.refresh(confirmation_record)
+        assert target_error.value.status_code == 422
+        assert target_error.value.detail == "entry_id_required"
+        assert entry.status == "waiting"
+        assert confirmation_record.consumed_at is None
+        failed = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "staff_action_failed")
+            .one()
+        )
+        assert failed.payload["reason"] == "entry_id_required"
 
     @pytest.mark.asyncio
     async def test_staff_state_change_command_denies_unauthorized_role(

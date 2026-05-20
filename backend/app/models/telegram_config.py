@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -293,6 +294,93 @@ class TelegramStaffConfirmationToken(Base):
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     staff_user: Mapped[User] = relationship("User", foreign_keys=[staff_user_id])
+
+
+class TelegramPatientFormSubmission(Base):
+    """Protected Telegram Mini App patient form submission."""
+
+    __tablename__ = "telegram_patient_form_submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "form_id <> ''",
+            name="ck_telegram_patient_form_submissions_form_id_not_empty",
+        ),
+        CheckConstraint(
+            "schema_version > 0",
+            name="ck_telegram_patient_form_submissions_schema_version_positive",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'submitted')",
+            name="ck_telegram_patient_form_submissions_status_allowed",
+        ),
+        CheckConstraint(
+            "source <> ''",
+            name="ck_telegram_patient_form_submissions_source_not_empty",
+        ),
+        UniqueConstraint(
+            "patient_id",
+            "form_id",
+            name="uq_telegram_patient_form_submissions_patient_form",
+        ),
+        Index(
+            "ix_telegram_patient_form_submissions_patient_id",
+            "patient_id",
+        ),
+        Index(
+            "ix_telegram_patient_form_submissions_telegram_user_id",
+            "telegram_user_id",
+        ),
+        Index(
+            "ix_telegram_patient_form_submissions_chat_id",
+            "telegram_chat_id",
+        ),
+        Index(
+            "ix_telegram_patient_form_submissions_patient_status",
+            "patient_id",
+            "status",
+        ),
+        Index(
+            "ix_telegram_patient_form_submissions_updated_at",
+            "updated_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    patient_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    telegram_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("telegram_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    form_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="draft", nullable=False)
+    answers: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(32), default="telegram_mini_app", nullable=False
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    patient: Mapped[Patient] = relationship("Patient", foreign_keys=[patient_id])
+    telegram_user: Mapped[TelegramUser | None] = relationship(
+        "TelegramUser", foreign_keys=[telegram_user_id]
+    )
 
 
 class TelegramMessage(Base):

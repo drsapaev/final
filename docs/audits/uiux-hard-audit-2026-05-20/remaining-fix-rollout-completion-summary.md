@@ -98,4 +98,3 @@ deployment behavior was intentionally changed.
 The second-cycle checklist is complete after this summary PR merges into
 `main`. Local and cloud `main` should be synced after merge, and no second-cycle
 work branches should remain open.
-

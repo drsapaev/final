@@ -16,19 +16,19 @@ function sourceBetween(source, start, end) {
 
 describe('Telegram Mini App expired link guardrails', () => {
   it('maps expired entry-token reasons to patient-safe copy', () => {
-    const reasonMapping = sourceBetween(
+    const sessionMapping = sourceBetween(
       appSource,
-      "const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set",
-      'function createMiniAppAppointmentPreviewForm()'
+      'const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set',
+      'function isMiniAppCapabilityEnabled(capability)'
     );
 
-    expect(reasonMapping).toContain("'entry_token_invalid'");
-    expect(reasonMapping).toContain("'entry_token_expired'");
-    expect(reasonMapping).toContain('Ссылка устарела. Откройте Mini App заново из Telegram');
-    expect(reasonMapping).toContain('MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)');
-    expect(reasonMapping).toContain('return MINI_APP_EXPIRED_ENTRY_TOKEN_MESSAGE;');
-    expect(reasonMapping).toContain('return MINI_APP_SESSION_UNCONFIRMED_MESSAGE;');
-    expect(reasonMapping).not.toContain('Request failed with status code');
+    expect(sessionMapping).toContain("'entry_token_invalid'");
+    expect(sessionMapping).toContain("'entry_token_expired'");
+    expect(appSource).toContain('Ссылка устарела. Откройте Mini App заново из Telegram');
+    expect(sessionMapping).toContain('MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)');
+    expect(sessionMapping).toContain("return translateMiniAppText(languageCode, 'sessionExpired');");
+    expect(sessionMapping).toContain("return translateMiniAppText(languageCode, 'sessionNotConfirmed');");
+    expect(sessionMapping).not.toContain('Request failed with status code');
   });
 
   it('keeps handled Mini App API errors out of the global raw-toast path', () => {
@@ -40,31 +40,29 @@ describe('Telegram Mini App expired link guardrails', () => {
     const miniAppShell = sourceBetween(
       appSource,
       'function TelegramMiniAppPatientShell() {',
-      'const previewAppointment = appointmentPreview.payload?.appointment || null;'
+      'function AppShell({ children }) {'
     );
 
     expect(handledConfig).toContain('silent: true');
     expect(handledConfig).toContain('expectedErrorStatuses: [400, 403, 503]');
 
     [
-      '/telegram/mini-app/patient/manifest',
-      '/telegram/mini-app/forms/manifest',
-      '/telegram/mini-app/cabinet/manifest',
-      '/telegram/mini-app/payments/manifest',
-      '/telegram/mini-app/results/manifest',
-      '/telegram/mini-app/appointments/preview',
-    ].forEach((endpoint) => {
-      expect(miniAppShell).toContain(
-        `api.post('${endpoint}', ${endpoint.endsWith('/preview') ? 'requestBody' : '{ initData }'}, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)`
-      );
+      "api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)",
+      "MINI_APP_HANDLED_ERROR_REQUEST_CONFIG",
+    ].forEach((expectedSnippet) => {
+      expect(miniAppShell).toContain(expectedSnippet);
     });
   });
 
   it('keeps the session error state visually and accessibly distinct', () => {
     const statusBadge = sourceBetween(
       appSource,
-      'function getMiniAppStatusBadge(status) {',
-      'function createMiniAppAppointmentPreviewForm()'
+      'function getMiniAppStatusBadge(status, languageCode) {',
+      'function isMiniAppCapabilityEnabled(capability)'
     );
     const heroMarkup = sourceBetween(
       appSource,
@@ -74,7 +72,7 @@ describe('Telegram Mini App expired link guardrails', () => {
 
     expect(statusBadge).toContain("case 'error':");
     expect(statusBadge).toContain("variant: 'danger'");
-    expect(statusBadge).toContain('Сессия недоступна');
+    expect(statusBadge).toContain("'sessionUnavailableBadge'");
     expect(heroMarkup).toContain("aria-live={state.status === 'error' ? 'assertive' : 'polite'}");
     expect(heroMarkup).toContain('<Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>');
     expect(appSource).toContain("role: 'alert'");

@@ -4,10 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/App.jsx'), 'utf8');
 
-const CANONICAL_SECTIONS = ['appointments', 'forms', 'cabinet', 'payments', 'results'];
+const CANONICAL_SECTIONS = ['appointments', 'visits', 'queue', 'forms', 'cabinet', 'payments', 'results'];
 const ALIAS_MAPPINGS = {
   doctors: 'appointments',
   documents: 'results',
+  navbat: 'queue',
 };
 
 function sourceBetween(source, start, end) {
@@ -25,12 +26,12 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const aliases = sourceBetween(
       appSource,
       'const MINI_APP_SECTION_ALIASES = {',
-      'const MINI_APP_CAPABILITY_SAFETY_FLAGS = ['
+      'const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set'
     );
     const selectedSectionParser = sourceBetween(
       appSource,
       'function getTelegramMiniAppSelectedSection(search) {',
-      'function getDefaultMiniAppAppointmentDate() {'
+      'function normalizeMiniAppLanguage(languageCode) {'
     );
 
     CANONICAL_SECTIONS.forEach((section) => {
@@ -58,14 +59,14 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const selectedSectionPanel = sourceBetween(
       appSource,
       '{selectedSection && (',
-      '{canShowCabinetManifest && ('
+      "{selectedSection === 'cabinet' && cabinetSummary.status === 'loading' && ("
     );
 
     expect(shellSetup).toContain('const selectedSection = getTelegramMiniAppSelectedSection(location.search);');
     expect(appSource).toContain('const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;');
     expect(selectedSectionPanel).toContain('{selectedSection && (');
-    expect(selectedSectionPanel).toContain('{MINI_APP_CAPABILITY_LABELS[selectedSection]}');
-    expect(selectedSectionPanel).toContain("{selectedCapability?.status || 'manifest_only'}");
+    expect(selectedSectionPanel).toContain('{capabilityLabels[selectedSection]}');
+    expect(selectedSectionPanel).toContain('localizeMiniAppCapabilityStatus(languageCode, selectedCapability?.status)');
     expect(selectedSectionPanel).not.toContain('URLSearchParams');
     expect(selectedSectionPanel).not.toContain('location.search');
   });
@@ -74,7 +75,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const panelGates = sourceBetween(
       appSource,
       'const canPreviewAppointments = Boolean(',
-      'const statusBadge = getMiniAppStatusBadge(state.status);'
+      'const handleAppointmentPreviewFieldChange = (field) => (event) => {'
     );
     const capabilityGrid = sourceBetween(
       appSource,
@@ -83,14 +84,14 @@ describe('Telegram Mini App deep-link guardrails', () => {
     );
 
     CANONICAL_SECTIONS.forEach((section) => {
-      expect(panelGates).toContain(`selectedSection === '${section}'`);
+      expect(appSource).toContain(`selectedSection === '${section}'`);
     });
     Object.keys(ALIAS_MAPPINGS).forEach((alias) => {
       expect(panelGates).not.toContain(`selectedSection === '${alias}'`);
     });
 
     expect(panelGates).toContain('selectedCapability?.preview_enabled');
-    expect(panelGates.match(/selectedCapability\?\.manifest_endpoint/g)).toHaveLength(4);
+    expect(panelGates).toContain('selectedCapability?.create_enabled');
     expect(panelGates).not.toContain('URLSearchParams');
     expect(panelGates).not.toContain('location.search');
     expect(capabilityGrid).toContain('const isSelected = key === selectedSection;');

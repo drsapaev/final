@@ -160,4 +160,3 @@ For runtime MUI PRs:
 - Stop if a MUI migration touches more than one component family.
 - Stop if browser/auth proof is needed but cannot run without weakening auth.
 - Stop if the next performance candidate is too broad for a single PR.
-

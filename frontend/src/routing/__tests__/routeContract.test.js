@@ -6,7 +6,9 @@ import {
   getCompatibilityRedirects,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
+  getProtectedPatientFormsEntryPath,
   getProtectedPatientPaymentEntryPath,
+  getProtectedPatientBookingEntryPath,
   getRoleHomeRoute,
   getRouteDocsSnapshot,
   getRouteChromeState,
@@ -212,6 +214,31 @@ describe('route contract invariants', () => {
     const chrome = getRouteChromeState('/patient/payments', '', { role: 'Doctor' });
     expect(chrome.activeSidebarItem).toBe('payments');
     expect(chrome.hideSidebar).toBe(true);
+  });
+
+  it('adds protected patient booking entry as its own route contract', () => {
+    const route = getRouteById('patient-booking-entry');
+
+    expect(route).toBeTruthy();
+    expect(getProtectedPatientBookingEntryPath()).toBe('/patient/bookings');
+    expect(route.path).toBe('/patient/bookings');
+    expect(route.auth).toBe('authenticated');
+    expect(route.roles).toEqual([]);
+    expect(route.nav).toBe(false);
+    expect(route.component).toBe('PatientPanel');
+    expect(isRouteAccessibleToProfile(route, null)).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(true);
+
+    const chrome = getRouteChromeState('/patient/bookings', '', { role: 'Doctor' });
+    expect(chrome.activeSidebarItem).toBe('appointments');
+    expect(chrome.hideSidebar).toBe(true);
+  });
+
+  it('keeps protected patient forms entry as query-route fallback', () => {
+    const route = getRouteById('patient-forms-entry');
+
+    expect(getProtectedPatientFormsEntryPath()).toBe('/patient?tab=forms');
+    expect(route).toBeFalsy();
   });
 });
 

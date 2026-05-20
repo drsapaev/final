@@ -4,19 +4,22 @@ Webhook endpoint для обработки входящих сообщений �
 
 import hashlib
 import html
+import hmac
 import logging
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.api.v1.endpoints.admin_telegram import (
+    PATIENT_BOOKING_ENTRY_ROUTE,
+    PATIENT_MINI_APP_ENTRY_ROUTE,
     PATIENT_PAYMENT_ENTRY_ROUTE,
     STAFF_BOT_COMMAND_REGISTRATION_CONTRACT,
     STAFF_BOT_CONFIRMATION_CONTRACT,
@@ -35,6 +38,7 @@ from app.crud.appointment import appointment as appointment_crud
 from app.crud import audit as crud_audit
 from app.crud import telegram_config as crud_telegram
 from app.db.session import get_db
+from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.lab import LabReportInstance
 from app.models.notification import NotificationDelivery, NotificationEvent
@@ -56,12 +60,18 @@ from app.services.payment_reconciliation_api_service import (
 from app.services.telegram_staff_confirmation_token_service import (
     TelegramStaffConfirmationTokenService,
 )
-from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_bot import (
+    get_telegram_bot_service,
+    telegram_text_corruption_reason,
+)
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppInitDataError,
+    TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
     build_telegram_mini_app_appointment_booking_preview,
+    build_telegram_mini_app_patient_forms_preview,
     resolve_telegram_mini_app_session_scope,
+    save_telegram_mini_app_patient_form_submission,
     validate_telegram_mini_app_init_data,
 )
 from app.services.visit_confirmation_service import (
@@ -387,22 +397,23 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: (
             "Kosmed Clinic bot\n\n"
             "Для пациента:\n"
-            "🏥 Записаться на приём - безопасная подсказка для связи с регистратурой.\n"
+            "🏥 Записаться на приём - отправить заявку через защищенный Mini App.\n"
             "🎫 Моя очередь - номер, кабинет, статус и позиция ожидания.\n"
             "📅 Мои визиты - последние и сегодняшние визиты без медицинских деталей.\n"
             "💳 Оплаты и долг - начислено, оплачено, долг и незавершенные платежи.\n"
             "📄 Результаты - до 3 готовых PDF-отчетов, только после привязки.\n"
             "📲 Онлайн-сервисы - карта подключенных и будущих защищенных функций.\n"
-            "📋 Анкеты пациента - безопасная заглушка до подключения Mini App.\n"
+            "📋 Анкеты пациента - защищенное заполнение через Mini App.\n"
             "🧾 Документы и чеки - безопасный вход к будущему кабинету документов.\n"
-            "🧑‍⚕️ Врачи и расписание - пока только подсказка, запись через регистратуру.\n"
-            "📲 Кабинет пациента - будущий защищенный вход, без медданных в чате.\n"
+            "🧑‍⚕️ Врачи и расписание - защищенный просмотр расписания.\n"
+            "📲 Кабинет пациента - защищенный вход без медданных в чате.\n"
             "👤 Мой статус - привязка Telegram к карте пациента.\n"
             "⚙️ Настройки - язык и уведомления.\n"
             "👥 Режим сотрудника - вход только по персональной ссылке администратора или /staff.\n\n"
             "☎️ Связаться с клиникой - безопасная подсказка, куда обращаться по записи, кассе и срочным вопросам.\n\n"
             "Команды: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
+            "Для записи откройте Mini App из кнопки под сообщением \"Записаться на приём\". "
             "Для привязки отсканируйте QR с чека или нажмите "
             "\"Поделиться номером\".\n\n"
             "Для сотрудников: доступ отдельно через персональную ссылку администратора "
@@ -412,22 +423,23 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: (
             "Kosmed Clinic bot\n\n"
             "Bemor uchun:\n"
-            "🏥 Qabulga yozilish - registratura bilan bog'lanish uchun xavfsiz yo'l-yo'riq.\n"
+            "🏥 Qabulga yozilish - himoyalangan Mini App orqali so'rov yuborish.\n"
             "🎫 Mening navbatim - raqam, kabinet, holat va kutishdagi o'rin.\n"
             "📅 Mening tashriflarim - so'nggi va bugungi tashriflar, tibbiy tafsilotlarsiz.\n"
             "💳 To'lovlar va qarz - hisoblangan, to'langan, qarz va yakunlanmagan to'lovlar.\n"
             "📄 Natijalar - faqat bog'langan bemor uchun 3 tagacha tayyor PDF hisobot.\n"
             "📲 Onlayn xizmatlar - ulangan va kelajakdagi himoyalangan funksiyalar xaritasi.\n"
-            "📋 Bemor anketalari - Mini App ulanmaguncha xavfsiz izoh.\n"
+            "📋 Bemor anketalari - Mini App orqali himoyalangan to'ldirish.\n"
             "🧾 Hujjatlar va cheklar - kelajakdagi himoyalangan hujjatlar kabineti kirishi.\n"
-            "🧑‍⚕️ Shifokorlar jadvali - hozircha izoh, yozilish registratura orqali.\n"
-            "📲 Bemor kabineti - kelajakdagi himoyalangan kirish, chatda tibbiy ma'lumotsiz.\n"
+            "🧑‍⚕️ Shifokorlar jadvali - himoyalangan jadval ko'rish.\n"
+            "📲 Bemor kabineti - chatda tibbiy ma'lumotsiz himoyalangan kirish.\n"
             "👤 Mening holatim - Telegram bemor kartasiga bog'langanini ko'rish.\n"
             "⚙️ Sozlamalar - til va xabarnomalar.\n"
             "👥 Xodim rejimi - faqat administrator bergan shaxsiy havola yoki /staff orqali.\n\n"
             "☎️ Klinikaga bog'lanish - yozilish, kassa va shoshilinch savollar bo'yicha xavfsiz yo'l-yo'riq.\n\n"
             "Buyruqlar: /start, /menu, /services, /book, /queue, /visits, /payments, /results, "
             "/forms, /documents, /doctors, /cabinet, /profile, /settings, /support, /staff, /help.\n\n"
+            "Yozilish uchun \"Qabulga yozilish\" xabari ostidagi Mini App tugmasini oching. "
             "Bog'lash uchun chekdagi QR kodni skaner qiling yoki "
             "\"Telefon raqamni ulashish\" tugmasini bosing.\n\n"
             "Xodimlar uchun: kirish administrator bergan shaxsiy havola orqali "
@@ -450,21 +462,42 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "book": {
         TELEGRAM_LANGUAGE_RU: (
             "Записаться на приём\n\n"
-            "Пока онлайн-запись через Telegram не подключена. Для записи обратитесь "
-            "в регистратуру или позвоните по номеру, указанному на чеке и в клинике.\n\n"
-            "Бот не создаёт визит из сообщения в чате и не принимает медицинские "
-            "данные в свободном тексте. После записи вы сможете смотреть очередь, "
-            "визиты, оплаты и готовые результаты в этом меню."
+            "Онлайн-заявка на запись уже доступна через защищенный Mini App. "
+            "Нажмите кнопку ниже, выберите дату и время, затем отправьте заявку: "
+            "регистратура подтвердит детали.\n\n"
+            "Бот не создаёт визит, очередь или оплату из свободного сообщения в чате "
+            "и не принимает медицинские данные в тексте. После подтверждения записи "
+            "вы сможете смотреть очередь, визиты, оплаты и готовые результаты в этом меню."
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Qabulga yozilish\n\n"
-            "Telegram orqali onlayn yozilish hozircha ulanmagan. Qabulga yozilish "
-            "uchun registraturaga murojaat qiling yoki chekda va klinikada "
-            "ko'rsatilgan raqamga qo'ng'iroq qiling.\n\n"
-            "Bot chat xabaridan tashrif yaratmaydi va erkin matnda tibbiy "
-            "ma'lumotlarni qabul qilmaydi. Yozilgandan keyin bu menyuda navbat, "
-            "tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
+            "Himoyalangan Mini App orqali yozilish so'rovi allaqachon ishlaydi. "
+            "Quyidagi tugmani bosing, sana va vaqtni tanlang, keyin so'rovni yuboring: "
+            "registratura ma'lumotlarni tasdiqlaydi.\n\n"
+            "Bot chatdagi erkin matndan tashrif, navbat yoki to'lov yaratmaydi "
+            "va tibbiy ma'lumotlarni matn orqali qabul qilmaydi. Yozilish tasdiqlangach, "
+            "bu menyuda navbat, tashriflar, to'lovlar va tayyor natijalarni ko'rishingiz mumkin."
         ),
+    },
+    "service_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть защищенный раздел",
+        TELEGRAM_LANGUAGE_UZ: "Havfsiz bo'limni ochish",
+    },
+    "patient_forms_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть анкету",
+        TELEGRAM_LANGUAGE_UZ: "Anketani ochish",
+    },
+    "patient_documents_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть документы",
+        TELEGRAM_LANGUAGE_UZ: "Hujjatlarni ochish",
+    },
+    "patient_doctors_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть расписание врачей",
+        TELEGRAM_LANGUAGE_UZ: "Shifokorlar jadvalini ochish",
+    },
+    "patient_cabinet_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть мой кабинет",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetimni ochish",
     },
     "services_menu": {
         TELEGRAM_LANGUAGE_RU: (
@@ -718,21 +751,25 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Открыть оплату в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda to'lovni ochish",
     },
-    "patient_forms_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть анкеты",
-        TELEGRAM_LANGUAGE_UZ: "Anketalarni ochish",
+    "booking_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Открыть запись в кабинете",
+        TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
     },
-    "patient_documents_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть документы",
-        TELEGRAM_LANGUAGE_UZ: "Hujjatlarni ochish",
+    "queue_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "🎫 Открыть мою очередь",
+        TELEGRAM_LANGUAGE_UZ: "🎫 Mening navbatimni ochish",
     },
-    "doctor_schedule_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть врачей",
-        TELEGRAM_LANGUAGE_UZ: "Shifokorlarni ochish",
+    "queue_open_hint": {
+        TELEGRAM_LANGUAGE_RU: "Нажмите кнопку ниже, чтобы открыть очередь в Mini App.",
+        TELEGRAM_LANGUAGE_UZ: "Mini Appda navbatni ochish uchun quyidagi tugmani bosing.",
     },
-    "patient_cabinet_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть кабинет",
-        TELEGRAM_LANGUAGE_UZ: "Kabinetni ochish",
+    "visits_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "📅 Открыть мои визиты",
+        TELEGRAM_LANGUAGE_UZ: "📅 Mening tashriflarimni ochish",
+    },
+    "visits_open_hint": {
+        TELEGRAM_LANGUAGE_RU: "Нажмите кнопку ниже, чтобы открыть визиты в Mini App.",
+        TELEGRAM_LANGUAGE_UZ: "Mini Appda tashriflarni ochish uchun quyidagi tugmani bosing.",
     },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
@@ -790,127 +827,17 @@ MINI_APP_BOOKING_REQUEST_ERROR_REASONS = frozenset(
         "notes_too_long",
     }
 )
-TELEGRAM_MINI_APP_PATIENT_FORMS_MANIFEST = (
+MINI_APP_FORMS_REQUEST_ERROR_REASONS = frozenset(
     {
-        "key": "patient_intake",
-        "title": "Patient intake",
-        "status": "planned",
-        "capture_enabled": False,
-        "submission_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-    },
-    {
-        "key": "treatment_consent",
-        "title": "Treatment consent",
-        "status": "planned",
-        "capture_enabled": False,
-        "submission_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-    },
-)
-TELEGRAM_MINI_APP_PATIENT_CABINET_MANIFEST = (
-    {
-        "key": "appointments",
-        "title": "Appointments",
-        "status": "planned",
-        "read_enabled": False,
-        "write_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-        "contains_billing_records": False,
-    },
-    {
-        "key": "documents",
-        "title": "Documents",
-        "status": "planned",
-        "read_enabled": False,
-        "write_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-        "contains_billing_records": False,
-    },
-    {
-        "key": "payments",
-        "title": "Payments",
-        "status": "planned",
-        "read_enabled": False,
-        "write_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-        "contains_billing_records": False,
-    },
-)
-TELEGRAM_MINI_APP_PATIENT_PAYMENTS_MANIFEST = (
-    {
-        "key": "balance_summary",
-        "title": "Balance summary",
-        "status": "planned",
-        "read_enabled": False,
-        "payment_enabled": False,
-        "contains_amounts": False,
-        "contains_payment_records": False,
-        "contains_provider_payloads": False,
-    },
-    {
-        "key": "invoices",
-        "title": "Invoices",
-        "status": "planned",
-        "read_enabled": False,
-        "payment_enabled": False,
-        "contains_amounts": False,
-        "contains_payment_records": False,
-        "contains_provider_payloads": False,
-    },
-    {
-        "key": "receipts",
-        "title": "Receipts",
-        "status": "planned",
-        "read_enabled": False,
-        "payment_enabled": False,
-        "contains_amounts": False,
-        "contains_payment_records": False,
-        "contains_provider_payloads": False,
-    },
-)
-TELEGRAM_MINI_APP_PATIENT_RESULTS_MANIFEST = (
-    {
-        "key": "lab_reports",
-        "title": "Lab reports",
-        "status": "planned",
-        "view_enabled": False,
-        "download_enabled": False,
-        "contains_medical_results": False,
-        "contains_lab_values": False,
-        "contains_report_records": False,
-        "contains_file_urls": False,
-        "contains_diagnoses": False,
-    },
-    {
-        "key": "visit_summaries",
-        "title": "Visit summaries",
-        "status": "planned",
-        "view_enabled": False,
-        "download_enabled": False,
-        "contains_medical_results": False,
-        "contains_lab_values": False,
-        "contains_report_records": False,
-        "contains_file_urls": False,
-        "contains_diagnoses": False,
-    },
-    {
-        "key": "attachments",
-        "title": "Attachments",
-        "status": "planned",
-        "view_enabled": False,
-        "download_enabled": False,
-        "contains_medical_results": False,
-        "contains_lab_values": False,
-        "contains_report_records": False,
-        "contains_file_urls": False,
-        "contains_diagnoses": False,
-    },
+        "patient_form_id_required",
+        "patient_form_unknown",
+        "patient_form_status_invalid",
+        "patient_form_answers_invalid",
+        "patient_form_answer_unknown_field",
+        "patient_form_answer_type_invalid",
+        "patient_form_answer_too_long",
+        "patient_form_answer_required",
+    }
 )
 QUEUE_TERMINAL_STATUSES = {"served", "incomplete", "no_show", "cancelled"}
 QUEUE_WAITING_STATUSES = {"waiting"}
@@ -982,6 +909,20 @@ LAB_RESULT_DELIVERY_EVENT_TYPES = {
 SUCCESSFUL_DELIVERY_STATUSES = {"delivered", "seen", "read", "archived"}
 PENDING_DELIVERY_STATUSES = {"pending", "dispatched"}
 MAX_TELEGRAM_LAB_REPORTS = 3
+PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX = "pma"
+PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR = "_"
+PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS = 10 * 60
+PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
+    "appointments",
+    "forms",
+    "cabinet",
+    "visits",
+    "queue",
+    "payments",
+    "results",
+    "documents",
+    "doctors",
+}
 
 
 def _telegram_update_summary(update: Dict[str, Any]) -> Dict[str, Any]:
@@ -1047,63 +988,144 @@ def _localized_text(key: str, language_code: Any) -> str:
     return values.get(language) or values.get(TELEGRAM_LANGUAGE_RU) or ""
 
 
-def _patient_payment_entry_url() -> str | None:
+def _base36_encode(value: int) -> str:
+    if value < 0:
+        raise ValueError("base36 value must be non-negative")
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if value == 0:
+        return "0"
+    result = ""
+    while value:
+        value, remainder = divmod(value, 36)
+        result = alphabet[remainder] + result
+    return result
+
+
+def _base36_decode(value: str) -> int:
+    return int(value, 36)
+
+
+def _patient_mini_app_token_section(section: str | None) -> str:
+    normalized = str(section or "cabinet").strip().lower()
+    if normalized in {"booking", "doctors"}:
+        return "appointments"
+    if normalized == "payment":
+        return "payments"
+    if normalized == "documents":
+        return "results"
+    if normalized in PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS:
+        return normalized
+    return "cabinet"
+
+
+def _patient_mini_app_entry_token_signature(body: str) -> str:
+    digest = hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        body.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return _base36_encode(int.from_bytes(digest[:12], "big"))
+
+
+def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
+    expires_at = datetime.utcnow() + timedelta(
+        seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
+    )
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
+        [
+            PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX,
+            _patient_mini_app_token_section(section),
+            _base36_encode(int(chat_id)),
+            _base36_encode(
+                int(expires_at.replace(tzinfo=timezone.utc).timestamp())
+            ),
+            _base36_encode(secrets.randbits(48)),
+        ]
+    )
+    signature = _patient_mini_app_entry_token_signature(body)
+    return f"{body}{PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR}{signature}"
+
+
+def _parse_patient_mini_app_entry_token(
+    token: str,
+    *,
+    expected_section: str | None = None,
+) -> dict[str, Any] | None:
+    parts = str(token or "").split(PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR)
+    if len(parts) != 6 or parts[0] != PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX:
+        return None
+
+    section = _patient_mini_app_token_section(parts[1])
+    if expected_section and section != _patient_mini_app_token_section(expected_section):
+        return None
+
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(parts[:5])
+    if not hmac.compare_digest(
+        parts[5],
+        _patient_mini_app_entry_token_signature(body),
+    ):
+        return None
+
+    try:
+        chat_id = _base36_decode(parts[2])
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+    if expires_at < datetime.now(timezone.utc):
+        return None
+
+    return {
+        "chat_id": chat_id,
+        "section": section,
+        "expires_at": expires_at,
+    }
+
+
+def _append_patient_mini_app_entry_token(entry_url: str, token: str) -> str:
+    separator = "&" if "?" in entry_url else "?"
+    return f"{entry_url}{separator}entryToken={token}"
+
+
+def _patient_entry_url(section: str | None = None) -> str | None:
     frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
     if not frontend_url:
         return None
-    route = PATIENT_PAYMENT_ENTRY_ROUTE
+
+    if section == "booking":
+        route = PATIENT_BOOKING_ENTRY_ROUTE
+    elif section == "payment":
+        route = PATIENT_PAYMENT_ENTRY_ROUTE
+    elif section:
+        route = f"{PATIENT_MINI_APP_ENTRY_ROUTE}?section={section}"
+    else:
+        route = PATIENT_MINI_APP_ENTRY_ROUTE
+
     if not route.startswith("/"):
         route = f"/{route}"
     return f"{frontend_url.rstrip('/')}{route}"
 
 
-PATIENT_MINI_APP_ENTRY_ROUTE = "/telegram/mini-app/patient"
-PATIENT_MINI_APP_SECTION_TARGETS = {
-    "forms": "forms",
-    "documents": "results",
-    "doctors": "appointments",
-    "cabinet": "cabinet",
-}
+def _telegram_entry_button(text: str, entry_url: str) -> Dict[str, Any]:
+    button: Dict[str, Any] = {"text": text}
+    if entry_url.lower().startswith("https://"):
+        button["web_app"] = {"url": entry_url}
+    else:
+        button["url"] = entry_url
+    return button
 
 
-def _patient_protected_section_entry_url(section: str) -> str | None:
-    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
-    section_key = str(section or "").strip().lower()
-    mini_app_section = PATIENT_MINI_APP_SECTION_TARGETS.get(section_key)
-    if not frontend_url or not mini_app_section:
-        return None
-    return (
-        f"{frontend_url.rstrip('/')}{PATIENT_MINI_APP_ENTRY_ROUTE}"
-        f"?section={mini_app_section}"
-    )
+def _patient_payment_entry_url() -> str | None:
+    return _patient_entry_url("payment")
 
 
-def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
-    if not telegram_user or not telegram_user.patient_id:
-        return None
-
-    entry_url = _patient_payment_entry_url()
-    if not entry_url:
-        return None
-
-    language = _telegram_chat_language(db, chat_id)
-    return {
-        "inline_keyboard": [
-            [
-                {
-                    "text": _localized_text("payments_entry_button", language),
-                    "url": entry_url,
-                }
-            ]
-        ]
-    }
+def _patient_booking_entry_url() -> str | None:
+    return _patient_entry_url("booking")
 
 
-def _telegram_patient_section_entry_markup(
+def _telegram_service_entry_markup(
     db: Session,
     chat_id: int,
-    *,
     section: str,
     button_text_key: str,
 ) -> Dict[str, Any] | None:
@@ -1111,21 +1133,100 @@ def _telegram_patient_section_entry_markup(
     if not telegram_user or not telegram_user.patient_id:
         return None
 
-    entry_url = _patient_protected_section_entry_url(section)
+    entry_url = _patient_entry_url(section)
     if not entry_url:
         return None
+
+    if not entry_url.lower().startswith("https://"):
+        entry_token = _build_patient_mini_app_entry_token(
+            chat_id,
+            _patient_mini_app_token_section(section),
+        )
+        entry_url = _append_patient_mini_app_entry_token(entry_url, entry_token)
 
     language = _telegram_chat_language(db, chat_id)
     return {
         "inline_keyboard": [
             [
-                {
-                    "text": _localized_text(button_text_key, language),
-                    "web_app": {"url": entry_url},
-                }
+                _telegram_entry_button(
+                    _localized_text(button_text_key, language),
+                    entry_url,
+                )
             ]
         ]
     }
+
+
+def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "payment",
+        "payments_entry_button",
+    )
+
+
+def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "booking",
+        "booking_entry_button",
+    )
+
+
+def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "queue",
+        "queue_entry_button",
+    )
+
+
+def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "visits",
+        "visits_entry_button",
+    )
+
+
+def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "forms",
+        "patient_forms_entry_button",
+    )
+
+
+def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "documents",
+        "patient_documents_entry_button",
+    )
+
+
+def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "doctors",
+        "patient_doctors_entry_button",
+    )
+
+
+def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "cabinet",
+        "patient_cabinet_entry_button",
+    )
 
 
 def _localized_main_menu(language_code: Any) -> Dict[str, Any]:
@@ -1249,6 +1350,34 @@ async def _send_patient_bot_reply(
     reply_markup: Dict[str, Any],
     template_key: str,
 ) -> bool:
+    corruption_reason = telegram_text_corruption_reason(text)
+    if corruption_reason:
+        try:
+            db.add(
+                TelegramMessage(
+                    chat_id=chat_id,
+                    message_type="patient_bot_reply",
+                    template_key=template_key,
+                    message_text="[blocked_corrupted_text]",
+                    status="failed",
+                    error_message=f"blocked_corrupted_text:{corruption_reason}",
+                )
+            )
+            db.commit()
+            logger.warning(
+                "Telegram patient bot reply blocked template_key=%s reason=%s",
+                template_key,
+                corruption_reason,
+            )
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Telegram patient bot reply block log failed template_key=%s error_type=%s",
+                template_key,
+                type(exc).__name__,
+            )
+        return False
+
     sent = bool(await bot_service._send_message(chat_id, text, reply_markup))
     try:
         db.add(
@@ -3005,13 +3134,15 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
     entries = _patient_today_queue_entries(db, telegram_user.patient_id)
+    open_hint = _localized_text("queue_open_hint", language)
     if not entries:
-        return _localized_text("queue_empty", language).format(
+        queue_empty = _localized_text("queue_empty", language).format(
             patient=patient_name,
             visit_summary=_html_text(
                 _recent_visit_summary(db, telegram_user.patient_id, language)
             ),
         )
+        return f"{queue_empty}\n\n{open_hint}"
 
     lines = [
         _localized_text("queue_patient", language).format(patient=patient_name),
@@ -3040,6 +3171,7 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
         lines.append(
             _localized_text("queue_more", language).format(count=len(entries) - 5)
         )
+    lines.extend(["", open_hint])
     return "\n".join(lines)
 
 
@@ -3051,8 +3183,12 @@ def _clinic_visits_message(db: Session, chat_id: int) -> str:
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
     visits = _patient_recent_visits(db, telegram_user.patient_id)
+    open_hint = _localized_text("visits_open_hint", language)
     if not visits:
-        return _localized_text("visits_empty", language).format(patient=patient_name)
+        visits_empty = _localized_text("visits_empty", language).format(
+            patient=patient_name
+        )
+        return f"{visits_empty}\n\n{open_hint}"
 
     lines = [
         _localized_text("visits_patient", language).format(patient=patient_name),
@@ -3072,7 +3208,7 @@ def _clinic_visits_message(db: Session, chat_id: int) -> str:
                 status=_html_text(visit.status),
             )
         )
-    lines.append(_localized_text("visits_privacy_note", language))
+    lines.extend([_localized_text("visits_privacy_note", language), "", open_hint])
     return "\n".join(lines)
 
 
@@ -3694,7 +3830,8 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _clinic_queue_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_queue_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_queue",
         )
 
@@ -3704,7 +3841,8 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _clinic_visits_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_visits_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_visits",
         )
 
@@ -3744,80 +3882,73 @@ async def _handle_clinic_bot_update(
 
     async def book_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = _telegram_booking_entry_markup(db, chat_id) or _localized_main_menu(language)
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("book", language),
-            _localized_main_menu(language),
+            reply_markup,
             "telegram_patient_book",
         )
 
     async def patient_forms_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_forms_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_forms", language),
-            _telegram_patient_section_entry_markup(
-                db,
-                chat_id,
-                section="forms",
-                button_text_key="patient_forms_entry_button",
-            )
-            or _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_forms_placeholder",
         )
 
     async def patient_documents_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_documents_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_documents", language),
-            _telegram_patient_section_entry_markup(
-                db,
-                chat_id,
-                section="documents",
-                button_text_key="patient_documents_entry_button",
-            )
-            or _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_documents_placeholder",
         )
 
     async def doctor_schedule_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_doctors_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("doctor_schedule", language),
-            _telegram_patient_section_entry_markup(
-                db,
-                chat_id,
-                section="doctors",
-                button_text_key="doctor_schedule_entry_button",
-            )
-            or _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_doctor_schedule_placeholder",
         )
 
     async def patient_cabinet_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        reply_markup = (
+            _telegram_patient_cabinet_entry_markup(db, chat_id)
+            or _localized_services_menu(language)
+        )
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _localized_text("patient_cabinet", language),
-            _telegram_patient_section_entry_markup(
-                db,
-                chat_id,
-                section="cabinet",
-                button_text_key="patient_cabinet_entry_button",
-            )
-            or _localized_services_menu(language),
+            reply_markup,
             "telegram_patient_cabinet_placeholder",
         )
 
@@ -3975,23 +4106,67 @@ async def _handle_clinic_bot_update(
     return False
 
 
-class TelegramMiniAppPatientScopeRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    init_data: str = Field(..., alias="initData", min_length=1)
-
-
 class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
     appointment_date: date = Field(..., alias="appointmentDate")
     appointment_time: str | None = Field(default=None, alias="appointmentTime")
     doctor_id: int | None = Field(default=None, alias="doctorId")
     department: str | None = None
     notes: str | None = None
     services: list[str] | None = None
+
+
+class TelegramMiniAppPatientManifestRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    section: str | None = None
+
+
+class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
+
+
+class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
+
+
+class TelegramMiniAppPatientReportDownloadRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
+    report_id: int = Field(..., alias="reportId", ge=1)
+
+
+class TelegramMiniAppPatientFormSubmissionRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
+    form_id: str = Field(..., alias="formId", min_length=1, max_length=64)
+    answers: dict[str, Any] = Field(default_factory=dict)
+    status: str = Field(default="submitted")
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
@@ -4041,7 +4216,62 @@ def _mini_app_booking_scope_status_code(reason: str) -> int:
     return status.HTTP_403_FORBIDDEN
 
 
-def _resolve_mini_app_patient_scope_from_init_data(init_data_value: str, db: Session):
+def _mini_app_forms_scope_status_code(reason: str) -> int:
+    if reason in MINI_APP_FORMS_REQUEST_ERROR_REASONS:
+        return status.HTTP_400_BAD_REQUEST
+    return status.HTTP_403_FORBIDDEN
+
+
+def _build_mini_app_appointment_booking_preview_from_request(
+    request_body: TelegramMiniAppAppointmentPreviewRequest,
+    db: Session,
+    *,
+    allow_entry_token: bool = False,
+):
+    try:
+        if allow_entry_token:
+            scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+                db,
+                init_data_payload=request_body.init_data,
+                entry_token=request_body.entry_token,
+                expected_section=request_body.section or "appointments",
+            )
+        else:
+            if not request_body.init_data:
+                raise TelegramMiniAppInitDataError("init_data_required")
+            scope = _resolve_mini_app_patient_scope_from_init_data(
+                db,
+                request_body.init_data,
+            )
+
+        preview = build_telegram_mini_app_appointment_booking_preview(
+            scope,
+            patient_id=request_body.patient_id,
+            appointment_date=request_body.appointment_date,
+            appointment_time=request_body.appointment_time,
+            doctor_id=request_body.doctor_id,
+            department=request_body.department,
+            notes=request_body.notes,
+            services=request_body.services,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=_mini_app_booking_scope_status_code(exc.reason),
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return preview
+
+
+def _resolve_mini_app_patient_scope_from_init_data(
+    db: Session,
+    init_data_payload: str,
+):
     bot_token = _get_configured_bot_token(db)
     if not bot_token:
         raise HTTPException(
@@ -4049,15 +4279,160 @@ def _resolve_mini_app_patient_scope_from_init_data(init_data_value: str, db: Ses
             detail={"reason": "bot_token_required"},
         )
 
-    try:
-        init_data = validate_telegram_mini_app_init_data(
-            init_data_value,
-            bot_token=bot_token,
-        )
-        return resolve_telegram_mini_app_session_scope(
+    init_data = validate_telegram_mini_app_init_data(
+        init_data_payload,
+        bot_token=bot_token,
+    )
+    return resolve_telegram_mini_app_session_scope(
+        db,
+        init_data,
+        expected_scope="patient",
+    )
+
+
+def _resolve_mini_app_patient_scope_from_entry_token(
+    db: Session,
+    entry_token: str,
+    *,
+    expected_section: str | None = None,
+) -> TelegramMiniAppSessionScope:
+    parsed = _parse_patient_mini_app_entry_token(
+        entry_token,
+        expected_section=expected_section,
+    )
+    if not parsed:
+        raise TelegramMiniAppSessionScopeError("entry_token_invalid")
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+        db,
+        int(parsed["chat_id"]),
+    )
+    if not telegram_user:
+        raise TelegramMiniAppSessionScopeError("telegram_link_required")
+    if not getattr(telegram_user, "active", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_inactive")
+    if getattr(telegram_user, "blocked", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_blocked")
+    if not getattr(telegram_user, "patient_id", None):
+        raise TelegramMiniAppSessionScopeError("patient_scope_required")
+
+    return TelegramMiniAppSessionScope(
+        scope_type="patient",
+        telegram_user_id=int(telegram_user.id),
+        telegram_chat_id=int(telegram_user.chat_id),
+        patient_id=int(telegram_user.patient_id),
+    )
+
+
+def _resolve_mini_app_patient_scope_from_auth(
+    db: Session,
+    *,
+    init_data_payload: str | None = None,
+    entry_token: str | None = None,
+    expected_section: str | None = None,
+) -> tuple[TelegramMiniAppSessionScope, str]:
+    normalized_init_data = str(init_data_payload or "").strip()
+    if normalized_init_data:
+        return _resolve_mini_app_patient_scope_from_init_data(
             db,
-            init_data,
-            expected_scope="patient",
+            normalized_init_data,
+        ), "init_data"
+
+    normalized_entry_token = str(entry_token or "").strip()
+    if normalized_entry_token:
+        return _resolve_mini_app_patient_scope_from_entry_token(
+            db,
+            normalized_entry_token,
+            expected_section=expected_section,
+        ), "entry_token"
+
+    raise TelegramMiniAppInitDataError("init_data_required")
+
+
+def _mini_app_patient_manifest_payload(
+    db: Session,
+    scope: TelegramMiniAppSessionScope,
+    *,
+    auth_source: str,
+) -> dict[str, Any]:
+    patient = db.query(Patient).filter(Patient.id == int(scope.patient_id)).first()
+    telegram_user = (
+        db.query(TelegramUser)
+        .filter(TelegramUser.id == int(scope.telegram_user_id))
+        .first()
+    )
+    language_code = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
+    return {
+        "scope": {
+            "type": scope.scope_type,
+        },
+        "auth": {
+            "source": auth_source,
+            "entry_token_fallback": auth_source == "entry_token",
+        },
+        "language": {
+            "code": language_code,
+            "label": "O'zbekcha"
+            if language_code == TELEGRAM_LANGUAGE_UZ
+            else "Русский",
+        },
+        "patient": {
+            "linked": True,
+            "name": _patient_display_name(patient),
+        },
+        "capabilities": {
+            "appointments": {
+                "status": "preview_enabled",
+                "preview_enabled": True,
+                "create_enabled": False,
+            },
+            "forms": {
+                "status": "preview_enabled",
+                "preview_enabled": True,
+                "capture_enabled": True,
+            },
+            "cabinet": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "visits": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "queue": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "payments": {
+                "status": "summary_enabled",
+                "view_enabled": True,
+                "payment_capture_enabled": False,
+            },
+            "results": {
+                "status": "ready_pdf_list_enabled",
+                "read_enabled": True,
+            },
+        },
+        "policy": {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "entry_token_ttl_seconds": PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS,
+        },
+    }
+
+
+def _build_mini_app_patient_manifest_from_request(
+    request_body: TelegramMiniAppPatientManifestRequest,
+    db: Session,
+) -> dict[str, Any]:
+    try:
+        scope, auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section,
         )
     except TelegramMiniAppInitDataError as exc:
         raise HTTPException(
@@ -4070,260 +4445,280 @@ def _resolve_mini_app_patient_scope_from_init_data(init_data_value: str, db: Ses
             detail={"reason": exc.reason},
         ) from exc
 
-
-def _build_mini_app_patient_forms_manifest_response(scope):
-    return {
-        "scope": {
-            "type": scope.scope_type,
-            "patient_id": int(scope.patient_id),
-        },
-        "status": "manifest_only",
-        "forms_enabled": False,
-        "capture_enabled": False,
-        "submission_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-        "message_key": "telegram_mini_app_patient_forms_manifest_only",
-        "forms": [dict(form) for form in TELEGRAM_MINI_APP_PATIENT_FORMS_MANIFEST],
-    }
+    return _mini_app_patient_manifest_payload(db, scope, auth_source=auth_source)
 
 
-def _build_mini_app_patient_cabinet_manifest_response(scope):
-    return {
-        "scope": {
-            "type": scope.scope_type,
-            "patient_id": int(scope.patient_id),
-        },
-        "status": "manifest_only",
-        "cabinet_enabled": False,
-        "read_enabled": False,
-        "mutation_enabled": False,
-        "contains_medical_data": False,
-        "contains_passport_data": False,
-        "contains_billing_records": False,
-        "message_key": "telegram_mini_app_patient_cabinet_manifest_only",
-        "sections": [
-            dict(section) for section in TELEGRAM_MINI_APP_PATIENT_CABINET_MANIFEST
-        ],
-    }
+def _iso_date_value(value: date | datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
 
 
-def _build_mini_app_patient_payments_manifest_response(scope):
-    return {
-        "scope": {
-            "type": scope.scope_type,
-            "patient_id": int(scope.patient_id),
-        },
-        "status": "manifest_only",
-        "payments_enabled": False,
-        "read_enabled": False,
-        "payment_capture_enabled": False,
-        "provider_redirect_enabled": False,
-        "contains_amounts": False,
-        "contains_payment_records": False,
-        "contains_provider_payloads": False,
-        "message_key": "telegram_mini_app_patient_payments_manifest_only",
-        "sections": [
-            dict(section) for section in TELEGRAM_MINI_APP_PATIENT_PAYMENTS_MANIFEST
-        ],
-    }
+def _iso_datetime_value(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
 
 
-def _build_mini_app_patient_results_manifest_response(scope):
-    return {
-        "scope": {
-            "type": scope.scope_type,
-            "patient_id": int(scope.patient_id),
-        },
-        "status": "manifest_only",
-        "results_enabled": False,
-        "view_enabled": False,
-        "download_enabled": False,
-        "contains_medical_results": False,
-        "contains_lab_values": False,
-        "contains_report_records": False,
-        "contains_file_urls": False,
-        "contains_pdfs": False,
-        "contains_diagnoses": False,
-        "message_key": "telegram_mini_app_patient_results_manifest_only",
-        "sections": [
-            dict(section) for section in TELEGRAM_MINI_APP_PATIENT_RESULTS_MANIFEST
-        ],
-    }
-
-
-def _build_mini_app_patient_manifest_response(scope):
-    return {
-        "scope": {
-            "type": scope.scope_type,
-            "patient_id": int(scope.patient_id),
-        },
-        "status": "manifest_only",
-        "message_key": "telegram_mini_app_patient_manifest_only",
-        "capabilities": {
-            "appointments": {
-                "status": "booking_enabled",
-                "preview_endpoint": "/api/v1/telegram/mini-app/appointments/preview",
-                "create_endpoint": "/api/v1/telegram/mini-app/appointments",
-                "preview_enabled": True,
-                "create_enabled": True,
-                "contains_medical_data": False,
-                "contains_payment_provider_data": False,
-            },
-            "forms": {
-                "status": "manifest_only",
-                "manifest_endpoint": "/api/v1/telegram/mini-app/forms/manifest",
-                "capture_enabled": False,
-                "submission_enabled": False,
-                "contains_medical_data": False,
-                "contains_passport_data": False,
-            },
-            "cabinet": {
-                "status": "manifest_only",
-                "manifest_endpoint": "/api/v1/telegram/mini-app/cabinet/manifest",
-                "read_enabled": False,
-                "mutation_enabled": False,
-                "contains_medical_data": False,
-                "contains_passport_data": False,
-                "contains_billing_records": False,
-            },
-            "payments": {
-                "status": "manifest_only",
-                "manifest_endpoint": "/api/v1/telegram/mini-app/payments/manifest",
-                "read_enabled": False,
-                "payment_capture_enabled": False,
-                "provider_redirect_enabled": False,
-                "contains_amounts": False,
-                "contains_payment_records": False,
-                "contains_provider_payloads": False,
-            },
-            "results": {
-                "status": "manifest_only",
-                "manifest_endpoint": "/api/v1/telegram/mini-app/results/manifest",
-                "view_enabled": False,
-                "download_enabled": False,
-                "contains_medical_results": False,
-                "contains_lab_values": False,
-                "contains_report_records": False,
-                "contains_file_urls": False,
-                "contains_pdfs": False,
-                "contains_diagnoses": False,
-            },
-        },
-    }
-
-
-def _build_mini_app_appointment_booking_preview_from_request(
-    request_body: TelegramMiniAppAppointmentPreviewRequest,
+def _mini_app_patient_appointments(
     db: Session,
-):
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    try:
-        preview = build_telegram_mini_app_appointment_booking_preview(
-            scope,
-            patient_id=request_body.patient_id,
-            appointment_date=request_body.appointment_date,
-            appointment_time=request_body.appointment_time,
-            doctor_id=request_body.doctor_id,
-            department=request_body.department,
-            notes=request_body.notes,
-            services=request_body.services,
+    patient_id: int,
+    *,
+    limit: int = 3,
+) -> list[Appointment]:
+    return (
+        db.query(Appointment)
+        .filter(Appointment.patient_id == patient_id)
+        .order_by(
+            Appointment.appointment_date.desc(),
+            Appointment.created_at.desc(),
+            Appointment.id.desc(),
         )
+        .limit(limit)
+        .all()
+    )
+
+
+def _appointment_department_label(appointment: Appointment) -> str | None:
+    department = getattr(appointment, "department", None)
+    return getattr(department, "name", None)
+
+
+def _mini_app_patient_cabinet_summary_payload(
+    db: Session,
+    scope,
+) -> dict[str, Any]:
+    patient_id = int(scope.patient_id)
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    appointments = _mini_app_patient_appointments(db, patient_id)
+    recent_visits = _patient_recent_visits(db, patient_id)
+    queue_entries = _patient_today_queue_entries(db, patient_id)
+    entries, visits_for_billing, expected_total, paid_total, pending_total, debt_total = (
+        _billing_totals(db, patient_id)
+    )
+    reports = _latest_ready_lab_report_instances(db, patient_id)
+
+    return {
+        "scope": {
+            "type": scope.scope_type,
+            "patient_id": patient_id,
+        },
+        "patient": {
+            "name": _patient_display_name(patient),
+        },
+        "appointments": [
+            {
+                "id": int(appointment.id),
+                "date": _iso_date_value(appointment.appointment_date),
+                "time": appointment.appointment_time,
+                "status": appointment.status,
+                "department": _appointment_department_label(appointment),
+            }
+            for appointment in appointments
+        ],
+        "visits": [
+            {
+                "id": int(visit.id),
+                "date": _iso_date_value(visit.visit_date),
+                "status": visit.status,
+            }
+            for visit in recent_visits
+        ],
+        "queue": [
+            {
+                "number": entry.number,
+                "status": entry.status,
+                "cabinet": getattr(getattr(entry, "queue", None), "cabinet_number", None),
+            }
+            for entry in queue_entries[:5]
+        ],
+        "payments": {
+            "billed": _format_money(expected_total),
+            "paid": _format_money(paid_total),
+            "pending": _format_money(pending_total),
+            "debt": _format_money(debt_total),
+            "linked_visit_count": len(visits_for_billing),
+            "active_queue_count": len(entries),
+        },
+        "reports": [
+            {
+                "id": int(report.id),
+                "name": getattr(getattr(report, "template", None), "name", "Lab report"),
+                "ready_at": _iso_datetime_value(report.finalized_at or report.created_at),
+                "status": report.status,
+            }
+            for report in reports
+        ],
+        "policy": {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "pdf_included": False,
+        },
+    }
+
+
+def _build_mini_app_patient_cabinet_summary_from_request(
+    request_body: TelegramMiniAppPatientCabinetSummaryRequest,
+    db: Session,
+) -> dict[str, Any]:
+    try:
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "cabinet",
+        )
+        if request_body.patient_id is not None:
+            if int(scope.patient_id) != int(request_body.patient_id):
+                raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
     except TelegramMiniAppSessionScopeError as exc:
         raise HTTPException(
-            status_code=_mini_app_booking_scope_status_code(exc.reason),
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    return _mini_app_patient_cabinet_summary_payload(db, scope)
+
+
+def _resolve_mini_app_patient_scope_for_optional_patient(
+    db: Session,
+    init_data_payload: str | None,
+    entry_token: str | None,
+    patient_id: int | None,
+    *,
+    expected_section: str | None = None,
+):
+    scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+        db,
+        init_data_payload=init_data_payload,
+        entry_token=entry_token,
+        expected_section=expected_section,
+    )
+    if patient_id is not None and int(scope.patient_id) != int(patient_id):
+        raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
+    return scope
+
+
+def _build_mini_app_patient_report_download_response(
+    request_body: TelegramMiniAppPatientReportDownloadRequest,
+    db: Session,
+) -> Response:
+    try:
+        scope = _resolve_mini_app_patient_scope_for_optional_patient(
+            db,
+            request_body.init_data,
+            request_body.entry_token,
+            request_body.patient_id,
+            expected_section=request_body.section or "results",
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    report = (
+        db.query(LabReportInstance)
+        .filter(
+            LabReportInstance.id == int(request_body.report_id),
+            LabReportInstance.patient_id == int(scope.patient_id),
+            LabReportInstance.status.in_(LAB_REPORT_READY_STATUSES),
+        )
+        .first()
+    )
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"reason": "report_not_ready_or_not_found"},
+        )
+
+    try:
+        filename, pdf_bytes, _caption = _build_lab_report_pdf(db, report)
+    except Exception as exc:
+        _raise_telegram_webhook_internal_error(
+            "mini_app_patient_report_download",
+            "Protected report could not be generated",
+            exc,
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _build_mini_app_patient_forms_preview_from_request(
+    request_body: TelegramMiniAppPatientFormsPreviewRequest,
+    db: Session,
+):
+    try:
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "forms",
+        )
+        preview = build_telegram_mini_app_patient_forms_preview(
+            db,
+            scope,
+            patient_id=request_body.patient_id,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
 
     return preview
 
 
-@router.post(
-    "/mini-app/patient/manifest",
-    operation_id="telegram_mini_app_patient_manifest",
-)
-def get_mini_app_patient_manifest(
-    request_body: TelegramMiniAppPatientScopeRequest,
-    db: Session = Depends(get_db),
+def _save_mini_app_patient_form_submission_from_request(
+    request_body: TelegramMiniAppPatientFormSubmissionRequest,
+    db: Session,
 ):
-    """Return safe aggregate patient Mini App status for a trusted session."""
+    try:
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "forms",
+        )
+        result = save_telegram_mini_app_patient_form_submission(
+            db,
+            scope,
+            patient_id=request_body.patient_id,
+            form_id=request_body.form_id,
+            answers=request_body.answers,
+            status=request_body.status,
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=_mini_app_forms_scope_status_code(exc.reason),
+            detail={"reason": exc.reason},
+        ) from exc
 
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    return _build_mini_app_patient_manifest_response(scope)
-
-
-@router.post(
-    "/mini-app/forms/manifest",
-    operation_id="telegram_mini_app_patient_forms_manifest",
-)
-def get_mini_app_patient_forms_manifest(
-    request_body: TelegramMiniAppPatientScopeRequest,
-    db: Session = Depends(get_db),
-):
-    """Return safe patient forms status for a trusted Mini App session."""
-
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    return _build_mini_app_patient_forms_manifest_response(scope)
-
-
-@router.post(
-    "/mini-app/cabinet/manifest",
-    operation_id="telegram_mini_app_patient_cabinet_manifest",
-)
-def get_mini_app_patient_cabinet_manifest(
-    request_body: TelegramMiniAppPatientScopeRequest,
-    db: Session = Depends(get_db),
-):
-    """Return safe patient cabinet status for a trusted Mini App session."""
-
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    return _build_mini_app_patient_cabinet_manifest_response(scope)
-
-
-@router.post(
-    "/mini-app/payments/manifest",
-    operation_id="telegram_mini_app_patient_payments_manifest",
-)
-def get_mini_app_patient_payments_manifest(
-    request_body: TelegramMiniAppPatientScopeRequest,
-    db: Session = Depends(get_db),
-):
-    """Return safe patient payment status for a trusted Mini App session."""
-
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    return _build_mini_app_patient_payments_manifest_response(scope)
-
-
-@router.post(
-    "/mini-app/results/manifest",
-    operation_id="telegram_mini_app_patient_results_manifest",
-)
-def get_mini_app_patient_results_manifest(
-    request_body: TelegramMiniAppPatientScopeRequest,
-    db: Session = Depends(get_db),
-):
-    """Return safe patient result/report status for a trusted Mini App session."""
-
-    scope = _resolve_mini_app_patient_scope_from_init_data(
-        request_body.init_data,
-        db,
-    )
-    return _build_mini_app_patient_results_manifest_response(scope)
+    return result
 
 
 @router.post(
@@ -4337,6 +4732,83 @@ def preview_mini_app_appointment_booking(
     """Return a trusted Mini App appointment preview without creating it."""
 
     preview = _build_mini_app_appointment_booking_preview_from_request(
+        request_body,
+        db,
+        allow_entry_token=True,
+    )
+    return preview.to_response_payload()
+
+
+@router.post(
+    "/mini-app/forms/submissions",
+    operation_id="telegram_mini_app_submit_patient_form",
+)
+def submit_mini_app_patient_form(
+    request_body: TelegramMiniAppPatientFormSubmissionRequest,
+    db: Session = Depends(get_db),
+):
+    """Create or update one protected Mini App patient form submission."""
+
+    result = _save_mini_app_patient_form_submission_from_request(
+        request_body,
+        db,
+    )
+    return result.to_response_payload()
+
+
+@router.post(
+    "/mini-app/cabinet/summary",
+    operation_id="telegram_mini_app_patient_cabinet_summary",
+)
+def preview_mini_app_patient_cabinet_summary(
+    request_body: TelegramMiniAppPatientCabinetSummaryRequest,
+    db: Session = Depends(get_db),
+):
+    """Return protected patient cabinet summary without exposing Telegram ids."""
+
+    return _build_mini_app_patient_cabinet_summary_from_request(
+        request_body,
+        db,
+    )
+
+
+@router.post(
+    "/mini-app/reports/download",
+    operation_id="telegram_mini_app_patient_report_download",
+)
+def download_mini_app_patient_report(
+    request_body: TelegramMiniAppPatientReportDownloadRequest,
+    db: Session = Depends(get_db),
+):
+    """Return one protected ready PDF report for the linked Mini App patient."""
+
+    return _build_mini_app_patient_report_download_response(request_body, db)
+
+
+@router.post(
+    "/mini-app/patient/manifest",
+    operation_id="telegram_mini_app_patient_manifest",
+)
+def preview_mini_app_patient_manifest(
+    request_body: TelegramMiniAppPatientManifestRequest,
+    db: Session = Depends(get_db),
+):
+    """Return safe Mini App capability manifest for a linked patient."""
+
+    return _build_mini_app_patient_manifest_from_request(request_body, db)
+
+
+@router.post(
+    "/mini-app/forms/preview",
+    operation_id="telegram_mini_app_preview_patient_forms",
+)
+def preview_mini_app_patient_forms(
+    request_body: TelegramMiniAppPatientFormsPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Return trusted Mini App patient form metadata without storing data."""
+
+    preview = _build_mini_app_patient_forms_preview_from_request(
         request_body,
         db,
     )
@@ -4357,6 +4829,7 @@ def create_mini_app_appointment_booking(
     preview = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
+        allow_entry_token=True,
     )
     draft_payload = preview.draft.to_appointment_create_payload()
 

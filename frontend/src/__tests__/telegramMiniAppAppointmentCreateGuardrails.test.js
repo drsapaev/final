@@ -18,11 +18,12 @@ describe('Telegram Mini App appointment create guardrails', () => {
   it('keeps the create action behind a successful preview and create capability gate', () => {
     const createActionMarkup = sourceBetween(
       appSource,
-      "{appointmentPreview.status === 'ready' && previewAppointment && selectedCapability?.create_enabled && (",
-      "{appointmentCreate.status === 'error' && ("
+      "{appointmentPreview.status === 'ready' && previewAppointment && (",
+      "{selectedSection === 'forms' && formsPreview.status === 'loading' && ("
     );
 
-    expect(createActionMarkup).toContain('onClick={handleAppointmentCreate}');
+    expect(createActionMarkup).toContain('{canCreateAppointments && (');
+    expect(createActionMarkup).toContain('onClick={handleAppointmentCreateSubmit}');
     expect(createActionMarkup).toContain(
       "disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}"
     );
@@ -33,14 +34,17 @@ describe('Telegram Mini App appointment create guardrails', () => {
   it('posts creates through the existing appointment endpoint with the preview request body shape', () => {
     const createHandler = sourceBetween(
       appSource,
-      'const handleAppointmentCreate = () => {',
-      'const previewAppointment = appointmentPreview.payload?.appointment || null;'
+      'const handleAppointmentCreateSubmit = () => {',
+      'const handlePatientFormFieldChange = (formId, field) => (event) => {'
     );
 
+    expect(createHandler).toContain("getTelegramMiniAppAuthPayload(location.search, 'appointments')");
     expect(createHandler).toContain(
-      'const requestBody = buildMiniAppAppointmentRequestBody(initData, appointmentPreviewForm);'
+      'const requestBody = buildMiniAppAppointmentRequestBody(authPayload, appointmentPreviewForm);'
     );
-    expect(createHandler).toContain("api.post('/telegram/mini-app/appointments', requestBody)");
+    expect(createHandler).toContain(
+      "api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)"
+    );
     expect(createHandler).not.toContain('/telegram/mini-app/appointments/preview');
     expect(createHandler).not.toMatch(/payment_provider|provider_payload|providerPayload|transaction|webhook|invoice|amount/i);
   });
@@ -54,7 +58,7 @@ describe('Telegram Mini App appointment create guardrails', () => {
     const previewSubmitHandler = sourceBetween(
       appSource,
       'const handleAppointmentPreviewSubmit = (event) => {',
-      'const handleAppointmentCreate = () => {'
+      'const handleAppointmentCreateSubmit = () => {'
     );
 
     expect(fieldChangeHandler).toContain('setAppointmentCreate({');

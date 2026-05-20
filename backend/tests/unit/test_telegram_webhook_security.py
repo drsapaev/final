@@ -23,6 +23,7 @@ from app.models.payment import Payment
 from app.models.telegram_config import (
     TelegramConfig,
     TelegramMessage,
+    TelegramPatientFormSubmission,
     TelegramStaffLinkToken,
     TelegramUser,
 )
@@ -75,13 +76,23 @@ def _add_mini_app_telegram_config(db_session) -> None:
     db_session.commit()
 
 
-def _link_patient_to_chat(db_session, *, chat_id: int, patient_id: int) -> TelegramUser:
+def _future_mini_app_appointment_date() -> date:
+    return date.today() + timedelta(days=1)
+
+
+def _link_patient_to_chat(
+    db_session,
+    *,
+    chat_id: int,
+    patient_id: int,
+    language_code: str = "ru",
+) -> TelegramUser:
     telegram_user = TelegramUser(
         chat_id=chat_id,
         patient_id=patient_id,
         username="patient_chat",
         first_name="Patient",
-        language_code="ru",
+        language_code=language_code,
         notifications_enabled=True,
         appointment_reminders=True,
         lab_notifications=True,
@@ -92,6 +103,14 @@ def _link_patient_to_chat(db_session, *, chat_id: int, patient_id: int) -> Teleg
     db_session.commit()
     db_session.refresh(telegram_user)
     return telegram_user
+
+
+def _reply_keyboard_texts(reply_markup):
+    return [
+        button["text"]
+        for row in reply_markup.get("keyboard", [])
+        for button in row
+    ]
 
 
 def _create_lab_report_instance(
@@ -294,6 +313,7 @@ class TestTelegramWebhookSecurity:
         chat_id = 880201
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
         initial_appointments = db_session.query(Appointment).count()
+        appointment_date = _future_mini_app_appointment_date()
 
         response = client.post(
             "/api/v1/telegram/mini-app/appointments/preview",
@@ -301,7 +321,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": 12,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
                 "department": "Cardiology",
                 "notes": "Mini App request",
@@ -317,7 +337,7 @@ class TestTelegramWebhookSecurity:
         assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
         assert "appointment_id" not in appointment
         assert appointment["patient_id"] == test_patient.id
-        assert appointment["appointment_date"] == "2026-05-20"
+        assert appointment["appointment_date"] == appointment_date.isoformat()
         assert appointment["appointment_time"] == "09:30"
         assert appointment["status"] == "scheduled"
         assert appointment["payment_type"] == "cash"
@@ -406,649 +426,6 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "bot_token_required"}
         assert db_session.query(Appointment).count() == initial_appointments
 
-    def test_mini_app_patient_manifest_endpoint_returns_aggregate_status(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880228
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-        initial_appointments = db_session.query(Appointment).count()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/patient/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
-        assert payload["status"] == "manifest_only"
-        capabilities = payload["capabilities"]
-        assert set(capabilities) == {
-            "appointments",
-            "forms",
-            "cabinet",
-            "payments",
-            "results",
-        }
-        assert capabilities["appointments"]["preview_enabled"] is True
-        assert capabilities["appointments"]["create_enabled"] is True
-        assert capabilities["appointments"]["contains_medical_data"] is False
-        assert (
-            capabilities["appointments"]["contains_payment_provider_data"] is False
-        )
-        assert capabilities["forms"]["capture_enabled"] is False
-        assert capabilities["forms"]["submission_enabled"] is False
-        assert capabilities["forms"]["contains_medical_data"] is False
-        assert capabilities["forms"]["contains_passport_data"] is False
-        assert capabilities["cabinet"]["read_enabled"] is False
-        assert capabilities["cabinet"]["mutation_enabled"] is False
-        assert capabilities["cabinet"]["contains_medical_data"] is False
-        assert capabilities["cabinet"]["contains_passport_data"] is False
-        assert capabilities["cabinet"]["contains_billing_records"] is False
-        assert capabilities["payments"]["read_enabled"] is False
-        assert capabilities["payments"]["payment_capture_enabled"] is False
-        assert capabilities["payments"]["provider_redirect_enabled"] is False
-        assert capabilities["payments"]["contains_amounts"] is False
-        assert capabilities["payments"]["contains_payment_records"] is False
-        assert capabilities["payments"]["contains_provider_payloads"] is False
-        assert capabilities["results"]["view_enabled"] is False
-        assert capabilities["results"]["download_enabled"] is False
-        assert capabilities["results"]["contains_medical_results"] is False
-        assert capabilities["results"]["contains_lab_values"] is False
-        assert capabilities["results"]["contains_report_records"] is False
-        assert capabilities["results"]["contains_file_urls"] is False
-        assert capabilities["results"]["contains_pdfs"] is False
-        assert capabilities["results"]["contains_diagnoses"] is False
-        for capability in capabilities.values():
-            assert "records" not in capability
-            assert "report_id" not in capability
-            assert "file_url" not in capability
-            assert "pdf_url" not in capability
-            assert "amount" not in capability
-            assert "provider_payload" not in capability
-        assert db_session.query(Appointment).count() == initial_appointments
-
-    def test_mini_app_patient_manifest_endpoint_rejects_forged_init_data(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880229
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/patient/manifest",
-            json={
-                "initData": _signed_mini_app_init_data(chat_id).replace(
-                    "hash=",
-                    "hash=forged",
-                    1,
-                )
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "hash_mismatch"}
-
-    def test_mini_app_patient_manifest_endpoint_rejects_staff_scope(
-        self,
-        client,
-        db_session,
-        admin_user,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880230
-        db_session.add(
-            TelegramUser(
-                chat_id=chat_id,
-                user_id=admin_user.id,
-                language_code="ru",
-                active=True,
-                blocked=False,
-            )
-        )
-        db_session.commit()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/patient/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "patient_scope_required"}
-
-    def test_mini_app_patient_manifest_endpoint_rejects_unlinked_chat(
-        self,
-        client,
-        db_session,
-    ):
-        _add_mini_app_telegram_config(db_session)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/patient/manifest",
-            json={"initData": _signed_mini_app_init_data(880231)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "telegram_link_required"}
-
-    def test_mini_app_patient_manifest_endpoint_requires_configured_bot_token(
-        self,
-        client,
-        db_session,
-    ):
-        response = client.post(
-            "/api/v1/telegram/mini-app/patient/manifest",
-            json={"initData": _signed_mini_app_init_data(880232)},
-        )
-
-        assert response.status_code == 503
-        assert response.json()["detail"] == {"reason": "bot_token_required"}
-
-    def test_mini_app_forms_manifest_endpoint_returns_capture_disabled_status(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880208
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-        initial_appointments = db_session.query(Appointment).count()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/forms/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
-        assert payload["status"] == "manifest_only"
-        assert payload["forms_enabled"] is False
-        assert payload["capture_enabled"] is False
-        assert payload["submission_enabled"] is False
-        assert payload["contains_medical_data"] is False
-        assert payload["contains_passport_data"] is False
-        assert payload["forms"]
-        assert all(form["capture_enabled"] is False for form in payload["forms"])
-        assert all(form["submission_enabled"] is False for form in payload["forms"])
-        assert all(form["contains_medical_data"] is False for form in payload["forms"])
-        assert all(form["contains_passport_data"] is False for form in payload["forms"])
-        assert all("fields" not in form for form in payload["forms"])
-        assert db_session.query(Appointment).count() == initial_appointments
-
-    def test_mini_app_forms_manifest_endpoint_rejects_forged_init_data(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880209
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/forms/manifest",
-            json={
-                "initData": _signed_mini_app_init_data(chat_id).replace(
-                    "hash=",
-                    "hash=forged",
-                    1,
-                )
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "hash_mismatch"}
-
-    def test_mini_app_forms_manifest_endpoint_rejects_staff_scope(
-        self,
-        client,
-        db_session,
-        admin_user,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880210
-        db_session.add(
-            TelegramUser(
-                chat_id=chat_id,
-                user_id=admin_user.id,
-                language_code="ru",
-                active=True,
-                blocked=False,
-            )
-        )
-        db_session.commit()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/forms/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "patient_scope_required"}
-
-    def test_mini_app_forms_manifest_endpoint_rejects_unlinked_chat(
-        self,
-        client,
-        db_session,
-    ):
-        _add_mini_app_telegram_config(db_session)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/forms/manifest",
-            json={"initData": _signed_mini_app_init_data(880211)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "telegram_link_required"}
-
-    def test_mini_app_forms_manifest_endpoint_requires_configured_bot_token(
-        self,
-        client,
-        db_session,
-    ):
-        response = client.post(
-            "/api/v1/telegram/mini-app/forms/manifest",
-            json={"initData": _signed_mini_app_init_data(880212)},
-        )
-
-        assert response.status_code == 503
-        assert response.json()["detail"] == {"reason": "bot_token_required"}
-
-    def test_mini_app_cabinet_manifest_endpoint_returns_disabled_status(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880213
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-        initial_appointments = db_session.query(Appointment).count()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/cabinet/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
-        assert payload["status"] == "manifest_only"
-        assert payload["cabinet_enabled"] is False
-        assert payload["read_enabled"] is False
-        assert payload["mutation_enabled"] is False
-        assert payload["contains_medical_data"] is False
-        assert payload["contains_passport_data"] is False
-        assert payload["contains_billing_records"] is False
-        assert payload["sections"]
-        assert all(section["read_enabled"] is False for section in payload["sections"])
-        assert all(section["write_enabled"] is False for section in payload["sections"])
-        assert all(
-            section["contains_medical_data"] is False for section in payload["sections"]
-        )
-        assert all(
-            section["contains_passport_data"] is False
-            for section in payload["sections"]
-        )
-        assert all(
-            section["contains_billing_records"] is False
-            for section in payload["sections"]
-        )
-        assert all("records" not in section for section in payload["sections"])
-        assert db_session.query(Appointment).count() == initial_appointments
-
-    def test_mini_app_cabinet_manifest_endpoint_rejects_forged_init_data(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880214
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/cabinet/manifest",
-            json={
-                "initData": _signed_mini_app_init_data(chat_id).replace(
-                    "hash=",
-                    "hash=forged",
-                    1,
-                )
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "hash_mismatch"}
-
-    def test_mini_app_cabinet_manifest_endpoint_rejects_staff_scope(
-        self,
-        client,
-        db_session,
-        admin_user,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880215
-        db_session.add(
-            TelegramUser(
-                chat_id=chat_id,
-                user_id=admin_user.id,
-                language_code="ru",
-                active=True,
-                blocked=False,
-            )
-        )
-        db_session.commit()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/cabinet/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "patient_scope_required"}
-
-    def test_mini_app_cabinet_manifest_endpoint_rejects_unlinked_chat(
-        self,
-        client,
-        db_session,
-    ):
-        _add_mini_app_telegram_config(db_session)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/cabinet/manifest",
-            json={"initData": _signed_mini_app_init_data(880216)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "telegram_link_required"}
-
-    def test_mini_app_cabinet_manifest_endpoint_requires_configured_bot_token(
-        self,
-        client,
-        db_session,
-    ):
-        response = client.post(
-            "/api/v1/telegram/mini-app/cabinet/manifest",
-            json={"initData": _signed_mini_app_init_data(880217)},
-        )
-
-        assert response.status_code == 503
-        assert response.json()["detail"] == {"reason": "bot_token_required"}
-
-    def test_mini_app_payments_manifest_endpoint_returns_disabled_status(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880218
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-        initial_appointments = db_session.query(Appointment).count()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/payments/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
-        assert payload["status"] == "manifest_only"
-        assert payload["payments_enabled"] is False
-        assert payload["read_enabled"] is False
-        assert payload["payment_capture_enabled"] is False
-        assert payload["provider_redirect_enabled"] is False
-        assert payload["contains_amounts"] is False
-        assert payload["contains_payment_records"] is False
-        assert payload["contains_provider_payloads"] is False
-        assert payload["sections"]
-        assert all(section["read_enabled"] is False for section in payload["sections"])
-        assert all(
-            section["payment_enabled"] is False for section in payload["sections"]
-        )
-        assert all(
-            section["contains_amounts"] is False for section in payload["sections"]
-        )
-        assert all(
-            section["contains_payment_records"] is False
-            for section in payload["sections"]
-        )
-        assert all(
-            section["contains_provider_payloads"] is False
-            for section in payload["sections"]
-        )
-        assert all("amount" not in section for section in payload["sections"])
-        assert all("records" not in section for section in payload["sections"])
-        assert all("provider_payload" not in section for section in payload["sections"])
-        assert db_session.query(Appointment).count() == initial_appointments
-
-    def test_mini_app_payments_manifest_endpoint_rejects_forged_init_data(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880219
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/payments/manifest",
-            json={
-                "initData": _signed_mini_app_init_data(chat_id).replace(
-                    "hash=",
-                    "hash=forged",
-                    1,
-                )
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "hash_mismatch"}
-
-    def test_mini_app_payments_manifest_endpoint_rejects_staff_scope(
-        self,
-        client,
-        db_session,
-        admin_user,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880220
-        db_session.add(
-            TelegramUser(
-                chat_id=chat_id,
-                user_id=admin_user.id,
-                language_code="ru",
-                active=True,
-                blocked=False,
-            )
-        )
-        db_session.commit()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/payments/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "patient_scope_required"}
-
-    def test_mini_app_payments_manifest_endpoint_rejects_unlinked_chat(
-        self,
-        client,
-        db_session,
-    ):
-        _add_mini_app_telegram_config(db_session)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/payments/manifest",
-            json={"initData": _signed_mini_app_init_data(880221)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "telegram_link_required"}
-
-    def test_mini_app_payments_manifest_endpoint_requires_configured_bot_token(
-        self,
-        client,
-        db_session,
-    ):
-        response = client.post(
-            "/api/v1/telegram/mini-app/payments/manifest",
-            json={"initData": _signed_mini_app_init_data(880222)},
-        )
-
-        assert response.status_code == 503
-        assert response.json()["detail"] == {"reason": "bot_token_required"}
-
-    def test_mini_app_results_manifest_endpoint_returns_disabled_status(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880223
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-        initial_appointments = db_session.query(Appointment).count()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/results/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
-        assert payload["status"] == "manifest_only"
-        assert payload["results_enabled"] is False
-        assert payload["view_enabled"] is False
-        assert payload["download_enabled"] is False
-        assert payload["contains_medical_results"] is False
-        assert payload["contains_lab_values"] is False
-        assert payload["contains_report_records"] is False
-        assert payload["contains_file_urls"] is False
-        assert payload["contains_pdfs"] is False
-        assert payload["contains_diagnoses"] is False
-        assert payload["sections"]
-        assert all(section["view_enabled"] is False for section in payload["sections"])
-        assert all(
-            section["download_enabled"] is False for section in payload["sections"]
-        )
-        assert all(
-            section["contains_medical_results"] is False
-            for section in payload["sections"]
-        )
-        assert all(
-            section["contains_lab_values"] is False
-            for section in payload["sections"]
-        )
-        assert all(
-            section["contains_report_records"] is False
-            for section in payload["sections"]
-        )
-        assert all(
-            section["contains_file_urls"] is False for section in payload["sections"]
-        )
-        assert all(
-            section["contains_diagnoses"] is False for section in payload["sections"]
-        )
-        assert all("records" not in section for section in payload["sections"])
-        assert all("report_id" not in section for section in payload["sections"])
-        assert all("file_url" not in section for section in payload["sections"])
-        assert all("pdf_url" not in section for section in payload["sections"])
-        assert db_session.query(Appointment).count() == initial_appointments
-
-    def test_mini_app_results_manifest_endpoint_rejects_forged_init_data(
-        self,
-        client,
-        db_session,
-        test_patient,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880224
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/results/manifest",
-            json={
-                "initData": _signed_mini_app_init_data(chat_id).replace(
-                    "hash=",
-                    "hash=forged",
-                    1,
-                )
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "hash_mismatch"}
-
-    def test_mini_app_results_manifest_endpoint_rejects_staff_scope(
-        self,
-        client,
-        db_session,
-        admin_user,
-    ):
-        _add_mini_app_telegram_config(db_session)
-        chat_id = 880225
-        db_session.add(
-            TelegramUser(
-                chat_id=chat_id,
-                user_id=admin_user.id,
-                language_code="ru",
-                active=True,
-                blocked=False,
-            )
-        )
-        db_session.commit()
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/results/manifest",
-            json={"initData": _signed_mini_app_init_data(chat_id)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "patient_scope_required"}
-
-    def test_mini_app_results_manifest_endpoint_rejects_unlinked_chat(
-        self,
-        client,
-        db_session,
-    ):
-        _add_mini_app_telegram_config(db_session)
-
-        response = client.post(
-            "/api/v1/telegram/mini-app/results/manifest",
-            json={"initData": _signed_mini_app_init_data(880226)},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == {"reason": "telegram_link_required"}
-
-    def test_mini_app_results_manifest_endpoint_requires_configured_bot_token(
-        self,
-        client,
-        db_session,
-    ):
-        response = client.post(
-            "/api/v1/telegram/mini-app/results/manifest",
-            json={"initData": _signed_mini_app_init_data(880227)},
-        )
-
-        assert response.status_code == 503
-        assert response.json()["detail"] == {"reason": "bot_token_required"}
-
     def test_mini_app_booking_preview_endpoint_maps_invalid_booking_field_to_400(
         self,
         client,
@@ -1073,6 +450,393 @@ class TestTelegramWebhookSecurity:
         assert response.json()["detail"] == {"reason": "appointment_date_in_past"}
         assert db_session.query(Appointment).count() == initial_appointments
 
+    def test_mini_app_patient_forms_preview_endpoint_returns_safe_schema(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880211
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        initial_appointments = db_session.query(Appointment).count()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["preview_only"] is True
+        assert payload["mutation_allowed"] is False
+        assert payload["message_key"] == "telegram_mini_app_patient_forms_preview_ready"
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["policy"] == {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "storage_enabled": True,
+        }
+        assert payload["forms"][0]["id"] == "patient_intake"
+        assert {field["key"] for field in payload["forms"][0]["fields"]} == {
+            "chief_complaint",
+            "allergies",
+            "current_medications",
+            "medical_history",
+            "consent_to_contact",
+        }
+        assert "patient_id" not in payload["forms"][0]
+        assert "submission" not in payload["forms"][0]
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_patient_forms_preview_endpoint_rejects_untrusted_scope(
+        self,
+        client,
+        db_session,
+        test_patient,
+        admin_user,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        patient_chat_id = 880212
+        staff_chat_id = 880213
+        _link_patient_to_chat(db_session, chat_id=patient_chat_id, patient_id=test_patient.id)
+        db_session.add(
+            TelegramUser(
+                chat_id=staff_chat_id,
+                user_id=admin_user.id,
+                language_code="ru",
+                active=True,
+                blocked=False,
+            )
+        )
+        db_session.commit()
+        initial_appointments = db_session.query(Appointment).count()
+
+        forged_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(patient_chat_id).replace(
+                    "hash=",
+                    "hash=forged",
+                    1,
+                ),
+                "patientId": test_patient.id,
+            },
+        )
+        staff_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={"initData": _signed_mini_app_init_data(staff_chat_id)},
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(patient_chat_id),
+                "patientId": test_patient.id + 1,
+            },
+        )
+
+        assert forged_response.status_code == 403
+        assert forged_response.json()["detail"] == {"reason": "hash_mismatch"}
+        assert staff_response.status_code == 403
+        assert staff_response.json()["detail"] == {"reason": "patient_scope_required"}
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {"reason": "patient_scope_mismatch"}
+        assert db_session.query(Appointment).count() == initial_appointments
+
+    def test_mini_app_patient_form_submission_endpoint_creates_and_updates_submission(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880214
+        telegram_user = _link_patient_to_chat(
+            db_session,
+            chat_id=chat_id,
+            patient_id=test_patient.id,
+        )
+
+        create_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "status": "draft",
+                "answers": {
+                    "chief_complaint": "  Headache  ",
+                    "allergies": "None",
+                    "consent_to_contact": True,
+                },
+            },
+        )
+
+        assert create_response.status_code == 200
+        created_payload = create_response.json()
+        assert created_payload["stored"] is True
+        assert created_payload["created"] is True
+        assert created_payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert created_payload["submission"]["form_id"] == "patient_intake"
+        assert created_payload["submission"]["status"] == "draft"
+        assert created_payload["submission"]["answers"] == {
+            "chief_complaint": "Headache",
+            "allergies": "None",
+            "consent_to_contact": True,
+        }
+        assert "telegram_chat_id" not in created_payload["submission"]
+        assert "telegram_user_id" not in created_payload["submission"]
+
+        submission = db_session.query(TelegramPatientFormSubmission).one()
+        assert submission.patient_id == test_patient.id
+        assert submission.telegram_user_id == telegram_user.id
+        assert submission.telegram_chat_id == chat_id
+        assert submission.status == "draft"
+        assert submission.submitted_at is None
+
+        update_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "status": "submitted",
+                "answers": {
+                    "chief_complaint": "Headache improved",
+                    "allergies": "",
+                    "current_medications": "Ibuprofen",
+                    "medical_history": "No chronic conditions",
+                    "consent_to_contact": False,
+                },
+            },
+        )
+
+        assert update_response.status_code == 200
+        updated_payload = update_response.json()
+        assert updated_payload["created"] is False
+        assert updated_payload["submission"]["id"] == created_payload["submission"]["id"]
+        assert updated_payload["submission"]["status"] == "submitted"
+        assert updated_payload["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert updated_payload["submission"]["submitted_at"] is not None
+        assert db_session.query(TelegramPatientFormSubmission).count() == 1
+
+        preview_response = client.post(
+            "/api/v1/telegram/mini-app/forms/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+
+        assert preview_response.status_code == 200
+        hydrated_form = preview_response.json()["forms"][0]
+        assert hydrated_form["id"] == "patient_intake"
+        assert hydrated_form["submission"]["id"] == created_payload["submission"]["id"]
+        assert hydrated_form["submission"]["form_id"] == "patient_intake"
+        assert hydrated_form["submission"]["status"] == "submitted"
+        assert hydrated_form["submission"]["answers"]["chief_complaint"] == "Headache improved"
+        assert hydrated_form["submission"]["submitted_at"] is not None
+        assert "telegram_chat_id" not in hydrated_form["submission"]
+        assert "telegram_user_id" not in hydrated_form["submission"]
+
+    def test_mini_app_patient_form_submission_endpoint_rejects_invalid_answers(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880215
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+
+        unknown_field_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "answers": {"diagnosis": "do not accept"},
+            },
+        )
+        bool_type_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "formId": "patient_intake",
+                "answers": {"consent_to_contact": "yes"},
+            },
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/forms/submissions",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id + 1,
+                "formId": "patient_intake",
+                "answers": {"chief_complaint": "Headache"},
+            },
+        )
+
+        assert unknown_field_response.status_code == 400
+        assert unknown_field_response.json()["detail"] == {
+            "reason": "patient_form_answer_unknown_field"
+        }
+        assert bool_type_response.status_code == 400
+        assert bool_type_response.json()["detail"] == {
+            "reason": "patient_form_answer_type_invalid"
+        }
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {
+            "reason": "patient_scope_mismatch"
+        }
+        assert db_session.query(TelegramPatientFormSubmission).count() == 0
+
+    def test_mini_app_patient_cabinet_summary_endpoint_returns_safe_summary(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880216
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        db_session.add(
+            Appointment(
+                patient_id=test_patient.id,
+                appointment_date=date(2026, 5, 20),
+                appointment_time="10:00",
+                status="scheduled",
+                visit_type="paid",
+                payment_type="cash",
+                payment_currency="UZS",
+            )
+        )
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/cabinet/summary",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+            },
+        )
+        wrong_patient_response = client.post(
+            "/api/v1/telegram/mini-app/cabinet/summary",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id + 1,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
+        assert payload["patient"]["name"] == test_patient.short_name()
+        assert payload["appointments"][0] == {
+            "id": payload["appointments"][0]["id"],
+            "date": "2026-05-20",
+            "time": "10:00",
+            "status": "scheduled",
+            "department": None,
+        }
+        assert payload["payments"]["debt"] == "0"
+        assert payload["policy"] == {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "pdf_included": False,
+        }
+        assert "telegram_chat_id" not in str(payload)
+        assert "telegram_user_id" not in str(payload)
+        assert wrong_patient_response.status_code == 403
+        assert wrong_patient_response.json()["detail"] == {
+            "reason": "patient_scope_mismatch"
+        }
+
+    def test_mini_app_patient_report_download_endpoint_returns_safe_pdf(
+        self,
+        client,
+        db_session,
+        test_patient,
+        monkeypatch,
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880217
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        other_patient = Patient(first_name="Other", last_name="Report")
+        template = LabReportTemplate(
+            code="TG_MINI_APP_REPORT",
+            name="Mini App Report",
+            family="test",
+        )
+        db_session.add_all([other_patient, template])
+        db_session.flush()
+        version = LabReportTemplateVersion(
+            template_id=template.id,
+            version_no=1,
+            status="PUBLISHED",
+            layout_preset="default",
+            page_settings={},
+            branding_overrides={},
+            signer_defaults={},
+        )
+        db_session.add(version)
+        db_session.flush()
+        ready_report = _create_lab_report_instance(
+            db_session,
+            patient_id=test_patient.id,
+            template=template,
+            version=version,
+            status_value="FINALIZED",
+            created_at=datetime.utcnow(),
+        )
+        other_report = _create_lab_report_instance(
+            db_session,
+            patient_id=other_patient.id,
+            template=template,
+            version=version,
+            status_value="FINALIZED",
+            created_at=datetime.utcnow(),
+        )
+        db_session.commit()
+        monkeypatch.setattr(
+            telegram_webhook,
+            "_build_lab_report_pdf",
+            lambda db, instance: (
+                f"report-{instance.id}.pdf",
+                b"%PDF-1.4 mini app",
+                "Ready report",
+            ),
+        )
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/reports/download",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "reportId": ready_report.id,
+            },
+        )
+        other_patient_response = client.post(
+            "/api/v1/telegram/mini-app/reports/download",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "reportId": other_report.id,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content == b"%PDF-1.4 mini app"
+        assert f"report-{ready_report.id}.pdf" in response.headers["content-disposition"]
+        assert other_patient_response.status_code == 404
+        assert other_patient_response.json()["detail"] == {
+            "reason": "report_not_ready_or_not_found"
+        }
+
     def test_mini_app_booking_create_endpoint_creates_safe_appointment(
         self,
         client,
@@ -1084,6 +848,7 @@ class TestTelegramWebhookSecurity:
         chat_id = 880206
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
         initial_appointments = db_session.query(Appointment).count()
+        appointment_date = _future_mini_app_appointment_date()
 
         response = client.post(
             "/api/v1/telegram/mini-app/appointments",
@@ -1091,7 +856,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": test_doctor.id,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
                 "department": "Cardiology",
                 "notes": "Mini App create request",
@@ -1109,7 +874,7 @@ class TestTelegramWebhookSecurity:
         assert created is not None
         assert created.patient_id == test_patient.id
         assert created.doctor_id == test_doctor.id
-        assert created.appointment_date == date(2026, 5, 20)
+        assert created.appointment_date == appointment_date
         assert created.appointment_time == "09:30"
         assert created.status == "scheduled"
         assert created.visit_type == "paid"
@@ -1130,11 +895,12 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         chat_id = 880207
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        appointment_date = _future_mini_app_appointment_date()
         db_session.add(
             Appointment(
                 patient_id=test_patient.id,
                 doctor_id=test_doctor.id,
-                appointment_date=date(2026, 5, 20),
+                appointment_date=appointment_date,
                 appointment_time="09:30",
                 status="scheduled",
                 visit_type="paid",
@@ -1151,7 +917,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": test_doctor.id,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
             },
         )
@@ -1246,6 +1012,64 @@ class TestTelegramWebhookSecurity:
         assert "Programma Clinic-ga" in template["text"]
         assert "Ali" in template["text"]
         assert "Dobro" not in template["text"]
+
+    @pytest.mark.parametrize(
+        "language_code,main_expected,services_expected",
+        [
+            (
+                "ru",
+                [
+                    "📲 Онлайн-сервисы",
+                    "📋 Анкеты пациента",
+                    "🧾 Документы и чеки",
+                    "🧑‍⚕️ Врачи и расписание",
+                    "📲 Кабинет пациента",
+                    "👥 Режим сотрудника",
+                ],
+                [
+                    "📋 Анкеты пациента",
+                    "🧾 Документы и чеки",
+                    "🧑‍⚕️ Врачи и расписание",
+                    "📲 Кабинет пациента",
+                    "👥 Режим сотрудника",
+                    "⬅️ Главное меню",
+                ],
+            ),
+            (
+                "uz-Latn",
+                [
+                    "📲 Onlayn xizmatlar",
+                    "📋 Bemor anketalari",
+                    "🧾 Hujjatlar va cheklar",
+                    "🧑‍⚕️ Shifokorlar jadvali",
+                    "📲 Bemor kabineti",
+                    "👥 Xodim rejimi",
+                ],
+                [
+                    "📋 Bemor anketalari",
+                    "🧾 Hujjatlar va cheklar",
+                    "🧑‍⚕️ Shifokorlar jadvali",
+                    "📲 Bemor kabineti",
+                    "👥 Xodim rejimi",
+                    "⬅️ Asosiy menyu",
+                ],
+            ),
+        ],
+    )
+    def test_patient_visible_reply_menus_expose_service_buttons(
+        self, language_code, main_expected, services_expected
+    ):
+        main_texts = _reply_keyboard_texts(
+            telegram_webhook._localized_main_menu(language_code)
+        )
+        service_texts = _reply_keyboard_texts(
+            telegram_webhook._localized_services_menu(language_code)
+        )
+
+        for expected in main_expected:
+            assert expected in main_texts
+        for expected in services_expected:
+            assert expected in service_texts
 
     @pytest.mark.asyncio
     async def test_uzbek_language_choice_stores_canonical_uz_latn(self, db_session):
@@ -1729,21 +1553,20 @@ class TestTelegramWebhookSecurity:
 
     @pytest.mark.asyncio
     async def test_book_command_returns_localized_safe_booking_entrypoint(
-        self, db_session
+        self, db_session, test_patient, monkeypatch
     ):
-        telegram_user = TelegramUser(
+        _link_patient_to_chat(
+            db_session,
             chat_id=7022,
-            username="patient_chat",
-            first_name="Patient",
+            patient_id=test_patient.id,
             language_code="uz-Latn",
-            notifications_enabled=True,
-            appointment_reminders=True,
-            lab_notifications=True,
-            active=True,
-            blocked=False,
         )
-        db_session.add(telegram_user)
-        db_session.commit()
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "https://clinic.example",
+            raising=False,
+        )
         fake_service = FakeTelegramBotService(active=True)
         update = {
             "update_id": 126,
@@ -1760,11 +1583,23 @@ class TestTelegramWebhookSecurity:
         )
 
         assert handled is True
-        fake_service._send_message.assert_awaited_once_with(
-            7022,
-            telegram_webhook._localized_text("book", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
-        )
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7022
+        assert message == telegram_webhook._localized_text("book", "uz-Latn")
+        assert reply_markup == {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": telegram_webhook._localized_text("booking_entry_button", "uz-Latn"),
+                        "web_app": {
+                            "url": "https://clinic.example" + admin_telegram.PATIENT_BOOKING_ENTRY_ROUTE,
+                        },
+                    }
+                ]
+            ]
+        }
+        assert str(test_patient.id) not in str(reply_markup)
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == 7022)
@@ -1773,51 +1608,48 @@ class TestTelegramWebhookSecurity:
         assert log.template_key == "telegram_patient_book"
 
     @pytest.mark.parametrize(
-        (
-            "command",
-            "text_key",
-            "button_key",
-            "mini_app_section",
-            "template_key",
-            "chat_id",
-        ),
+        "command,text_key,button_key,template_key,section,chat_id,update_id",
         [
             (
                 "/forms",
                 "patient_forms",
                 "patient_forms_entry_button",
-                "forms",
                 "telegram_patient_forms_placeholder",
-                7023,
+                "forms",
+                7050,
+                1270,
             ),
             (
                 "/documents",
                 "patient_documents",
                 "patient_documents_entry_button",
-                "results",
                 "telegram_patient_documents_placeholder",
-                7024,
+                "documents",
+                7051,
+                1271,
             ),
             (
                 "/doctors",
                 "doctor_schedule",
-                "doctor_schedule_entry_button",
-                "appointments",
+                "patient_doctors_entry_button",
                 "telegram_patient_doctor_schedule_placeholder",
-                7025,
+                "doctors",
+                7052,
+                1272,
             ),
             (
                 "/cabinet",
                 "patient_cabinet",
                 "patient_cabinet_entry_button",
-                "cabinet",
                 "telegram_patient_cabinet_placeholder",
-                7026,
+                "cabinet",
+                7053,
+                1273,
             ),
         ],
     )
     @pytest.mark.asyncio
-    async def test_patient_section_commands_return_protected_entry_buttons(
+    async def test_patient_service_commands_return_protected_section_entry_button(
         self,
         db_session,
         test_patient,
@@ -1825,11 +1657,17 @@ class TestTelegramWebhookSecurity:
         command,
         text_key,
         button_key,
-        mini_app_section,
         template_key,
+        section,
         chat_id,
+        update_id,
     ):
-        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        _link_patient_to_chat(
+            db_session,
+            chat_id=chat_id,
+            patient_id=test_patient.id,
+            language_code="uz-Latn",
+        )
         monkeypatch.setattr(
             telegram_webhook.settings,
             "FRONTEND_URL",
@@ -1838,7 +1676,7 @@ class TestTelegramWebhookSecurity:
         )
         fake_service = FakeTelegramBotService(active=True)
         update = {
-            "update_id": 1260 + chat_id,
+            "update_id": update_id,
             "message": {
                 "message_id": 1,
                 "chat": {"id": chat_id},
@@ -1853,26 +1691,104 @@ class TestTelegramWebhookSecurity:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once()
-        sent_chat_id, message, reply_markup = fake_service._send_message.await_args.args
-        assert sent_chat_id == chat_id
-        assert message == telegram_webhook._localized_text(text_key, "ru")
+        reply_chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert reply_chat_id == chat_id
+        assert message == telegram_webhook._localized_text(text_key, "uz-Latn")
         assert reply_markup == {
             "inline_keyboard": [
                 [
                     {
-                        "text": telegram_webhook._localized_text(button_key, "ru"),
+                        "text": telegram_webhook._localized_text(button_key, "uz-Latn"),
                         "web_app": {
                             "url": (
-                                "https://clinic.example/telegram/mini-app/patient"
-                                f"?section={mini_app_section}"
-                            )
+                                "https://clinic.example"
+                                f"{admin_telegram.PATIENT_MINI_APP_ENTRY_ROUTE}?section={section}"
+                            ),
                         },
                     }
                 ]
             ]
         }
         assert str(test_patient.id) not in str(reply_markup)
-        assert "/patient?tab=" not in str(reply_markup)
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == chat_id)
+            .one()
+        )
+        assert log.template_key == template_key
+
+    @pytest.mark.parametrize(
+        "command,text_key,template_key,chat_id,update_id",
+        [
+            ("/forms", "patient_forms", "telegram_patient_forms_placeholder", 7054, 1274),
+            (
+                "/documents",
+                "patient_documents",
+                "telegram_patient_documents_placeholder",
+                7055,
+                1275,
+            ),
+            (
+                "/doctors",
+                "doctor_schedule",
+                "telegram_patient_doctor_schedule_placeholder",
+                7056,
+                1276,
+            ),
+            (
+                "/cabinet",
+                "patient_cabinet",
+                "telegram_patient_cabinet_placeholder",
+                7057,
+                1277,
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_patient_service_commands_without_frontend_falls_back_to_services_menu(
+        self,
+        db_session,
+        test_patient,
+        monkeypatch,
+        command,
+        text_key,
+        template_key,
+        chat_id,
+        update_id,
+    ):
+        _link_patient_to_chat(
+            db_session,
+            chat_id=chat_id,
+            patient_id=test_patient.id,
+            language_code="uz-Latn",
+        )
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "",
+            raising=False,
+        )
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": update_id,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": chat_id},
+                "from": {"id": 111},
+                "text": command,
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once_with(
+            chat_id,
+            telegram_webhook._localized_text(text_key, "uz-Latn"),
+            telegram_webhook._localized_services_menu("uz-Latn"),
+        )
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == chat_id)
@@ -1881,13 +1797,13 @@ class TestTelegramWebhookSecurity:
         assert log.template_key == template_key
 
     @pytest.mark.asyncio
-    async def test_patient_section_command_without_link_keeps_services_menu(
-        self, db_session, monkeypatch
+    async def test_book_command_without_link_or_frontend_falls_back_to_main_menu(
+        self, db_session
     ):
         telegram_user = TelegramUser(
-            chat_id=7027,
-            username="patient_chat",
-            first_name="Patient",
+            chat_id=7030,
+            username="unlinked_patient",
+            first_name="NoLink",
             language_code="uz-Latn",
             notifications_enabled=True,
             appointment_reminders=True,
@@ -1897,20 +1813,14 @@ class TestTelegramWebhookSecurity:
         )
         db_session.add(telegram_user)
         db_session.commit()
-        monkeypatch.setattr(
-            telegram_webhook.settings,
-            "FRONTEND_URL",
-            "https://clinic.example",
-            raising=False,
-        )
         fake_service = FakeTelegramBotService(active=True)
         update = {
-            "update_id": 128,
+            "update_id": 127,
             "message": {
                 "message_id": 1,
-                "chat": {"id": 7027},
+                "chat": {"id": 7030},
                 "from": {"id": 111},
-                "text": "/forms",
+                "text": "/book",
             },
         }
 
@@ -1920,43 +1830,16 @@ class TestTelegramWebhookSecurity:
 
         assert handled is True
         fake_service._send_message.assert_awaited_once_with(
-            7027,
-            telegram_webhook._localized_text("patient_forms", "uz-Latn"),
-            telegram_webhook._localized_services_menu("uz-Latn"),
+            7030,
+            telegram_webhook._localized_text("book", "uz-Latn"),
+            telegram_webhook._localized_main_menu("uz-Latn"),
         )
-
-    @pytest.mark.asyncio
-    async def test_patient_section_command_without_frontend_url_keeps_services_menu(
-        self, db_session, test_patient, monkeypatch
-    ):
-        _link_patient_to_chat(db_session, chat_id=7028, patient_id=test_patient.id)
-        monkeypatch.setattr(
-            telegram_webhook.settings,
-            "FRONTEND_URL",
-            "",
-            raising=False,
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7030)
+            .one()
         )
-        fake_service = FakeTelegramBotService(active=True)
-        update = {
-            "update_id": 129,
-            "message": {
-                "message_id": 1,
-                "chat": {"id": 7028},
-                "from": {"id": 111},
-                "text": "/cabinet",
-            },
-        }
-
-        handled = await telegram_webhook._handle_clinic_bot_update(
-            update, db_session, fake_service
-        )
-
-        assert handled is True
-        fake_service._send_message.assert_awaited_once_with(
-            7028,
-            telegram_webhook._localized_text("patient_cabinet", "ru"),
-            telegram_webhook._localized_services_menu("ru"),
-        )
+        assert log.template_key == "telegram_patient_book"
 
     @pytest.mark.asyncio
     async def test_staff_start_token_links_user_and_writes_audit(
@@ -2653,7 +2536,10 @@ class TestTelegramWebhookSecurity:
                         "text": telegram_webhook._localized_text(
                             "payments_entry_button", "ru"
                         ),
-                        "url": "https://clinic.example/patient/payments",
+                        "web_app": {
+                            "url": "https://clinic.example"
+                            + admin_telegram.PATIENT_PAYMENT_ENTRY_ROUTE,
+                        },
                     }
                 ]
             ]
@@ -2821,6 +2707,66 @@ class TestTelegramWebhookSecurity:
             "application/pdf",
         )
         assert captured["timeout"] == 20
+
+    @pytest.mark.asyncio
+    async def test_telegram_bot_service_blocks_corrupted_send_message(self, monkeypatch):
+        captured = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"ok": True}
+
+        def fake_post(url, json, timeout):
+            captured.append({"url": url, "json": json, "timeout": timeout})
+            return FakeResponse()
+
+        monkeypatch.setattr(telegram_bot.requests, "post", fake_post)
+        service = telegram_bot.TelegramBotService()
+        service.bot_token = "bot-token"
+
+        assert await service._send_message(7006, "???? Mini App") is False
+        assert captured == []
+
+        valid_ru_text = "\u041a\u0430\u0431\u0438\u043d\u0435\u0442 \u043f\u0430\u0446\u0438\u0435\u043d\u0442\u0430"
+        assert telegram_bot.telegram_text_corruption_reason(valid_ru_text) is None
+        assert await service._send_message(7006, valid_ru_text) is True
+        assert len(captured) == 1
+        assert captured[0]["json"]["text"] == valid_ru_text
+
+    @pytest.mark.asyncio
+    async def test_patient_bot_reply_blocks_corrupted_log_text(self, db_session):
+        fake_service = FakeTelegramBotService(active=True)
+
+        sent = await telegram_webhook._send_patient_bot_reply(
+            db_session,
+            fake_service,
+            7007,
+            "???? Mini App",
+            telegram_webhook._localized_main_menu("ru"),
+            "telegram_patient_help",
+        )
+
+        assert sent is False
+        fake_service._send_message.assert_not_awaited()
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7007)
+            .one()
+        )
+        assert log.status == "failed"
+        assert log.message_text == "[blocked_corrupted_text]"
+        assert log.error_message == "blocked_corrupted_text:question_mark_run"
+
+    def test_patient_facing_localized_templates_have_no_corruption_markers(self):
+        for key, values in telegram_webhook.TELEGRAM_LOCALIZED_TEXTS.items():
+            for language, text in values.items():
+                assert telegram_bot.telegram_text_corruption_reason(text) is None, (
+                    key,
+                    language,
+                    telegram_bot.telegram_text_corruption_reason(text),
+                )
 
     @pytest.mark.asyncio
     async def test_telegram_bot_service_registers_patient_commands(self, monkeypatch):
