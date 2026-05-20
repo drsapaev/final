@@ -39,6 +39,35 @@ export const AUTHENTICATED_ROLE_QA_ROUTES = [
   },
 ];
 
+export const AUTHENTICATED_SPECIALTY_QA_ROUTES = [
+  {
+    key: 'doctor-cardiology',
+    role: 'Doctor',
+    path: '/doctor/cardiology',
+    routeId: 'doctor-cardiology',
+    summaryLabel: 'Сводка записей кардиолога',
+  },
+  {
+    key: 'doctor-dermatology',
+    role: 'Doctor',
+    path: '/doctor/dermatology',
+    routeId: 'doctor-dermatology',
+    summaryLabel: 'Сводка записей дерматолога',
+  },
+  {
+    key: 'doctor-dentistry',
+    role: 'Doctor',
+    path: '/doctor/dentistry',
+    routeId: 'doctor-dentistry',
+    summaryLabel: 'Сводка записей стоматолога',
+  },
+];
+
+export const AUTHENTICATED_UI_QA_ROUTES = [
+  ...AUTHENTICATED_ROLE_QA_ROUTES,
+  ...AUTHENTICATED_SPECIALTY_QA_ROUTES,
+];
+
 function base64UrlEncode(value) {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')

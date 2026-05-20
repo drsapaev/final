@@ -8,6 +8,7 @@ This Playwright harness is for local UI/UX audit evidence only. It does not chan
 - Mocks local `/api/v1/*` requests inside Playwright so protected role panels can render without production secrets or a live database.
 - Keeps route access checks active: protected routes must still pass the existing frontend route guard for the seeded role.
 - Captures screenshots for Admin, Registrar, Doctor, Cashier, Lab, and Patient payment entry surfaces.
+- Captures specialty doctor panel screenshots for Cardiology, Dermatology, and Dentistry without production credentials.
 
 ## Command
 
@@ -23,6 +24,9 @@ npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --re
 | Admin | `/admin` | `admin-dashboard` |
 | Registrar | `/registrar` | `registrar-home` |
 | Doctor | `/doctor` | `doctor-home` |
+| Doctor | `/doctor/cardiology` | `doctor-cardiology` |
+| Doctor | `/doctor/dermatology` | `doctor-dermatology` |
+| Doctor | `/doctor/dentistry` | `doctor-dentistry` |
 | Cashier | `/cashier` | `cashier-home` |
 | Lab | `/lab` | `lab-home` |
 | Patient | `/patient/payments` | `patient-payment-entry` |
@@ -35,3 +39,4 @@ npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --re
 - Do not copy the seeded token/profile into production code.
 - Do not weaken `RouteAccessBoundary`, `RoleGate`, or backend RBAC because this harness exists.
 - For business-flow verification, use live QA credentials or dedicated backend fixtures in a separate plan.
+- Keep negative RBAC browser checks in their own focused PR so this smoke harness remains a positive render check.
