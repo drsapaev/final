@@ -158,6 +158,22 @@ const MINI_APP_CAPABILITY_SAFETY_FLAGS = [
   ['contains_diagnoses', 'diagnoses', 'no diagnoses'],
 ];
 
+const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set(['entry_token_invalid', 'entry_token_expired']);
+const MINI_APP_EXPIRED_ENTRY_TOKEN_MESSAGE = 'Ссылка устарела. Откройте Mini App заново из Telegram';
+const MINI_APP_SESSION_UNCONFIRMED_MESSAGE = 'Сессия Mini App не подтверждена';
+const MINI_APP_HANDLED_ERROR_REQUEST_CONFIG = {
+  silent: true,
+  expectedErrorStatuses: [400, 403, 503],
+};
+const MINI_APP_ERROR_ALERT_PROPS = {
+  role: 'alert',
+  'aria-live': 'assertive',
+};
+const MINI_APP_STATUS_ALERT_PROPS = {
+  role: 'status',
+  'aria-live': 'polite',
+};
+
 function getTelegramMiniAppInitData() {
   if (typeof window === 'undefined') {
     return '';
@@ -178,6 +194,42 @@ function getDefaultMiniAppAppointmentDate() {
   const month = String(nextDay.getMonth() + 1).padStart(2, '0');
   const day = String(nextDay.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getMiniAppErrorReason(error) {
+  const detail = error?.response?.data?.detail;
+  if (detail && typeof detail === 'object' && typeof detail.reason === 'string') {
+    return detail.reason;
+  }
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  const reason = error?.response?.data?.reason;
+  return typeof reason === 'string' ? reason : '';
+}
+
+function getMiniAppPatientSessionErrorMessage(error) {
+  const reason = getMiniAppErrorReason(error);
+  if (MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)) {
+    return MINI_APP_EXPIRED_ENTRY_TOKEN_MESSAGE;
+  }
+
+  return MINI_APP_SESSION_UNCONFIRMED_MESSAGE;
+}
+
+function getMiniAppStatusBadge(status) {
+  switch (status) {
+    case 'ready':
+      return { variant: 'success', label: 'Сессия подтверждена' };
+    case 'error':
+      return { variant: 'danger', label: 'Сессия недоступна' };
+    case 'unavailable':
+      return { variant: 'secondary', label: 'Откройте из Telegram' };
+    case 'checking':
+    default:
+      return { variant: 'secondary', label: 'Ожидание сессии' };
+  }
 }
 
 function createMiniAppAppointmentPreviewForm() {
@@ -301,7 +353,7 @@ function TelegramMiniAppPatientShell() {
       };
     }
 
-    api.post('/telegram/mini-app/patient/manifest', { initData })
+    api.post('/telegram/mini-app/patient/manifest', { initData }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setState({
@@ -310,12 +362,12 @@ function TelegramMiniAppPatientShell() {
           error: null,
         });
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
         setState({
           status: 'error',
           manifest: null,
-          error: 'Сессия Mini App не подтверждена',
+          error: getMiniAppPatientSessionErrorMessage(error),
         });
       });
 
@@ -356,7 +408,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/forms/manifest', { initData })
+    api.post('/telegram/mini-app/forms/manifest', { initData }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setFormsManifest({
@@ -412,7 +464,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/cabinet/manifest', { initData })
+    api.post('/telegram/mini-app/cabinet/manifest', { initData }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setCabinetManifest({
@@ -468,7 +520,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/payments/manifest', { initData })
+    api.post('/telegram/mini-app/payments/manifest', { initData }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setPaymentsManifest({
@@ -524,7 +576,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/results/manifest', { initData })
+    api.post('/telegram/mini-app/results/manifest', { initData }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setResultsManifest({
@@ -573,6 +625,7 @@ function TelegramMiniAppPatientShell() {
     selectedSection === 'results' &&
     selectedCapability?.manifest_endpoint
   );
+  const statusBadge = getMiniAppStatusBadge(state.status);
 
   const handleAppointmentPreviewFieldChange = (field) => (event) => {
     setAppointmentPreviewForm((current) => ({
@@ -617,7 +670,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/appointments/preview', requestBody)
+    api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setAppointmentPreview({
           status: 'ready',
@@ -687,26 +740,27 @@ function TelegramMiniAppPatientShell() {
             <h1 style={miniAppTitleStyle}>Mini App пациента</h1>
           </div>
           <Badge
-            variant={state.status === 'ready' ? 'success' : 'secondary'}
+            variant={statusBadge.variant}
             size="large"
             style={miniAppStatusBadgeStyle}
+            aria-live={state.status === 'error' ? 'assertive' : 'polite'}
           >
-            {state.status === 'ready' ? 'Сессия подтверждена' : 'Ожидание сессии'}
+            {statusBadge.label}
           </Badge>
         </section>
 
         {state.status === 'checking' && (
-          <Alert severity="info" style={miniAppNoticeStyle}>Загрузка статуса...</Alert>
+          <Alert severity="info" style={miniAppNoticeStyle} {...MINI_APP_STATUS_ALERT_PROPS}>Загрузка статуса...</Alert>
         )}
 
         {state.status === 'unavailable' && (
-          <Alert severity="info" style={miniAppNoticeStyle}>
+          <Alert severity="info" style={miniAppNoticeStyle} {...MINI_APP_STATUS_ALERT_PROPS}>
             Сессия Telegram недоступна. Данные пациента не загружаются.
           </Alert>
         )}
 
         {state.status === 'error' && (
-          <Alert severity="error" style={miniAppNoticeStyle}>
+          <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
             {state.error}
           </Alert>
         )}
@@ -764,7 +818,7 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {cabinetManifest.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {cabinetManifest.error}
                     </Alert>
                   )}
@@ -834,7 +888,7 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {paymentsManifest.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {paymentsManifest.error}
                     </Alert>
                   )}
@@ -916,7 +970,7 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {resultsManifest.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {resultsManifest.error}
                     </Alert>
                   )}
@@ -995,7 +1049,7 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {formsManifest.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {formsManifest.error}
                     </Alert>
                   )}
@@ -1113,7 +1167,7 @@ function TelegramMiniAppPatientShell() {
                   </form>
 
                   {appointmentPreview.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {appointmentPreview.error}
                     </Alert>
                   )}
@@ -1157,7 +1211,7 @@ function TelegramMiniAppPatientShell() {
                   )}
 
                   {appointmentCreate.status === 'error' && (
-                    <Alert severity="error" style={miniAppNoticeStyle}>
+                    <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
                       {appointmentCreate.error}
                     </Alert>
                   )}
@@ -1436,6 +1490,7 @@ const miniAppHeroStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
+  flexWrap: 'wrap',
   gap: '16px',
   padding: '8px 0 18px',
 };
@@ -1458,6 +1513,9 @@ const miniAppTitleStyle = {
 const miniAppStatusBadgeStyle = {
   flexShrink: 0,
   fontWeight: 700,
+  maxWidth: '100%',
+  whiteSpace: 'normal',
+  textAlign: 'center',
 };
 
 const miniAppNoticeStyle = {
