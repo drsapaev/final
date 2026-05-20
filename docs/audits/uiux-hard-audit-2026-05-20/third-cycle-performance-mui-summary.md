@@ -136,3 +136,28 @@ Runtime performance PRs used:
 
 The third cycle is complete. Remaining MUI debt is no longer ambiguous: it is
 classified, policy-covered, and guarded for future small PRs.
+
+## Post-Cycle Continuation Note
+
+Later small PRs reduced the current MUI inventory from the historical third
+cycle count of 14 files to 9 files:
+
+- stale `frontend/src/components/dashboard/Dashboard.jsx` removal;
+- gated `frontend/src/components/admin/UserManagement.jsx` actions menu
+  migration;
+- `frontend/src/components/examples/UnifiedButton.tsx` and
+  `frontend/src/components/examples/UnifiedCard.tsx` conversion to
+  macOS/native examples;
+- gated `frontend/src/pages/PaymentTest.jsx` internal demo migration.
+
+Current remaining MUI files:
+
+- `frontend/src/components/payment/PaymentWidget.jsx`
+- `frontend/src/components/queue/OnlineQueueManager.jsx`
+- `frontend/src/components/patient/FamilyRelationsCard.jsx`
+- `frontend/src/components/laboratory/LabReportGenerator.jsx`
+- `frontend/src/components/cardiology/ECGViewer.jsx`
+- `frontend/src/components/dental/TreatmentPlanner.jsx`
+- `frontend/src/components/dental/ToothModal.jsx`
+- `frontend/src/components/TelegramManager.jsx`
+- `frontend/src/components/ai/MCPMonitor.jsx`
