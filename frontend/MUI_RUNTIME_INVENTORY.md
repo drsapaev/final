@@ -100,6 +100,11 @@ webhook/polling display, staff link safety text, payment/appointment safety
 summary display, API calls, request payloads, token visibility rules, route
 behavior, and RBAC behavior remain unchanged.
 
+MUI package cleanup: `@mui/material`, `@mui/icons-material`, the stale
+`vite.config.js` MUI optimizeDeps entry, and the unused legacy MUI theme
+TypeScript cluster under `frontend/src/theme` were removed after full source
+import audit found no remaining app/runtime/test imports.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -114,7 +119,7 @@ Default rule:
   - why the canonical macOS primitive cannot safely cover the need;
   - the intended follow-up or migration/retirement path;
   - validation that no route, RBAC, payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
-- MUI removal must be staged one file or one component family at a time. Runtime imports have reached `0`; dependency removal still needs its own package-audit PR.
+- MUI removal must be staged one file or one component family at a time. Runtime imports have reached `0`, and package removal is complete; any new MUI dependency/import requires a fresh approval and rollback note.
 
 Review command for future PRs:
 
@@ -126,7 +131,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 
 - Canonical app UI layer remains `frontend/src/components/ui/macos` per `frontend/DESIGN_SYSTEM.md`.
 - Do not add new MUI usage in clinic app pages or workflow panels.
-- Do not remove MUI dependencies without a separate package-audit PR proving no runtime/test/tool import still needs them.
+- Do not reintroduce MUI dependencies without a separate package-audit PR proving the canonical macOS UI layer cannot cover the need.
 - Migrate only one low-risk runtime file per slice unless a later gate or handoff explicitly approves broader work.
 - Leave dental, cardiology, lab, queue, payment, Telegram, AI, and EMR-adjacent files untouched until a dedicated gate/handoff reviews domain behavior.
 

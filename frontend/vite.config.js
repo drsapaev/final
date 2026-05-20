@@ -48,10 +48,6 @@ export default defineConfig({
     // Source maps только для development
     sourcemap: process.env.NODE_ENV === 'development'
   },
-  optimizeDeps: {
-    // Only include packages that are in frontend/package.json dependencies
-    include: ['@mui/material']
-  },
   // PWA настройки
   define: {
     // Переменные окружения для PWA
