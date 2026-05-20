@@ -69,6 +69,36 @@ function getDirectorySize(dirPath) {
   return totalSize;
 }
 
+function sourceFilesContain(dirPath, matcher) {
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+
+      if (entry.isDirectory()) {
+        if (sourceFilesContain(fullPath, matcher)) {
+          return true;
+        }
+        continue;
+      }
+
+      if (!/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
+        continue;
+      }
+
+      const content = fs.readFileSync(fullPath, 'utf8');
+      if (matcher(content)) {
+        return true;
+      }
+    }
+  } catch (error) {
+    console.warn(`Не удалось просканировать ${dirPath}: ${error.message}`);
+  }
+
+  return false;
+}
+
 // Анализ текущего состояния
 function analyzeCurrentBundle() {
   console.log('📊 Анализ текущего бандла:\n');
@@ -131,11 +161,13 @@ function analyzeDependencies() {
     
     // Крупные зависимости
     const largeDependencies = [
-      '@mui/material',
-      '@mui/icons-material', 
       'react',
       'react-dom',
-      'react-router-dom'
+      'react-router-dom',
+      'recharts',
+      'chart.js',
+      'jspdf',
+      'heic2any'
     ];
     
     console.log('\n📊 Крупные зависимости:');
@@ -167,16 +199,25 @@ function generateOptimizationRecommendations() {
       title: 'Tree Shaking',
       description: 'Импортируйте только нужные компоненты из библиотек',
       check: () => {
-        // Проверяем импорты Material-UI
-        const files = ['src/App.jsx', 'src/components/layout/Header.jsx'];
-        return files.some(file => {
-          const filePath = path.join(projectRoot, file);
-          if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return content.includes("import { ") && content.includes("} from '@mui/material'");
-          }
-          return false;
-        });
+        // Проверяем, что удалённые heavy UI packages не вернулись в runtime deps.
+        const removedHeavyUiDeps = ['@mui/material', '@mui/icons-material'];
+        const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+        const dependencies = Object.keys(packageJson.dependencies || {});
+        const devDependencies = Object.keys(packageJson.devDependencies || {});
+        return removedHeavyUiDeps.every(dep => !dependencies.includes(dep) && !devDependencies.includes(dep));
+      },
+      priority: 'Средний'
+    },
+    {
+      title: 'Named Library Imports',
+      description: 'Проверяйте named imports для библиотек, которые поддерживают tree shaking',
+      check: () => {
+        return sourceFilesContain(path.join(projectRoot, 'src'), content =>
+          content.includes("import { ") && (
+            content.includes("} from 'lucide-react'") ||
+            content.includes('} from "lucide-react"')
+          )
+        );
       },
       priority: 'Средний'
     },
