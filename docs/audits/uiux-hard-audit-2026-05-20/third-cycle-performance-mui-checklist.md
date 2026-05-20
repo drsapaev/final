@@ -35,11 +35,11 @@ These PRs are already merged before this third-cycle checklist:
 - [x] PR-PERF-7 / #952: lazy-load admin queue profiles view.
 - [x] PR-PERF-8 / #953: lazy-load admin service catalog view.
 
-Current local build evidence after PR #953:
+Current local build evidence after PR #953 and PR-PERF-9 refresh:
 
 | Asset | Approx size |
 | --- | ---: |
-| `index-*` | `1385.75 KiB` |
+| `index-*` | `1395.09 KiB` |
 | `heic2any-*` | `1320.46 KiB` |
 | `AdminPanel-*` | `1021.80 KiB` |
 | `AnalyticsPage-*` | `245.86 KiB` |
@@ -49,8 +49,8 @@ Current local build evidence after PR #953:
 
 ## Third-Cycle Backlog
 
-- [ ] PR-3-0: add this third-cycle performance/MUI debt checklist.
-- [ ] PR-PERF-9: update Vite performance warning docs with post-PR #953
+- [x] PR-3-0: add this third-cycle performance/MUI debt checklist.
+- [x] PR-PERF-9: update Vite performance warning docs with post-PR #953
   baseline and resolved warnings.
 - [ ] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
   into a lazy boundary.
