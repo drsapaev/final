@@ -18,16 +18,9 @@ import { Alert, Badge, Card, CardContent, Sidebar } from './components/ui/macos'
 import HeaderNew from './components/layout/HeaderNew.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
-import ButtonShowcase from './components/buttons/ButtonShowcase.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
 import Setup from './pages/Setup.jsx';
 import { useSetupStatus } from './hooks/useSetupStatus.js';
-import TelegramManager from './components/TelegramManager.jsx';
-import EmailSMSManager from './components/notifications/EmailSMSManager.jsx';
-import TwoFactorManager from './components/security/TwoFactorManager.jsx';
-import FileManager from './components/files/FileManager.jsx';
-import UserManagement from './components/admin/UserManagement.jsx';
-import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
 import { api } from './api/client.js';
 import auth from './stores/auth.js';
 import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
@@ -68,6 +61,13 @@ const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
+const ButtonShowcase = lazy(() => import('./components/buttons/ButtonShowcase.jsx'));
+const TelegramManager = lazy(() => import('./components/TelegramManager.jsx'));
+const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
+const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
+const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
+const UserManagement = lazy(() => import('./components/admin/UserManagement.jsx'));
+const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo.jsx'));
 
 const ROUTE_COMPONENTS = {
   Landing,
