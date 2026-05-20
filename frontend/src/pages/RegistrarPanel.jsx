@@ -20,6 +20,61 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 
 const API_BASE = getApiOrigin();
 const APPOINTMENT_OVERRIDE_TTL_MS = 10 * 60 * 1000;
+const REGISTRAR_TAB_LABEL_KEYS = {
+  appointments: 'tabs_appointments',
+  cardio: 'tabs_cardio',
+  echokg: 'tabs_echokg',
+  derma: 'tabs_derma',
+  dental: 'tabs_dental',
+  lab: 'tabs_lab',
+  procedures: 'tabs_procedures'
+};
+const REGISTRAR_STATUS_LABEL_KEYS = {
+  scheduled: 'status_scheduled',
+  confirmed: 'status_confirmed',
+  queued: 'status_queued',
+  in_cabinet: 'status_in_cabinet',
+  done: 'status_done',
+  cancelled: 'status_cancelled',
+  no_show: 'status_no_show',
+  paid_pending: 'status_paid_pending',
+  paid: 'status_paid'
+};
+const registrarWorkflowHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 'var(--mac-spacing-4)',
+  flexWrap: 'wrap',
+  padding: 'var(--mac-spacing-4)',
+  marginBottom: 'var(--mac-spacing-4)',
+  background: 'var(--mac-bg-primary)',
+  border: '1px solid var(--mac-separator)',
+  borderRadius: 'var(--mac-radius-lg)',
+  boxShadow: 'var(--mac-shadow-xs)',
+  minWidth: 0
+};
+const registrarWorkflowTitleStyle = {
+  margin: 0,
+  color: 'var(--mac-text-primary)',
+  fontSize: 'var(--mac-font-size-xl)',
+  fontWeight: 'var(--mac-font-weight-semibold)',
+  lineHeight: 1.25
+};
+const registrarWorkflowMetaStyle = {
+  margin: 'var(--mac-spacing-1) 0 0',
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-sm)',
+  lineHeight: 1.5
+};
+const registrarWorkflowActionsStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 'var(--mac-spacing-2)',
+  flexWrap: 'wrap',
+  minWidth: 0
+};
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -739,6 +794,8 @@ const RegistrarPanel = () => {
       status_scheduled: 'Rejalashtirilgan', status_confirmed: 'Tasdiqlangan', status_queued: 'Navbatda', status_in_cabinet: 'Kabinetda', status_done: 'Tugallangan', status_cancelled: 'Bekor qilingan', status_no_show: 'Kelmagan', status_paid_pending: 'To\'lovni kutmoqda', status_paid: 'To\'langan', // Статистика
       total_patients: 'Jami bemorlar', today_appointments: 'Bugungi yozuvlar', pending_payments: 'To\'lovni kutmoqda', active_queues: 'Faol navbatlar', empty_table: 'Ma\'lumot yo\'q', // Сообщения
       appointment_created: 'Yozuv muvaffaqiyatli yaratildi', appointment_cancelled: 'Yozuv bekor qilindi', payment_successful: 'To\'lov muvaffaqiyatli o\'tdi', print_ticket: 'Talon chop etish', auto_refresh: 'Avtomatik yangilash', data_source_demo: 'Demo ma\'lumotlar ko\'rsatilgan', data_source_api: 'Ma\'lumotlar serverdan yuklandi' } };const t = (key) => translations[language] && translations[language][key] || translations.ru[key] || key; // Используем централизованную тему
+  const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
+  const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
   const { theme, isDark, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   const cardBg = isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)';
@@ -3514,6 +3571,65 @@ const RegistrarPanel = () => {
             ...tableContentStyle,
             padding: isMobile ? '0.5rem' : '1rem'
           }}>
+
+              <div
+                style={registrarWorkflowHeaderStyle}
+                aria-label="Сводка рабочего списка регистратуры">
+                <div style={{ minWidth: 0, flex: '1 1 280px' }}>
+                  <div style={{
+                    color: 'var(--mac-text-secondary)',
+                    fontSize: 'var(--mac-font-size-xs)',
+                    fontWeight: 'var(--mac-font-weight-semibold)',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    marginBottom: 'var(--mac-spacing-1)'
+                  }}>
+                    Регистратура
+                  </div>
+                  <h2 style={registrarWorkflowTitleStyle}>
+                    Рабочий список: {currentWorklistLabel}
+                  </h2>
+                  <p style={registrarWorkflowMetaStyle}>
+                    {showCalendar ?
+                    new Date(historyDate).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }) :
+                    t('today')} · {filteredAppointments.length} {t('tabs_appointments')}
+                  </p>
+                </div>
+
+                <div style={registrarWorkflowActionsStyle}>
+                  {statusFilterLabel &&
+                  <Badge variant="warning" style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 'var(--mac-spacing-1)'
+                  }}>
+                      <Icon name="magnifyingglass" size="small" />
+                      Фильтр: {statusFilterLabel}
+                    </Badge>
+                  }
+                  <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>
+                    {appointmentsLoading ? t('loading') : `${filteredAppointments.length} ${t('tabs_appointments')}`}
+                  </Badge>
+                  <Button
+                  variant="primary"
+                  size="default"
+                  onClick={() => {
+                    setWizardEditMode(false);
+                    setWizardInitialData(null);
+                    setShowWizard(true);
+                  }}
+                  aria-label="Создать новую запись из рабочего списка регистратора"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 'var(--mac-spacing-2)',
+                    flexShrink: 0
+                  }}>
+                    <Icon name="plus" size="small" style={{ color: 'white' }} />
+                    {t('new_appointment')}
+                  </Button>
+                </div>
+              </div>
 
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 &&
