@@ -29,6 +29,10 @@ Dashboard stale component removal: 13 files now contain runtime or example MUI
 imports after deleting the caller-free `frontend/src/components/dashboard`
 barrel and component.
 
+UserManagement actions menu migration: 12 files now contain runtime or example
+MUI imports after replacing the admin user actions menu with macOS/native
+controls in `frontend/src/components/admin/UserManagement.jsx`.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -65,7 +69,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | --- | --- | --- | --- |
 | `frontend/src/components/pwa/ConnectionStatus.jsx` | Low-risk | PWA online/offline/sync status UI; no backend contract ownership. | Migrated in Task 36; no current `@mui` import. |
 | `frontend/src/components/pwa/PWAInstallPrompt.jsx` | Low-risk | PWA install/update/notification prompt UI. | Migrated in Task 37; no current `@mui` import. |
-| `frontend/src/components/admin/UserManagement.jsx` | Shared/admin-sensitive | Legacy actions menu imports MUI. Admin user workflow is role-sensitive. | Do not touch until dedicated admin slice. |
+| `frontend/src/components/admin/UserManagement.jsx` | Migrated/admin-sensitive | Admin user actions menu now uses macOS/native controls with no current `@mui` import. Admin user workflow remains role-sensitive. | Migrated in dedicated gated admin slice; keep future changes scoped to user lifecycle behavior. |
 | `frontend/src/components/dashboard/Dashboard.jsx` | Stale/removed | No active route owner or caller found. | Removed after route-owner discovery. |
 | `frontend/src/components/payment/PaymentWidget.jsx` | Payment/queue-adjacent | Payment flow behavior and error handling are payment-sensitive. | Gate/handoff only. |
 | `frontend/src/pages/PaymentTest.jsx` | Payment/queue-adjacent | Internal payment demo/test surface. | Gate/handoff only; do not alter payment semantics. |
@@ -116,6 +120,8 @@ $files.Count
 
 Result after stale dashboard removal: 13 files.
 
+Result after UserManagement actions menu migration: 12 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -128,6 +134,10 @@ handoff:
 - Lab/cardiology/dental/patient: preserve clinical meaning, report generation, ECG/dental status, and patient relationship visibility.
 - Telegram/AI/MCP: preserve integration status, security copy, and operational diagnostics.
 - Examples: decide whether example-only files stay as MUI design-system references before counting them as runtime cleanup.
+
+The dedicated admin actions menu migration has now removed `UserManagement.jsx`
+from the current MUI search result. Remaining runtime MUI targets are payment,
+queue, clinical, Telegram/AI, and example-only files.
 
 Next safe MUI migration should be a dedicated PR with one first-touch file,
 route/browser smoke, and a PR body that explicitly proves no role, route,
