@@ -190,15 +190,27 @@ local performance analyzer with the current Vite app:
 | Archive legacy MUI guidance docs | #1006 | Merged |
 | Fix performance analyzer lazy/Vite checks | #1007 | Merged |
 | Align bundle visualizer guidance with Vite/Rollup | #1008 | Merged |
+| Summarize package/tooling cleanup tail | #1009 | Merged |
+| Add optional Vite/Rollup bundle visualizer | #1019 | Merged |
+| Remove stale root MUI dependency | #1023 | Merged |
+| Remove stale root Vite MUI config | #1025 | Merged |
+| Remove stale root toast dependency | #1026 | Merged |
 
 Current package/runtime proof:
 
 - no `@mui/*` runtime packages remain in `frontend/package.json` or
   `frontend/package-lock.json`;
+- no stale `@mui/material` direct dependency remains in the root
+  `package.json` or `package-lock.json`;
+- no stale MUI manual chunk or `optimizeDeps` entry remains in the root
+  `vite.config.js`;
 - no `@mui|Mui` runtime matches remain in `frontend/src/pages` or
   `frontend/src/components`;
 - stale generated MUI class compatibility rules were removed from
   `frontend/src/styles/global-fixes.css`;
+- root `react-hot-toast` was removed as unused dependency metadata; the
+  frontend-owned `react-hot-toast` dependency remains in `frontend/package.json`
+  for runtime UI ownership;
 - `npm run analyze` reports `Lazy Loading компонентов` and
   `Vite оптимизация` as passing;
 - `npm run build:visualize` produces the optional Vite/Rollup visualizer at
