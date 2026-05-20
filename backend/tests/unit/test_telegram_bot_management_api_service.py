@@ -317,7 +317,7 @@ class TestTelegramBotManagementApiService:
         assert status["audit"]["staff_command_events_ready"] is True
         assert status["audit"]["read_only_menu_events_ready"] is True
         assert status["audit"]["confirmation_request_events_ready"] is True
-        assert status["audit"]["state_change_events_ready"] is False
+        assert status["audit"]["state_change_events_ready"] is True
         assert status["role_menus"]["read_only"] is True
         assert status["role_menus"]["runtime_enabled"] is True
         assert status["role_menus"]["state_changing_actions_enabled"] is False
@@ -422,6 +422,9 @@ class TestTelegramBotManagementApiService:
         assert set(adapters_by_operation) == {
             "queue_call_or_skip_patient",
             "visit_cancel_or_move",
+            "payment_status_change",
+            "refund_issue",
+            "doctor_schedule_change",
         }
         queue_adapter = adapters_by_operation["queue_call_or_skip_patient"]
         assert queue_adapter["adapter_key"] == "staff_queue_call_or_skip_adapter"
@@ -446,21 +449,59 @@ class TestTelegramBotManagementApiService:
             "/move_visit",
         ]
         assert visit_adapter["runtime_enabled"] is True
-        assert visit_adapter["runtime_scope"] == "queue_link_status_only"
-        assert visit_adapter["runtime_owner"] == "QueueBusinessService"
+        assert visit_adapter["runtime_scope"] == "visit_record_and_queue_link_status"
+        assert visit_adapter["runtime_owner"] == "TelegramStaffActionAdapterService"
         assert visit_adapter["runtime_methods"] == [
+            "staff_cancel_visit",
+            "staff_move_visit",
+        ]
+        assert visit_adapter["queue_link_runtime_owner"] == "QueueBusinessService"
+        assert visit_adapter["queue_link_runtime_methods"] == [
             "staff_cancel_visit_queue_link",
             "staff_move_visit_queue_link",
         ]
-        assert visit_adapter["visit_record_mutation_enabled"] is False
+        assert visit_adapter["visit_record_mutation_enabled"] is True
         assert "queue_fairness_not_reordered" in visit_adapter[
             "required_runtime_checks"
         ]
         assert "queue_time_not_rewritten" in visit_adapter[
             "required_runtime_checks"
         ]
-        assert "visit_record_mutation_adapter" in visit_adapter["blocked_by"]
+        assert "visit_record_mutation_adapter" not in visit_adapter["blocked_by"]
         assert "explicit_action_enablement" in visit_adapter["blocked_by"]
+        payment_adapter = adapters_by_operation["payment_status_change"]
+        assert payment_adapter["adapter_key"] == "staff_payment_status_change_adapter"
+        assert payment_adapter["domain"] == "payment"
+        assert payment_adapter["telegram_commands"] == ["/payment_status"]
+        assert payment_adapter["runtime_enabled"] is True
+        assert payment_adapter["runtime_owner"] == "TelegramStaffActionAdapterService"
+        assert payment_adapter["runtime_methods"] == ["staff_change_payment_status"]
+        assert "payment_status_transition_validated_by_billing_service" in payment_adapter[
+            "required_runtime_checks"
+        ]
+        assert "explicit_action_enablement" in payment_adapter["blocked_by"]
+        refund_adapter = adapters_by_operation["refund_issue"]
+        assert refund_adapter["adapter_key"] == "staff_payment_refund_adapter"
+        assert refund_adapter["domain"] == "payment"
+        assert refund_adapter["telegram_commands"] == ["/refund"]
+        assert refund_adapter["runtime_enabled"] is True
+        assert refund_adapter["runtime_owner"] == "TelegramStaffActionAdapterService"
+        assert refund_adapter["runtime_methods"] == ["staff_refund_payment"]
+        assert "refund_amount_within_available_balance" in refund_adapter[
+            "required_runtime_checks"
+        ]
+        assert "explicit_action_enablement" in refund_adapter["blocked_by"]
+        schedule_adapter = adapters_by_operation["doctor_schedule_change"]
+        assert schedule_adapter["adapter_key"] == "staff_schedule_change_adapter"
+        assert schedule_adapter["domain"] == "schedule"
+        assert schedule_adapter["telegram_commands"] == ["/change_schedule"]
+        assert schedule_adapter["runtime_enabled"] is True
+        assert schedule_adapter["runtime_owner"] == "TelegramStaffActionAdapterService"
+        assert schedule_adapter["runtime_methods"] == ["staff_change_doctor_schedule"]
+        assert "schedule_time_range_validated" in schedule_adapter[
+            "required_runtime_checks"
+        ]
+        assert "explicit_action_enablement" in schedule_adapter["blocked_by"]
         assert status["linking_contract"]["enabled"] is True
         assert (
             status["linking_runtime_contract"]["runtime_handler"]
@@ -538,7 +579,7 @@ class TestTelegramBotManagementApiService:
             status["confirmation_contract"]["runtime_blocked_by"][0]
             == "domain_service_action_adapters"
         )
-        assert status["confirmations"]["domain_adapter_runtime_enabled"] is False
+        assert status["confirmations"]["domain_adapter_runtime_enabled"] is True
         assert status["confirmations"]["queue_action_adapter_runtime_enabled"] is True
         assert (
             status["confirmations"]["visit_queue_link_adapter_runtime_enabled"]
