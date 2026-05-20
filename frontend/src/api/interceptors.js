@@ -6,6 +6,7 @@ import { api } from './client';
 import { tokenManager } from '../utils/tokenManager';
 import { clearToken as clearAuthState } from '../stores/auth.js';
 import logger from '../utils/logger';
+import { handleError } from '../utils/errorHandler';
 
 export function isExpectedApiErrorStatus(originalRequest, status) {
   if (!originalRequest || typeof status !== 'number') {
@@ -109,9 +110,6 @@ export function setupInterceptors() {
         });
         return Promise.reject(error);
       }
-
-      // Импортируем обработчик ошибок
-      const { handleError } = await import('../utils/errorHandler');
 
       // Обрабатываем ошибку централизованно
       void handleError(error, {
