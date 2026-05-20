@@ -4308,6 +4308,14 @@ def _mini_app_patient_manifest_payload(
     auth_source: str,
 ) -> dict[str, Any]:
     patient = db.query(Patient).filter(Patient.id == int(scope.patient_id)).first()
+    telegram_user = (
+        db.query(TelegramUser)
+        .filter(TelegramUser.id == int(scope.telegram_user_id))
+        .first()
+    )
+    language_code = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
     return {
         "scope": {
             "type": scope.scope_type,
@@ -4315,6 +4323,12 @@ def _mini_app_patient_manifest_payload(
         "auth": {
             "source": auth_source,
             "entry_token_fallback": auth_source == "entry_token",
+        },
+        "language": {
+            "code": language_code,
+            "label": "O'zbekcha"
+            if language_code == TELEGRAM_LANGUAGE_UZ
+            else "Русский",
         },
         "patient": {
             "linked": True,

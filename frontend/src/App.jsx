@@ -124,12 +124,176 @@ function LoadingScreen() {
   );
 }
 
-const MINI_APP_CAPABILITY_LABELS = {
-  appointments: 'Запись',
-  forms: 'Анкеты',
-  cabinet: 'Кабинет',
-  payments: 'Оплаты',
-  results: 'Результаты',
+const MINI_APP_LANGUAGE_RU = 'ru';
+const MINI_APP_LANGUAGE_UZ = 'uz-Latn';
+
+const MINI_APP_I18N = {
+  [MINI_APP_LANGUAGE_RU]: {
+    title: 'Mini App пациента',
+    sessionReady: 'Сессия подтверждена',
+    sessionWaiting: 'Ожидание сессии',
+    statusLoading: 'Загрузка статуса...',
+    sessionUnavailable: 'Сессия Telegram недоступна. Данные пациента не загружаются.',
+    openSection: 'Открытый раздел',
+    available: 'Доступно',
+    statusOnly: 'Только статус',
+    patient: 'Пациент',
+    patientFallback: 'Пациент',
+    accessConfirmed: 'Доступ подтверждён',
+    visits: 'Визиты',
+    queue: 'Очередь',
+    debt: 'Долг',
+    results: 'Результаты',
+    cabinetLoading: 'Кабинет пациента загружается...',
+    cabinetLoadFailed: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
+    formsLoadFailed: 'Анкеты пациента не загрузились. Откройте ссылку заново из Telegram.',
+    documentsLoadFailed: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
+    sessionNotConfirmed: 'Сессия Mini App не подтверждена',
+    appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
+    appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
+    appointmentPrecheck: 'Предварительная проверка',
+    appointmentDraft: 'Черновик записи',
+    noCreate: 'Без создания',
+    date: 'Дата',
+    time: 'Время',
+    department: 'Отделение',
+    optional: 'Опционально',
+    registrarNote: 'Заметка для регистратуры',
+    noMedicalData: 'Без медицинских данных',
+    checkDraft: 'Проверить черновик',
+    dateTime: 'Дата и время',
+    timeMissing: 'время не указано',
+    status: 'Статус',
+    payment: 'Оплата',
+    previewOnly: 'Только предпросмотр',
+    needsCheck: 'Требует проверки',
+    formsLoading: 'Анкеты пациента загружаются...',
+    formsEmpty: 'Сейчас нет доступных анкет для заполнения.',
+    patientForm: 'Анкета пациента',
+    saved: 'Сохранена',
+    new: 'Новая',
+    formOpenAgain: 'Откройте анкету заново из Telegram.',
+    formNotSaved: 'Анкета не сохранена: {reason}',
+    formSaved: 'Анкета сохранена.',
+    saveForm: 'Сохранить анкету',
+    documentsLoading: 'Документы пациента загружаются...',
+    documentsEmpty: 'Готовые PDF-результаты пока не найдены.',
+    documents: 'Документы',
+    readyPdfResults: 'Готовые PDF-результаты',
+    readyDateMissing: 'Дата готовности не указана',
+    getPdf: 'Получить PDF',
+    documentsOpenAgain: 'Откройте документы заново из Telegram.',
+    documentFailed: 'Документ не получен: {reason}',
+    capabilityStatus: {
+      manifest_only: 'Статус из manifest',
+      preview_enabled: 'Доступен предпросмотр',
+      summary_enabled: 'Доступна сводка',
+      ready_pdf_list_enabled: 'Доступны готовые PDF',
+    },
+    capabilities: {
+      appointments: 'Запись',
+      forms: 'Анкеты',
+      cabinet: 'Кабинет',
+      payments: 'Оплаты',
+      results: 'Результаты',
+    },
+    forms: {
+      patient_intake: {
+        title: 'Анкета перед визитом',
+        description: 'Короткие данные для подготовки регистратуры и врача.',
+        fields: {
+          chief_complaint: 'Причина визита',
+          allergies: 'Аллергии',
+          current_medications: 'Текущие лекарства',
+          medical_history: 'Важная медицинская история',
+          consent_to_contact: 'Разрешаю клинике связаться со мной',
+        },
+      },
+    },
+  },
+  [MINI_APP_LANGUAGE_UZ]: {
+    title: 'Bemor Mini App',
+    sessionReady: 'Sessiya tasdiqlandi',
+    sessionWaiting: 'Sessiya kutilmoqda',
+    statusLoading: 'Holat yuklanmoqda...',
+    sessionUnavailable: 'Telegram sessiyasi mavjud emas. Bemor maʼlumotlari yuklanmaydi.',
+    openSection: 'Ochiq bo\'lim',
+    available: 'Mavjud',
+    statusOnly: 'Faqat holat',
+    patient: 'Bemor',
+    patientFallback: 'Bemor',
+    accessConfirmed: 'Kirish tasdiqlandi',
+    visits: 'Tashriflar',
+    queue: 'Navbat',
+    debt: 'Qarz',
+    results: 'Natijalar',
+    cabinetLoading: 'Bemor kabineti yuklanmoqda...',
+    cabinetLoadFailed: 'Bemor kabineti yuklanmadi. Havolani Telegramdan qayta oching.',
+    formsLoadFailed: 'Bemor anketalari yuklanmadi. Havolani Telegramdan qayta oching.',
+    documentsLoadFailed: 'Bemor hujjatlari yuklanmadi. Havolani Telegramdan qayta oching.',
+    sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
+    appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
+    appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
+    appointmentPrecheck: 'Oldindan tekshirish',
+    appointmentDraft: 'Yozilish qoralamasi',
+    noCreate: 'Yaratmasdan',
+    date: 'Sana',
+    time: 'Vaqt',
+    department: 'Bo\'lim',
+    optional: 'Ixtiyoriy',
+    registrarNote: 'Registratura uchun izoh',
+    noMedicalData: 'Tibbiy maʼlumotlarsiz',
+    checkDraft: 'Qoralamani tekshirish',
+    dateTime: 'Sana va vaqt',
+    timeMissing: 'vaqt ko\'rsatilmagan',
+    status: 'Holat',
+    payment: 'To\'lov',
+    previewOnly: 'Faqat ko\'rish',
+    needsCheck: 'Tekshiruv kerak',
+    formsLoading: 'Bemor anketalari yuklanmoqda...',
+    formsEmpty: 'Hozircha to\'ldirish uchun anketa yo\'q.',
+    patientForm: 'Bemor anketasi',
+    saved: 'Saqlangan',
+    new: 'Yangi',
+    formOpenAgain: 'Anketani Telegramdan qayta oching.',
+    formNotSaved: 'Anketa saqlanmadi: {reason}',
+    formSaved: 'Anketa saqlandi.',
+    saveForm: 'Anketani saqlash',
+    documentsLoading: 'Bemor hujjatlari yuklanmoqda...',
+    documentsEmpty: 'Tayyor PDF-natijalar hozircha topilmadi.',
+    documents: 'Hujjatlar',
+    readyPdfResults: 'Tayyor PDF-natijalar',
+    readyDateMissing: 'Tayyor bo\'lgan sana ko\'rsatilmagan',
+    getPdf: 'PDF olish',
+    documentsOpenAgain: 'Hujjatlarni Telegramdan qayta oching.',
+    documentFailed: 'Hujjat olinmadi: {reason}',
+    capabilityStatus: {
+      manifest_only: 'Manifest holati',
+      preview_enabled: 'Oldindan ko\'rish mavjud',
+      summary_enabled: 'Qisqa maʼlumot mavjud',
+      ready_pdf_list_enabled: 'Tayyor PDFlar mavjud',
+    },
+    capabilities: {
+      appointments: 'Yozilish',
+      forms: 'Anketalar',
+      cabinet: 'Kabinet',
+      payments: 'To\'lovlar',
+      results: 'Natijalar',
+    },
+    forms: {
+      patient_intake: {
+        title: 'Tashrifdan oldingi anketa',
+        description: 'Registratura va shifokor tayyorlanishi uchun qisqa maʼlumotlar.',
+        fields: {
+          chief_complaint: 'Tashrif sababi',
+          allergies: 'Allergiyalar',
+          current_medications: 'Hozir qabul qilayotgan dorilar',
+          medical_history: 'Muhim tibbiy tarix',
+          consent_to_contact: 'Klinika men bilan bog\'lanishiga roziman',
+        },
+      },
+    },
+  },
 };
 
 const MINI_APP_SECTION_ALIASES = {
@@ -179,6 +343,59 @@ function getTelegramMiniAppAuthPayload(search, section) {
 function getTelegramMiniAppSelectedSection(search) {
   const section = new URLSearchParams(search || '').get('section') || '';
   return MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || '';
+}
+
+function normalizeMiniAppLanguage(languageCode) {
+  const value = String(languageCode || '').trim().toLowerCase().replace('_', '-');
+  return value.startsWith('uz') ? MINI_APP_LANGUAGE_UZ : MINI_APP_LANGUAGE_RU;
+}
+
+function getTelegramMiniAppClientLanguage() {
+  if (typeof window === 'undefined') {
+    return MINI_APP_LANGUAGE_RU;
+  }
+  return window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code || MINI_APP_LANGUAGE_RU;
+}
+
+function getNestedMiniAppTranslation(dictionary, key) {
+  return key.split('.').reduce((value, segment) => (
+    value && Object.prototype.hasOwnProperty.call(value, segment)
+      ? value[segment]
+      : undefined
+  ), dictionary);
+}
+
+function translateMiniAppText(languageCode, key, params = {}) {
+  const language = normalizeMiniAppLanguage(languageCode);
+  const dictionary = MINI_APP_I18N[language] || MINI_APP_I18N[MINI_APP_LANGUAGE_RU];
+  const fallbackDictionary = MINI_APP_I18N[MINI_APP_LANGUAGE_RU];
+  const template = getNestedMiniAppTranslation(dictionary, key)
+    ?? getNestedMiniAppTranslation(fallbackDictionary, key)
+    ?? key;
+  return String(template).replace(/\{(\w+)\}/g, (_, paramKey) => (
+    params[paramKey] == null ? '' : String(params[paramKey])
+  ));
+}
+
+function localizeMiniAppCapabilityStatus(languageCode, status) {
+  const key = status || 'manifest_only';
+  const translated = translateMiniAppText(languageCode, `capabilityStatus.${key}`);
+  return translated === `capabilityStatus.${key}` ? key : translated;
+}
+
+function localizeMiniAppPatientForm(languageCode, form) {
+  const formTranslations = MINI_APP_I18N[normalizeMiniAppLanguage(languageCode)]?.forms?.[form.id]
+    || MINI_APP_I18N[MINI_APP_LANGUAGE_RU].forms?.[form.id]
+    || {};
+  return {
+    ...form,
+    title: formTranslations.title || form.title,
+    description: formTranslations.description || form.description,
+    fields: (form.fields || []).map((field) => ({
+      ...field,
+      label: formTranslations.fields?.[field.key] || field.label,
+    })),
+  };
 }
 
 function getDefaultMiniAppAppointmentDate() {
@@ -291,9 +508,14 @@ function TelegramMiniAppPatientShell() {
     reportId: null,
     error: null,
   });
+  const languageCode = normalizeMiniAppLanguage(
+    state.manifest?.language?.code || getTelegramMiniAppClientLanguage()
+  );
+  const t = (key, params) => translateMiniAppText(languageCode, key, params);
 
   useEffect(() => {
     let isMounted = true;
+    const effectLanguageCode = getTelegramMiniAppClientLanguage();
     notifyTelegramMiniAppReady();
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
@@ -383,22 +605,22 @@ function TelegramMiniAppPatientShell() {
         setCabinetSummary({
           status: selectedSection === 'cabinet' ? 'error' : 'idle',
           payload: null,
-          error: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
+          error: translateMiniAppText(effectLanguageCode, 'cabinetLoadFailed'),
         });
         setFormsPreview({
           status: selectedSection === 'forms' ? 'error' : 'idle',
           payload: null,
-          error: 'Анкеты пациента не загрузились. Откройте ссылку заново из Telegram.',
+          error: translateMiniAppText(effectLanguageCode, 'formsLoadFailed'),
         });
         setResultsSummary({
           status: selectedSection === 'results' ? 'error' : 'idle',
           payload: null,
-          error: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
+          error: translateMiniAppText(effectLanguageCode, 'documentsLoadFailed'),
         });
         setState({
           status: 'error',
           manifest: null,
-          error: 'Сессия Mini App не подтверждена',
+          error: translateMiniAppText(effectLanguageCode, 'sessionNotConfirmed'),
         });
       });
 
@@ -408,7 +630,9 @@ function TelegramMiniAppPatientShell() {
   }, [location.search, selectedSection]);
 
   const capabilities = state.manifest?.capabilities || {};
-  const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
+  const capabilityLabels = MINI_APP_I18N[languageCode]?.capabilities
+    || MINI_APP_I18N[MINI_APP_LANGUAGE_RU].capabilities;
+  const capabilityEntries = Object.entries(capabilityLabels);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
   const selectedCapabilityEnabled = isMiniAppCapabilityEnabled(selectedCapability);
   const canPreviewAppointments = Boolean(
@@ -431,7 +655,7 @@ function TelegramMiniAppPatientShell() {
       setAppointmentPreview({
         status: 'error',
         payload: null,
-        error: 'Укажите дату и откройте Mini App из Telegram.',
+        error: t('appointmentDateRequired'),
       });
       return;
     }
@@ -463,7 +687,7 @@ function TelegramMiniAppPatientShell() {
         setAppointmentPreview({
           status: 'error',
           payload: null,
-          error: `Черновик записи не подтвержден: ${reason}`,
+          error: t('appointmentPreviewFailed', { reason }),
         });
       });
   };
@@ -487,7 +711,7 @@ function TelegramMiniAppPatientShell() {
       setFormSubmit({
         status: 'error',
         formId: form.id,
-        error: 'Откройте анкету заново из Telegram.',
+        error: t('formOpenAgain'),
       });
       return;
     }
@@ -526,7 +750,7 @@ function TelegramMiniAppPatientShell() {
         setFormSubmit({
           status: 'error',
           formId: form.id,
-          error: `Анкета не сохранена: ${reason}`,
+          error: t('formNotSaved', { reason }),
         });
       });
   };
@@ -537,7 +761,7 @@ function TelegramMiniAppPatientShell() {
       setReportDownload({
         status: 'error',
         reportId: report.id,
-        error: 'Откройте документы заново из Telegram.',
+        error: t('documentsOpenAgain'),
       });
       return;
     }
@@ -577,13 +801,15 @@ function TelegramMiniAppPatientShell() {
         setReportDownload({
           status: 'error',
           reportId: report.id,
-          error: `Документ не получен: ${reason}`,
+          error: t('documentFailed', { reason }),
         });
       });
   };
 
   const previewAppointment = appointmentPreview.payload?.appointment || null;
-  const patientForms = formsPreview.payload?.forms || [];
+  const patientForms = (formsPreview.payload?.forms || []).map((form) => (
+    localizeMiniAppPatientForm(languageCode, form)
+  ));
   const patientReports = resultsSummary.payload?.reports || [];
 
   return (
@@ -592,24 +818,24 @@ function TelegramMiniAppPatientShell() {
         <section style={miniAppHeroStyle}>
           <div>
             <p style={miniAppKickerStyle}>Kosmed Clinic</p>
-            <h1 style={miniAppTitleStyle}>Mini App пациента</h1>
+            <h1 style={miniAppTitleStyle}>{t('title')}</h1>
           </div>
           <Badge
             variant={state.status === 'ready' ? 'success' : 'secondary'}
             size="large"
             style={miniAppStatusBadgeStyle}
           >
-            {state.status === 'ready' ? 'Сессия подтверждена' : 'Ожидание сессии'}
+            {state.status === 'ready' ? t('sessionReady') : t('sessionWaiting')}
           </Badge>
         </section>
 
         {state.status === 'checking' && (
-          <Alert severity="info" style={miniAppNoticeStyle}>Загрузка статуса...</Alert>
+          <Alert severity="info" style={miniAppNoticeStyle}>{t('statusLoading')}</Alert>
         )}
 
         {state.status === 'unavailable' && (
           <Alert severity="info" style={miniAppNoticeStyle}>
-            Сессия Telegram недоступна. Данные пациента не загружаются.
+            {t('sessionUnavailable')}
           </Alert>
         )}
 
@@ -625,9 +851,9 @@ function TelegramMiniAppPatientShell() {
               <Card padding="small" shadow="none" style={miniAppSelectedSectionStyle}>
                 <CardContent style={miniAppSelectedSectionContentStyle}>
                   <div>
-                    <p style={miniAppKickerStyle}>Открытый раздел</p>
+                    <p style={miniAppKickerStyle}>{t('openSection')}</p>
                     <h2 style={miniAppSelectedSectionTitleStyle}>
-                      {MINI_APP_CAPABILITY_LABELS[selectedSection]}
+                      {capabilityLabels[selectedSection]}
                     </h2>
                   </div>
                   <div style={miniAppSelectedSectionStatusStyle}>
@@ -635,10 +861,10 @@ function TelegramMiniAppPatientShell() {
                       variant={selectedCapabilityEnabled ? 'primary' : 'secondary'}
                       size="small"
                     >
-                      {selectedCapabilityEnabled ? 'Доступно' : 'Только статус'}
+                      {selectedCapabilityEnabled ? t('available') : t('statusOnly')}
                     </Badge>
                     <p style={miniAppCapabilityTextStyle}>
-                      {selectedCapability?.status || 'manifest_only'}
+                      {localizeMiniAppCapabilityStatus(languageCode, selectedCapability?.status)}
                     </p>
                   </div>
                 </CardContent>
@@ -647,7 +873,7 @@ function TelegramMiniAppPatientShell() {
 
             {selectedSection === 'cabinet' && cabinetSummary.status === 'loading' && (
               <Alert severity="info" style={miniAppNoticeStyle}>
-                Кабинет пациента загружается...
+                {t('cabinetLoading')}
               </Alert>
             )}
 
@@ -662,28 +888,28 @@ function TelegramMiniAppPatientShell() {
                 <CardContent style={miniAppAppointmentPreviewContentStyle}>
                   <div style={miniAppAppointmentPreviewHeaderStyle}>
                     <div>
-                      <p style={miniAppKickerStyle}>Пациент</p>
+                      <p style={miniAppKickerStyle}>{t('patient')}</p>
                       <h2 style={miniAppSelectedSectionTitleStyle}>
-                        {cabinetSummary.payload?.patient?.name || 'Пациент'}
+                        {cabinetSummary.payload?.patient?.name || t('patientFallback')}
                       </h2>
                     </div>
-                    <Badge variant="success" size="small">Доступ подтверждён</Badge>
+                    <Badge variant="success" size="small">{t('accessConfirmed')}</Badge>
                   </div>
                   <div style={miniAppAppointmentPreviewResultStyle}>
                     <div>
-                      <p style={miniAppCapabilityTextStyle}>Визиты</p>
+                      <p style={miniAppCapabilityTextStyle}>{t('visits')}</p>
                       <strong>{cabinetSummary.payload?.visits?.length || 0}</strong>
                     </div>
                     <div>
-                      <p style={miniAppCapabilityTextStyle}>Очередь</p>
+                      <p style={miniAppCapabilityTextStyle}>{t('queue')}</p>
                       <strong>{cabinetSummary.payload?.queue?.length || 0}</strong>
                     </div>
                     <div>
-                      <p style={miniAppCapabilityTextStyle}>Долг</p>
+                      <p style={miniAppCapabilityTextStyle}>{t('debt')}</p>
                       <strong>{cabinetSummary.payload?.payments?.debt || '0'}</strong>
                     </div>
                     <div>
-                      <p style={miniAppCapabilityTextStyle}>Результаты</p>
+                      <p style={miniAppCapabilityTextStyle}>{t('results')}</p>
                       <strong>{cabinetSummary.payload?.reports?.length || 0}</strong>
                     </div>
                   </div>
@@ -696,17 +922,17 @@ function TelegramMiniAppPatientShell() {
                 <CardContent style={miniAppAppointmentPreviewContentStyle}>
                   <div style={miniAppAppointmentPreviewHeaderStyle}>
                     <div>
-                      <p style={miniAppKickerStyle}>Предварительная проверка</p>
-                      <h2 style={miniAppSelectedSectionTitleStyle}>Черновик записи</h2>
+                      <p style={miniAppKickerStyle}>{t('appointmentPrecheck')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('appointmentDraft')}</h2>
                     </div>
-                    <Badge variant="secondary" size="small">Без создания</Badge>
+                    <Badge variant="secondary" size="small">{t('noCreate')}</Badge>
                   </div>
 
                   <form style={miniAppAppointmentFormStyle} onSubmit={handleAppointmentPreviewSubmit}>
                     <div style={miniAppAppointmentFormGridStyle}>
                       <Input
                         type="date"
-                        label="Дата"
+                        label={t('date')}
                         value={appointmentPreviewForm.appointmentDate}
                         onChange={handleAppointmentPreviewFieldChange('appointmentDate')}
                         required
@@ -714,25 +940,25 @@ function TelegramMiniAppPatientShell() {
                       />
                       <Input
                         type="time"
-                        label="Время"
+                        label={t('time')}
                         value={appointmentPreviewForm.appointmentTime}
                         onChange={handleAppointmentPreviewFieldChange('appointmentTime')}
                         style={miniAppAppointmentInputStyle}
                       />
                       <Input
-                        label="Отделение"
+                        label={t('department')}
                         value={appointmentPreviewForm.department}
                         onChange={handleAppointmentPreviewFieldChange('department')}
-                        placeholder="Опционально"
+                        placeholder={t('optional')}
                         maxLength={64}
                         style={miniAppAppointmentInputStyle}
                       />
                     </div>
                     <Textarea
-                      label="Заметка для регистратуры"
+                      label={t('registrarNote')}
                       value={appointmentPreviewForm.notes}
                       onChange={handleAppointmentPreviewFieldChange('notes')}
-                      placeholder="Без медицинских данных"
+                      placeholder={t('noMedicalData')}
                       maxLength={1000}
                       minRows={2}
                     />
@@ -743,7 +969,7 @@ function TelegramMiniAppPatientShell() {
                       loading={appointmentPreview.status === 'loading'}
                       disabled={appointmentPreview.status === 'loading'}
                     >
-                      Проверить черновик
+                      {t('checkDraft')}
                     </Button>
                   </form>
 
@@ -756,19 +982,19 @@ function TelegramMiniAppPatientShell() {
                   {appointmentPreview.status === 'ready' && previewAppointment && (
                     <div style={miniAppAppointmentPreviewResultStyle}>
                       <div>
-                        <p style={miniAppCapabilityTextStyle}>Дата и время</p>
-                        <strong>{previewAppointment.appointment_date} {previewAppointment.appointment_time || 'время не указано'}</strong>
+                        <p style={miniAppCapabilityTextStyle}>{t('dateTime')}</p>
+                        <strong>{previewAppointment.appointment_date} {previewAppointment.appointment_time || t('timeMissing')}</strong>
                       </div>
                       <div>
-                        <p style={miniAppCapabilityTextStyle}>Статус</p>
+                        <p style={miniAppCapabilityTextStyle}>{t('status')}</p>
                         <strong>{previewAppointment.status}</strong>
                       </div>
                       <div>
-                        <p style={miniAppCapabilityTextStyle}>Оплата</p>
+                        <p style={miniAppCapabilityTextStyle}>{t('payment')}</p>
                         <strong>{previewAppointment.payment_type} / {previewAppointment.payment_currency}</strong>
                       </div>
                       <Badge variant={appointmentPreview.payload?.mutation_allowed ? 'warning' : 'success'} size="small">
-                        {appointmentPreview.payload?.preview_only ? 'Только предпросмотр' : 'Требует проверки'}
+                        {appointmentPreview.payload?.preview_only ? t('previewOnly') : t('needsCheck')}
                       </Badge>
                     </div>
                   )}
@@ -778,7 +1004,7 @@ function TelegramMiniAppPatientShell() {
 
             {selectedSection === 'forms' && formsPreview.status === 'loading' && (
               <Alert severity="info" style={miniAppNoticeStyle}>
-                Анкеты пациента загружаются...
+                {t('formsLoading')}
               </Alert>
             )}
 
@@ -790,7 +1016,7 @@ function TelegramMiniAppPatientShell() {
 
             {selectedSection === 'forms' && formsPreview.status === 'ready' && patientForms.length === 0 && (
               <Alert severity="info" style={miniAppNoticeStyle}>
-                Сейчас нет доступных анкет для заполнения.
+                {t('formsEmpty')}
               </Alert>
             )}
 
@@ -799,12 +1025,12 @@ function TelegramMiniAppPatientShell() {
                 <CardContent style={miniAppAppointmentPreviewContentStyle}>
                   <div style={miniAppAppointmentPreviewHeaderStyle}>
                     <div>
-                      <p style={miniAppKickerStyle}>Анкета пациента</p>
+                      <p style={miniAppKickerStyle}>{t('patientForm')}</p>
                       <h2 style={miniAppSelectedSectionTitleStyle}>{form.title}</h2>
                       <p style={miniAppCapabilityTextStyle}>{form.description}</p>
                     </div>
                     <Badge variant={form.submission ? 'success' : 'secondary'} size="small">
-                      {form.submission ? 'Сохранена' : 'Новая'}
+                      {form.submission ? t('saved') : t('new')}
                     </Badge>
                   </div>
 
@@ -840,7 +1066,7 @@ function TelegramMiniAppPatientShell() {
 
                     {formSubmit.status === 'ready' && formSubmit.formId === form.id && (
                       <Alert severity="success" style={miniAppNoticeStyle}>
-                        Анкета сохранена.
+                        {t('formSaved')}
                       </Alert>
                     )}
 
@@ -851,7 +1077,7 @@ function TelegramMiniAppPatientShell() {
                       loading={formSubmit.status === 'loading' && formSubmit.formId === form.id}
                       disabled={formSubmit.status === 'loading'}
                     >
-                      Сохранить анкету
+                      {t('saveForm')}
                     </Button>
                   </form>
                 </CardContent>
@@ -860,7 +1086,7 @@ function TelegramMiniAppPatientShell() {
 
             {selectedSection === 'results' && resultsSummary.status === 'loading' && (
               <Alert severity="info" style={miniAppNoticeStyle}>
-                Документы пациента загружаются...
+                {t('documentsLoading')}
               </Alert>
             )}
 
@@ -872,7 +1098,7 @@ function TelegramMiniAppPatientShell() {
 
             {selectedSection === 'results' && resultsSummary.status === 'ready' && patientReports.length === 0 && (
               <Alert severity="info" style={miniAppNoticeStyle}>
-                Готовые PDF-результаты пока не найдены.
+                {t('documentsEmpty')}
               </Alert>
             )}
 
@@ -881,8 +1107,8 @@ function TelegramMiniAppPatientShell() {
                 <CardContent style={miniAppAppointmentPreviewContentStyle}>
                   <div style={miniAppAppointmentPreviewHeaderStyle}>
                     <div>
-                      <p style={miniAppKickerStyle}>Документы</p>
-                      <h2 style={miniAppSelectedSectionTitleStyle}>Готовые PDF-результаты</h2>
+                      <p style={miniAppKickerStyle}>{t('documents')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('readyPdfResults')}</h2>
                     </div>
                     <Badge variant="success" size="small">{patientReports.length}</Badge>
                   </div>
@@ -893,7 +1119,7 @@ function TelegramMiniAppPatientShell() {
                         <div>
                           <strong>{report.name}</strong>
                           <p style={miniAppCapabilityTextStyle}>
-                            {report.ready_at || 'Дата готовности не указана'} · {report.status}
+                            {report.ready_at || t('readyDateMissing')} · {report.status}
                           </p>
                         </div>
                         <Button
@@ -904,7 +1130,7 @@ function TelegramMiniAppPatientShell() {
                           disabled={reportDownload.status === 'loading'}
                           onClick={handleReportDownload(report)}
                         >
-                          Получить PDF
+                          {t('getPdf')}
                         </Button>
                       </div>
                     ))}
@@ -938,11 +1164,11 @@ function TelegramMiniAppPatientShell() {
                       <div style={miniAppCapabilityHeaderStyle}>
                         <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
                         <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
-                          {enabled ? 'Доступно' : 'Только статус'}
+                          {enabled ? t('available') : t('statusOnly')}
                         </Badge>
                       </div>
                       <p style={miniAppCapabilityTextStyle}>
-                        {capability.status || 'manifest_only'}
+                        {localizeMiniAppCapabilityStatus(languageCode, capability.status)}
                       </p>
                     </CardContent>
                   </Card>
