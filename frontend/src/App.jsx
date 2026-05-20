@@ -221,6 +221,11 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [cabinetManifest, setCabinetManifest] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -317,6 +322,62 @@ function TelegramMiniAppPatientShell() {
     };
   }, [selectedSection, state.status]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (state.status !== 'ready' || selectedSection !== 'cabinet') {
+      setCabinetManifest({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData) {
+      setCabinetManifest({
+        status: 'error',
+        payload: null,
+        error: 'Mini App session is not confirmed.',
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setCabinetManifest({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/cabinet/manifest', { initData })
+      .then((response) => {
+        if (!isMounted) return;
+        setCabinetManifest({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        const reason = error?.response?.data?.detail?.reason || 'cabinet_manifest_failed';
+        setCabinetManifest({
+          status: 'error',
+          payload: null,
+          error: `Patient cabinet is unavailable: ${reason}`,
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSection, state.status]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
@@ -327,6 +388,10 @@ function TelegramMiniAppPatientShell() {
   );
   const canShowFormsManifest = Boolean(
     selectedSection === 'forms' &&
+    selectedCapability?.manifest_endpoint
+  );
+  const canShowCabinetManifest = Boolean(
+    selectedSection === 'cabinet' &&
     selectedCapability?.manifest_endpoint
   );
 
@@ -384,6 +449,7 @@ function TelegramMiniAppPatientShell() {
 
   const previewAppointment = appointmentPreview.payload?.appointment || null;
   const formsManifestItems = formsManifest.payload?.forms || [];
+  const cabinetManifestSections = cabinetManifest.payload?.sections || [];
 
   return (
     <div style={miniAppPageStyle}>
@@ -440,6 +506,76 @@ function TelegramMiniAppPatientShell() {
                       {selectedCapability?.status || 'manifest_only'}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {canShowCabinetManifest && (
+              <Card padding="small" shadow="none" style={miniAppCabinetManifestStyle}>
+                <CardContent style={miniAppFormsManifestContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Patient cabinet</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>Read-only status</h2>
+                    </div>
+                    <Badge variant="secondary" size="small">No records or edits</Badge>
+                  </div>
+
+                  {cabinetManifest.status === 'loading' && (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      Loading cabinet status...
+                    </Alert>
+                  )}
+
+                  {cabinetManifest.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {cabinetManifest.error}
+                    </Alert>
+                  )}
+
+                  {cabinetManifest.status === 'ready' && (
+                    <>
+                      <div style={miniAppFormsSummaryStyle}>
+                        <Badge variant={cabinetManifest.payload?.cabinet_enabled ? 'primary' : 'secondary'} size="small">
+                          {cabinetManifest.payload?.cabinet_enabled ? 'cabinet on' : 'cabinet planned'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {cabinetManifest.payload?.read_enabled ? 'read on' : 'read off'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {cabinetManifest.payload?.mutation_enabled ? 'mutation on' : 'mutation off'}
+                        </Badge>
+                      </div>
+
+                      <section style={miniAppFormsGridStyle}>
+                        {cabinetManifestSections.map((section) => (
+                          <div key={section.key || section.title} style={miniAppCabinetManifestItemStyle}>
+                            <div>
+                              <h3 style={miniAppFormManifestTitleStyle}>{section.title || section.key}</h3>
+                              <p style={miniAppCapabilityTextStyle}>{section.status || 'planned'}</p>
+                            </div>
+                            <div style={miniAppFormManifestBadgeRowStyle}>
+                              <Badge variant="secondary" size="small">
+                                {section.read_enabled ? 'read on' : 'read off'}
+                              </Badge>
+                              <Badge variant="secondary" size="small">
+                                {section.write_enabled ? 'write on' : 'write off'}
+                              </Badge>
+                              <Badge variant={section.contains_medical_data ? 'warning' : 'success'} size="small">
+                                {section.contains_medical_data ? 'medical data' : 'no medical data'}
+                              </Badge>
+                              <Badge variant={section.contains_passport_data ? 'warning' : 'success'} size="small">
+                                {section.contains_passport_data ? 'passport data' : 'no passport data'}
+                              </Badge>
+                              <Badge variant={section.contains_billing_records ? 'warning' : 'success'} size="small">
+                                {section.contains_billing_records ? 'billing records' : 'no billing records'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -976,6 +1112,11 @@ const miniAppFormsManifestStyle = {
   borderColor: 'rgba(88, 86, 214, 0.24)',
 };
 
+const miniAppCabinetManifestStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(0, 122, 255, 0.24)',
+};
+
 const miniAppFormsManifestContentStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -1005,6 +1146,12 @@ const miniAppFormManifestItemStyle = {
   border: '1px solid rgba(88, 86, 214, 0.22)',
   borderRadius: '8px',
   background: 'rgba(88, 86, 214, 0.07)',
+};
+
+const miniAppCabinetManifestItemStyle = {
+  ...miniAppFormManifestItemStyle,
+  border: '1px solid rgba(0, 122, 255, 0.22)',
+  background: 'rgba(0, 122, 255, 0.07)',
 };
 
 const miniAppFormManifestTitleStyle = {
