@@ -1629,7 +1629,7 @@ const DoctorPanel = () => {
         useWebSocket={false}
         position="bottom-right" />
 
-      <RoleNotificationCenter role="doctor" />
+      <RoleNotificationCenter userRole="doctor" />
     </div>);
 
 };

@@ -57,7 +57,7 @@ function extractMetadata(item) {
   return metadata && typeof metadata === 'object' ? metadata : {};
 }
 
-function resolveNotificationTarget(item, role) {
+function resolveNotificationTarget(item, userRole) {
   const explicitDeepLink = String(item?.deepLink || '').trim();
   if (explicitDeepLink) {
     return explicitDeepLink;
@@ -96,7 +96,7 @@ function resolveNotificationTarget(item, role) {
     case 'registrar_system_alert':
       return '/registrar';
     case 'system_alert':
-      return role === 'admin' ? '/admin' : '/registrar';
+      return userRole === 'admin' ? '/admin' : '/registrar';
     default:
       return null;
   }
@@ -119,7 +119,7 @@ function navigateToNotificationTarget(target) {
   }
 }
 
-export default function NotificationInbox({ role, onClose }) {
+export default function NotificationInbox({ userRole, onClose }) {
   const {
     getNotificationsByRole,
     markAsRead,
@@ -132,7 +132,7 @@ export default function NotificationInbox({ role, onClose }) {
   const [searchText, setSearchText] = useState('');
 
   const notifications = useMemo(() => {
-    const scoped = getNotificationsByRole(role);
+    const scoped = getNotificationsByRole(userRole);
     const query = searchText.trim().toLowerCase();
 
     return scoped
@@ -175,7 +175,7 @@ export default function NotificationInbox({ role, onClose }) {
 
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
-  }, [getNotificationsByRole, role, searchText, showUnreadOnly, statusFilter]);
+  }, [getNotificationsByRole, userRole, searchText, showUnreadOnly, statusFilter]);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.isRead && !item.isArchived).length,
@@ -192,7 +192,7 @@ export default function NotificationInbox({ role, onClose }) {
         await markAsRead(item.id);
       }
 
-      const target = resolveNotificationTarget(item, role);
+      const target = resolveNotificationTarget(item, userRole);
       navigateToNotificationTarget(target);
     } catch (error) {
       logger.warn('[NotificationInbox] failed to mark notification open state', error);
@@ -210,7 +210,7 @@ export default function NotificationInbox({ role, onClose }) {
 
   const handleMarkAllRead = async () => {
     try {
-      await markAllAsRead(role);
+      await markAllAsRead(userRole);
     } catch (error) {
       logger.warn('[NotificationInbox] failed to mark all notifications as read', error);
     }
@@ -249,7 +249,7 @@ export default function NotificationInbox({ role, onClose }) {
         <div>
           <strong style={{ display: 'block' }}>Уведомления</strong>
           <span style={{ fontSize: 12, color: 'var(--mac-text-tertiary)' }}>
-            {role || 'all'} · {unreadCount} unread
+            {userRole || 'all'} · {unreadCount} unread
           </span>
         </div>
         <button
@@ -520,7 +520,7 @@ export default function NotificationInbox({ role, onClose }) {
 }
 
 NotificationInbox.propTypes = {
-  role: PropTypes.oneOf([
+  userRole: PropTypes.oneOf([
     'doctor',
     'registrar',
     'lab',

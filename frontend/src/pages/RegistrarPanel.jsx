@@ -4182,7 +4182,7 @@ const RegistrarPanel = () => {
           loadAppointments({ source: 'force_majeure' });
         }} />
 
-      <RoleNotificationCenter role="registrar" />
+      <RoleNotificationCenter userRole="registrar" />
 
     </div>);
 
