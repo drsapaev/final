@@ -99,6 +99,30 @@ function sourceFilesContain(dirPath, matcher) {
   return false;
 }
 
+// Current optimization signal checks
+function hasReactLazyDynamicImport() {
+  return sourceFilesContain(path.join(projectRoot, 'src'), content =>
+    /(?:React\.)?lazy\s*\(\s*\(\s*\)\s*=>\s*import\s*\(/.test(content)
+  );
+}
+
+function hasViteProductionOptimization() {
+  const viteConfig = path.join(projectRoot, 'vite.config.js');
+
+  if (!fs.existsSync(viteConfig)) {
+    return false;
+  }
+
+  const content = fs.readFileSync(viteConfig, 'utf8');
+  return (
+    content.includes('chunkSizeWarningLimit') &&
+    content.includes('terserOptions') &&
+    content.includes("minify: 'terser'") &&
+    content.includes('drop_console') &&
+    content.includes('drop_debugger')
+  );
+}
+
 // Анализ текущего состояния
 function analyzeCurrentBundle() {
   console.log('📊 Анализ текущего бандла:\n');
@@ -192,7 +216,7 @@ function generateOptimizationRecommendations() {
     {
       title: 'Code Splitting',
       description: 'Используйте React.lazy() для ленивой загрузки компонентов',
-      implemented: fs.existsSync(path.join(projectRoot, 'src', 'AppOptimized.jsx')),
+      implemented: hasReactLazyDynamicImport(),
       priority: 'Высокий'
     },
     {
@@ -268,25 +292,11 @@ function checkPerformance() {
   const checks = [
     {
       name: 'Lazy Loading компонентов',
-      check: () => {
-        const appOptimized = path.join(projectRoot, 'src', 'AppOptimized.jsx');
-        if (fs.existsSync(appOptimized)) {
-          const content = fs.readFileSync(appOptimized, 'utf8');
-          return content.includes('React.lazy') || content.includes('lazy(');
-        }
-        return false;
-      }
+      check: () => hasReactLazyDynamicImport()
     },
     {
       name: 'Vite оптимизация',
-      check: () => {
-        const viteConfig = path.join(projectRoot, 'vite.config.js');
-        if (fs.existsSync(viteConfig)) {
-          const content = fs.readFileSync(viteConfig, 'utf8');
-          return content.includes('manualChunks') && content.includes('terser');
-        }
-        return false;
-      }
+      check: () => hasViteProductionOptimization()
     },
     {
       name: 'API кэширование',
@@ -319,7 +329,8 @@ function generateReport() {
     timestamp: new Date().toISOString(),
     analysis: {
       bundleExists: fs.existsSync(path.join(projectRoot, 'dist')),
-      optimizedAppExists: fs.existsSync(path.join(projectRoot, 'src', 'AppOptimized.jsx')),
+      lazyLoadedRoutesPresent: hasReactLazyDynamicImport(),
+      viteProductionOptimized: hasViteProductionOptimization(),
       apiCacheExists: fs.existsSync(path.join(projectRoot, 'src', 'utils', 'apiCache.js')),
       serviceWorkerExists: fs.existsSync(path.join(projectRoot, 'public', 'sw.js'))
     }
