@@ -67,7 +67,7 @@ Current local build evidence after PR-PERF-12 review:
   route/browser proof and keep runtime UI unchanged.
 - [x] PR-MUI-3: decide example-only MUI policy for `components/examples` without
   changing runtime UI.
-- [ ] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
+- [x] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
   MUI islands; do not migrate them in the same PR as the handoff.
 - [ ] Final: summarize third-cycle completion, merged PRs, remaining chunks, MUI
   status, and next backlog.
