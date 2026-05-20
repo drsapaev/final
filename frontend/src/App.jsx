@@ -189,6 +189,16 @@ function createMiniAppAppointmentPreviewForm() {
   };
 }
 
+function buildMiniAppAppointmentRequestBody(initData, form) {
+  return {
+    initData,
+    appointmentDate: form.appointmentDate,
+    appointmentTime: form.appointmentTime || undefined,
+    department: form.department.trim() || undefined,
+    notes: form.notes.trim() || undefined,
+  };
+}
+
 function isMiniAppCapabilityEnabled(capability) {
   return Boolean(
     capability?.create_enabled ||
@@ -245,6 +255,11 @@ function TelegramMiniAppPatientShell() {
   });
   const [appointmentPreviewForm, setAppointmentPreviewForm] = useState(createMiniAppAppointmentPreviewForm);
   const [appointmentPreview, setAppointmentPreview] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
+  const [appointmentCreate, setAppointmentCreate] = useState({
     status: 'idle',
     payload: null,
     error: null,
@@ -564,6 +579,16 @@ function TelegramMiniAppPatientShell() {
       ...current,
       [field]: event.target.value,
     }));
+    setAppointmentPreview({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
+    setAppointmentCreate({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
   };
 
   const handleAppointmentPreviewSubmit = (event) => {
@@ -579,16 +604,15 @@ function TelegramMiniAppPatientShell() {
       return;
     }
 
-    const requestBody = {
-      initData,
-      appointmentDate: appointmentPreviewForm.appointmentDate,
-      appointmentTime: appointmentPreviewForm.appointmentTime || undefined,
-      department: appointmentPreviewForm.department.trim() || undefined,
-      notes: appointmentPreviewForm.notes.trim() || undefined,
-    };
+    const requestBody = buildMiniAppAppointmentRequestBody(initData, appointmentPreviewForm);
 
     setAppointmentPreview({
       status: 'loading',
+      payload: null,
+      error: null,
+    });
+    setAppointmentCreate({
+      status: 'idle',
       payload: null,
       error: null,
     });
@@ -607,6 +631,43 @@ function TelegramMiniAppPatientShell() {
           status: 'error',
           payload: null,
           error: `Р§РµСЂРЅРѕРІРёРє Р·Р°РїРёСЃРё РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅ: ${reason}`,
+        });
+      });
+  };
+
+  const handleAppointmentCreate = () => {
+    const initData = getTelegramMiniAppInitData();
+    if (!initData || !appointmentPreviewForm.appointmentDate) {
+      setAppointmentCreate({
+        status: 'error',
+        payload: null,
+        error: 'Open Mini App from Telegram and preview the appointment date first.',
+      });
+      return;
+    }
+
+    const requestBody = buildMiniAppAppointmentRequestBody(initData, appointmentPreviewForm);
+
+    setAppointmentCreate({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/appointments', requestBody)
+      .then((response) => {
+        setAppointmentCreate({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        const reason = error?.response?.data?.detail?.reason || 'create_failed';
+        setAppointmentCreate({
+          status: 'error',
+          payload: null,
+          error: `Appointment was not created: ${reason}`,
         });
       });
   };
@@ -1045,7 +1106,7 @@ function TelegramMiniAppPatientShell() {
                       variant="primary"
                       size="small"
                       loading={appointmentPreview.status === 'loading'}
-                      disabled={appointmentPreview.status === 'loading'}
+                      disabled={appointmentPreview.status === 'loading' || appointmentCreate.status === 'loading'}
                     >
                       РџСЂРѕРІРµСЂРёС‚СЊ С‡РµСЂРЅРѕРІРёРє
                     </Button>
@@ -1075,6 +1136,36 @@ function TelegramMiniAppPatientShell() {
                         {appointmentPreview.payload?.preview_only ? 'РўРѕР»СЊРєРѕ РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂ' : 'РўСЂРµР±СѓРµС‚ РїСЂРѕРІРµСЂРєРё'}
                       </Badge>
                     </div>
+                  )}
+
+                  {appointmentPreview.status === 'ready' && previewAppointment && selectedCapability?.create_enabled && (
+                    <div style={miniAppAppointmentCreateActionStyle}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="small"
+                        loading={appointmentCreate.status === 'loading'}
+                        disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}
+                        onClick={handleAppointmentCreate}
+                      >
+                        Create appointment
+                      </Button>
+                      <Badge variant={appointmentCreate.status === 'ready' ? 'success' : 'secondary'} size="small">
+                        {appointmentCreate.status === 'ready' ? 'created' : 'creates one scheduled visit'}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {appointmentCreate.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {appointmentCreate.error}
+                    </Alert>
+                  )}
+
+                  {appointmentCreate.status === 'ready' && (
+                    <Alert severity="success" style={miniAppNoticeStyle}>
+                      Appointment request accepted. The clinic will continue the visit workflow in the protected system.
+                    </Alert>
                   )}
                 </CardContent>
               </Card>
@@ -1464,6 +1555,13 @@ const miniAppAppointmentPreviewResultStyle = {
   background: 'rgba(52, 199, 89, 0.08)',
   fontSize: '13px',
   color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppAppointmentCreateActionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: '8px',
 };
 
 const miniAppFormsManifestStyle = {
