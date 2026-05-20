@@ -3,28 +3,105 @@
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Container,
-  FormControl,
-  Grid,
-  InputLabel,
-  MenuItem,
-  Select,
-  TextField,
-  Typography,
-} from '@mui/material';
-import CreditCardIcon from '@mui/icons-material/CreditCard';
-import ScienceIcon from '@mui/icons-material/Science';
+import { CreditCard, FlaskConical } from 'lucide-react';
 
+import { Alert, Button, Card, CardContent, Typography } from '../components/ui/macos';
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
+
+const pageStyle = {
+  maxWidth: 1180,
+  margin: '0 auto',
+  padding: '32px 16px 48px',
+};
+
+const headerStyle = {
+  textAlign: 'center',
+  marginBottom: 32,
+};
+
+const titleRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  flexWrap: 'wrap',
+};
+
+const mainGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+  gap: 24,
+  alignItems: 'start',
+};
+
+const fieldStackStyle = {
+  display: 'grid',
+  gap: 14,
+  marginTop: 16,
+};
+
+const fieldLabelStyle = {
+  display: 'grid',
+  gap: 6,
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-sm)',
+  fontWeight: 'var(--mac-font-weight-medium)',
+};
+
+const fieldControlStyle = {
+  width: '100%',
+  minHeight: 40,
+  boxSizing: 'border-box',
+  border: '1px solid var(--mac-card-border, var(--mac-border))',
+  borderRadius: 'var(--mac-radius-md)',
+  background: 'var(--mac-card-bg, var(--mac-bg-primary))',
+  color: 'var(--mac-text-primary)',
+  padding: '9px 12px',
+  font: 'inherit',
+  outlineOffset: 2,
+};
+
+const resultPreStyle = {
+  margin: 0,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  border: '1px solid var(--mac-border)',
+  borderRadius: 'var(--mac-radius-md)',
+  background: 'var(--mac-bg-tertiary)',
+  color: 'var(--mac-text-primary)',
+  padding: 12,
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+const placeholderStyle = {
+  minHeight: 400,
+  display: 'grid',
+  placeItems: 'center',
+  textAlign: 'center',
+};
+
+const statsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  gap: 12,
+};
+
+const statItemStyle = {
+  textAlign: 'center',
+  border: '1px solid var(--mac-border)',
+  borderRadius: 'var(--mac-radius-md)',
+  padding: 16,
+  background: 'var(--mac-bg-secondary)',
+};
+
+const fullWidthButtonStyle = {
+  width: '100%',
+};
+
 const PaymentTest = () => {
   const [showWidget, setShowWidget] = useState(false);
   const [testData, setTestData] = useState({
@@ -83,147 +160,150 @@ const PaymentTest = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Заголовок */}
-      <Box textAlign="center" mb={4}>
-        <Typography variant="h3" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ScienceIcon sx={{ mr: 2, fontSize: 40 }} />
-          Тестирование PaymentWidget
-        </Typography>
-        <Typography variant="body1" color="textSecondary">
+    <main style={pageStyle} aria-labelledby="payment-test-title">
+      <header style={headerStyle}>
+        <div style={titleRowStyle}>
+          <FlaskConical size={40} aria-hidden="true" />
+          <Typography id="payment-test-title" variant="h1">
+            Тестирование PaymentWidget
+          </Typography>
+        </div>
+        <Typography variant="body1" color="textSecondary" style={{ marginTop: 8 }}>
           Страница для тестирования компонента онлайн-платежей
         </Typography>
-      </Box>
+      </header>
 
-      <Grid container spacing={4}>
-        {/* Настройки теста */}
-        <Grid item xs={12} md={4}>
+      <section style={mainGridStyle}>
+        <div>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Настройки теста
               </Typography>
-              
-              <Box sx={{ mt: 2 }}>
-                <TextField
-                  fullWidth
-                  label="ID визита"
-                  type="number"
-                  value={testData.visitId}
-                  onChange={(e) => setTestData({ ...testData, visitId: parseInt(e.target.value) })}
-                  sx={{ mb: 2 }}
-                />
-                
-                <TextField
-                  fullWidth
-                  label="Сумма"
-                  type="number"
-                  value={testData.amount}
-                  onChange={(e) => setTestData({ ...testData, amount: parseFloat(e.target.value) })}
-                  sx={{ mb: 2 }}
-                />
-                
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Валюта</InputLabel>
-                  <Select
+
+              <div style={fieldStackStyle}>
+                <label style={fieldLabelStyle} htmlFor="payment-test-visit-id">
+                  ID визита
+                  <input
+                    id="payment-test-visit-id"
+                    type="number"
+                    value={testData.visitId}
+                    onChange={(e) => setTestData({ ...testData, visitId: parseInt(e.target.value, 10) })}
+                    style={fieldControlStyle}
+                  />
+                </label>
+
+                <label style={fieldLabelStyle} htmlFor="payment-test-amount">
+                  Сумма
+                  <input
+                    id="payment-test-amount"
+                    type="number"
+                    value={testData.amount}
+                    onChange={(e) => setTestData({ ...testData, amount: parseFloat(e.target.value) })}
+                    style={fieldControlStyle}
+                  />
+                </label>
+
+                <label style={fieldLabelStyle} htmlFor="payment-test-currency">
+                  Валюта
+                  <select
+                    id="payment-test-currency"
                     value={testData.currency}
                     onChange={(e) => setTestData({ ...testData, currency: e.target.value })}
-                    label="Валюта"
+                    style={fieldControlStyle}
                   >
-                    <MenuItem value="UZS">UZS (Узбекский сум)</MenuItem>
-                    <MenuItem value="KZT">KZT (Казахский тенге)</MenuItem>
-                    <MenuItem value="USD">USD (Доллар США)</MenuItem>
-                  </Select>
-                </FormControl>
-                
-                <TextField
-                  fullWidth
-                  label="Описание"
-                  multiline
-                  rows={2}
-                  value={testData.description}
-                  onChange={(e) => setTestData({ ...testData, description: e.target.value })}
-                  sx={{ mb: 3 }}
-                />
-                
+                    <option value="UZS">UZS (Узбекский сум)</option>
+                    <option value="KZT">KZT (Казахский тенге)</option>
+                    <option value="USD">USD (Доллар США)</option>
+                  </select>
+                </label>
+
+                <label style={fieldLabelStyle} htmlFor="payment-test-description">
+                  Описание
+                  <textarea
+                    id="payment-test-description"
+                    rows={2}
+                    value={testData.description}
+                    onChange={(e) => setTestData({ ...testData, description: e.target.value })}
+                    style={{ ...fieldControlStyle, resize: 'vertical', minHeight: 72 }}
+                  />
+                </label>
+
                 {!isAuthenticated ? (
                   <Button
-                    variant="outlined"
-                    color="warning"
+                    variant="outline"
                     size="large"
-                    fullWidth
                     onClick={handleTestAuth}
-                    sx={{ mb: 2 }}
+                    style={{
+                      ...fullWidthButtonStyle,
+                      borderColor: 'var(--mac-warning)',
+                      color: 'var(--mac-warning)',
+                    }}
                   >
                     🔐 Открыть вход
                   </Button>
                 ) : (
-                  <Box sx={{ mb: 2 }}>
-                    <Alert severity="success" sx={{ mb: 1 }}>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <Alert severity="success" role="status">
                       ✅ Авторизован для тестирования
                     </Alert>
                     <Button
-                      variant="outlined"
-                      color="secondary"
+                      variant="outline"
                       size="small"
-                      fullWidth
                       onClick={() => {
                         setToken(null);
                         setIsAuthenticated(false);
                         setResult({ type: 'info', message: 'Авторизация сброшена' });
                       }}
+                      style={fullWidthButtonStyle}
                     >
                       🚪 Выйти
                     </Button>
-                  </Box>
+                  </div>
                 )}
-                
+
                 <Button
-                  variant="contained"
-                  color="primary"
+                  variant="primary"
                   size="large"
-                  fullWidth
                   onClick={startTest}
-                  startIcon={<CreditCardIcon />}
                   disabled={showWidget || !isAuthenticated}
+                  style={fullWidthButtonStyle}
                 >
+                  <CreditCard size={18} aria-hidden="true" />
                   {showWidget ? 'Тест запущен...' : isAuthenticated ? 'Запустить тест' : 'Требуется авторизация'}
                 </Button>
-              </Box>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Результаты */}
           {result && (
-            <Card sx={{ mt: 2 }}>
+            <Card style={{ marginTop: 16 }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
                   Результат теста
                 </Typography>
-                
-                <Alert 
+
+                <Alert
                   severity={result.type === 'success' ? 'success' : result.type === 'error' ? 'error' : 'info'}
-                  sx={{ mb: 2 }}
+                  role={result.type === 'error' ? 'alert' : 'status'}
+                  style={{ marginBottom: 12 }}
                 >
                   {result.message}
                 </Alert>
-                
+
                 {result.data && (
-                  <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                    <Typography variant="body2" component="pre" sx={{ fontSize: '0.75rem' }}>
-                      {JSON.stringify(result.data, null, 2)}
-                    </Typography>
-                  </Box>
+                  <pre style={resultPreStyle}>
+                    {JSON.stringify(result.data, null, 2)}
+                  </pre>
                 )}
               </CardContent>
             </Card>
           )}
-        </Grid>
+        </div>
 
-        {/* Виджет платежа */}
-        <Grid item xs={12} md={8}>
+        <div>
           {showWidget ? (
-                  <PaymentWidget
+            <PaymentWidget
               visitId={testData.visitId}
               amount={testData.amount}
               currency={testData.currency}
@@ -233,58 +313,53 @@ const PaymentTest = () => {
               onCancel={handlePaymentCancel}
             />
           ) : (
-            <Card sx={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CardContent>
-                <Box textAlign="center">
-                  <CreditCardIcon sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
+            <Card>
+              <CardContent style={placeholderStyle}>
+                <div>
+                  <CreditCard
+                    size={80}
+                    aria-hidden="true"
+                    style={{ color: 'var(--mac-text-tertiary)', marginBottom: 12 }}
+                  />
                   <Typography variant="h6" color="textSecondary">
                     Нажмите &quot;Запустить тест&quot; для отображения виджета
                   </Typography>
-                </Box>
+                </div>
               </CardContent>
             </Card>
           )}
-        </Grid>
-      </Grid>
+        </div>
+      </section>
 
-      {/* Информация о системе */}
-      <Card sx={{ mt: 4 }}>
+      <Card style={{ marginTop: 24 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Информация о тестируемой системе
           </Typography>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box textAlign="center" p={2}>
-                <Typography variant="h4" color="primary">3</Typography>
-                <Typography variant="body2" color="textSecondary">Провайдера</Typography>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box textAlign="center" p={2}>
-                <Typography variant="h4" color="success.main">2</Typography>
-                <Typography variant="body2" color="textSecondary">Валюты</Typography>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box textAlign="center" p={2}>
-                <Typography variant="h4" color="warning.main">100%</Typography>
-                <Typography variant="body2" color="textSecondary">Готовность</Typography>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Box textAlign="center" p={2}>
-                <Typography variant="h4" color="info.main">✓</Typography>
-                <Typography variant="body2" color="textSecondary">Webhook</Typography>
-              </Box>
-            </Grid>
-          </Grid>
-          
-          <Alert severity="info" sx={{ mt: 2 }}>
+
+          <div style={statsGridStyle}>
+            <div style={statItemStyle}>
+              <Typography variant="h4" color="primary">3</Typography>
+              <Typography variant="body2" color="textSecondary">Провайдера</Typography>
+            </div>
+
+            <div style={statItemStyle}>
+              <Typography variant="h4" color="success">2</Typography>
+              <Typography variant="body2" color="textSecondary">Валюты</Typography>
+            </div>
+
+            <div style={statItemStyle}>
+              <Typography variant="h4" color="warning">100%</Typography>
+              <Typography variant="body2" color="textSecondary">Готовность</Typography>
+            </div>
+
+            <div style={statItemStyle}>
+              <Typography variant="h4" color="primary">✓</Typography>
+              <Typography variant="body2" color="textSecondary">Webhook</Typography>
+            </div>
+          </div>
+
+          <Alert severity="info" style={{ marginTop: 16 }}>
             <Typography variant="body2">
               <strong>Поддерживаемые провайдеры:</strong> Click (UZS), Payme (UZS), Kaspi (KZT)
               <br />
@@ -295,7 +370,7 @@ const PaymentTest = () => {
           </Alert>
         </CardContent>
       </Card>
-    </Container>
+    </main>
   );
 };
 
