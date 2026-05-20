@@ -35,11 +35,11 @@ These PRs are already merged before this third-cycle checklist:
 - [x] PR-PERF-7 / #952: lazy-load admin queue profiles view.
 - [x] PR-PERF-8 / #953: lazy-load admin service catalog view.
 
-Current local build evidence after PR-PERF-11:
+Current local build evidence after PR-PERF-12 review:
 
 | Asset | Approx size |
 | --- | ---: |
-| `index-*` | `1397.95 KiB` |
+| `index-*` | `1400.99 KiB` |
 | `heic2any-*` | `1320.46 KiB` |
 | `AdminPanel-*` | `970.11 KiB` |
 | `AnalyticsPage-*` | `245.86 KiB` |
@@ -58,7 +58,7 @@ Current local build evidence after PR-PERF-11:
   into a lazy boundary.
 - [x] PR-PERF-11: split one additional low-risk analytics/admin reporting child
   view only if route/RBAC proof stays behavior-identical.
-- [ ] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
+- [x] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
   with one more optional-view split; stop if the next candidate is
   user/RBAC/payment/queue/Telegram/security-sensitive.
 - [ ] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
