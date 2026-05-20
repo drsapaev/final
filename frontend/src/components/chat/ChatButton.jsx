@@ -19,6 +19,7 @@ const ChatButton = () => {
             <button
                 onClick={() => setIsOpen(true)}
                 title={isConnected ? 'Сообщения' : 'Сообщения (офлайн)'}
+                aria-label={isConnected ? 'Сообщения' : 'Сообщения (офлайн)'}
                 style={{
                     position: 'relative',
                     width: '36px',

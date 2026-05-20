@@ -161,6 +161,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                             onClick={startRecording}
                             className="btn-record"
                             title="Записать голосовое сообщение"
+                            aria-label="Записать голосовое сообщение"
                         >
                             <Mic size={20} />
                             <span>Записать голосовое</span>
@@ -185,10 +186,10 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                     <span className="duration-label">{formatTime(duration)}</span>
 
                     <div className="preview-actions">
-                        <button onClick={handleCancel} className="btn-cancel" title="Отменить">
+                        <button onClick={handleCancel} className="btn-cancel" title="Отменить" aria-label="Отменить">
                             <Trash2 size={18} />
                         </button>
-                        <button onClick={handleSend} className="btn-send" title="Отправить">
+                        <button onClick={handleSend} className="btn-send" title="Отправить" aria-label="Отправить">
                             <Send size={18} />
                             <span>Отправить</span>
                         </button>

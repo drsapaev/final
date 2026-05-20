@@ -18,13 +18,13 @@ describe('Telegram Mini App appointment create guardrails', () => {
   it('keeps the create action behind a successful preview and create capability gate', () => {
     const createActionMarkup = sourceBetween(
       appSource,
-      "{appointmentPreview.status === 'ready' && previewAppointment && selectedCapability?.create_enabled && (",
-      "{appointmentCreate.status === 'error' && ("
+      '{appointmentPreview.status === \'ready\' && previewAppointment && selectedCapability?.create_enabled && (',
+      '{appointmentCreate.status === \'error\' && ('
     );
 
     expect(createActionMarkup).toContain('onClick={handleAppointmentCreate}');
     expect(createActionMarkup).toContain(
-      "disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}"
+      'disabled={appointmentCreate.status === \'loading\' || appointmentCreate.status === \'ready\'}'
     );
     expect(createActionMarkup).not.toContain('payment provider');
     expect(createActionMarkup).not.toContain('provider payload');
@@ -40,7 +40,7 @@ describe('Telegram Mini App appointment create guardrails', () => {
     expect(createHandler).toContain(
       'const requestBody = buildMiniAppAppointmentRequestBody(initData, appointmentPreviewForm);'
     );
-    expect(createHandler).toContain("api.post('/telegram/mini-app/appointments', requestBody)");
+    expect(createHandler).toContain('api.post(\'/telegram/mini-app/appointments\', requestBody)');
     expect(createHandler).not.toContain('/telegram/mini-app/appointments/preview');
     expect(createHandler).not.toMatch(/payment_provider|provider_payload|providerPayload|transaction|webhook|invoice|amount/i);
   });
@@ -58,8 +58,8 @@ describe('Telegram Mini App appointment create guardrails', () => {
     );
 
     expect(fieldChangeHandler).toContain('setAppointmentCreate({');
-    expect(fieldChangeHandler).toContain("status: 'idle'");
+    expect(fieldChangeHandler).toContain('status: \'idle\'');
     expect(previewSubmitHandler).toContain('setAppointmentCreate({');
-    expect(previewSubmitHandler).toContain("status: 'idle'");
+    expect(previewSubmitHandler).toContain('status: \'idle\'');
   });
 });
