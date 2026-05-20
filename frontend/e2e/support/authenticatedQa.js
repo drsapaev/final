@@ -68,6 +68,33 @@ export const AUTHENTICATED_UI_QA_ROUTES = [
   ...AUTHENTICATED_SPECIALTY_QA_ROUTES,
 ];
 
+export const AUTHENTICATED_RBAC_DENY_QA_ROUTES = [
+  {
+    key: 'cashier-denied-admin',
+    role: 'Cashier',
+    path: '/admin',
+    deniedRouteId: 'admin-dashboard',
+  },
+  {
+    key: 'doctor-denied-cashier',
+    role: 'Doctor',
+    path: '/cashier',
+    deniedRouteId: 'cashier-home',
+  },
+  {
+    key: 'cashier-denied-lab',
+    role: 'Cashier',
+    path: '/lab',
+    deniedRouteId: 'lab-home',
+  },
+  {
+    key: 'registrar-denied-cardiology',
+    role: 'Registrar',
+    path: '/doctor/cardiology',
+    deniedRouteId: 'doctor-cardiology',
+  },
+];
+
 function base64UrlEncode(value) {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')

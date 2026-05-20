@@ -15,6 +15,7 @@ This Playwright harness is for local UI/UX audit evidence only. It does not chan
 ```powershell
 cd frontend
 npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --reporter=line
+npx playwright test e2e/authenticated-rbac-deny.spec.js --project=chromium --reporter=line
 ```
 
 ## Role Coverage
@@ -33,6 +34,17 @@ npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --re
 
 `/patient` is currently staff-scoped in the route registry, so the patient QA surface uses the authenticated patient payment entry route.
 
+## Negative RBAC Coverage
+
+These checks seed an authenticated session with a real but wrong role and verify that the route guard sends the user to `/forbidden` instead of rendering the protected app shell or falling back to `/login`.
+
+| Seeded Role | Denied Route | Denied Route ID |
+| --- | --- | --- |
+| Cashier | `/admin` | `admin-dashboard` |
+| Doctor | `/cashier` | `cashier-home` |
+| Cashier | `/lab` | `lab-home` |
+| Registrar | `/doctor/cardiology` | `doctor-cardiology` |
+
 ## Boundaries
 
 - Do not use this harness to bypass backend contract tests.
@@ -40,3 +52,4 @@ npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --re
 - Do not weaken `RouteAccessBoundary`, `RoleGate`, or backend RBAC because this harness exists.
 - For business-flow verification, use live QA credentials or dedicated backend fixtures in a separate plan.
 - Keep negative RBAC browser checks in their own focused PR so this smoke harness remains a positive render check.
+- Negative RBAC smoke must not be used as backend authorization proof; it only verifies frontend route-denial UX.

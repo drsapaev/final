@@ -18,7 +18,7 @@ This checklist starts the second small-PR cycle for issues that remained after t
 
 - [x] PR-UX-10: fix invalid ARIA role lint warnings in touched frontend surfaces.
 - [x] PR-UX-11: promote the repeated specialty appointment summary/action-bar pattern into one reusable primitive, only if the current duplication stays behavior-identical.
-- [ ] PR-UX-12: extend authenticated QA harness into stable Playwright smoke specs for Admin, Doctor, Cashier, Lab, and specialty panels.
+- [x] PR-UX-12: extend authenticated QA harness into stable Playwright smoke specs for Admin, Doctor, Cashier, Lab, and specialty panels.
 - [ ] PR-UX-13: add negative RBAC browser checks for protected role routes without changing production auth behavior.
 - [ ] PR-UX-14: improve Registrar workflow hierarchy as one narrow visible slice.
 - [ ] PR-UX-15: improve Patient panel readability/accessibility as one narrow visible slice.
