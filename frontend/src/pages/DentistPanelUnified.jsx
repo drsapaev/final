@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button, Badge, Card } from '../components/ui/macos';
@@ -16,7 +16,6 @@ import DiagnosisForm from '../components/dental/DiagnosisForm';
 import VisitProtocol from '../components/dental/VisitProtocol';
 import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
-import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
@@ -62,10 +61,18 @@ import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
+const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
+
 const API_V1_BASE = getApiBaseUrl();
 const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const DENTISTRY_CALLED_STATUSES = ['called', 'in_progress'];
 const DENTISTRY_COMPLETED_STATUSES = ['completed', 'done'];
+const DENTISTRY_LAZY_FALLBACK_STYLE = {
+  margin: 'var(--mac-spacing-4)',
+  padding: 'var(--mac-spacing-4)',
+  color: 'var(--mac-text-secondary)',
+  textAlign: 'center'
+};
 const dentistryAppointmentsHeaderStyle = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -3522,7 +3529,13 @@ const DentistPanelUnified = () => {
       }
 
       {showReports &&
-      <ReportsAndAnalytics
+      <Suspense
+        fallback={
+          <Card role="status" aria-live="polite" style={DENTISTRY_LAZY_FALLBACK_STYLE}>
+            Загрузка отчетов...
+          </Card>
+        }>
+        <LazyReportsAndAnalytics
         patientId={selectedPatient?.id}
         doctorId={user?.id}
         clinicId={user?.clinic_id}
@@ -3531,7 +3544,8 @@ const DentistPanelUnified = () => {
           logger.info('Сохранение отчета:', reportData);
           setShowReports(false);
         }}
-        onClose={() => setShowReports(false)} />
+          onClose={() => setShowReports(false)} />
+      </Suspense>
 
       }
 
