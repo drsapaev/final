@@ -155,7 +155,6 @@ import ClinicManagement from '../components/admin/ClinicManagement';
 
 import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
 import AIAnalytics from '../components/analytics/AIAnalytics';
-import GraphQLExplorer from '../components/admin/GraphQLExplorer';
 import WebhookManager from '../components/admin/WebhookManager';
 import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
@@ -173,6 +172,8 @@ import { MobileNavigation } from '../components/admin/MobileOptimization';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
+
+const LazyGraphQLExplorer = React.lazy(() => import('../components/admin/GraphQLExplorer'));
 
 const getAppointmentPatientDisplayName = (appointment) => {
   const rawName =
@@ -2590,7 +2591,11 @@ const AdminPanel = () => {
       case 'queue-cabinet-management':
         return <QueueCabinetManagement />;
       case 'graphql-explorer':
-        return <GraphQLExplorer />;
+        return (
+          <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+            <LazyGraphQLExplorer />
+          </React.Suspense>
+        );
       case 'services':{
           // Вкладки для секции Services
           // ⭐ SSOT: DepartmentManagement удалён - QueueProfilesManager теперь единственный источник для вкладок регистратуры
