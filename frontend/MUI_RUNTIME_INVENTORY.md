@@ -227,3 +227,22 @@ Policy:
 Future cleanup should be a separate docs/examples PR: convert these examples to
 macOS primitives, archive them, or delete them after confirming no developer
 workflow still uses them.
+
+## PR-MUI-4 Risky Runtime Handoff
+
+The remaining runtime MUI islands are intentionally not migrated in a generic
+cleanup PR. They now require the gated handoff in
+`docs/audits/uiux-hard-audit-2026-05-20/mui-risky-islands-handoff.md`.
+
+Gate-required groups:
+
+- Payment: `PaymentWidget.jsx`, `PaymentTest.jsx`
+- Queue: `OnlineQueueManager.jsx`
+- Clinical: `LabReportGenerator.jsx`, `ECGViewer.jsx`,
+  `TreatmentPlanner.jsx`, `ToothModal.jsx`, `FamilyRelationsCard.jsx`
+- Telegram/AI: `TelegramManager.jsx`, `MCPMonitor.jsx`
+- Admin/shared: `UserManagement.jsx`, `Dashboard.jsx`
+
+Default rule: one risky MUI island per PR, with first-touch boundaries,
+read-only references, browser/auth proof, and stop conditions named before
+editing.
