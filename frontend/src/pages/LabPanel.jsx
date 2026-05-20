@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../components/ui/macos';
+import { Alert, Badge, Button, Card, CardContent, CardHeader, Icon } from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
@@ -18,6 +18,17 @@ const tabs = [
   { id: 'templates', label: 'Шаблоны', icon: 'rectangle.stack.badge.plus' },
   { id: 'reports', label: 'Бланки', icon: 'doc.text' }
 ];
+
+const LAB_PANEL_TITLE_ID = 'lab-panel-title';
+const LAB_PANEL_TABLIST_ID = 'lab-panel-tabs';
+
+function getLabPanelTabId(tabId) {
+  return `lab-panel-tab-${tabId}`;
+}
+
+function getLabPanelTabPanelId(tabId) {
+  return `lab-panel-tabpanel-${tabId}`;
+}
 
 function formatAppointmentEntry(queue, entry) {
   return {
@@ -63,6 +74,22 @@ function pickLatestInstance(left, right) {
     return rightTime > leftTime ? right : left;
   }
   return (right.id || 0) > (left.id || 0) ? right : left;
+}
+
+function normalizeListPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+  if (Array.isArray(payload?.results)) {
+    return payload.results;
+  }
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+  return [];
 }
 
 function mergeQueueEntriesWithLabInstances(queueEntries, labInstances) {
@@ -172,6 +199,40 @@ export default function LabPanel() {
     navigate(`/lab?tab=${tabId}`, { replace: true });
   }, [navigate]);
 
+  const handleTabKeyDown = useCallback((event, tabId) => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    const keyOffsets = {
+      ArrowRight: 1,
+      ArrowDown: 1,
+      ArrowLeft: -1,
+      ArrowUp: -1
+    };
+
+    let nextIndex = null;
+    if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1;
+    } else if (keyOffsets[event.key]) {
+      nextIndex = (currentIndex + keyOffsets[event.key] + tabs.length) % tabs.length;
+    }
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    switchTab(nextTab.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(getLabPanelTabId(nextTab.id))?.focus();
+    });
+  }, [switchTab]);
+
   const loadLabAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
@@ -202,7 +263,7 @@ export default function LabPanel() {
             visit_ids: visitIds,
             limit: Math.min(Math.max(visitIds.length * 4, 100), 500)
           });
-          mergedEntries = mergeQueueEntriesWithLabInstances(queueEntries, linkedInstances);
+          mergedEntries = mergeQueueEntriesWithLabInstances(queueEntries, normalizeListPayload(linkedInstances));
         } catch (linkError) {
           logger.warn('[LabPanel] queue/report status sync failed', linkError);
         }
@@ -234,8 +295,9 @@ export default function LabPanel() {
   const loadTemplates = useCallback(async (preferredTemplateId = null) => {
     try {
       const summary = await labReportingApi.listTemplates();
-      setTemplates(summary);
-      const templateId = preferredTemplateId || selectedTemplate?.id || summary[0]?.id || null;
+      const templateSummary = normalizeListPayload(summary);
+      setTemplates(templateSummary);
+      const templateId = preferredTemplateId || selectedTemplate?.id || templateSummary[0]?.id || null;
       if (templateId) {
         const detail = await labReportingApi.getTemplate(templateId);
         setSelectedTemplate(detail);
@@ -258,7 +320,7 @@ export default function LabPanel() {
     }
     try {
       const history = await labReportingApi.listInstances({ patient_id: patientId, limit: 50 });
-      setReportHistory(history);
+      setReportHistory(normalizeListPayload(history));
     } catch (error) {
       logger.error('[LabPanel] loadReportHistory failed', error);
       notify(
@@ -271,7 +333,7 @@ export default function LabPanel() {
   const loadRecentReports = useCallback(async () => {
     try {
       const instances = await labReportingApi.listInstances({ limit: 50 });
-      setRecentReports(instances);
+      setRecentReports(normalizeListPayload(instances));
     } catch (error) {
       logger.error('[LabPanel] loadRecentReports failed', error);
       notify(
@@ -369,7 +431,8 @@ export default function LabPanel() {
   }), [appointments.length, reportsCounter, templates.length]);
 
   return (
-    <div
+    <main
+      aria-labelledby={LAB_PANEL_TITLE_ID}
       style={{
         padding: '24px',
         display: 'grid',
@@ -386,87 +449,142 @@ export default function LabPanel() {
             padding: '18px 20px'
           }}
         >
-          <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+            <h1
+              id={LAB_PANEL_TITLE_ID}
+              style={{
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 700,
+                lineHeight: 1.2
+              }}
+            >
               <Icon name="cross.case" size={22} />
-              Панель лаборатории
-            </span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <span>Панель лаборатории</span>
+            </h1>
+            <div
+              id={LAB_PANEL_TABLIST_ID}
+              role="tablist"
+              aria-labelledby={LAB_PANEL_TITLE_ID}
+              style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}
+            >
               {tabs.map((tab) => (
                 <Button
                   key={tab.id}
+                  id={getLabPanelTabId(tab.id)}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={getLabPanelTabPanelId(tab.id)}
+                  aria-label={`${tab.label}: ${statusCounters[tab.id]} записей`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
                   variant={activeTab === tab.id ? 'primary' : 'outline'}
                   onClick={() => switchTab(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
                 >
                   <Icon name={tab.icon} size={16} />
                   {tab.label}
-                  <Badge variant={activeTab === tab.id ? 'success' : 'info'}>{statusCounters[tab.id]}</Badge>
+                  <Badge
+                    aria-hidden="true"
+                    variant={activeTab === tab.id ? 'success' : 'info'}
+                  >
+                    {statusCounters[tab.id]}
+                  </Badge>
                 </Button>
               ))}
             </div>
-          </CardTitle>
+          </div>
         </CardHeader>
         {message.text && (
-          <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
+          <CardContent
+            role={message.type === 'error' ? 'alert' : 'status'}
+            aria-live={message.type === 'error' ? 'assertive' : 'polite'}
+            style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}
+          >
             <Alert severity={message.type === 'error' ? 'error' : 'info'}>{message.text}</Alert>
           </CardContent>
         )}
       </Card>
 
       {activeTab === 'queue' && (
-        <LabQueueWorkbench
-          appointments={appointments}
-          loading={appointmentsLoading}
-          onRefresh={loadLabAppointments}
-          onOpenAppointment={(appointment) => {
-            setSelectedAppointment(appointment);
-            setActiveInstance(null);
-            setTemplateResolution(null);
-            switchTab('reports');
-          }}
-          selectedAppointment={selectedAppointment}
-          reportHistory={reportHistory}
-        />
+        <section
+          id={getLabPanelTabPanelId('queue')}
+          role="tabpanel"
+          aria-labelledby={getLabPanelTabId('queue')}
+          tabIndex={0}
+        >
+          <LabQueueWorkbench
+            appointments={appointments}
+            loading={appointmentsLoading}
+            onRefresh={loadLabAppointments}
+            onOpenAppointment={(appointment) => {
+              setSelectedAppointment(appointment);
+              setActiveInstance(null);
+              setTemplateResolution(null);
+              switchTab('reports');
+            }}
+            selectedAppointment={selectedAppointment}
+            reportHistory={reportHistory}
+          />
+        </section>
       )}
 
       {activeTab === 'templates' && (
-        <LabTemplateWorkbench
-          templates={templates}
-          selectedTemplate={selectedTemplate}
-          onSelectTemplate={async (templateId) => {
-            try {
-              const template = await labReportingApi.getTemplate(templateId);
-              setSelectedTemplate(template);
-            } catch (error) {
-              notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
-            }
-          }}
-          onTemplatesChanged={async (preferredTemplateId = null) => {
-            await loadTemplates(preferredTemplateId);
-          }}
-          notify={notify}
-        />
+        <section
+          id={getLabPanelTabPanelId('templates')}
+          role="tabpanel"
+          aria-labelledby={getLabPanelTabId('templates')}
+          tabIndex={0}
+        >
+          <LabTemplateWorkbench
+            templates={templates}
+            selectedTemplate={selectedTemplate}
+            onSelectTemplate={async (templateId) => {
+              try {
+                const template = await labReportingApi.getTemplate(templateId);
+                setSelectedTemplate(template);
+              } catch (error) {
+                notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
+              }
+            }}
+            onTemplatesChanged={async (preferredTemplateId = null) => {
+              await loadTemplates(preferredTemplateId);
+            }}
+            notify={notify}
+          />
+        </section>
       )}
 
       {activeTab === 'reports' && (
-        <LabReportWorkbench
-          selectedAppointment={selectedAppointment}
-          templates={templates}
-          templateResolution={templateResolution}
-          templateResolutionLoading={templateResolutionLoading}
-          reportHistory={reportHistory}
-          recentReports={recentReports}
-          activeInstance={activeInstance}
-          onInstanceChange={setActiveInstance}
-          onOpenInstance={loadInstance}
-          onRefreshHistory={loadReportHistory}
-          onRefreshRecentReports={loadRecentReports}
-          onQueueChanged={loadLabAppointments}
-          notify={notify}
-        />
+        <section
+          id={getLabPanelTabPanelId('reports')}
+          role="tabpanel"
+          aria-labelledby={getLabPanelTabId('reports')}
+          tabIndex={0}
+        >
+          <LabReportWorkbench
+            selectedAppointment={selectedAppointment}
+            templates={templates}
+            templateResolution={templateResolution}
+            templateResolutionLoading={templateResolutionLoading}
+            reportHistory={reportHistory}
+            recentReports={recentReports}
+            activeInstance={activeInstance}
+            onInstanceChange={setActiveInstance}
+            onOpenInstance={loadInstance}
+            onRefreshHistory={loadReportHistory}
+            onRefreshRecentReports={loadRecentReports}
+            onQueueChanged={loadLabAppointments}
+            notify={notify}
+          />
+        </section>
       )}
 
       <RoleNotificationCenter userRole="lab" />
-    </div>
+    </main>
   );
 }
