@@ -246,3 +246,16 @@ Gate-required groups:
 Default rule: one risky MUI island per PR, with first-touch boundaries,
 read-only references, browser/auth proof, and stop conditions named before
 editing.
+
+## Dashboard Route Owner Discovery
+
+`docs/audits/uiux-hard-audit-2026-05-20/dashboard-route-owner-discovery.md`
+records a source-based route ownership check for
+`frontend/src/components/dashboard/Dashboard.jsx`.
+
+Current decision: `Dashboard.jsx` has no confirmed active route owner or caller
+in `frontend/src`. Do not spend a runtime MUI migration PR on this file unless
+a caller appears. The next safe step is a dedicated archive/delete PR for
+`frontend/src/components/dashboard/Dashboard.jsx` and its caller-free barrel
+`frontend/src/components/dashboard/index.js`, validated by frontend build and a
+fresh MUI inventory.
