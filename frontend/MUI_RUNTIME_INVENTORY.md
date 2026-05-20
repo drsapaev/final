@@ -203,3 +203,27 @@ actions without a dedicated admin/RBAC browser proof slice.
 Next safe step: PR-MUI-3 example-only policy for
 `frontend/src/components/examples/UnifiedButton.tsx` and
 `frontend/src/components/examples/UnifiedCard.tsx`.
+
+## PR-MUI-3 Example-Only Policy
+
+The two `components/examples/Unified*` files remain MUI references, but static
+search found no active app callers for `UnifiedButton` or `UnifiedCard`.
+`MacOSDemoPage.jsx` lazy-loads `components/examples/MacOSDemo`, not these two
+files.
+
+Policy:
+
+- Treat `frontend/src/components/examples/UnifiedButton.tsx` and
+  `frontend/src/components/examples/UnifiedCard.tsx` as isolated example-only
+  MUI debt, not active clinic runtime UI.
+- Do not import these files into app pages, role panels, workflow components,
+  route views, payment/queue/clinical screens, or authenticated dashboards.
+- Do not copy their MUI patterns into new clinic runtime UI; use
+  `frontend/src/components/ui/macos` first.
+- If either file becomes reachable from an active route, reclassify it as
+  runtime debt and require a scoped migration/removal PR.
+- Leave MUI dependencies in place while any runtime MUI imports remain.
+
+Future cleanup should be a separate docs/examples PR: convert these examples to
+macOS primitives, archive them, or delete them after confirming no developer
+workflow still uses them.

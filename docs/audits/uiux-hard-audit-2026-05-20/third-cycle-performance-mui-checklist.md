@@ -65,7 +65,7 @@ Current local build evidence after PR-PERF-12 review:
   performance changes and classify remaining runtime/example MUI refs.
 - [x] PR-MUI-2: decide no low-risk admin MUI island is eligible without
   route/browser proof and keep runtime UI unchanged.
-- [ ] PR-MUI-3: decide example-only MUI policy for `components/examples` without
+- [x] PR-MUI-3: decide example-only MUI policy for `components/examples` without
   changing runtime UI.
 - [ ] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
   MUI islands; do not migrate them in the same PR as the handoff.
