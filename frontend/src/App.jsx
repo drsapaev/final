@@ -329,8 +329,8 @@ function TelegramMiniAppPatientShell() {
   const handleAppointmentPreviewSubmit = (event) => {
     event.preventDefault();
 
-    const initData = getTelegramMiniAppInitData();
-    if (!initData || !appointmentPreviewForm.appointmentDate) {
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
+    if (!authPayload || !appointmentPreviewForm.appointmentDate) {
       setAppointmentPreview({
         status: 'error',
         payload: null,
@@ -340,7 +340,7 @@ function TelegramMiniAppPatientShell() {
     }
 
     const requestBody = {
-      initData,
+      ...authPayload,
       appointmentDate: appointmentPreviewForm.appointmentDate,
       appointmentTime: appointmentPreviewForm.appointmentTime || undefined,
       department: appointmentPreviewForm.department.trim() || undefined,

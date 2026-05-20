@@ -986,10 +986,12 @@ def _base36_decode(value: str) -> int:
 
 def _patient_mini_app_token_section(section: str | None) -> str:
     normalized = str(section or "cabinet").strip().lower()
-    if normalized == "booking":
+    if normalized in {"booking", "doctors"}:
         return "appointments"
     if normalized == "payment":
         return "payments"
+    if normalized == "documents":
+        return "results"
     if normalized in PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS:
         return normalized
     return "cabinet"
@@ -4059,8 +4061,10 @@ async def _handle_clinic_bot_update(
 class TelegramMiniAppAppointmentPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
     appointment_date: date = Field(..., alias="appointmentDate")
     appointment_time: str | None = Field(default=None, alias="appointmentTime")
     doctor_id: int | None = Field(default=None, alias="doctorId")
@@ -4080,8 +4084,10 @@ class TelegramMiniAppPatientManifestRequest(BaseModel):
 class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
 
 
 class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
@@ -4096,16 +4102,20 @@ class TelegramMiniAppPatientCabinetSummaryRequest(BaseModel):
 class TelegramMiniAppPatientReportDownloadRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
     report_id: int = Field(..., alias="reportId", ge=1)
 
 
 class TelegramMiniAppPatientFormSubmissionRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    init_data: str = Field(..., alias="initData", min_length=1)
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
     patient_id: int | None = Field(default=None, alias="patientId")
+    section: str | None = None
     form_id: str = Field(..., alias="formId", min_length=1, max_length=64)
     answers: dict[str, Any] = Field(default_factory=dict)
     status: str = Field(default="submitted")
@@ -4167,24 +4177,25 @@ def _mini_app_forms_scope_status_code(reason: str) -> int:
 def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
     db: Session,
+    *,
+    allow_entry_token: bool = False,
 ):
-    bot_token = _get_configured_bot_token(db)
-    if not bot_token:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"reason": "bot_token_required"},
-        )
-
     try:
-        init_data = validate_telegram_mini_app_init_data(
-            request_body.init_data,
-            bot_token=bot_token,
-        )
-        scope = resolve_telegram_mini_app_session_scope(
-            db,
-            init_data,
-            expected_scope="patient",
-        )
+        if allow_entry_token:
+            scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
+                db,
+                init_data_payload=request_body.init_data,
+                entry_token=request_body.entry_token,
+                expected_section=request_body.section or "appointments",
+            )
+        else:
+            if not request_body.init_data:
+                raise TelegramMiniAppInitDataError("init_data_required")
+            scope = _resolve_mini_app_patient_scope_from_init_data(
+                db,
+                request_body.init_data,
+            )
+
         preview = build_telegram_mini_app_appointment_booking_preview(
             scope,
             patient_id=request_body.patient_id,
@@ -4506,12 +4517,17 @@ def _build_mini_app_patient_cabinet_summary_from_request(
 
 def _resolve_mini_app_patient_scope_for_optional_patient(
     db: Session,
-    init_data_payload: str,
+    init_data_payload: str | None,
+    entry_token: str | None,
     patient_id: int | None,
+    *,
+    expected_section: str | None = None,
 ):
-    scope = _resolve_mini_app_patient_scope_from_init_data(
+    scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
         db,
-        init_data_payload,
+        init_data_payload=init_data_payload,
+        entry_token=entry_token,
+        expected_section=expected_section,
     )
     if patient_id is not None and int(scope.patient_id) != int(patient_id):
         raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
@@ -4526,7 +4542,9 @@ def _build_mini_app_patient_report_download_response(
         scope = _resolve_mini_app_patient_scope_for_optional_patient(
             db,
             request_body.init_data,
+            request_body.entry_token,
             request_body.patient_id,
+            expected_section=request_body.section or "results",
         )
     except TelegramMiniAppInitDataError as exc:
         raise HTTPException(
@@ -4575,9 +4593,11 @@ def _build_mini_app_patient_forms_preview_from_request(
     db: Session,
 ):
     try:
-        scope = _resolve_mini_app_patient_scope_from_init_data(
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
-            request_body.init_data,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "forms",
         )
         preview = build_telegram_mini_app_patient_forms_preview(
             db,
@@ -4603,9 +4623,11 @@ def _save_mini_app_patient_form_submission_from_request(
     db: Session,
 ):
     try:
-        scope = _resolve_mini_app_patient_scope_from_init_data(
+        scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
-            request_body.init_data,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "forms",
         )
         result = save_telegram_mini_app_patient_form_submission(
             db,
@@ -4642,6 +4664,7 @@ def preview_mini_app_appointment_booking(
     preview = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
+        allow_entry_token=True,
     )
     return preview.to_response_payload()
 
