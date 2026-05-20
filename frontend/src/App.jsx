@@ -226,6 +226,11 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
+  const [paymentsManifest, setPaymentsManifest] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -378,6 +383,62 @@ function TelegramMiniAppPatientShell() {
     };
   }, [selectedSection, state.status]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (state.status !== 'ready' || selectedSection !== 'payments') {
+      setPaymentsManifest({
+        status: 'idle',
+        payload: null,
+        error: null,
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const initData = getTelegramMiniAppInitData();
+    if (!initData) {
+      setPaymentsManifest({
+        status: 'error',
+        payload: null,
+        error: 'Mini App session is not confirmed.',
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setPaymentsManifest({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/payments/manifest', { initData })
+      .then((response) => {
+        if (!isMounted) return;
+        setPaymentsManifest({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        const reason = error?.response?.data?.detail?.reason || 'payments_manifest_failed';
+        setPaymentsManifest({
+          status: 'error',
+          payload: null,
+          error: `Patient payments are unavailable: ${reason}`,
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSection, state.status]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
@@ -392,6 +453,10 @@ function TelegramMiniAppPatientShell() {
   );
   const canShowCabinetManifest = Boolean(
     selectedSection === 'cabinet' &&
+    selectedCapability?.manifest_endpoint
+  );
+  const canShowPaymentsManifest = Boolean(
+    selectedSection === 'payments' &&
     selectedCapability?.manifest_endpoint
   );
 
@@ -450,6 +515,7 @@ function TelegramMiniAppPatientShell() {
   const previewAppointment = appointmentPreview.payload?.appointment || null;
   const formsManifestItems = formsManifest.payload?.forms || [];
   const cabinetManifestSections = cabinetManifest.payload?.sections || [];
+  const paymentsManifestSections = paymentsManifest.payload?.sections || [];
 
   return (
     <div style={miniAppPageStyle}>
@@ -569,6 +635,79 @@ function TelegramMiniAppPatientShell() {
                               </Badge>
                               <Badge variant={section.contains_billing_records ? 'warning' : 'success'} size="small">
                                 {section.contains_billing_records ? 'billing records' : 'no billing records'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {canShowPaymentsManifest && (
+              <Card padding="small" shadow="none" style={miniAppPaymentsManifestStyle}>
+                <CardContent style={miniAppFormsManifestContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>Patient payments</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>Manifest only</h2>
+                    </div>
+                    <Badge variant="secondary" size="small">No amounts or charges</Badge>
+                  </div>
+
+                  {paymentsManifest.status === 'loading' && (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      Loading payment status...
+                    </Alert>
+                  )}
+
+                  {paymentsManifest.status === 'error' && (
+                    <Alert severity="error" style={miniAppNoticeStyle}>
+                      {paymentsManifest.error}
+                    </Alert>
+                  )}
+
+                  {paymentsManifest.status === 'ready' && (
+                    <>
+                      <div style={miniAppFormsSummaryStyle}>
+                        <Badge variant={paymentsManifest.payload?.payments_enabled ? 'primary' : 'secondary'} size="small">
+                          {paymentsManifest.payload?.payments_enabled ? 'payments on' : 'payments planned'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {paymentsManifest.payload?.read_enabled ? 'read on' : 'read off'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {paymentsManifest.payload?.payment_capture_enabled ? 'capture on' : 'capture off'}
+                        </Badge>
+                        <Badge variant="secondary" size="small">
+                          {paymentsManifest.payload?.provider_redirect_enabled ? 'provider redirect on' : 'provider redirect off'}
+                        </Badge>
+                      </div>
+
+                      <section style={miniAppFormsGridStyle}>
+                        {paymentsManifestSections.map((section) => (
+                          <div key={section.key || section.title} style={miniAppPaymentsManifestItemStyle}>
+                            <div>
+                              <h3 style={miniAppFormManifestTitleStyle}>{section.title || section.key}</h3>
+                              <p style={miniAppCapabilityTextStyle}>{section.status || 'planned'}</p>
+                            </div>
+                            <div style={miniAppFormManifestBadgeRowStyle}>
+                              <Badge variant="secondary" size="small">
+                                {section.read_enabled ? 'read on' : 'read off'}
+                              </Badge>
+                              <Badge variant="secondary" size="small">
+                                {section.payment_enabled ? 'payment on' : 'payment off'}
+                              </Badge>
+                              <Badge variant={section.contains_amounts ? 'warning' : 'success'} size="small">
+                                {section.contains_amounts ? 'amounts present' : 'no amounts'}
+                              </Badge>
+                              <Badge variant={section.contains_payment_records ? 'warning' : 'success'} size="small">
+                                {section.contains_payment_records ? 'payment records' : 'no payment records'}
+                              </Badge>
+                              <Badge variant={section.contains_provider_payloads ? 'warning' : 'success'} size="small">
+                                {section.contains_provider_payloads ? 'provider payloads' : 'no provider payloads'}
                               </Badge>
                             </div>
                           </div>
@@ -1117,6 +1256,11 @@ const miniAppCabinetManifestStyle = {
   borderColor: 'rgba(0, 122, 255, 0.24)',
 };
 
+const miniAppPaymentsManifestStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(255, 149, 0, 0.26)',
+};
+
 const miniAppFormsManifestContentStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -1152,6 +1296,12 @@ const miniAppCabinetManifestItemStyle = {
   ...miniAppFormManifestItemStyle,
   border: '1px solid rgba(0, 122, 255, 0.22)',
   background: 'rgba(0, 122, 255, 0.07)',
+};
+
+const miniAppPaymentsManifestItemStyle = {
+  ...miniAppFormManifestItemStyle,
+  border: '1px solid rgba(255, 149, 0, 0.24)',
+  background: 'rgba(255, 149, 0, 0.08)',
 };
 
 const miniAppFormManifestTitleStyle = {
