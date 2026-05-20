@@ -29,63 +29,6 @@ body {
   flex-direction: column;
 }
 
-/* Исправления для MUI Box компонентов */
-.MuiBox-root {
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 100vh !important;
-  width: 100% !important;
-}
-
-/* Исправления для MUI Chip - возвращаем нормальный размер */
-.MuiChip-root {
-  height: auto !important;
-  font-size: 0.8125rem !important;
-  line-height: 1.4 !important;
-}
-
-.MuiChip-sizeSmall {
-  height: 24px !important;
-  font-size: 0.75rem !important;
-}
-
-.MuiChip-label {
-  padding: 0 8px !important;
-  font-size: inherit !important;
-  line-height: inherit !important;
-}
-
-.MuiChip-labelSmall {
-  padding: 0 6px !important;
-  font-size: 0.75rem !important;
-}
-
-.MuiChip-icon {
-  width: 18px !important;
-  height: 18px !important;
-  margin-left: 4px !important;
-  margin-right: -6px !important;
-}
-
-.MuiChip-iconSmall {
-  width: 16px !important;
-  height: 16px !important;
-  margin-left: 4px !important;
-  margin-right: -4px !important;
-}
-
-/* Исправления для основных контейнеров */
-.css-axw7ok,
-.css-1uqhpru,
-.css-k008qs {
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 100vh !important;
-  width: 100% !important;
-  background-color: var(--mac-bg-primary, var(--bg-primary, #ffffff)) !important;
-  color: var(--mac-text-primary, var(--text-primary, #1e293b)) !important;
-}
-
 /* Исправления для панелей */
 .panel-container {
   display: flex;
@@ -144,14 +87,6 @@ body {
 [data-theme="dark"][data-color-scheme="dark"] {
   background-color: var(--bg-primary, #0f172a);
   color: var(--text-primary, #f8fafc);
-}
-
-[data-theme="dark"][data-color-scheme="dark"] .MuiBox-root,
-[data-theme="dark"][data-color-scheme="dark"] .css-axw7ok,
-[data-theme="dark"][data-color-scheme="dark"] .css-1uqhpru,
-[data-theme="dark"][data-color-scheme="dark"] .css-k008qs {
-  background-color: var(--bg-primary, #0f172a) !important;
-  color: var(--text-primary, #f8fafc) !important;
 }
 
 /* Исправления для скроллбара - единый стиль как у админ панели */
@@ -246,13 +181,6 @@ body {
 
 /* Исправления для адаптивности */
 @media (max-width: 768px) {
-  .MuiBox-root,
-  .css-axw7ok,
-  .css-1uqhpru,
-  .css-k008qs {
-    padding: 8px !important;
-  }
-
   .panel-container {
     padding: 8px !important;
     box-sizing: border-box;
