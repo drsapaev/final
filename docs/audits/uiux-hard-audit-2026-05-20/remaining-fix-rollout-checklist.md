@@ -24,8 +24,8 @@ This checklist starts the second small-PR cycle for issues that remained after t
 - [x] PR-UX-15: improve Patient panel readability/accessibility as one narrow visible slice.
 - [x] PR-UX-16: improve Lab panel visual/accessibility QA as one narrow visible slice.
 - [x] PR-UX-17: migrate one low-risk MUI island or document why no low-risk runtime island is safe yet.
-- [ ] PR-PERF-1: report and plan Vite large chunk / dynamic-static import overlap remediation without changing runtime behavior.
-- [ ] Final: summarize second-cycle completion, remaining unknowns, and next backlog.
+- [x] PR-PERF-1: report and plan Vite large chunk / dynamic-static import overlap remediation without changing runtime behavior.
+- [x] Final: summarize second-cycle completion, remaining unknowns, and next backlog.
 
 ## Validation Baseline
 
