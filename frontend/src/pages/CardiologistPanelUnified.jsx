@@ -21,6 +21,7 @@ import {
   MacOSCheckbox } from
 '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ECGViewer from '../components/cardiology/ECGViewer';
@@ -41,6 +42,29 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 import tokenManager from '../utils/tokenManager';
 
 const API_V1_BASE = getApiBaseUrl();
+const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
+const CARDIOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
+const CARDIOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
+const cardiologyAppointmentsHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 'var(--mac-spacing-4)',
+  marginBottom: 'var(--mac-spacing-6)',
+  flexWrap: 'wrap'
+};
+const cardiologyAppointmentsTitleStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  fontSize: 'var(--mac-font-size-lg)',
+  fontWeight: 'var(--mac-font-weight-semibold)',
+  color: 'var(--mac-text-primary)',
+  margin: 0,
+  minWidth: 'min(100%, 260px)'
+};
+function countAppointmentsByStatuses(appointments, statuses) {
+  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
+}
 
 /**
  * Унифицированная панель кардиолога
@@ -1443,6 +1467,32 @@ const MacOSCardiologistPanelUnified = () => {
     || selectedPatient?.patient?.full_name
     || selectedPatient?.patient?.name
     || '—';
+  const appointmentSummaryItems = [
+    {
+      key: 'total',
+      label: 'Всего',
+      value: appointments.length,
+      variant: 'info'
+    },
+    {
+      key: 'waiting',
+      label: 'Ожидают',
+      value: countAppointmentsByStatuses(appointments, CARDIOLOGY_WAITING_STATUSES),
+      variant: 'warning'
+    },
+    {
+      key: 'called',
+      label: 'Вызваны',
+      value: countAppointmentsByStatuses(appointments, CARDIOLOGY_CALLED_STATUSES),
+      variant: 'primary'
+    },
+    {
+      key: 'completed',
+      label: 'Приняты',
+      value: countAppointmentsByStatuses(appointments, CARDIOLOGY_COMPLETED_STATUSES),
+      variant: 'success'
+    }
+  ];
 
   return (
     <div style={{
@@ -1495,59 +1545,21 @@ const MacOSCardiologistPanelUnified = () => {
               overflow: 'hidden',
               padding: '24px'
             }}>
-                <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '24px'
-              }}>
-                  <h3 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontSize: 'var(--mac-font-size-lg)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-primary)',
-                  margin: 0
-                }}>
+                <div style={cardiologyAppointmentsHeaderStyle}>
+                  <h3 style={cardiologyAppointmentsTitleStyle}>
                     <Calendar size={20} style={{
                     marginRight: '12px',
                     color: 'var(--mac-accent)'
                   }} />
                     Записи к кардиологу
                   </h3>
-                  <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                    {/* Статистика очереди */}
-                    <MacOSBadge variant="info">
-                      Всего: {appointments.length}
-                    </MacOSBadge>
-                    <MacOSBadge variant="warning">
-                      Ожидают: {appointments.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
-                    </MacOSBadge>
-                    <MacOSBadge variant="primary">
-                      Вызваны: {appointments.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
-                    </MacOSBadge>
-                    <MacOSBadge variant="success">
-                      Приняты: {appointments.filter((a) => a.status === 'completed' || a.status === 'done').length}
-                    </MacOSBadge>
-
-                    <MacOSButton
-                    variant="outline"
-                    onClick={loadMacOSCardiologyAppointments}
-                    disabled={appointmentsLoading}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-
-                      <RefreshCw size={16} />
-                      Обновить
-                    </MacOSButton>
-                  </div>
+                  <AppointmentSummaryBar
+                    ariaLabel="Сводка записей кардиолога"
+                    items={appointmentSummaryItems}
+                    onRefresh={loadMacOSCardiologyAppointments}
+                    refreshDisabled={appointmentsLoading}
+                    buttonProps={{ variant: 'outline' }}
+                  />
                 </div>
 
                 {appointmentsLoading ?
@@ -2564,7 +2576,7 @@ const MacOSCardiologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-        <RoleNotificationCenter role="cardiologist" />
+        <RoleNotificationCenter userRole="cardiologist" />
       </div>
     </div>);
 

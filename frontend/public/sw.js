@@ -381,12 +381,12 @@ async function syncClinicData() {
 // Обработка HEIC конвертации
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CONVERT_HEIC') {
-    event.waitUntil(convertHEICToJPEG(event.data.file, event.ports[0]));
+    event.waitUntil(convertHEICToJPEG(event.data.file, event.ports[0], event.data.quality));
   }
 });
 
 // HEIC → JPEG конвертация
-async function convertHEICToJPEG(heicFile, port) {
+async function convertHEICToJPEG(heicFile, port, quality = 0.8) {
   try {
     // Импортируем heic2any динамически
     const heic2any = (await import('https://cdn.skypack.dev/heic2any')).default;
@@ -394,7 +394,7 @@ async function convertHEICToJPEG(heicFile, port) {
     const jpegBlob = await heic2any({
       blob: heicFile,
       toType: 'image/jpeg',
-      quality: 0.8
+      quality
     });
     
     port.postMessage({

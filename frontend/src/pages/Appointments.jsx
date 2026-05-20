@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
-import { AppEmpty, AppError, Button } from '../components/ui/macos';
+import { AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input } from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
@@ -21,7 +20,6 @@ function todayStr() {
  * Для минимальных перезаписей реализуем только чтение и поиск.
  */
 export default function Appointments() {
-  const [page, setPage] = useState('Appointments');
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -61,29 +59,65 @@ export default function Appointments() {
     );
   }, [q, rows]);
   const isFilteredEmpty = q.trim().length > 0 && rows.length > 0 && filtered.length === 0;
+  const toolbarStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap'
+  };
+  const fieldStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'var(--mac-text-secondary)',
+    fontSize: 13
+  };
+  const tableWrapStyle = {
+    overflowX: 'auto',
+    border: '1px solid var(--mac-card-border)',
+    borderRadius: 8,
+    background: 'var(--mac-card-bg)',
+    marginTop: 16
+  };
+  const tableStyle = {
+    width: '100%',
+    borderCollapse: 'collapse'
+  };
 
   return (
     <div>
-      <Nav active={page} onNavigate={setPage} />
       <RoleGate roles={['Admin', 'Registrar', 'Doctor']}>
-        <div className="legacy-page-shell">
-          <h2 style={{ margin: 0 }}>Записи</h2>
+        <Card>
+          <CardHeader>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>Записи</h2>
+              <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
+                {filtered.length} из {rows.length}
+              </span>
+            </div>
+          </CardHeader>
 
-          <div className="legacy-toolbar">
-            <label>
+          <CardContent>
+          <div style={toolbarStyle}>
+            <label style={fieldStyle}>
               Дата:&nbsp;
-              <input className="legacy-input" type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
+              <Input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
             </label>
-            <input className="legacy-input" placeholder="Поиск по пациенту/врачу/статусу/ID" value={q} onChange={(e)=>setQ(e.target.value)} style={{ minWidth: 260 }} />
-            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
-            <label>
-              <input 
-                type="checkbox" 
-                checked={useAdvancedTable} 
-                onChange={(e) => setUseAdvancedTable(e.target.checked)} 
-              />
-              &nbsp;Расширенная таблица
-            </label>
+            <Input
+              placeholder="Поиск по пациенту/врачу/статусу/ID"
+              value={q}
+              onChange={(e)=>setQ(e.target.value)}
+              style={{ minWidth: 260 }}
+              aria-label="Поиск по записям"
+            />
+            <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
+              Обновить
+            </Button>
+            <Checkbox
+              checked={useAdvancedTable}
+              onChange={(next) => setUseAdvancedTable(next)}
+              label="Расширенная таблица"
+            />
           </div>
 
           {err && (
@@ -107,8 +141,8 @@ export default function Appointments() {
               setShowWizard={(show) => logger.log('Show wizard:', show)}
             />
           ) : (
-            <div className="legacy-table-wrap">
-              <table className="legacy-table">
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -160,7 +194,8 @@ export default function Appointments() {
               </table>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </RoleGate>
     </div>
   );

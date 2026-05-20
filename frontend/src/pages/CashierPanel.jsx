@@ -199,6 +199,34 @@ const buildReceiptPrintPayload = (paymentRow) => {
   };
 };
 
+const getPaymentStatusMeta = (status) => {
+  const normalizedStatus = String(status || 'pending').trim().toLowerCase();
+  const statusMap = {
+    paid: { variant: 'success', ariaLabel: 'Payment status: paid' },
+    partial: { variant: 'info', ariaLabel: 'Payment status: partially paid' },
+    cancelled: { variant: 'danger', ariaLabel: 'Payment status: cancelled' },
+    refunded: { variant: 'danger', ariaLabel: 'Payment status: refunded' },
+    pending: { variant: 'warning', ariaLabel: 'Payment status: pending' },
+  };
+
+  return statusMap[normalizedStatus] || statusMap.pending;
+};
+
+const getPaymentActionContext = (paymentRow) => {
+  const paymentId = resolvePaymentId(paymentRow) || 'unknown';
+  const patientName = paymentRow?.patient || paymentRow?.patient_name || 'unknown patient';
+  return `payment ${paymentId} for ${patientName}`;
+};
+
+const getAppointmentPaymentActionContext = (appointment) => {
+  const appointmentId = appointment?.visit_id || appointment?.id || appointment?.patient_id || 'unknown';
+  const patientName = appointment?.patient_name ||
+    (appointment?.patient_last_name && appointment?.patient_first_name
+      ? `${appointment.patient_last_name} ${appointment.patient_first_name}`
+      : 'unknown patient');
+  return `appointment ${appointmentId} for ${patientName}`;
+};
+
 const CashierPanel = () => {void
   useBreakpoint();
   const location = useLocation();
@@ -1214,14 +1242,20 @@ const CashierPanel = () => {void
                               {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
                             </td>
                             <td style={{ padding: '12px 16px' }}>
-                              <Badge variant="warning">Ожидает оплаты</Badge>
+                              <Badge
+                                variant="warning"
+                                role="status"
+                                aria-label="Payment status: pending">
+                                Ожидает оплаты
+                              </Badge>
                             </td>
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openPaymentWidget(appointment)}>
+                            onClick={() => openPaymentWidget(appointment)}
+                            aria-label={`Start online payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
                                   💳 Онлайн
                                 </Button>
@@ -1229,7 +1263,8 @@ const CashierPanel = () => {void
                             size="sm"
                             onClick={() => {
                               paymentModal.openModal(appointment);
-                            }}>
+                            }}
+                            aria-label={`Take cash payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
                                   💵 Касса
                                 </Button>
@@ -1336,12 +1371,10 @@ const CashierPanel = () => {void
                                 {format(row.total_amount || row.amount || 0)}
                               </td>
                               <td style={{ padding: '12px 16px' }}>
-                                <Badge variant={
-                        row.status === 'paid' ? 'success' :
-                        row.status === 'partial' ? 'info' :
-                        row.status === 'cancelled' || row.status === 'refunded' ? 'danger' :
-                        'warning'
-                        }>
+                                <Badge
+                                  variant={getPaymentStatusMeta(row.status).variant}
+                                  role="status"
+                                  aria-label={getPaymentStatusMeta(row.status).ariaLabel}>
                                   {row.status === 'paid' ? 'Оплачено' :
                           row.status === 'partial' ? 'Частично' :
                           row.status === 'cancelled' ? 'Отменён' :
@@ -1350,14 +1383,19 @@ const CashierPanel = () => {void
                                 </Badge>
                               </td>
                               <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                <Button size="sm" variant="outline" onClick={() => confirmPayment(row.id)}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => confirmPayment(row.id)}
+                                  aria-label={`Confirm ${getPaymentActionContext(row)}`}>
                                   ✅ Принять
                                 </Button>
                                 <Button
                           size="sm"
                           variant="outline"
                           onClick={() => openCancelDialog(row.id)}
-                          disabled={row.status === 'cancelled'}>
+                          disabled={row.status === 'cancelled'}
+                          aria-label={`Cancel ${getPaymentActionContext(row)}`}>
 
                                   ❌ Отмена
                                 </Button>
@@ -1367,6 +1405,7 @@ const CashierPanel = () => {void
                           variant="outline"
                           onClick={() => openRefundDialog(row)}
                           disabled={row.status === 'cancelled' || row.status === 'refunded'}
+                          aria-label={`Refund ${getPaymentActionContext(row)}`}
                           title="Возврат средств">
 
                                   💸 Возврат
@@ -1376,6 +1415,7 @@ const CashierPanel = () => {void
                           size="sm"
                           variant="outline"
                           onClick={() => handlePrintReceipt(row)}
+                          aria-label={`Print receipt for ${getPaymentActionContext(row)}`}
                           title="Печать чека">
 
                                   🧾 Чек

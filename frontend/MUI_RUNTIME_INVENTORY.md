@@ -1,6 +1,6 @@
 # MUI Runtime Inventory
 
-Date: 2026-05-15
+Date: 2026-05-20
 
 Scope: `frontend/src/pages` and `frontend/src/components`
 
@@ -13,7 +13,35 @@ rg -n "@mui|Mui" frontend\src\pages frontend\src\components
 
 Initial count: 16 files with runtime or example MUI imports.
 
-Current count after Tasks 36-37: 14 files with runtime or example MUI imports.
+Current count after PR-UX-9 inventory refresh: 14 files with runtime or example MUI imports.
+
+PR-UX-17 decision refresh: 14 files still contain runtime or example MUI imports.
+The two previous low-risk PWA runtime islands remain migrated. No additional
+low-risk runtime island is safe to migrate in this cycle without crossing into
+admin user management, queue, payment, lab reporting, patient clinical data,
+cardiology, dental, Telegram, AI/MCP, or example-only policy work.
+
+## No-New-MUI Island Policy
+
+MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
+
+Default rule:
+
+- Do not add new `@mui/material`, `@mui/icons-material`, `@mui/system`, or `@material-ui/*` imports in app pages, route panels, workflow components, forms, tables, dashboards, empty/loading/error states, payment flows, queue flows, EMR/lab/dental/cardiology surfaces, Telegram management, or authenticated role UI.
+- Use `frontend/src/components/ui/macos` and the macOS token/CSS variable layer first.
+- If a touched file already imports MUI, do not expand its MUI surface. Leave the existing island in place unless the PR is explicitly a scoped MUI migration.
+- A new MUI import requires explicit approval in the PR body with:
+  - the exact file and UI surface;
+  - why the canonical macOS primitive cannot safely cover the need;
+  - the intended follow-up or migration/retirement path;
+  - validation that no route, RBAC, payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
+- MUI removal must be staged one file or one component family at a time. Do not mass-remove MUI dependencies until runtime imports reach `0`.
+
+Review command for future PRs:
+
+```powershell
+rg -l '@mui|Mui' frontend/src/pages frontend/src/components
+```
 
 ## Policy
 
@@ -65,3 +93,34 @@ These targets were low-risk because they are UI-status prompts and were migrated
 ## Remaining Runtime Targets
 
 The remaining current `@mui` files are all in do-not-touch buckets or shared/admin-sensitive/example-only categories. Do not migrate them without a dedicated gate/handoff.
+
+## PR-UX-17 Decision
+
+PR-UX-17 is intentionally documentation-only.
+
+Fresh command:
+
+```powershell
+$files = rg -l '@mui|Mui' frontend/src/pages frontend/src/components
+$files | Sort-Object
+$files.Count
+```
+
+Result: 14 files.
+
+Decision: do not force a runtime MUI migration in this PR. The only already
+approved low-risk runtime targets were `ConnectionStatus.jsx` and
+`PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
+target has a domain or workflow risk that should be handled as its own bounded
+handoff:
+
+- Admin/user management: preserve RBAC, account actions, and legacy action menu behavior.
+- Dashboard: plan a dashboard consolidation slice before changing summary cards or menus.
+- Queue/payment: protect queue status, payment state, receipts, and print/download actions.
+- Lab/cardiology/dental/patient: preserve clinical meaning, report generation, ECG/dental status, and patient relationship visibility.
+- Telegram/AI/MCP: preserve integration status, security copy, and operational diagnostics.
+- Examples: decide whether example-only files stay as MUI design-system references before counting them as runtime cleanup.
+
+Next safe MUI migration should be a dedicated PR with one first-touch file,
+route/browser smoke, and a PR body that explicitly proves no role, route,
+payment, queue, EMR, lab, Telegram, notification, or backend contract changed.

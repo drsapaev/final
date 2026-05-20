@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import heic2any from 'heic2any';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
+import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import '../../styles/animations.css';
 import PropTypes from 'prop-types';
 
@@ -24,31 +24,6 @@ const FileUpload = ({
   const [converting, setConverting] = useState(false);
   const [error, setError] = useState(null);
   const [previews, setPreviews] = useState([]);
-
-  // Convert HEIC to JPEG
-  const convertHEICtoJPEG = async (file) => {
-    try {
-      const blob = await heic2any({
-        blob: file,
-        toType: 'image/jpeg',
-        quality: 0.9
-      });
-
-      // Handle generic blob or array of blobs
-      const resultBlob = Array.isArray(blob) ? blob[0] : blob;
-
-      const convertedFile = new File(
-        [resultBlob],
-        file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'),
-        { type: 'image/jpeg' }
-      );
-
-      return convertedFile;
-    } catch (err) {
-      logger.error('HEIC conversion error:', err);
-      throw new Error('Failed to convert HEIC image');
-    }
-  };
 
   const handleDrop = useCallback(async (acceptedFiles, rejectedFiles) => {
     setError(null);
@@ -73,14 +48,9 @@ const FileUpload = ({
         let fileToProcess = file;
 
         // Check if HEIC/HEIF
-        if (
-        file.type === 'image/heic' ||
-        file.type === 'image/heif' ||
-        file.name.toLowerCase().endsWith('.heic') ||
-        file.name.toLowerCase().endsWith('.heif'))
-        {
+        if (isHEICFile(file)) {
           try {
-            fileToProcess = await convertHEICtoJPEG(file);
+            fileToProcess = await convertHEICToJPEG(file, 0.9);
           } catch {
             logger.warn(`Could not convert ${file.name}, using original`);
           }

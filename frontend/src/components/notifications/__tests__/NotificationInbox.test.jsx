@@ -95,7 +95,7 @@ describe('NotificationInbox routing', () => {
         }),
       ];
 
-      render(<NotificationInbox role={role} onClose={() => {}} />);
+      render(<NotificationInbox userRole={role} onClose={() => {}} />);
       fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
       await waitFor(() => {
@@ -117,7 +117,7 @@ describe('NotificationInbox routing', () => {
       }),
     ];
 
-    render(<NotificationInbox role="admin" onClose={() => {}} />);
+    render(<NotificationInbox userRole="admin" onClose={() => {}} />);
     fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {
@@ -135,7 +135,7 @@ describe('NotificationInbox routing', () => {
       }),
     ];
 
-    render(<NotificationInbox role="admin" onClose={() => {}} />);
+    render(<NotificationInbox userRole="admin" onClose={() => {}} />);
     fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {

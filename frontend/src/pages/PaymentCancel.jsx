@@ -6,6 +6,49 @@ import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 
 const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';
 const SUPPORT_TELEGRAM_URL = 'https://t.me/clinic_support';
 
+const pageStyle = {
+  maxWidth: 960,
+  margin: '32px auto',
+  padding: '0 16px 40px',
+};
+
+const statusCardStyle = {
+  marginBottom: 16,
+  borderColor: 'rgba(255, 149, 0, 0.36)',
+  background: 'rgba(255, 149, 0, 0.08)',
+};
+
+const statusContentStyle = {
+  textAlign: 'center',
+  padding: '32px 16px',
+};
+
+const cancelIconStyle = {
+  width: 80,
+  height: 80,
+  color: 'var(--mac-warning)',
+  marginBottom: 8,
+};
+
+const detailGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+  gap: 12,
+};
+
+const detailItemStyle = {
+  border: '1px solid var(--mac-border)',
+  borderRadius: 'var(--mac-radius-md)',
+  padding: 12,
+};
+
+const actionGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 12,
+  marginTop: 8,
+};
+
 const PaymentCancel = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -39,15 +82,20 @@ const PaymentCancel = () => {
   };
 
   return (
-    <Box style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
+    <main style={pageStyle} aria-labelledby="payment-cancel-title">
       {/* Заголовок */}
-      <Card style={{ marginBottom: 16 }}>
-        <CardContent style={{ textAlign: 'center', padding: '32px 16px' }}>
-          <CancelIcon style={{ fontSize: 80, color: 'var(--mac-warning)', marginBottom: 8 }} />
-          <Typography variant="h4" color="warning" gutterBottom>
+      <Card
+        style={statusCardStyle}
+        role="alert"
+        aria-live="assertive"
+        aria-labelledby="payment-cancel-title"
+        aria-describedby="payment-cancel-reason">
+        <CardContent style={statusContentStyle}>
+          <CancelIcon style={cancelIconStyle} aria-hidden="true" />
+          <Typography id="payment-cancel-title" variant="h4" color="warning" gutterBottom>
             Платеж не завершен
           </Typography>
-          <Typography variant="h6" color="textSecondary">
+          <Typography id="payment-cancel-reason" variant="h6" color="textSecondary">
             {getReason()}
           </Typography>
         </CardContent>
@@ -55,7 +103,7 @@ const PaymentCancel = () => {
 
       {/* Информация об ошибке */}
       {error &&
-      <Alert severity="error" style={{ marginBottom: 12 }}>
+      <Alert severity="error" role="alert" style={{ marginBottom: 12 }}>
           <Typography variant="body1" style={{ fontWeight: 600 }}>
             Детали ошибки:
           </Typography>
@@ -72,12 +120,12 @@ const PaymentCancel = () => {
             <Typography variant="h6" gutterBottom>
               Информация о платеже
             </Typography>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-              <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12 }}>
+            <div style={detailGridStyle}>
+              <div style={detailItemStyle}>
                 <Typography variant="body2" color="textSecondary">Номер платежа</Typography>
                 <Typography variant="h6">#{paymentId}</Typography>
               </div>
-              <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12 }}>
+              <div style={detailItemStyle}>
                 <Typography variant="body2" color="textSecondary">Время отмены</Typography>
                 <Typography variant="body1">{new Date().toLocaleString('ru-RU')}</Typography>
               </div>
@@ -115,7 +163,7 @@ const PaymentCancel = () => {
           <Typography variant="h6" gutterBottom>
             Доступные действия
           </Typography>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
+          <div style={actionGridStyle}>
             <Button onClick={handleCashierPayment}>К оплате в кассе</Button>
             <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />Связаться в Telegram</Button>
             <Button variant="outline" onClick={() => navigate('/')}><HomeIcon style={{ marginRight: 8 }} />На главную</Button>
@@ -132,7 +180,7 @@ const PaymentCancel = () => {
           Контакты клиники также доступны на главной странице.
         </Typography>
       </Box>
-    </Box>);
+    </main>);
 
 };
 

@@ -73,6 +73,20 @@ PATIENT_FORMS_ENTRY_CONTRACT = {
     "telegram_url_parameters_allowed": False,
     "entrypoint_type": "mini_app_tab_entry",
 }
+PATIENT_MINI_APP_MANIFEST_ENDPOINT = "/api/v1/telegram/mini-app/patient/manifest"
+PATIENT_MINI_APP_MANIFEST_CONTRACT = {
+    "contract_version": "patient-mini-app-manifest-v1",
+    "endpoint": PATIENT_MINI_APP_MANIFEST_ENDPOINT,
+    "surface": "telegram_mini_app_backend",
+    "auth": "telegram_init_data",
+    "scope": "linked_patient",
+    "status": "manifest_only",
+    "mutation_enabled": False,
+    "contains_medical_data": False,
+    "contains_payment_records": False,
+    "contains_provider_payloads": False,
+    "contains_report_files": False,
+}
 
 TELEGRAM_AI_APPROVAL_OUTCOMES = {"accepted", "rejected"}
 TELEGRAM_AI_APPROVAL_REASON_CODES = {
@@ -2937,6 +2951,12 @@ def get_telegram_integration_status(
                         "label": "Защищенный вход к оплатам пациента",
                         "enabled": bool(bot_token),
                         "contract": PATIENT_PAYMENT_ENTRY_CONTRACT,
+                    },
+                    {
+                        "key": "patient_mini_app_manifest",
+                        "label": "Mini App manifest пациента",
+                        "enabled": bool(bot_token),
+                        "contract": PATIENT_MINI_APP_MANIFEST_CONTRACT,
                     },
                     {
                         "key": "lab_results_pdf",

@@ -18,6 +18,7 @@ import {
 'lucide-react';
 import { MacOSButton, MacOSCard, MacOSBadge, MacOSInput, MacOSTextarea, MacOSSelect, MacOSEmptyState } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
@@ -45,12 +46,37 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
+const DERMATOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
+const DERMATOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
+const DERMATOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
+const dermatologyAppointmentsHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 'var(--mac-spacing-4)',
+  marginBottom: 'var(--mac-spacing-5)',
+  flexWrap: 'wrap'
+};
+const dermatologyAppointmentsTitleStyle = {
+  fontSize: 'var(--mac-font-size-lg)',
+  fontWeight: 'var(--mac-font-weight-semibold)',
+  color: 'var(--mac-text-primary)',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+  display: 'flex',
+  alignItems: 'center',
+  margin: 0,
+  minWidth: 'min(100%, 260px)'
+};
 const dermatologyRequestCache = {
   appointments: { promise: null, data: null, lastAttemptAt: 0 },
   services: { promise: null, data: null, lastAttemptAt: 0 },
   skinExaminations: { promise: null, data: null, lastAttemptAt: 0 },
   cosmeticProcedures: { promise: null, data: null, lastAttemptAt: 0 }
 };
+
+function countAppointmentsByStatuses(appointments, statuses) {
+  return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
+}
 
 function getRecentDermatologyCache(cacheEntry, fallbackValue) {
   if (cacheEntry.lastAttemptAt && Date.now() - cacheEntry.lastAttemptAt < DERMATOLOGY_REQUEST_COOLDOWN_MS) {
@@ -1354,6 +1380,33 @@ const DermatologistPanelUnified = () => {
     return null;
   }
 
+  const appointmentSummaryItems = [
+    {
+      key: 'total',
+      label: 'Всего',
+      value: appointments.length,
+      variant: 'info'
+    },
+    {
+      key: 'waiting',
+      label: 'Ожидают',
+      value: countAppointmentsByStatuses(appointments, DERMATOLOGY_WAITING_STATUSES),
+      variant: 'warning'
+    },
+    {
+      key: 'called',
+      label: 'Вызваны',
+      value: countAppointmentsByStatuses(appointments, DERMATOLOGY_CALLED_STATUSES),
+      variant: 'primary'
+    },
+    {
+      key: 'completed',
+      label: 'Приняты',
+      value: countAppointmentsByStatuses(appointments, DERMATOLOGY_COMPLETED_STATUSES),
+      variant: 'success'
+    }
+  ];
+
   return (
     <div style={{
       ...pageStyle,
@@ -1395,40 +1448,18 @@ const DermatologistPanelUnified = () => {
               boxSizing: 'border-box',
               overflow: 'hidden'
             }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'var(--mac-text-primary)',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center',
-                  margin: 0
-                }}>
+                <div style={dermatologyAppointmentsHeaderStyle}>
+                  <h3 style={dermatologyAppointmentsTitleStyle}>
                     <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Записи к дерматологу
                   </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MacOSBadge variant="info">Всего: {appointments.length}</MacOSBadge>
-                    <MacOSBadge variant="warning">
-                      Ожидают: {appointments.filter((a) => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
-                    </MacOSBadge>
-                    <MacOSBadge variant="primary">
-                      Вызваны: {appointments.filter((a) => a.status === 'called' || a.status === 'in_progress').length}
-                    </MacOSBadge>
-                    <MacOSBadge variant="success">
-                      Приняты: {appointments.filter((a) => a.status === 'completed' || a.status === 'done').length}
-                    </MacOSBadge>
-                    <MacOSButton
-                    variant="outline"
-                    onClick={loadDermatologyAppointments}
-                    disabled={appointmentsLoading}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-
-                      <RefreshCw size={16} />
-                      Обновить
-                    </MacOSButton>
-                  </div>
+                  <AppointmentSummaryBar
+                    ariaLabel="Сводка записей дерматолога"
+                    items={appointmentSummaryItems}
+                    onRefresh={loadDermatologyAppointments}
+                    refreshDisabled={appointmentsLoading}
+                    buttonProps={{ variant: 'outline' }}
+                  />
                 </div>
 
                 <EnhancedAppointmentsTable
@@ -2823,7 +2854,7 @@ const DermatologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-        <RoleNotificationCenter role="dermatologist" />
+        <RoleNotificationCenter userRole="dermatologist" />
       </div>
     </div>);
 
