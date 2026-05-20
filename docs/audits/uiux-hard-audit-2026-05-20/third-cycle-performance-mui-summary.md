@@ -200,12 +200,14 @@ Current package/runtime proof:
 - stale generated MUI class compatibility rules were removed from
   `frontend/src/styles/global-fixes.css`;
 - `npm run analyze` reports `Lazy Loading компонентов` and
-  `Vite оптимизация` as passing.
+  `Vite оптимизация` as passing;
+- `npm run build:visualize` produces the optional Vite/Rollup visualizer at
+  `frontend/dist/bundle-visualizer.html`.
 
 Remaining performance notes:
 
 - `heic2any-*` remains intentionally isolated as a lazy conversion chunk;
 - `AdminPanel-*` remains below the local `1000 KiB` review target from this
   cycle;
-- optional `rollup-plugin-visualizer` and image optimization remain future
-  enhancements, not blockers for the completed MUI cleanup.
+- image optimization remains a future enhancement, not a blocker for the
+  completed MUI cleanup.
