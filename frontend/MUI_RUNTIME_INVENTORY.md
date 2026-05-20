@@ -21,6 +21,13 @@ low-risk runtime island is safe to migrate in this cycle without crossing into
 admin user management, queue, payment, lab reporting, patient clinical data,
 cardiology, dental, Telegram, AI/MCP, or example-only policy work.
 
+PR-MUI-1 decision refresh after the performance split cycle: 14 files still
+contain runtime or example MUI imports. PR-PERF-9 through PR-PERF-12 did not add
+new MUI islands. The remaining classification is unchanged: every runtime target
+is shared/admin-sensitive, payment/queue-adjacent, clinical-heavy, or
+Telegram/AI-sensitive; the two `components/examples` files remain example-only
+until the example policy is decided.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -124,3 +131,54 @@ handoff:
 Next safe MUI migration should be a dedicated PR with one first-touch file,
 route/browser smoke, and a PR body that explicitly proves no role, route,
 payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
+
+## PR-MUI-1 Refresh
+
+PR-MUI-1 is intentionally inventory-only after the AdminPanel performance split
+cycle.
+
+Fresh command:
+
+```powershell
+rg -l "@mui|Mui" frontend\src\pages frontend\src\components
+rg -n "@mui|Mui" frontend\src\pages frontend\src\components
+```
+
+Result: 14 files.
+
+No new MUI imports were introduced by the recent performance PRs. Current
+classification:
+
+| Category | Files | Decision |
+| --- | ---: | --- |
+| Shared/admin-sensitive | 2 | Requires dedicated admin/dashboard slice. |
+| Payment/queue-adjacent | 3 | Gate/handoff only. |
+| Clinical-heavy | 5 | Clinical safety review before migration. |
+| Telegram/AI-sensitive | 2 | Gate/handoff only. |
+| Example-only | 2 | Decide example policy before counting as runtime cleanup. |
+
+Current files:
+
+- Shared/admin-sensitive:
+  - `frontend/src/components/admin/UserManagement.jsx`
+  - `frontend/src/components/dashboard/Dashboard.jsx`
+- Payment/queue-adjacent:
+  - `frontend/src/components/payment/PaymentWidget.jsx`
+  - `frontend/src/pages/PaymentTest.jsx`
+  - `frontend/src/components/queue/OnlineQueueManager.jsx`
+- Clinical-heavy:
+  - `frontend/src/components/patient/FamilyRelationsCard.jsx`
+  - `frontend/src/components/laboratory/LabReportGenerator.jsx`
+  - `frontend/src/components/cardiology/ECGViewer.jsx`
+  - `frontend/src/components/dental/TreatmentPlanner.jsx`
+  - `frontend/src/components/dental/ToothModal.jsx`
+- Telegram/AI-sensitive:
+  - `frontend/src/components/TelegramManager.jsx`
+  - `frontend/src/components/ai/MCPMonitor.jsx`
+- Example-only:
+  - `frontend/src/components/examples/UnifiedButton.tsx`
+  - `frontend/src/components/examples/UnifiedCard.tsx`
+
+Decision: do not migrate MUI in PR-MUI-1. The next safe step is PR-MUI-2 only
+if one low-risk admin island can be scoped with browser proof; otherwise move to
+PR-MUI-3 example-only policy.
