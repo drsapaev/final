@@ -184,6 +184,17 @@ const MINI_APP_I18N = {
     getPdf: 'Получить PDF',
     documentsOpenAgain: 'Откройте документы заново из Telegram.',
     documentFailed: 'Документ не получен: {reason}',
+    paymentsLoading: 'Оплаты и долг загружаются...',
+    paymentsLoadFailed: 'Оплаты пациента не загрузились. Откройте ссылку заново из Telegram.',
+    paymentsTitle: 'Оплаты и долг',
+    billed: 'Начислено',
+    paid: 'Оплачено',
+    pending: 'Ожидает подтверждения',
+    linkedVisits: 'Связанные визиты',
+    activeQueue: 'Активная очередь',
+    currencySuffix: 'сум',
+    onlinePaymentUnavailable: 'Онлайн-оплата пока не подключена. Для оплаты обратитесь в кассу клиники.',
+    protectedPaymentNote: 'В Telegram не показываются номера счетов и платежей. Подробности доступны только в защищённом кабинете клиники.',
     capabilityStatus: {
       manifest_only: 'Статус из manifest',
       preview_enabled: 'Доступен предпросмотр',
@@ -267,6 +278,17 @@ const MINI_APP_I18N = {
     getPdf: 'PDF olish',
     documentsOpenAgain: 'Hujjatlarni Telegramdan qayta oching.',
     documentFailed: 'Hujjat olinmadi: {reason}',
+    paymentsLoading: 'To\'lovlar va qarz yuklanmoqda...',
+    paymentsLoadFailed: 'Bemor to\'lovlari yuklanmadi. Havolani Telegramdan qayta oching.',
+    paymentsTitle: 'To\'lovlar va qarz',
+    billed: 'Hisoblangan',
+    paid: 'To\'langan',
+    pending: 'Tasdiqlanishi kutilmoqda',
+    linkedVisits: 'Bog\'langan tashriflar',
+    activeQueue: 'Faol navbat',
+    currencySuffix: 'so\'m',
+    onlinePaymentUnavailable: 'Onlayn to\'lov hozircha ulanmagan. To\'lov uchun klinika kassasiga murojaat qiling.',
+    protectedPaymentNote: 'Telegramda hisob va to\'lov raqamlari ko\'rsatilmaydi. Tafsilotlar faqat klinikaning himoyalangan kabinetida ochiladi.',
     capabilityStatus: {
       manifest_only: 'Manifest holati',
       preview_enabled: 'Oldindan ko\'rish mavjud',
@@ -398,6 +420,12 @@ function localizeMiniAppPatientForm(languageCode, form) {
   };
 }
 
+function formatMiniAppMoney(languageCode, value) {
+  const amount = String(value == null || value === '' ? '0' : value).trim();
+  const suffix = translateMiniAppText(languageCode, 'currencySuffix');
+  return /\b(сум|so'?m)\b/i.test(amount) ? amount : `${amount} ${suffix}`;
+}
+
 function getDefaultMiniAppAppointmentDate() {
   const nextDay = new Date();
   nextDay.setDate(nextDay.getDate() + 1);
@@ -520,7 +548,7 @@ function TelegramMiniAppPatientShell() {
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
     setCabinetSummary({
-      status: selectedSection === 'cabinet' && authPayload ? 'loading' : 'idle',
+      status: (selectedSection === 'cabinet' || selectedSection === 'payments') && authPayload ? 'loading' : 'idle',
       payload: null,
       error: null,
     });
@@ -564,7 +592,7 @@ function TelegramMiniAppPatientShell() {
           manifest: response.data,
           error: null,
         });
-        if (selectedSection === 'cabinet') {
+        if (selectedSection === 'cabinet' || selectedSection === 'payments') {
           return api.post('/telegram/mini-app/cabinet/summary', authPayload)
             .then((summaryResponse) => {
               if (!isMounted) return;
@@ -603,9 +631,12 @@ function TelegramMiniAppPatientShell() {
       .catch(() => {
         if (!isMounted) return;
         setCabinetSummary({
-          status: selectedSection === 'cabinet' ? 'error' : 'idle',
+          status: selectedSection === 'cabinet' || selectedSection === 'payments' ? 'error' : 'idle',
           payload: null,
-          error: translateMiniAppText(effectLanguageCode, 'cabinetLoadFailed'),
+          error: translateMiniAppText(
+            effectLanguageCode,
+            selectedSection === 'payments' ? 'paymentsLoadFailed' : 'cabinetLoadFailed'
+          ),
         });
         setFormsPreview({
           status: selectedSection === 'forms' ? 'error' : 'idle',
@@ -811,6 +842,8 @@ function TelegramMiniAppPatientShell() {
     localizeMiniAppPatientForm(languageCode, form)
   ));
   const patientReports = resultsSummary.payload?.reports || [];
+  const paymentsSummary = cabinetSummary.payload?.payments || {};
+  const paymentsDebtValue = Number(String(paymentsSummary.debt || '0').replace(/\s/g, ''));
 
   return (
     <div style={miniAppPageStyle}>
@@ -913,6 +946,70 @@ function TelegramMiniAppPatientShell() {
                       <strong>{cabinetSummary.payload?.reports?.length || 0}</strong>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedSection === 'payments' && cabinetSummary.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                {t('paymentsLoading')}
+              </Alert>
+            )}
+
+            {selectedSection === 'payments' && cabinetSummary.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {cabinetSummary.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'payments' && cabinetSummary.status === 'ready' && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>{t('patient')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('paymentsTitle')}</h2>
+                      <p style={miniAppCapabilityTextStyle}>
+                        {cabinetSummary.payload?.patient?.name || t('patientFallback')}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={paymentsDebtValue > 0 ? 'warning' : 'success'}
+                      size="small"
+                    >
+                      {t('debt')}: {formatMiniAppMoney(languageCode, paymentsSummary.debt)}
+                    </Badge>
+                  </div>
+
+                  <div style={miniAppAppointmentPreviewResultStyle}>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('billed')}</p>
+                      <strong>{formatMiniAppMoney(languageCode, paymentsSummary.billed)}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('paid')}</p>
+                      <strong>{formatMiniAppMoney(languageCode, paymentsSummary.paid)}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('pending')}</p>
+                      <strong>{formatMiniAppMoney(languageCode, paymentsSummary.pending)}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('linkedVisits')}</p>
+                      <strong>{paymentsSummary.linked_visit_count || 0}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('activeQueue')}</p>
+                      <strong>{paymentsSummary.active_queue_count || 0}</strong>
+                    </div>
+                  </div>
+
+                  <Alert severity="info" style={miniAppNoticeStyle}>
+                    {t('onlinePaymentUnavailable')}
+                  </Alert>
+                  <Alert severity="warning" style={miniAppNoticeStyle}>
+                    {t('protectedPaymentNote')}
+                  </Alert>
                 </CardContent>
               </Card>
             )}
