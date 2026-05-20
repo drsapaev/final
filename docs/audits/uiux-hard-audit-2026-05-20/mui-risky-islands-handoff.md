@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 3 files.
+Current post-continuation result: 2 files.
 
 ## Global Rule
 
@@ -113,7 +113,7 @@ Validation:
 
 Files:
 
-- `frontend/src/components/cardiology/ECGViewer.jsx`
+- none currently matching `@mui|Mui`
 
 Note: `frontend/src/components/laboratory/LabReportGenerator.jsx` had no
 active frontend source importer and was removed as stale code. Active lab
@@ -130,6 +130,11 @@ semantics are clinical-sensitive.
 dedicated dental tooth modal slice; future tooth modal changes remain
 dental/clinical-gated because procedure selection, material pricing,
 follow-up state, notes, history, total price, and save semantics are
+clinical-sensitive.
+`frontend/src/components/cardiology/ECGViewer.jsx` was migrated away from MUI
+in a dedicated cardiology viewer slice; future ECG viewer changes remain
+cardiology/clinical-gated because ECG upload metadata, preview/download/delete
+behavior, parsed parameters, and AI interpretation semantics are
 clinical-sensitive.
 
 Mode:
@@ -260,8 +265,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 3 files across queue,
-cardiology, and Telegram surfaces.
+migration. The current remaining MUI inventory is 2 files across queue and
+Telegram surfaces.
 
 ## Next Smallest Step
 
