@@ -85,14 +85,28 @@ describe('Telegram Mini App expired link guardrails', () => {
       'const miniAppHeroStyle = {',
       'const miniAppKickerStyle = {'
     );
+    const heroTitleGroupStyle = sourceBetween(
+      appSource,
+      'const miniAppHeroTitleGroupStyle = {',
+      'const miniAppKickerStyle = {'
+    );
     const badgeStyle = sourceBetween(
       appSource,
       'const miniAppStatusBadgeStyle = {',
       'const miniAppNoticeStyle = {'
     );
+    const heroMarkup = sourceBetween(
+      appSource,
+      '<section style={miniAppHeroStyle}>',
+      '</section>'
+    );
 
     expect(heroStyle).toContain("flexWrap: 'wrap'");
-    expect(badgeStyle).toContain("maxWidth: '100%'");
+    expect(heroStyle).toContain("rowGap: '10px'");
+    expect(heroTitleGroupStyle).toContain("flex: '1 1 220px'");
+    expect(heroTitleGroupStyle).toContain('minWidth: 0');
+    expect(heroMarkup).toContain('<div style={miniAppHeroTitleGroupStyle}>');
+    expect(badgeStyle).toContain("maxWidth: 'min(100%, 220px)'");
     expect(badgeStyle).toContain("whiteSpace: 'normal'");
     expect(badgeStyle).toContain("textAlign: 'center'");
   });
