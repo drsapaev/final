@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 5 files.
+Current post-continuation result: 4 files.
 
 ## Global Rule
 
@@ -110,7 +110,6 @@ Validation:
 Files:
 
 - `frontend/src/components/cardiology/ECGViewer.jsx`
-- `frontend/src/components/dental/ToothModal.jsx`
 
 Note: `frontend/src/components/laboratory/LabReportGenerator.jsx` had no
 active frontend source importer and was removed as stale code. Active lab
@@ -123,6 +122,11 @@ behavior are patient-sensitive.
 MUI in a dedicated dental planning slice; future treatment plan changes remain
 dental/clinical-gated because stage, cost, duration, priority, print, and save
 semantics are clinical-sensitive.
+`frontend/src/components/dental/ToothModal.jsx` was migrated away from MUI in a
+dedicated dental tooth modal slice; future tooth modal changes remain
+dental/clinical-gated because procedure selection, material pricing,
+follow-up state, notes, history, total price, and save semantics are
+clinical-sensitive.
 
 Mode:
 
@@ -252,8 +256,8 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 5 files across payment
-widget, queue, cardiology, dental, and Telegram surfaces.
+migration. The current remaining MUI inventory is 4 files across payment
+widget, queue, cardiology, and Telegram surfaces.
 
 ## Next Smallest Step
 
