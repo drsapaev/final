@@ -132,12 +132,38 @@ const MINI_APP_CAPABILITY_LABELS = {
   results: 'Результаты',
 };
 
+const MINI_APP_SECTION_ALIASES = {
+  appointments: 'appointments',
+  doctors: 'appointments',
+  forms: 'forms',
+  cabinet: 'cabinet',
+  payments: 'payments',
+  results: 'results',
+  documents: 'results',
+};
+
 function getTelegramMiniAppInitData() {
   if (typeof window === 'undefined') {
     return '';
   }
 
   return window.Telegram?.WebApp?.initData || '';
+}
+
+function getTelegramMiniAppSelectedSection(search) {
+  const section = new URLSearchParams(search || '').get('section') || '';
+  return MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || '';
+}
+
+function isMiniAppCapabilityEnabled(capability) {
+  return Boolean(
+    capability?.create_enabled ||
+    capability?.preview_enabled ||
+    capability?.read_enabled ||
+    capability?.view_enabled ||
+    capability?.capture_enabled ||
+    capability?.payment_capture_enabled
+  );
 }
 
 function notifyTelegramMiniAppReady() {
@@ -159,6 +185,8 @@ function notifyTelegramMiniAppReady() {
 }
 
 function TelegramMiniAppPatientShell() {
+  const location = useLocation();
+  const selectedSection = getTelegramMiniAppSelectedSection(location.search);
   const [state, setState] = useState({
     status: 'checking',
     manifest: null,
@@ -206,6 +234,8 @@ function TelegramMiniAppPatientShell() {
 
   const capabilities = state.manifest?.capabilities || {};
   const capabilityEntries = Object.entries(MINI_APP_CAPABILITY_LABELS);
+  const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
+  const selectedCapabilityEnabled = isMiniAppCapabilityEnabled(selectedCapability);
 
   return (
     <div style={miniAppPageStyle}>
@@ -241,34 +271,62 @@ function TelegramMiniAppPatientShell() {
         )}
 
         {state.status === 'ready' && (
-          <section style={miniAppGridStyle}>
-            {capabilityEntries.map(([key, label]) => {
-              const capability = capabilities[key] || {};
-              const enabled = Boolean(
-                capability.create_enabled ||
-                capability.preview_enabled ||
-                capability.read_enabled ||
-                capability.view_enabled ||
-                capability.capture_enabled ||
-                capability.payment_capture_enabled
-              );
-              return (
-                <Card key={key} padding="small" shadow="none" style={miniAppCapabilityStyle}>
-                  <CardContent style={miniAppCapabilityContentStyle}>
-                    <div style={miniAppCapabilityHeaderStyle}>
-                      <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
-                      <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
-                        {enabled ? 'Доступно' : 'Только статус'}
-                      </Badge>
-                    </div>
+          <>
+            {selectedSection && (
+              <Card padding="small" shadow="none" style={miniAppSelectedSectionStyle}>
+                <CardContent style={miniAppSelectedSectionContentStyle}>
+                  <div>
+                    <p style={miniAppKickerStyle}>Открытый раздел</p>
+                    <h2 style={miniAppSelectedSectionTitleStyle}>
+                      {MINI_APP_CAPABILITY_LABELS[selectedSection]}
+                    </h2>
+                  </div>
+                  <div style={miniAppSelectedSectionStatusStyle}>
+                    <Badge
+                      variant={selectedCapabilityEnabled ? 'primary' : 'secondary'}
+                      size="small"
+                    >
+                      {selectedCapabilityEnabled ? 'Доступно' : 'Только статус'}
+                    </Badge>
                     <p style={miniAppCapabilityTextStyle}>
-                      {capability.status || 'manifest_only'}
+                      {selectedCapability?.status || 'manifest_only'}
                     </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </section>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <section style={miniAppGridStyle}>
+              {capabilityEntries.map(([key, label]) => {
+                const capability = capabilities[key] || {};
+                const enabled = isMiniAppCapabilityEnabled(capability);
+                const isSelected = key === selectedSection;
+                return (
+                  <Card
+                    key={key}
+                    padding="small"
+                    shadow="none"
+                    style={{
+                      ...miniAppCapabilityStyle,
+                      ...(isSelected ? miniAppCapabilitySelectedStyle : {}),
+                    }}
+                  >
+                    <CardContent style={miniAppCapabilityContentStyle}>
+                      <div style={miniAppCapabilityHeaderStyle}>
+                        <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
+                        <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
+                          {enabled ? 'Доступно' : 'Только статус'}
+                        </Badge>
+                      </div>
+                      <p style={miniAppCapabilityTextStyle}>
+                        {capability.status || 'manifest_only'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </section>
+          </>
         )}
       </main>
     </div>
@@ -538,8 +596,42 @@ const miniAppGridStyle = {
   gap: '12px',
 };
 
+const miniAppSelectedSectionStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(23, 92, 211, 0.28)',
+};
+
+const miniAppSelectedSectionContentStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '14px',
+  flexWrap: 'wrap',
+};
+
+const miniAppSelectedSectionTitleStyle = {
+  margin: 0,
+  fontSize: '20px',
+  lineHeight: 1.25,
+  fontWeight: 800,
+  color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppSelectedSectionStatusStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: '8px',
+  minWidth: '128px',
+};
+
 const miniAppCapabilityStyle = {
   minHeight: '128px',
+};
+
+const miniAppCapabilitySelectedStyle = {
+  outline: '2px solid rgba(23, 92, 211, 0.18)',
+  outlineOffset: '-2px',
 };
 
 const miniAppCapabilityContentStyle = {
