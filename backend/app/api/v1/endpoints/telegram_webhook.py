@@ -897,6 +897,7 @@ PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
     "appointments",
     "forms",
     "cabinet",
+    "visits",
     "payments",
     "results",
     "documents",
@@ -4346,6 +4347,10 @@ def _mini_app_patient_manifest_payload(
                 "capture_enabled": True,
             },
             "cabinet": {
+                "status": "summary_enabled",
+                "read_enabled": True,
+            },
+            "visits": {
                 "status": "summary_enabled",
                 "read_enabled": True,
             },

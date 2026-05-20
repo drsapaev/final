@@ -148,6 +148,8 @@ const MINI_APP_I18N = {
     cabinetLoadFailed: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
     formsLoadFailed: 'Анкеты пациента не загрузились. Откройте ссылку заново из Telegram.',
     documentsLoadFailed: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
+    visitsLoading: 'Визиты и записи загружаются...',
+    visitsLoadFailed: 'Визиты пациента не загрузились. Откройте ссылку заново из Telegram.',
     sessionNotConfirmed: 'Сессия Mini App не подтверждена',
     appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
     appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
@@ -163,6 +165,8 @@ const MINI_APP_I18N = {
     date: 'Дата',
     time: 'Время',
     department: 'Отделение',
+    departmentMissing: 'Отделение не указано',
+    dateMissing: 'Дата не указана',
     optional: 'Опционально',
     registrarNote: 'Заметка для регистратуры',
     noMedicalData: 'Без медицинских данных',
@@ -198,6 +202,14 @@ const MINI_APP_I18N = {
     pending: 'Ожидает подтверждения',
     linkedVisits: 'Связанные визиты',
     activeQueue: 'Активная очередь',
+    visitsTitle: 'Мои визиты',
+    appointmentRequests: 'Заявки на запись',
+    recentVisits: 'Последние визиты',
+    appointmentsEmpty: 'Активных заявок на запись пока нет.',
+    visitsEmpty: 'Последних визитов пока нет.',
+    visitNumber: 'Визит #{id}',
+    appointmentNumber: 'Запись #{id}',
+    visitsPrivacyNote: 'В Telegram показываются только номер, дата, отделение и статус. Медицинские детали остаются в защищенной системе клиники.',
     currencySuffix: 'сум',
     onlinePaymentUnavailable: 'Онлайн-оплата пока не подключена. Для оплаты обратитесь в кассу клиники.',
     protectedPaymentNote: 'В Telegram не показываются номера счетов и платежей. Подробности доступны только в защищённом кабинете клиники.',
@@ -209,6 +221,7 @@ const MINI_APP_I18N = {
     },
     capabilities: {
       appointments: 'Запись',
+      visits: 'Визиты',
       forms: 'Анкеты',
       cabinet: 'Кабинет',
       payments: 'Оплаты',
@@ -248,6 +261,8 @@ const MINI_APP_I18N = {
     cabinetLoadFailed: 'Bemor kabineti yuklanmadi. Havolani Telegramdan qayta oching.',
     formsLoadFailed: 'Bemor anketalari yuklanmadi. Havolani Telegramdan qayta oching.',
     documentsLoadFailed: 'Bemor hujjatlari yuklanmadi. Havolani Telegramdan qayta oching.',
+    visitsLoading: 'Tashriflar va yozilishlar yuklanmoqda...',
+    visitsLoadFailed: 'Bemor tashriflari yuklanmadi. Havolani Telegramdan qayta oching.',
     sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
     appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
     appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
@@ -263,6 +278,8 @@ const MINI_APP_I18N = {
     date: 'Sana',
     time: 'Vaqt',
     department: 'Bo\'lim',
+    departmentMissing: 'Bo\'lim ko\'rsatilmagan',
+    dateMissing: 'Sana ko\'rsatilmagan',
     optional: 'Ixtiyoriy',
     registrarNote: 'Registratura uchun izoh',
     noMedicalData: 'Tibbiy maʼlumotlarsiz',
@@ -298,6 +315,14 @@ const MINI_APP_I18N = {
     pending: 'Tasdiqlanishi kutilmoqda',
     linkedVisits: 'Bog\'langan tashriflar',
     activeQueue: 'Faol navbat',
+    visitsTitle: 'Mening tashriflarim',
+    appointmentRequests: 'Yozilish so\'rovlari',
+    recentVisits: 'So\'nggi tashriflar',
+    appointmentsEmpty: 'Faol yozilish so\'rovlari hozircha yo\'q.',
+    visitsEmpty: 'So\'nggi tashriflar hozircha yo\'q.',
+    visitNumber: 'Tashrif #{id}',
+    appointmentNumber: 'Yozuv #{id}',
+    visitsPrivacyNote: 'Telegramda faqat raqam, sana, bo\'lim va holat ko\'rsatiladi. Tibbiy tafsilotlar klinikaning himoyalangan tizimida qoladi.',
     currencySuffix: 'so\'m',
     onlinePaymentUnavailable: 'Onlayn to\'lov hozircha ulanmagan. To\'lov uchun klinika kassasiga murojaat qiling.',
     protectedPaymentNote: 'Telegramda hisob va to\'lov raqamlari ko\'rsatilmaydi. Tafsilotlar faqat klinikaning himoyalangan kabinetida ochiladi.',
@@ -309,6 +334,7 @@ const MINI_APP_I18N = {
     },
     capabilities: {
       appointments: 'Yozilish',
+      visits: 'Tashriflar',
       forms: 'Anketalar',
       cabinet: 'Kabinet',
       payments: 'To\'lovlar',
@@ -333,6 +359,7 @@ const MINI_APP_I18N = {
 const MINI_APP_SECTION_ALIASES = {
   appointments: 'appointments',
   doctors: 'appointments',
+  visits: 'visits',
   forms: 'forms',
   cabinet: 'cabinet',
   payments: 'payments',
@@ -582,8 +609,11 @@ function TelegramMiniAppPatientShell() {
     notifyTelegramMiniAppReady();
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, selectedSection);
+    const usesCabinetSummary = selectedSection === 'cabinet'
+      || selectedSection === 'payments'
+      || selectedSection === 'visits';
     setCabinetSummary({
-      status: (selectedSection === 'cabinet' || selectedSection === 'payments') && authPayload ? 'loading' : 'idle',
+      status: usesCabinetSummary && authPayload ? 'loading' : 'idle',
       payload: null,
       error: null,
     });
@@ -637,7 +667,7 @@ function TelegramMiniAppPatientShell() {
           manifest: response.data,
           error: null,
         });
-        if (selectedSection === 'cabinet' || selectedSection === 'payments') {
+        if (usesCabinetSummary) {
           return api.post('/telegram/mini-app/cabinet/summary', authPayload)
             .then((summaryResponse) => {
               if (!isMounted) return;
@@ -676,11 +706,15 @@ function TelegramMiniAppPatientShell() {
       .catch(() => {
         if (!isMounted) return;
         setCabinetSummary({
-          status: selectedSection === 'cabinet' || selectedSection === 'payments' ? 'error' : 'idle',
+          status: usesCabinetSummary ? 'error' : 'idle',
           payload: null,
           error: translateMiniAppText(
             effectLanguageCode,
-            selectedSection === 'payments' ? 'paymentsLoadFailed' : 'cabinetLoadFailed'
+            selectedSection === 'payments'
+              ? 'paymentsLoadFailed'
+              : selectedSection === 'visits'
+                ? 'visitsLoadFailed'
+                : 'cabinetLoadFailed'
           ),
         });
         setFormsPreview({
@@ -937,6 +971,8 @@ function TelegramMiniAppPatientShell() {
   ));
   const patientReports = resultsSummary.payload?.reports || [];
   const paymentsSummary = cabinetSummary.payload?.payments || {};
+  const patientAppointments = cabinetSummary.payload?.appointments || [];
+  const patientVisits = cabinetSummary.payload?.visits || [];
   const paymentsDebtValue = Number(String(paymentsSummary.debt || '0').replace(/\s/g, ''));
 
   return (
@@ -1040,6 +1076,112 @@ function TelegramMiniAppPatientShell() {
                       <strong>{cabinetSummary.payload?.reports?.length || 0}</strong>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedSection === 'visits' && cabinetSummary.status === 'loading' && (
+              <Alert severity="info" style={miniAppNoticeStyle}>
+                {t('visitsLoading')}
+              </Alert>
+            )}
+
+            {selectedSection === 'visits' && cabinetSummary.status === 'error' && (
+              <Alert severity="error" style={miniAppNoticeStyle}>
+                {cabinetSummary.error}
+              </Alert>
+            )}
+
+            {selectedSection === 'visits' && cabinetSummary.status === 'ready' && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>{t('patient')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('visitsTitle')}</h2>
+                      <p style={miniAppCapabilityTextStyle}>
+                        {cabinetSummary.payload?.patient?.name || t('patientFallback')}
+                      </p>
+                    </div>
+                    <Badge variant="success" size="small">{t('accessConfirmed')}</Badge>
+                  </div>
+
+                  <div style={miniAppAppointmentPreviewResultStyle}>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('appointmentRequests')}</p>
+                      <strong>{patientAppointments.length}</strong>
+                    </div>
+                    <div>
+                      <p style={miniAppCapabilityTextStyle}>{t('recentVisits')}</p>
+                      <strong>{patientVisits.length}</strong>
+                    </div>
+                  </div>
+
+                  <section style={miniAppVisitsSectionStyle}>
+                    <h3 style={miniAppSubsectionTitleStyle}>{t('appointmentRequests')}</h3>
+                    {patientAppointments.length === 0 ? (
+                      <Alert severity="info" style={miniAppNoticeStyle}>
+                        {t('appointmentsEmpty')}
+                      </Alert>
+                    ) : (
+                      <div style={miniAppVisitsListStyle}>
+                        {patientAppointments.map((appointment) => (
+                          <div key={`appointment-${appointment.id}`} style={miniAppVisitItemStyle}>
+                            <div style={miniAppVisitItemHeaderStyle}>
+                              <strong>{t('appointmentNumber', { id: appointment.id })}</strong>
+                              <Badge variant="secondary" size="small">
+                                {appointment.status || t('status')}
+                              </Badge>
+                            </div>
+                            <div style={miniAppAppointmentPreviewResultStyle}>
+                              <div>
+                                <p style={miniAppCapabilityTextStyle}>{t('dateTime')}</p>
+                                <strong>
+                                  {appointment.date || t('dateMissing')} {appointment.time || t('timeMissing')}
+                                </strong>
+                              </div>
+                              <div>
+                                <p style={miniAppCapabilityTextStyle}>{t('department')}</p>
+                                <strong>{appointment.department || t('departmentMissing')}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section style={miniAppVisitsSectionStyle}>
+                    <h3 style={miniAppSubsectionTitleStyle}>{t('recentVisits')}</h3>
+                    {patientVisits.length === 0 ? (
+                      <Alert severity="info" style={miniAppNoticeStyle}>
+                        {t('visitsEmpty')}
+                      </Alert>
+                    ) : (
+                      <div style={miniAppVisitsListStyle}>
+                        {patientVisits.map((visit) => (
+                          <div key={`visit-${visit.id}`} style={miniAppVisitItemStyle}>
+                            <div style={miniAppVisitItemHeaderStyle}>
+                              <strong>{t('visitNumber', { id: visit.id })}</strong>
+                              <Badge variant="secondary" size="small">
+                                {visit.status || t('status')}
+                              </Badge>
+                            </div>
+                            <div style={miniAppAppointmentPreviewResultStyle}>
+                              <div>
+                                <p style={miniAppCapabilityTextStyle}>{t('date')}</p>
+                                <strong>{visit.date || t('dateMissing')}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <Alert severity="warning" style={miniAppNoticeStyle}>
+                    {t('visitsPrivacyNote')}
+                  </Alert>
                 </CardContent>
               </Card>
             )}
@@ -1745,6 +1887,45 @@ const miniAppAppointmentPreviewResultStyle = {
   background: 'rgba(52, 199, 89, 0.08)',
   fontSize: '13px',
   color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppVisitsSectionStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+};
+
+const miniAppSubsectionTitleStyle = {
+  margin: 0,
+  fontSize: '15px',
+  lineHeight: 1.3,
+  fontWeight: 800,
+  color: 'var(--mac-text-primary, #111827)',
+};
+
+const miniAppVisitsListStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+};
+
+const miniAppVisitItemStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  padding: '12px',
+  border: '1px solid var(--mac-border, rgba(15, 23, 42, 0.12))',
+  borderRadius: '8px',
+  background: 'var(--mac-bg-secondary, #ffffff)',
+};
+
+const miniAppVisitItemHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '10px',
+  flexWrap: 'wrap',
+  fontSize: '14px',
 };
 
 const miniAppCheckboxRowStyle = {
