@@ -37,6 +37,10 @@ UnifiedButton example migration: 11 files now contain runtime or example MUI
 imports after converting `frontend/src/components/examples/UnifiedButton.tsx`
 to a macOS/native example.
 
+UnifiedCard example migration: 10 files now contain runtime MUI imports after
+converting `frontend/src/components/examples/UnifiedCard.tsx` to a
+macOS/native example. No example-only `Unified*` MUI references remain.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -85,7 +89,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/dental/ToothModal.jsx` | Clinical-heavy | Dental tooth modal and clinical status semantics. | Clinical safety review before migration. |
 | `frontend/src/components/TelegramManager.jsx` | Telegram/AI-sensitive | Telegram integration management. | Gate/handoff only. |
 | `frontend/src/components/ai/MCPMonitor.jsx` | Telegram/AI-sensitive | AI/MCP monitoring surface. | Gate/handoff only; preserve AI safety copy. |
-| `frontend/src/components/examples/UnifiedCard.tsx` | Example-only | Design-system example file. | Do not count as blocking app runtime until examples policy is decided. |
+| `frontend/src/components/examples/UnifiedCard.tsx` | Migrated/example-only | Design-system example file now uses macOS/native card markup with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 | `frontend/src/components/examples/UnifiedButton.tsx` | Migrated/example-only | Design-system example file now uses macOS/native controls with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 
 ## Do-Not-Touch Buckets
@@ -108,7 +112,7 @@ These targets were low-risk because they are UI-status prompts and were migrated
 
 ## Remaining Runtime Targets
 
-The remaining current `@mui` files are all in do-not-touch buckets or shared/admin-sensitive/example-only categories. Do not migrate them without a dedicated gate/handoff.
+The remaining current `@mui` files are all in do-not-touch runtime buckets. Do not migrate them without a dedicated gate/handoff.
 
 ## PR-UX-17 Decision
 
@@ -128,6 +132,8 @@ Result after UserManagement actions menu migration: 12 files.
 
 Result after UnifiedButton example migration: 11 files.
 
+Result after UnifiedCard example migration: 10 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -139,12 +145,12 @@ handoff:
 - Queue/payment: protect queue status, payment state, receipts, and print/download actions.
 - Lab/cardiology/dental/patient: preserve clinical meaning, report generation, ECG/dental status, and patient relationship visibility.
 - Telegram/AI/MCP: preserve integration status, security copy, and operational diagnostics.
-- Examples: decide whether example-only files stay as MUI design-system references before counting them as runtime cleanup.
+- Examples: both `Unified*` example files now use macOS/native examples and no longer count in the MUI search result.
 
 The dedicated admin actions menu migration has now removed `UserManagement.jsx`
-from the current MUI search result. The follow-up example migration removed
-`UnifiedButton.tsx` from the current MUI search result. Remaining MUI targets
-are payment, queue, clinical, Telegram/AI, and `UnifiedCard.tsx`.
+from the current MUI search result. The follow-up example migrations removed
+`UnifiedButton.tsx` and `UnifiedCard.tsx` from the current MUI search result.
+Remaining MUI targets are payment, queue, clinical, and Telegram/AI.
 
 Next safe MUI migration should be a dedicated PR with one first-touch file,
 route/browser smoke, and a PR body that explicitly proves no role, route,
@@ -173,7 +179,7 @@ classification:
 | Payment/queue-adjacent | 3 | Gate/handoff only. |
 | Clinical-heavy | 5 | Clinical safety review before migration. |
 | Telegram/AI-sensitive | 2 | Gate/handoff only. |
-| Example-only | 2 | Decide example policy before counting as runtime cleanup. |
+| Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
 
 Current files:
 
@@ -193,8 +199,7 @@ Current files:
   - `frontend/src/components/TelegramManager.jsx`
   - `frontend/src/components/ai/MCPMonitor.jsx`
 - Example-only:
-  - `frontend/src/components/examples/UnifiedButton.tsx`
-  - `frontend/src/components/examples/UnifiedCard.tsx`
+  - none currently matching `@mui|Mui`
 
 Decision: do not migrate MUI in PR-MUI-1. The next safe step is PR-MUI-2 only
 if one low-risk admin island can be scoped with browser proof; otherwise move to
@@ -223,7 +228,7 @@ Next safe step: PR-MUI-3 example-only policy for
 
 ## PR-MUI-3 Example-Only Policy
 
-The two `components/examples/Unified*` files remain MUI references, but static
+The two `components/examples/Unified*` files were MUI references, but static
 search found no active app callers for `UnifiedButton` or `UnifiedCard`.
 `MacOSDemoPage.jsx` lazy-loads `components/examples/MacOSDemo`, not these two
 files.
@@ -232,7 +237,7 @@ Policy:
 
 - Treat `frontend/src/components/examples/UnifiedButton.tsx` and
   `frontend/src/components/examples/UnifiedCard.tsx` as isolated example-only
-  MUI debt, not active clinic runtime UI.
+  reference files, not active clinic runtime UI.
 - Do not import these files into app pages, role panels, workflow components,
   route views, payment/queue/clinical screens, or authenticated dashboards.
 - Do not copy their MUI patterns into new clinic runtime UI; use
@@ -241,9 +246,9 @@ Policy:
   runtime debt and require a scoped migration/removal PR.
 - Leave MUI dependencies in place while any runtime MUI imports remain.
 
-Future cleanup should be a separate docs/examples PR: convert these examples to
-macOS primitives, archive them, or delete them after confirming no developer
-workflow still uses them.
+The cleanup has now converted both examples to macOS/native examples. Future
+cleanup can update older docs that still mention the historical MUI variants or
+delete/archive the examples if no developer workflow uses them.
 
 ## PR-MUI-4 Risky Runtime Handoff
 

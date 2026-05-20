@@ -1,22 +1,15 @@
 /**
  * Unified Card Component
- * Example of proper MUI Card using theme tokens with variants
+ * Example of a macOS-native card pattern using existing clinic tokens.
+ *
+ * This example is intentionally MUI-free. Clinic runtime UI should prefer
+ * frontend/src/components/ui/macos before copying example code.
  */
 
 import React from 'react';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import CardHeader from '@mui/material/CardHeader';
-import CardActions from '@mui/material/CardActions';
-import Typography from '@mui/material/Typography';
-import { styled } from '@mui/material/styles';
-import { spacing, borderRadius, shadows, shadowsDark, transitions, easing } from '@/theme/tokens';
-import { useTheme } from '@mui/material/styles';
 
-// ============================================================================
-// CARD VARIANTS
-// ============================================================================
 type CardVariant = 'elevated' | 'outlined' | 'filled' | 'soft' | 'glass' | 'interactive';
+type UnifiedCardSize = 'sm' | 'md' | 'lg';
 
 interface UnifiedCardProps {
   variant?: CardVariant;
@@ -26,245 +19,273 @@ interface UnifiedCardProps {
   actions?: React.ReactNode;
   onClick?: () => void;
   interactive?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: UnifiedCardSize;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-// ============================================================================
-// STYLED VARIANTS
-// ============================================================================
-const ElevatedCard = styled(Card)(({ theme }) => ({
-  border: 'none',
-  boxShadow: theme.palette.mode === 'light' ? shadows.md : shadowsDark.md,
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    boxShadow: theme.palette.mode === 'light' ? shadows.lg : shadowsDark.lg,
-  },
-}));
+const sizePadding: Record<UnifiedCardSize, string> = {
+  sm: '12px',
+  md: '16px',
+  lg: '24px',
+};
 
-const OutlinedCard = styled(Card)(({ theme }) => ({
-  border: `1px solid ${theme.palette.divider}`,
-  boxShadow: 'none',
-  backgroundColor: theme.palette.background.paper,
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    borderColor: theme.palette.primary.main,
-    boxShadow: theme.palette.mode === 'light' ? shadows.sm : shadowsDark.sm,
-  },
-}));
+const baseCardStyle: React.CSSProperties = {
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: 'var(--mac-radius-lg)',
+  color: 'var(--mac-text-primary)',
+  fontFamily: 'var(--mac-font-family, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif)',
+  transition: 'box-shadow var(--mac-duration-normal) var(--mac-ease), border-color var(--mac-duration-normal) var(--mac-ease), background-color var(--mac-duration-normal) var(--mac-ease), transform var(--mac-duration-fast) var(--mac-ease)',
+  outlineOffset: 2,
+};
 
-const FilledCard = styled(Card)(({ theme }) => ({
-  backgroundColor: theme.palette.action.hover,
-  border: 'none',
-  boxShadow: 'none',
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    backgroundColor: theme.palette.action.selected,
+const variantStyles: Record<CardVariant, React.CSSProperties> = {
+  elevated: {
+    background: 'var(--mac-card-bg, var(--mac-bg-primary))',
+    border: '1px solid var(--mac-border-secondary)',
+    boxShadow: 'var(--mac-shadow-md)',
   },
-}));
-
-const SoftCard = styled(Card)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === 'light'
-    ? 'rgba(59, 130, 246, 0.05)'
-    : 'rgba(147, 51, 234, 0.1)',
-  border: `1px solid ${theme.palette.mode === 'light'
-    ? 'rgba(59, 130, 246, 0.2)'
-    : 'rgba(147, 51, 234, 0.3)'}`,
-  boxShadow: 'none',
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    backgroundColor: theme.palette.mode === 'light'
-      ? 'rgba(59, 130, 246, 0.1)'
-      : 'rgba(147, 51, 234, 0.15)',
+  outlined: {
+    background: 'var(--mac-card-bg, var(--mac-bg-primary))',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    boxShadow: 'none',
   },
-}));
-
-const GlassCard = styled(Card)(({ theme }) => ({
-  backdropFilter: 'blur(10px)',
-  backgroundColor: theme.palette.mode === 'light'
-    ? 'rgba(255, 255, 255, 0.7)'
-    : 'rgba(30, 30, 40, 0.7)',
-  border: `1px solid ${theme.palette.mode === 'light'
-    ? 'rgba(255, 255, 255, 0.5)'
-    : 'rgba(255, 255, 255, 0.1)'}`,
-  boxShadow: 'none',
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    backgroundColor: theme.palette.mode === 'light'
-      ? 'rgba(255, 255, 255, 0.8)'
-      : 'rgba(40, 40, 50, 0.8)',
-    borderColor: theme.palette.mode === 'light'
-      ? 'rgba(255, 255, 255, 0.7)'
-      : 'rgba(255, 255, 255, 0.2)',
+  filled: {
+    background: 'var(--mac-bg-tertiary)',
+    border: '1px solid var(--mac-border-secondary)',
+    boxShadow: 'none',
   },
-}));
+  soft: {
+    background: 'var(--mac-accent-bg, rgba(0, 122, 255, 0.08))',
+    border: '1px solid var(--mac-accent-border, rgba(0, 122, 255, 0.22))',
+    boxShadow: 'none',
+  },
+  glass: {
+    background: 'var(--mac-glass-bg, rgba(255, 255, 255, 0.72))',
+    border: '1px solid var(--mac-glass-border, rgba(255, 255, 255, 0.58))',
+    boxShadow: 'var(--mac-shadow-sm)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
+  },
+  interactive: {
+    background: 'var(--mac-card-bg, var(--mac-bg-primary))',
+    border: '1px solid var(--mac-card-border, var(--mac-border))',
+    boxShadow: 'var(--mac-shadow-sm)',
+  },
+};
 
-const InteractiveCard = styled(Card)(({ theme }) => ({
-  border: `1px solid ${theme.palette.divider}`,
-  boxShadow: theme.palette.mode === 'light' ? shadows.sm : shadowsDark.sm,
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--mac-text-primary)',
+  fontSize: 'var(--mac-font-size-lg)',
+  fontWeight: 'var(--mac-font-weight-semibold)',
+  lineHeight: 1.25,
+};
+
+const subtitleStyle: React.CSSProperties = {
+  margin: '4px 0 0',
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-sm)',
+  lineHeight: 1.4,
+};
+
+const bodyTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-base)',
+  lineHeight: 1.55,
+};
+
+const actionButtonStyle: React.CSSProperties = {
+  minHeight: 32,
+  borderRadius: 'var(--mac-radius-md)',
+  border: '1px solid var(--mac-border)',
+  background: 'var(--mac-bg-secondary)',
+  color: 'var(--mac-text-primary)',
+  padding: '8px 14px',
+  font: 'inherit',
   cursor: 'pointer',
-  transition: `all ${transitions.base} ${easing.easeInOut}`,
-  '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: theme.palette.mode === 'light' ? shadows.lg : shadowsDark.lg,
-    borderColor: theme.palette.primary.main,
-  },
-  '&:active': {
-    transform: 'translateY(-2px)',
-  },
-}));
+};
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 export const UnifiedCard = React.forwardRef<HTMLDivElement, UnifiedCardProps>(
-  ({ 
-    variant = 'outlined', 
-    title, 
-    subtitle, 
-    children, 
-    actions,
-    onClick,
-    size = 'md',
-  }, ref) => {
-    const theme = useTheme();
+  (
+    {
+      variant = 'outlined',
+      title,
+      subtitle,
+      children,
+      actions,
+      onClick,
+      interactive = false,
+      size = 'md',
+      className = '',
+      style,
+    },
+    ref
+  ) => {
+    const isInteractive = Boolean(interactive || onClick || variant === 'interactive');
 
-    // Get padding based on size
-    const getPadding = (size: 'sm' | 'md' | 'lg') => {
-      switch (size) {
-        case 'sm':
-          return spacing[3];
-        case 'md':
-          return spacing[4];
-        case 'lg':
-          return spacing[6];
-        default:
-          return spacing[4];
+    const cardStyle: React.CSSProperties = {
+      ...baseCardStyle,
+      ...variantStyles[variant],
+      padding: sizePadding[size],
+      cursor: isInteractive ? 'pointer' : 'default',
+      ...style,
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!isInteractive || !onClick) return;
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onClick();
       }
     };
 
-    // Select variant component
-    const CardComponent = {
-      elevated: ElevatedCard,
-      outlined: OutlinedCard,
-      filled: FilledCard,
-      soft: SoftCard,
-      glass: GlassCard,
-      interactive: InteractiveCard,
-    }[variant];
-
-    return (
-      <CardComponent
-        ref={ref}
-        onClick={onClick}
-        sx={{
-          borderRadius: borderRadius.lg,
-        }}
-      >
+    const content = (
+      <>
         {(title || subtitle) && (
-          <CardHeader
-            title={title}
-            subheader={subtitle}
-            titleTypographyProps={{ variant: 'h5' }}
-            subheaderTypographyProps={{ variant: 'body2' }}
-            sx={{
-              paddingBottom: spacing[3],
+          <header
+            style={{
+              paddingBottom: children ? '12px' : 0,
+              borderBottom: children ? '1px solid var(--mac-separator)' : undefined,
+              marginBottom: children ? '14px' : 0,
             }}
-          />
+          >
+            {title && <h3 style={titleStyle}>{title}</h3>}
+            {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
+          </header>
         )}
 
-        <CardContent
-          sx={{
-            padding: getPadding(size),
-            '&:last-child': {
-              paddingBottom: getPadding(size),
-            },
-          }}
-        >
-          {children}
-        </CardContent>
+        <section>{children}</section>
 
         {actions && (
-          <CardActions
-            sx={{
-              padding: spacing[4],
-              paddingTop: 0,
-              borderTop: `1px solid ${theme.palette.divider}`,
+          <footer
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '8px',
+              flexWrap: 'wrap',
+              marginTop: '16px',
+              paddingTop: '12px',
+              borderTop: '1px solid var(--mac-separator)',
             }}
           >
             {actions}
-          </CardActions>
+          </footer>
         )}
-      </CardComponent>
+      </>
+    );
+
+    if (isInteractive) {
+      return (
+        <div
+          ref={ref}
+          className={className}
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          style={cardStyle}
+        >
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={ref}
+        className={className}
+        style={cardStyle}
+      >
+        {content}
+      </div>
     );
   }
 );
 
 UnifiedCard.displayName = 'UnifiedCard';
 
-// ============================================================================
-// USAGE EXAMPLES
-// ============================================================================
-import Button from '@mui/material/Button';
-
 export const UnifiedCardShowcase = () => {
   return (
-    <div style={{ display: 'grid', gap: '24px', padding: '24px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-      {/* Elevated variant */}
+    <div
+      style={{
+        display: 'grid',
+        gap: '24px',
+        padding: '24px',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      }}
+    >
       <UnifiedCard variant="elevated" title="Elevated Card" subtitle="With shadow">
-        <Typography>This card has a subtle shadow elevation.</Typography>
+        <p style={bodyTextStyle}>This card has a quiet shadow for high-level summaries.</p>
       </UnifiedCard>
 
-      {/* Outlined variant */}
       <UnifiedCard variant="outlined" title="Outlined Card" subtitle="Minimal style">
-        <Typography>This card uses just a border for definition.</Typography>
+        <p style={bodyTextStyle}>This card uses a border for definition without extra visual weight.</p>
       </UnifiedCard>
 
-      {/* Filled variant */}
       <UnifiedCard variant="filled" title="Filled Card" subtitle="Background colored">
-        <Typography>This card has a filled background.</Typography>
+        <p style={bodyTextStyle}>This card uses a filled surface for secondary grouped content.</p>
       </UnifiedCard>
 
-      {/* Soft variant */}
-      <UnifiedCard variant="soft" title="Soft Card" subtitle="Subtle color">
-        <Typography>This card uses a soft background tint.</Typography>
+      <UnifiedCard variant="soft" title="Soft Card" subtitle="Subtle accent">
+        <p style={bodyTextStyle}>This card uses the accent background for low-risk informational emphasis.</p>
       </UnifiedCard>
 
-      {/* Glass variant */}
-      <UnifiedCard variant="glass" title="Glass Card" subtitle="Modern blur effect">
-        <Typography>This card uses a glassmorphism effect.</Typography>
+      <UnifiedCard variant="glass" title="Glass Card" subtitle="Blurred surface">
+        <p style={bodyTextStyle}>This card demonstrates a restrained glass surface for demo contexts.</p>
       </UnifiedCard>
 
-      {/* Interactive variant */}
-      <UnifiedCard 
-        variant="interactive" 
-        title="Interactive Card" 
-        subtitle="Hover & click"
-        onClick={() => alert('Card clicked!')}
+      <UnifiedCard
+        variant="interactive"
+        title="Interactive Card"
+        subtitle="Keyboard reachable"
+        onClick={() => undefined}
       >
-        <Typography>This card responds to interaction with elevation change.</Typography>
+        <p style={bodyTextStyle}>This card exposes button semantics and handles Enter or Space.</p>
       </UnifiedCard>
 
-      {/* With actions */}
-      <UnifiedCard 
+      <UnifiedCard
         variant="outlined"
         title="Card with Actions"
         subtitle="Contains buttons"
         actions={
           <>
-            <Button variant="text">Cancel</Button>
-            <Button variant="contained" color="primary">Save</Button>
+            <button type="button" style={actionButtonStyle}>Cancel</button>
+            <button
+              type="button"
+              style={{
+                ...actionButtonStyle,
+                background: 'var(--mac-accent-blue)',
+                borderColor: 'var(--mac-accent-blue)',
+                color: 'var(--mac-text-on-accent)',
+              }}
+            >
+              Save
+            </button>
           </>
         }
       >
-        <Typography>This card demonstrates the CardActions component.</Typography>
+        <p style={bodyTextStyle}>This card demonstrates an accessible footer action row.</p>
       </UnifiedCard>
 
-      {/* Large card */}
       <UnifiedCard variant="elevated" title="Large Card" size="lg">
-        <Typography variant="h6" gutterBottom>Medical Department Card</Typography>
-        <Typography>
-          This is a larger card variant useful for displaying detailed information like patient records, diagnostic results, or department details.
-        </Typography>
+        <h4
+          style={{
+            margin: '0 0 8px',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+          }}
+        >
+          Medical Department Card
+        </h4>
+        <p style={bodyTextStyle}>
+          This larger card can describe patient records, diagnostic summaries, or department details
+          without relying on MUI.
+        </p>
       </UnifiedCard>
     </div>
   );

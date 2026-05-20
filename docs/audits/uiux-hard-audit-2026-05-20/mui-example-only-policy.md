@@ -81,8 +81,14 @@ not block runtime UI decisions or be treated as safe app patterns.
 to a macOS/native example with no current `@mui` import. It remains example-only
 and must not be imported into clinic runtime UI.
 
-`frontend/src/components/examples/UnifiedCard.tsx` remains the only current
-example-only MUI reference.
+## Follow-Up: UnifiedCard Example Migration
+
+`frontend/src/components/examples/UnifiedCard.tsx` has since been converted to
+a macOS/native example with no current `@mui` import. It remains example-only
+and must not be imported into clinic runtime UI.
+
+The current example-only MUI count is now `0`; remaining MUI files are all
+runtime domain islands that require dedicated gate/handoff slices.
 
 ## Next Smallest Step
 
