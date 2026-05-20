@@ -749,7 +749,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: "Kabinetda to'lovni ochish",
     },
     "booking_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "ÐŸÐµÑ€ÐµÐ¹Ñ‚Ð¸ Ð² Ð²Ñ€Ð°Ð¼ÐµÐ¼Ð½Ð¾Ð´ÐµÐ¹ÑÑ‚Ð²ÐµÐ½Ð½Ð¾Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸",
+        TELEGRAM_LANGUAGE_RU: "Открыть запись в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
     },
     "queue_empty": {
