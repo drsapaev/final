@@ -33,6 +33,10 @@ UserManagement actions menu migration: 12 files now contain runtime or example
 MUI imports after replacing the admin user actions menu with macOS/native
 controls in `frontend/src/components/admin/UserManagement.jsx`.
 
+UnifiedButton example migration: 11 files now contain runtime or example MUI
+imports after converting `frontend/src/components/examples/UnifiedButton.tsx`
+to a macOS/native example.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -82,7 +86,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/TelegramManager.jsx` | Telegram/AI-sensitive | Telegram integration management. | Gate/handoff only. |
 | `frontend/src/components/ai/MCPMonitor.jsx` | Telegram/AI-sensitive | AI/MCP monitoring surface. | Gate/handoff only; preserve AI safety copy. |
 | `frontend/src/components/examples/UnifiedCard.tsx` | Example-only | Design-system example file. | Do not count as blocking app runtime until examples policy is decided. |
-| `frontend/src/components/examples/UnifiedButton.tsx` | Example-only | Design-system example file. | Do not count as blocking app runtime until examples policy is decided. |
+| `frontend/src/components/examples/UnifiedButton.tsx` | Migrated/example-only | Design-system example file now uses macOS/native controls with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 
 ## Do-Not-Touch Buckets
 
@@ -122,6 +126,8 @@ Result after stale dashboard removal: 13 files.
 
 Result after UserManagement actions menu migration: 12 files.
 
+Result after UnifiedButton example migration: 11 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -136,8 +142,9 @@ handoff:
 - Examples: decide whether example-only files stay as MUI design-system references before counting them as runtime cleanup.
 
 The dedicated admin actions menu migration has now removed `UserManagement.jsx`
-from the current MUI search result. Remaining runtime MUI targets are payment,
-queue, clinical, Telegram/AI, and example-only files.
+from the current MUI search result. The follow-up example migration removed
+`UnifiedButton.tsx` from the current MUI search result. Remaining MUI targets
+are payment, queue, clinical, Telegram/AI, and `UnifiedCard.tsx`.
 
 Next safe MUI migration should be a dedicated PR with one first-touch file,
 route/browser smoke, and a PR body that explicitly proves no role, route,
