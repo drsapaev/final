@@ -13,9 +13,11 @@ import {
   DialogActions,
   Alert,
   CircularProgress,
+  Input,
   Select,
 
   Switch,
+  Textarea,
 
   Grid,
   List,
@@ -25,7 +27,8 @@ import {
   TableHead,
   TableBody,
   TableRow,
-  TableCell } from
+  TableCell,
+  TableHeaderCell } from
 './ui/macos/Table';
 import {
   ListItem,
@@ -58,15 +61,6 @@ import {
 
 
 'lucide-react';
-import {
-  TableContainer,
-  IconButton,
-  TextField,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  FormControlLabel } from
-'@mui/material';
 import { api } from '../api/client.js';
 
 const TelegramManager = () => {
@@ -524,6 +518,16 @@ const TelegramManager = () => {
       'RBAC, audit и подтверждения обязательны перед действиями.'
     }
   ];
+  const templateTypeOptions = [
+    { value: 'text', label: 'Текст' },
+    { value: 'photo', label: 'Фото' },
+    { value: 'document', label: 'Документ' }
+  ];
+  const iconActionStyle = {
+    width: 32,
+    minHeight: 32,
+    padding: 0
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -1132,14 +1136,14 @@ const TelegramManager = () => {
               <Typography variant="h6" gutterBottom>
                 Шаблоны сообщений
               </Typography>
-              <TableContainer>
-                <Table>
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <Table style={{ minWidth: 640 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Название</TableCell>
-                      <TableCell>Тип</TableCell>
-                      <TableCell>Статус</TableCell>
-                      <TableCell align="right">Действия</TableCell>
+                      <TableHeaderCell>Название</TableHeaderCell>
+                      <TableHeaderCell>Тип</TableHeaderCell>
+                      <TableHeaderCell>Статус</TableHeaderCell>
+                      <TableHeaderCell align="right">Действия</TableHeaderCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1163,18 +1167,32 @@ const TelegramManager = () => {
                           </Badge>
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton aria-label="Редактировать" title="Редактировать">
-                            <Edit />
-                          </IconButton>
-                          <IconButton aria-label="Удалить" title="Удалить">
-                            <Trash2 />
-                          </IconButton>
+                          <Box display="inline-flex" gap={0.5} justifyContent="flex-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="small"
+                              aria-label="Редактировать"
+                              title="Редактировать"
+                              style={iconActionStyle}>
+                              <Edit size={16} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="small"
+                              aria-label="Удалить"
+                              title="Удалить"
+                              style={iconActionStyle}>
+                              <Trash2 size={16} />
+                            </Button>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </div>
             </CardContent>
           </Card>
         </Grid>
@@ -1185,50 +1203,40 @@ const TelegramManager = () => {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
+              <Input
                 label="Название шаблона"
                 value={templateForm.name}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                style={{ width: '100%' }}
                 required />
-              
+
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Тип сообщения</InputLabel>
-                <Select
-                  value={templateForm.message_type}
-                  onChange={(e) => setTemplateForm({ ...templateForm, message_type: e.target.value })}
-                  label="Тип сообщения">
-                  
-                  <MenuItem value="text">Текст</MenuItem>
-                  <MenuItem value="photo">Фото</MenuItem>
-                  <MenuItem value="document">Документ</MenuItem>
-                </Select>
-              </FormControl>
+              <Select
+                label="Тип сообщения"
+                value={templateForm.message_type}
+                options={templateTypeOptions}
+                onChange={(messageType) => setTemplateForm({ ...templateForm, message_type: messageType })}
+                style={{ width: '100%' }} />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
+              <Textarea
                 label="Содержание сообщения"
-                multiline
-                rows={6}
+                minRows={6}
+                maxRows={8}
                 value={templateForm.content}
                 onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                 required
+                style={{ width: '100%' }}
                 placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}" />
-              
+
             </Grid>
             <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                <Switch
-                  checked={templateForm.is_active}
-                  onChange={(e) => setTemplateForm({ ...templateForm, is_active: e.target.checked })} />
+              <Switch
+                label="Активный шаблон"
+                checked={templateForm.is_active}
+                onChange={(isActive) => setTemplateForm({ ...templateForm, is_active: isActive })} />
 
-                }
-                label="Активный шаблон" />
-              
             </Grid>
           </Grid>
         </DialogContent>

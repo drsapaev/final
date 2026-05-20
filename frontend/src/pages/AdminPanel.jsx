@@ -152,10 +152,8 @@ import ClinicManagement from '../components/admin/ClinicManagement';
 
 
 
-import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
 import AIAnalytics from '../components/analytics/AIAnalytics';
 import WebhookManager from '../components/admin/WebhookManager';
-import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
@@ -174,6 +172,8 @@ import '../styles/admin-styles.css';
 const LazyGraphQLExplorer = React.lazy(() => import('../components/admin/GraphQLExplorer'));
 const LazyQueueProfilesManager = React.lazy(() => import('../components/admin/QueueProfilesManager'));
 const LazyServiceCatalog = React.lazy(() => import('../components/admin/ServiceCatalog'));
+const LazyUnifiedReports = React.lazy(() => import('../components/admin/UnifiedReports'));
+const LazyWaitTimeAnalytics = React.lazy(() => import('../components/analytics/WaitTimeAnalytics'));
 
 const getAppointmentPatientDisplayName = (appointment) => {
   const rawName =
@@ -2522,7 +2522,11 @@ const AdminPanel = () => {
       case 'analytics':
         return <AnalyticsDashboard />;
       case 'wait-time-analytics':
-        return <WaitTimeAnalytics />;
+        return (
+          <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+            <LazyWaitTimeAnalytics />
+          </React.Suspense>
+        );
       case 'ai-analytics':
         return <AIAnalytics />;
       case 'analytics-insights':
@@ -2552,7 +2556,11 @@ const AdminPanel = () => {
       case 'discount-benefits':
         return <UnifiedFinance renderFinance={renderFinance} />;
       case 'reports':
-        return <UnifiedReports />;
+        return (
+          <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+            <LazyUnifiedReports />
+          </React.Suspense>
+        );
       case 'clinic-management':
         return <ClinicManagement />;
       case 'clinic-settings':

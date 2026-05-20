@@ -134,6 +134,8 @@ const MINI_APP_I18N = {
     sessionWaiting: 'Ожидание сессии',
     statusLoading: 'Загрузка статуса...',
     sessionUnavailable: 'Сессия Telegram недоступна. Данные пациента не загружаются.',
+    sessionUnavailableBadge: 'Сессия недоступна',
+    openFromTelegram: 'Откройте из Telegram',
     openSection: 'Открытый раздел',
     available: 'Сервис доступен',
     statusOnly: 'Только статус',
@@ -153,6 +155,7 @@ const MINI_APP_I18N = {
     queueLoading: 'Очередь пациента загружается...',
     queueLoadFailed: 'Очередь пациента не загрузилась. Откройте ссылку заново из Telegram.',
     sessionNotConfirmed: 'Сессия Mini App не подтверждена',
+    sessionExpired: 'Ссылка устарела. Откройте Mini App заново из Telegram',
     appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
     appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
     appointmentCreateFailed: 'Заявка на запись не создана: {reason}',
@@ -260,6 +263,8 @@ const MINI_APP_I18N = {
     sessionWaiting: 'Sessiya kutilmoqda',
     statusLoading: 'Holat yuklanmoqda...',
     sessionUnavailable: 'Telegram sessiyasi mavjud emas. Bemor maʼlumotlari yuklanmaydi.',
+    sessionUnavailableBadge: 'Sessiya mavjud emas',
+    openFromTelegram: 'Telegramdan oching',
     openSection: 'Ochiq bo\'lim',
     available: 'Xizmat mavjud',
     statusOnly: 'Faqat holat',
@@ -279,6 +284,7 @@ const MINI_APP_I18N = {
     queueLoading: 'Bemor navbati yuklanmoqda...',
     queueLoadFailed: 'Bemor navbati yuklanmadi. Havolani Telegramdan qayta oching.',
     sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
+    sessionExpired: 'Havola eskirgan. Mini Appni Telegramdan qayta oching',
     appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
     appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
     appointmentCreateFailed: 'Yozilish so\'rovi yaratilmadi: {reason}',
@@ -393,6 +399,20 @@ const MINI_APP_SECTION_ALIASES = {
   payments: 'payments',
   results: 'results',
   documents: 'results',
+};
+
+const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set(['entry_token_invalid', 'entry_token_expired']);
+const MINI_APP_HANDLED_ERROR_REQUEST_CONFIG = {
+  silent: true,
+  expectedErrorStatuses: [400, 403, 503],
+};
+const MINI_APP_ERROR_ALERT_PROPS = {
+  role: 'alert',
+  'aria-live': 'assertive',
+};
+const MINI_APP_STATUS_ALERT_PROPS = {
+  role: 'status',
+  'aria-live': 'polite',
 };
 
 function getTelegramMiniAppInitData() {
@@ -526,7 +546,33 @@ function getMiniAppApiErrorReason(error, fallback) {
   if (typeof detail === 'string') {
     return detail;
   }
-  return detail?.reason || fallback;
+  if (detail && typeof detail.reason === 'string') {
+    return detail.reason;
+  }
+  const reason = error?.response?.data?.reason;
+  return typeof reason === 'string' ? reason : fallback;
+}
+
+function getMiniAppPatientSessionErrorMessage(error, languageCode) {
+  const reason = getMiniAppApiErrorReason(error, 'session_not_confirmed');
+  if (MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)) {
+    return translateMiniAppText(languageCode, 'sessionExpired');
+  }
+  return translateMiniAppText(languageCode, 'sessionNotConfirmed');
+}
+
+function getMiniAppStatusBadge(status, languageCode) {
+  switch (status) {
+    case 'ready':
+      return { variant: 'success', label: translateMiniAppText(languageCode, 'sessionReady') };
+    case 'error':
+      return { variant: 'danger', label: translateMiniAppText(languageCode, 'sessionUnavailableBadge') };
+    case 'unavailable':
+      return { variant: 'secondary', label: translateMiniAppText(languageCode, 'openFromTelegram') };
+    case 'checking':
+    default:
+      return { variant: 'secondary', label: translateMiniAppText(languageCode, 'sessionWaiting') };
+  }
 }
 
 function isMiniAppCapabilityEnabled(capability) {
@@ -688,7 +734,7 @@ function TelegramMiniAppPatientShell() {
       };
     }
 
-    api.post('/telegram/mini-app/patient/manifest', authPayload)
+    api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
         setState({
@@ -697,7 +743,7 @@ function TelegramMiniAppPatientShell() {
           error: null,
         });
         if (usesCabinetSummary) {
-          return api.post('/telegram/mini-app/cabinet/summary', authPayload)
+          return api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
             .then((summaryResponse) => {
               if (!isMounted) return;
               setCabinetSummary({
@@ -708,7 +754,7 @@ function TelegramMiniAppPatientShell() {
             });
         }
         if (selectedSection === 'forms') {
-          return api.post('/telegram/mini-app/forms/preview', authPayload)
+          return api.post('/telegram/mini-app/forms/preview', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
             .then((formsResponse) => {
               if (!isMounted) return;
               setFormsPreview({
@@ -720,7 +766,7 @@ function TelegramMiniAppPatientShell() {
             });
         }
         if (selectedSection === 'results') {
-          return api.post('/telegram/mini-app/cabinet/summary', authPayload)
+          return api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
             .then((summaryResponse) => {
               if (!isMounted) return;
               setResultsSummary({
@@ -732,7 +778,7 @@ function TelegramMiniAppPatientShell() {
         }
         return null;
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
         setCabinetSummary({
           status: usesCabinetSummary ? 'error' : 'idle',
@@ -761,7 +807,7 @@ function TelegramMiniAppPatientShell() {
         setState({
           status: 'error',
           manifest: null,
-          error: translateMiniAppText(effectLanguageCode, 'sessionNotConfirmed'),
+          error: getMiniAppPatientSessionErrorMessage(error, effectLanguageCode),
         });
       });
 
@@ -779,6 +825,10 @@ function TelegramMiniAppPatientShell() {
   const canPreviewAppointments = Boolean(
     selectedSection === 'appointments' &&
     selectedCapability?.preview_enabled
+  );
+  const canCreateAppointments = Boolean(
+    canPreviewAppointments &&
+    selectedCapability?.create_enabled
   );
 
   const handleAppointmentPreviewFieldChange = (field) => (event) => {
@@ -818,8 +868,13 @@ function TelegramMiniAppPatientShell() {
       payload: null,
       error: null,
     });
+    setAppointmentCreate({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
 
-    api.post('/telegram/mini-app/appointments/preview', requestBody)
+    api.post('/telegram/mini-app/appointments/preview', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setAppointmentPreview({
           status: 'ready',
@@ -856,7 +911,7 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
 
-    api.post('/telegram/mini-app/appointments', requestBody)
+    api.post('/telegram/mini-app/appointments', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         setAppointmentCreate({
           status: 'ready',
@@ -916,7 +971,7 @@ function TelegramMiniAppPatientShell() {
       formId: form.id,
       answers: formAnswers[form.id] || {},
       status: 'submitted',
-    })
+    }, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         const submission = response.data?.submission;
         setFormsPreview((current) => ({
@@ -967,7 +1022,10 @@ function TelegramMiniAppPatientShell() {
         ...authPayload,
         reportId: report.id,
       },
-      { responseType: 'blob' }
+      {
+        ...MINI_APP_HANDLED_ERROR_REQUEST_CONFIG,
+        responseType: 'blob',
+      }
     )
       .then((response) => {
         const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -1007,6 +1065,7 @@ function TelegramMiniAppPatientShell() {
   const patientQueueEntries = cabinetSummary.payload?.queue || [];
   const currentQueueEntry = patientQueueEntries[0] || null;
   const paymentsDebtValue = Number(String(paymentsSummary.debt || '0').replace(/\s/g, ''));
+  const statusBadge = getMiniAppStatusBadge(state.status, languageCode);
 
   return (
     <div style={miniAppPageStyle}>
@@ -1017,26 +1076,29 @@ function TelegramMiniAppPatientShell() {
             <h1 style={miniAppTitleStyle}>{t('title')}</h1>
           </div>
           <Badge
-            variant={state.status === 'ready' ? 'success' : 'secondary'}
+            variant={statusBadge.variant}
             size="small"
             style={miniAppStatusBadgeStyle}
+            aria-live={state.status === 'error' ? 'assertive' : 'polite'}
           >
-            {state.status === 'ready' ? t('sessionReady') : t('sessionWaiting')}
+            {statusBadge.label}
           </Badge>
         </section>
 
         {state.status === 'checking' && (
-          <Alert severity="info" style={miniAppNoticeStyle}>{t('statusLoading')}</Alert>
+          <Alert severity="info" style={miniAppNoticeStyle} {...MINI_APP_STATUS_ALERT_PROPS}>
+            {t('statusLoading')}
+          </Alert>
         )}
 
         {state.status === 'unavailable' && (
-          <Alert severity="info" style={miniAppNoticeStyle}>
+          <Alert severity="info" style={miniAppNoticeStyle} {...MINI_APP_STATUS_ALERT_PROPS}>
             {t('sessionUnavailable')}
           </Alert>
         )}
 
         {state.status === 'error' && (
-          <Alert severity="error" style={miniAppNoticeStyle}>
+          <Alert severity="error" style={miniAppNoticeStyle} {...MINI_APP_ERROR_ALERT_PROPS}>
             {state.error}
           </Alert>
         )}
@@ -1472,18 +1534,20 @@ function TelegramMiniAppPatientShell() {
                         </Alert>
                       )}
 
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="small"
-                        loading={appointmentCreate.status === 'loading'}
-                        disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}
-                        onClick={handleAppointmentCreateSubmit}
-                      >
-                        {appointmentCreate.status === 'loading'
-                          ? t('appointmentCreating')
-                          : t('confirmAppointmentRequest')}
-                      </Button>
+                      {canCreateAppointments && (
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="small"
+                          loading={appointmentCreate.status === 'loading'}
+                          disabled={appointmentCreate.status === 'loading' || appointmentCreate.status === 'ready'}
+                          onClick={handleAppointmentCreateSubmit}
+                        >
+                          {appointmentCreate.status === 'loading'
+                            ? t('appointmentCreating')
+                            : t('confirmAppointmentRequest')}
+                        </Button>
+                      )}
                     </>
                   )}
                 </CardContent>

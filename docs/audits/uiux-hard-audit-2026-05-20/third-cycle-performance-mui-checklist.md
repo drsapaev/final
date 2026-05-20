@@ -35,39 +35,41 @@ These PRs are already merged before this third-cycle checklist:
 - [x] PR-PERF-7 / #952: lazy-load admin queue profiles view.
 - [x] PR-PERF-8 / #953: lazy-load admin service catalog view.
 
-Current local build evidence after PR #953:
+Current local build evidence after PR-PERF-12 review:
 
 | Asset | Approx size |
 | --- | ---: |
-| `index-*` | `1385.75 KiB` |
+| `index-*` | `1400.99 KiB` |
 | `heic2any-*` | `1320.46 KiB` |
-| `AdminPanel-*` | `1021.80 KiB` |
+| `AdminPanel-*` | `970.11 KiB` |
 | `AnalyticsPage-*` | `245.86 KiB` |
 | `RegistrarPanel-*` | `245.68 KiB` |
 | `DentistPanelUnified-*` | `243.58 KiB` |
 | `ServiceCatalog-*` | `46.51 KiB` |
+| `UnifiedReports-*` | `35.25 KiB` |
+| `WaitTimeAnalytics-*` | `19.27 KiB` |
 
 ## Third-Cycle Backlog
 
-- [ ] PR-3-0: add this third-cycle performance/MUI debt checklist.
-- [ ] PR-PERF-9: update Vite performance warning docs with post-PR #953
+- [x] PR-3-0: add this third-cycle performance/MUI debt checklist.
+- [x] PR-PERF-9: update Vite performance warning docs with post-PR #953
   baseline and resolved warnings.
-- [ ] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
+- [x] PR-PERF-10: split one additional low-risk `AdminPanel` optional child view
   into a lazy boundary.
-- [ ] PR-PERF-11: split one additional low-risk analytics/admin reporting child
+- [x] PR-PERF-11: split one additional low-risk analytics/admin reporting child
   view only if route/RBAC proof stays behavior-identical.
-- [ ] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
+- [x] PR-PERF-12: review whether `AdminPanel-*` can be reduced below `1000 KiB`
   with one more optional-view split; stop if the next candidate is
   user/RBAC/payment/queue/Telegram/security-sensitive.
-- [ ] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
+- [x] PR-MUI-1: refresh `frontend/MUI_RUNTIME_INVENTORY.md` after current
   performance changes and classify remaining runtime/example MUI refs.
-- [ ] PR-MUI-2: migrate exactly one low-risk admin MUI island only if a dedicated
-  first-touch file and browser proof are available.
-- [ ] PR-MUI-3: decide example-only MUI policy for `components/examples` without
+- [x] PR-MUI-2: decide no low-risk admin MUI island is eligible without
+  route/browser proof and keep runtime UI unchanged.
+- [x] PR-MUI-3: decide example-only MUI policy for `components/examples` without
   changing runtime UI.
-- [ ] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
+- [x] PR-MUI-4: create a gated handoff for payment/queue/lab/dental/cardiology
   MUI islands; do not migrate them in the same PR as the handoff.
-- [ ] Final: summarize third-cycle completion, merged PRs, remaining chunks, MUI
+- [x] Final: summarize third-cycle completion, merged PRs, remaining chunks, MUI
   status, and next backlog.
 
 ## Candidate Performance Slices

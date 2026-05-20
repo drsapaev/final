@@ -21,6 +21,90 @@ low-risk runtime island is safe to migrate in this cycle without crossing into
 admin user management, queue, payment, lab reporting, patient clinical data,
 cardiology, dental, Telegram, AI/MCP, or example-only policy work.
 
+PR-MUI-1 decision refresh after the performance split cycle: 14 files still
+contained runtime or example MUI imports. PR-PERF-9 through PR-PERF-12 did not
+add new MUI islands.
+
+Dashboard stale component removal: 13 files now contain runtime or example MUI
+imports after deleting the caller-free `frontend/src/components/dashboard`
+barrel and component.
+
+UserManagement actions menu migration: 12 files now contain runtime or example
+MUI imports after replacing the admin user actions menu with macOS/native
+controls in `frontend/src/components/admin/UserManagement.jsx`.
+
+UnifiedButton example migration: 11 files now contain runtime or example MUI
+imports after converting `frontend/src/components/examples/UnifiedButton.tsx`
+to a macOS/native example.
+
+UnifiedCard example migration: 10 files now contain runtime MUI imports after
+converting `frontend/src/components/examples/UnifiedCard.tsx` to a
+macOS/native example. No example-only `Unified*` MUI references remain.
+
+PaymentTest internal demo migration: 9 files now contain runtime MUI imports
+after converting `frontend/src/pages/PaymentTest.jsx` to macOS/native controls
+in a gate-limited payment demo slice. `PaymentWidget.jsx` was later migrated
+away from MUI in a dedicated payment widget slice, so no payment MUI runtime
+island remains in the active inventory.
+
+MCPMonitor stale component removal: 8 files now contain runtime MUI imports
+after deleting caller-free `frontend/src/components/ai/MCPMonitor.jsx`.
+`TelegramManager.jsx` was still the Telegram/AI-sensitive MUI runtime island
+at this point in the inventory history.
+
+LabReportGenerator stale component removal: 7 files now contain runtime MUI
+imports after deleting caller-free
+`frontend/src/components/laboratory/LabReportGenerator.jsx`. Active lab panel,
+report, and export behavior remains owned by the mounted lab routes/components.
+
+FamilyRelationsCard migration: 6 files now contain runtime MUI imports after
+converting `frontend/src/components/patient/FamilyRelationsCard.jsx` to
+macOS/native controls in a gate-limited patient relationship slice.
+`PatientPickupView.jsx` role gating and family relationship API behavior remain
+unchanged.
+
+TreatmentPlanner migration: 5 files now contain runtime MUI imports after
+converting `frontend/src/components/dental/TreatmentPlanner.jsx` to
+macOS/native controls in a gate-limited dental treatment planning slice.
+Treatment stage calculations, save payloads, print output data, and
+`DentistPanelUnified.jsx` mounting remain unchanged.
+
+ToothModal migration: 4 files now contain runtime MUI imports after converting
+`frontend/src/components/dental/ToothModal.jsx` to macOS/native controls in a
+gate-limited dental tooth modal slice. Tooth procedure selection, material
+pricing, follow-up state, notes, history display, total price calculation, save
+payloads, and `DentistPanelUnified.jsx` mounting remain unchanged.
+
+PaymentWidget migration: 3 files now contain runtime MUI imports after
+converting `frontend/src/components/payment/PaymentWidget.jsx` to
+macOS/native controls in a gate-limited payment widget slice. Payment provider
+codes, selected provider state, amount formatting, payment initialization,
+status checks, confirmation, cancellation, and callbacks remain unchanged.
+
+ECGViewer migration: 2 files now contain runtime MUI imports after converting
+`frontend/src/components/cardiology/ECGViewer.jsx` to macOS/native controls in
+a gate-limited cardiology slice. ECG upload metadata, preview/download/delete
+behavior, parsed parameter display, AI analysis payload, analysis warning
+thresholds, and cardiology route/RBAC behavior remain unchanged.
+
+OnlineQueueManager migration: 1 file now contains runtime MUI imports after
+converting `frontend/src/components/queue/OnlineQueueManager.jsx` to
+macOS/native controls in a gate-limited queue slice. Queue hook calls, selected
+specialist/date state, QR generation value, QR download/print behavior, status
+wording, call/open queue actions, and auto-refresh behavior remain unchanged.
+
+TelegramManager migration: 0 files now contain runtime MUI imports after
+converting `frontend/src/components/TelegramManager.jsx` to macOS/native
+controls in a gate-limited Telegram integration slice. Telegram bot status,
+webhook/polling display, staff link safety text, payment/appointment safety
+summary display, API calls, request payloads, token visibility rules, route
+behavior, and RBAC behavior remain unchanged.
+
+MUI package cleanup: `@mui/material`, `@mui/icons-material`, the stale
+`vite.config.js` MUI optimizeDeps entry, and the unused legacy MUI theme
+TypeScript cluster under `frontend/src/theme` were removed after full source
+import audit found no remaining app/runtime/test imports.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -35,7 +119,7 @@ Default rule:
   - why the canonical macOS primitive cannot safely cover the need;
   - the intended follow-up or migration/retirement path;
   - validation that no route, RBAC, payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
-- MUI removal must be staged one file or one component family at a time. Do not mass-remove MUI dependencies until runtime imports reach `0`.
+- MUI removal must be staged one file or one component family at a time. Runtime imports have reached `0`, and package removal is complete; any new MUI dependency/import requires a fresh approval and rollback note.
 
 Review command for future PRs:
 
@@ -47,7 +131,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 
 - Canonical app UI layer remains `frontend/src/components/ui/macos` per `frontend/DESIGN_SYSTEM.md`.
 - Do not add new MUI usage in clinic app pages or workflow panels.
-- Do not remove MUI dependencies until runtime imports reach `0`.
+- Do not reintroduce MUI dependencies without a separate package-audit PR proving the canonical macOS UI layer cannot cover the need.
 - Migrate only one low-risk runtime file per slice unless a later gate or handoff explicitly approves broader work.
 - Leave dental, cardiology, lab, queue, payment, Telegram, AI, and EMR-adjacent files untouched until a dedicated gate/handoff reviews domain behavior.
 
@@ -57,31 +141,24 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | --- | --- | --- | --- |
 | `frontend/src/components/pwa/ConnectionStatus.jsx` | Low-risk | PWA online/offline/sync status UI; no backend contract ownership. | Migrated in Task 36; no current `@mui` import. |
 | `frontend/src/components/pwa/PWAInstallPrompt.jsx` | Low-risk | PWA install/update/notification prompt UI. | Migrated in Task 37; no current `@mui` import. |
-| `frontend/src/components/admin/UserManagement.jsx` | Shared/admin-sensitive | Legacy actions menu imports MUI. Admin user workflow is role-sensitive. | Do not touch until dedicated admin slice. |
-| `frontend/src/components/dashboard/Dashboard.jsx` | Shared/admin-sensitive | Dashboard summary UI with MUI icons/components. | Leave for later dashboard consolidation. |
-| `frontend/src/components/payment/PaymentWidget.jsx` | Payment/queue-adjacent | Payment flow behavior and error handling are payment-sensitive. | Gate/handoff only. |
-| `frontend/src/pages/PaymentTest.jsx` | Payment/queue-adjacent | Internal payment demo/test surface. | Gate/handoff only; do not alter payment semantics. |
-| `frontend/src/components/queue/OnlineQueueManager.jsx` | Payment/queue-adjacent | Queue status, print/download, and queue operations. | Gate/handoff only. |
-| `frontend/src/components/patient/FamilyRelationsCard.jsx` | Clinical-heavy | Patient relationship data and visibility semantics. | Clinical safety review before migration. |
-| `frontend/src/components/laboratory/LabReportGenerator.jsx` | Clinical-heavy | Lab report generation UI. | Clinical safety review before migration. |
-| `frontend/src/components/cardiology/ECGViewer.jsx` | Clinical-heavy | ECG viewer and cardiology data display. | Clinical safety review before migration. |
-| `frontend/src/components/dental/TreatmentPlanner.jsx` | Clinical-heavy | Dental treatment planning and cost/status semantics. | Clinical safety review before migration. |
-| `frontend/src/components/dental/ToothModal.jsx` | Clinical-heavy | Dental tooth modal and clinical status semantics. | Clinical safety review before migration. |
-| `frontend/src/components/TelegramManager.jsx` | Telegram/AI-sensitive | Telegram integration management. | Gate/handoff only. |
-| `frontend/src/components/ai/MCPMonitor.jsx` | Telegram/AI-sensitive | AI/MCP monitoring surface. | Gate/handoff only; preserve AI safety copy. |
-| `frontend/src/components/examples/UnifiedCard.tsx` | Example-only | Design-system example file. | Do not count as blocking app runtime until examples policy is decided. |
-| `frontend/src/components/examples/UnifiedButton.tsx` | Example-only | Design-system example file. | Do not count as blocking app runtime until examples policy is decided. |
+| `frontend/src/components/admin/UserManagement.jsx` | Migrated/admin-sensitive | Admin user actions menu now uses macOS/native controls with no current `@mui` import. Admin user workflow remains role-sensitive. | Migrated in dedicated gated admin slice; keep future changes scoped to user lifecycle behavior. |
+| `frontend/src/components/dashboard/Dashboard.jsx` | Stale/removed | No active route owner or caller found. | Removed after route-owner discovery. |
+| `frontend/src/components/payment/PaymentWidget.jsx` | Migrated/payment-sensitive | Payment widget UI now uses macOS/native controls with no current `@mui` import. | Keep future changes payment-gated because provider flow, status, confirmation, retry/error handling, and callback semantics are payment-sensitive. |
+| `frontend/src/pages/PaymentTest.jsx` | Migrated/payment-demo | Internal payment demo/test surface now uses macOS/native controls with no current `@mui` import. | Keep route, admin/internal-demo visibility, and payment demo semantics unchanged; future behavior changes still require payment gate review. |
+| `frontend/src/components/queue/OnlineQueueManager.jsx` | Migrated/queue-sensitive | Queue manager UI now uses macOS/native controls with no current `@mui` import. | Keep future changes queue-gated because status wording, QR generation, print/download behavior, call/open queue actions, and auto-refresh semantics are queue-sensitive. |
+| `frontend/src/components/patient/FamilyRelationsCard.jsx` | Migrated/clinical | Patient relationship UI now uses macOS/native controls with no current `@mui` import. | Keep future changes clinical-gated because relationship visibility and pickup-role context are patient-sensitive. |
+| `frontend/src/components/laboratory/LabReportGenerator.jsx` | Stale/removed | Caller-free lab report generator had no active frontend source importer. | Removed after source search; active lab panel/report/export behavior remains unchanged. |
+| `frontend/src/components/cardiology/ECGViewer.jsx` | Migrated/clinical | ECG viewer UI now uses macOS/native controls with no current `@mui` import. | Keep future changes cardiology/clinical-gated because ECG upload metadata, preview/download/delete behavior, parsed parameters, and AI interpretation semantics are clinical-sensitive. |
+| `frontend/src/components/dental/TreatmentPlanner.jsx` | Migrated/clinical | Dental treatment planner UI now uses macOS/native controls with no current `@mui` import. | Keep future changes dental/clinical-gated because treatment stage, cost, duration, priority, print, and save semantics are clinical-sensitive. |
+| `frontend/src/components/dental/ToothModal.jsx` | Migrated/clinical | Dental tooth modal UI now uses macOS/native controls with no current `@mui` import. | Keep future changes dental/clinical-gated because procedure selection, material pricing, follow-up state, notes, history, total price, and save semantics are clinical-sensitive. |
+| `frontend/src/components/TelegramManager.jsx` | Migrated/Telegram-sensitive | Telegram integration management now uses macOS/native controls with no current `@mui` import. | Keep future changes Telegram-gated because bot status, webhook/polling state, staff link token safety, payment/appointment summaries, and token visibility are integration-sensitive. |
+| `frontend/src/components/ai/MCPMonitor.jsx` | Stale/removed | Caller-free AI/MCP monitoring surface had no active frontend route owner/importer. | Removed after route-owner/source search; MCP API client and active AI assistant surfaces remain unchanged. |
+| `frontend/src/components/examples/UnifiedCard.tsx` | Migrated/example-only | Design-system example file now uses macOS/native card markup with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
+| `frontend/src/components/examples/UnifiedButton.tsx` | Migrated/example-only | Design-system example file now uses macOS/native controls with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 
 ## Do-Not-Touch Buckets
 
-- Dental: `TreatmentPlanner.jsx`, `ToothModal.jsx`
-- Cardiology: `ECGViewer.jsx`
-- Lab: `LabReportGenerator.jsx`
-- Queue: `OnlineQueueManager.jsx`
-- Payment: `PaymentWidget.jsx`, `PaymentTest.jsx`
-- Telegram: `TelegramManager.jsx`
-- AI: `MCPMonitor.jsx`
-- Patient clinical data: `FamilyRelationsCard.jsx`
+- none currently matching `@mui|Mui`
 
 ## Completed Low-Risk Runtime Targets
 
@@ -92,7 +169,8 @@ These targets were low-risk because they are UI-status prompts and were migrated
 
 ## Remaining Runtime Targets
 
-The remaining current `@mui` files are all in do-not-touch buckets or shared/admin-sensitive/example-only categories. Do not migrate them without a dedicated gate/handoff.
+No current file in `frontend/src/pages` or `frontend/src/components` matches
+`@mui|Mui`.
 
 ## PR-UX-17 Decision
 
@@ -106,7 +184,33 @@ $files | Sort-Object
 $files.Count
 ```
 
-Result: 14 files.
+Result after stale dashboard removal: 13 files.
+
+Result after UserManagement actions menu migration: 12 files.
+
+Result after UnifiedButton example migration: 11 files.
+
+Result after UnifiedCard example migration: 10 files.
+
+Result after PaymentTest internal demo migration: 9 files.
+
+Result after MCPMonitor stale component removal: 8 files.
+
+Result after LabReportGenerator stale component removal: 7 files.
+
+Result after FamilyRelationsCard patient relationship migration: 6 files.
+
+Result after TreatmentPlanner dental planning migration: 5 files.
+
+Result after ToothModal dental tooth modal migration: 4 files.
+
+Result after PaymentWidget payment widget migration: 3 files.
+
+Result after ECGViewer cardiology viewer migration: 2 files.
+
+Result after OnlineQueueManager queue manager migration: 1 file.
+
+Result after TelegramManager Telegram integration migration: 0 files.
 
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
@@ -119,8 +223,139 @@ handoff:
 - Queue/payment: protect queue status, payment state, receipts, and print/download actions.
 - Lab/cardiology/dental/patient: preserve clinical meaning, report generation, ECG/dental status, and patient relationship visibility.
 - Telegram/AI/MCP: preserve integration status, security copy, and operational diagnostics.
-- Examples: decide whether example-only files stay as MUI design-system references before counting them as runtime cleanup.
+- Examples: both `Unified*` example files now use macOS/native examples and no longer count in the MUI search result.
 
-Next safe MUI migration should be a dedicated PR with one first-touch file,
-route/browser smoke, and a PR body that explicitly proves no role, route,
-payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
+The dedicated admin actions menu migration has now removed `UserManagement.jsx`
+from the current MUI search result. The follow-up example migrations removed
+`UnifiedButton.tsx` and `UnifiedCard.tsx` from the current MUI search result.
+The patient relationship slice removed `FamilyRelationsCard.jsx` from the
+current MUI search result. The dental planning slice removed
+`TreatmentPlanner.jsx` from the current MUI search result. The dental tooth
+modal slice removed `ToothModal.jsx` from the current MUI search result.
+The payment widget slice removed `PaymentWidget.jsx` from the current MUI
+search result. The cardiology viewer slice removed `ECGViewer.jsx` from the
+current MUI search result. The queue manager slice removed
+`OnlineQueueManager.jsx` from the current MUI search result. The Telegram
+integration slice removed `TelegramManager.jsx` from the current MUI search
+result.
+
+Next safe MUI-related step should be a dedicated package/dependency audit PR
+before removing any `@mui/*` dependencies.
+
+## PR-MUI-1 Refresh
+
+PR-MUI-1 is intentionally inventory-only after the AdminPanel performance split
+cycle.
+
+Fresh command:
+
+```powershell
+rg -l "@mui|Mui" frontend\src\pages frontend\src\components
+rg -n "@mui|Mui" frontend\src\pages frontend\src\components
+```
+
+Historical PR-MUI-1 result: 14 files.
+
+Current post-continuation result after dashboard removal, UserManagement,
+UnifiedButton, UnifiedCard, PaymentTest migration, MCPMonitor stale component
+removal, LabReportGenerator stale component removal, FamilyRelationsCard
+patient relationship migration, TreatmentPlanner dental planning migration,
+ToothModal dental tooth modal migration, PaymentWidget payment widget
+migration, ECGViewer cardiology viewer migration, OnlineQueueManager queue
+manager migration, and TelegramManager Telegram integration migration:
+0 files.
+
+No new MUI imports were introduced by the recent performance PRs. Current
+classification:
+
+| Category | Files | Decision |
+| --- | ---: | --- |
+| Shared/admin-sensitive | 0 | No current MUI search result after UserManagement migration and stale dashboard removal. |
+| Payment/queue-adjacent | 0 | No current MUI search result after payment and queue migrations. |
+| Clinical-heavy | 0 | No current MUI search result after cardiology and dental migrations. |
+| Telegram/AI-sensitive | 0 | No current MUI search result after TelegramManager migration. |
+| Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
+
+Current files:
+
+- Telegram/AI-sensitive:
+  - none currently matching `@mui|Mui`
+- Example-only:
+  - none currently matching `@mui|Mui`
+
+Decision: do not treat the historical PR-MUI-1 inventory as current. The
+current live MUI inventory is 0 files and excludes the migrated/removed
+admin/shared, dashboard, example-only, PaymentTest, MCPMonitor,
+LabReportGenerator, FamilyRelationsCard, TreatmentPlanner, and ToothModal
+surfaces, plus the migrated PaymentWidget, ECGViewer, and OnlineQueueManager
+surfaces, plus the migrated TelegramManager surface.
+
+## PR-MUI-2 Low-Risk Admin Decision
+
+PR-MUI-2 was intentionally decision-only at that point in the rollout history.
+
+Fresh admin/shared review:
+
+- `frontend/src/components/admin/UserManagement.jsx` was not low-risk for a
+  generic cleanup PR at the time. Its MUI actions menu was later migrated in a
+  dedicated gated admin slice.
+- `frontend/src/components/dashboard/Dashboard.jsx` has no confirmed active
+  caller in `frontend/src` from static search, so the required route/browser
+  proof is not available.
+
+Decision: no runtime MUI migration in PR-MUI-2. Do not reduce the MUI count by
+editing an unproven route surface, and do not touch admin destructive-account
+actions without a dedicated admin/RBAC browser proof slice.
+
+Next safe step: PR-MUI-3 example-only policy for
+`frontend/src/components/examples/UnifiedButton.tsx` and
+`frontend/src/components/examples/UnifiedCard.tsx`.
+
+## PR-MUI-3 Example-Only Policy
+
+The two `components/examples/Unified*` files were MUI references, but static
+search found no active app callers for `UnifiedButton` or `UnifiedCard`.
+`MacOSDemoPage.jsx` lazy-loads `components/examples/MacOSDemo`, not these two
+files.
+
+Policy:
+
+- Treat `frontend/src/components/examples/UnifiedButton.tsx` and
+  `frontend/src/components/examples/UnifiedCard.tsx` as isolated example-only
+  reference files, not active clinic runtime UI.
+- Do not import these files into app pages, role panels, workflow components,
+  route views, payment/queue/clinical screens, or authenticated dashboards.
+- Do not copy their MUI patterns into new clinic runtime UI; use
+  `frontend/src/components/ui/macos` first.
+- If either file becomes reachable from an active route, reclassify it as
+  runtime debt and require a scoped migration/removal PR.
+- Leave MUI dependencies in place while any runtime MUI imports remain.
+
+The cleanup has now converted both examples to macOS/native examples. Future
+cleanup can update older docs that still mention the historical MUI variants or
+delete/archive the examples if no developer workflow uses them.
+
+## PR-MUI-4 Risky Runtime Handoff
+
+The former risky runtime MUI islands were migrated one at a time through gated
+cleanup PRs. Keep the handoff document as the historical guardrail pattern for
+future reintroductions or route-sensitive UI migrations.
+
+Current gate-required MUI groups:
+
+- none currently matching `@mui|Mui`
+
+Default rule: one risky MUI island per PR, with first-touch boundaries,
+read-only references, browser/auth proof, and stop conditions named before
+editing.
+
+## Dashboard Route Owner Discovery
+
+`docs/audits/uiux-hard-audit-2026-05-20/dashboard-route-owner-discovery.md`
+records a source-based route ownership check for
+`frontend/src/components/dashboard/Dashboard.jsx`.
+
+Current decision: `Dashboard.jsx` had no confirmed active route owner or caller
+in `frontend/src`. The stale component and its caller-free barrel were deleted
+in the follow-up removal PR. Keep it out of future runtime MUI handoffs unless a
+new dashboard route owner is intentionally created.

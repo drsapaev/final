@@ -1,6 +1,6 @@
 /**
  * Color Palette - Semantic & Medical
- * Light mode as base; dark mode inverts automatically via MUI
+ * Light mode as base; dark mode uses the local inverted palette exports
  */
 
 export interface ColorScale {
