@@ -756,8 +756,12 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
     },
     "queue_entry_button": {
-        TELEGRAM_LANGUAGE_RU: "Открыть очередь в кабинете",
-        TELEGRAM_LANGUAGE_UZ: "Kabinetda navbatni ochish",
+        TELEGRAM_LANGUAGE_RU: "🎫 Открыть мою очередь",
+        TELEGRAM_LANGUAGE_UZ: "🎫 Mening navbatimni ochish",
+    },
+    "queue_open_hint": {
+        TELEGRAM_LANGUAGE_RU: "Нажмите кнопку ниже, чтобы открыть очередь в Mini App.",
+        TELEGRAM_LANGUAGE_UZ: "Mini Appda navbatni ochish uchun quyidagi tugmani bosing.",
     },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
@@ -3113,13 +3117,15 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
     entries = _patient_today_queue_entries(db, telegram_user.patient_id)
+    open_hint = _localized_text("queue_open_hint", language)
     if not entries:
-        return _localized_text("queue_empty", language).format(
+        queue_empty = _localized_text("queue_empty", language).format(
             patient=patient_name,
             visit_summary=_html_text(
                 _recent_visit_summary(db, telegram_user.patient_id, language)
             ),
         )
+        return f"{queue_empty}\n\n{open_hint}"
 
     lines = [
         _localized_text("queue_patient", language).format(patient=patient_name),
@@ -3148,6 +3154,7 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
         lines.append(
             _localized_text("queue_more", language).format(count=len(entries) - 5)
         )
+    lines.extend(["", open_hint])
     return "\n".join(lines)
 
 
