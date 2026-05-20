@@ -1,5 +1,10 @@
 # Enterprise-Grade MUI Design System: Executive Summary
 
+> Archive notice (2026-05-20): this is historical MUI migration documentation.
+> The current clinic runtime UI is MUI-free; use `frontend/DESIGN_SYSTEM.md`
+> and `frontend/MUI_RUNTIME_INVENTORY.md` as canonical guidance. Do not
+> reintroduce `@mui/*` from this document without explicit approval.
+
 ## Delivered
 
 This is a **production-ready, hardened design system** for a 600+ component medical EMR built on React 18 + Vite + MUI v5.
