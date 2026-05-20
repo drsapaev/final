@@ -49,8 +49,8 @@ island remains in the active inventory.
 
 MCPMonitor stale component removal: 8 files now contain runtime MUI imports
 after deleting caller-free `frontend/src/components/ai/MCPMonitor.jsx`.
-`TelegramManager.jsx` remains the only Telegram/AI-sensitive MUI runtime
-island in the active inventory.
+`TelegramManager.jsx` was still the Telegram/AI-sensitive MUI runtime island
+at this point in the inventory history.
 
 LabReportGenerator stale component removal: 7 files now contain runtime MUI
 imports after deleting caller-free
@@ -93,6 +93,13 @@ macOS/native controls in a gate-limited queue slice. Queue hook calls, selected
 specialist/date state, QR generation value, QR download/print behavior, status
 wording, call/open queue actions, and auto-refresh behavior remain unchanged.
 
+TelegramManager migration: 0 files now contain runtime MUI imports after
+converting `frontend/src/components/TelegramManager.jsx` to macOS/native
+controls in a gate-limited Telegram integration slice. Telegram bot status,
+webhook/polling display, staff link safety text, payment/appointment safety
+summary display, API calls, request payloads, token visibility rules, route
+behavior, and RBAC behavior remain unchanged.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -107,7 +114,7 @@ Default rule:
   - why the canonical macOS primitive cannot safely cover the need;
   - the intended follow-up or migration/retirement path;
   - validation that no route, RBAC, payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
-- MUI removal must be staged one file or one component family at a time. Do not mass-remove MUI dependencies until runtime imports reach `0`.
+- MUI removal must be staged one file or one component family at a time. Runtime imports have reached `0`; dependency removal still needs its own package-audit PR.
 
 Review command for future PRs:
 
@@ -119,7 +126,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 
 - Canonical app UI layer remains `frontend/src/components/ui/macos` per `frontend/DESIGN_SYSTEM.md`.
 - Do not add new MUI usage in clinic app pages or workflow panels.
-- Do not remove MUI dependencies until runtime imports reach `0`.
+- Do not remove MUI dependencies without a separate package-audit PR proving no runtime/test/tool import still needs them.
 - Migrate only one low-risk runtime file per slice unless a later gate or handoff explicitly approves broader work.
 - Leave dental, cardiology, lab, queue, payment, Telegram, AI, and EMR-adjacent files untouched until a dedicated gate/handoff reviews domain behavior.
 
@@ -139,14 +146,14 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/cardiology/ECGViewer.jsx` | Migrated/clinical | ECG viewer UI now uses macOS/native controls with no current `@mui` import. | Keep future changes cardiology/clinical-gated because ECG upload metadata, preview/download/delete behavior, parsed parameters, and AI interpretation semantics are clinical-sensitive. |
 | `frontend/src/components/dental/TreatmentPlanner.jsx` | Migrated/clinical | Dental treatment planner UI now uses macOS/native controls with no current `@mui` import. | Keep future changes dental/clinical-gated because treatment stage, cost, duration, priority, print, and save semantics are clinical-sensitive. |
 | `frontend/src/components/dental/ToothModal.jsx` | Migrated/clinical | Dental tooth modal UI now uses macOS/native controls with no current `@mui` import. | Keep future changes dental/clinical-gated because procedure selection, material pricing, follow-up state, notes, history, total price, and save semantics are clinical-sensitive. |
-| `frontend/src/components/TelegramManager.jsx` | Telegram/AI-sensitive | Telegram integration management. | Gate/handoff only. |
+| `frontend/src/components/TelegramManager.jsx` | Migrated/Telegram-sensitive | Telegram integration management now uses macOS/native controls with no current `@mui` import. | Keep future changes Telegram-gated because bot status, webhook/polling state, staff link token safety, payment/appointment summaries, and token visibility are integration-sensitive. |
 | `frontend/src/components/ai/MCPMonitor.jsx` | Stale/removed | Caller-free AI/MCP monitoring surface had no active frontend route owner/importer. | Removed after route-owner/source search; MCP API client and active AI assistant surfaces remain unchanged. |
 | `frontend/src/components/examples/UnifiedCard.tsx` | Migrated/example-only | Design-system example file now uses macOS/native card markup with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 | `frontend/src/components/examples/UnifiedButton.tsx` | Migrated/example-only | Design-system example file now uses macOS/native controls with no current `@mui` import. | Keep example-only; do not import into clinic runtime UI. |
 
 ## Do-Not-Touch Buckets
 
-- Telegram: `TelegramManager.jsx`
+- none currently matching `@mui|Mui`
 
 ## Completed Low-Risk Runtime Targets
 
@@ -157,8 +164,8 @@ These targets were low-risk because they are UI-status prompts and were migrated
 
 ## Remaining Runtime Targets
 
-The remaining current `@mui` file is in the Telegram/AI do-not-touch runtime
-bucket. Do not migrate it without a dedicated gate/handoff.
+No current file in `frontend/src/pages` or `frontend/src/components` matches
+`@mui|Mui`.
 
 ## PR-UX-17 Decision
 
@@ -198,6 +205,8 @@ Result after ECGViewer cardiology viewer migration: 2 files.
 
 Result after OnlineQueueManager queue manager migration: 1 file.
 
+Result after TelegramManager Telegram integration migration: 0 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -221,12 +230,12 @@ modal slice removed `ToothModal.jsx` from the current MUI search result.
 The payment widget slice removed `PaymentWidget.jsx` from the current MUI
 search result. The cardiology viewer slice removed `ECGViewer.jsx` from the
 current MUI search result. The queue manager slice removed
-`OnlineQueueManager.jsx` from the current MUI search result. The remaining MUI
-target is the Telegram surface.
+`OnlineQueueManager.jsx` from the current MUI search result. The Telegram
+integration slice removed `TelegramManager.jsx` from the current MUI search
+result.
 
-Next safe MUI migration should be a dedicated PR with one first-touch file,
-route/browser smoke, and a PR body that explicitly proves no role, route,
-payment, queue, EMR, lab, Telegram, notification, or backend contract changed.
+Next safe MUI-related step should be a dedicated package/dependency audit PR
+before removing any `@mui/*` dependencies.
 
 ## PR-MUI-1 Refresh
 
@@ -244,11 +253,12 @@ Historical PR-MUI-1 result: 14 files.
 
 Current post-continuation result after dashboard removal, UserManagement,
 UnifiedButton, UnifiedCard, PaymentTest migration, MCPMonitor stale component
-removal, LabReportGenerator stale component removal, and FamilyRelationsCard
-patient relationship migration, TreatmentPlanner dental planning migration, and
-ToothModal dental tooth modal migration, and PaymentWidget payment widget
-migration, and ECGViewer cardiology viewer migration:
-1 file.
+removal, LabReportGenerator stale component removal, FamilyRelationsCard
+patient relationship migration, TreatmentPlanner dental planning migration,
+ToothModal dental tooth modal migration, PaymentWidget payment widget
+migration, ECGViewer cardiology viewer migration, OnlineQueueManager queue
+manager migration, and TelegramManager Telegram integration migration:
+0 files.
 
 No new MUI imports were introduced by the recent performance PRs. Current
 classification:
@@ -258,32 +268,32 @@ classification:
 | Shared/admin-sensitive | 0 | No current MUI search result after UserManagement migration and stale dashboard removal. |
 | Payment/queue-adjacent | 0 | No current MUI search result after payment and queue migrations. |
 | Clinical-heavy | 0 | No current MUI search result after cardiology and dental migrations. |
-| Telegram/AI-sensitive | 1 | Gate/handoff only. |
+| Telegram/AI-sensitive | 0 | No current MUI search result after TelegramManager migration. |
 | Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
 
 Current files:
 
 - Telegram/AI-sensitive:
-  - `frontend/src/components/TelegramManager.jsx`
+  - none currently matching `@mui|Mui`
 - Example-only:
   - none currently matching `@mui|Mui`
 
 Decision: do not treat the historical PR-MUI-1 inventory as current. The
-current live MUI inventory is 1 file and excludes the migrated/removed
+current live MUI inventory is 0 files and excludes the migrated/removed
 admin/shared, dashboard, example-only, PaymentTest, MCPMonitor,
 LabReportGenerator, FamilyRelationsCard, TreatmentPlanner, and ToothModal
 surfaces, plus the migrated PaymentWidget, ECGViewer, and OnlineQueueManager
-surfaces.
+surfaces, plus the migrated TelegramManager surface.
 
 ## PR-MUI-2 Low-Risk Admin Decision
 
-PR-MUI-2 is intentionally decision-only.
+PR-MUI-2 was intentionally decision-only at that point in the rollout history.
 
 Fresh admin/shared review:
 
-- `frontend/src/components/admin/UserManagement.jsx` is not low-risk for a
-  generic cleanup PR. Its remaining MUI usage is the admin actions menu around
-  edit, activate/deactivate, delete, and self-delete guardrail flows.
+- `frontend/src/components/admin/UserManagement.jsx` was not low-risk for a
+  generic cleanup PR at the time. Its MUI actions menu was later migrated in a
+  dedicated gated admin slice.
 - `frontend/src/components/dashboard/Dashboard.jsx` has no confirmed active
   caller in `frontend/src` from static search, so the required route/browser
   proof is not available.
@@ -322,13 +332,13 @@ delete/archive the examples if no developer workflow uses them.
 
 ## PR-MUI-4 Risky Runtime Handoff
 
-The remaining runtime MUI islands are intentionally not migrated in a generic
-cleanup PR. They now require the gated handoff in
-`docs/audits/uiux-hard-audit-2026-05-20/mui-risky-islands-handoff.md`.
+The former risky runtime MUI islands were migrated one at a time through gated
+cleanup PRs. Keep the handoff document as the historical guardrail pattern for
+future reintroductions or route-sensitive UI migrations.
 
-Gate-required groups:
+Current gate-required MUI groups:
 
-- Telegram/AI: `TelegramManager.jsx`
+- none currently matching `@mui|Mui`
 
 Default rule: one risky MUI island per PR, with first-touch boundaries,
 read-only references, browser/auth proof, and stop conditions named before
