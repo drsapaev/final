@@ -1,5 +1,10 @@
 # Unified MUI v5 Design System - Complete Summary
 
+> Archive notice (2026-05-20): this is historical MUI migration documentation.
+> The current clinic runtime UI is MUI-free; use `frontend/DESIGN_SYSTEM.md`
+> and `frontend/MUI_RUNTIME_INVENTORY.md` as canonical guidance. Do not
+> reintroduce `@mui/*` from this document without explicit approval.
+
 **Status:** ✅ Production Ready  
 **Version:** 1.0.0  
 **Created:** February 28, 2026  
