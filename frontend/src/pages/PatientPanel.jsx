@@ -4,11 +4,79 @@ import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText } from 'lucide-react';
 import PropTypes from 'prop-types';
 
+const PATIENT_DATA_UNAVAILABLE_HINT_ID = 'patient-data-unavailable-note';
+const patientContentStyle = {
+  maxWidth: '1200px',
+  margin: '0 auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '24px'
+};
+const patientSearchCardStyle = {
+  backgroundColor: 'var(--mac-bg-primary)',
+  border: '1px solid var(--mac-border)',
+  borderRadius: 'var(--mac-radius-lg)',
+  padding: '16px',
+  boxShadow: 'var(--mac-shadow-sm)',
+  backdropFilter: 'var(--mac-blur-light)',
+  WebkitBackdropFilter: 'var(--mac-blur-light)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px'
+};
+const patientSearchRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  flexWrap: 'wrap'
+};
+const patientSearchFieldWrapStyle = {
+  position: 'relative',
+  flex: '1 1 280px',
+  minWidth: 0
+};
+const patientSearchHintStyle = {
+  margin: 0,
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-sm)',
+  lineHeight: 1.5
+};
+const patientEmptyStateStyle = {
+  padding: 'var(--mac-spacing-6)',
+  border: '1px dashed var(--mac-separator)',
+  borderRadius: 'var(--mac-radius-lg)',
+  textAlign: 'center',
+  background: 'var(--mac-bg-primary)',
+  color: 'var(--mac-text-primary)'
+};
+const patientEmptyIconWrapStyle = {
+  width: '44px',
+  height: '44px',
+  margin: '0 auto var(--mac-spacing-3)',
+  borderRadius: '999px',
+  display: 'grid',
+  placeItems: 'center',
+  background: 'var(--mac-bg-secondary)',
+  color: 'var(--mac-text-secondary)'
+};
+const patientEmptyTitleStyle = {
+  fontWeight: 'var(--mac-font-weight-semibold)',
+  color: 'var(--mac-text-primary)'
+};
+const patientEmptyDescriptionStyle = {
+  margin: 'var(--mac-spacing-1) 0 0',
+  fontSize: 'var(--mac-font-size-sm)',
+  color: 'var(--mac-text-secondary)',
+  lineHeight: 1.5
+};
+
 const PanelEmptyState = ({ icon: EmptyIcon, title, description }) =>
-  <div className="p-6 border border-dashed border-gray-300 rounded-lg text-center bg-white/60">
-    <EmptyIcon className="w-8 h-8 mx-auto mb-3 text-gray-400" aria-hidden="true" />
-    <div className="font-medium text-gray-900">{title}</div>
-    <p className="mt-1 text-sm text-gray-500">{description}</p>
+  <div style={patientEmptyStateStyle} role="status" aria-live="polite">
+    <div style={patientEmptyIconWrapStyle}>
+      <EmptyIcon size={22} aria-hidden="true" />
+    </div>
+    <div style={patientEmptyTitleStyle}>{title}</div>
+    <p style={patientEmptyDescriptionStyle}>{description}</p>
   </div>;
 
 PanelEmptyState.propTypes = {
@@ -34,20 +102,12 @@ const PatientPanel = () => {
       color: 'var(--mac-text-primary)'
     }}>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={patientContentStyle}>
 
         {/* Search */}
-        <Card style={{
-          backgroundColor: 'var(--mac-bg-primary)',
-          border: '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-lg)',
-          padding: '16px',
-          boxShadow: 'var(--mac-shadow-sm)',
-          backdropFilter: 'var(--mac-blur-light)',
-          WebkitBackdropFilter: 'var(--mac-blur-light)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
+        <Card style={patientSearchCardStyle}>
+          <div style={patientSearchRowStyle}>
+            <div style={patientSearchFieldWrapStyle}>
               <Icon
                 name="magnifyingglass"
                 size="small"
@@ -63,6 +123,8 @@ const PatientPanel = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 disabled={!hasPatientData}
+                aria-label="Поиск по данным пациента"
+                aria-describedby={!hasPatientData ? PATIENT_DATA_UNAVAILABLE_HINT_ID : undefined}
                 style={{
                   width: '100%',
                   padding: '12px 12px 12px 40px',
@@ -74,7 +136,8 @@ const PatientPanel = () => {
                   fontFamily: 'inherit',
                   outline: 'none',
                   transition: 'border-color var(--mac-duration-normal) var(--mac-ease)',
-                  opacity: hasPatientData ? 1 : 0.65
+                  opacity: hasPatientData ? 1 : 0.75,
+                  cursor: hasPatientData ? 'text' : 'not-allowed'
                 }}
                 placeholder={hasPatientData ? 'Поиск по врачу, услуге или результату' : 'Данные пациента пока не подключены'}
                 onFocus={(e) => e.target.style.borderColor = 'var(--mac-accent-blue)'}
@@ -84,11 +147,17 @@ const PatientPanel = () => {
             <Button
               variant="secondary"
               disabled
+              aria-describedby={PATIENT_DATA_UNAVAILABLE_HINT_ID}
               title="Запись из кабинета пациента будет доступна после подключения реальных данных">
               <Icon name="plus" size="small" />
               Запись через кабинет
             </Button>
           </div>
+          {!hasPatientData &&
+            <p id={PATIENT_DATA_UNAVAILABLE_HINT_ID} style={patientSearchHintStyle}>
+              Личный кабинет показывает только реальные записи и результаты. Поиск и самостоятельная запись включатся после подключения данных пациента к кабинету.
+            </p>
+          }
         </Card>
 
         {/* Grid */}
