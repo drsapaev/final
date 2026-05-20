@@ -40,9 +40,9 @@ Partially closed areas as of the latest static audit:
 
 - Patient bot MVP is closed for the Phase 1 backend slice: notification consent is shown after successful contact or QR/start patient linking, the full start -> language -> link -> consent path has targeted test coverage, the canonical notification sender has a tested safe patient Telegram event mapping helper, and appointment reminders now use the linked-patient Telegram event path when `db` and `patient_id` are provided.
 - QR queue Phase 2 is closed for the current backend/security slice: linking, status reads, sensitive QR/start token TTL, event-driven next/called Telegram notifications, queue ordering/`queue_time` refresh validation, and expired/malformed/replayed/consumed token rollout checks are present.
-- Payments can show status/debt summaries, send confirmation-style notifications, emit a safe patient Telegram unpaid bill notification from payment invoice creation, link the patient `/payments` bot reply to the protected `/patient/payments` app route, send safe patient Telegram `payment_paid` updates after successful provider webhook visit/appointment integration, and expose read-only staff reconciliation alerts for the supported Click/PayMe/Kaspi provider inventory. Public provider callbacks and internal demo routes must not be used as Telegram entry buttons.
+- Payments can show status/debt summaries, send confirmation-style notifications, emit a safe patient Telegram unpaid bill notification from payment invoice creation, link the patient `/payments` bot reply to the protected Mini App payment section, send safe patient Telegram `payment_paid` updates after successful provider webhook visit/appointment integration, and expose read-only staff reconciliation alerts for the supported Click/PayMe/Kaspi provider inventory. Public provider callbacks and internal demo routes must not be used as Telegram entry buttons.
 - Staff bot has role-based read-only menus, authorization, token separation, hash-only confirmation request storage, hash-only idempotency binding for confirmation requests, confirmation-request audit, and denied-action audit, but confirmed state-changing action execution remains disabled by design until domain adapters and explicit action enablement are added.
-- Telegram Mini App and AI approval flows are still planning items, not implemented runtime flows.
+- Telegram Mini App patient runtime and AI approval flows are implemented for the current protected-surface scope; medical document publishing through Telegram remains deferred to protected medical approval.
 
 ## Product Model
 
@@ -55,7 +55,7 @@ Patient bot:
 - payment notifications and payment links
 - ready-result notifications with secure delivery policy
 - support and clinic contact actions
-- future Mini App entry points for full appointment booking, forms, payments, and patient cabinet
+- Mini App entry points for appointment booking, forms, payments, patient cabinet, queue, visits, and protected results
 
 Staff/admin bot:
 
@@ -169,7 +169,7 @@ Localization architecture:
 
 Mini App architecture:
 
-- future Mini App handles rich flows: appointment booking, patient forms, payment details, patient cabinet, and protected reports
+- Mini App handles rich flows: appointment booking, patient forms, payment details, patient cabinet, queue, visits, and protected reports
 - server validates Telegram Mini App `initData` before trusting identity
 - Mini App links must be scoped to the linked patient or authenticated staff user
 
@@ -351,6 +351,8 @@ AI workflow engines such as LangGraph orchestrate steps; they do not train the m
 - [x] Route linked patient section entry buttons to the protected Mini App shell: `backend/app/api/v1/endpoints/telegram_webhook.py` now returns Telegram `web_app` inline buttons to `/telegram/mini-app/patient?section=<capability>` for forms, documents/results, doctors/appointments, and cabinet, keeps unlinked or missing-frontend fallbacks on the safe services menu, and `backend/tests/unit/test_telegram_webhook_security.py` verifies no patient/internal IDs or legacy `/patient?tab=` links are exposed.
 - [x] Honor Mini App section deep links in the frontend shell: `frontend/src/App.jsx` whitelists `?section=` values, highlights the selected manifest capability, ignores unknown section values, and keeps direct no-`initData` access on the non-sensitive unavailable state.
 - [x] Queue Mini App empty state distinguishes service availability from active queue presence and guides patients to registration or a fresh Telegram link when no active queue exists.
+- [x] Mini App capability cards are navigable status cards rather than static tiles: `frontend/src/App.jsx` preserves the protected Mini App URL, updates only the canonical `section` query parameter, and `frontend/src/__tests__/telegramMiniAppDeepLinkGuardrails.test.js` guards against legacy `/patient?tab=` URLs or raw patient identifiers.
+- [x] Mini App mobile header keeps the title and session badge from competing on narrow screens: `frontend/src/App.jsx` gives the title group a wrapping flex basis and caps the badge width, while `frontend/src/__tests__/telegramMiniAppExpiredLinkGuardrails.test.js` preserves the responsive header contract.
 - [x] Add tests for forged `initData`, expired auth, wrong patient scope, and direct URL access without Telegram identity: `backend/tests/unit/test_telegram_mini_app_init_data.py` covers `hash_mismatch`, `auth_date_expired`, `patient_scope_mismatch`, and missing Telegram `user` identity rejection.
 
 ### Phase 6: AI assistant approval flows
