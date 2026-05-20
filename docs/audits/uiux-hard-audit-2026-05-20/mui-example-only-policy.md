@@ -23,7 +23,8 @@ rg -n "@mui|Mui" frontend\src\components\examples\UnifiedButton.tsx frontend\src
 
 Result:
 
-- `UnifiedButton.tsx` and `UnifiedCard.tsx` contain MUI imports.
+- `UnifiedButton.tsx` and `UnifiedCard.tsx` contained MUI imports at the time
+  PR-MUI-3 was written.
 - Static search did not find active app callers for `UnifiedButton` or
   `UnifiedCard`.
 - `frontend/src/pages/MacOSDemoPage.jsx` lazy-loads
@@ -73,6 +74,15 @@ AI/MCP MUI migration.
 PR-MUI-3 does not reduce the raw `rg '@mui|Mui'` count. It clarifies that the
 two `components/examples/Unified*` files are isolated reference debt and should
 not block runtime UI decisions or be treated as safe app patterns.
+
+## Follow-Up: UnifiedButton Example Migration
+
+`frontend/src/components/examples/UnifiedButton.tsx` has since been converted
+to a macOS/native example with no current `@mui` import. It remains example-only
+and must not be imported into clinic runtime UI.
+
+`frontend/src/components/examples/UnifiedCard.tsx` remains the only current
+example-only MUI reference.
 
 ## Next Smallest Step
 
