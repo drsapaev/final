@@ -41,6 +41,11 @@ UnifiedCard example migration: 10 files now contain runtime MUI imports after
 converting `frontend/src/components/examples/UnifiedCard.tsx` to a
 macOS/native example. No example-only `Unified*` MUI references remain.
 
+PaymentTest internal demo migration: 9 files now contain runtime MUI imports
+after converting `frontend/src/pages/PaymentTest.jsx` to macOS/native controls
+in a gate-limited payment demo slice. `PaymentWidget.jsx` remains the only
+payment MUI runtime island.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -80,7 +85,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/admin/UserManagement.jsx` | Migrated/admin-sensitive | Admin user actions menu now uses macOS/native controls with no current `@mui` import. Admin user workflow remains role-sensitive. | Migrated in dedicated gated admin slice; keep future changes scoped to user lifecycle behavior. |
 | `frontend/src/components/dashboard/Dashboard.jsx` | Stale/removed | No active route owner or caller found. | Removed after route-owner discovery. |
 | `frontend/src/components/payment/PaymentWidget.jsx` | Payment/queue-adjacent | Payment flow behavior and error handling are payment-sensitive. | Gate/handoff only. |
-| `frontend/src/pages/PaymentTest.jsx` | Payment/queue-adjacent | Internal payment demo/test surface. | Gate/handoff only; do not alter payment semantics. |
+| `frontend/src/pages/PaymentTest.jsx` | Migrated/payment-demo | Internal payment demo/test surface now uses macOS/native controls with no current `@mui` import. | Keep route, admin/internal-demo visibility, and payment demo semantics unchanged; future behavior changes still require payment gate review. |
 | `frontend/src/components/queue/OnlineQueueManager.jsx` | Payment/queue-adjacent | Queue status, print/download, and queue operations. | Gate/handoff only. |
 | `frontend/src/components/patient/FamilyRelationsCard.jsx` | Clinical-heavy | Patient relationship data and visibility semantics. | Clinical safety review before migration. |
 | `frontend/src/components/laboratory/LabReportGenerator.jsx` | Clinical-heavy | Lab report generation UI. | Clinical safety review before migration. |
@@ -98,7 +103,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 - Cardiology: `ECGViewer.jsx`
 - Lab: `LabReportGenerator.jsx`
 - Queue: `OnlineQueueManager.jsx`
-- Payment: `PaymentWidget.jsx`, `PaymentTest.jsx`
+- Payment: `PaymentWidget.jsx`
 - Telegram: `TelegramManager.jsx`
 - AI: `MCPMonitor.jsx`
 - Patient clinical data: `FamilyRelationsCard.jsx`
@@ -134,6 +139,8 @@ Result after UnifiedButton example migration: 11 files.
 
 Result after UnifiedCard example migration: 10 files.
 
+Result after PaymentTest internal demo migration: 9 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -150,7 +157,8 @@ handoff:
 The dedicated admin actions menu migration has now removed `UserManagement.jsx`
 from the current MUI search result. The follow-up example migrations removed
 `UnifiedButton.tsx` and `UnifiedCard.tsx` from the current MUI search result.
-Remaining MUI targets are payment, queue, clinical, and Telegram/AI.
+Remaining MUI targets are the payment widget, queue, clinical, and
+Telegram/AI surfaces.
 
 Next safe MUI migration should be a dedicated PR with one first-touch file,
 route/browser smoke, and a PR body that explicitly proves no role, route,
@@ -168,26 +176,26 @@ rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 rg -n "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Result: 14 files.
+Historical PR-MUI-1 result: 14 files.
+
+Current post-continuation result after dashboard removal, UserManagement,
+UnifiedButton, UnifiedCard, and PaymentTest migrations: 9 files.
 
 No new MUI imports were introduced by the recent performance PRs. Current
 classification:
 
 | Category | Files | Decision |
 | --- | ---: | --- |
-| Shared/admin-sensitive | 1 | Requires dedicated admin user-action slice. |
-| Payment/queue-adjacent | 3 | Gate/handoff only. |
+| Shared/admin-sensitive | 0 | No current MUI search result after UserManagement migration and stale dashboard removal. |
+| Payment/queue-adjacent | 2 | Gate/handoff only. |
 | Clinical-heavy | 5 | Clinical safety review before migration. |
 | Telegram/AI-sensitive | 2 | Gate/handoff only. |
 | Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
 
 Current files:
 
-- Shared/admin-sensitive:
-  - `frontend/src/components/admin/UserManagement.jsx`
 - Payment/queue-adjacent:
   - `frontend/src/components/payment/PaymentWidget.jsx`
-  - `frontend/src/pages/PaymentTest.jsx`
   - `frontend/src/components/queue/OnlineQueueManager.jsx`
 - Clinical-heavy:
   - `frontend/src/components/patient/FamilyRelationsCard.jsx`
@@ -201,9 +209,9 @@ Current files:
 - Example-only:
   - none currently matching `@mui|Mui`
 
-Decision: do not migrate MUI in PR-MUI-1. The next safe step is PR-MUI-2 only
-if one low-risk admin island can be scoped with browser proof; otherwise move to
-PR-MUI-3 example-only policy.
+Decision: do not treat the historical PR-MUI-1 inventory as current. The
+current live MUI inventory is 9 files and excludes the migrated/removed
+admin/shared, dashboard, example-only, and PaymentTest surfaces.
 
 ## PR-MUI-2 Low-Risk Admin Decision
 
@@ -258,12 +266,11 @@ cleanup PR. They now require the gated handoff in
 
 Gate-required groups:
 
-- Payment: `PaymentWidget.jsx`, `PaymentTest.jsx`
+- Payment: `PaymentWidget.jsx`
 - Queue: `OnlineQueueManager.jsx`
 - Clinical: `LabReportGenerator.jsx`, `ECGViewer.jsx`,
   `TreatmentPlanner.jsx`, `ToothModal.jsx`, `FamilyRelationsCard.jsx`
 - Telegram/AI: `TelegramManager.jsx`, `MCPMonitor.jsx`
-- Admin/shared: `UserManagement.jsx`
 
 Default rule: one risky MUI island per PR, with first-touch boundaries,
 read-only references, browser/auth proof, and stop conditions named before

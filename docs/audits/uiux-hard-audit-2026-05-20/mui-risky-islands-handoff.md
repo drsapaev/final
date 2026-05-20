@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current result: 14 files.
+Current post-continuation result: 9 files.
 
 ## Global Rule
 
@@ -36,7 +36,11 @@ Each future migration PR must:
 Files:
 
 - `frontend/src/components/payment/PaymentWidget.jsx`
-- `frontend/src/pages/PaymentTest.jsx`
+
+Note: `frontend/src/pages/PaymentTest.jsx` was migrated to macOS/native
+controls in a gate-limited payment demo slice and no longer appears in the MUI
+runtime inventory. Future behavior changes to that page still require payment
+gate review.
 
 Mode:
 
@@ -179,33 +183,17 @@ Validation:
 - static proof no token/secret handling changed;
 - PR body proof that no Telegram or AI backend contract changed.
 
-## Shared/Admin Handoff
+## Shared/Admin Status
 
-Files:
+No current shared/admin MUI runtime island remains in the active inventory:
 
-- `frontend/src/components/admin/UserManagement.jsx`
-- `frontend/src/components/dashboard/Dashboard.jsx`
+- `frontend/src/components/admin/UserManagement.jsx` was migrated away from MUI
+  in a dedicated gated admin slice.
+- `frontend/src/components/dashboard/Dashboard.jsx` had no confirmed route
+  owner and was removed as stale code.
 
-Mode:
-
-- `gate_known_root_cause` for `UserManagement.jsx`;
-- route-owner discovery before any `Dashboard.jsx` runtime migration.
-
-First-touch:
-
-- exactly one file after route ownership is proven.
-
-Stop conditions:
-
-- user create/update/delete/activate/deactivate behavior changes;
-- self-delete guardrail behavior changes;
-- `Dashboard.jsx` remains unmounted or lacks browser proof.
-
-Validation:
-
-- authenticated admin browser proof;
-- keyboard/focus proof for destructive actions if `UserManagement.jsx` changes;
-- static proof only one MUI island was touched.
+Future admin UI changes still require admin/RBAC proof when they touch user
+lifecycle, destructive actions, or role-sensitive behavior.
 
 ## Example-Only References
 
@@ -214,7 +202,8 @@ Files:
 - `frontend/src/components/examples/UnifiedButton.tsx`
 - `frontend/src/components/examples/UnifiedCard.tsx`
 
-These are governed by `mui-example-only-policy.md`.
+These were governed by `mui-example-only-policy.md` and have since been
+converted to macOS/native examples.
 
 Do not include them in risky runtime migration PRs.
 
@@ -250,8 +239,9 @@ Stop if:
 
 ## Result
 
-PR-MUI-4 creates the guardrails needed before any remaining runtime MUI
-migration. It deliberately does not change runtime UI.
+PR-MUI-4 created the guardrails needed before any remaining runtime MUI
+migration. The current remaining MUI inventory is 9 files across payment
+widget, queue, clinical, Telegram, and AI surfaces.
 
 ## Next Smallest Step
 
