@@ -18,6 +18,7 @@ import {
 'lucide-react';
 import { MacOSButton, MacOSCard, MacOSBadge, MacOSInput, MacOSTextarea, MacOSSelect, MacOSEmptyState } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
@@ -65,20 +66,6 @@ const dermatologyAppointmentsTitleStyle = {
   alignItems: 'center',
   margin: 0,
   minWidth: 'min(100%, 260px)'
-};
-const dermatologyAppointmentsSummaryStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 'var(--mac-spacing-2)',
-  flexWrap: 'wrap',
-  minWidth: 0
-};
-const dermatologyRefreshButtonStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--mac-spacing-2)',
-  flexShrink: 0
 };
 const dermatologyRequestCache = {
   appointments: { promise: null, data: null, lastAttemptAt: 0 },
@@ -1466,26 +1453,13 @@ const DermatologistPanelUnified = () => {
                     <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Записи к дерматологу
                   </h3>
-                  <div style={dermatologyAppointmentsSummaryStyle} role="list" aria-label="Сводка записей дерматолога">
-                    {appointmentSummaryItems.map((item) => (
-                      <MacOSBadge
-                      key={item.key}
-                      role="listitem"
-                      variant={item.variant}
-                      aria-label={`${item.label}: ${item.value}`}>
-                        {item.label}: {item.value}
-                      </MacOSBadge>
-                    ))}
-                    <MacOSButton
-                    variant="outline"
-                    onClick={loadDermatologyAppointments}
-                    disabled={appointmentsLoading}
-                    style={dermatologyRefreshButtonStyle}>
-
-                      <RefreshCw size={16} />
-                      Обновить
-                    </MacOSButton>
-                  </div>
+                  <AppointmentSummaryBar
+                    ariaLabel="Сводка записей дерматолога"
+                    items={appointmentSummaryItems}
+                    onRefresh={loadDermatologyAppointments}
+                    refreshDisabled={appointmentsLoading}
+                    buttonProps={{ variant: 'outline' }}
+                  />
                 </div>
 
                 <EnhancedAppointmentsTable

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button, Badge, Card } from '../components/ui/macos';
+import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth.js';
 import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -33,7 +34,6 @@ import {
   Stethoscope as Tooth,
   Smile,
   BarChart3,
-  RefreshCw,
   Users,
   DollarSign,
   Scissors,
@@ -83,21 +83,6 @@ const dentistryAppointmentsTitleStyle = {
   margin: 0,
   minWidth: 'min(100%, 260px)'
 };
-const dentistryAppointmentsSummaryStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 'var(--mac-spacing-2)',
-  flexWrap: 'wrap',
-  minWidth: 0
-};
-const dentistryRefreshButtonStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 'var(--mac-spacing-1)',
-  flexShrink: 0
-};
-
 let dentistAppointmentsCache = null;
 let dentistAppointmentsLoadPromise = null;
 let dentistServicesCache = null;
@@ -2170,27 +2155,15 @@ const DentistPanelUnified = () => {
             <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-success)' }} />
             Записи к стоматологу
           </h3>
-          <div style={dentistryAppointmentsSummaryStyle} role="list" aria-label="Сводка записей стоматолога">
-            {appointmentSummaryItems.map((item) => (
-              <Badge
-              key={item.key}
-              role="listitem"
-              variant={item.variant}
-              aria-label={`${item.label}: ${item.value}`}>
-                {item.label}: {item.value}
-              </Badge>
-            ))}
-            <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadDentistryAppointments}
-            disabled={appointmentsLoading}
-            style={dentistryRefreshButtonStyle}>
-
-              <RefreshCw size={16} />
-              Обновить
-            </Button>
-          </div>
+          <AppointmentSummaryBar
+            ariaLabel="Сводка записей стоматолога"
+            items={appointmentSummaryItems}
+            onRefresh={loadDentistryAppointments}
+            refreshDisabled={appointmentsLoading}
+            BadgeComponent={Badge}
+            ButtonComponent={Button}
+            buttonProps={{ variant: 'secondary', size: 'sm' }}
+          />
         </div>
 
         <EnhancedAppointmentsTable

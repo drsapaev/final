@@ -21,6 +21,7 @@ import {
   MacOSCheckbox } from
 '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
+import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ECGViewer from '../components/cardiology/ECGViewer';
@@ -61,21 +62,6 @@ const cardiologyAppointmentsTitleStyle = {
   margin: 0,
   minWidth: 'min(100%, 260px)'
 };
-const cardiologyAppointmentsSummaryStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 'var(--mac-spacing-2)',
-  flexWrap: 'wrap',
-  minWidth: 0
-};
-const cardiologyRefreshButtonStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--mac-spacing-2)',
-  flexShrink: 0
-};
-
 function countAppointmentsByStatuses(appointments, statuses) {
   return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
 }
@@ -1567,28 +1553,13 @@ const MacOSCardiologistPanelUnified = () => {
                   }} />
                     Записи к кардиологу
                   </h3>
-                  <div style={cardiologyAppointmentsSummaryStyle} role="list" aria-label="Сводка записей кардиолога">
-                    {/* Статистика очереди */}
-                    {appointmentSummaryItems.map((item) => (
-                    <MacOSBadge
-                      key={item.key}
-                      role="listitem"
-                      variant={item.variant}
-                      aria-label={`${item.label}: ${item.value}`}>
-                        {item.label}: {item.value}
-                      </MacOSBadge>
-                    ))}
-
-                    <MacOSButton
-                    variant="outline"
-                    onClick={loadMacOSCardiologyAppointments}
-                    disabled={appointmentsLoading}
-                    style={cardiologyRefreshButtonStyle}>
-
-                      <RefreshCw size={16} />
-                      Обновить
-                    </MacOSButton>
-                  </div>
+                  <AppointmentSummaryBar
+                    ariaLabel="Сводка записей кардиолога"
+                    items={appointmentSummaryItems}
+                    onRefresh={loadMacOSCardiologyAppointments}
+                    refreshDisabled={appointmentsLoading}
+                    buttonProps={{ variant: 'outline' }}
+                  />
                 </div>
 
                 {appointmentsLoading ?

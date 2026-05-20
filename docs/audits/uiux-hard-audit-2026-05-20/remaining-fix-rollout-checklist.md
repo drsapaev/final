@@ -16,7 +16,7 @@ This checklist starts the second small-PR cycle for issues that remained after t
 
 ## Remaining Backlog
 
-- [ ] PR-UX-10: fix invalid ARIA role lint warnings in touched frontend surfaces.
+- [x] PR-UX-10: fix invalid ARIA role lint warnings in touched frontend surfaces.
 - [ ] PR-UX-11: promote the repeated specialty appointment summary/action-bar pattern into one reusable primitive, only if the current duplication stays behavior-identical.
 - [ ] PR-UX-12: extend authenticated QA harness into stable Playwright smoke specs for Admin, Doctor, Cashier, Lab, and specialty panels.
 - [ ] PR-UX-13: add negative RBAC browser checks for protected role routes without changing production auth behavior.
