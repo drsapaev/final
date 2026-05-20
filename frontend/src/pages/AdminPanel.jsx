@@ -165,7 +165,6 @@ import { getApiOrigin } from '../api/runtime';
 
 
 
-import QueueProfilesManager from '../components/admin/QueueProfilesManager'; // ⭐ SSOT: Dynamic queue tabs management
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation } from '../components/admin/MobileOptimization';
@@ -174,6 +173,7 @@ import tokenManager from '../utils/tokenManager';
 import '../styles/admin-styles.css';
 
 const LazyGraphQLExplorer = React.lazy(() => import('../components/admin/GraphQLExplorer'));
+const LazyQueueProfilesManager = React.lazy(() => import('../components/admin/QueueProfilesManager'));
 
 const getAppointmentPatientDisplayName = (appointment) => {
   const rawName =
@@ -2662,13 +2662,21 @@ const AdminPanel = () => {
 
             {/* Содержимое вкладок */}
             {servicesTab === 'catalog' && <ServiceCatalog />}
-            {servicesTab === 'queue-profiles' && <QueueProfilesManager theme={isDark ? 'dark' : 'light'} />}
+            {servicesTab === 'queue-profiles' && (
+              <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+                <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
+              </React.Suspense>
+            )}
           </div>);
 
         }
       case 'departments':
         // ⭐ DEPRECATED: Redirect to SSOT queue-profiles
-        return <QueueProfilesManager theme={isDark ? 'dark' : 'light'} />;
+        return (
+          <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+            <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
+          </React.Suspense>
+        );
       case 'ai-settings':
         return <UnifiedSettings />;
       case 'display-settings':
