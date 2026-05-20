@@ -43,8 +43,9 @@ macOS/native example. No example-only `Unified*` MUI references remain.
 
 PaymentTest internal demo migration: 9 files now contain runtime MUI imports
 after converting `frontend/src/pages/PaymentTest.jsx` to macOS/native controls
-in a gate-limited payment demo slice. `PaymentWidget.jsx` remains the only
-payment MUI runtime island.
+in a gate-limited payment demo slice. `PaymentWidget.jsx` was later migrated
+away from MUI in a dedicated payment widget slice, so no payment MUI runtime
+island remains in the active inventory.
 
 MCPMonitor stale component removal: 8 files now contain runtime MUI imports
 after deleting caller-free `frontend/src/components/ai/MCPMonitor.jsx`.
@@ -73,6 +74,12 @@ ToothModal migration: 4 files now contain runtime MUI imports after converting
 gate-limited dental tooth modal slice. Tooth procedure selection, material
 pricing, follow-up state, notes, history display, total price calculation, save
 payloads, and `DentistPanelUnified.jsx` mounting remain unchanged.
+
+PaymentWidget migration: 3 files now contain runtime MUI imports after
+converting `frontend/src/components/payment/PaymentWidget.jsx` to
+macOS/native controls in a gate-limited payment widget slice. Payment provider
+codes, selected provider state, amount formatting, payment initialization,
+status checks, confirmation, cancellation, and callbacks remain unchanged.
 
 ## No-New-MUI Island Policy
 
@@ -112,7 +119,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/components/pwa/PWAInstallPrompt.jsx` | Low-risk | PWA install/update/notification prompt UI. | Migrated in Task 37; no current `@mui` import. |
 | `frontend/src/components/admin/UserManagement.jsx` | Migrated/admin-sensitive | Admin user actions menu now uses macOS/native controls with no current `@mui` import. Admin user workflow remains role-sensitive. | Migrated in dedicated gated admin slice; keep future changes scoped to user lifecycle behavior. |
 | `frontend/src/components/dashboard/Dashboard.jsx` | Stale/removed | No active route owner or caller found. | Removed after route-owner discovery. |
-| `frontend/src/components/payment/PaymentWidget.jsx` | Payment/queue-adjacent | Payment flow behavior and error handling are payment-sensitive. | Gate/handoff only. |
+| `frontend/src/components/payment/PaymentWidget.jsx` | Migrated/payment-sensitive | Payment widget UI now uses macOS/native controls with no current `@mui` import. | Keep future changes payment-gated because provider flow, status, confirmation, retry/error handling, and callback semantics are payment-sensitive. |
 | `frontend/src/pages/PaymentTest.jsx` | Migrated/payment-demo | Internal payment demo/test surface now uses macOS/native controls with no current `@mui` import. | Keep route, admin/internal-demo visibility, and payment demo semantics unchanged; future behavior changes still require payment gate review. |
 | `frontend/src/components/queue/OnlineQueueManager.jsx` | Payment/queue-adjacent | Queue status, print/download, and queue operations. | Gate/handoff only. |
 | `frontend/src/components/patient/FamilyRelationsCard.jsx` | Migrated/clinical | Patient relationship UI now uses macOS/native controls with no current `@mui` import. | Keep future changes clinical-gated because relationship visibility and pickup-role context are patient-sensitive. |
@@ -129,7 +136,6 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 
 - Cardiology: `ECGViewer.jsx`
 - Queue: `OnlineQueueManager.jsx`
-- Payment: `PaymentWidget.jsx`
 - Telegram: `TelegramManager.jsx`
 
 ## Completed Low-Risk Runtime Targets
@@ -175,6 +181,8 @@ Result after TreatmentPlanner dental planning migration: 5 files.
 
 Result after ToothModal dental tooth modal migration: 4 files.
 
+Result after PaymentWidget payment widget migration: 3 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -195,7 +203,8 @@ The patient relationship slice removed `FamilyRelationsCard.jsx` from the
 current MUI search result. The dental planning slice removed
 `TreatmentPlanner.jsx` from the current MUI search result. The dental tooth
 modal slice removed `ToothModal.jsx` from the current MUI search result.
-Remaining MUI targets are payment widget, queue, cardiology, and Telegram
+The payment widget slice removed `PaymentWidget.jsx` from the current MUI
+search result. Remaining MUI targets are queue, cardiology, and Telegram
 surfaces.
 
 Next safe MUI migration should be a dedicated PR with one first-touch file,
@@ -220,8 +229,9 @@ Current post-continuation result after dashboard removal, UserManagement,
 UnifiedButton, UnifiedCard, PaymentTest migration, MCPMonitor stale component
 removal, LabReportGenerator stale component removal, and FamilyRelationsCard
 patient relationship migration, TreatmentPlanner dental planning migration, and
-ToothModal dental tooth modal migration:
-4 files.
+ToothModal dental tooth modal migration, and PaymentWidget payment widget
+migration:
+3 files.
 
 No new MUI imports were introduced by the recent performance PRs. Current
 classification:
@@ -229,7 +239,7 @@ classification:
 | Category | Files | Decision |
 | --- | ---: | --- |
 | Shared/admin-sensitive | 0 | No current MUI search result after UserManagement migration and stale dashboard removal. |
-| Payment/queue-adjacent | 2 | Gate/handoff only. |
+| Payment/queue-adjacent | 1 | Gate/handoff only. |
 | Clinical-heavy | 1 | Clinical safety review before migration. |
 | Telegram/AI-sensitive | 1 | Gate/handoff only. |
 | Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
@@ -237,7 +247,6 @@ classification:
 Current files:
 
 - Payment/queue-adjacent:
-  - `frontend/src/components/payment/PaymentWidget.jsx`
   - `frontend/src/components/queue/OnlineQueueManager.jsx`
 - Clinical-heavy:
   - `frontend/src/components/cardiology/ECGViewer.jsx`
@@ -247,10 +256,10 @@ Current files:
   - none currently matching `@mui|Mui`
 
 Decision: do not treat the historical PR-MUI-1 inventory as current. The
-current live MUI inventory is 4 files and excludes the migrated/removed
+current live MUI inventory is 3 files and excludes the migrated/removed
 admin/shared, dashboard, example-only, PaymentTest, MCPMonitor,
 LabReportGenerator, FamilyRelationsCard, TreatmentPlanner, and ToothModal
-surfaces.
+surfaces, plus the migrated PaymentWidget surface.
 
 ## PR-MUI-2 Low-Risk Admin Decision
 
@@ -305,7 +314,6 @@ cleanup PR. They now require the gated handoff in
 
 Gate-required groups:
 
-- Payment: `PaymentWidget.jsx`
 - Queue: `OnlineQueueManager.jsx`
 - Clinical: `ECGViewer.jsx`
 - Telegram/AI: `TelegramManager.jsx`
