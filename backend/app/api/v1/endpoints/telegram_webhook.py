@@ -763,6 +763,14 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Нажмите кнопку ниже, чтобы открыть очередь в Mini App.",
         TELEGRAM_LANGUAGE_UZ: "Mini Appda navbatni ochish uchun quyidagi tugmani bosing.",
     },
+    "visits_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "📅 Открыть мои визиты",
+        TELEGRAM_LANGUAGE_UZ: "📅 Mening tashriflarimni ochish",
+    },
+    "visits_open_hint": {
+        TELEGRAM_LANGUAGE_RU: "Нажмите кнопку ниже, чтобы открыть визиты в Mini App.",
+        TELEGRAM_LANGUAGE_UZ: "Mini Appda tashriflarni ochish uchun quyidagi tugmani bosing.",
+    },
     "queue_empty": {
         TELEGRAM_LANGUAGE_RU: (
             "Telegram привязан к пациенту: {patient}.\n"
@@ -1173,6 +1181,15 @@ def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | 
         chat_id,
         "queue",
         "queue_entry_button",
+    )
+
+
+def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    return _telegram_service_entry_markup(
+        db,
+        chat_id,
+        "visits",
+        "visits_entry_button",
     )
 
 
@@ -3166,8 +3183,12 @@ def _clinic_visits_message(db: Session, chat_id: int) -> str:
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
     visits = _patient_recent_visits(db, telegram_user.patient_id)
+    open_hint = _localized_text("visits_open_hint", language)
     if not visits:
-        return _localized_text("visits_empty", language).format(patient=patient_name)
+        visits_empty = _localized_text("visits_empty", language).format(
+            patient=patient_name
+        )
+        return f"{visits_empty}\n\n{open_hint}"
 
     lines = [
         _localized_text("visits_patient", language).format(patient=patient_name),
@@ -3187,7 +3208,7 @@ def _clinic_visits_message(db: Session, chat_id: int) -> str:
                 status=_html_text(visit.status),
             )
         )
-    lines.append(_localized_text("visits_privacy_note", language))
+    lines.extend([_localized_text("visits_privacy_note", language), "", open_hint])
     return "\n".join(lines)
 
 
@@ -3820,7 +3841,8 @@ async def _handle_clinic_bot_update(
             bot_service,
             chat_id,
             _clinic_visits_message(db, chat_id),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_visits_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_visits",
         )
 

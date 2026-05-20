@@ -76,6 +76,10 @@ def _add_mini_app_telegram_config(db_session) -> None:
     db_session.commit()
 
 
+def _future_mini_app_appointment_date() -> date:
+    return date.today() + timedelta(days=1)
+
+
 def _link_patient_to_chat(
     db_session,
     *,
@@ -309,6 +313,7 @@ class TestTelegramWebhookSecurity:
         chat_id = 880201
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
         initial_appointments = db_session.query(Appointment).count()
+        appointment_date = _future_mini_app_appointment_date()
 
         response = client.post(
             "/api/v1/telegram/mini-app/appointments/preview",
@@ -316,7 +321,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": 12,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
                 "department": "Cardiology",
                 "notes": "Mini App request",
@@ -332,7 +337,7 @@ class TestTelegramWebhookSecurity:
         assert payload["scope"] == {"type": "patient", "patient_id": test_patient.id}
         assert "appointment_id" not in appointment
         assert appointment["patient_id"] == test_patient.id
-        assert appointment["appointment_date"] == "2026-05-20"
+        assert appointment["appointment_date"] == appointment_date.isoformat()
         assert appointment["appointment_time"] == "09:30"
         assert appointment["status"] == "scheduled"
         assert appointment["payment_type"] == "cash"
@@ -843,6 +848,7 @@ class TestTelegramWebhookSecurity:
         chat_id = 880206
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
         initial_appointments = db_session.query(Appointment).count()
+        appointment_date = _future_mini_app_appointment_date()
 
         response = client.post(
             "/api/v1/telegram/mini-app/appointments",
@@ -850,7 +856,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": test_doctor.id,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
                 "department": "Cardiology",
                 "notes": "Mini App create request",
@@ -868,7 +874,7 @@ class TestTelegramWebhookSecurity:
         assert created is not None
         assert created.patient_id == test_patient.id
         assert created.doctor_id == test_doctor.id
-        assert created.appointment_date == date(2026, 5, 20)
+        assert created.appointment_date == appointment_date
         assert created.appointment_time == "09:30"
         assert created.status == "scheduled"
         assert created.visit_type == "paid"
@@ -889,11 +895,12 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         chat_id = 880207
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        appointment_date = _future_mini_app_appointment_date()
         db_session.add(
             Appointment(
                 patient_id=test_patient.id,
                 doctor_id=test_doctor.id,
-                appointment_date=date(2026, 5, 20),
+                appointment_date=appointment_date,
                 appointment_time="09:30",
                 status="scheduled",
                 visit_type="paid",
@@ -910,7 +917,7 @@ class TestTelegramWebhookSecurity:
                 "initData": _signed_mini_app_init_data(chat_id),
                 "patientId": test_patient.id,
                 "doctorId": test_doctor.id,
-                "appointmentDate": "2026-05-20",
+                "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
             },
         )
