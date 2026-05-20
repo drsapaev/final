@@ -4251,7 +4251,7 @@ const DentistPanelUnified = () => {
         useWebSocket={false}
         position="bottom-right" />
 
-      <RoleNotificationCenter role="dentist" />
+      <RoleNotificationCenter userRole="dentist" />
     </div>);
 
 };

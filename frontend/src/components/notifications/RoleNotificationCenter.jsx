@@ -7,7 +7,7 @@ import { useNotificationCenter } from '../../contexts/NotificationCenterContext'
 import { getProfile } from '../../stores/auth';
 import logger from '../../utils/logger';
 
-export default function RoleNotificationCenter({ role }) {
+export default function RoleNotificationCenter({ userRole }) {
   const [open, setOpen] = useState(false);
   const [recipientScope, setRecipientScope] = useState(null);
   const { loadNotifications, getUnreadCount } = useNotificationCenter();
@@ -19,13 +19,13 @@ export default function RoleNotificationCenter({ role }) {
       return true;
     }
 
-    const loadKey = `${role}:${scope.recipientId}:${scope.recipientType || 'unknown'}`;
+    const loadKey = `${userRole}:${scope.recipientId}:${scope.recipientType || 'unknown'}`;
     const now = Date.now();
     const withinCooldown = lastLoadKeyRef.current === loadKey && (now - lastLoadAtRef.current) < 15_000;
 
     if (withinCooldown) {
       logger.info('[FIX:NOTIFICATIONS] skipping duplicate role notification load', {
-        role,
+        role: userRole,
         source,
         loadKey,
         ageMs: now - lastLoadAtRef.current
@@ -36,7 +36,7 @@ export default function RoleNotificationCenter({ role }) {
     lastLoadKeyRef.current = loadKey;
     lastLoadAtRef.current = now;
     return false;
-  }, [role]);
+  }, [userRole]);
 
   const runLoadNotifications = useCallback((source) => {
     if (shouldSkipLoad(recipientScope, source)) {
@@ -44,13 +44,13 @@ export default function RoleNotificationCenter({ role }) {
     }
 
     return loadNotifications({
-      role,
+      role: userRole,
       recipient_id: recipientScope.recipientId,
       recipient_type: recipientScope.recipientType,
       status: 'all',
       limit: 50
     });
-  }, [loadNotifications, recipientScope, role, shouldSkipLoad]);
+  }, [loadNotifications, recipientScope, userRole, shouldSkipLoad]);
 
   useEffect(() => {
     let isActive = true;
@@ -63,20 +63,20 @@ export default function RoleNotificationCenter({ role }) {
         }
 
         if (!profile?.id) {
-          logger.warn(`[NotificationCenter] missing auth profile for role=${role}`);
+          logger.warn(`[NotificationCenter] missing auth profile for role=${userRole}`);
           return;
         }
 
         setRecipientScope({
           recipientId: profile.id,
-          recipientType: role
+          recipientType: userRole
         });
       } catch (error) {
         if (!isActive) {
           return;
         }
 
-        logger.warn(`[NotificationCenter] failed to resolve recipient scope for role=${role}`, error);
+        logger.warn(`[NotificationCenter] failed to resolve recipient scope for role=${userRole}`, error);
       }
     };
 
@@ -85,7 +85,7 @@ export default function RoleNotificationCenter({ role }) {
     return () => {
       isActive = false;
     };
-  }, [role]);
+  }, [userRole]);
 
   const refreshNotifications = useCallback(() => {
     return runLoadNotifications('manual');
@@ -93,9 +93,9 @@ export default function RoleNotificationCenter({ role }) {
 
   useEffect(() => {
     runLoadNotifications('initial').catch((error) => {
-      logger.warn(`[NotificationCenter] initial load failed for role=${role}`, error);
+      logger.warn(`[NotificationCenter] initial load failed for role=${userRole}`, error);
     });
-  }, [runLoadNotifications, role]);
+  }, [runLoadNotifications, userRole]);
 
   useEffect(() => {
     if (!open) {
@@ -103,20 +103,20 @@ export default function RoleNotificationCenter({ role }) {
     }
 
     runLoadNotifications('open').catch((error) => {
-      logger.warn(`[NotificationCenter] refresh load failed for role=${role}`, error);
+      logger.warn(`[NotificationCenter] refresh load failed for role=${userRole}`, error);
     });
-  }, [open, runLoadNotifications, role]);
+  }, [open, runLoadNotifications, userRole]);
 
   return (
     <div style={{ position: 'fixed', top: 80, right: 24, zIndex: 1200 }}>
-      <NotificationBell unreadCount={getUnreadCount(role)} onClick={() => setOpen((value) => !value)} />
-      {open ? <NotificationInbox role={role} onClose={() => setOpen(false)} /> : null}
+      <NotificationBell unreadCount={getUnreadCount(userRole)} onClick={() => setOpen((value) => !value)} />
+      {open ? <NotificationInbox userRole={userRole} onClose={() => setOpen(false)} /> : null}
     </div>
   );
 }
 
 RoleNotificationCenter.propTypes = {
-  role: PropTypes.oneOf([
+  userRole: PropTypes.oneOf([
     'doctor',
     'registrar',
     'lab',

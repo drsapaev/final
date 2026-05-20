@@ -466,7 +466,7 @@ export default function LabPanel() {
         />
       )}
 
-      <RoleNotificationCenter role="lab" />
+      <RoleNotificationCenter userRole="lab" />
     </div>
   );
 }

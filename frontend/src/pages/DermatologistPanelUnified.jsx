@@ -2880,7 +2880,7 @@ const DermatologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-        <RoleNotificationCenter role="dermatologist" />
+        <RoleNotificationCenter userRole="dermatologist" />
       </div>
     </div>);
 

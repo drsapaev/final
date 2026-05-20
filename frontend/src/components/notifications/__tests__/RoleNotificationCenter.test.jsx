@@ -56,8 +56,7 @@ describe('RoleNotificationCenter', () => {
   it('loads history for the current recipient scope', async () => {
     getProfileMock.mockResolvedValueOnce({ id: 77, role: 'lab' });
 
-    // eslint-disable-next-line jsx-a11y/aria-role
-    const { rerender } = render(<RoleNotificationCenter role="lab" />);
+    const { rerender } = render(<RoleNotificationCenter userRole="lab" />);
 
     await waitFor(() => {
       expect(loadNotifications).toHaveBeenCalledWith(
@@ -71,7 +70,7 @@ describe('RoleNotificationCenter', () => {
       );
     });
 
-    rerender(<RoleNotificationCenter role="lab" />);
+    rerender(<RoleNotificationCenter userRole="lab" />);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(loadNotifications).toHaveBeenCalledTimes(1);
@@ -80,8 +79,7 @@ describe('RoleNotificationCenter', () => {
   it('skips history load when the auth profile is unavailable', async () => {
     getProfileMock.mockResolvedValueOnce(null);
 
-    // eslint-disable-next-line jsx-a11y/aria-role
-    render(<RoleNotificationCenter role="lab" />);
+    render(<RoleNotificationCenter userRole="lab" />);
 
     await waitFor(() => {
       expect(getProfileMock).toHaveBeenCalled();

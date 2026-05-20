@@ -4776,7 +4776,7 @@ const AdminPanel = () => {
           isOpen={showHotkeysModal}
           onClose={() => setShowHotkeysModal(false)} />
 
-        <RoleNotificationCenter role="admin" />
+        <RoleNotificationCenter userRole="admin" />
       </div>
     </div>);
 

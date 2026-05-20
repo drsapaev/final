@@ -2605,7 +2605,7 @@ const MacOSCardiologistPanelUnified = () => {
           useWebSocket={false}
           position="bottom-right" />
 
-        <RoleNotificationCenter role="cardiologist" />
+        <RoleNotificationCenter userRole="cardiologist" />
       </div>
     </div>);
 
