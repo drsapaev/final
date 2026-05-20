@@ -14,7 +14,10 @@ from pathlib import Path
 DEFAULT_PLAN_PATH = Path(".ai-factory/plans/telegram-bot-clinic-full-strategy.md")
 HEADING_RE = re.compile(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*$")
 UNCHECKED_RE = re.compile(r"^(?P<indent>\s*)-\s+\[\s\]\s+(?P<text>.+?)\s*$")
-EXCLUDED_SECTIONS = {"Implementation Status Legend"}
+EXCLUDED_SECTIONS = {
+    "Implementation Status Legend",
+    "Continuous Plan Improvement Automation",
+}
 
 
 def _section_path(stack: list[tuple[int, str]]) -> str:
@@ -68,7 +71,7 @@ def main() -> int:
         parser.error(f"plan file not found: {plan_path}")
 
     unchecked = iter_unchecked_items(plan_path)
-    print(f"Unchecked Telegram roadmap items: {len(unchecked)}")
+    print(f"Unchecked Telegram product roadmap items: {len(unchecked)}")
     print(f"Plan: {plan_path}")
 
     for line_number, section, text in unchecked:
