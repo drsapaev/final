@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -27,7 +27,6 @@ import {
 
 
 'lucide-react';
-import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, IconButton } from '@mui/material'; // Legacy for Actions menu
 import UserModal from './UserModal';
 import { useRoles } from '../../hooks/useRoles';
 import { getProfile } from '../../stores/auth';
@@ -46,7 +45,9 @@ const UserManagement = () => {
   const [currentProfile, setCurrentProfile] = useState(null);
   const [deleteDialogMode, setDeleteDialogMode] = useState('confirm');
   const [deleteDialogMessage, setDeleteDialogMessage] = useState('');
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [actionsMenuUser, setActionsMenuUser] = useState(null);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState(null);
+  const actionsMenuRef = useRef(null);
 
   // Load roles from API (Phase 4: DB-driven roles)
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: true });
@@ -97,6 +98,47 @@ const UserManagement = () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!actionsMenuUser) {
+      return undefined;
+    }
+
+    const closeMenu = () => {
+      setActionsMenuUser(null);
+      setActionsMenuPosition(null);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
+    };
+
+    const handlePointerDown = (event) => {
+      if (actionsMenuRef.current?.contains(event.target)) {
+        return;
+      }
+
+      if (event.target.closest?.('[data-user-actions-trigger="true"]')) {
+        return;
+      }
+
+      closeMenu();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('resize', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+    };
+  }, [actionsMenuUser]);
 
   const loadUsers = async () => {
     try {
@@ -231,6 +273,53 @@ const UserManagement = () => {
     setShowUserModal(true);
   };
 
+  const closeActionsMenu = () => {
+    setActionsMenuUser(null);
+    setActionsMenuPosition(null);
+  };
+
+  const openActionsMenu = (event, user) => {
+    event.stopPropagation();
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 208;
+    const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+
+    setSelectedUser(user);
+    setActionsMenuUser(user);
+    setActionsMenuPosition({
+      top: rect.bottom + 6,
+      left
+    });
+  };
+
+  const handleEditFromActionsMenu = () => {
+    if (!actionsMenuUser) {
+      return;
+    }
+
+    openUserDialog(actionsMenuUser);
+    closeActionsMenu();
+  };
+
+  const handleToggleStatusFromActionsMenu = () => {
+    if (!actionsMenuUser) {
+      return;
+    }
+
+    handleToggleUserStatus(actionsMenuUser.id, actionsMenuUser.is_active);
+    closeActionsMenu();
+  };
+
+  const handleDeleteFromActionsMenu = () => {
+    if (!actionsMenuUser) {
+      return;
+    }
+
+    openDeleteDialog(actionsMenuUser);
+    closeActionsMenu();
+  };
+
   const getRoleBadgeVariant = (role) => {
     const variants = {
       'Admin': 'error',
@@ -260,6 +349,31 @@ const UserManagement = () => {
 
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const actionMenuItemStyle = {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '9px 10px',
+    border: 'none',
+    borderRadius: 'var(--mac-radius-sm)',
+    background: 'transparent',
+    color: 'var(--mac-text-primary)',
+    font: 'inherit',
+    fontSize: '13px',
+    textAlign: 'left',
+    cursor: 'pointer'
+  };
+
+  const actionMenuIconStyle = {
+    width: '18px',
+    minWidth: '18px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'var(--mac-text-secondary)'
+  };
 
   // Table Columns Configuration
   const columns = [
@@ -327,19 +441,22 @@ const UserManagement = () => {
     key: 'actions',
     title: '',
     render: (_, user) =>
-    <div onClick={(e) => e.stopPropagation()}>
-          <IconButton
-        aria-label="Действия"
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <MacOSButton
+        data-user-actions-trigger="true"
+        aria-label={`Действия: ${user.full_name || user.username}`}
+        aria-haspopup="menu"
+        aria-expanded={actionsMenuUser?.id === user.id}
         title="Действия"
         onClick={(e) => {
-          e.stopPropagation();
-          setAnchorEl(e.currentTarget);
-          setSelectedUser(user);
+          openActionsMenu(e, user);
         }}
-        size="small">
+        variant="ghost"
+        size="sm"
+        style={{ width: '32px', height: '32px', padding: 0 }}>
         
             <MoreVertical size={16} />
-          </IconButton>
+          </MacOSButton>
         </div>
 
   }];
@@ -439,44 +556,48 @@ const UserManagement = () => {
         
       </MacOSCard>
 
-      {/* Actions Menu (MUI Legacy for now) */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
-        PaperProps={{
-          style: {
-            borderRadius: '10px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            border: '1px solid #e5e7eb'
-          }
+      {/* Actions Menu */}
+      {actionsMenuUser && actionsMenuPosition &&
+      <div
+        ref={actionsMenuRef}
+        role="menu"
+        aria-label="Действия пользователя"
+        style={{
+          position: 'fixed',
+          top: actionsMenuPosition.top,
+          left: actionsMenuPosition.left,
+          zIndex: 2000,
+          width: '208px',
+          padding: '6px',
+          borderRadius: 'var(--mac-radius-md)',
+          border: '1px solid var(--mac-border)',
+          background: 'var(--mac-bg-primary)',
+          boxShadow: 'var(--mac-shadow-lg)',
+          display: 'grid',
+          gap: '2px'
         }}>
-        
-        <MenuItem onClick={() => {openUserDialog(selectedUser);setAnchorEl(null);}}>
-          <ListItemIcon><Edit size={16} /></ListItemIcon>
-          <ListItemText primary="Редактировать" primaryTypographyProps={{ fontSize: '13px' }} />
-        </MenuItem>
-        <MenuItem onClick={() => {
-          handleToggleUserStatus(selectedUser.id, selectedUser.is_active);
-          setAnchorEl(null);
-        }}>
-          <ListItemIcon>
-            {selectedUser?.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
-          </ListItemIcon>
-          <ListItemText
-            primary={selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
-            primaryTypographyProps={{ fontSize: '13px' }} />
-          
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={() => {
-          openDeleteDialog(selectedUser);
-          setAnchorEl(null);
-        }}>
-          <ListItemIcon><Trash2 size={16} color="#ef4444" /></ListItemIcon>
-          <ListItemText primary="Удалить" primaryTypographyProps={{ fontSize: '13px', color: '#ef4444' }} />
-        </MenuItem>
-      </Menu>
+
+        <button type="button" role="menuitem" style={actionMenuItemStyle} onClick={handleEditFromActionsMenu}>
+          <span style={actionMenuIconStyle}><Edit size={16} /></span>
+          <span>Редактировать</span>
+        </button>
+        <button type="button" role="menuitem" style={actionMenuItemStyle} onClick={handleToggleStatusFromActionsMenu}>
+          <span style={actionMenuIconStyle}>
+            {actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
+          </span>
+          <span>{actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}</span>
+        </button>
+        <div role="separator" style={{ height: '1px', background: 'var(--mac-border)', margin: '4px 0' }} />
+        <button
+          type="button"
+          role="menuitem"
+          style={{ ...actionMenuItemStyle, color: 'var(--mac-error)' }}
+          onClick={handleDeleteFromActionsMenu}>
+          <span style={{ ...actionMenuIconStyle, color: 'var(--mac-error)' }}><Trash2 size={16} /></span>
+          <span>Удалить</span>
+        </button>
+      </div>
+      }
 
       {/* User Modal (New MacOS Styled) */}
       <UserModal
