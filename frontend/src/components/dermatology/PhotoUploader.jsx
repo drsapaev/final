@@ -34,10 +34,10 @@ import {
 
 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import heic2any from 'heic2any';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
 const PhotoUploader = ({ visitId, onDataUpdate }) => {
   const [photos, setPhotos] = useState({
@@ -73,25 +73,13 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
   const convertHEICtoJPEG = async (file) => {
     setConverting(true);
     try {
-      const blob = await heic2any({
-        blob: file,
-        toType: 'image/jpeg',
-        quality: 0.9
-      });
+      return await convertHEICToJPEG(file, 0.9);
 
-      // Создаем новый File объект
-      const convertedFile = new File(
-        [blob],
-        file.name.replace(/\.heic$/i, '.jpg'),
-        { type: 'image/jpeg' }
-      );
-
-      setConverting(false);
-      return convertedFile;
     } catch (error) {
       logger.error('Ошибка конвертации HEIC:', error);
-      setConverting(false);
       throw error;
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -103,7 +91,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
       try {
         // Проверяем и конвертируем HEIC
         let processedFile = file;
-        if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
+        if (isHEICFile(file)) {
           processedFile = await convertHEICtoJPEG(file);
         }
 

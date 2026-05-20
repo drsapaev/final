@@ -23,6 +23,21 @@ export function isHEICFile(file) {
   return fileName.endsWith('.heic') || fileName.endsWith('.heif');
 }
 
+function getConvertedBlob(convertedBlob) {
+  return Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+}
+
+function createJPEGFile(sourceFile, convertedBlob) {
+  return new File(
+    [getConvertedBlob(convertedBlob)],
+    sourceFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
+    {
+      type: 'image/jpeg',
+      lastModified: Date.now()
+    }
+  );
+}
+
 /**
  * Конвертирует HEIC файл в JPEG через Service Worker
  * @param {File} heicFile - HEIC файл
@@ -52,16 +67,7 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
 
         if (success) {
           // Создаем новый File объект из Blob
-          const jpegFile = new File(
-            [convertedFile],
-            heicFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
-            {
-              type: 'image/jpeg',
-              lastModified: Date.now()
-            }
-          );
-
-          resolve(jpegFile);
+          resolve(createJPEGFile(heicFile, convertedFile));
         } else {
           reject(new Error(error || 'Ошибка конвертации'));
         }
@@ -101,16 +107,7 @@ async function convertHEICFallback(heicFile, quality = 0.8) {
     });
 
     // Создаем File из Blob
-    const jpegFile = new File(
-      [jpegBlob],
-      heicFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
-      {
-        type: 'image/jpeg',
-        lastModified: Date.now()
-      }
-    );
-
-    return jpegFile;
+    return createJPEGFile(heicFile, jpegBlob);
 
   } catch (error) {
     logger.error('HEIC fallback conversion failed:', error);
