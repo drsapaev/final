@@ -1,7 +1,6 @@
 {
   "dependencies": {
     "@babel/parser": "^7.29.3",
-    "@mui/material": "^7.3.11",
     "@vitejs/plugin-react": "^6.0.2",
     "glob": "^13.0.6",
     "lucide-react": "^0.577.0",
