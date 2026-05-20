@@ -140,7 +140,7 @@ classified, policy-covered, and guarded for future small PRs.
 ## Post-Cycle Continuation Note
 
 Later small PRs reduced the current MUI inventory from the historical third
-cycle count of 14 files to 7 files:
+cycle count of 14 files to 6 files:
 
 - stale `frontend/src/components/dashboard/Dashboard.jsx` removal;
 - gated `frontend/src/components/admin/UserManagement.jsx` actions menu
@@ -152,12 +152,13 @@ cycle count of 14 files to 7 files:
 - stale caller-free `frontend/src/components/ai/MCPMonitor.jsx` removal.
 - stale caller-free `frontend/src/components/laboratory/LabReportGenerator.jsx`
   removal.
+- gated `frontend/src/components/patient/FamilyRelationsCard.jsx` patient
+  relationship migration.
 
 Current remaining MUI files:
 
 - `frontend/src/components/payment/PaymentWidget.jsx`
 - `frontend/src/components/queue/OnlineQueueManager.jsx`
-- `frontend/src/components/patient/FamilyRelationsCard.jsx`
 - `frontend/src/components/cardiology/ECGViewer.jsx`
 - `frontend/src/components/dental/TreatmentPlanner.jsx`
 - `frontend/src/components/dental/ToothModal.jsx`
