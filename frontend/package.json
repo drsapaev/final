@@ -20,6 +20,7 @@
     "check-theme": "node scripts/check-theme-compliance.js",
     "analyze": "node scripts/analyze-bundle.js",
     "build:analyze": "npm run build && npm run analyze",
+    "build:visualize": "vite build --mode analyze",
     "optimize": "npm run build:analyze && npm run test:e2e:run",
     "test:e2e:run": "playwright test --reporter=html"
   },
@@ -79,6 +80,7 @@
     "http-server": "14.1.1",
     "jsdom": "26.1.0",
     "rollup": "^3.30.0",
+    "rollup-plugin-visualizer": "^7.0.1",
     "terser": "^5.24.0",
     "vite": "^6.4.2",
     "vitest": "3.2.4"

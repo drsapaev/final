@@ -1,13 +1,36 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
 
 const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
 const wsProxyTarget =
   process.env.VITE_WS_PROXY_TARGET ||
   apiProxyTarget.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
 
-export default defineConfig({
-  plugins: [react()],
+function createPlugins(enableBundleVisualizer) {
+  const plugins = [react()];
+
+  if (enableBundleVisualizer) {
+    plugins.push(
+      visualizer({
+        filename: "dist/bundle-visualizer.html",
+        template: "treemap",
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }),
+    );
+  }
+
+  return plugins;
+}
+
+export default defineConfig(({ mode }) => ({
+  plugins: createPlugins(
+    mode === "analyze" ||
+      process.env.ANALYZE_BUNDLE === "true" ||
+      process.env.VITE_BUNDLE_ANALYZE === "true",
+  ),
   server: {
     port: 5173,
     host: '0.0.0.0',
@@ -53,4 +76,4 @@ export default defineConfig({
     // Переменные окружения для PWA
     'process.env.REACT_APP_VAPID_PUBLIC_KEY': JSON.stringify(process.env.REACT_APP_VAPID_PUBLIC_KEY || ''),
   }
-});
+}));
