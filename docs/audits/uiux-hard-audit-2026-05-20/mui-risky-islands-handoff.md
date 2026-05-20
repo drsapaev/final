@@ -13,7 +13,7 @@ Fresh inventory:
 rg -l "@mui|Mui" frontend\src\pages frontend\src\components
 ```
 
-Current post-continuation result: 8 files.
+Current post-continuation result: 7 files.
 
 ## Global Rule
 
@@ -109,11 +109,14 @@ Validation:
 
 Files:
 
-- `frontend/src/components/laboratory/LabReportGenerator.jsx`
 - `frontend/src/components/cardiology/ECGViewer.jsx`
 - `frontend/src/components/dental/TreatmentPlanner.jsx`
 - `frontend/src/components/dental/ToothModal.jsx`
 - `frontend/src/components/patient/FamilyRelationsCard.jsx`
+
+Note: `frontend/src/components/laboratory/LabReportGenerator.jsx` had no
+active frontend source importer and was removed as stale code. Active lab
+panel/report/export behavior remains outside this handoff and unchanged.
 
 Mode:
 
@@ -243,7 +246,7 @@ Stop if:
 ## Result
 
 PR-MUI-4 created the guardrails needed before any remaining runtime MUI
-migration. The current remaining MUI inventory is 8 files across payment
+migration. The current remaining MUI inventory is 7 files across payment
 widget, queue, clinical, and Telegram surfaces.
 
 ## Next Smallest Step

@@ -51,6 +51,11 @@ after deleting caller-free `frontend/src/components/ai/MCPMonitor.jsx`.
 `TelegramManager.jsx` remains the only Telegram/AI-sensitive MUI runtime
 island in the active inventory.
 
+LabReportGenerator stale component removal: 7 files now contain runtime MUI
+imports after deleting caller-free
+`frontend/src/components/laboratory/LabReportGenerator.jsx`. Active lab panel,
+report, and export behavior remains owned by the mounted lab routes/components.
+
 ## No-New-MUI Island Policy
 
 MUI is a legacy compatibility layer in this clinic frontend. New clinic runtime UI should not create new MUI islands.
@@ -93,7 +98,7 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 | `frontend/src/pages/PaymentTest.jsx` | Migrated/payment-demo | Internal payment demo/test surface now uses macOS/native controls with no current `@mui` import. | Keep route, admin/internal-demo visibility, and payment demo semantics unchanged; future behavior changes still require payment gate review. |
 | `frontend/src/components/queue/OnlineQueueManager.jsx` | Payment/queue-adjacent | Queue status, print/download, and queue operations. | Gate/handoff only. |
 | `frontend/src/components/patient/FamilyRelationsCard.jsx` | Clinical-heavy | Patient relationship data and visibility semantics. | Clinical safety review before migration. |
-| `frontend/src/components/laboratory/LabReportGenerator.jsx` | Clinical-heavy | Lab report generation UI. | Clinical safety review before migration. |
+| `frontend/src/components/laboratory/LabReportGenerator.jsx` | Stale/removed | Caller-free lab report generator had no active frontend source importer. | Removed after source search; active lab panel/report/export behavior remains unchanged. |
 | `frontend/src/components/cardiology/ECGViewer.jsx` | Clinical-heavy | ECG viewer and cardiology data display. | Clinical safety review before migration. |
 | `frontend/src/components/dental/TreatmentPlanner.jsx` | Clinical-heavy | Dental treatment planning and cost/status semantics. | Clinical safety review before migration. |
 | `frontend/src/components/dental/ToothModal.jsx` | Clinical-heavy | Dental tooth modal and clinical status semantics. | Clinical safety review before migration. |
@@ -106,7 +111,6 @@ rg -l '@mui|Mui' frontend/src/pages frontend/src/components
 
 - Dental: `TreatmentPlanner.jsx`, `ToothModal.jsx`
 - Cardiology: `ECGViewer.jsx`
-- Lab: `LabReportGenerator.jsx`
 - Queue: `OnlineQueueManager.jsx`
 - Payment: `PaymentWidget.jsx`
 - Telegram: `TelegramManager.jsx`
@@ -147,6 +151,8 @@ Result after PaymentTest internal demo migration: 9 files.
 
 Result after MCPMonitor stale component removal: 8 files.
 
+Result after LabReportGenerator stale component removal: 7 files.
+
 Decision: do not force a runtime MUI migration in this PR. The only already
 approved low-risk runtime targets were `ConnectionStatus.jsx` and
 `PWAInstallPrompt.jsx`, and both are already migrated. Every remaining runtime
@@ -185,8 +191,8 @@ rg -n "@mui|Mui" frontend\src\pages frontend\src\components
 Historical PR-MUI-1 result: 14 files.
 
 Current post-continuation result after dashboard removal, UserManagement,
-UnifiedButton, UnifiedCard, PaymentTest migration, and MCPMonitor stale
-component removal: 8 files.
+UnifiedButton, UnifiedCard, PaymentTest migration, MCPMonitor stale component
+removal, and LabReportGenerator stale component removal: 7 files.
 
 No new MUI imports were introduced by the recent performance PRs. Current
 classification:
@@ -195,7 +201,7 @@ classification:
 | --- | ---: | --- |
 | Shared/admin-sensitive | 0 | No current MUI search result after UserManagement migration and stale dashboard removal. |
 | Payment/queue-adjacent | 2 | Gate/handoff only. |
-| Clinical-heavy | 5 | Clinical safety review before migration. |
+| Clinical-heavy | 4 | Clinical safety review before migration. |
 | Telegram/AI-sensitive | 1 | Gate/handoff only. |
 | Example-only | 0 | Both `Unified*` examples have been converted away from MUI. |
 
@@ -206,7 +212,6 @@ Current files:
   - `frontend/src/components/queue/OnlineQueueManager.jsx`
 - Clinical-heavy:
   - `frontend/src/components/patient/FamilyRelationsCard.jsx`
-  - `frontend/src/components/laboratory/LabReportGenerator.jsx`
   - `frontend/src/components/cardiology/ECGViewer.jsx`
   - `frontend/src/components/dental/TreatmentPlanner.jsx`
   - `frontend/src/components/dental/ToothModal.jsx`
@@ -216,8 +221,9 @@ Current files:
   - none currently matching `@mui|Mui`
 
 Decision: do not treat the historical PR-MUI-1 inventory as current. The
-current live MUI inventory is 8 files and excludes the migrated/removed
-admin/shared, dashboard, example-only, PaymentTest, and MCPMonitor surfaces.
+current live MUI inventory is 7 files and excludes the migrated/removed
+admin/shared, dashboard, example-only, PaymentTest, MCPMonitor, and
+LabReportGenerator surfaces.
 
 ## PR-MUI-2 Low-Risk Admin Decision
 
@@ -274,8 +280,8 @@ Gate-required groups:
 
 - Payment: `PaymentWidget.jsx`
 - Queue: `OnlineQueueManager.jsx`
-- Clinical: `LabReportGenerator.jsx`, `ECGViewer.jsx`,
-  `TreatmentPlanner.jsx`, `ToothModal.jsx`, `FamilyRelationsCard.jsx`
+- Clinical: `ECGViewer.jsx`, `TreatmentPlanner.jsx`, `ToothModal.jsx`,
+  `FamilyRelationsCard.jsx`
 - Telegram/AI: `TelegramManager.jsx`
 
 Default rule: one risky MUI island per PR, with first-touch boundaries,
