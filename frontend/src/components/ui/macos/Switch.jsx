@@ -67,6 +67,7 @@ const Switch = React.forwardRef(({
   };
 
   const labelStyles = { fontSize: '13px', color: 'var(--mac-text-primary)' };
+  const accessibleLabel = props['aria-label'] || (typeof label === 'string' ? label : 'Toggle setting');
 
   return (
     <label className={`mac-switch ${className}`} style={wrapper} htmlFor={controlId} aria-disabled={disabled}>
@@ -80,6 +81,7 @@ const Switch = React.forwardRef(({
         disabled={disabled}
         className="mac-switch-input"
         style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+        aria-label={accessibleLabel}
         {...props}
       />
       <span className="mac-switch-track" aria-hidden style={track}>

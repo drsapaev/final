@@ -30,6 +30,7 @@ export default function AccentPicker({ size = 22, className = '', style = {} }) 
             key={key}
             role="radio"
             aria-checked={isActive}
+            aria-label={LABELS[key] || key}
             onClick={() => setAccent(key)}
             title={LABELS[key] || key}
             style={{

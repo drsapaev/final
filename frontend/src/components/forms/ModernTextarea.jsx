@@ -126,6 +126,7 @@ const ModernTextarea = ({
           className="expand-btn"
           onClick={toggleExpanded}
           title={isExpanded ? 'Свернуть' : 'Развернуть'}
+          aria-label={isExpanded ? 'Collapse textarea' : 'Expand textarea'}
           style={{ color: getColor('textSecondary') }}>
           
               {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}

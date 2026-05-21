@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:34:27.111Z",
+  "generatedAt": "2026-05-21T08:39:16.062Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -28,28 +28,12 @@
       "reason": "missing-accessible-name"
     },
     {
-      "signature": "src/components/forms/ModernTextarea.jsx:124:9:button:title-only",
-      "file": "src/components/forms/ModernTextarea.jsx",
-      "line": 124,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
       "signature": "src/components/layout/UnifiedLayout.jsx:91:7:div:missing-accessible-name",
       "file": "src/components/layout/UnifiedLayout.jsx",
       "line": 91,
       "column": 7,
       "element": "div",
       "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/layout/UnifiedSidebar.jsx:248:9:button:title-only",
-      "file": "src/components/layout/UnifiedSidebar.jsx",
-      "line": 248,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
     },
     {
       "signature": "src/components/mobile/PWAInstallPrompt.jsx:104:13:button:missing-accessible-name",
@@ -64,30 +48,6 @@
       "file": "src/components/tickets/MultipleTicketsPrinter.jsx",
       "line": 78,
       "column": 9,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ui/macos/AccentPicker.jsx:29:11:button:title-only",
-      "file": "src/components/ui/macos/AccentPicker.jsx",
-      "line": 29,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/ui/macos/Switch.jsx:73:7:input:missing-accessible-name",
-      "file": "src/components/ui/macos/Switch.jsx",
-      "line": 73,
-      "column": 7,
-      "element": "input",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ui/native/Modal.jsx:101:15:button:missing-accessible-name",
-      "file": "src/components/ui/native/Modal.jsx",
-      "line": 101,
-      "column": 15,
       "element": "button",
       "reason": "missing-accessible-name"
     },

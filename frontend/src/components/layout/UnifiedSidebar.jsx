@@ -265,7 +265,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#9ca3af' : '#6b7280';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}>
+          title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
 
           <Icon name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
         </button>
