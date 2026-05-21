@@ -32,6 +32,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>АД сист.</label>
                     <input
                         type="number"
+                        aria-label="Systolic blood pressure"
                         value={vitals?.systolic || ''}
                         onChange={(e) => handleChange('systolic', e.target.value)}
                         placeholder="120"
@@ -43,6 +44,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>АД диаст.</label>
                     <input
                         type="number"
+                        aria-label="Diastolic blood pressure"
                         value={vitals?.diastolic || ''}
                         onChange={(e) => handleChange('diastolic', e.target.value)}
                         placeholder="80"
@@ -53,6 +55,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>Пульс</label>
                     <input
                         type="number"
+                        aria-label="Pulse"
                         value={vitals?.pulse || ''}
                         onChange={(e) => handleChange('pulse', e.target.value)}
                         placeholder="72"
@@ -63,6 +66,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>SpO₂</label>
                     <input
                         type="number"
+                        aria-label="Blood oxygen saturation"
                         value={vitals?.spo2 || ''}
                         onChange={(e) => handleChange('spo2', e.target.value)}
                         placeholder="98"
@@ -83,6 +87,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>Рост {vitals?.heightSource && <small>({vitals.heightSource})</small>}</label>
                     <input
                         type="number"
+                        aria-label="Height in centimeters"
                         value={vitals?.height || ''}
                         onChange={(e) => handleChange('height', e.target.value)}
                         placeholder="170"
@@ -94,6 +99,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     <label>Вес {vitals?.weightSource && <small>({vitals.weightSource})</small>}</label>
                     <input
                         type="number"
+                        aria-label="Weight in kilograms"
                         value={vitals?.weight || ''}
                         onChange={(e) => handleChange('weight', e.target.value)}
                         placeholder="70"
