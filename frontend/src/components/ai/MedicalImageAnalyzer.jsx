@@ -626,6 +626,7 @@ const MedicalImageAnalyzer = () => {
                         id="file-upload"
                         name="file-upload"
                         type="file"
+                        aria-label="Выберите медицинское изображение"
                         style={{ display: 'none' }}
                         accept="image/*"
                         onChange={handleFileSelect} />
