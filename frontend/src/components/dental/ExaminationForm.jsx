@@ -191,6 +191,7 @@ const ExaminationForm = ({
             Лицо
           </label>
           <textarea
+          aria-label="Осмотр лица"
           value={formData.generalCondition.face || ''}
           onChange={(e) => handleInputChange('generalCondition.face', e.target.value)}
           disabled={!isEditing}
@@ -205,6 +206,7 @@ const ExaminationForm = ({
             Губы
           </label>
           <textarea
+          aria-label="Осмотр губ"
           value={formData.generalCondition.lips || ''}
           onChange={(e) => handleInputChange('generalCondition.lips', e.target.value)}
           disabled={!isEditing}
@@ -219,6 +221,7 @@ const ExaminationForm = ({
             Язык
           </label>
           <textarea
+          aria-label="Осмотр языка"
           value={formData.generalCondition.tongue || ''}
           onChange={(e) => handleInputChange('generalCondition.tongue', e.target.value)}
           disabled={!isEditing}
@@ -233,6 +236,7 @@ const ExaminationForm = ({
             Слизистая оболочка
           </label>
           <textarea
+          aria-label="Осмотр слизистой оболочки"
           value={formData.generalCondition.mucosa || ''}
           onChange={(e) => handleInputChange('generalCondition.mucosa', e.target.value)}
           disabled={!isEditing}
@@ -247,6 +251,7 @@ const ExaminationForm = ({
             Десны
           </label>
           <textarea
+          aria-label="Осмотр десен"
           value={formData.generalCondition.gums || ''}
           onChange={(e) => handleInputChange('generalCondition.gums', e.target.value)}
           disabled={!isEditing}
@@ -277,6 +282,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Индекс гигиены OHI-S"
             step="0.1"
             min="0"
             max="6"
@@ -301,6 +307,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Индекс зубного налета PLI"
             step="0.1"
             min="0"
             max="3"
@@ -326,6 +333,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Пародонтальный индекс CPI"
             step="0.1"
             min="0"
             max="4"
@@ -352,6 +360,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Индекс кровоточивости"
             step="0.1"
             min="0"
             max="100"
@@ -390,6 +399,7 @@ const ExaminationForm = ({
               <input
                 key={position}
                 type="number"
+                aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
                 step="0.5"
                 min="0"
                 max="10"
@@ -418,6 +428,7 @@ const ExaminationForm = ({
               <input
                 key={position}
                 type="number"
+                aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
                 step="0.5"
                 min="0"
                 max="10"
@@ -460,6 +471,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Overjet в миллиметрах"
             step="0.1"
             value={formData.measurements.overjet || ''}
             onChange={(e) => handleInputChange('measurements.overjet', e.target.value)}
@@ -477,6 +489,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Overbite в миллиметрах"
             step="0.1"
             value={formData.measurements.overbite || ''}
             onChange={(e) => handleInputChange('measurements.overbite', e.target.value)}
@@ -492,6 +505,7 @@ const ExaminationForm = ({
             Срединная линия
           </label>
           <select
+          aria-label="Срединная линия"
           value={formData.measurements.midline || ''}
           onChange={(e) => handleInputChange('measurements.midline', e.target.value)}
           disabled={!isEditing}
@@ -509,6 +523,7 @@ const ExaminationForm = ({
             Перекрестный прикус
           </label>
           <select
+          aria-label="Перекрестный прикус"
           value={formData.measurements.crossbite || ''}
           onChange={(e) => handleInputChange('measurements.crossbite', e.target.value)}
           disabled={!isEditing}
@@ -529,6 +544,7 @@ const ExaminationForm = ({
           <div className="flex items-center gap-2">
             <input
             type="number"
+            aria-label="Открытый прикус в миллиметрах"
             step="0.1"
             value={formData.measurements.openBite || ''}
             onChange={(e) => handleInputChange('measurements.openBite', e.target.value)}
@@ -564,6 +580,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.before', index)}
+              aria-label={`Удалить фото до осмотра ${index + 1}`}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -577,6 +594,7 @@ const ExaminationForm = ({
                 <span className="text-sm">Загрузить фото</span>
                 <input
               type="file"
+              aria-label="Загрузить фото до осмотра"
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -600,6 +618,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.after', index)}
+              aria-label={`Удалить фото после осмотра ${index + 1}`}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -613,6 +632,7 @@ const ExaminationForm = ({
                 <span className="text-sm">Загрузить фото</span>
                 <input
               type="file"
+              aria-label="Загрузить фото после осмотра"
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -636,6 +656,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.intraoral', index)}
+              aria-label={`Удалить внутриротовое фото ${index + 1}`}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -649,6 +670,7 @@ const ExaminationForm = ({
                 <span className="text-sm">Загрузить фото</span>
                 <input
               type="file"
+              aria-label="Загрузить внутриротовое фото"
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -672,6 +694,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.extraoral', index)}
+              aria-label={`Удалить внеротовое фото ${index + 1}`}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -685,6 +708,7 @@ const ExaminationForm = ({
                 <span className="text-sm">Загрузить фото</span>
                 <input
               type="file"
+              aria-label="Загрузить внеротовое фото"
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -709,6 +733,7 @@ const ExaminationForm = ({
             </label>
             <input
             type="text"
+            aria-label="Ортопантомограмма"
             value={formData.radiographs.panoramic || ''}
             onChange={(e) => handleInputChange('radiographs.panoramic', e.target.value)}
             disabled={!isEditing}
@@ -723,6 +748,7 @@ const ExaminationForm = ({
             </label>
             <input
             type="text"
+            aria-label="КЛКТ"
             value={formData.radiographs.cbct || ''}
             onChange={(e) => handleInputChange('radiographs.cbct', e.target.value)}
             disabled={!isEditing}
@@ -750,6 +776,7 @@ const ExaminationForm = ({
           Заключение
         </label>
         <textarea
+        aria-label="Заключение по результатам осмотра"
         value={formData.conclusion || ''}
         onChange={(e) => handleInputChange('conclusion', e.target.value)}
         disabled={!isEditing}
@@ -764,6 +791,7 @@ const ExaminationForm = ({
           Рекомендации
         </label>
         <textarea
+        aria-label="Рекомендации по результатам осмотра"
         value={formData.recommendations || ''}
         onChange={(e) => handleInputChange('recommendations', e.target.value)}
         disabled={!isEditing}
@@ -839,6 +867,7 @@ const ExaminationForm = ({
             }
             <button
               onClick={onClose}
+              aria-label="Закрыть форму осмотра"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
