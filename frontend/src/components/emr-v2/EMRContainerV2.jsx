@@ -716,6 +716,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                             ) : (
                                 <div className="emr-v2-amend-form">
                                     <textarea
+                                        aria-label="Причина поправки EMR"
                                         value={amendReason}
                                         onChange={(e) => setAmendReason(e.target.value)}
                                         placeholder="Причина поправки (мин. 10 символов)..."
