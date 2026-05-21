@@ -33,7 +33,7 @@ function Row({ k, v, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{k}</div>
-      <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(k, val)} style={btn}>Сохранить</button>
     </div>);
 
@@ -269,6 +269,7 @@ export default function Settings() {void
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
                   placeholder="Вставьте ключ активации"
+                  aria-label="Activation key"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                   style={{ ...inp, minWidth: 320 }} />
@@ -534,6 +535,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Название *</label>
             <input
               type="text"
+              aria-label="Provider name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -552,6 +554,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Код *</label>
             <input
               type="text"
+              aria-label="Provider code"
               value={formData.code}
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
@@ -569,6 +572,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Описание</label>
             <textarea
+              aria-label="Provider description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
@@ -588,6 +592,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Секретный ключ *</label>
             <input
               type="password"
+              aria-label="Provider secret key"
               value={formData.secret_key}
               onChange={(e) => setFormData({ ...formData, secret_key: e.target.value })}
               required
@@ -606,6 +611,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Webhook URL</label>
             <input
               type="url"
+              aria-label="Provider webhook URL"
               value={formData.webhook_url}
               onChange={(e) => setFormData({ ...formData, webhook_url: e.target.value })}
               style={{
@@ -623,6 +629,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>API URL</label>
             <input
               type="url"
+              aria-label="Provider API URL"
               value={formData.api_url}
               onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
               style={{
@@ -640,6 +647,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="checkbox"
               id="is_active"
+              aria-label="Provider active"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
             
@@ -737,7 +745,7 @@ function KVField({ label, defKey, items, onSave }) {
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{label}</div>
-      <input value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
+      <input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} style={inp} />
       <button onClick={() => onSave(defKey, val)} style={btn}>Сохранить</button>
     </div>);
 
@@ -753,6 +761,7 @@ function RoleMapItem({ role, items, onSave }) {
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{role}</div>
       <input
+        aria-label={`Route target for ${role}`}
         value={val}
         onChange={(e) => setVal(e.target.value)}
         style={inp}
