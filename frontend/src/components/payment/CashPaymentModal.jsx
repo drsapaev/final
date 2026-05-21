@@ -66,7 +66,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
-                    <button onClick={onClose} style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
+                    <button onClick={onClose} aria-label="Закрыть окно обработки оплаты" style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
                         <XCircle style={{ width: '24px', height: '24px' }} />
                     </button>
                 </div>
@@ -99,11 +99,13 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
                 <form onSubmit={handleSubmit}>
                     <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                        <label htmlFor="cash-payment-amount" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
                             Сумма (сум)
                         </label>
                         <input
+                            id="cash-payment-amount"
                             type="number"
+                            aria-label="Сумма оплаты"
                             value={paymentData.amount}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
                             style={{
@@ -121,10 +123,11 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     </div>
 
                     <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                        <label htmlFor="cash-payment-method" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
                             Способ оплаты
                         </label>
                         <select
+                            id="cash-payment-method"
                             value={paymentData.method}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, method: e.target.value }))}
                             style={{
@@ -143,10 +146,12 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     </div>
 
                     <div style={{ marginBottom: '24px' }}>
-                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
+                        <label htmlFor="cash-payment-note" style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
                             Примечание (необязательно)
                         </label>
                         <textarea
+                            id="cash-payment-note"
+                            aria-label="Примечание к оплате"
                             value={paymentData.note}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
                             style={{
