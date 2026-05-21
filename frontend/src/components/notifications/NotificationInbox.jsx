@@ -284,6 +284,7 @@ export default function NotificationInbox({ userRole, onClose }) {
           <Search size={16} />
           <input
             type="search"
+            aria-label="Поиск по уведомлениям"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             placeholder="Поиск по уведомлениям"
