@@ -187,6 +187,7 @@ export function DentistrySection({
                                         <span className="tooth-number">{toothNum}</span>
                                         <input
                                             type="number"
+                                            aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"
                                             max="15"
                                             value={depth}
@@ -216,6 +217,7 @@ export function DentistrySection({
                                         <span className="tooth-number">{toothNum}</span>
                                         <input
                                             type="number"
+                                            aria-label={`Periodontal pocket depth for tooth ${toothNum}`}
                                             min="0"
                                             max="15"
                                             value={depth}
@@ -301,6 +303,7 @@ export function DentistrySection({
                             <label className="dentistry-checkbox">
                                 <input
                                     type="checkbox"
+                                    aria-label="Crossbite measurement"
                                     checked={measurements?.crossbite || false}
                                     onChange={(e) => handleMeasurementChange('crossbite', e.target.checked)}
                                     disabled={disabled}
@@ -310,6 +313,7 @@ export function DentistrySection({
                             <label className="dentistry-checkbox">
                                 <input
                                     type="checkbox"
+                                    aria-label="Open bite measurement"
                                     checked={measurements?.openBite || false}
                                     onChange={(e) => handleMeasurementChange('openBite', e.target.checked)}
                                     disabled={disabled}
