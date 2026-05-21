@@ -260,6 +260,7 @@ const PaymentDialog = ({
             {/* Сумма */}
             <div>
               <label
+                htmlFor="payment-amount"
                 style={{
                   display: 'block',
                   fontSize: '14px',
@@ -271,7 +272,11 @@ const PaymentDialog = ({
                 Сумма к оплате *
               </label>
               <input
+                id="payment-amount"
                 type="number"
+                aria-label="Сумма к оплате"
+                aria-invalid={!!errors.amount}
+                aria-describedby={errors.amount ? 'payment-amount-error' : undefined}
                 value={paymentAmount}
                 onChange={(e) => {
                   setPaymentAmount(e.target.value);
@@ -314,6 +319,7 @@ const PaymentDialog = ({
               />
               {errors.amount && (
                 <p
+                  id="payment-amount-error"
                   style={{
                     color: '#ef4444',
                     fontSize: '12px',
