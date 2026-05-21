@@ -696,7 +696,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Полноэкранный режим">
+              title="Полноэкранный режим"
+              aria-label={document.fullscreenElement ? 'Выйти из полноэкранного режима' : 'Включить полноэкранный режим'}>
               
               {document.fullscreenElement ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -714,7 +715,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}>
+              title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}
+              aria-label={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}>
               
               {boardSettings.soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
@@ -732,7 +734,8 @@ export default function DisplayBoardUnified({
                 alignItems: 'center',
                 gap: '5px'
               }}
-              title="Контрастный режим">
+              title="Контрастный режим"
+              aria-label={boardSettings.contrastMode ? 'Выключить контрастный режим' : 'Включить контрастный режим'}>
               
               {boardSettings.contrastMode ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
