@@ -86,6 +86,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </label>
         <input
         type="text"
+        aria-label="Authenticator code"
         value={totpCode}
         onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         onKeyPress={handleKeyPress}
@@ -132,6 +133,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </label>
         <input
         type="text"
+        aria-label="Backup code"
         value={backupCode}
         onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
         onKeyPress={handleKeyPress}
@@ -178,6 +180,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         </label>
         <input
         type="text"
+        aria-label="Recovery token"
         value={recoveryToken}
         onChange={(e) => setRecoveryToken(e.target.value)}
         onKeyPress={handleKeyPress}
@@ -214,6 +217,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         }}>
             <input
             type="checkbox"
+            aria-label="Remember this device for 30 days"
             checked={rememberDevice}
             onChange={(e) => setRememberDevice(e.target.checked)}
             style={{ margin: 0 }} />
