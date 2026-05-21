@@ -411,6 +411,7 @@ export default function Header() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '24px' }}>
                   <input
                 type="date"
+                aria-label="Filter appointment history by date"
                 className="interactive-element focus-ring"
                 style={{
                   height: '40px',
@@ -445,6 +446,7 @@ export default function Header() {
                 
                     <input
                   type="search"
+                  aria-label="Search appointment history"
                   placeholder="Поиск по ФИО, телефону, услугам или ID записи..."
                   className="interactive-element focus-ring"
                   style={{
