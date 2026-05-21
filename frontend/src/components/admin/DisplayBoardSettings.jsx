@@ -272,6 +272,7 @@ const DisplayBoardSettings = () => {
               </label>
               <input
                 type="text"
+                aria-label="Display board location"
                 value={selectedBoard.location || ''}
                 onChange={(e) => handleBoardSettingChange('location', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -325,6 +326,7 @@ const DisplayBoardSettings = () => {
               </label>
               <input
                 type="number"
+                aria-label="Displayed queue number count"
                 min="1"
                 max="20"
                 value={selectedBoard.queue_display_count}
@@ -340,6 +342,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Show doctor photos"
                   checked={selectedBoard.show_doctor_photos}
                   onChange={(e) => handleBoardSettingChange('show_doctor_photos', e.target.checked)}
                   className="mr-2" />
@@ -350,6 +353,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Show announcements"
                   checked={selectedBoard.show_announcements}
                   onChange={(e) => handleBoardSettingChange('show_announcements', e.target.checked)}
                   className="mr-2" />
@@ -360,6 +364,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Show banners"
                   checked={selectedBoard.show_banners}
                   onChange={(e) => handleBoardSettingChange('show_banners', e.target.checked)}
                   className="mr-2" />
@@ -370,6 +375,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Show videos"
                   checked={selectedBoard.show_videos}
                   onChange={(e) => handleBoardSettingChange('show_videos', e.target.checked)}
                   className="mr-2" />
@@ -394,6 +400,7 @@ const DisplayBoardSettings = () => {
               </label>
               <input
                 type="number"
+                aria-label="Call display duration seconds"
                 min="5"
                 max="300"
                 value={selectedBoard.call_display_duration}
@@ -406,6 +413,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Enable sound signals"
                   checked={selectedBoard.sound_enabled}
                   onChange={(e) => handleBoardSettingChange('sound_enabled', e.target.checked)}
                   className="mr-2" />
@@ -416,6 +424,7 @@ const DisplayBoardSettings = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  aria-label="Enable voice announcements"
                   checked={selectedBoard.voice_announcements}
                   onChange={(e) => handleBoardSettingChange('voice_announcements', e.target.checked)}
                   className="mr-2" />
@@ -449,6 +458,7 @@ const DisplayBoardSettings = () => {
                   </label>
                   <input
                   type="range"
+                  aria-label="Volume level"
                   min="0"
                   max="100"
                   value={selectedBoard.volume_level}
