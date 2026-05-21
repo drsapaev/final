@@ -453,11 +453,13 @@ const ScheduleNextModal = ({
         <form onSubmit={handleSubmit}>
           {/* Пациент */}
           <div style={formGroupStyle}>
-            <label style={labelStyle}>
+            <label htmlFor="schedule-next-patient" style={labelStyle}>
               <User size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
               Пациент
             </label>
             <select
+              id="schedule-next-patient"
+              aria-label="Schedule next visit patient"
               style={selectStyle}
               value={formData.patient_id}
               onChange={(e) => handleInputChange('patient_id', e.target.value)}
@@ -475,12 +477,14 @@ const ScheduleNextModal = ({
           {/* Дата и время */}
           <div style={{ display: 'flex', gap: getSpacing('md') }}>
             <div style={{ ...formGroupStyle, flex: 1 }}>
-              <label style={labelStyle}>
+              <label htmlFor="schedule-next-visit-date" style={labelStyle}>
                 <Calendar size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
                 Дата визита
               </label>
               <input
+                id="schedule-next-visit-date"
                 type="date"
+                aria-label="Schedule next visit date"
                 style={inputStyle}
                 value={formData.visit_date}
                 onChange={(e) => handleInputChange('visit_date', e.target.value)}
@@ -490,12 +494,14 @@ const ScheduleNextModal = ({
             </div>
 
             <div style={{ ...formGroupStyle, flex: 1 }}>
-              <label style={labelStyle}>
+              <label htmlFor="schedule-next-visit-time" style={labelStyle}>
                 <Clock size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
                 Время
               </label>
               <input
+                id="schedule-next-visit-time"
                 type="time"
+                aria-label="Schedule next visit time"
                 style={inputStyle}
                 value={formData.visit_time}
                 onChange={(e) => handleInputChange('visit_time', e.target.value)}
@@ -515,6 +521,8 @@ const ScheduleNextModal = ({
             <div key={index} style={serviceRowStyle}>
                 <div style={{ flex: 2 }}>
                   <select
+                  id={`schedule-next-service-${index}`}
+                  aria-label={`Schedule next visit service ${index + 1}`}
                   style={selectStyle}
                   value={service.service_id}
                   onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
@@ -530,7 +538,9 @@ const ScheduleNextModal = ({
                 </div>
                 <div style={{ flex: 1 }}>
                   <input
+                  id={`schedule-next-service-quantity-${index}`}
                   type="number"
+                  aria-label={`Schedule next visit service ${index + 1} quantity`}
                   style={inputStyle}
                   value={service.quantity}
                   onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
@@ -561,8 +571,10 @@ const ScheduleNextModal = ({
 
           {/* Тип визита */}
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Тип визита</label>
+            <label htmlFor="schedule-next-discount-mode" style={labelStyle}>Тип визита</label>
             <select
+              id="schedule-next-discount-mode"
+              aria-label="Schedule next visit type"
               style={selectStyle}
               value={formData.discount_mode}
               onChange={(e) => handleInputChange('discount_mode', e.target.value)}>
@@ -575,8 +587,10 @@ const ScheduleNextModal = ({
 
           {/* Канал подтверждения */}
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Канал подтверждения</label>
+            <label htmlFor="schedule-next-confirmation-channel" style={labelStyle}>Канал подтверждения</label>
             <select
+              id="schedule-next-confirmation-channel"
+              aria-label="Schedule next visit confirmation channel"
               style={selectStyle}
               value={formData.confirmation_channel}
               onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}>
