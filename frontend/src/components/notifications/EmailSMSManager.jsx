@@ -349,6 +349,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
             type="email"
+            aria-label="Email recipient"
             value={emailForm.to}
             onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -362,6 +363,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
             type="text"
+            aria-label="Email subject"
             value={emailForm.subject}
             onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -407,6 +409,7 @@ const EmailSMSManager = () => {void
             Сообщение
           </label>
           <textarea
+          aria-label="Email message"
           value={emailForm.message}
           onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
           rows={4}
@@ -449,6 +452,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
             type="tel"
+            aria-label="SMS phone number"
             value={smsForm.phone}
             onChange={(e) => setSmsForm({ ...smsForm, phone: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -462,6 +466,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
             type="text"
+            aria-label="SMS sender"
             value={smsForm.sender}
             onChange={(e) => setSmsForm({ ...smsForm, sender: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -507,6 +512,7 @@ const EmailSMSManager = () => {void
             Сообщение
           </label>
           <textarea
+          aria-label="SMS message"
           value={smsForm.message}
           onChange={(e) => setSmsForm({ ...smsForm, message: e.target.value })}
           rows={3}
@@ -563,6 +569,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
             type="number"
+            aria-label="Bulk batch size"
             value={bulkForm.batchSize}
             onChange={(e) => setBulkForm({ ...bulkForm, batchSize: parseInt(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
@@ -578,6 +585,7 @@ const EmailSMSManager = () => {void
             <input
             type="number"
             step="0.1"
+            aria-label="Bulk delay between batches"
             value={bulkForm.delay}
             onChange={(e) => setBulkForm({ ...bulkForm, delay: parseFloat(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
@@ -612,6 +620,7 @@ const EmailSMSManager = () => {void
             </label>
             <input
           type="text"
+          aria-label="Bulk email subject"
           value={bulkForm.subject}
           onChange={(e) => setBulkForm({ ...bulkForm, subject: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
@@ -625,6 +634,7 @@ const EmailSMSManager = () => {void
             Сообщение
           </label>
           <textarea
+          aria-label="Bulk message"
           value={bulkForm.message}
           onChange={(e) => setBulkForm({ ...bulkForm, message: e.target.value })}
           rows={4}
@@ -754,6 +764,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="text"
+                aria-label="SMTP server"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="smtp.gmail.com" />
               
@@ -764,6 +775,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="number"
+                aria-label="SMTP port"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="587" />
               
@@ -774,6 +786,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="email"
+                aria-label="SMTP email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="clinic@example.com" />
               
@@ -790,6 +803,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="url"
+                aria-label="SMS API URL"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="https://api.sms-provider.com" />
               
@@ -800,6 +814,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="password"
+                aria-label="SMS API key"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="••••••••••••••••" />
               
@@ -810,6 +825,7 @@ const EmailSMSManager = () => {void
                 </label>
                 <input
                 type="text"
+                aria-label="SMS default sender"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 placeholder="Clinic" />
               
