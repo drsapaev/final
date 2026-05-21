@@ -395,6 +395,7 @@ const ForceMajeureModal = ({
             Причина *
           </label>
           <textarea
+            aria-label="Force majeure reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Опишите причину форс-мажора..."
@@ -441,6 +442,7 @@ const ForceMajeureModal = ({
                 type="radio"
                 name="refundType"
                 value="deposit"
+                aria-label="Refund to deposit"
                 checked={refundType === 'deposit'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
@@ -458,6 +460,7 @@ const ForceMajeureModal = ({
                 type="radio"
                 name="refundType"
                 value="bank_transfer"
+                aria-label="Refund to bank card"
                 checked={refundType === 'bank_transfer'}
                 onChange={(e) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
@@ -482,6 +485,7 @@ const ForceMajeureModal = ({
           </label>
           <input
             type="text"
+            aria-label="Type confirmation phrase"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
             placeholder="ПОДТВЕРЖДАЮ"
