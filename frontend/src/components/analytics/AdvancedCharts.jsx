@@ -159,7 +159,11 @@ const AdvancedCharts = ({
         </div>
         <div className="p-4">
           <div className="h-80 w-full">
-            <canvas id={canvasId}></canvas>
+            <canvas
+              id={canvasId}
+              role="img"
+              aria-label={`${chartConfig.title || chartName} chart`}
+            ></canvas>
           </div>
         </div>
       </Card>);
@@ -206,6 +210,7 @@ const AdvancedCharts = ({
             <label key={metric} className="flex items-center space-x-1">
                 <input
                 type="checkbox"
+                aria-label={`Toggle ${metric} metric`}
                 checked={selectedMetrics.includes(metric)}
                 onChange={(e) => {
                   if (e.target.checked) {
