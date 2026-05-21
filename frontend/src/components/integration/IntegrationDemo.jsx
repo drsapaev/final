@@ -109,6 +109,7 @@ const IntegrationDemo = () => {
               <label className="clinic-label">Симптомы:</label>
               <input
                 type="text"
+                aria-label="Test symptoms"
                 value={testSymptoms}
                 onChange={(e) => setTestSymptoms(e.target.value)}
                 className="clinic-input"
@@ -120,6 +121,7 @@ const IntegrationDemo = () => {
               <label className="clinic-label">Диагноз:</label>
               <input
                 type="text"
+                aria-label="Test diagnosis"
                 value={testDiagnosis}
                 onChange={(e) => setTestDiagnosis(e.target.value)}
                 className="clinic-input"
