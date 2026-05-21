@@ -46,7 +46,8 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 - 2026-05-21: admin security and QR controls cleanup removed 7 baseline findings.
 - 2026-05-21: file manager controls cleanup removed 11 baseline findings.
 - 2026-05-21: doctor panel primary controls cleanup removed 12 baseline findings.
-- Current baseline after this slice: 126 findings.
+- 2026-05-21: doctor panel queue and modal controls cleanup removed 9 baseline findings.
+- Current baseline after this slice: 117 findings.
 
 ## CI Policy
 
