@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:44:51.125Z",
+  "generatedAt": "2026-05-21T07:49:19.163Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -96,38 +96,6 @@
       "file": "src/components/dental/DentalPriceManager.jsx",
       "line": 175,
       "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PatientCard.jsx:509:11:button:missing-accessible-name",
-      "file": "src/components/dental/PatientCard.jsx",
-      "line": 509,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PatientCard.jsx:553:11:button:missing-accessible-name",
-      "file": "src/components/dental/PatientCard.jsx",
-      "line": 553,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PatientCard.jsx:597:11:button:missing-accessible-name",
-      "file": "src/components/dental/PatientCard.jsx",
-      "line": 597,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PatientCard.jsx:813:13:button:missing-accessible-name",
-      "file": "src/components/dental/PatientCard.jsx",
-      "line": 813,
-      "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
     },

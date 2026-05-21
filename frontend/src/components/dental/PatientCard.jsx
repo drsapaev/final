@@ -503,12 +503,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            aria-label={`Соматическое заболевание ${index + 1}`}
             placeholder="Название заболевания" />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.somaticDiseases', index)}
+            aria-label={`Удалить соматическое заболевание ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -547,12 +549,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            aria-label={`Аллергия ${index + 1}`}
             placeholder="Аллерген (например: лидокаин, пенициллин)" />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.allergies', index)}
+            aria-label={`Удалить аллергию ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -591,12 +595,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            aria-label={`Текущее лекарство ${index + 1}`}
             placeholder="Название лекарства и дозировка" />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.currentMedications', index)}
+            aria-label={`Удалить текущее лекарство ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -812,6 +818,7 @@ const PatientCard = ({
             }
             <button
               onClick={onClose}
+              aria-label={`Закрыть карточку пациента ${formData.surname || ''} ${formData.name || ''}`.trim()}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
