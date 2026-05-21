@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:04:39.260Z",
+  "generatedAt": "2026-05-21T08:09:58.128Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -17,30 +17,6 @@
       "line": 74,
       "column": 11,
       "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/auth/ForgotPassword.jsx:337:11:button:missing-accessible-name",
-      "file": "src/components/auth/ForgotPassword.jsx",
-      "line": 337,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/auth/ForgotPassword.jsx:399:11:button:missing-accessible-name",
-      "file": "src/components/auth/ForgotPassword.jsx",
-      "line": 399,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/auth/ForgotPassword.jsx:491:9:button:missing-accessible-name",
-      "file": "src/components/auth/ForgotPassword.jsx",
-      "line": 491,
-      "column": 9,
-      "element": "button",
       "reason": "missing-accessible-name"
     },
     {
@@ -240,30 +216,6 @@
       "file": "src/pages/RegistrarPanel.jsx",
       "line": 3842,
       "column": 19,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/auth/ChangePasswordRequired.jsx:213:25:button:missing-accessible-name",
-      "file": "src/pages/auth/ChangePasswordRequired.jsx",
-      "line": 213,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/auth/ChangePasswordRequired.jsx:232:25:button:missing-accessible-name",
-      "file": "src/pages/auth/ChangePasswordRequired.jsx",
-      "line": 232,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/auth/ChangePasswordRequired.jsx:264:25:button:missing-accessible-name",
-      "file": "src/pages/auth/ChangePasswordRequired.jsx",
-      "line": 264,
-      "column": 25,
       "element": "button",
       "reason": "missing-accessible-name"
     }

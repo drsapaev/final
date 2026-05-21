@@ -213,6 +213,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
+                            aria-label={showCurrentPassword ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                         >
                             {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -232,6 +233,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
+                            aria-label={showNewPassword ? 'Скрыть новый пароль' : 'Показать новый пароль'}
                             onClick={() => setShowNewPassword(!showNewPassword)}
                         >
                             {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -264,6 +266,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
+                            aria-label={showConfirmPassword ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         >
                             {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
