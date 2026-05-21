@@ -509,6 +509,7 @@ const PaymentClick = ({
                       </div>
                       <button
                     className="print-ticket-btn"
+                    aria-label={`Печать талона для ${ticket.patient_name}`}
                     onClick={() => printTicket(ticket)}>
                     
                         <Printer size={16} />

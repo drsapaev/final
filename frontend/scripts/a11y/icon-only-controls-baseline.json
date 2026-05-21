@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T04:45:35.250Z",
+  "generatedAt": "2026-05-21T05:20:07.324Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -218,30 +218,6 @@
       "column": 7,
       "element": "div",
       "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/cashier/RefundRequestsTable.jsx:242:21:button:missing-accessible-name",
-      "file": "src/components/cashier/RefundRequestsTable.jsx",
-      "line": 242,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/cashier/RefundRequestsTable.jsx:358:57:button:title-only",
-      "file": "src/components/cashier/RefundRequestsTable.jsx",
-      "line": 358,
-      "column": 57,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/cashier/RefundRequestsTable.jsx:372:57:button:title-only",
-      "file": "src/components/cashier/RefundRequestsTable.jsx",
-      "line": 372,
-      "column": 57,
-      "element": "button",
-      "reason": "title-only"
     },
     {
       "signature": "src/components/common/ScheduleNextModal.jsx:428:11:button:missing-accessible-name",
@@ -1032,30 +1008,6 @@
       "file": "src/components/notifications/EmailSMSManager.jsx",
       "line": 712,
       "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/payment/CashPaymentModal.jsx:69:21:button:missing-accessible-name",
-      "file": "src/components/payment/CashPaymentModal.jsx",
-      "line": 69,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/payment/PaymentClick.jsx:510:23:button:missing-accessible-name",
-      "file": "src/components/payment/PaymentClick.jsx",
-      "line": 510,
-      "column": 23,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/payment/PaymentPayMe.jsx:510:23:button:missing-accessible-name",
-      "file": "src/components/payment/PaymentPayMe.jsx",
-      "line": 510,
-      "column": 23,
       "element": "button",
       "reason": "missing-accessible-name"
     },

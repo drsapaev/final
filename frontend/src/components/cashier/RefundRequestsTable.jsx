@@ -242,6 +242,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
                     <button
             onClick={loadRequests}
             disabled={loading}
+            aria-label="Обновить список заявок на возврат"
             style={{
               padding: '6px 12px',
               borderRadius: '6px',
@@ -358,6 +359,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
                                                         <button
                       onClick={() => handleApprove(request.id)}
                       title="Одобрить"
+                      aria-label={`Одобрить заявку на возврат ${request.id}`}
                       style={{
                         padding: '6px',
                         borderRadius: '4px',
@@ -372,6 +374,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
                                                         <button
                       onClick={() => handleReject(request.id)}
                       title="Отклонить"
+                      aria-label={`Отклонить заявку на возврат ${request.id}`}
                       style={{
                         padding: '6px',
                         borderRadius: '4px',
