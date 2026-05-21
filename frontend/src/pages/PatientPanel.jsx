@@ -991,6 +991,11 @@ const PatientPanel = () => {
                 }}
               />
               <input
+                aria-label={
+                  hasPatientData
+                    ? 'Search patient records and quick actions'
+                    : 'Patient records search unavailable'
+                }
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 disabled={!hasPatientData}

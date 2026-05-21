@@ -60,7 +60,7 @@ export default function Scheduler() {
           <div className="clinic-ops-toolbar">
             <label htmlFor="scheduler-date">
               Дата:&nbsp;
-              <input id="scheduler-date" className="clinic-ops-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input id="scheduler-date" className="clinic-ops-input" type="date" aria-label="Дата расписания" value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
             <input className="clinic-ops-input" aria-label="Поиск по врачу, кабинету или статусу" placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
             <button className="clinic-ops-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
