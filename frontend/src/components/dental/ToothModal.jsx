@@ -433,6 +433,7 @@ const ToothModal = ({
         <label style={styles.checkboxRow}>
           <input
             type="checkbox"
+            aria-label={COPY.followUpLabel}
             checked={formData.requiresFollowUp}
             onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
           />
