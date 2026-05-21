@@ -2627,7 +2627,9 @@ const AdminPanel = () => {
                   const isActive = servicesTab === tab.key;
                   return (
                     <button
+                      type="button"
                       key={tab.key}
+                      aria-label={tab.label}
                       onClick={() => {
                         setServicesTab(tab.key);
                         // Обновляем URL
@@ -2904,7 +2906,10 @@ const AdminPanel = () => {
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = adminTableRowHover}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
 
-                    <td style={{ padding: '12px 16px' }}>
+                    <td
+                      aria-label={`Врач ${doctor.user?.full_name || doctor.name || doctor.user?.username || 'без имени'}`}
+                      style={{ padding: '12px 16px' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                     width: '40px',

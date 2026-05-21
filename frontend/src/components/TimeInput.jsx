@@ -7,7 +7,13 @@ import PropTypes from 'prop-types';
  *  - disabled?: boolean
  *  - style?: object
  */
-export default function TimeInput({ value = '09:00', onChange = () => {}, disabled = false, style = {} }) {
+export default function TimeInput({
+  value = '09:00',
+  onChange = () => {},
+  disabled = false,
+  style = {},
+  ariaLabel = 'Время в формате часы и минуты',
+}) {
   function onInput(e) {
     const raw = e.target.value;
     // Нормализуем до ##:##, только цифры и двоеточие
@@ -36,6 +42,7 @@ export default function TimeInput({ value = '09:00', onChange = () => {}, disabl
 
   return (
     <input
+      aria-label={ariaLabel}
       type="text"
       placeholder="HH:MM"
       value={value}
@@ -53,6 +60,7 @@ export default function TimeInput({ value = '09:00', onChange = () => {}, disabl
 TimeInput.propTypes = {
   ...(TimeInput.propTypes || {}),
   disabled: PropTypes.any,
+  ariaLabel: PropTypes.string,
   onChange: PropTypes.any,
   style: PropTypes.any,
   value: PropTypes.any,
