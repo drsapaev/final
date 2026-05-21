@@ -527,10 +527,12 @@ const AllFreeApproval = () => {void
                 </div>
                 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="all-free-rejection-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Причина отклонения
                   </label>
                   <textarea
+                  id="all-free-rejection-reason"
+                  aria-label="Причина отклонения All Free"
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={3}
