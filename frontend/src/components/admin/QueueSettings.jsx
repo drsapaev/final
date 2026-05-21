@@ -405,6 +405,7 @@ const QueueSettings = () => {
             </div>
             <button
               onClick={() => handleSettingChange('dev_mode_enabled', !settings.dev_mode_enabled)}
+              aria-label={settings.dev_mode_enabled ? 'Отключить режим разработки очереди' : 'Включить режим разработки очереди'}
               style={{
                 display: 'flex',
                 alignItems: 'center',

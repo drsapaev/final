@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T05:35:05.269Z",
+  "generatedAt": "2026-05-21T05:46:37.476Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -74,94 +74,6 @@
       "column": 19,
       "element": "button",
       "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:643:25:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 643,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:664:25:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 664,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:721:33:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 721,
-      "column": 33,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:742:37:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 742,
-      "column": 37,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:824:41:button:title-only",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 824,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:832:41:button:title-only",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 832,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:840:41:button:title-only",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 840,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:1055:21:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 1055,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:1157:33:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 1157,
-      "column": 33,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueProfilesManager.jsx:1210:25:button:missing-accessible-name",
-      "file": "src/components/admin/QueueProfilesManager.jsx",
-      "line": 1210,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QueueSettings.jsx:406:13:button:missing-accessible-name",
-      "file": "src/components/admin/QueueSettings.jsx",
-      "line": 406,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
     },
     {
       "signature": "src/components/admin/SecuritySettings.jsx:318:19:button:missing-accessible-name",
