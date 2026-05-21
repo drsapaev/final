@@ -564,6 +564,12 @@ jobs:
         npm run lint:check
         echo "✅ Frontend lint passed"
 
+    - name: Icon-only controls accessibility sweep
+      run: |
+        cd frontend
+        npm run audit:icon-controls
+        echo "Icon-only controls accessibility sweep passed"
+
   frontend-unit-tests:
     name: Frontend unit tests
     runs-on: ubuntu-latest

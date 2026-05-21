@@ -1,0 +1,1607 @@
+{
+  "version": 1,
+  "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
+  "generatedAt": "2026-05-21T01:01:59.586Z",
+  "entries": [
+    {
+      "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
+      "file": "src/components/TwoFactorSettings.jsx",
+      "line": 369,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/TwoFactorSetup.jsx:253:13:button:missing-accessible-name",
+      "file": "src/components/TwoFactorSetup.jsx",
+      "line": 253,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/TwoFactorSetup.jsx:421:15:button:missing-accessible-name",
+      "file": "src/components/TwoFactorSetup.jsx",
+      "line": 421,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
+      "file": "src/components/admin/FinanceModal.jsx",
+      "line": 215,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:74:11:div:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 74,
+      "column": 11,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QRTokenManager.jsx:293:19:button:title-only",
+      "file": "src/components/admin/QRTokenManager.jsx",
+      "line": 293,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QRTokenManager.jsx:304:19:button:title-only",
+      "file": "src/components/admin/QRTokenManager.jsx",
+      "line": 304,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QRTokenManager.jsx:312:19:button:title-only",
+      "file": "src/components/admin/QRTokenManager.jsx",
+      "line": 312,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QRTokenManager.jsx:320:19:button:title-only",
+      "file": "src/components/admin/QRTokenManager.jsx",
+      "line": 320,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:643:25:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 643,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:664:25:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 664,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:721:33:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 721,
+      "column": 33,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:742:37:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 742,
+      "column": 37,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:824:41:button:title-only",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 824,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:832:41:button:title-only",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 832,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:840:41:button:title-only",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 840,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:1055:21:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 1055,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:1157:33:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 1157,
+      "column": 33,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueProfilesManager.jsx:1210:25:button:missing-accessible-name",
+      "file": "src/components/admin/QueueProfilesManager.jsx",
+      "line": 1210,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueSettings.jsx:406:13:button:missing-accessible-name",
+      "file": "src/components/admin/QueueSettings.jsx",
+      "line": 406,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SecuritySettings.jsx:318:19:button:missing-accessible-name",
+      "file": "src/components/admin/SecuritySettings.jsx",
+      "line": 318,
+      "column": 19,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SecuritySettings.jsx:378:19:button:missing-accessible-name",
+      "file": "src/components/admin/SecuritySettings.jsx",
+      "line": 378,
+      "column": 19,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SecuritySettings.jsx:438:19:button:missing-accessible-name",
+      "file": "src/components/admin/SecuritySettings.jsx",
+      "line": 438,
+      "column": 19,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AIChatWindow.jsx:186:25:button:title-only",
+      "file": "src/components/ai/AIChatWindow.jsx",
+      "line": 186,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/ai/AIChatWindow.jsx:193:25:button:title-only",
+      "file": "src/components/ai/AIChatWindow.jsx",
+      "line": 193,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/ai/AIChatWindow.jsx:213:15:button:title-only",
+      "file": "src/components/ai/AIChatWindow.jsx",
+      "line": 213,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/ai/AIChatWindow.jsx:247:21:button:missing-accessible-name",
+      "file": "src/components/ai/AIChatWindow.jsx",
+      "line": 247,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AISuggestions.jsx:136:13:button:missing-accessible-name",
+      "file": "src/components/ai/AISuggestions.jsx",
+      "line": 136,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/auth/ForgotPassword.jsx:337:11:button:missing-accessible-name",
+      "file": "src/components/auth/ForgotPassword.jsx",
+      "line": 337,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/auth/ForgotPassword.jsx:399:11:button:missing-accessible-name",
+      "file": "src/components/auth/ForgotPassword.jsx",
+      "line": 399,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/auth/ForgotPassword.jsx:491:9:button:missing-accessible-name",
+      "file": "src/components/auth/ForgotPassword.jsx",
+      "line": 491,
+      "column": 9,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/buttons/FloatingActionButton.jsx:47:7:div:missing-accessible-name",
+      "file": "src/components/buttons/FloatingActionButton.jsx",
+      "line": 47,
+      "column": 7,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/cashier/RefundRequestsTable.jsx:242:21:button:missing-accessible-name",
+      "file": "src/components/cashier/RefundRequestsTable.jsx",
+      "line": 242,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/cashier/RefundRequestsTable.jsx:358:57:button:title-only",
+      "file": "src/components/cashier/RefundRequestsTable.jsx",
+      "line": 358,
+      "column": 57,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/cashier/RefundRequestsTable.jsx:372:57:button:title-only",
+      "file": "src/components/cashier/RefundRequestsTable.jsx",
+      "line": 372,
+      "column": 57,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatButton.jsx:19:13:button:title-only",
+      "file": "src/components/chat/ChatButton.jsx",
+      "line": 19,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:634:13:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 634,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:658:13:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 658,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:669:25:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 669,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:678:25:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 678,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:774:33:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 774,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:986:85:img:missing-accessible-name",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 986,
+      "column": 85,
+      "element": "img",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:1047:65:button:missing-accessible-name",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 1047,
+      "column": 65,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/chat/ChatWindow.jsx:1113:15:button:title-only",
+      "file": "src/components/chat/ChatWindow.jsx",
+      "line": 1113,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/FileUploader.jsx:28:13:button:title-only",
+      "file": "src/components/chat/FileUploader.jsx",
+      "line": 28,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/VoiceMessage.jsx:212:13:button:title-only",
+      "file": "src/components/chat/VoiceMessage.jsx",
+      "line": 212,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/chat/VoiceRecorder.jsx:188:25:button:title-only",
+      "file": "src/components/chat/VoiceRecorder.jsx",
+      "line": 188,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/common/ScheduleNextModal.jsx:428:11:button:missing-accessible-name",
+      "file": "src/components/common/ScheduleNextModal.jsx",
+      "line": 428,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/common/ScheduleNextModal.jsx:537:17:button:missing-accessible-name",
+      "file": "src/components/common/ScheduleNextModal.jsx",
+      "line": 537,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DentalChart.jsx:286:11:button:title-only",
+      "file": "src/components/dental/DentalChart.jsx",
+      "line": 286,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/DentalChart.jsx:293:11:button:title-only",
+      "file": "src/components/dental/DentalChart.jsx",
+      "line": 293,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/DentalChart.jsx:300:11:button:title-only",
+      "file": "src/components/dental/DentalChart.jsx",
+      "line": 300,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/DentalChart.jsx:737:21:button:missing-accessible-name",
+      "file": "src/components/dental/DentalChart.jsx",
+      "line": 737,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DentalPriceManager.jsx:175:11:button:missing-accessible-name",
+      "file": "src/components/dental/DentalPriceManager.jsx",
+      "line": 175,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:259:9:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 259,
+      "column": 9,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:314:11:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 314,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:357:11:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 357,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:400:11:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 400,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:524:11:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 524,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:651:11:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 651,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/DiagnosisForm.jsx:740:13:button:missing-accessible-name",
+      "file": "src/components/dental/DiagnosisForm.jsx",
+      "line": 740,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ExaminationForm.jsx:565:13:button:missing-accessible-name",
+      "file": "src/components/dental/ExaminationForm.jsx",
+      "line": 565,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ExaminationForm.jsx:601:13:button:missing-accessible-name",
+      "file": "src/components/dental/ExaminationForm.jsx",
+      "line": 601,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ExaminationForm.jsx:637:13:button:missing-accessible-name",
+      "file": "src/components/dental/ExaminationForm.jsx",
+      "line": 637,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ExaminationForm.jsx:673:13:button:missing-accessible-name",
+      "file": "src/components/dental/ExaminationForm.jsx",
+      "line": 673,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ExaminationForm.jsx:840:13:button:missing-accessible-name",
+      "file": "src/components/dental/ExaminationForm.jsx",
+      "line": 840,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PatientCard.jsx:509:11:button:missing-accessible-name",
+      "file": "src/components/dental/PatientCard.jsx",
+      "line": 509,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PatientCard.jsx:553:11:button:missing-accessible-name",
+      "file": "src/components/dental/PatientCard.jsx",
+      "line": 553,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PatientCard.jsx:597:11:button:missing-accessible-name",
+      "file": "src/components/dental/PatientCard.jsx",
+      "line": 597,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PatientCard.jsx:813:13:button:missing-accessible-name",
+      "file": "src/components/dental/PatientCard.jsx",
+      "line": 813,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:301:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 301,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:307:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 307,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:328:13:div:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 328,
+      "column": 13,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:394:15:button:title-only",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 394,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:405:15:button:title-only",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 405,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:419:11:button:title-only",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 419,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:464:19:div:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 464,
+      "column": 19,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:523:11:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 523,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:562:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 562,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:623:13:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 623,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:705:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 705,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:711:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 711,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/PhotoArchive.jsx:717:17:button:missing-accessible-name",
+      "file": "src/components/dental/PhotoArchive.jsx",
+      "line": 717,
+      "column": 17,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ProtocolTemplates.jsx:388:9:button:title-only",
+      "file": "src/components/dental/ProtocolTemplates.jsx",
+      "line": 388,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/ProtocolTemplates.jsx:395:9:button:title-only",
+      "file": "src/components/dental/ProtocolTemplates.jsx",
+      "line": 395,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/ProtocolTemplates.jsx:403:7:button:title-only",
+      "file": "src/components/dental/ProtocolTemplates.jsx",
+      "line": 403,
+      "column": 7,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dental/ProtocolTemplates.jsx:420:9:button:missing-accessible-name",
+      "file": "src/components/dental/ProtocolTemplates.jsx",
+      "line": 420,
+      "column": 9,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ProtocolTemplates.jsx:555:13:button:missing-accessible-name",
+      "file": "src/components/dental/ProtocolTemplates.jsx",
+      "line": 555,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/ReportsAndAnalytics.jsx:566:13:button:missing-accessible-name",
+      "file": "src/components/dental/ReportsAndAnalytics.jsx",
+      "line": 566,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/TeethChart.jsx:138:9:button:missing-accessible-name",
+      "file": "src/components/dental/TeethChart.jsx",
+      "line": 138,
+      "column": 9,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/TeethChart.jsx:223:15:button:missing-accessible-name",
+      "file": "src/components/dental/TeethChart.jsx",
+      "line": 223,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/TeethChart.jsx:237:15:button:missing-accessible-name",
+      "file": "src/components/dental/TeethChart.jsx",
+      "line": 237,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:316:11:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 316,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:415:11:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 415,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:546:11:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 546,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:600:13:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 600,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:690:11:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 690,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:771:11:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 771,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dental/VisitProtocol.jsx:922:13:button:missing-accessible-name",
+      "file": "src/components/dental/VisitProtocol.jsx",
+      "line": 922,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:120:15:button:title-only",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 120,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:136:15:button:title-only",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 136,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:152:15:button:title-only",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 152,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:171:13:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 171,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:187:13:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 187,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:202:13:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 202,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoComparison.jsx:217:13:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoComparison.jsx",
+      "line": 217,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoUploader.jsx:332:21:img:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoUploader.jsx",
+      "line": 332,
+      "column": 21,
+      "element": "img",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoUploader.jsx:360:23:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoUploader.jsx",
+      "line": 360,
+      "column": 23,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoUploader.jsx:439:21:img:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoUploader.jsx",
+      "line": 439,
+      "column": 21,
+      "element": "img",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PhotoUploader.jsx:467:23:button:missing-accessible-name",
+      "file": "src/components/dermatology/PhotoUploader.jsx",
+      "line": 467,
+      "column": 23,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/PriceOverrideManager.jsx:201:11:button:missing-accessible-name",
+      "file": "src/components/dermatology/PriceOverrideManager.jsx",
+      "line": 201,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/dermatology/ProcedureTemplates.jsx:353:21:button:missing-accessible-name",
+      "file": "src/components/dermatology/ProcedureTemplates.jsx",
+      "line": 353,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:126:21:button:title-only",
+      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
+      "line": 126,
+      "column": 21,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:163:41:button:title-only",
+      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
+      "line": 163,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:171:41:button:title-only",
+      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
+      "line": 171,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:179:41:button:title-only",
+      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
+      "line": 179,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/ExaminationMatrix.jsx:189:33:button:title-only",
+      "file": "src/components/emr-v2/sections/ExaminationMatrix.jsx",
+      "line": 189,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/ExaminationMatrix.jsx:197:33:button:title-only",
+      "file": "src/components/emr-v2/sections/ExaminationMatrix.jsx",
+      "line": 197,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/TreatmentSection.jsx:268:41:button:title-only",
+      "file": "src/components/emr-v2/sections/TreatmentSection.jsx",
+      "line": 268,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/TreatmentSection.jsx:290:41:button:title-only",
+      "file": "src/components/emr-v2/sections/TreatmentSection.jsx",
+      "line": 290,
+      "column": 41,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:207:33:img:missing-accessible-name",
+      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
+      "line": 207,
+      "column": 33,
+      "element": "img",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:222:13:button:missing-accessible-name",
+      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
+      "line": 222,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:269:25:button:missing-accessible-name",
+      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
+      "line": 269,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/emr-v2/templates/TreatmentTemplatesPanel.jsx:128:13:div:missing-accessible-name",
+      "file": "src/components/emr-v2/templates/TreatmentTemplatesPanel.jsx",
+      "line": 128,
+      "column": 13,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:321:13:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 321,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:331:13:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 331,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:341:13:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 341,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:438:19:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 438,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:445:19:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 445,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:452:19:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 452,
+      "column": 19,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:553:13:button:missing-accessible-name",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 553,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:559:13:button:missing-accessible-name",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 559,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:583:11:button:title-only",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 583,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:620:15:button:missing-accessible-name",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 620,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/files/FileManager.jsx:683:15:button:missing-accessible-name",
+      "file": "src/components/files/FileManager.jsx",
+      "line": 683,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/forms/ModernTextarea.jsx:124:9:button:title-only",
+      "file": "src/components/forms/ModernTextarea.jsx",
+      "line": 124,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/layout/UnifiedLayout.jsx:91:7:div:missing-accessible-name",
+      "file": "src/components/layout/UnifiedLayout.jsx",
+      "line": 91,
+      "column": 7,
+      "element": "div",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/layout/UnifiedSidebar.jsx:248:9:button:title-only",
+      "file": "src/components/layout/UnifiedSidebar.jsx",
+      "line": 248,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/medical/MedicalTable.jsx:75:9:button:title-only",
+      "file": "src/components/medical/MedicalTable.jsx",
+      "line": 75,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/medical/MedicalTable.jsx:88:9:button:title-only",
+      "file": "src/components/medical/MedicalTable.jsx",
+      "line": 88,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/medical/MedicalTable.jsx:101:9:button:title-only",
+      "file": "src/components/medical/MedicalTable.jsx",
+      "line": 101,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/mobile/PWAInstallPrompt.jsx:104:13:button:missing-accessible-name",
+      "file": "src/components/mobile/PWAInstallPrompt.jsx",
+      "line": 104,
+      "column": 13,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/notifications/EmailSMSManager.jsx:676:21:button:missing-accessible-name",
+      "file": "src/components/notifications/EmailSMSManager.jsx",
+      "line": 676,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/notifications/EmailSMSManager.jsx:679:21:button:missing-accessible-name",
+      "file": "src/components/notifications/EmailSMSManager.jsx",
+      "line": 679,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/notifications/EmailSMSManager.jsx:709:21:button:missing-accessible-name",
+      "file": "src/components/notifications/EmailSMSManager.jsx",
+      "line": 709,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/notifications/EmailSMSManager.jsx:712:21:button:missing-accessible-name",
+      "file": "src/components/notifications/EmailSMSManager.jsx",
+      "line": 712,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/payment/CashPaymentModal.jsx:69:21:button:missing-accessible-name",
+      "file": "src/components/payment/CashPaymentModal.jsx",
+      "line": 69,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/payment/PaymentClick.jsx:510:23:button:missing-accessible-name",
+      "file": "src/components/payment/PaymentClick.jsx",
+      "line": 510,
+      "column": 23,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/payment/PaymentPayMe.jsx:510:23:button:missing-accessible-name",
+      "file": "src/components/payment/PaymentPayMe.jsx",
+      "line": 510,
+      "column": 23,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/queue/ModernQueueManager.jsx:486:15:button:title-only",
+      "file": "src/components/queue/ModernQueueManager.jsx",
+      "line": 486,
+      "column": 15,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:122:11:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 122,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:137:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 137,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:145:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 145,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:153:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 153,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:167:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 167,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:175:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 175,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:183:25:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 183,
+      "column": 25,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/queue/QueueManagementCard.jsx:196:11:button:title-only",
+      "file": "src/components/queue/QueueManagementCard.jsx",
+      "line": 196,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/security/SMSEmail2FA.jsx:214:15:button:missing-accessible-name",
+      "file": "src/components/security/SMSEmail2FA.jsx",
+      "line": 214,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/security/TwoFactorSetupWizard.jsx:365:15:button:missing-accessible-name",
+      "file": "src/components/security/TwoFactorSetupWizard.jsx",
+      "line": 365,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/security/TwoFactorSetupWizard.jsx:371:15:button:missing-accessible-name",
+      "file": "src/components/security/TwoFactorSetupWizard.jsx",
+      "line": 371,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/security/TwoFactorSetupWizard.jsx:441:15:button:missing-accessible-name",
+      "file": "src/components/security/TwoFactorSetupWizard.jsx",
+      "line": 441,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/tickets/MultipleTicketsPrinter.jsx:78:9:button:missing-accessible-name",
+      "file": "src/components/tickets/MultipleTicketsPrinter.jsx",
+      "line": 78,
+      "column": 9,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ui/macos/AccentPicker.jsx:29:11:button:title-only",
+      "file": "src/components/ui/macos/AccentPicker.jsx",
+      "line": 29,
+      "column": 11,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/ui/macos/Switch.jsx:73:7:input:missing-accessible-name",
+      "file": "src/components/ui/macos/Switch.jsx",
+      "line": 73,
+      "column": 7,
+      "element": "input",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ui/native/Modal.jsx:101:15:button:missing-accessible-name",
+      "file": "src/components/ui/native/Modal.jsx",
+      "line": 101,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/wizard/AppointmentWizardV2.jsx:2628:9:button:title-only",
+      "file": "src/components/wizard/AppointmentWizardV2.jsx",
+      "line": 2628,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/wizard/AppointmentWizardV2.jsx:2663:9:button:title-only",
+      "file": "src/components/wizard/AppointmentWizardV2.jsx",
+      "line": 2663,
+      "column": 9,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/wizard/AppointmentWizardV2.jsx:3764:21:button:missing-accessible-name",
+      "file": "src/components/wizard/AppointmentWizardV2.jsx",
+      "line": 3764,
+      "column": 21,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/hooks/useAI.jsx:653:11:button:missing-accessible-name",
+      "file": "src/hooks/useAI.jsx",
+      "line": 653,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:3588:15:button:missing-accessible-name",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 3588,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:3661:15:button:missing-accessible-name",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 3661,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DisplayBoardUnified.jsx:686:13:button:title-only",
+      "file": "src/pages/DisplayBoardUnified.jsx",
+      "line": 686,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DisplayBoardUnified.jsx:704:13:button:title-only",
+      "file": "src/pages/DisplayBoardUnified.jsx",
+      "line": 704,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DisplayBoardUnified.jsx:722:13:button:title-only",
+      "file": "src/pages/DisplayBoardUnified.jsx",
+      "line": 722,
+      "column": 13,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:582:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 582,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:592:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 592,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:602:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 602,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:613:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 613,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:628:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 628,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:638:11:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 638,
+      "column": 11,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:979:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 979,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:988:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 988,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:997:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 997,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1136:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1136,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1145:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1145,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1154:29:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1154,
+      "column": 29,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1325:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1325,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1337:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1337,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1345:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1345,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1353:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1353,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1365:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1365,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1373:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1373,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1381:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1381,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1392:23:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1392,
+      "column": 23,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1516:15:button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1516,
+      "column": 15,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/RegistrarPanel.jsx:3842:19:button:missing-accessible-name",
+      "file": "src/pages/RegistrarPanel.jsx",
+      "line": 3842,
+      "column": 19,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/auth/ChangePasswordRequired.jsx:213:25:button:missing-accessible-name",
+      "file": "src/pages/auth/ChangePasswordRequired.jsx",
+      "line": 213,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/auth/ChangePasswordRequired.jsx:232:25:button:missing-accessible-name",
+      "file": "src/pages/auth/ChangePasswordRequired.jsx",
+      "line": 232,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/auth/ChangePasswordRequired.jsx:264:25:button:missing-accessible-name",
+      "file": "src/pages/auth/ChangePasswordRequired.jsx",
+      "line": 264,
+      "column": 25,
+      "element": "button",
+      "reason": "missing-accessible-name"
+    }
+  ]
+}
