@@ -91,6 +91,7 @@ const FormInput = ({
     <input
       type={type}
       placeholder={placeholder}
+      aria-label={placeholder || 'Form input'}
       value={value}
       onChange={onChange}
       disabled={disabled}
@@ -178,6 +179,7 @@ const FormTextarea = ({
   return (
     <textarea
       placeholder={placeholder}
+      aria-label={placeholder || 'Form text'}
       value={value}
       onChange={onChange}
       disabled={disabled}
