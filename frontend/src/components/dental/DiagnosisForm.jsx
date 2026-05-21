@@ -245,6 +245,7 @@ const DiagnosisForm = ({
       <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
             <input
           type="text"
+          aria-label={`Общий диагноз ${index + 1}`}
           value={diagnosis}
           onChange={(e) => {
             const newDiagnoses = [...formData.generalDiagnoses];
@@ -258,6 +259,7 @@ const DiagnosisForm = ({
             {isEditing &&
         <button
           onClick={() => handleArrayRemove('generalDiagnoses', index)}
+          aria-label={`Удалить общий диагноз ${index + 1}`}
           className="text-red-500 hover:text-red-700">
           
                 <Trash2 className="h-4 w-4" />
@@ -300,6 +302,7 @@ const DiagnosisForm = ({
         <div key={index} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <input
             type="text"
+            aria-label={`Срочная мера лечения ${index + 1}`}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.immediate];
@@ -313,6 +316,7 @@ const DiagnosisForm = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.immediate', index)}
+            aria-label={`Удалить срочную меру лечения ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -343,6 +347,7 @@ const DiagnosisForm = ({
         <div key={index} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <input
             type="text"
+            aria-label={`Краткосрочная процедура ${index + 1}`}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.shortTerm];
@@ -356,6 +361,7 @@ const DiagnosisForm = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.shortTerm', index)}
+            aria-label={`Удалить краткосрочную процедуру ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -386,6 +392,7 @@ const DiagnosisForm = ({
         <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <input
             type="text"
+            aria-label={`Долгосрочная процедура ${index + 1}`}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.longTerm];
@@ -399,6 +406,7 @@ const DiagnosisForm = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.longTerm', index)}
+            aria-label={`Удалить долгосрочную процедуру ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -440,6 +448,7 @@ const DiagnosisForm = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Название препарата ${index + 1}`}
               value={prescription.medication || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -458,6 +467,7 @@ const DiagnosisForm = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Дозировка препарата ${index + 1}`}
               value={prescription.dosage || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -476,6 +486,7 @@ const DiagnosisForm = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Способ применения препарата ${index + 1}`}
               value={prescription.administration || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -494,6 +505,7 @@ const DiagnosisForm = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Продолжительность приема препарата ${index + 1}`}
               value={prescription.duration || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -509,6 +521,7 @@ const DiagnosisForm = ({
             
             <div className="flex items-center justify-between">
               <textarea
+            aria-label={`Дополнительные указания к рецепту ${index + 1}`}
             value={prescription.notes || ''}
             onChange={(e) => {
               const newPrescriptions = [...formData.prescriptions];
@@ -523,6 +536,7 @@ const DiagnosisForm = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('prescriptions', index)}
+            aria-label={`Удалить рецепт ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -621,6 +635,7 @@ const DiagnosisForm = ({
                 Причина направления
               </label>
               <textarea
+            aria-label={`Причина направления ${index + 1}`}
             value={referral.reason || ''}
             onChange={(e) => {
               const newReferrals = [...formData.referrals];
@@ -637,6 +652,7 @@ const DiagnosisForm = ({
             <div className="flex items-center justify-between">
               <input
             type="text"
+            aria-label={`Дополнительные указания к направлению ${index + 1}`}
             value={referral.notes || ''}
             onChange={(e) => {
               const newReferrals = [...formData.referrals];
@@ -650,6 +666,7 @@ const DiagnosisForm = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('referrals', index)}
+            aria-label={`Удалить направление ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -739,6 +756,7 @@ const DiagnosisForm = ({
             }
             <button
               onClick={onClose}
+              aria-label="Закрыть форму диагнозов и назначений"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
