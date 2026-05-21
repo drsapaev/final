@@ -101,6 +101,7 @@ const Modal = React.forwardRef(({
               <button
                 onClick={onClose}
                 className="p-1 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-100"
+                aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
               </button>
