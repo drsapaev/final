@@ -198,7 +198,7 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) =>
-          <th key={i} style={cellStyle}>
+          <th key={i} style={cellStyle} aria-label={`Loading column ${i + 1}`}>
               <div style={skeletonStyle} />
             </th>
           )}
@@ -208,7 +208,11 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
         {Array.from({ length: rows }).map((_, rowIndex) =>
         <tr key={rowIndex}>
             {Array.from({ length: columns }).map((_, colIndex) =>
-          <td key={colIndex} style={cellStyle}>
+          <td
+            key={colIndex}
+            style={cellStyle}
+            aria-label={`Loading cell row ${rowIndex + 1} column ${colIndex + 1}`}
+          >
                 <div style={skeletonStyle} />
               </td>
           )}
