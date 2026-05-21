@@ -737,7 +737,12 @@ export default function LabReportWorkbench({
                 {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
                   <label key={key} style={{ display: 'grid', gap: '6px' }}>
                     <span>{signerFieldLabels[key] || key}</span>
-                    <input className="macos-input" value={signerSnapshot?.[key] || ''} onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))} />
+                    <input
+                      className="macos-input"
+                      aria-label={signerFieldLabels[key] || key}
+                      value={signerSnapshot?.[key] || ''}
+                      onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
+                    />
                   </label>
                 ))}
               </div>
@@ -836,6 +841,7 @@ export default function LabReportWorkbench({
                             ) : field.value_type === 'multiline' ? (
                               <textarea
                                 className="macos-input"
+                                aria-label={`Lab result for ${field.label}`}
                                 rows={3}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
@@ -844,6 +850,7 @@ export default function LabReportWorkbench({
                             ) : (
                               <input
                                 className="macos-input"
+                                aria-label={`Lab result for ${field.label}`}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
                                 disabled={activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'}
