@@ -21,21 +21,18 @@ Command:
 
 ```powershell
 cd frontend
-npm run audit:icon-controls
+npm run audit:icon-controls:strict
 ```
 
 Result:
 
 ```text
 Files scanned: 614
-Findings: 200
+Findings: 0
 Parse errors: 0
-Baseline entries: 200
-New findings: 0
-Stale baseline entries: 0
 ```
 
-The project now has a required no-new-regression gate for icon-only controls. The current historical baseline is tracked in `frontend/scripts/a11y/icon-only-controls-baseline.json`.
+The project now has a required strict gate for icon-only controls. The historical baseline in `frontend/scripts/a11y/icon-only-controls-baseline.json` has been reduced to zero entries.
 
 ## Cleanup Progress
 
@@ -71,13 +68,13 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 
 ## CI Policy
 
-- `npm run audit:icon-controls` fails when new icon-only controls are added without a robust accessible name.
-- `npm run audit:icon-controls:strict` fails on any finding and is the target command after baseline cleanup.
-- The CI `frontend-lint` job runs the baseline-gated sweep after `npm run lint:check`.
+- `npm run audit:icon-controls:strict` fails when any icon-only control is added without a robust accessible name.
+- The CI `frontend-lint` job runs the strict sweep after `npm run lint:check`.
+- `npm run audit:icon-controls` remains available for baseline-aware local review, but the committed baseline is empty.
 
-## Baseline Cleanup Backlog
+## Baseline Cleanup Completed
 
-Priority cleanup order:
+Completed cleanup order:
 
 1. Chat and AI controls: `frontend/src/components/chat/**`, `frontend/src/components/ai/**`
 2. Payment and cashier controls: `frontend/src/components/payment/**`, `frontend/src/components/cashier/**`

@@ -567,8 +567,8 @@ jobs:
     - name: Icon-only controls accessibility sweep
       run: |
         cd frontend
-        npm run audit:icon-controls
-        echo "Icon-only controls accessibility sweep passed"
+        npm run audit:icon-controls:strict
+        echo "Strict icon-only controls accessibility sweep passed"
 
   frontend-unit-tests:
     name: Frontend unit tests
