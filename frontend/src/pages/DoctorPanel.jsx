@@ -496,6 +496,19 @@ const DoctorPanel = () => {
     return `queue entry ${queueNumber} for ${patientName}`;
   };
 
+  const getPatientA11yContext = (patient) => {
+    const patientId = patient?.id || 'unknown';
+    const patientName = patient?.name || 'patient';
+    return `patient ${patientName} (${patientId})`;
+  };
+
+  const getAppointmentA11yContext = (appointment) => {
+    const appointmentId = appointment?.id || 'unknown';
+    const patientName = appointment?.patientName || 'patient';
+    const appointmentTime = appointment?.time ? ` at ${appointment.time}` : '';
+    return `appointment ${appointmentId} for ${patientName}${appointmentTime}`;
+  };
+
   const getCurrentVisitMeta = (entry) => {
     const statusMap = {
       called: { label: 'Текущий прием', variant: 'primary' },
@@ -580,6 +593,7 @@ const DoctorPanel = () => {
         {/* Вкладки */}
         <div style={tabsStyle}>
           <button
+            aria-label="Open doctor dashboard tab"
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('dashboard')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
@@ -590,6 +604,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
+            aria-label="Open patients tab"
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('patients')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
@@ -600,6 +615,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
+            aria-label="Open appointments tab"
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('appointments')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
@@ -611,6 +627,7 @@ const DoctorPanel = () => {
 
           {/* ✅ НОВОЕ: Таб очереди */}
           <button
+            aria-label="Open queue tab"
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('queue')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
@@ -626,6 +643,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
+            aria-label="Open AI assistant tab"
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('ai')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
@@ -636,6 +654,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
+            aria-label="Open reports tab"
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('reports')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
@@ -857,6 +876,7 @@ const DoctorPanel = () => {
                     <div style={{ position: 'relative' }}>
                       <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
                       <input
+                      aria-label="Search patients"
                       type="text"
                       placeholder="Поиск пациентов..."
                       value={searchQuery}
@@ -939,9 +959,10 @@ const DoctorPanel = () => {
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
+                    aria-label={`Open ${getPatientA11yContext(patient)}`}
                     onClick={() => handlePatientClick(patient)}>
 
-                          <td style={tdStyle}>
+                          <td style={tdStyle} aria-label={getPatientA11yContext(patient)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
                               <div style={{
                           width: '32px',
@@ -970,13 +991,14 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>{patient.age ? `${patient.age} лет` : '—'}</td>
                           <td style={tdStyle}>{patient.phone || '—'}</td>
                           <td style={tdStyle}>{patient.diagnosis || '—'}</td>
-                          <td style={tdStyle}>
+                          <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} status`}>
                             <Badge variant={getStatusVariant(patient.status)} size="md">
                               {getStatusText(patient.status)}
                             </Badge>
                           </td>
-                          <td style={tdStyle}>
+                          <td style={tdStyle} aria-label={`${getPatientA11yContext(patient)} actions`}>
                             <button
+                        aria-label={`Edit ${getPatientA11yContext(patient)}`}
                         style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -986,6 +1008,7 @@ const DoctorPanel = () => {
                               <Edit size={16} />
                             </button>
                             <button
+                        aria-label={`View ${getPatientA11yContext(patient)}`}
                         style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -995,6 +1018,7 @@ const DoctorPanel = () => {
                               <Eye size={16} />
                             </button>
                             <button
+                        aria-label={`Delete ${getPatientA11yContext(patient)}`}
                         style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1031,6 +1055,7 @@ const DoctorPanel = () => {
                     <div style={{ position: 'relative' }}>
                       <Search size={20} style={{ position: 'absolute', left: getSpacing('sm'), top: '50%', transform: 'translateY(-50%)', color: getColor('secondary', 400) }} />
                       <input
+                      aria-label="Search appointments"
                       type="text"
                       placeholder="Поиск записей..."
                       value={searchQuery}
@@ -1134,6 +1159,7 @@ const DoctorPanel = () => {
                           <td style={tdStyle}>{appointment.notes || '—'}</td>
                           <td style={tdStyle}>
                             <button
+                        aria-label={`Edit ${getAppointmentA11yContext(appointment)}`}
                         style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1143,6 +1169,7 @@ const DoctorPanel = () => {
                               <Edit size={16} />
                             </button>
                             <button
+                        aria-label={`Complete ${getAppointmentA11yContext(appointment)}`}
                         style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1152,6 +1179,7 @@ const DoctorPanel = () => {
                               <CheckCircle size={16} />
                             </button>
                             <button
+                        aria-label={`Cancel ${getAppointmentA11yContext(appointment)}`}
                         style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1265,7 +1293,7 @@ const DoctorPanel = () => {
                               {entry.number || index + 1}
                             </Badge>
                           </td>
-                          <td style={tdStyle}>
+                          <td style={tdStyle} aria-label={getQueuePatientContext(entry)}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
                               <strong>{entry.patient_name}</strong>
                               <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), flexWrap: 'wrap' }}>
