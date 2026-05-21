@@ -325,6 +325,7 @@ const DoctorServiceSelector = ({
                   {canEditPrices ?
               <input
                 type="number"
+                aria-label={`Цена услуги ${service.name}`}
                 value={service.price}
                 onChange={(e) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
                 style={{
