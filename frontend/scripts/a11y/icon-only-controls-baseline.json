@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:17:39.837Z",
+  "generatedAt": "2026-05-21T07:24:12.424Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -272,62 +272,6 @@
       "file": "src/components/dental/TeethChart.jsx",
       "line": 237,
       "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:316:11:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 316,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:415:11:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 415,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:546:11:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 546,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:600:13:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 600,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:690:11:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 690,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:771:11:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 771,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/VisitProtocol.jsx:922:13:button:missing-accessible-name",
-      "file": "src/components/dental/VisitProtocol.jsx",
-      "line": 922,
-      "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
     },
