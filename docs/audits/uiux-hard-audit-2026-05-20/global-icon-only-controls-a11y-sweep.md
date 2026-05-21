@@ -43,7 +43,8 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 - 2026-05-21: payment and cashier controls cleanup removed 6 baseline findings.
 - 2026-05-21: runtime queue controls cleanup removed 9 baseline findings.
 - 2026-05-21: admin queue configuration controls cleanup removed 11 baseline findings.
-- Current baseline after this slice: 156 findings.
+- 2026-05-21: admin security and QR controls cleanup removed 7 baseline findings.
+- Current baseline after this slice: 149 findings.
 
 ## CI Policy
 

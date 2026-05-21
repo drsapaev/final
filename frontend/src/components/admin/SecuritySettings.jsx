@@ -318,6 +318,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('current')}
+                  aria-label={showPasswords.current ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
                   style={{
                     position: 'absolute',
                     right: '12px',
@@ -378,6 +379,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('new')}
+                  aria-label={showPasswords.new ? 'Скрыть новый пароль' : 'Показать новый пароль'}
                   style={{
                     position: 'absolute',
                     right: '12px',
@@ -438,6 +440,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('confirm')}
+                  aria-label={showPasswords.confirm ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
                   style={{
                     position: 'absolute',
                     right: '12px',

@@ -220,7 +220,10 @@ const QRTokenManager = () => {
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center">
           <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
           <span className="text-red-700">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">×</button>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-500 hover:text-red-700"
+            aria-label="Скрыть ошибку QR токена">×</button>
         </div>
       }
 
@@ -228,7 +231,10 @@ const QRTokenManager = () => {
       <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
           <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
           <span className="text-green-700">{success}</span>
-          <button onClick={() => setSuccess(null)} className="ml-auto text-green-500 hover:text-green-700">×</button>
+          <button
+            onClick={() => setSuccess(null)}
+            className="ml-auto text-green-500 hover:text-green-700"
+            aria-label="Скрыть сообщение об успешном действии QR токена">×</button>
         </div>
       }
 
@@ -296,6 +302,7 @@ const QRTokenManager = () => {
                   setShowQRModal(true);
                 }}
                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                aria-label={`Показать QR код для ${getDepartmentName(token.department)}`}
                 title="Показать QR код">
                 
                     <Eye className="h-4 w-4" />
@@ -304,6 +311,7 @@ const QRTokenManager = () => {
                   <button
                 onClick={() => copyToClipboard(token.qr_url)}
                 className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                aria-label={`Копировать ссылку QR токена для ${getDepartmentName(token.department)}`}
                 title="Копировать ссылку">
                 
                     <Copy className="h-4 w-4" />
@@ -312,6 +320,7 @@ const QRTokenManager = () => {
                   <button
                 onClick={() => downloadQR(token)}
                 className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                aria-label={`Скачать QR код для ${getDepartmentName(token.department)}`}
                 title="Скачать QR код">
                 
                     <Download className="h-4 w-4" />
@@ -320,6 +329,7 @@ const QRTokenManager = () => {
                   <button
                 onClick={() => deleteToken(token.token)}
                 className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                aria-label={`Деактивировать QR токен для ${getDepartmentName(token.department)}`}
                 title="Деактивировать">
                 
                     <Trash2 className="h-4 w-4" />
@@ -343,6 +353,7 @@ const QRTokenManager = () => {
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                   type="checkbox"
+                  aria-label="Создать общий QR токен для всей клиники"
                   checked={createForm.is_clinic_wide}
                   onChange={(e) => setCreateForm((prev) => ({
                     ...prev,
@@ -412,6 +423,7 @@ const QRTokenManager = () => {
                 </label>
                 <input
                 type="number"
+                aria-label="Время жизни QR токена в часах"
                 min="1"
                 max="168"
                 value={createForm.expires_hours}
