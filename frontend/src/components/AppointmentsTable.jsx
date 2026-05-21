@@ -406,6 +406,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="primary"
                       size="sm"
+                      aria-label="Print appointment ticket"
                       title="Печать талона"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -414,6 +415,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="danger"
                       size="sm"
+                      aria-label="Cancel appointment"
                       title="Отмена"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -422,6 +424,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="warning"
                       size="sm"
+                      aria-label="Reschedule appointment"
                       title="Перенос"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -430,6 +433,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="info"
                       size="sm"
+                      aria-label="Open appointment payment"
                       title="Оплата"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -503,6 +507,7 @@ const AppointmentsTable = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                  <input
                       type="checkbox"
+                      aria-label={`Select appointment ${appointment.patient_fio || appointment.id || index + 1}`}
                       checked={appointmentsSelected.has(appointment.id)}
                       onChange={(e) => {
                         const next = new Set(appointmentsSelected);
@@ -637,6 +642,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="primary"
                       size="sm"
+                      aria-label="Print appointment ticket"
                       title="Печать талона"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -645,6 +651,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="danger"
                       size="sm"
+                      aria-label="Cancel appointment"
                       title="Отмена"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -653,6 +660,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="warning"
                       size="sm"
+                      aria-label="Reschedule appointment"
                       title="Перенос"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
@@ -661,6 +669,7 @@ const AppointmentsTable = ({
                  <Button
                       variant="info"
                       size="sm"
+                      aria-label="Open appointment payment"
                       title="Оплата"
                       style={{ width: '36px', height: '36px', padding: '0' }}>
                       
