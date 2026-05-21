@@ -155,6 +155,7 @@ export function DermatologySection({
           <label key={condition} className="dermatology-checkbox">
                             <input
               type="checkbox"
+              aria-label={`Состояние кожи: ${condition}`}
               checked={conditions.includes(condition)}
               onChange={(e) => {
                 if (e.target.checked) {
@@ -190,6 +191,7 @@ export function DermatologySection({
                 <input
           ref={fileInputRef}
           type="file"
+          aria-label="Загрузить фото для дерматологического осмотра"
           accept="image/*"
           onChange={handleFileSelect}
           style={{ display: 'none' }} />
@@ -207,6 +209,7 @@ export function DermatologySection({
                                 <img
               src={photo.url}
               alt={`Фото ${photo.category}`}
+              aria-label={`Открыть фото ${photo.category}`}
               role="button"
               tabIndex={0}
               onClick={() => setSelectedPhoto(photo)}
@@ -222,6 +225,7 @@ export function DermatologySection({
             <button
               type="button"
               onClick={() => handlePhotoDelete(photo.id)}
+              aria-label={`Удалить фото ${photo.category}`}
               className="dermatology-photo-delete">
               
                                         <X size={14} />
@@ -269,6 +273,7 @@ export function DermatologySection({
                         <button
             type="button"
             onClick={() => setSelectedPhoto(null)}
+            aria-label="Закрыть просмотр фото"
             className="dermatology-photo-modal-close">
             
                             <X size={20} />

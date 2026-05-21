@@ -126,6 +126,7 @@ export function DoctorTemplatesPanel({
                     <button
                         className="doctor-templates-close"
                         onClick={handleClose}
+                        aria-label={`Закрыть панель шаблонов ${sectionLabel}`}
                         title="Закрыть"
                     >
                         <X size={18} />
@@ -164,6 +165,7 @@ export function DoctorTemplatesPanel({
                                             type="button"
                                             onClick={(e) => handlePinToggle(template, e)}
                                             className={`doctor-templates-action-btn ${template.is_pinned ? 'active' : ''}`}
+                                            aria-label={`${template.is_pinned ? 'Открепить' : 'Закрепить'} шаблон врача`}
                                             title={template.is_pinned ? 'Открепить' : 'Закрепить'}
                                         >
                                             <Pin size={14} />
@@ -172,6 +174,7 @@ export function DoctorTemplatesPanel({
                                             type="button"
                                             onClick={(e) => handleEditStart(template, e)}
                                             className="doctor-templates-action-btn"
+                                            aria-label="Редактировать шаблон врача"
                                             title="Редактировать"
                                         >
                                             <Edit2 size={14} />
@@ -180,6 +183,7 @@ export function DoctorTemplatesPanel({
                                             type="button"
                                             onClick={(e) => handleDelete(template, e)}
                                             className="doctor-templates-action-btn doctor-templates-action-btn--danger"
+                                            aria-label="Удалить шаблон врача"
                                             title="Удалить"
                                         >
                                             <Trash2 size={14} />
@@ -232,6 +236,7 @@ export function DoctorTemplatesPanel({
                             </div>
                             <textarea
                                 className="doctor-templates-edit-textarea"
+                                aria-label="Текст шаблона врача"
                                 value={editText}
                                 onChange={(e) => setEditText(e.target.value)}
                                 rows={6}
