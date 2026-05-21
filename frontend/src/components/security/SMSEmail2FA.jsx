@@ -203,6 +203,7 @@ const SMSEmail2FA = ({
             <div className="relative">
               <input
                 type={showCode ? 'text' : 'password'}
+                aria-label="Код подтверждения"
                 value={code}
                 onChange={handleCodeChange}
                 onKeyPress={handleKeyPress}
