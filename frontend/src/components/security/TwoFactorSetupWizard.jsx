@@ -206,6 +206,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
         return (
           <button
             key={method.id}
+            aria-label={`Select ${method.name} 2FA method`}
             onClick={() => handleMethodSelect(method.id)}
             className={`p-6 border-2 rounded-lg text-left transition-all ${selectedMethod === method.id ?
             'border-blue-500 bg-blue-50' :
@@ -264,6 +265,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
             </label>
             <input
           type={selectedMethod === 'sms' ? 'tel' : 'email'}
+          aria-label={selectedMethod === 'sms' ? '2FA setup phone number' : '2FA setup email address'}
           value={selectedMethod === 'sms' ? recoveryPhone : recoveryEmail}
           onChange={(e) => {
             if (selectedMethod === 'sms') {
@@ -284,6 +286,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           </label>
           <input
           type="email"
+          aria-label="Recovery email"
           value={recoveryEmail}
           onChange={(e) => setRecoveryEmail(e.target.value)}
           placeholder="recovery@example.com"
@@ -297,6 +300,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           </label>
           <input
           type="tel"
+          aria-label="Recovery phone"
           value={recoveryPhone}
           onChange={(e) => setRecoveryPhone(e.target.value)}
           placeholder="+7 (999) 123-45-67"
@@ -387,6 +391,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
         </label>
         <input
         type="text"
+        aria-label="2FA verification code"
         value={verificationCode}
         onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         placeholder="000000"
