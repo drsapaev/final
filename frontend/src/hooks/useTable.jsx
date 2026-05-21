@@ -311,6 +311,7 @@ export const TableRow = ({
       <td style={{ padding: '12px 16px', width: '40px' }}>
           <input
           type="checkbox"
+          aria-label={selected ? 'Deselect table row' : 'Select table row'}
           checked={selected}
           onChange={handleSelect}
           style={{
@@ -324,8 +325,9 @@ export const TableRow = ({
 
       {/* Стрелка для разворачивания */}
       {expandable &&
-      <td style={{ padding: '12px 16px', width: '40px' }}>
+        <td style={{ padding: '12px 16px', width: '40px' }}>
           <button
+          aria-label={expanded ? 'Collapse table row' : 'Expand table row'}
           onClick={handleExpand}
           style={{
             background: 'none',
@@ -569,6 +571,7 @@ export const TableSearch = ({
       <div style={{ fontSize: '16px', color: '#6b7280' }}>🔍</div>
       <input
         type="text"
+        aria-label={placeholder || 'Table search'}
         value={searchTerm}
         onChange={(e) => onSearch(e.target.value)}
         placeholder={placeholder}
