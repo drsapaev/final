@@ -232,6 +232,7 @@ const DataExporter = ({
               <label className="flex items-center space-x-3">
                 <input
                 type="checkbox"
+                aria-label="Include charts in export"
                 checked={includeCharts}
                 onChange={(e) => setIncludeCharts(e.target.checked)}
                 className="rounded" />
@@ -245,6 +246,7 @@ const DataExporter = ({
               <label className="flex items-center space-x-3">
                 <input
                 type="checkbox"
+                aria-label="Include raw data in export"
                 checked={includeRawData}
                 onChange={(e) => setIncludeRawData(e.target.checked)}
                 className="rounded" />
@@ -258,6 +260,7 @@ const DataExporter = ({
               <label className="flex items-center space-x-3">
                 <input
                 type="checkbox"
+                aria-label="Send export by email"
                 checked={emailExport}
                 onChange={(e) => setEmailExport(e.target.checked)}
                 className="rounded" />
@@ -272,6 +275,7 @@ const DataExporter = ({
             <div className="ml-6">
                   <input
                 type="email"
+                aria-label="Export email address"
                 value={emailAddress}
                 onChange={(e) => setEmailAddress(e.target.value)}
                 placeholder="Введите email адрес"
