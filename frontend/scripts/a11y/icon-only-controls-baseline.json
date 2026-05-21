@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T05:46:37.476Z",
+  "generatedAt": "2026-05-21T05:56:39.337Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -41,62 +41,6 @@
       "line": 74,
       "column": 11,
       "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/QRTokenManager.jsx:293:19:button:title-only",
-      "file": "src/components/admin/QRTokenManager.jsx",
-      "line": 293,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QRTokenManager.jsx:304:19:button:title-only",
-      "file": "src/components/admin/QRTokenManager.jsx",
-      "line": 304,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QRTokenManager.jsx:312:19:button:title-only",
-      "file": "src/components/admin/QRTokenManager.jsx",
-      "line": 312,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/QRTokenManager.jsx:320:19:button:title-only",
-      "file": "src/components/admin/QRTokenManager.jsx",
-      "line": 320,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/SecuritySettings.jsx:318:19:button:missing-accessible-name",
-      "file": "src/components/admin/SecuritySettings.jsx",
-      "line": 318,
-      "column": 19,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/SecuritySettings.jsx:378:19:button:missing-accessible-name",
-      "file": "src/components/admin/SecuritySettings.jsx",
-      "line": 378,
-      "column": 19,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/SecuritySettings.jsx:438:19:button:missing-accessible-name",
-      "file": "src/components/admin/SecuritySettings.jsx",
-      "line": 438,
-      "column": 19,
-      "element": "button",
       "reason": "missing-accessible-name"
     },
     {
