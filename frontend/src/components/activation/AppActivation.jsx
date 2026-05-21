@@ -163,7 +163,7 @@ const AppActivation = () => {
       )}
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{
+        <label htmlFor="activation-key" style={{
           display: 'block',
           marginBottom: '8px',
           fontSize: '13px',
@@ -176,7 +176,9 @@ const AppActivation = () => {
         <div style={{ position: 'relative' }}>
           <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
           <input
+            id="activation-key"
             type="text"
+            aria-label="Ключ активации"
             className="glass-input"
             style={{ paddingLeft: '44px' }}
             value={activationKey}
