@@ -328,10 +328,12 @@ const PriceOverrideApproval = () => {void
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="price-override-rejection-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Причина отклонения
                 </label>
                 <textarea
+                id="price-override-rejection-reason"
+                aria-label="Причина отклонения изменения цены"
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={3}
