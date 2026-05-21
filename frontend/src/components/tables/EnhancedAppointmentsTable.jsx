@@ -1311,9 +1311,11 @@ const EnhancedAppointmentsTable = ({
                 borderBottom: '1px solid var(--mac-border)',
                 width: '40px',
                 color: 'var(--mac-text-primary)'
-              }}>
+              }}
+              aria-label={t.selectAll}>
                   <input
                   type="checkbox"
+                  aria-label={t.selectAll}
                   checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
                   style={{ cursor: 'pointer' }} />
@@ -1602,9 +1604,12 @@ const EnhancedAppointmentsTable = ({
 
                     {/* Чекбокс */}
                     {showCheckboxes &&
-                  <td style={{ padding: '12px 8px' }}>
+                  <td
+                    style={{ padding: '12px 8px' }}
+                    aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}>
                         <input
                       type="checkbox"
+                      aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}
                       checked={selectedRows.has(row.id)}
                       onChange={(e) => {
                         e.stopPropagation();
