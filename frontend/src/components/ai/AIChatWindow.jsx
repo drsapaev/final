@@ -187,10 +187,10 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
               id: 'welcome',
               role: 'assistant',
               content: 'Здравствуйте! Я ваш AI-ассистент. Чем могу помочь?'
-            }])} className="ai-btn-icon" title="Очистить чат">
+            }])} className="ai-btn-icon" title="Очистить чат" aria-label="Очистить чат">
                             <RefreshCw size={16} />
                         </button>
-                        <button onClick={onClose} className="ai-btn-icon" title="Закрыть">
+                        <button onClick={onClose} className="ai-btn-icon" title="Закрыть" aria-label="Закрыть">
                             <X size={18} />
                         </button>
                     </div>
@@ -213,7 +213,8 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
               <button
                 className="copy-btn"
                 onClick={() => copyToClipboard(msg.content)}
-                title="Копировать">
+                title="Копировать"
+                aria-label="Копировать ответ AI Doctor">
                 
                                         <Copy size={12} />
                                     </button>
@@ -241,12 +242,14 @@ const AIChatWindow = ({ isOpen, onClose, contextData = {} }) => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Спросите о диагнозе, лечении или анализах..."
+            aria-label="Сообщение AI Doctor"
             rows={1}
             disabled={isThinking} />
           
                     <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isThinking}
+            aria-label="Отправить сообщение AI Doctor"
             className="ai-send-btn">
             
                         <Send size={16} />

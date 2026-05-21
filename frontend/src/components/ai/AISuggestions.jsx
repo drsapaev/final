@@ -133,7 +133,10 @@ const AISuggestions = ({
               style={{ cursor: 'pointer' }}>
               {typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item)}
             </span>
-            <button onClick={() => handleCopy(typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item), index)} style={{ marginLeft: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+            <button
+              onClick={() => handleCopy(typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item), index)}
+              aria-label="Копировать подсказку AI"
+              style={{ marginLeft: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}>
               {copiedId === index ? <Check style={{ width: 14, height: 14 }} /> : <Copy style={{ width: 14, height: 14 }} />}
             </button>
           </Pill>

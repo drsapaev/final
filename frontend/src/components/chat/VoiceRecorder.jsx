@@ -181,11 +181,11 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             ) : (
                 // Режим предпросмотра
                 <div className="recording-preview">
-                    <audio src={audioURL} controls className="audio-preview" />
+                    <audio src={audioURL} controls className="audio-preview" aria-label="Предпросмотр голосового сообщения" />
                     <span className="duration-label">{formatTime(duration)}</span>
 
                     <div className="preview-actions">
-                        <button onClick={handleCancel} className="btn-cancel" title="Отменить">
+                        <button onClick={handleCancel} className="btn-cancel" title="Отменить" aria-label="Отменить голосовое сообщение">
                             <Trash2 size={18} />
                         </button>
                         <button onClick={handleSend} className="btn-send" title="Отправить">

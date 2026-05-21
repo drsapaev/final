@@ -626,6 +626,7 @@ export const AIAssistant = ({
             type="text"
             name="message"
             placeholder="Задайте вопрос ИИ помощнику..."
+            aria-label="Сообщение ИИ помощнику"
             disabled={loading}
             style={{
               flex: 1,
@@ -653,6 +654,7 @@ export const AIAssistant = ({
           <button
             type="submit"
             disabled={loading}
+            aria-label={loading ? 'Отправка сообщения ИИ помощнику' : 'Отправить сообщение ИИ помощнику'}
             style={{
               padding: '10px 16px',
               fontSize: '14px',
