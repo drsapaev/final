@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:49:19.163Z",
+  "generatedAt": "2026-05-21T07:53:58.864Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -104,30 +104,6 @@
       "file": "src/components/dental/ReportsAndAnalytics.jsx",
       "line": 566,
       "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/TeethChart.jsx:138:9:button:missing-accessible-name",
-      "file": "src/components/dental/TeethChart.jsx",
-      "line": 138,
-      "column": 9,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/TeethChart.jsx:223:15:button:missing-accessible-name",
-      "file": "src/components/dental/TeethChart.jsx",
-      "line": 223,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/TeethChart.jsx:237:15:button:missing-accessible-name",
-      "file": "src/components/dental/TeethChart.jsx",
-      "line": 237,
-      "column": 15,
       "element": "button",
       "reason": "missing-accessible-name"
     },
