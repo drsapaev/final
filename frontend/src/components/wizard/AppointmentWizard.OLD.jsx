@@ -594,6 +594,7 @@ const PatientStep = React.memo(({
           key="fio-input"
           ref={fioRef}
           type="text"
+          aria-label="Patient full name"
           value={data.fio}
           onChange={handleFioChange}
           placeholder="Введите ФИО для поиска..."
@@ -635,6 +636,7 @@ const PatientStep = React.memo(({
           <input
         key="birth-date-input"
         type="date"
+        aria-label="Patient birth date"
         value={data.birth_date}
         onChange={handleBirthDateChange}
         className={errors.birth_date ? 'error' : ''} />
@@ -652,6 +654,7 @@ const PatientStep = React.memo(({
           key="phone-input"
           ref={phoneRef}
           type="tel"
+          aria-label="Patient phone"
           value={data.phone}
           onChange={handlePhoneChange}
           placeholder="+998-xx-xxx-xx-xx"
@@ -671,6 +674,7 @@ const PatientStep = React.memo(({
           <input
           key="address-input"
           type="text"
+          aria-label="Patient address"
           value={data.address}
           onChange={handleAddressChange}
           placeholder="Адрес проживания" />
@@ -717,6 +721,7 @@ const AppointmentStep = ({
           return !nodoctorServices.some((keyword) => serviceName.includes(keyword));
         }) ? '*' : '(необязательно)'}</label>
         <select
+        aria-label="Appointment doctor"
         value={data.doctor_id}
         onChange={(e) => onUpdate('doctor_id', e.target.value)}
         className={errors.doctor_id ? 'error' : ''}>
@@ -743,6 +748,7 @@ const AppointmentStep = ({
           <input
         key="appointment-date-input"
         type="date"
+        aria-label="Appointment date"
         value={data.date}
         onChange={(e) => onUpdate('date', e.target.value)}
         min={new Date().toISOString().split('T')[0]}
@@ -755,6 +761,7 @@ const AppointmentStep = ({
         <label>Время</label>
         <input
         type="time"
+        aria-label="Appointment time"
         value={data.time}
         onChange={(e) => onUpdate('time', e.target.value)} />
       
@@ -789,6 +796,7 @@ const AppointmentStep = ({
               <label key={service.id || service.service_id} className="service-item">
                     <input
                   type="checkbox"
+                  aria-label={`Service ${service.name || service.service_name || service.id || service.service_id}`}
                   checked={data.services.includes(service.id || service.service_id)}
                   onChange={(e) => {
                     const serviceId = service.id || service.service_id;
@@ -813,6 +821,7 @@ const AppointmentStep = ({
       <div className="form-field full-width">
         <label>Примечания</label>
         <textarea
+        aria-label="Appointment notes"
         value={data.notes}
         onChange={(e) => onUpdate('notes', e.target.value)}
         placeholder="Дополнительная информация..."
@@ -859,6 +868,7 @@ const PaymentStep = ({
               <input
             type="radio"
             name="payment_method"
+            aria-label={`Payment method ${method.label}`}
             value={method.value}
             checked={data.method === method.value}
             onChange={(e) => onUpdate('method', e.target.value)} />
@@ -878,6 +888,7 @@ const PaymentStep = ({
         <label>Сумма к оплате *</label>
         <input
         type="number"
+        aria-label="Payment amount"
         value={data.amount}
         onChange={(e) => onUpdate('amount', parseFloat(e.target.value) || 0)}
         min="0"
