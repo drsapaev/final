@@ -184,6 +184,8 @@ const FileManager = () => {void
     }
   };
 
+  const getFileDisplayName = (file) => file.title || file.filename || file.original_filename || 'файл';
+
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -324,6 +326,7 @@ const FileManager = () => {void
             handlePreview(file.id);
           }}
           className="p-1 text-gray-400 hover:text-blue-600"
+          aria-label={`Предварительный просмотр файла ${getFileDisplayName(file)}`}
           title="Предварительный просмотр">
           
               <Eye className="w-4 h-4" />
@@ -334,6 +337,7 @@ const FileManager = () => {void
             handleDownload(file.id, file.filename);
           }}
           className="p-1 text-gray-400 hover:text-green-600"
+          aria-label={`Скачать файл ${getFileDisplayName(file)}`}
           title="Скачать">
           
               <Download className="w-4 h-4" />
@@ -344,6 +348,7 @@ const FileManager = () => {void
             handleDelete(file.id);
           }}
           className="p-1 text-gray-400 hover:text-red-600"
+          aria-label={`Удалить файл ${getFileDisplayName(file)}`}
           title="Удалить">
           
               <Trash2 className="w-4 h-4" />
@@ -362,6 +367,7 @@ const FileManager = () => {void
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               <input
               type="checkbox"
+              aria-label={selectedFiles.length === files.length && files.length > 0 ? 'Снять выбор со всех файлов' : 'Выбрать все файлы'}
               className="rounded border-gray-300"
               checked={selectedFiles.length === files.length && files.length > 0}
               onChange={(e) => {
@@ -393,9 +399,12 @@ const FileManager = () => {void
         <tbody className="bg-white divide-y divide-gray-200">
           {files.map((file) =>
         <tr key={file.id} className="hover:bg-gray-50">
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td
+                className="px-6 py-4 whitespace-nowrap"
+                aria-label={`Файл ${getFileDisplayName(file)}`}>
                 <input
               type="checkbox"
+              aria-label={selectedFiles.includes(file.id) ? `Снять выбор файла ${getFileDisplayName(file)}` : `Выбрать файл ${getFileDisplayName(file)}`}
               className="rounded border-gray-300"
               checked={selectedFiles.includes(file.id)}
               onChange={(e) => {
@@ -407,7 +416,9 @@ const FileManager = () => {void
               }} />
             
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td
+                className="px-6 py-4 whitespace-nowrap"
+                aria-label={`Файл ${getFileDisplayName(file)}`}>
                 <div className="flex items-center">
                   <div className="flex-shrink-0 mr-3">
                     {getFileIcon(file)}
@@ -438,6 +449,7 @@ const FileManager = () => {void
                   <button
                 onClick={() => handlePreview(file.id)}
                 className="text-blue-600 hover:text-blue-900"
+                aria-label={`Предварительный просмотр файла ${getFileDisplayName(file)}`}
                 title="Предварительный просмотр">
                 
                     <Eye className="w-4 h-4" />
@@ -445,6 +457,7 @@ const FileManager = () => {void
                   <button
                 onClick={() => handleDownload(file.id, file.filename)}
                 className="text-green-600 hover:text-green-900"
+                aria-label={`Скачать файл ${getFileDisplayName(file)}`}
                 title="Скачать">
                 
                     <Download className="w-4 h-4" />
@@ -452,6 +465,7 @@ const FileManager = () => {void
                   <button
                 onClick={() => handleDelete(file.id)}
                 className="text-red-600 hover:text-red-900"
+                aria-label={`Удалить файл ${getFileDisplayName(file)}`}
                 title="Удалить">
                 
                     <Trash2 className="w-4 h-4" />
@@ -501,6 +515,7 @@ const FileManager = () => {void
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
+                aria-label="Поиск файлов"
                 placeholder="Поиск файлов..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
@@ -511,6 +526,7 @@ const FileManager = () => {void
 
           <div className="flex items-center space-x-4">
             <select
+              aria-label="Фильтр файлов по типу"
               value={filters.fileType}
               onChange={(e) => handleFilterChange('fileType', e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -525,6 +541,7 @@ const FileManager = () => {void
             </select>
 
             <select
+              aria-label="Фильтр файлов по правам доступа"
               value={filters.permission}
               onChange={(e) => handleFilterChange('permission', e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -552,12 +569,14 @@ const FileManager = () => {void
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setViewMode('grid')}
+              aria-label="Показать файлы плиткой"
               className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
               
               <Grid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
+              aria-label="Показать файлы списком"
               className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
               
               <List className="w-4 h-4" />
@@ -583,6 +602,7 @@ const FileManager = () => {void
           <button
             onClick={loadFiles}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Обновить список файлов"
             title="Обновить">
             
             <RefreshCw className="w-4 h-4" />
@@ -619,6 +639,7 @@ const FileManager = () => {void
               <h3 className="text-lg font-semibold">Загрузить файлы</h3>
               <button
               onClick={() => setShowUploadModal(false)}
+              aria-label="Закрыть окно загрузки файлов"
               className="text-gray-400 hover:text-gray-600">
               
                 <X className="w-5 h-5" />
@@ -629,6 +650,7 @@ const FileManager = () => {void
               <div
               role="button"
               tabIndex={0}
+              aria-label="Выбрать файлы для загрузки"
               className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(event) => handleActivationKeyDown(event, () => fileInputRef.current?.click())}>
@@ -641,6 +663,7 @@ const FileManager = () => {void
               <input
               ref={fileInputRef}
               type="file"
+              aria-label="Файлы для загрузки"
               multiple
               onChange={handleFileUpload}
               className="hidden" />
@@ -682,6 +705,7 @@ const FileManager = () => {void
               <h3 className="text-lg font-semibold">Статистика файлов</h3>
               <button
               onClick={() => setShowStatsModal(false)}
+              aria-label="Закрыть статистику файлов"
               className="text-gray-400 hover:text-gray-600">
               
                 <X className="w-5 h-5" />
