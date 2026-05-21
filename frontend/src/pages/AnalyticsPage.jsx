@@ -956,6 +956,7 @@ export default function AnalyticsPage() {
             <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Начало периода</span>
             <input
               type="date"
+              aria-label="Дата начала периода"
               value={dateRange.start}
               onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
               style={{
@@ -971,6 +972,7 @@ export default function AnalyticsPage() {
             <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Конец периода</span>
             <input
               type="date"
+              aria-label="Дата окончания периода"
               value={dateRange.end}
               onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
               style={{
