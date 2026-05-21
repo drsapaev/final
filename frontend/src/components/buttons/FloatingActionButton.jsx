@@ -48,6 +48,7 @@ const FloatingActionButton = ({
         className="fab-backdrop"
         role="button"
         tabIndex={0}
+        aria-label="Close floating action menu"
         onClick={() => setIsExpanded(false)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => setIsExpanded(false))} />
 

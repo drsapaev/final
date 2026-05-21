@@ -75,6 +75,7 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
           className="fixed inset-0 bg-black bg-opacity-50"
           role="button"
           tabIndex={0}
+          aria-label="Close mobile navigation menu"
           onClick={() => setIsOpen(false)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {

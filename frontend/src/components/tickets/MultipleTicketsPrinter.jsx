@@ -75,7 +75,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
     <div className="multiple-tickets-printer">
       <div className="printer-header">
         <h3>Печать талонов ({tickets.length})</h3>
-        <button className="close-btn" onClick={onClose}>
+        <button className="close-btn" onClick={onClose} aria-label="Close tickets printer">
           <X size={20} />
         </button>
       </div>

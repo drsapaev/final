@@ -104,6 +104,7 @@ const PWAInstallPrompt = () => {
             <button
               onClick={handleDismiss}
               className="text-white/70 hover:text-white transition-colors"
+              aria-label="Dismiss app install prompt"
             >
               <X className="w-4 h-4" />
             </button>

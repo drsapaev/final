@@ -216,6 +216,7 @@ const FinanceModal = ({
               onClick={onClose}
               className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
               style={{ color: 'var(--text-secondary)' }}
+              aria-label="Close finance transaction modal"
             >
               <X className="w-5 h-5" />
             </button>
