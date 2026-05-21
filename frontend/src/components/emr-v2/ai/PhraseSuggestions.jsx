@@ -169,6 +169,7 @@ export function PhraseSuggestions({
                         >
                             <input
                                 type="checkbox"
+                                aria-label={`Выбрать клиническую формулировку: ${phrase}`}
                                 checked={isSelected}
                                 onChange={() => togglePhrase(phrase)}
                                 disabled={disabled}
