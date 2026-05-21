@@ -308,6 +308,7 @@ const FinanceModal = ({
                                 style={{ color: 'var(--text-tertiary)' }} />
                     <input
                       type="number"
+                      aria-label="Finance transaction amount"
                       value={formData.amount}
                       onChange={(e) => handleChange('amount', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -346,6 +347,7 @@ const FinanceModal = ({
                               style={{ color: 'var(--text-tertiary)' }} />
                     <input
                       type="date"
+                      aria-label="Finance transaction date"
                       value={formData.transactionDate}
                       onChange={(e) => handleChange('transactionDate', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -373,6 +375,7 @@ const FinanceModal = ({
                   Описание *
                 </label>
                 <textarea
+                  aria-label="Finance transaction description"
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -525,6 +528,7 @@ const FinanceModal = ({
                               style={{ color: 'var(--text-tertiary)' }} />
                     <input
                       type="text"
+                      aria-label="Finance card or transaction reference"
                       value={formData.reference}
                       onChange={(e) => handleChange('reference', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -558,6 +562,7 @@ const FinanceModal = ({
                   Заметки
                 </label>
                 <textarea
+                  aria-label="Finance transaction notes"
                   value={formData.notes}
                   onChange={(e) => handleChange('notes', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
