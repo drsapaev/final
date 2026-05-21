@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:24:12.424Z",
+  "generatedAt": "2026-05-21T07:31:02.720Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -128,46 +128,6 @@
       "file": "src/components/dental/DentalPriceManager.jsx",
       "line": 175,
       "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ExaminationForm.jsx:565:13:button:missing-accessible-name",
-      "file": "src/components/dental/ExaminationForm.jsx",
-      "line": 565,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ExaminationForm.jsx:601:13:button:missing-accessible-name",
-      "file": "src/components/dental/ExaminationForm.jsx",
-      "line": 601,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ExaminationForm.jsx:637:13:button:missing-accessible-name",
-      "file": "src/components/dental/ExaminationForm.jsx",
-      "line": 637,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ExaminationForm.jsx:673:13:button:missing-accessible-name",
-      "file": "src/components/dental/ExaminationForm.jsx",
-      "line": 673,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ExaminationForm.jsx:840:13:button:missing-accessible-name",
-      "file": "src/components/dental/ExaminationForm.jsx",
-      "line": 840,
-      "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
     },
