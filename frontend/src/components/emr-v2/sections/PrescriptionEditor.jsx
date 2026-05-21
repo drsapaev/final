@@ -136,6 +136,7 @@ const PrescriptionEditor = ({
                                     <label className="prescription-label">Препарат</label>
                                     <input
                 className="prescription-input"
+                aria-label="Prescription medicine name"
                 value={newItem.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="Название..."
@@ -170,6 +171,7 @@ const PrescriptionEditor = ({
                                     <label className="prescription-label">Доза</label>
                                     <input
                 className="prescription-input"
+                aria-label="Prescription dose"
                 value={newItem.dose}
                 onChange={(e) => handleInputChange('dose', e.target.value)}
                 placeholder="500 мг" />
@@ -179,6 +181,7 @@ const PrescriptionEditor = ({
                                     <label className="prescription-label">Кратность</label>
                                     <input
                 className="prescription-input"
+                aria-label="Prescription frequency"
                 value={newItem.frequency}
                 onChange={(e) => handleInputChange('frequency', e.target.value)}
                 placeholder="3 р/д" />
@@ -188,6 +191,7 @@ const PrescriptionEditor = ({
                                     <label className="prescription-label">Длит.</label>
                                     <input
                 className="prescription-input"
+                aria-label="Prescription duration"
                 value={newItem.duration}
                 onChange={(e) => handleInputChange('duration', e.target.value)}
                 placeholder="7 дней" />
