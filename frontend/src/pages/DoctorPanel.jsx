@@ -1352,6 +1352,7 @@ const DoctorPanel = () => {
                       <>
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
+                          aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                           onClick={() => markNoShow(entry.id)}
                           title="Отметить неявку">
@@ -1364,6 +1365,7 @@ const DoctorPanel = () => {
                       <>
                                 <button
                           {...getQueueActionA11yProps('Send to diagnostics', entry)}
+                          aria-label={`Send to diagnostics for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
                           onClick={() => sendToDiagnostics(entry.id)}
                           title="На обследование">
@@ -1372,6 +1374,7 @@ const DoctorPanel = () => {
                                 </button>
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
+                          aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
@@ -1380,6 +1383,7 @@ const DoctorPanel = () => {
                                 </button>
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
+                          aria-label={`Mark no-show for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                           onClick={() => markNoShow(entry.id)}
                           title="Не явился">
@@ -1392,6 +1396,7 @@ const DoctorPanel = () => {
                       <>
                                 <button
                           {...getQueueActionA11yProps('Call back from diagnostics', entry)}
+                          aria-label={`Call back from diagnostics for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
                           onClick={() => callFromDiagnostics(entry.id)}
                           title="Вернуть с диагностики (Push)">
@@ -1400,6 +1405,7 @@ const DoctorPanel = () => {
                                 </button>
                                 <button
                           {...getQueueActionA11yProps('Complete visit', entry)}
+                          aria-label={`Complete visit for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                           onClick={() => completeVisit(entry.id)}
                           title="Завершить приём">
@@ -1408,6 +1414,7 @@ const DoctorPanel = () => {
                                 </button>
                                 <button
                           {...getQueueActionA11yProps('Mark visit incomplete', entry)}
+                          aria-label={`Mark visit incomplete for ${getQueuePatientContext(entry)}`}
                           style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
                           onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
                           title="Не вернулся">
@@ -1419,6 +1426,7 @@ const DoctorPanel = () => {
                             {entry.status === 'no_show' &&
                       <button
                         {...getQueueActionA11yProps('Restore as next patient', entry)}
+                        aria-label={`Restore as next patient for ${getQueuePatientContext(entry)}`}
                         style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
                         onClick={() => restoreToNext(entry.id)}
                         title="Восстановить следующим">
@@ -1542,6 +1550,7 @@ const DoctorPanel = () => {
                 Информация о пациенте
               </h3>
               <button
+              aria-label="Close patient information dialog"
               onClick={patientModal.closeModal}
               style={{
                 color: 'var(--mac-text-tertiary)',
