@@ -514,6 +514,7 @@ const DoctorQueuePanel = ({
                 key={entry.id}
                 role="button"
                 tabIndex={0}
+                aria-label={`Выбрать пациента ${entry.patient_name || entry.number} из очереди`}
                 style={{
                   padding: '16px',
                   cursor: 'pointer',
