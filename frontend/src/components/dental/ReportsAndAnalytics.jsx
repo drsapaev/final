@@ -565,6 +565,7 @@ const ReportsAndAnalytics = ({
             
             <button
               onClick={onClose}
+              aria-label="Закрыть отчеты и аналитику стоматологии"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
