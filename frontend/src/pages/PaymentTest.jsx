@@ -187,6 +187,7 @@ const PaymentTest = () => {
                   <input
                     id="payment-test-visit-id"
                     type="number"
+                    aria-label="Payment test visit id"
                     value={testData.visitId}
                     onChange={(e) => setTestData({ ...testData, visitId: parseInt(e.target.value, 10) })}
                     style={fieldControlStyle}
@@ -198,6 +199,7 @@ const PaymentTest = () => {
                   <input
                     id="payment-test-amount"
                     type="number"
+                    aria-label="Payment test amount"
                     value={testData.amount}
                     onChange={(e) => setTestData({ ...testData, amount: parseFloat(e.target.value) })}
                     style={fieldControlStyle}
@@ -222,6 +224,7 @@ const PaymentTest = () => {
                   Описание
                   <textarea
                     id="payment-test-description"
+                    aria-label="Payment test description"
                     rows={2}
                     value={testData.description}
                     onChange={(e) => setTestData({ ...testData, description: e.target.value })}
