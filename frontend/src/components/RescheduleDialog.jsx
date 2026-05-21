@@ -102,6 +102,7 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
             <span>Новая дата</span>
             <input
               type="date"
+              aria-label="Новая дата визита"
               value={d}
               onChange={(e) => setD(e.target.value)}
               style={input}
