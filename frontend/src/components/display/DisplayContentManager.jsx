@@ -345,22 +345,26 @@ const DisplayContentManager = ({
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="display-content-title" className="block text-sm font-medium text-gray-700 mb-2">
                     Название:
                   </label>
                   <input
+                  id="display-content-title"
                   type="text"
+                  aria-label="Display content title"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Введите название..." />
                 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="display-content-file" className="block text-sm font-medium text-gray-700 mb-2">
                     Файл:
                   </label>
                   <input
+                  id="display-content-file"
                   type="file"
+                  aria-label="Display content file"
                   accept={
                   uploadDialog.type === 'banner' ? 'image/*' :
                   uploadDialog.type === 'video' ? 'video/*' : '*/*'
