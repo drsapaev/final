@@ -1605,6 +1605,7 @@ function TelegramMiniAppPatientShell() {
                         <label key={field.key} style={miniAppCheckboxRowStyle}>
                           <input
                             type="checkbox"
+                            aria-label={field.label || field.key}
                             checked={getMiniAppFormFieldValue(formAnswers, form.id, field)}
                             onChange={handlePatientFormFieldChange(form.id, field)}
                             style={miniAppCheckboxStyle}
