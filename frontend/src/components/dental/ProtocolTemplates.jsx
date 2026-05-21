@@ -388,6 +388,7 @@ const ProtocolTemplates = ({
         <button
         onClick={() => handleEditTemplate(template)}
         className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+        aria-label={`Редактировать шаблон ${template.name}`}
         title="Редактировать">
         
           <Edit className="h-4 w-4" />
@@ -395,6 +396,7 @@ const ProtocolTemplates = ({
         <button
         onClick={() => handleDuplicateTemplate(template)}
         className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+        aria-label={`Дублировать шаблон ${template.name}`}
         title="Дублировать">
         
           <Copy className="h-4 w-4" />
@@ -403,6 +405,7 @@ const ProtocolTemplates = ({
       <button
         onClick={() => handleDeleteTemplate(template.id)}
         className="px-3 py-2 border border-gray-300 text-red-700 rounded-md hover:bg-red-50"
+        aria-label={`Удалить шаблон ${template.name}`}
         title="Удалить">
         
             <Trash2 className="h-4 w-4" />
@@ -419,6 +422,7 @@ const ProtocolTemplates = ({
         <h2 className="text-xl font-semibold">{template.name}</h2>
         <button
         onClick={() => setSelectedTemplate(null)}
+        aria-label={`Закрыть просмотр шаблона ${template.name}`}
         className="p-2 text-gray-500 hover:text-gray-700">
         
           <X className="h-5 w-5" />
@@ -554,6 +558,7 @@ const ProtocolTemplates = ({
             </button>
             <button
               onClick={onClose}
+              aria-label="Закрыть шаблоны протоколов"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
@@ -571,6 +576,7 @@ const ProtocolTemplates = ({
                 <input
                   type="text"
                   placeholder="Поиск шаблонов..."
+                  aria-label="Поиск шаблонов протоколов"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -583,6 +589,7 @@ const ProtocolTemplates = ({
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
+                aria-label="Фильтр шаблонов по категории"
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
                 {categories.map((category) =>
@@ -595,6 +602,7 @@ const ProtocolTemplates = ({
               <select
                 value={filterDifficulty}
                 onChange={(e) => setFilterDifficulty(e.target.value)}
+                aria-label="Фильтр шаблонов по сложности"
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
                 {difficulties.map((difficulty) =>

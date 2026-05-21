@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:31:02.720Z",
+  "generatedAt": "2026-05-21T07:38:22.453Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -159,46 +159,6 @@
       "signature": "src/components/dental/PatientCard.jsx:813:13:button:missing-accessible-name",
       "file": "src/components/dental/PatientCard.jsx",
       "line": 813,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ProtocolTemplates.jsx:388:9:button:title-only",
-      "file": "src/components/dental/ProtocolTemplates.jsx",
-      "line": 388,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/ProtocolTemplates.jsx:395:9:button:title-only",
-      "file": "src/components/dental/ProtocolTemplates.jsx",
-      "line": 395,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/ProtocolTemplates.jsx:403:7:button:title-only",
-      "file": "src/components/dental/ProtocolTemplates.jsx",
-      "line": 403,
-      "column": 7,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/ProtocolTemplates.jsx:420:9:button:missing-accessible-name",
-      "file": "src/components/dental/ProtocolTemplates.jsx",
-      "line": 420,
-      "column": 9,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ProtocolTemplates.jsx:555:13:button:missing-accessible-name",
-      "file": "src/components/dental/ProtocolTemplates.jsx",
-      "line": 555,
       "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
