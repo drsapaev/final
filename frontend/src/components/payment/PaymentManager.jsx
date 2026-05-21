@@ -172,9 +172,11 @@ const PaymentManager = ({
 
               <div className="payment-form">
                 <div className="form-row">
-                  <label>Сумма оплаты (сум)</label>
+                  <label htmlFor="payment-manager-amount">Сумма оплаты (сум)</label>
                   <input
+                    id="payment-manager-amount"
                     type="number"
+                    aria-label="Payment amount"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(Number(e.target.value))}
                     placeholder="Введите сумму"
@@ -190,6 +192,7 @@ const PaymentManager = ({
                         type="radio"
                         name="provider"
                         value="click"
+                        aria-label="Use Click payment provider"
                         checked={selectedProvider === 'click'}
                         onChange={(e) => setSelectedProvider(e.target.value)} />
                       
@@ -201,6 +204,7 @@ const PaymentManager = ({
                         type="radio"
                         name="provider"
                         value="payme"
+                        aria-label="Use PayMe payment provider"
                         checked={selectedProvider === 'payme'}
                         onChange={(e) => setSelectedProvider(e.target.value)} />
                       
