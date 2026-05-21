@@ -198,13 +198,15 @@ const DentalPriceManager = ({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="dental-final-price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Итоговая стоимость (UZS)
               </label>
               <div className="relative">
                 <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
+                  id="dental-final-price"
                   type="text"
+                  aria-label="Dental final price"
                   value={finalPrice}
                   onChange={(e) => setFinalPrice(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -215,10 +217,12 @@ const DentalPriceManager = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="dental-price-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Обоснование цены
               </label>
               <select
+                id="dental-price-reason"
+                aria-label="Dental price reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2">
@@ -232,7 +236,9 @@ const DentalPriceManager = ({
               
               {reason === 'custom' &&
               <input
+                id="dental-custom-price-reason"
                 type="text"
+                aria-label="Custom dental price reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -242,10 +248,12 @@ const DentalPriceManager = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="dental-treatment-details" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Детали лечения (необязательно)
               </label>
               <textarea
+                id="dental-treatment-details"
+                aria-label="Dental treatment details"
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
