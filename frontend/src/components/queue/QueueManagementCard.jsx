@@ -123,6 +123,7 @@ export const QueueActionButtons = ({
             style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
             onClick={() => handleAction('no-show')}
             disabled={loading}
+            aria-label="Отметить неявку"
             title="Отметить неявку">
             
                         <XCircle size={iconSize} />
@@ -138,6 +139,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
               onClick={() => handleAction('diagnostics')}
               disabled={loading}
+              aria-label="Направить на обследование"
               title="На обследование">
               
                             <Stethoscope size={iconSize} />
@@ -146,6 +148,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
               onClick={() => handleAction('complete')}
               disabled={loading}
+              aria-label="Завершить приём"
               title="Завершить приём">
               
                             <CheckCircle size={iconSize} />
@@ -154,6 +157,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
               onClick={() => handleAction('no-show')}
               disabled={loading}
+              aria-label="Отметить, что пациент не явился"
               title="Не явился">
               
                             <XCircle size={iconSize} />
@@ -168,6 +172,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
               onClick={() => handleAction('call-from-diagnostics')}
               disabled={loading}
+              aria-label="Вернуть с диагностики и вызвать повторно"
               title="Вернуть с диагностики (Вызвать повторно)">
               
                             <Bell size={iconSize} />
@@ -176,6 +181,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
               onClick={() => handleAction('complete')}
               disabled={loading}
+              aria-label="Завершить приём"
               title="Завершить приём">
               
                             <CheckCircle size={iconSize} />
@@ -184,6 +190,7 @@ export const QueueActionButtons = ({
               style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
               onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
               disabled={loading}
+              aria-label="Отметить, что пациент не вернулся"
               title="Не вернулся">
               
                             <AlertCircle size={iconSize} />
@@ -197,6 +204,7 @@ export const QueueActionButtons = ({
             style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
             onClick={() => handleAction('restore-next')}
             disabled={loading}
+            aria-label="Восстановить пациента следующим в очереди"
             title="Восстановить следующим">
             
                         <RotateCcw size={iconSize} />

@@ -376,11 +376,13 @@ const ModernQueueManager = ({
 
           <div className="mqm-controls-grid">
             <div className="mqm-input-group">
-              <label className="mqm-label">
+              <label className="mqm-label" htmlFor="modern-queue-date">
                 Дата
               </label>
               <input
+                id="modern-queue-date"
                 type="date"
+                aria-label="Дата очереди"
                 value={effectiveDate}
                 // Min удален, чтобы можно было смотреть историю и текущий день в любое время
                 onChange={(e) => {
@@ -395,10 +397,12 @@ const ModernQueueManager = ({
             </div>
 
             <div className="mqm-input-group">
-              <label className="mqm-label">
+              <label className="mqm-label" htmlFor="modern-queue-doctor">
                 Врач
               </label>
               <select
+                id="modern-queue-doctor"
+                aria-label="Врач очереди"
                 value={effectiveDoctor}
                 onChange={(e) => {
                   const newDoctor = e.target.value;
@@ -494,6 +498,7 @@ const ModernQueueManager = ({
                   alignItems: 'center'
                 }}
                 onClick={() => setAutoRefresh(!autoRefresh)}
+                aria-label={autoRefresh ? 'Отключить автообновление очереди' : 'Включить автообновление очереди'}
                 title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
 
                 <Icon
