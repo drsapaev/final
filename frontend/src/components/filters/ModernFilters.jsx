@@ -92,6 +92,7 @@ const ModernFilters = ({
           <input
             ref={searchInputRef}
             type="text"
+            aria-label="Search appointments"
             placeholder="Поиск по ФИО, телефону, услугам..."
             value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -120,6 +121,7 @@ const ModernFilters = ({
             <Calendar className="filter-icon" size={18} />
             <input
               type="date"
+              aria-label="Filter appointments by date"
               value={dateValue}
               onChange={(e) => {
                 setDateValue(e.target.value);
@@ -259,6 +261,7 @@ const ModernFilters = ({
               <label className="auto-refresh-toggle">
                 <input
                 type="checkbox"
+                aria-label="Toggle auto refresh"
                 checked={autoRefresh}
                 onChange={(e) => onAutoRefreshChange(e.target.checked)} />
               
