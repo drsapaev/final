@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:03:12.222Z",
+  "generatedAt": "2026-05-21T07:11:26.305Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -256,110 +256,6 @@
       "file": "src/components/dental/PatientCard.jsx",
       "line": 813,
       "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:301:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 301,
-      "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:307:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 307,
-      "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:328:13:div:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 328,
-      "column": 13,
-      "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:394:15:button:title-only",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 394,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:405:15:button:title-only",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 405,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:419:11:button:title-only",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 419,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:464:19:div:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 464,
-      "column": 19,
-      "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:523:11:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 523,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:562:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 562,
-      "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:623:13:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 623,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:705:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 705,
-      "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:711:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 711,
-      "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/PhotoArchive.jsx:717:17:button:missing-accessible-name",
-      "file": "src/components/dental/PhotoArchive.jsx",
-      "line": 717,
-      "column": 17,
       "element": "button",
       "reason": "missing-accessible-name"
     },
