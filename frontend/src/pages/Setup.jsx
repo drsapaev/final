@@ -193,6 +193,7 @@ export default function Setup() {
                   style={missingRequiredKeys.has('clinicName') ? requiredInputStyle : inputStyle}
                   name="clinicName"
                   required
+                  aria-label="Название клиники"
                   aria-invalid={missingRequiredKeys.has('clinicName')}
                   value={form.clinicName}
                   onChange={updateField('clinicName')}
@@ -200,23 +201,23 @@ export default function Setup() {
               </label>
               <label style={labelStyle}>
                 Телефон
-                <input style={inputStyle} value={form.clinicPhone} onChange={updateField('clinicPhone')} />
+                <input style={inputStyle} aria-label="Телефон клиники" value={form.clinicPhone} onChange={updateField('clinicPhone')} />
               </label>
               <label style={labelStyle}>
                 Email
-                <input style={inputStyle} type="email" value={form.clinicEmail} onChange={updateField('clinicEmail')} />
+                <input style={inputStyle} type="email" aria-label="Email клиники" value={form.clinicEmail} onChange={updateField('clinicEmail')} />
               </label>
               <label style={labelStyle}>
                 Timezone
-                <input style={inputStyle} value={form.clinicTimezone} onChange={updateField('clinicTimezone')} />
+                <input style={inputStyle} aria-label="Timezone клиники" value={form.clinicTimezone} onChange={updateField('clinicTimezone')} />
               </label>
               <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
                 Адрес
-                <textarea style={textareaStyle} value={form.clinicAddress} onChange={updateField('clinicAddress')} />
+                <textarea style={textareaStyle} aria-label="Адрес клиники" value={form.clinicAddress} onChange={updateField('clinicAddress')} />
               </label>
               <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
                 URL логотипа
-                <input style={inputStyle} value={form.clinicLogoUrl} onChange={updateField('clinicLogoUrl')} />
+                <input style={inputStyle} aria-label="URL логотипа клиники" value={form.clinicLogoUrl} onChange={updateField('clinicLogoUrl')} />
               </label>
             </div>
           </section>
@@ -231,6 +232,7 @@ export default function Setup() {
                   style={missingRequiredKeys.has('branchName') ? requiredInputStyle : inputStyle}
                   name="branchName"
                   required
+                  aria-label="Название филиала"
                   aria-invalid={missingRequiredKeys.has('branchName')}
                   value={form.branchName}
                   onChange={updateField('branchName')}
@@ -238,23 +240,23 @@ export default function Setup() {
               </label>
               <label style={labelStyle}>
                 Код филиала
-                <input style={inputStyle} value={form.branchCode} onChange={updateField('branchCode')} placeholder="optional" />
+                <input style={inputStyle} aria-label="Код филиала" value={form.branchCode} onChange={updateField('branchCode')} placeholder="optional" />
               </label>
               <label style={labelStyle}>
                 Телефон филиала
-                <input style={inputStyle} value={form.branchPhone} onChange={updateField('branchPhone')} />
+                <input style={inputStyle} aria-label="Телефон филиала" value={form.branchPhone} onChange={updateField('branchPhone')} />
               </label>
               <label style={labelStyle}>
                 Email филиала
-                <input style={inputStyle} type="email" value={form.branchEmail} onChange={updateField('branchEmail')} />
+                <input style={inputStyle} type="email" aria-label="Email филиала" value={form.branchEmail} onChange={updateField('branchEmail')} />
               </label>
               <label style={labelStyle}>
                 Timezone филиала
-                <input style={inputStyle} value={form.branchTimezone} onChange={updateField('branchTimezone')} />
+                <input style={inputStyle} aria-label="Timezone филиала" value={form.branchTimezone} onChange={updateField('branchTimezone')} />
               </label>
               <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
                 Адрес филиала
-                <textarea style={textareaStyle} value={form.branchAddress} onChange={updateField('branchAddress')} />
+                <textarea style={textareaStyle} aria-label="Адрес филиала" value={form.branchAddress} onChange={updateField('branchAddress')} />
               </label>
             </div>
           </section>
@@ -270,6 +272,7 @@ export default function Setup() {
                   name="adminUsername"
                   required
                   minLength={3}
+                  aria-label="Username администратора"
                   aria-invalid={missingRequiredKeys.has('adminUsername')}
                   value={form.adminUsername}
                   onChange={updateField('adminUsername')}
@@ -282,6 +285,7 @@ export default function Setup() {
                   style={missingRequiredKeys.has('adminFullName') ? requiredInputStyle : inputStyle}
                   name="adminFullName"
                   required
+                  aria-label="Полное имя администратора"
                   aria-invalid={missingRequiredKeys.has('adminFullName')}
                   value={form.adminFullName}
                   onChange={updateField('adminFullName')}
@@ -295,6 +299,7 @@ export default function Setup() {
                   type="email"
                   name="adminEmail"
                   required
+                  aria-label="Email администратора"
                   aria-invalid={missingRequiredKeys.has('adminEmail')}
                   value={form.adminEmail}
                   onChange={updateField('adminEmail')}
@@ -309,6 +314,7 @@ export default function Setup() {
                   name="adminPassword"
                   required
                   minLength={8}
+                  aria-label="Пароль администратора"
                   aria-invalid={missingRequiredKeys.has('adminPassword')}
                   autoComplete="new-password"
                   value={form.adminPassword}
@@ -317,7 +323,7 @@ export default function Setup() {
               </label>
               <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
                 Ключ активации
-                <input style={inputStyle} value={form.activationKey} onChange={updateField('activationKey')} placeholder="optional" />
+                <input style={inputStyle} aria-label="Ключ активации" value={form.activationKey} onChange={updateField('activationKey')} placeholder="optional" />
               </label>
             </div>
           </section>
