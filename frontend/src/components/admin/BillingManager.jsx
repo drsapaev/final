@@ -521,6 +521,7 @@ const BillingManager = () => {
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                 <input
               type="checkbox"
+              aria-label="Auto send invoice"
               checked={invoiceForm.auto_send}
               onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
               style={{ margin: 0 }} />
@@ -530,6 +531,7 @@ const BillingManager = () => {
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                 <input
               type="checkbox"
+              aria-label="Send payment reminders"
               checked={invoiceForm.send_reminders}
               onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
               style={{ margin: 0 }} />
