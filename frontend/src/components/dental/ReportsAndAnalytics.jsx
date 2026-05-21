@@ -405,8 +405,8 @@ const ReportsAndAnalytics = ({
           <tbody className="bg-white divide-y divide-gray-200">
               {analyticsData.doctors.map((doctor) =>
             <tr key={doctor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                  <td className="px-6 py-4 whitespace-nowrap" aria-label={`Doctor ${doctor.name}`}>
+                    <div className="flex items-center" aria-label={`Doctor ${doctor.name}`}>
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <User className="h-4 w-4 text-blue-600" />
       </div>
@@ -428,13 +428,13 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{doctor.revenue.toLocaleString()} ₽</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                    <div className="flex items-center" aria-label={`Rating ${doctor.rating}`}>
                       <Star className="h-4 w-4 text-yellow-400 mr-1" />
                       <span className="text-sm text-gray-900">{doctor.rating}</span>
         </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                  <td className="px-6 py-4 whitespace-nowrap" aria-label={`Efficiency ${doctor.efficiency}%`}>
+                    <div className="flex items-center" aria-label={`Efficiency ${doctor.efficiency}%`}>
                       <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                         <div
                       className="bg-green-500 h-2 rounded-full"
@@ -481,8 +481,8 @@ const ReportsAndAnalytics = ({
           <tbody className="bg-white divide-y divide-gray-200">
               {analyticsData.procedures.map((procedure, index) =>
             <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                  <td className="px-6 py-4 whitespace-nowrap" aria-label={`Procedure ${procedure.name}`}>
+                    <div className="flex items-center" aria-label={`Procedure ${procedure.name}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                   index === 0 ? 'bg-blue-100' :
                   index === 1 ? 'bg-green-100' :
