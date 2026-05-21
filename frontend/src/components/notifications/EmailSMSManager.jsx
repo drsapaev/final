@@ -673,10 +673,16 @@ const EmailSMSManager = () => {void
                     <p className="text-sm text-gray-600">{template.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-blue-600">
+                    <button
+                      className="p-2 text-gray-400 hover:text-blue-600"
+                      aria-label={`View email template ${template.title}`}
+                    >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-blue-600">
+                    <button
+                      className="p-2 text-gray-400 hover:text-blue-600"
+                      aria-label={`Edit email template ${template.title}`}
+                    >
                       <Edit className="w-4 h-4" />
                     </button>
                   </div>
@@ -706,10 +712,16 @@ const EmailSMSManager = () => {void
                     <p className="text-sm text-gray-600">{template.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-green-600">
+                    <button
+                      className="p-2 text-gray-400 hover:text-green-600"
+                      aria-label={`View SMS template ${template.title}`}
+                    >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-green-600">
+                    <button
+                      className="p-2 text-gray-400 hover:text-green-600"
+                      aria-label={`Edit SMS template ${template.title}`}
+                    >
                       <Edit className="w-4 h-4" />
                     </button>
                   </div>
