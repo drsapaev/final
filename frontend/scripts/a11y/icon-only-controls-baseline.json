@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T06:14:13.431Z",
+  "generatedAt": "2026-05-21T06:28:05.712Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -908,126 +908,6 @@
       "reason": "title-only"
     },
     {
-      "signature": "src/pages/DoctorPanel.jsx:582:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 582,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:592:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 592,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:602:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 602,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:613:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 613,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:628:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 628,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:638:11:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 638,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:979:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 979,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:988:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 988,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:997:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 997,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1136:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1136,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1145:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1145,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1154:29:button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1154,
-      "column": 29,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1325:33:button:title-only",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1325,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1337:33:button:title-only",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1337,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1345:33:button:title-only",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1345,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
       "signature": "src/pages/DoctorPanel.jsx:1353:33:button:title-only",
       "file": "src/pages/DoctorPanel.jsx",
       "line": 1353,
@@ -1060,17 +940,41 @@
       "reason": "title-only"
     },
     {
-      "signature": "src/pages/DoctorPanel.jsx:1392:23:button:title-only",
+      "signature": "src/pages/DoctorPanel.jsx:1393:33:button:title-only",
       "file": "src/pages/DoctorPanel.jsx",
-      "line": 1392,
+      "line": 1393,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1401:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1401,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1409:33:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1409,
+      "column": 33,
+      "element": "button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1420:23:button:title-only",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1420,
       "column": 23,
       "element": "button",
       "reason": "title-only"
     },
     {
-      "signature": "src/pages/DoctorPanel.jsx:1516:15:button:missing-accessible-name",
+      "signature": "src/pages/DoctorPanel.jsx:1544:15:button:missing-accessible-name",
       "file": "src/pages/DoctorPanel.jsx",
-      "line": 1516,
+      "line": 1544,
       "column": 15,
       "element": "button",
       "reason": "missing-accessible-name"
