@@ -603,6 +603,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             <Search size={16} style={styles.searchIcon} />
                             <input
                                 style={styles.searchInput}
+                                aria-label="Поиск профилей очереди"
                                 placeholder="Поиск..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
@@ -632,6 +633,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             Импорт
                             <input
                                 type="file"
+                                aria-label="Импортировать профили очереди из CSV"
                                 accept=".csv"
                                 onChange={handleImport}
                                 style={{ display: 'none' }}
@@ -640,7 +642,12 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         </label>
 
                         {/* Refresh */}
-                        <button style={styles.button} onClick={loadProfiles} disabled={saving}>
+                        <button
+                            style={styles.button}
+                            onClick={loadProfiles}
+                            disabled={saving}
+                            aria-label="Обновить профили очереди"
+                        >
                             <RefreshCw size={16} />
                         </button>
 
@@ -664,6 +671,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         <button
                             style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer' }}
                             onClick={() => setError(null)}
+                            aria-label="Скрыть сообщение об ошибке"
                         >
                             <X size={16} />
                         </button>
@@ -721,6 +729,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 <button
                                     style={styles.iconButton}
                                     onClick={() => handleSelectAll(!isAllSelected)}
+                                    aria-label={isAllSelected ? 'Снять выбор со всех вкладок очереди' : 'Выбрать все вкладки очереди'}
                                 >
                                     {isAllSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                                 </button>
@@ -745,6 +754,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                             profile.key,
                                             !selectedProfiles.includes(profile.key)
                                         )}
+                                        aria-label={selectedProfiles.includes(profile.key) ? `Снять выбор вкладки ${profile.name}` : `Выбрать вкладку ${profile.name}`}
                                     >
                                         {selectedProfiles.includes(profile.key)
                                             ? <CheckSquare size={18} style={{ color: 'var(--mac-accent-blue)' }} />
@@ -799,6 +809,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 </td>
                                 <td style={styles.td}>
                                     <div
+                                        role="img"
+                                        aria-label={`Цвет вкладки ${profile.name}: ${profile.color || 'не задан'}`}
                                         style={{
                                             ...styles.colorDot,
                                             backgroundColor: profile.color || '#718096'
@@ -824,6 +836,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             style={styles.iconButton}
                                             onClick={() => handleToggleActive(profile)}
+                                            aria-label={profile.is_active !== false ? `Скрыть вкладку ${profile.name}` : `Показать вкладку ${profile.name}`}
                                             title={profile.is_active !== false ? 'Скрыть' : 'Показать'}
                                             disabled={saving}
                                         >
@@ -832,6 +845,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             style={styles.iconButton}
                                             onClick={() => setEditingProfile(profile)}
+                                            aria-label={`Редактировать вкладку ${profile.name}`}
                                             title="Редактировать"
                                             disabled={saving}
                                         >
@@ -840,6 +854,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             style={{ ...styles.iconButton, color: '#EF4444' }}
                                             onClick={() => handleDelete(profile.key)}
+                                            aria-label={`Удалить вкладку ${profile.name}`}
                                             title="Удалить"
                                             disabled={saving}
                                         >
@@ -1045,6 +1060,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             style={styles.overlay}
             role="button"
             tabIndex={0}
+            aria-label="Закрыть форму вкладки очереди"
             onClick={onCancel}
             onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
             <div style={styles.modal} onClickCapture={e => e.stopPropagation()}>
@@ -1052,7 +1068,11 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     <h3 style={styles.title}>
                         {isEdit ? 'Редактирование вкладки' : 'Новая вкладка'}
                     </h3>
-                    <button style={styles.closeButton} onClick={onCancel}>
+                    <button
+                        style={styles.closeButton}
+                        onClick={onCancel}
+                        aria-label="Закрыть форму вкладки очереди"
+                    >
                         <X size={20} />
                     </button>
                 </div>
@@ -1064,6 +1084,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <label style={styles.label}>Уникальный ключ *</label>
                             <input
                                 style={styles.input}
+                                aria-label="Уникальный ключ вкладки очереди"
                                 value={formData.key}
                                 onChange={e => setFormData({ ...formData, key: e.target.value })}
                                 placeholder="например: cardiology"
@@ -1080,6 +1101,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <label style={styles.label}>Название (EN) *</label>
                             <input
                                 style={styles.input}
+                                aria-label="Название вкладки очереди на английском"
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 placeholder="Cardiology"
@@ -1090,6 +1112,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <label style={styles.label}>Название (RU)</label>
                             <input
                                 style={styles.input}
+                                aria-label="Название вкладки очереди на русском"
                                 value={formData.title_ru}
                                 onChange={e => setFormData({ ...formData, title_ru: e.target.value })}
                                 placeholder="Кардиология"
@@ -1102,6 +1125,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <label style={styles.label}>Queue Tags</label>
                         <input
                             style={styles.input}
+                            aria-label="Queue Tags"
                             value={formData.queue_tags}
                             onChange={e => setFormData({ ...formData, queue_tags: e.target.value })}
                             placeholder="cardio, cardiology, cardiology_common"
@@ -1115,6 +1139,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <input
                             style={{ ...styles.input, width: '100px' }}
                             type="number"
+                            aria-label="Порядок отображения вкладки очереди"
                             min="0"
                             value={formData.display_order}
                             onChange={e => setFormData({ ...formData, display_order: e.target.value })}
@@ -1164,10 +1189,13 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                         boxShadow: formData.color === color ? `0 0 0 2px ${color}` : 'none',
                                     }}
                                     onClick={() => setFormData({ ...formData, color })}
+                                    aria-label={`Выбрать цвет ${color}`}
+                                    title={color}
                                 />
                             ))}
                             <input
                                 type="color"
+                                aria-label="Пользовательский цвет вкладки очереди"
                                 value={formData.color}
                                 onChange={e => setFormData({ ...formData, color: e.target.value })}
                                 style={{ width: '32px', height: '32px', border: 'none', cursor: 'pointer' }}
@@ -1180,6 +1208,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
+                                aria-label="Активная вкладка очереди"
                                 checked={formData.is_active}
                                 onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                             />
@@ -1192,6 +1221,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
+                                aria-label="Показывать вкладку на QR-странице"
                                 checked={formData.show_on_qr_page}
                                 onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
                             />
@@ -1207,7 +1237,12 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <button type="button" style={styles.cancelButton} onClick={onCancel}>
                             Отмена
                         </button>
-                        <button type="submit" style={styles.submitButton} disabled={saving}>
+                        <button
+                            type="submit"
+                            style={styles.submitButton}
+                            disabled={saving}
+                            aria-label={isEdit ? 'Сохранить вкладку очереди' : 'Создать вкладку очереди'}
+                        >
                             {saving ? (
                                 <>Сохранение...</>
                             ) : (
