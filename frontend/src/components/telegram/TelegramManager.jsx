@@ -390,6 +390,7 @@ const TelegramManager = () => {
             <div className="flex space-x-2">
               <input
               type="password"
+              aria-label="Telegram bot token"
               value={settings.bot_token || ''}
               onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
               placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
@@ -398,6 +399,7 @@ const TelegramManager = () => {
               <Button
               onClick={() => setSettings({ ...settings, bot_token: '' })}
               variant="outline"
+              aria-label="Clear Telegram bot token"
               size="sm">
               
                 <Trash2 className="w-4 h-4" />
@@ -414,6 +416,7 @@ const TelegramManager = () => {
             </label>
             <input
             type="url"
+            aria-label="Telegram webhook URL"
             value={settings.webhook_url || ''}
             onChange={(e) => setSettings({ ...settings, webhook_url: e.target.value })}
             placeholder="https://yourdomain.com/api/v1/telegram/webhook"
@@ -505,7 +508,10 @@ const TelegramManager = () => {
       <Card key={key} className="p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium capitalize">{key.replace('_', ' ')}</h4>
-              <Button variant="ghost" size="sm">
+              <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Edit Telegram template ${key}`}>
                 <Edit className="w-4 h-4" />
               </Button>
             </div>
@@ -574,7 +580,10 @@ const TelegramManager = () => {
             }>
                     {user.active ? 'Активен' : 'Неактивен'}
                   </span>
-                  <Button variant="ghost" size="sm">
+                  <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Message Telegram user ${user.username || user.chat_id}`}>
                     <MessageSquare className="w-4 h-4" />
                   </Button>
                 </div>
@@ -669,6 +678,7 @@ const TelegramManager = () => {
                 </label>
                 <input
                 type="number"
+                aria-label="Telegram test chat ID"
                 value={testChatId}
                 onChange={(e) => setTestChatId(e.target.value)}
                 placeholder="123456789"
@@ -681,6 +691,7 @@ const TelegramManager = () => {
                   Сообщение
                 </label>
                 <textarea
+                aria-label="Telegram test message"
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
                 placeholder="Введите тестовое сообщение..."
