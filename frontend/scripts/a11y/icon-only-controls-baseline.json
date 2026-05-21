@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:16:23.741Z",
+  "generatedAt": "2026-05-21T08:21:42.126Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -154,30 +154,6 @@
       "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DisplayBoardUnified.jsx:686:13:button:title-only",
-      "file": "src/pages/DisplayBoardUnified.jsx",
-      "line": 686,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DisplayBoardUnified.jsx:704:13:button:title-only",
-      "file": "src/pages/DisplayBoardUnified.jsx",
-      "line": 704,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DisplayBoardUnified.jsx:722:13:button:title-only",
-      "file": "src/pages/DisplayBoardUnified.jsx",
-      "line": 722,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
     },
     {
       "signature": "src/pages/RegistrarPanel.jsx:3842:19:button:missing-accessible-name",
