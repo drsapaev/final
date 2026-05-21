@@ -286,6 +286,7 @@ const DentalChart = ({
           <button
             onClick={() => handleZoom('in')}
             className="btn btn-sm"
+            aria-label="Увеличить зубную карту"
             title="Увеличить">
             
             <ZoomIn size={16} />
@@ -293,6 +294,7 @@ const DentalChart = ({
           <button
             onClick={() => handleZoom('out')}
             className="btn btn-sm"
+            aria-label="Уменьшить зубную карту"
             title="Уменьшить">
             
             <ZoomOut size={16} />
@@ -300,6 +302,7 @@ const DentalChart = ({
           <button
             onClick={() => setZoom(1)}
             className="btn btn-sm"
+            aria-label="Сбросить масштаб зубной карты"
             title="Сбросить масштаб">
             
             <RotateCcw size={16} />
@@ -498,6 +501,7 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               value={formData.condition}
               onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
               placeholder="Введите диагноз"
+              aria-label={`Диагноз зуба ${toothId}`}
               style={{
                 width: '100%',
                 padding: '8px',
@@ -518,6 +522,7 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               value={formData.treatment}
               onChange={(e) => setFormData({ ...formData, treatment: e.target.value })}
               placeholder="Введите план лечения"
+              aria-label={`План лечения зуба ${toothId}`}
               style={{
                 width: '100%',
                 padding: '8px',
@@ -537,6 +542,7 @@ const ToothModal = ({ tooth, toothId, onUpdate, onClose }) => {
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Дополнительные заметки"
+              aria-label={`Примечания к зубу ${toothId}`}
               rows={3}
               style={{
                 width: '100%',
@@ -663,6 +669,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.treatment}
               onChange={(e) => setNewItem({ ...newItem, treatment: e.target.value })}
               placeholder="Описание лечения"
+              aria-label="Описание нового пункта лечения"
               style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
           </div>
@@ -681,6 +688,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.estimatedCost}
               onChange={(e) => setNewItem({ ...newItem, estimatedCost: e.target.value })}
               placeholder="Стоимость"
+              aria-label="Стоимость нового пункта лечения"
               style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
             <input
@@ -688,6 +696,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
               value={newItem.estimatedTime}
               onChange={(e) => setNewItem({ ...newItem, estimatedTime: e.target.value })}
               placeholder="Время (мин)"
+              aria-label="Время нового пункта лечения в минутах"
               style={{ padding: '8px', border: '1px solid var(--mac-border)', borderRadius: '4px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' }} />
             
           </div>
@@ -736,6 +745,7 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
                     </div>
                     <button
                   onClick={() => removeItem(item.id)}
+                  aria-label={`Удалить пункт плана лечения для зуба ${item.toothId}`}
                   style={{
                     padding: '4px 8px',
                     border: 'none',

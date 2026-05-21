@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:38:22.453Z",
+  "generatedAt": "2026-05-21T07:44:51.125Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -88,38 +88,6 @@
       "file": "src/components/common/ScheduleNextModal.jsx",
       "line": 537,
       "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DentalChart.jsx:286:11:button:title-only",
-      "file": "src/components/dental/DentalChart.jsx",
-      "line": 286,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/DentalChart.jsx:293:11:button:title-only",
-      "file": "src/components/dental/DentalChart.jsx",
-      "line": 293,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/DentalChart.jsx:300:11:button:title-only",
-      "file": "src/components/dental/DentalChart.jsx",
-      "line": 300,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dental/DentalChart.jsx:737:21:button:missing-accessible-name",
-      "file": "src/components/dental/DentalChart.jsx",
-      "line": 737,
-      "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
     },
