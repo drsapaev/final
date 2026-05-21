@@ -481,6 +481,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           <label style={styles.fieldGroup}>
             <span style={styles.label}>Поиск по ФИО или телефону</span>
             <input
+              aria-label="Search patient by name or phone"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
@@ -539,6 +540,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         <label style={styles.fieldGroup}>
           <span style={styles.label}>Описание (необязательно)</span>
           <textarea
+            aria-label="Family relation description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             style={styles.textarea}
@@ -549,6 +551,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         <label style={styles.checkboxRow}>
           <input
             type="checkbox"
+            aria-label="Mark as primary contact"
             checked={isPrimaryContact}
             onChange={(event) => setIsPrimaryContact(event.target.checked)}
           />
