@@ -338,6 +338,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           onClick={handleMethodSelect}
           className="btn-premium btn-primary"
           style={{ flex: 1, justifyContent: 'center' }}
+          aria-label={loading ? t.sending : t.continue}
           disabled={loading || !contact.trim()}>
 
             {loading ?
@@ -400,6 +401,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           onClick={handleVerifyPhoneCode}
           className="btn-premium btn-primary"
           style={{ flex: 1, justifyContent: 'center' }}
+          aria-label={loading ? 'Проверка кода восстановления' : 'Подтвердить код восстановления'}
           disabled={loading || !verificationCode || verificationCode.length !== 6}>
 
             {loading ?
@@ -492,6 +494,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         onClick={handlePasswordReset}
         className="btn-premium btn-primary"
         style={{ width: '100%', justifyContent: 'center' }}
+        aria-label={loading ? t.resetting : t.resetPassword}
         disabled={loading || !newPassword || !confirmPassword}>
 
           {loading ?
