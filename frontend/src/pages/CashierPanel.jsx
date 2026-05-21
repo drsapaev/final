@@ -945,6 +945,7 @@ const CashierPanel = () => {void
                   color: 'var(--mac-text-tertiary)'
                 }} />
                 <input
+                  aria-label="Search cashier payments"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   style={{
@@ -1204,7 +1205,9 @@ const CashierPanel = () => {void
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
 
-                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                            <td
+                              aria-label="Pending appointment date and time"
+                              style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '500' }}>
                                   {appointment.created_at ?
@@ -1351,7 +1354,9 @@ const CashierPanel = () => {void
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
 
-                              <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <td
+                                aria-label="Payment history date and time"
+                                style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
                                   <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{row.time || '—'}</span>
@@ -1496,6 +1501,7 @@ const CashierPanel = () => {void
                 Вы уверены, что хотите отменить платёж #{confirmingPaymentId}?
               </Typography>
               <textarea
+                aria-label="Payment cancel reason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Причина отмены (необязательно)"
@@ -1630,6 +1636,7 @@ const CashierPanel = () => {void
                   <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
                   <input
                     type="number"
+                    aria-label="Refund amount"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
                     style={{
@@ -1646,6 +1653,7 @@ const CashierPanel = () => {void
                 <Box>
                   <Typography variant="body2" gutterBottom>Причина возврата:</Typography>
                   <textarea
+                    aria-label="Refund reason"
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
                     placeholder="Укажите причину возврата (минимум 3 символа)"
