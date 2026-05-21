@@ -3587,6 +3587,7 @@ const DentistPanelUnified = () => {
               </h2>
               <button
               onClick={() => setShowDentalChart(false)}
+              aria-label={`Закрыть схему зубов пациента ${selectedPatientDisplayName}`}
               style={{
                 background: 'none',
                 border: 'none',
@@ -3660,6 +3661,7 @@ const DentistPanelUnified = () => {
               </h2>
               <button
               onClick={() => setShowTreatmentPlanner(false)}
+              aria-label={`Закрыть план лечения пациента ${selectedPatientDisplayName}`}
               style={{
                 background: 'none',
                 border: 'none',

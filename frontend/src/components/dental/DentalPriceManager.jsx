@@ -174,6 +174,7 @@ const DentalPriceManager = ({
           </div>
           <button
             onClick={onClose}
+            aria-label={`Закрыть указание цены для услуги ${serviceName}`}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             
             <X size={24} />

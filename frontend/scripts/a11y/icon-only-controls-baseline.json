@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:53:58.864Z",
+  "generatedAt": "2026-05-21T07:59:03.935Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -88,22 +88,6 @@
       "file": "src/components/common/ScheduleNextModal.jsx",
       "line": 537,
       "column": 17,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DentalPriceManager.jsx:175:11:button:missing-accessible-name",
-      "file": "src/components/dental/DentalPriceManager.jsx",
-      "line": 175,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/ReportsAndAnalytics.jsx:566:13:button:missing-accessible-name",
-      "file": "src/components/dental/ReportsAndAnalytics.jsx",
-      "line": 566,
-      "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
     },
@@ -280,22 +264,6 @@
       "file": "src/components/wizard/AppointmentWizardV2.jsx",
       "line": 3764,
       "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:3588:15:button:missing-accessible-name",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 3588,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:3661:15:button:missing-accessible-name",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 3661,
-      "column": 15,
       "element": "button",
       "reason": "missing-accessible-name"
     },
