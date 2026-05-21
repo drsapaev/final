@@ -218,6 +218,7 @@ export function Table({
                   {column.filterable !== false && (
                     <input
                       type="text"
+                      aria-label={`Filter ${column.title}`}
                       placeholder={`Фильтр по ${column.title.toLowerCase()}`}
                       value={filters[column.key] || ''}
                       onChange={(e) => handleFilter(column.key, e.target.value)}
@@ -269,6 +270,7 @@ export function Table({
           <div>
             <button
               style={pageButtonStyle}
+              aria-label="Previous table page"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
@@ -290,6 +292,7 @@ export function Table({
             
             <button
               style={pageButtonStyle}
+              aria-label="Next table page"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
@@ -334,7 +337,7 @@ function TableLoading({ columns = 3, rows = 5 }) {
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) => (
-            <th key={i} style={cellStyle}>
+            <th key={i} style={cellStyle} aria-label={`Loading table column ${i + 1}`}>
               <div style={skeletonStyle} />
             </th>
           ))}
@@ -344,7 +347,11 @@ function TableLoading({ columns = 3, rows = 5 }) {
         {Array.from({ length: rows }).map((_, rowIndex) => (
           <tr key={rowIndex}>
             {Array.from({ length: columns }).map((_, colIndex) => (
-              <td key={colIndex} style={cellStyle}>
+              <td
+                key={colIndex}
+                style={cellStyle}
+                aria-label={`Loading table row ${rowIndex + 1} column ${colIndex + 1}`}
+              >
                 <div style={skeletonStyle} />
               </td>
             ))}
