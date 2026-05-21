@@ -129,6 +129,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('slider')}
+                aria-label="Включить режим сравнения: слайдер"
                 title="Слайдер">
                 
                 <ArrowLeftRight style={{ width: 16, height: 16 }} />
@@ -145,6 +146,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('side-by-side')}
+                aria-label="Включить режим сравнения: рядом"
                 title="Рядом">
                 
                 <Columns style={{ width: 16, height: 16 }} />
@@ -161,6 +163,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('overlay')}
+                aria-label="Включить режим сравнения: наложение"
                 title="Наложение">
                 
                 <Layout style={{ width: 16, height: 16 }} />
@@ -170,6 +173,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             {/* Зум контролы */}
             <button
               onClick={handleZoomOut}
+              aria-label="Уменьшить масштаб фото"
               style={{
                 padding: '8px',
                 border: '1px solid var(--mac-border)',
@@ -186,6 +190,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             <Badge variant="info">{Math.round(zoom * 100)}%</Badge>
             <button
               onClick={handleZoomIn}
+              aria-label="Увеличить масштаб фото"
               style={{
                 padding: '8px',
                 border: '1px solid var(--mac-border)',
@@ -201,6 +206,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             </button>
             <button
               onClick={handleResetZoom}
+              aria-label="Сбросить масштаб фото"
               style={{
                 padding: '8px',
                 border: '1px solid var(--mac-border)',
@@ -216,6 +222,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             </button>
             <button
               onClick={handleFullscreen}
+              aria-label="Открыть сравнение фото на весь экран"
               style={{
                 padding: '8px',
                 border: '1px solid var(--mac-border)',
@@ -452,6 +459,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               </Typography>
               <input
               type="range"
+              aria-label="Настроить прозрачность наложения фото"
               min="0"
               max="100"
               value={sliderPosition}

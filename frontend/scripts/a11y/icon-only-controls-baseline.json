@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T06:53:30.895Z",
+  "generatedAt": "2026-05-21T07:03:12.222Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -488,110 +488,6 @@
       "file": "src/components/dental/VisitProtocol.jsx",
       "line": 922,
       "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:120:15:button:title-only",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 120,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:136:15:button:title-only",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 136,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:152:15:button:title-only",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 152,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:171:13:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 171,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:187:13:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 187,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:202:13:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 202,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoComparison.jsx:217:13:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoComparison.jsx",
-      "line": 217,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoUploader.jsx:332:21:img:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoUploader.jsx",
-      "line": 332,
-      "column": 21,
-      "element": "img",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoUploader.jsx:360:23:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoUploader.jsx",
-      "line": 360,
-      "column": 23,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoUploader.jsx:439:21:img:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoUploader.jsx",
-      "line": 439,
-      "column": 21,
-      "element": "img",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PhotoUploader.jsx:467:23:button:missing-accessible-name",
-      "file": "src/components/dermatology/PhotoUploader.jsx",
-      "line": 467,
-      "column": 23,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/PriceOverrideManager.jsx:201:11:button:missing-accessible-name",
-      "file": "src/components/dermatology/PriceOverrideManager.jsx",
-      "line": 201,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dermatology/ProcedureTemplates.jsx:353:21:button:missing-accessible-name",
-      "file": "src/components/dermatology/ProcedureTemplates.jsx",
-      "line": 353,
-      "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
     },

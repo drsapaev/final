@@ -333,6 +333,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
                   src={photo.preview}
                   alt="Before"
                   role="button"
+                  aria-label="Открыть фото до процедуры"
                   tabIndex={0}
                   style={{
                     width: '100%',
@@ -359,6 +360,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
                 }}>
                       <button
                     onClick={() => deletePhoto(photo.id, 'before')}
+                    aria-label="Удалить фото до процедуры"
                     style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}>
                     
                         <Trash2 style={{ width: 16, height: 16 }} />
@@ -440,6 +442,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
                   src={photo.preview}
                   alt="After"
                   role="button"
+                  aria-label="Открыть фото после процедуры"
                   tabIndex={0}
                   style={{
                     width: '100%',
@@ -466,6 +469,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
                 }}>
                       <button
                     onClick={() => deletePhoto(photo.id, 'after')}
+                    aria-label="Удалить фото после процедуры"
                     style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}>
                     
                         <Trash2 style={{ width: 16, height: 16 }} />
