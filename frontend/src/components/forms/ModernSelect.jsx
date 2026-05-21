@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
   ChevronDown,
@@ -34,6 +34,8 @@ const ModernSelect = ({
   className = '',
   ...props
 }) => {
+  const selectListboxId = useId();
+  const accessibleLabel = typeof label === 'string' && label.trim() ? label : placeholder;
   const { getColor } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -329,6 +331,8 @@ const ModernSelect = ({
         onBlur={() => setFocused(false)}
         tabIndex={disabled ? -1 : 0}
         role="combobox"
+        aria-label={accessibleLabel}
+        aria-controls={selectListboxId}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-invalid={hasError}>
@@ -392,6 +396,7 @@ const ModernSelect = ({
             ref={searchInputRef}
             type="text"
             className="search-input"
+            aria-label={`Поиск: ${accessibleLabel}`}
             placeholder="Поиск..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -404,7 +409,7 @@ const ModernSelect = ({
         }
 
           {/* Опции */}
-          <div className="select-options" role="listbox">
+          <div id={selectListboxId} className="select-options" role="listbox">
             {loading ?
           <div className="select-loading">
                 <div className="loading-spinner" />
