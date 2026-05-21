@@ -425,7 +425,11 @@ const ScheduleNextModal = ({
         {/* Заголовок */}
         <div style={headerStyle}>
           <h2 style={titleStyle}>{getModalTitle()}</h2>
-          <button style={closeButtonStyle} onClick={onClose}>
+          <button
+            style={closeButtonStyle}
+            onClick={onClose}
+            aria-label="Close schedule next visit modal"
+          >
             <X size={20} />
           </button>
         </div>
@@ -538,7 +542,8 @@ const ScheduleNextModal = ({
                 type="button"
                 style={dangerButtonStyle}
                 onClick={() => removeService(index)}
-                disabled={formData.services.length === 1}>
+                disabled={formData.services.length === 1}
+                aria-label={`Remove service ${index + 1}`}>
                 
                   <Trash2 size={16} />
                 </button>

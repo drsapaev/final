@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:29:55.105Z",
+  "generatedAt": "2026-05-21T08:34:27.111Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -25,22 +25,6 @@
       "line": 47,
       "column": 7,
       "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/common/ScheduleNextModal.jsx:428:11:button:missing-accessible-name",
-      "file": "src/components/common/ScheduleNextModal.jsx",
-      "line": 428,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/common/ScheduleNextModal.jsx:537:17:button:missing-accessible-name",
-      "file": "src/components/common/ScheduleNextModal.jsx",
-      "line": 537,
-      "column": 17,
-      "element": "button",
       "reason": "missing-accessible-name"
     },
     {
