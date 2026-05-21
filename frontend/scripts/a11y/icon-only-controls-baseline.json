@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:11:26.305Z",
+  "generatedAt": "2026-05-21T07:17:39.837Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -128,62 +128,6 @@
       "file": "src/components/dental/DentalPriceManager.jsx",
       "line": 175,
       "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:259:9:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 259,
-      "column": 9,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:314:11:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 314,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:357:11:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 357,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:400:11:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 400,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:524:11:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 524,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:651:11:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 651,
-      "column": 11,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/dental/DiagnosisForm.jsx:740:13:button:missing-accessible-name",
-      "file": "src/components/dental/DiagnosisForm.jsx",
-      "line": 740,
-      "column": 13,
       "element": "button",
       "reason": "missing-accessible-name"
     },

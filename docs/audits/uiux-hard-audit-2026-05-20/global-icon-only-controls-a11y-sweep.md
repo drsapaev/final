@@ -50,7 +50,8 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 - 2026-05-21: EMR v2 controls cleanup removed 12 baseline findings.
 - 2026-05-21: dermatology controls cleanup removed 13 baseline findings.
 - 2026-05-21: dental photo archive controls cleanup removed 13 baseline findings.
-- Current baseline after this slice: 79 findings.
+- 2026-05-21: dental diagnosis form controls cleanup removed 7 baseline findings.
+- Current baseline after this slice: 72 findings.
 
 ## CI Policy
 
