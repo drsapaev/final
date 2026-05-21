@@ -3842,6 +3842,7 @@ const RegistrarPanel = () => {
                   <button
                 onClick={loadMoreAppointments}
                 disabled={paginationInfo.loadingMore}
+                aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
                 style={{
                   padding: '12px 24px',
                   borderRadius: '8px',

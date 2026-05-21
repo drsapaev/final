@@ -91,6 +91,7 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
       <div
         role="button"
         tabIndex={0}
+        aria-label="Close sidebar overlay"
         style={{
           position: 'fixed',
           top: 0,

@@ -1,63 +1,6 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:39:16.062Z",
-  "entries": [
-    {
-      "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
-      "file": "src/components/admin/FinanceModal.jsx",
-      "line": 215,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:74:11:div:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 74,
-      "column": 11,
-      "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/buttons/FloatingActionButton.jsx:47:7:div:missing-accessible-name",
-      "file": "src/components/buttons/FloatingActionButton.jsx",
-      "line": 47,
-      "column": 7,
-      "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/layout/UnifiedLayout.jsx:91:7:div:missing-accessible-name",
-      "file": "src/components/layout/UnifiedLayout.jsx",
-      "line": 91,
-      "column": 7,
-      "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/mobile/PWAInstallPrompt.jsx:104:13:button:missing-accessible-name",
-      "file": "src/components/mobile/PWAInstallPrompt.jsx",
-      "line": 104,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/tickets/MultipleTicketsPrinter.jsx:78:9:button:missing-accessible-name",
-      "file": "src/components/tickets/MultipleTicketsPrinter.jsx",
-      "line": 78,
-      "column": 9,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/RegistrarPanel.jsx:3842:19:button:missing-accessible-name",
-      "file": "src/pages/RegistrarPanel.jsx",
-      "line": 3842,
-      "column": 19,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    }
-  ]
+  "generatedAt": "2026-05-21T08:43:49.311Z",
+  "entries": []
 }
