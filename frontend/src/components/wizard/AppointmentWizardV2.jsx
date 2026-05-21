@@ -3233,6 +3233,7 @@ const PatientStepV2 = ({
               type="radio"
               name="discount_mode"
               value="none"
+              aria-label="Select paid visit discount mode"
               checked={cart?.discount_mode === 'none'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
               style={{ margin: 0 }} />
@@ -3263,6 +3264,7 @@ const PatientStepV2 = ({
               type="radio"
               name="discount_mode"
               value="repeat"
+              aria-label="Select repeat visit discount mode"
               checked={cart?.discount_mode === 'repeat'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
               style={{ margin: 0 }} />
@@ -3293,6 +3295,7 @@ const PatientStepV2 = ({
               type="radio"
               name="discount_mode"
               value="benefit"
+              aria-label="Select benefit discount mode"
               checked={cart?.discount_mode === 'benefit'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
               style={{ margin: 0 }} />
@@ -3323,6 +3326,7 @@ const PatientStepV2 = ({
 
             <input
               type="checkbox"
+              aria-label="Request all services free approval"
               checked={cart?.all_free}
               onChange={(e) => onUpdateCart('all_free', e.target.checked)}
               style={{ margin: 0 }} />
@@ -3577,6 +3581,7 @@ const CartStepV2 = ({
 
                 <input
                   type="checkbox"
+                  aria-label={`Select service ${service.name || service.service_code || service.id}`}
                   checked={isInCart}
                   onChange={() => handleServiceToggle(service)}
                   style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, margin: 0 }} />
