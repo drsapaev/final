@@ -309,6 +309,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           </label>
           <input
           type={method === 'phone' ? 'tel' : 'email'}
+          aria-label={method === 'phone' ? t.phoneLabel : t.emailLabel}
           value={contact}
           onChange={(e) => {
             const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
@@ -376,6 +377,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>Код подтверждения</label>
           <input
           type="text"
+          aria-label="Verification code"
           value={verificationCode}
           onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
           placeholder="000000"
@@ -470,6 +472,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.newPassword}</label>
           <input
           type="password"
+          aria-label={t.newPassword}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           placeholder="••••••••"
@@ -482,6 +485,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.confirmPassword}</label>
           <input
           type="password"
+          aria-label={t.confirmPassword}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="••••••••"
