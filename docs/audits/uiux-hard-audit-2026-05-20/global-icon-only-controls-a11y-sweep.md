@@ -37,6 +37,11 @@ Stale baseline entries: 0
 
 The project now has a required no-new-regression gate for icon-only controls. The current historical baseline is tracked in `frontend/scripts/a11y/icon-only-controls-baseline.json`.
 
+## Cleanup Progress
+
+- 2026-05-21: chat and AI controls cleanup removed 18 baseline findings.
+- Current baseline after this slice: 182 findings.
+
 ## CI Policy
 
 - `npm run audit:icon-controls` fails when new icon-only controls are added without a robust accessible name.

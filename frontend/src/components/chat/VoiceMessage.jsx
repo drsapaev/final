@@ -206,6 +206,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
             <audio
                 ref={audioRef}
                 src={audioSrc || undefined}
+                aria-label="Голосовое сообщение"
                 preload="none"
             />
 
@@ -214,6 +215,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
                 className="play-button"
                 disabled={isLoading || audioUnavailable || !fileUrl}
                 title={audioUnavailable ? 'Аудио недоступно' : (isPlaying ? 'Пауза' : 'Воспроизвести')}
+                aria-label={audioUnavailable ? 'Аудио недоступно' : (isPlaying ? 'Поставить голосовое сообщение на паузу' : 'Воспроизвести голосовое сообщение')}
             >
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
             </button>

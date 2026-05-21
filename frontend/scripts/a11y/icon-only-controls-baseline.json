@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T01:01:59.586Z",
+  "generatedAt": "2026-05-21T04:45:35.250Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -188,46 +188,6 @@
       "reason": "missing-accessible-name"
     },
     {
-      "signature": "src/components/ai/AIChatWindow.jsx:186:25:button:title-only",
-      "file": "src/components/ai/AIChatWindow.jsx",
-      "line": 186,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/ai/AIChatWindow.jsx:193:25:button:title-only",
-      "file": "src/components/ai/AIChatWindow.jsx",
-      "line": 193,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/ai/AIChatWindow.jsx:213:15:button:title-only",
-      "file": "src/components/ai/AIChatWindow.jsx",
-      "line": 213,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/ai/AIChatWindow.jsx:247:21:button:missing-accessible-name",
-      "file": "src/components/ai/AIChatWindow.jsx",
-      "line": 247,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AISuggestions.jsx:136:13:button:missing-accessible-name",
-      "file": "src/components/ai/AISuggestions.jsx",
-      "line": 136,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
       "signature": "src/components/auth/ForgotPassword.jsx:337:11:button:missing-accessible-name",
       "file": "src/components/auth/ForgotPassword.jsx",
       "line": 337,
@@ -280,102 +240,6 @@
       "file": "src/components/cashier/RefundRequestsTable.jsx",
       "line": 372,
       "column": 57,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatButton.jsx:19:13:button:title-only",
-      "file": "src/components/chat/ChatButton.jsx",
-      "line": 19,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:634:13:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 634,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:658:13:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 658,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:669:25:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 669,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:678:25:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 678,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:774:33:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 774,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:986:85:img:missing-accessible-name",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 986,
-      "column": 85,
-      "element": "img",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:1047:65:button:missing-accessible-name",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 1047,
-      "column": 65,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/chat/ChatWindow.jsx:1113:15:button:title-only",
-      "file": "src/components/chat/ChatWindow.jsx",
-      "line": 1113,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/FileUploader.jsx:28:13:button:title-only",
-      "file": "src/components/chat/FileUploader.jsx",
-      "line": 28,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/VoiceMessage.jsx:212:13:button:title-only",
-      "file": "src/components/chat/VoiceMessage.jsx",
-      "line": 212,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/chat/VoiceRecorder.jsx:188:25:button:title-only",
-      "file": "src/components/chat/VoiceRecorder.jsx",
-      "line": 188,
-      "column": 25,
       "element": "button",
       "reason": "title-only"
     },
@@ -1352,14 +1216,6 @@
       "file": "src/components/wizard/AppointmentWizardV2.jsx",
       "line": 3764,
       "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/hooks/useAI.jsx:653:11:button:missing-accessible-name",
-      "file": "src/hooks/useAI.jsx",
-      "line": 653,
-      "column": 11,
       "element": "button",
       "reason": "missing-accessible-name"
     },
