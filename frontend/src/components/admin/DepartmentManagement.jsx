@@ -835,6 +835,7 @@ const DepartmentManagement = () => {
                                 </MacOSButton>
                                 <input
                   type="file"
+                  aria-label="Import departments from CSV"
                   accept=".csv"
                   onChange={handleImport}
                   style={{
@@ -1394,6 +1395,7 @@ const DepartmentManagement = () => {
                                                     <MacOSButton
                             size="sm"
                             variant="secondary"
+                            aria-label={`Edit department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => openEditModal(dept)}
                             title="Редактировать отделение">
                             
@@ -1402,6 +1404,7 @@ const DepartmentManagement = () => {
                                                     <MacOSButton
                             size="sm"
                             variant="danger"
+                            aria-label={`Delete department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => handleDeleteDepartment(dept.id)}
                             title="Удалить отделение">
                             
