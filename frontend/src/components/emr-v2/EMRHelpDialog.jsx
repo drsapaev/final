@@ -17,6 +17,7 @@ const EMRHelpDialog = ({ isOpen, onClose }) => {
             className="emr-v2-modal-overlay"
             role="button"
             tabIndex={0}
+            aria-label="Закрыть справку EMR"
             onClick={onClose}
             onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
             <div className="emr-v2-modal-content theme-soft-surface" onClickCapture={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: '12px' }}>
