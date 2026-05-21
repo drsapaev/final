@@ -54,22 +54,22 @@ export default function Scheduler() {
   return (
     <div>
       <RoleGate roles={['Admin', 'Registrar', 'Doctor']}>
-        <div className="legacy-page-shell">
+        <div className="clinic-ops-page-shell">
           <h2 style={{ margin: 0 }}>Расписание</h2>
 
-          <div className="legacy-toolbar">
-            <label>
+          <div className="clinic-ops-toolbar">
+            <label htmlFor="scheduler-date">
               Дата:&nbsp;
-              <input className="legacy-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input id="scheduler-date" className="clinic-ops-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
-            <input className="legacy-input" placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
-            <button className="legacy-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <input className="clinic-ops-input" aria-label="Поиск по врачу, кабинету или статусу" placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <button className="clinic-ops-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
           </div>
 
-          {err && <div className="legacy-error">{String(err)}</div>}
+          {err && <div className="clinic-ops-error">{String(err)}</div>}
 
-          <div className="legacy-table-wrap">
-            <table className="legacy-table">
+          <div className="clinic-ops-table-wrap">
+            <table className="clinic-ops-table">
               <thead>
                 <tr>
                   <th>Врач</th>

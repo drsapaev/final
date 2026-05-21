@@ -3882,7 +3882,7 @@ const RegistrarPanel = () => {
                 </div>
             }
 
-              {/* Старая таблица и legacy-конфигурация удалены - используется EnhancedAppointmentsTable */}
+              {/* Старая таблица и прежняя конфигурация удалены - используется EnhancedAppointmentsTable */}
             </div>
           </div>
         }

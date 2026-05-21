@@ -354,8 +354,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           {loading ?
           <Progress /> :
           filteredResults.length > 0 ?
-          <div className="legacy-table-wrap">
-              <table className="legacy-table">
+          <div className="clinic-ops-table-wrap">
+              <table className="clinic-ops-table">
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>Исследование</th>

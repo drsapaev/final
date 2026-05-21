@@ -123,7 +123,7 @@ const EnhancedAppointmentsTable = ({
 
   // ✅ FIX 17: Helper для безопасного парсинга даты
   // Контракт: backend должен отдавать ISO 8601 с корректным timezone.
-  // Для legacy-naive строк считаем, что это время клиники Asia/Tashkent.
+  // Для исторических naive строк считаем, что это время клиники Asia/Tashkent.
   const safeParseDate = useCallback((dateStr) => {
     return parseRegistrarTimestamp(dateStr);
   }, []);
