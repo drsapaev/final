@@ -161,6 +161,7 @@ function NewPatientComponent() {
       {/* Форма создания пациента */}
       <form onSubmit={handleSubmit} className="patient-form">
         <input type="text"
+      aria-label="Patient full name"
       placeholder="ФИО пациента"
       value={formData.full_name}
       onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
@@ -169,6 +170,7 @@ function NewPatientComponent() {
 
         <input
         type="tel"
+        aria-label="Patient phone"
         placeholder="Телефон"
         value={formData.phone}
         onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
@@ -177,6 +179,7 @@ function NewPatientComponent() {
 
         <input
         type="email"
+        aria-label="Patient email"
         placeholder="Email"
         value={formData.email}
         onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
@@ -185,6 +188,7 @@ function NewPatientComponent() {
 
         <input
         type="date"
+        aria-label="Patient birth date"
         value={formData.birth_date}
         onChange={(e) => setFormData((prev) => ({ ...prev, birth_date: e.target.value }))}
         disabled={submitting} />
