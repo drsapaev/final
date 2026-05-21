@@ -238,6 +238,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Зубы для процедуры ${index + 1}`}
               value={procedure.teeth || ''}
               onChange={(e) => handleArrayUpdate('procedures', index, { teeth: e.target.value })}
               disabled={!isEditing}
@@ -252,6 +253,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="time"
+              aria-label={`Время начала процедуры ${index + 1}`}
               value={procedure.startTime || ''}
               onChange={(e) => handleArrayUpdate('procedures', index, { startTime: e.target.value })}
               disabled={!isEditing}
@@ -265,6 +267,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="time"
+              aria-label={`Время окончания процедуры ${index + 1}`}
               value={procedure.endTime || ''}
               onChange={(e) => handleArrayUpdate('procedures', index, { endTime: e.target.value })}
               disabled={!isEditing}
@@ -278,6 +281,7 @@ const VisitProtocol = ({
                 Описание процедуры
               </label>
               <textarea
+            aria-label={`Описание процедуры ${index + 1}`}
             value={procedure.description || ''}
             onChange={(e) => handleArrayUpdate('procedures', index, { description: e.target.value })}
             disabled={!isEditing}
@@ -292,6 +296,7 @@ const VisitProtocol = ({
                 <label className="flex items-center gap-2">
                   <input
                 type="checkbox"
+                aria-label={`Процедура ${index + 1} завершена`}
                 checked={procedure.completed || false}
                 onChange={(e) => handleArrayUpdate('procedures', index, { completed: e.target.checked })}
                 disabled={!isEditing}
@@ -303,6 +308,7 @@ const VisitProtocol = ({
                 <label className="flex items-center gap-2">
                   <input
                 type="checkbox"
+                aria-label={`У процедуры ${index + 1} были осложнения`}
                 checked={procedure.complications || false}
                 onChange={(e) => handleArrayUpdate('procedures', index, { complications: e.target.checked })}
                 disabled={!isEditing}
@@ -315,6 +321,7 @@ const VisitProtocol = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('procedures', index)}
+            aria-label={`Удалить процедуру ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -365,6 +372,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Название материала ${index + 1}`}
               value={material.name || ''}
               onChange={(e) => handleArrayUpdate('materials', index, { name: e.target.value })}
               disabled={!isEditing}
@@ -379,6 +387,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Количество материала ${index + 1}`}
               value={material.quantity || ''}
               onChange={(e) => handleArrayUpdate('materials', index, { quantity: e.target.value })}
               disabled={!isEditing}
@@ -393,6 +402,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Партия или срок годности материала ${index + 1}`}
               value={material.batch || ''}
               onChange={(e) => handleArrayUpdate('materials', index, { batch: e.target.value })}
               disabled={!isEditing}
@@ -404,6 +414,7 @@ const VisitProtocol = ({
             
             <div className="flex items-center justify-between">
               <textarea
+            aria-label={`Заметки по материалу ${index + 1}`}
             value={material.notes || ''}
             onChange={(e) => handleArrayUpdate('materials', index, { notes: e.target.value })}
             disabled={!isEditing}
@@ -414,6 +425,7 @@ const VisitProtocol = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('materials', index)}
+            aria-label={`Удалить материал ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -461,6 +473,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Препарат анестезии ${index + 1}`}
               value={anesthesia.drug || ''}
               onChange={(e) => handleArrayUpdate('anesthesia', index, { drug: e.target.value })}
               disabled={!isEditing}
@@ -475,6 +488,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Доза анестезии ${index + 1}`}
               value={anesthesia.dose || ''}
               onChange={(e) => handleArrayUpdate('anesthesia', index, { dose: e.target.value })}
               disabled={!isEditing}
@@ -508,6 +522,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Область анестезии ${index + 1}`}
               value={anesthesia.area || ''}
               onChange={(e) => handleArrayUpdate('anesthesia', index, { area: e.target.value })}
               disabled={!isEditing}
@@ -522,6 +537,7 @@ const VisitProtocol = ({
                 <label className="flex items-center gap-2">
                   <input
                 type="checkbox"
+                aria-label={`Анестезия ${index + 1} эффективна`}
                 checked={anesthesia.effective || false}
                 onChange={(e) => handleArrayUpdate('anesthesia', index, { effective: e.target.checked })}
                 disabled={!isEditing}
@@ -533,6 +549,7 @@ const VisitProtocol = ({
                 <label className="flex items-center gap-2">
                   <input
                 type="checkbox"
+                aria-label={`У анестезии ${index + 1} были осложнения`}
                 checked={anesthesia.complications || false}
                 onChange={(e) => handleArrayUpdate('anesthesia', index, { complications: e.target.checked })}
                 disabled={!isEditing}
@@ -545,6 +562,7 @@ const VisitProtocol = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('anesthesia', index)}
+            aria-label={`Удалить анестезию ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -599,6 +617,7 @@ const VisitProtocol = ({
                   {isEditing &&
             <button
               onClick={() => handleArrayRemove(`photos.${category}`, index)}
+              aria-label={`Удалить фото ${index + 1}`}
               className="text-red-500 hover:text-red-700">
               
                       <Trash2 className="h-4 w-4" />
@@ -612,6 +631,7 @@ const VisitProtocol = ({
                   <span className="text-sm">Загрузить фото</span>
                   <input
               type="file"
+              aria-label={`Загрузить фото: ${category}`}
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -668,6 +688,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Область рентгена ${index + 1}`}
               value={radiograph.area || ''}
               onChange={(e) => handleArrayUpdate('radiographs', index, { area: e.target.value })}
               disabled={!isEditing}
@@ -679,6 +700,7 @@ const VisitProtocol = ({
             
             <div className="flex items-center justify-between">
               <textarea
+            aria-label={`Описание находок рентгена ${index + 1}`}
             value={radiograph.findings || ''}
             onChange={(e) => handleArrayUpdate('radiographs', index, { findings: e.target.value })}
             disabled={!isEditing}
@@ -689,6 +711,7 @@ const VisitProtocol = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('radiographs', index)}
+            aria-label={`Удалить рентген ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -735,6 +758,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Препарат назначения ${index + 1}`}
               value={prescription.medication || ''}
               onChange={(e) => handleArrayUpdate('prescriptions', index, { medication: e.target.value })}
               disabled={!isEditing}
@@ -749,6 +773,7 @@ const VisitProtocol = ({
                 </label>
                 <input
               type="text"
+              aria-label={`Дозировка назначения ${index + 1}`}
               value={prescription.dosage || ''}
               onChange={(e) => handleArrayUpdate('prescriptions', index, { dosage: e.target.value })}
               disabled={!isEditing}
@@ -760,6 +785,7 @@ const VisitProtocol = ({
             
             <div className="flex items-center justify-between">
               <textarea
+            aria-label={`Инструкции по назначению ${index + 1}`}
             value={prescription.instructions || ''}
             onChange={(e) => handleArrayUpdate('prescriptions', index, { instructions: e.target.value })}
             disabled={!isEditing}
@@ -770,6 +796,7 @@ const VisitProtocol = ({
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('prescriptions', index)}
+            aria-label={`Удалить назначение ${index + 1}`}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -800,6 +827,7 @@ const VisitProtocol = ({
           Общие рекомендации
         </label>
         <textarea
+        aria-label="Общие рекомендации протокола визита"
         value={formData.recommendations || ''}
         onChange={(e) => handleInputChange('recommendations', e.target.value)}
         disabled={!isEditing}
@@ -819,6 +847,7 @@ const VisitProtocol = ({
             </label>
             <input
             type="date"
+            aria-label="Дата следующего визита"
             value={formData.nextVisit.date || ''}
             onChange={(e) => handleInputChange('nextVisit.date', e.target.value)}
             disabled={!isEditing}
@@ -832,6 +861,7 @@ const VisitProtocol = ({
             </label>
             <input
             type="time"
+            aria-label="Время следующего визита"
             value={formData.nextVisit.time || ''}
             onChange={(e) => handleInputChange('nextVisit.time', e.target.value)}
             disabled={!isEditing}
@@ -845,6 +875,7 @@ const VisitProtocol = ({
             </label>
             <input
             type="text"
+            aria-label="Цель следующего визита"
             value={formData.nextVisit.purpose || ''}
             onChange={(e) => handleInputChange('nextVisit.purpose', e.target.value)}
             disabled={!isEditing}
@@ -921,6 +952,7 @@ const VisitProtocol = ({
             }
             <button
               onClick={onClose}
+              aria-label="Закрыть протокол визита"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
