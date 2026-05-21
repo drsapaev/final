@@ -554,6 +554,7 @@ const ClinicSettings = () => {
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <input
                     type="file"
+                    aria-label="Загрузить логотип клиники"
                     accept="image/*"
                     onChange={handleLogoSelect}
                     style={{ display: 'none' }}
