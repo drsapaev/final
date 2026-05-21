@@ -137,6 +137,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
         
         <button
           onClick={() => handleToothClick(toothNumber)}
+          aria-label={`Зуб ${toothNumber}: ${STATUS_NAMES[status]}`}
           style={{
             color: STATUS_COLORS[status],
             border: isSelected ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
@@ -222,6 +223,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
               <button
                 onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+                aria-label="Уменьшить зубную карту"
                 style={{
                   padding: '8px 12px',
                   border: 'none',
@@ -236,6 +238,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
               </button>
               <button
                 onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+                aria-label="Увеличить зубную карту"
                 style={{
                   padding: '8px 12px',
                   border: 'none',
