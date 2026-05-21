@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T05:56:39.337Z",
+  "generatedAt": "2026-05-21T06:14:13.431Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -689,94 +689,6 @@
       "line": 128,
       "column": 13,
       "element": "div",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:321:13:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 321,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:331:13:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 331,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:341:13:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 341,
-      "column": 13,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:438:19:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 438,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:445:19:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 445,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:452:19:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 452,
-      "column": 19,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:553:13:button:missing-accessible-name",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 553,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:559:13:button:missing-accessible-name",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 559,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:583:11:button:title-only",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 583,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:620:15:button:missing-accessible-name",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 620,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/files/FileManager.jsx:683:15:button:missing-accessible-name",
-      "file": "src/components/files/FileManager.jsx",
-      "line": 683,
-      "column": 15,
-      "element": "button",
       "reason": "missing-accessible-name"
     },
     {
