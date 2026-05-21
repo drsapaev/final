@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:09:58.128Z",
+  "generatedAt": "2026-05-21T08:16:23.741Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -96,38 +96,6 @@
       "file": "src/components/mobile/PWAInstallPrompt.jsx",
       "line": 104,
       "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/notifications/EmailSMSManager.jsx:676:21:button:missing-accessible-name",
-      "file": "src/components/notifications/EmailSMSManager.jsx",
-      "line": 676,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/notifications/EmailSMSManager.jsx:679:21:button:missing-accessible-name",
-      "file": "src/components/notifications/EmailSMSManager.jsx",
-      "line": 679,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/notifications/EmailSMSManager.jsx:709:21:button:missing-accessible-name",
-      "file": "src/components/notifications/EmailSMSManager.jsx",
-      "line": 709,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/notifications/EmailSMSManager.jsx:712:21:button:missing-accessible-name",
-      "file": "src/components/notifications/EmailSMSManager.jsx",
-      "line": 712,
-      "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
     },

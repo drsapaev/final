@@ -60,7 +60,8 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 - 2026-05-21: remaining dental close controls cleanup removed 4 baseline findings.
 - 2026-05-21: two-factor security controls cleanup removed 7 baseline findings.
 - 2026-05-21: auth password controls cleanup removed 6 baseline findings.
-- Current baseline after this slice: 27 findings.
+- 2026-05-21: notification template controls cleanup removed 4 baseline findings.
+- Current baseline after this slice: 23 findings.
 
 ## CI Policy
 
