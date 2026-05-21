@@ -300,12 +300,14 @@ const PhotoArchive = ({
         <div className="mt-2 flex gap-1">
                 <button
             onClick={() => handleFileUpdate(file.id, {})}
+            aria-label={`Редактировать файл ${file.name}`}
             className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
             
                   <Edit className="h-3 w-3 mx-auto" />
                 </button>
                 <button
             onClick={() => handleFileDelete(file.id)}
+            aria-label={`Удалить файл ${file.name}`}
             className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
             
                   <Trash2 className="h-3 w-3 mx-auto" />
@@ -328,6 +330,7 @@ const PhotoArchive = ({
             <div
           className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center cursor-pointer"
           role="button"
+          aria-label={`Открыть файл ${file.name}`}
           tabIndex={0}
           onClick={() => openFileViewer(file)}
           onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
@@ -397,6 +400,7 @@ const PhotoArchive = ({
               setShowImageViewer(true);
             }}
             className="p-2 text-gray-500 hover:text-blue-600"
+            aria-label={`Просмотреть файл ${file.name}`}
             title="Просмотр">
             
                 <Eye className="h-4 w-4" />
@@ -410,6 +414,7 @@ const PhotoArchive = ({
               link.click();
             }}
             className="p-2 text-gray-500 hover:text-green-600"
+            aria-label={`Скачать файл ${file.name}`}
             title="Скачать">
             
                 <Download className="h-4 w-4" />
@@ -419,6 +424,7 @@ const PhotoArchive = ({
           <button
             onClick={() => handleFileDelete(file.id)}
             className="p-2 text-gray-500 hover:text-red-600"
+            aria-label={`Удалить файл ${file.name}`}
             title="Удалить">
             
                   <Trash2 className="h-4 w-4" />
@@ -464,6 +470,7 @@ const PhotoArchive = ({
                   <div
                 className="aspect-video bg-gray-100 flex items-center justify-center cursor-pointer"
                 role="button"
+                aria-label={`Открыть файл ${file.name}`}
                 tabIndex={0}
                 onClick={() => openFileViewer(file)}
                 onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
@@ -522,6 +529,7 @@ const PhotoArchive = ({
           {/* Кнопка закрытия */}
           <button
             onClick={() => setShowImageViewer(false)}
+            aria-label="Закрыть просмотр файла"
             className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75">
             
             <X className="h-6 w-6" />
@@ -566,6 +574,7 @@ const PhotoArchive = ({
                     link.download = selectedFile.name;
                     link.click();
                   }}
+                  aria-label={`Скачать файл ${selectedFile.name}`}
                   className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                   
                   <Download className="h-4 w-4" />
@@ -622,6 +631,7 @@ const PhotoArchive = ({
             }
             <button
               onClick={onClose}
+              aria-label="Закрыть фотоархив"
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
@@ -638,6 +648,7 @@ const PhotoArchive = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
+                  aria-label="Поиск файлов фотоархива"
                   placeholder="Поиск файлов..."
                   value={formData.searchQuery}
                   onChange={(e) => handleInputChange('searchQuery', e.target.value)}
@@ -673,6 +684,7 @@ const PhotoArchive = ({
               
               <input
                 type="date"
+                aria-label="Фильтр фотоархива: дата с"
                 value={formData.filters.dateFrom}
                 onChange={(e) => handleInputChange('filters.dateFrom', e.target.value)}
                 placeholder="От"
@@ -681,6 +693,7 @@ const PhotoArchive = ({
               
               <input
                 type="date"
+                aria-label="Фильтр фотоархива: дата до"
                 value={formData.filters.dateTo}
                 onChange={(e) => handleInputChange('filters.dateTo', e.target.value)}
                 placeholder="До"
@@ -704,18 +717,21 @@ const PhotoArchive = ({
               <div className="flex border border-gray-300 rounded-md">
                 <button
                   onClick={() => setViewMode('grid')}
+                  aria-label="Показать архив плиткой"
                   className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <ImageIcon className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
+                  aria-label="Показать архив списком"
                   className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <FileText className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('timeline')}
+                  aria-label="Показать архив по временной шкале"
                   className={`px-3 py-2 ${viewMode === 'timeline' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <Calendar className="h-4 w-4" />
@@ -733,6 +749,7 @@ const PhotoArchive = ({
               <span className="text-blue-700">Загрузить файлы</span>
               <input
               type="file"
+              aria-label="Загрузить файлы в фотоархив"
               multiple
               accept="image/*,video/*,.pdf,.doc,.docx"
               onChange={(e) => handleFileUpload(e.target.files)}
@@ -757,6 +774,7 @@ const PhotoArchive = ({
                   Загрузить файлы
                   <input
                 type="file"
+                aria-label="Загрузить файлы в пустой фотоархив"
                 multiple
                 accept="image/*,video/*,.pdf,.doc,.docx"
                 onChange={(e) => handleFileUpload(e.target.files)}
