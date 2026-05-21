@@ -1938,6 +1938,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="date"
+                      aria-label="Blood test date"
                       value={bloodTestForm.test_date}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -1963,6 +1964,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="Total cholesterol"
                       value={bloodTestForm.cholesterol_total}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -1991,6 +1993,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="HDL cholesterol"
                       value={bloodTestForm.cholesterol_hdl}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2016,6 +2019,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="LDL cholesterol"
                       value={bloodTestForm.cholesterol_ldl}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2041,6 +2045,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="Triglycerides"
                       value={bloodTestForm.triglycerides}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2069,6 +2074,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="Glucose"
                       value={bloodTestForm.glucose}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2094,6 +2100,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="CRP"
                       value={bloodTestForm.crp}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2119,6 +2126,7 @@ const MacOSCardiologistPanelUnified = () => {
                         </label>
                         <input
                       type="number"
+                      aria-label="Troponin"
                       value={bloodTestForm.troponin}
                       onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
                       className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white"
@@ -2544,6 +2552,7 @@ const MacOSCardiologistPanelUnified = () => {
               }}>Порог LDL (мг/дл)</div>
                 <input
                 type="number"
+                aria-label="LDL threshold"
                 value={settings.ldlThreshold}
                 onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
                 style={{
