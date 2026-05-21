@@ -240,6 +240,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Название препарата</label>
                     <input
                   type="text"
+                  aria-label={`Medication ${index + 1} name`}
                   value={medication.name}
                   onChange={(e) => handleMedicationChange(medication.id, 'name', e.target.value)}
                   placeholder="Например: Амоксициллин"
@@ -252,6 +253,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Дозировка</label>
                     <input
                   type="text"
+                  aria-label={`Medication ${index + 1} dosage`}
                   value={medication.dosage}
                   onChange={(e) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
                   placeholder="Например: 500мг"
@@ -264,6 +266,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Кратность</label>
                     <input
                   type="text"
+                  aria-label={`Medication ${index + 1} frequency`}
                   value={medication.frequency}
                   onChange={(e) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
                   placeholder="Например: 3 раза в день"
@@ -276,6 +279,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Продолжительность</label>
                     <input
                   type="text"
+                  aria-label={`Medication ${index + 1} duration`}
                   value={medication.duration}
                   onChange={(e) => handleMedicationChange(medication.id, 'duration', e.target.value)}
                   placeholder="Например: 7 дней"
@@ -288,6 +292,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Количество</label>
                     <input
                   type="number"
+                  aria-label={`Medication ${index + 1} quantity`}
                   value={medication.quantity}
                   onChange={(e) => handleMedicationChange(medication.id, 'quantity', parseInt(e.target.value) || 1)}
                   className="w-full p-2 border border-gray-300 rounded"
@@ -299,6 +304,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                     <label className="block text-sm font-medium mb-1">Особые указания</label>
                     <input
                   type="text"
+                  aria-label={`Medication ${index + 1} special instructions`}
                   value={medication.instructions}
                   onChange={(e) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
                   placeholder="Например: после еды"
@@ -317,6 +323,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Общие инструкции</h3>
         <textarea
+          aria-label="Prescription general instructions"
           value={prescription.instructions}
           onChange={(e) => handleFieldChange('instructions', e.target.value)}
           placeholder="Общие рекомендации по приему препаратов..."
@@ -329,6 +336,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Заметки врача</h3>
         <textarea
+          aria-label="Prescription doctor notes"
           value={prescription.doctorNotes}
           onChange={(e) => handleFieldChange('doctorNotes', e.target.value)}
           placeholder="Внутренние заметки врача..."
