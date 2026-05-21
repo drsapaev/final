@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T05:20:07.324Z",
+  "generatedAt": "2026-05-21T05:35:05.269Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -1010,78 +1010,6 @@
       "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/queue/ModernQueueManager.jsx:486:15:button:title-only",
-      "file": "src/components/queue/ModernQueueManager.jsx",
-      "line": 486,
-      "column": 15,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:122:11:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 122,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:137:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 137,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:145:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 145,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:153:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 153,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:167:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 167,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:175:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 175,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:183:25:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 183,
-      "column": 25,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/queue/QueueManagementCard.jsx:196:11:button:title-only",
-      "file": "src/components/queue/QueueManagementCard.jsx",
-      "line": 196,
-      "column": 11,
-      "element": "button",
-      "reason": "title-only"
     },
     {
       "signature": "src/components/security/SMSEmail2FA.jsx:214:15:button:missing-accessible-name",
