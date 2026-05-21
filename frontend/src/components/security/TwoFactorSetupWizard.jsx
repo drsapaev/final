@@ -364,12 +364,14 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
               </code>
               <button
             onClick={() => setShowSecret(!showSecret)}
+            aria-label={showSecret ? 'Скрыть секретный ключ' : 'Показать секретный ключ'}
             className="text-gray-400 hover:text-gray-600">
             
                 {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
               <button
             onClick={() => copyToClipboard(setupData.secret)}
+            aria-label="Скопировать секретный ключ"
             className="text-gray-400 hover:text-gray-600">
             
                 <Copy className="w-4 h-4" />
@@ -440,6 +442,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
               <code className="font-mono text-sm">{code}</code>
               <button
             onClick={() => copyToClipboard(code)}
+            aria-label={`Скопировать резервный код ${index + 1}`}
             className="text-gray-400 hover:text-gray-600">
             
                 <Copy className="w-4 h-4" />

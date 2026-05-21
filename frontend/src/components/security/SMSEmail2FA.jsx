@@ -214,6 +214,7 @@ const SMSEmail2FA = ({
               <button
                 type="button"
                 onClick={() => setShowCode(!showCode)}
+                aria-label={showCode ? 'Скрыть код подтверждения' : 'Показать код подтверждения'}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 
                 {showCode ?
