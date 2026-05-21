@@ -407,6 +407,7 @@ const VoiceToText = () => {
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
           <input
           type="file"
+          aria-label="Upload audio file"
           accept="audio/*"
           onChange={handleFileUpload}
           ref={fileInputRef}
@@ -437,6 +438,7 @@ const VoiceToText = () => {
       <div style={{ display: 'flex', justifyContent: 'center' }}>
             <audio
           controls
+          aria-label="Recorded audio preview"
           src={audioUrl}
           style={{
             width: '100%',
