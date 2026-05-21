@@ -355,6 +355,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                       e.stopPropagation();
                       handleEdit(template);
                     }}
+                    aria-label={`Редактировать шаблон процедуры ${template.name}`}
                     style={{
                       padding: '8px',
                       border: '1px solid var(--mac-border)',

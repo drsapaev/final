@@ -200,6 +200,7 @@ const PriceOverrideManager = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Закрыть изменение цены процедуры"
             style={{
               background: 'none',
               border: 'none',
@@ -243,6 +244,7 @@ const PriceOverrideManager = ({
                 }} />
                 <input
                   type="text"
+                  aria-label="Новая цена процедуры"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                   style={{
@@ -318,6 +320,7 @@ const PriceOverrideManager = ({
               {reason === 'custom' &&
               <input
                 type="text"
+                aria-label="Другая причина изменения цены"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 style={{
@@ -357,6 +360,7 @@ const PriceOverrideManager = ({
                 Подробное описание (необязательно)
               </label>
               <textarea
+                aria-label="Подробное описание изменения цены"
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
