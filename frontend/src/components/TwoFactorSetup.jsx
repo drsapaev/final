@@ -96,7 +96,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{
+        <label htmlFor="two-factor-recovery-email" style={{
         display: 'block',
         marginBottom: '8px',
         fontWeight: '500',
@@ -105,7 +105,9 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           Email для восстановления (необязательно)
         </label>
         <input
+        id="two-factor-recovery-email"
         type="email"
+        aria-label="Two factor recovery email"
         value={recoveryEmail}
         onChange={(e) => setRecoveryEmail(e.target.value)}
         placeholder="your@email.com"
@@ -122,7 +124,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       </div>
 
       <div style={{ marginBottom: '32px' }}>
-        <label style={{
+        <label htmlFor="two-factor-recovery-phone" style={{
         display: 'block',
         marginBottom: '8px',
         fontWeight: '500',
@@ -131,7 +133,9 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           Телефон для восстановления (необязательно)
         </label>
         <input
+        id="two-factor-recovery-phone"
         type="tel"
+        aria-label="Two factor recovery phone"
         value={recoveryPhone}
         onChange={(e) => setRecoveryPhone(e.target.value)}
         placeholder="+7 (999) 123-45-67"
@@ -273,7 +277,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{
+        <label htmlFor="two-factor-totp-code" style={{
         display: 'block',
         marginBottom: '8px',
         fontWeight: '500',
@@ -282,7 +286,9 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           Введите 6-значный код из приложения:
         </label>
         <input
+        id="two-factor-totp-code"
         type="text"
+        aria-label="Two factor authentication code"
         value={totpCode}
         onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         placeholder="123456"
