@@ -552,6 +552,7 @@ const CloudPrintingManager = () => {
                 <input
                 type="checkbox"
                 id="color"
+                aria-label="Enable color printing"
                 checked={printForm.color}
                 onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
                 style={{ margin: 0 }} />
@@ -566,6 +567,7 @@ const CloudPrintingManager = () => {
                 <input
                 type="checkbox"
                 id="duplex"
+                aria-label="Enable duplex printing"
                 checked={printForm.duplex}
                 onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
                 style={{ margin: 0 }} />
