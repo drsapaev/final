@@ -2629,6 +2629,7 @@ const AppointmentWizardV2 = ({
         onClick={handleReloadServices}
         disabled={isReloadingServices}
         title="Обновить список услуг"
+        aria-label={isReloadingServices ? 'Refreshing service list' : 'Refresh service list'}
         style={{
           width: '34px',
           height: '34px',
@@ -2663,6 +2664,7 @@ const AppointmentWizardV2 = ({
         <button
         onClick={onClose}
         title="Закрыть"
+        aria-label="Close appointment wizard"
         style={{
           width: '34px',
           height: '34px',
@@ -3763,6 +3765,7 @@ const CartStepV2 = ({
                     </span>
                     <button
                     onClick={() => onRemoveFromCart(item.id)}
+                    aria-label={`Remove ${displayName} from appointment cart`}
                     style={{
                       border: 'none',
                       background: 'transparent',
