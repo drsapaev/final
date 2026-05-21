@@ -200,6 +200,7 @@ function ComponentTestInner() {
         <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(form?.values); }}>
           <input
             type="text"
+            aria-label="Test form name"
             placeholder="Имя"
             value={form?.values?.name || ''}
             onChange={(e) => setValue('name', e.target.value)}
@@ -207,6 +208,7 @@ function ComponentTestInner() {
           />
           <input
             type="email"
+            aria-label="Test form email"
             placeholder="Email"
             value={form?.values?.email || ''}
             onChange={(e) => setValue('email', e.target.value)}
