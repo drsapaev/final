@@ -201,6 +201,7 @@ const AIChatWidget = ({
             <form className="chat-widget-input" onSubmit={handleSubmit}>
                 <textarea
           ref={inputRef}
+          aria-label="Сообщение для AI чата"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
