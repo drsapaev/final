@@ -189,6 +189,7 @@ const ExaminationMatrix = ({
                                 <button
                   className={'ex-matrix__action-btn ex-matrix__action-btn--norm'}
                   onClick={() => handleToggle(item, 'norm')}
+                  aria-label={`Отметить "${item}" как норму`}
                   title="Норма">
                   
                                     <Check size={14} />
@@ -197,6 +198,7 @@ const ExaminationMatrix = ({
                                 <button
                   className={'ex-matrix__action-btn ex-matrix__action-btn--path'}
                   onClick={() => handleToggle(item, 'path')}
+                  aria-label={`Отметить "${item}" как патологию`}
                   title="Патология">
                   
                                     <AlertCircle size={14} />

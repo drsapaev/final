@@ -273,6 +273,7 @@ export function TreatmentSection({
                   unpinTemplate(t.id) :
                   pinTemplate(t.id);
                 }}
+                aria-label={`${t.is_pinned ? 'Открепить' : 'Закрепить'} шаблон лечения`}
                 title={t.is_pinned ? 'Открепить' : 'Закрепить (макс 3)'}
                 style={{
                   padding: '4px 8px',
@@ -294,6 +295,7 @@ export function TreatmentSection({
                   setEditingTemplate(t);
                   setEditText(t.treatment_text);
                 }}
+                aria-label="Редактировать шаблон лечения"
                 title="Редактировать"
                 style={{
                   padding: '4px 8px',
@@ -408,6 +410,7 @@ export function TreatmentSection({
         }}
         role="button"
         tabIndex={0}
+        aria-label="Закрыть окно редактирования шаблона лечения"
         onClick={() => setEditingTemplate(null)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -430,6 +433,7 @@ export function TreatmentSection({
                             ✏️ Редактировать шаблон
                         </h3>
                         <textarea
+            aria-label="Текст шаблона лечения"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             style={{

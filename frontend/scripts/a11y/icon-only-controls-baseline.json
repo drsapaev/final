@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T06:33:57.955Z",
+  "generatedAt": "2026-05-21T06:53:30.895Z",
   "entries": [
     {
       "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
@@ -593,102 +593,6 @@
       "line": 353,
       "column": 21,
       "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:126:21:button:title-only",
-      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
-      "line": 126,
-      "column": 21,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:163:41:button:title-only",
-      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
-      "line": 163,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:171:41:button:title-only",
-      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
-      "line": 171,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/DoctorTemplatesPanel.jsx:179:41:button:title-only",
-      "file": "src/components/emr-v2/DoctorTemplatesPanel.jsx",
-      "line": 179,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/ExaminationMatrix.jsx:189:33:button:title-only",
-      "file": "src/components/emr-v2/sections/ExaminationMatrix.jsx",
-      "line": 189,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/ExaminationMatrix.jsx:197:33:button:title-only",
-      "file": "src/components/emr-v2/sections/ExaminationMatrix.jsx",
-      "line": 197,
-      "column": 33,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/TreatmentSection.jsx:268:41:button:title-only",
-      "file": "src/components/emr-v2/sections/TreatmentSection.jsx",
-      "line": 268,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/TreatmentSection.jsx:290:41:button:title-only",
-      "file": "src/components/emr-v2/sections/TreatmentSection.jsx",
-      "line": 290,
-      "column": 41,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:207:33:img:missing-accessible-name",
-      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
-      "line": 207,
-      "column": 33,
-      "element": "img",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:222:13:button:missing-accessible-name",
-      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
-      "line": 222,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/emr-v2/sections/specialty/DermatologySection.jsx:269:25:button:missing-accessible-name",
-      "file": "src/components/emr-v2/sections/specialty/DermatologySection.jsx",
-      "line": 269,
-      "column": 25,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/emr-v2/templates/TreatmentTemplatesPanel.jsx:128:13:div:missing-accessible-name",
-      "file": "src/components/emr-v2/templates/TreatmentTemplatesPanel.jsx",
-      "line": 128,
-      "column": 13,
-      "element": "div",
       "reason": "missing-accessible-name"
     },
     {

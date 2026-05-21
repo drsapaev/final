@@ -129,6 +129,7 @@ export function TreatmentTemplatesPanel({
                 className="treatment-templates-backdrop"
                 role="button"
                 tabIndex={0}
+                aria-label="Закрыть панель шаблонов лечения"
                 onClick={handleClose}
                 onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
 
@@ -146,6 +147,7 @@ export function TreatmentTemplatesPanel({
                 <div className="treatment-templates-search">
                     <input
                         type="text"
+                        aria-label="Поиск шаблона лечения"
                         placeholder="Поиск шаблона..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
