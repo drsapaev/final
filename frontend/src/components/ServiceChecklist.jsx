@@ -51,6 +51,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <input
                 type="checkbox"
+                aria-label={`Выбрать услугу: ${service.name}`}
                 checked={value.includes(service.id)}
                 onChange={(e) => {
                   const newValue = e.target.checked 
