@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T08:25:50.381Z",
+  "generatedAt": "2026-05-21T08:29:55.105Z",
   "entries": [
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
@@ -104,30 +104,6 @@
       "file": "src/components/ui/native/Modal.jsx",
       "line": 101,
       "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/wizard/AppointmentWizardV2.jsx:2628:9:button:title-only",
-      "file": "src/components/wizard/AppointmentWizardV2.jsx",
-      "line": 2628,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/wizard/AppointmentWizardV2.jsx:2663:9:button:title-only",
-      "file": "src/components/wizard/AppointmentWizardV2.jsx",
-      "line": 2663,
-      "column": 9,
-      "element": "button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/wizard/AppointmentWizardV2.jsx:3764:21:button:missing-accessible-name",
-      "file": "src/components/wizard/AppointmentWizardV2.jsx",
-      "line": 3764,
-      "column": 21,
       "element": "button",
       "reason": "missing-accessible-name"
     },
