@@ -53,7 +53,8 @@ The project now has a required no-new-regression gate for icon-only controls. Th
 - 2026-05-21: dental diagnosis form controls cleanup removed 7 baseline findings.
 - 2026-05-21: dental visit protocol controls cleanup removed 7 baseline findings.
 - 2026-05-21: dental examination form controls cleanup removed 5 baseline findings.
-- Current baseline after this slice: 60 findings.
+- 2026-05-21: dental protocol template controls cleanup removed 5 baseline findings.
+- Current baseline after this slice: 55 findings.
 
 ## CI Policy
 
