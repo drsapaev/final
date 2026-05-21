@@ -15,7 +15,7 @@
  * 6. ОШИБКА - при попытке подписать пустое
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import './ComplaintsField.css';
 import logger from '../../../utils/logger';
@@ -56,6 +56,7 @@ const ComplaintsField = ({
     label = 'Жалобы',
     placeholder = 'Введите жалобы пациента...'
 }) => {
+    const complaintsFieldId = useId();
     const textareaRef = useRef(null);
 
     // Local state
@@ -203,10 +204,12 @@ const ComplaintsField = ({
 
     return (
         <div className="complaints-wrapper">
-            <label className="complaints-label">{label}</label>
+            <label className="complaints-label" htmlFor={complaintsFieldId}>{label}</label>
 
             <div className="complaints-container">
                 <textarea
+                    id={complaintsFieldId}
+                    aria-label={label}
                     ref={textareaRef}
                     className={fieldClasses}
                     value={value}
