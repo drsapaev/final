@@ -1265,6 +1265,7 @@ const QueueJoin = () => {
                     >
                       <input
                         type="checkbox"
+                        aria-label={`Select specialist: ${formatSpecialistLabel(specialist)}`}
                         checked={isSelected}
                         onChange={() => {
                           if (error) {
@@ -1492,6 +1493,7 @@ const QueueJoin = () => {
                     id="queue-patient-name"
                     name="patient_name"
                     type="text"
+                    aria-label="Patient full name"
                     value={formData.patientName}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     style={{
@@ -1548,6 +1550,7 @@ const QueueJoin = () => {
                     id="queue-phone"
                     name="phone"
                     type="tel"
+                    aria-label="Patient phone number"
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     onKeyDown={(e) => {
@@ -1633,6 +1636,7 @@ const QueueJoin = () => {
                   id="queue-telegram-id"
                   name="telegram_id"
                   type="number"
+                  aria-label="Telegram ID"
                   value={formData.telegramId}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
