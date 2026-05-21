@@ -77,6 +77,7 @@ const MedicalTable = ({
           onClick={() => onView(row, index)}
           className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="View details"
+          aria-label="View row details"
         >
           <Icon name="Eye" size={16} />
         </button>
@@ -90,6 +91,7 @@ const MedicalTable = ({
           onClick={() => onEdit(row, index)}
           className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="Edit"
+          aria-label="Edit row"
         >
           <Icon name="Edit" size={16} />
         </button>
@@ -103,6 +105,7 @@ const MedicalTable = ({
           onClick={() => onDelete(row, index)}
           className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="Delete"
+          aria-label="Delete row"
         >
           <Icon name="Trash2" size={16} />
         </button>
