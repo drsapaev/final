@@ -252,6 +252,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
             </code>
             <button
             onClick={() => copyToClipboard(setupData?.secret_key, 'secret')}
+            aria-label="Скопировать секретный ключ двухфакторной аутентификации"
             style={{
               padding: '4px 8px',
               background: 'var(--accent-color)',
@@ -420,6 +421,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
               </code>
               <button
             onClick={() => copyToClipboard(code, `code-${index}`)}
+            aria-label={`Скопировать резервный код ${index + 1}`}
             style={{
               padding: '4px',
               background: 'transparent',

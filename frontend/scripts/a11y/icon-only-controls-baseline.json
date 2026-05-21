@@ -1,32 +1,8 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-21T07:59:03.935Z",
+  "generatedAt": "2026-05-21T08:04:39.260Z",
   "entries": [
-    {
-      "signature": "src/components/TwoFactorSettings.jsx:369:21:button:missing-accessible-name",
-      "file": "src/components/TwoFactorSettings.jsx",
-      "line": 369,
-      "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/TwoFactorSetup.jsx:253:13:button:missing-accessible-name",
-      "file": "src/components/TwoFactorSetup.jsx",
-      "line": 253,
-      "column": 13,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/TwoFactorSetup.jsx:421:15:button:missing-accessible-name",
-      "file": "src/components/TwoFactorSetup.jsx",
-      "line": 421,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
     {
       "signature": "src/components/admin/FinanceModal.jsx:215:13:button:missing-accessible-name",
       "file": "src/components/admin/FinanceModal.jsx",
@@ -176,38 +152,6 @@
       "file": "src/components/notifications/EmailSMSManager.jsx",
       "line": 712,
       "column": 21,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/security/SMSEmail2FA.jsx:214:15:button:missing-accessible-name",
-      "file": "src/components/security/SMSEmail2FA.jsx",
-      "line": 214,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/security/TwoFactorSetupWizard.jsx:365:15:button:missing-accessible-name",
-      "file": "src/components/security/TwoFactorSetupWizard.jsx",
-      "line": 365,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/security/TwoFactorSetupWizard.jsx:371:15:button:missing-accessible-name",
-      "file": "src/components/security/TwoFactorSetupWizard.jsx",
-      "line": 371,
-      "column": 15,
-      "element": "button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/security/TwoFactorSetupWizard.jsx:441:15:button:missing-accessible-name",
-      "file": "src/components/security/TwoFactorSetupWizard.jsx",
-      "line": 441,
-      "column": 15,
       "element": "button",
       "reason": "missing-accessible-name"
     },
