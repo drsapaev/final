@@ -95,6 +95,7 @@ const ResponsiveTable = ({
                 {onRowSelect &&
               <input
                 type="checkbox"
+                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
                 checked={selectedRows.has(index)}
                 onChange={(e) => onRowSelect(index, e.target.checked)}
                 style={{ transform: 'scale(1.2)' }} />
@@ -242,9 +243,10 @@ const ResponsiveTable = ({
               visibility: 'visible !important',
               opacity: '1 !important',
               color: '#374151 !important'
-            }}>
+            }} aria-label="Row selection">
                 <input
                 type="checkbox"
+                aria-label="Select all rows"
                 checked={selectedRows.size === data.length && data.length > 0}
                 onChange={(e) => {
                   data.forEach((_, index) => onRowSelect(index, e.target.checked));
@@ -329,11 +331,12 @@ const ResponsiveTable = ({
                 e.target.style.background = 'white';
               }
             }}>
-            
+
               {onRowSelect &&
-            <td style={{ padding: '12px', textAlign: 'center' }}>
+            <td style={{ padding: '12px', textAlign: 'center' }} aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}>
                   <input
                 type="checkbox"
+                aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}
                 checked={selectedRows.has(index)}
                 onChange={(e) => {
                   e.stopPropagation();
