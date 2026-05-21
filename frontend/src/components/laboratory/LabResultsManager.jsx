@@ -563,6 +563,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           <input
             type="file"
             accept=".pdf,.xlsx,.xls,.csv"
+            aria-label="Загрузить файл с результатами лабораторных исследований"
             onChange={handleFileUpload}
             style={{ display: 'none' }}
             id="lab-file-upload" />
