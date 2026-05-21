@@ -622,6 +622,7 @@ const ServiceCatalog = () => {
             title: (
               <input
                 type="checkbox"
+                aria-label="Select all filtered services"
                 checked={selectedServiceIds.size === filteredServices.length && filteredServices.length > 0}
                 onChange={toggleSelectAll}
                 style={{ cursor: 'pointer' }}
@@ -652,6 +653,7 @@ const ServiceCatalog = () => {
               select:
               <input
                 type="checkbox"
+                aria-label={`Select service ${service.name || service.id}`}
                 checked={selectedServiceIds.has(service.id)}
                 onChange={() => toggleServiceSelection(service.id)}
                 style={{ cursor: 'pointer' }}
