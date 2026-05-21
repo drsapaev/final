@@ -16,7 +16,7 @@ export default function Nav() {
   }).filter((route) => route.nav?.menu);
 
   return (
-    <div className="legacy-nav-bar">
+    <div className="clinic-ops-nav-bar">
       <div style={{ fontWeight: 700, marginRight: 12, opacity: 0.85 }} aria-hidden="true"> </div>
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
@@ -53,13 +53,13 @@ export default function Nav() {
                 setProfile(null);
                 navigate('/login');
               }}
-              className="legacy-button"
+              className="clinic-ops-button"
             >
               Выйти
             </button>
           </>
         ) : (
-          <button onClick={() => navigate('/login')} className="legacy-button">
+          <button onClick={() => navigate('/login')} className="clinic-ops-button">
             Войти
           </button>
         )}

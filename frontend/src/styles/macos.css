@@ -593,14 +593,14 @@ body {
   border-radius: 0 0 8px 8px;
 }
 
-/* Legacy pages: normalize old JSX inline surfaces to token-based theme */
-.legacy-page-shell {
+/* Clinic operations surfaces: token-based shells for older route slices */
+.clinic-ops-page-shell {
   padding: 16px;
   display: grid;
   gap: 12px;
 }
 
-.legacy-toolbar {
+.clinic-ops-toolbar {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -615,7 +615,7 @@ body {
   );
 }
 
-.legacy-input {
+.clinic-ops-input {
   padding: 6px 10px;
   border: 1px solid var(--mac-border);
   border-radius: 8px;
@@ -623,12 +623,12 @@ body {
   color: var(--mac-text-primary);
 }
 
-.legacy-input:focus-visible {
+.clinic-ops-input:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--mac-accent), white 24%);
   outline-offset: 1px;
 }
 
-.legacy-button {
+.clinic-ops-button {
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--mac-border);
@@ -638,17 +638,17 @@ body {
   transition: all 0.2s ease;
 }
 
-.legacy-button:hover:not(:disabled) {
+.clinic-ops-button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--mac-bg-secondary), white 4%);
   border-color: color-mix(in srgb, var(--mac-border), white 12%);
 }
 
-.legacy-button:disabled {
+.clinic-ops-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.legacy-table-wrap {
+.clinic-ops-table-wrap {
   overflow: auto;
   border: 1px solid var(--mac-card-border);
   border-radius: 12px;
@@ -656,13 +656,13 @@ body {
   box-shadow: var(--mac-shadow-sm);
 }
 
-.legacy-table {
+.clinic-ops-table {
   width: 100%;
   border-collapse: collapse;
   color: var(--mac-text-primary);
 }
 
-.legacy-table th {
+.clinic-ops-table th {
   text-align: left;
   padding: 10px;
   border-bottom: 1px solid var(--mac-separator);
@@ -671,13 +671,13 @@ body {
   background: color-mix(in srgb, var(--mac-bg-secondary), transparent 8%);
 }
 
-.legacy-table td {
+.clinic-ops-table td {
   padding: 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--mac-separator), transparent 25%);
   vertical-align: top;
 }
 
-.legacy-error {
+.clinic-ops-error {
   color: var(--mac-error);
   background: var(--mac-error-bg);
   border: 1px solid var(--mac-error-border);
@@ -685,27 +685,7 @@ body {
   padding: 8px;
 }
 
-.legacy-muted {
-  color: var(--mac-text-secondary);
-}
-
-.legacy-list {
-  display: grid;
-  gap: 10px;
-}
-
-.legacy-list-item {
-  border: 1px solid var(--mac-card-border);
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--mac-card-bg);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.legacy-nav-bar {
+.clinic-ops-nav-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -719,32 +699,7 @@ body {
   -webkit-backdrop-filter: var(--mac-blur-light);
 }
 
-.legacy-nav-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--mac-border);
-  margin-right: 6px;
-  text-decoration: none;
-  background: var(--mac-bg-primary);
-  color: var(--mac-text-primary);
-  transition: all 0.2s ease;
-}
-
-.legacy-nav-link:hover {
-  background: var(--mac-nav-item-hover);
-  border-color: color-mix(in srgb, var(--mac-border), white 10%);
-}
-
-.legacy-nav-link--active {
-  background: var(--mac-nav-item-active);
-  color: var(--mac-nav-item-active-text);
-  border-color: var(--mac-nav-item-active-border);
-  box-shadow: var(--mac-shadow-sm);
-}
-
-/* Legacy hardcoded inline rescue layer: normalize old white/gray surfaces */
+/* Historical hardcoded inline rescue layer: normalize old white/gray surfaces */
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #fff"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background:#fff"],
 [data-theme] main :is(div, section, article, aside, table, thead, tbody, tr, th, td)[style*="background: #ffffff"],
