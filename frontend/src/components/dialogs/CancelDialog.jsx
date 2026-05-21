@@ -239,6 +239,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
         {/* Причина отмены */}
         <div>
           <label
+            htmlFor="cancel-reason"
             style={{
               display: 'block',
               fontSize: '14px',
@@ -251,10 +252,14 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
           </label>
 
           <textarea
+            id="cancel-reason"
+            aria-label="Причина отмены записи"
             value={reason}
             onChange={handleReasonChange}
             placeholder="Укажите причину отмены записи..."
             rows={4}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'cancel-reason-error' : undefined}
             style={{
               width: '100%',
               padding: '12px 14px',
@@ -305,6 +310,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
             <div>
               {error && (
                 <p
+                  id="cancel-reason-error"
                   style={{
                     color: '#ef4444',
                     fontSize: '12px',
