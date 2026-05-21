@@ -77,6 +77,7 @@ export default function ServicePicker({
   return (
     <div style={{ display: 'grid', gap: 8, ...style }}>
       <input
+        aria-label="Поиск услуги по названию или коду"
         placeholder="Поиск по названию/коду…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
