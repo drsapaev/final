@@ -423,9 +423,11 @@ const DynamicPricingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title={rule.is_active ? 'Приостановить' : 'Активировать'}>
-              
-                    {rule.is_active ? <Pause size={16} /> : <Play size={16} />}
+              title={rule.is_active ? 'Приостановить правило' : 'Активировать правило'}
+              type="button"
+              aria-label={`${rule.is_active ? 'Приостановить' : 'Активировать'} правило ${rule.name || rule.id}`}>
+
+                    {rule.is_active ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
                   </MacOSButton>
                   <MacOSButton
               variant="outline"
@@ -439,9 +441,11 @@ const DynamicPricingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Редактировать">
-              
-                    <Edit size={16} />
+              title="Редактировать правило"
+              type="button"
+              aria-label={`Редактировать правило ${rule.name || rule.id}`}>
+
+                    <Edit aria-hidden="true" size={16} />
                   </MacOSButton>
                   <MacOSButton
               variant="outline"
@@ -455,9 +459,11 @@ const DynamicPricingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Удалить">
-              
-                    <Trash2 size={16} />
+              title="Удалить правило"
+              type="button"
+              aria-label={`Удалить правило ${rule.name || rule.id}`}>
+
+                    <Trash2 aria-hidden="true" size={16} />
                   </MacOSButton>
                 </div>
               </div>
@@ -483,8 +489,13 @@ const DynamicPricingManager = () => {
         }}>
               Создать правило ценообразования
             </h4>
-            <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
-              <X size={16} />
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowCreateRule(false)}
+              type="button"
+              title="Закрыть форму создания правила"
+              aria-label="Закрыть форму создания правила">
+              <X aria-hidden="true" size={16} />
             </MacOSButton>
           </div>
 
@@ -857,9 +868,11 @@ const DynamicPricingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Редактировать">
-              
-                    <Edit size={16} />
+              title="Редактировать пакет"
+              type="button"
+              aria-label={`Редактировать пакет ${pkg.name || pkg.id}`}>
+
+                    <Edit aria-hidden="true" size={16} />
                   </MacOSButton>
                   <MacOSButton
               variant="outline"
@@ -873,9 +886,11 @@ const DynamicPricingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Удалить">
-              
-                    <Trash2 size={16} />
+              title="Удалить пакет"
+              type="button"
+              aria-label={`Удалить пакет ${pkg.name || pkg.id}`}>
+
+                    <Trash2 aria-hidden="true" size={16} />
                   </MacOSButton>
                 </div>
               </div>
@@ -901,8 +916,13 @@ const DynamicPricingManager = () => {
         }}>
               Создать пакет услуг
             </h4>
-            <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
-              <X size={16} />
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowCreatePackage(false)}
+              type="button"
+              title="Закрыть форму создания пакета"
+              aria-label="Закрыть форму создания пакета">
+              <X aria-hidden="true" size={16} />
             </MacOSButton>
           </div>
 
