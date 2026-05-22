@@ -54,6 +54,27 @@ const SESSION_COLORS = [
   '#84CC16' // lime
 ];
 
+const ACTION_ALIASES = {
+  payment: ['payment', 'mark_paid', 'mark-paid'],
+  call: ['call', 'start_visit', 'start-visit'],
+  print: ['print', 'print_ticket', 'print-ticket'],
+  complete: ['complete', 'complete_visit', 'complete-visit']
+};
+
+const getBackendActionAvailability = (row, action, flagName) => {
+  if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
+    return Boolean(row[flagName]);
+  }
+
+  if (!Array.isArray(row?.available_actions)) {
+    return null;
+  }
+
+  const actions = new Set(row.available_actions.map((item) => String(item).trim().toLowerCase()));
+  const aliases = ACTION_ALIASES[action] || [action];
+  return aliases.some((alias) => actions.has(alias));
+};
+
 const EnhancedAppointmentsTable = ({
   data = [],
   loading = false,
@@ -1570,6 +1591,29 @@ const EnhancedAppointmentsTable = ({
             paginatedData.map((row, index) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id);
+              const rowStatus = String(row.status || '').toLowerCase();
+              const rowPaymentStatus = String(row.payment_status || '').toLowerCase();
+              const backendCanPay = getBackendActionAvailability(row, 'payment', 'can_mark_paid');
+              const backendCanCall = getBackendActionAvailability(row, 'call', 'can_start_visit');
+              const backendCanPrint = getBackendActionAvailability(row, 'print', 'can_print_ticket');
+              const backendCanComplete = getBackendActionAvailability(row, 'complete', 'can_complete');
+              const legacyCanPay = (
+                rowStatus === 'paid_pending' ||
+                rowPaymentStatus === 'pending' ||
+                rowStatus === 'scheduled' && rowPaymentStatus !== 'paid' ||
+                rowStatus === 'confirmed' && rowPaymentStatus !== 'paid' ||
+                rowStatus === 'waiting' && rowPaymentStatus !== 'paid' ||
+                rowStatus === 'queued' && rowPaymentStatus !== 'paid' ||
+                !rowPaymentStatus && rowStatus !== 'paid' && rowStatus !== 'done' && rowStatus !== 'served' && rowStatus !== 'completed' && rowStatus !== 'cancelled'
+              );
+              const canPay = !isDoctorView && (backendCanPay ?? legacyCanPay);
+              const canCall = backendCanCall ?? (
+                isDoctorView ?
+                  rowStatus === 'queued' || rowStatus === 'waiting' || rowPaymentStatus === 'paid' :
+                  rowStatus === 'queued' || rowStatus === 'waiting'
+              );
+              const canPrint = backendCanPrint ?? (rowPaymentStatus === 'paid' || rowStatus === 'queued' || rowStatus === 'waiting');
+              const canComplete = backendCanComplete ?? (rowStatus === 'in_cabinet' || rowStatus === 'called');
 
               return (
                 <tr
@@ -2008,19 +2052,7 @@ const EnhancedAppointmentsTable = ({
                       }}>
 
                         {/* В режиме панели врача кнопки оплаты не показываем */}
-                        {!isDoctorView && (() => {
-                        const status = (row.status || '').toLowerCase();
-                        const paymentStatus = (row.payment_status || '').toLowerCase();
-                        return (
-                          status === 'paid_pending' ||
-                          paymentStatus === 'pending' ||
-                          status === 'scheduled' && paymentStatus !== 'paid' ||
-                          status === 'confirmed' && paymentStatus !== 'paid' ||
-                          status === 'waiting' && paymentStatus !== 'paid' ||
-                          status === 'queued' && paymentStatus !== 'paid' ||
-                          !paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled');
-
-                      })() &&
+                        {canPay &&
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
@@ -2049,7 +2081,7 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* Вызвать */}
-                        {(isDoctorView ? row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid' : row.status === 'queued' || row.status === 'waiting') &&
+                        {canCall &&
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
@@ -2078,7 +2110,7 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* Печать */}
-                        {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') &&
+                        {canPrint &&
                       <button
                         className="action-button"
                         onMouseDown={(e) => {
@@ -2107,7 +2139,7 @@ const EnhancedAppointmentsTable = ({
                       }
 
                         {/* Завершить */}
-                        {(row.status === 'in_cabinet' || row.status === 'called') &&
+                        {canComplete &&
                       <button
                         className="action-button"
                         onMouseDown={(e) => {

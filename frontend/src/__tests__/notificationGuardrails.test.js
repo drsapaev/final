@@ -63,4 +63,21 @@ describe('notification guardrails', () => {
     expect(roleCenter).toContain('useEffect(() => {');
     expect(roleCenter).toContain('[runLoadNotifications, userRole]');
   });
+
+  it('keeps registrar table action visibility on backend-provided actions', () => {
+    const table = read('components/tables/EnhancedAppointmentsTable.jsx');
+
+    expect(table).toContain('getBackendActionAvailability');
+    expect(table).toContain('can_mark_paid');
+    expect(table).toContain('can_start_visit');
+    expect(table).toContain('can_print_ticket');
+    expect(table).toContain('can_complete');
+    expect(table).toContain('available_actions');
+    expect(table).toContain('{canPay &&');
+    expect(table).not.toContain('{!isDoctorView && (() => {');
+    const quote = String.fromCharCode(39);
+    expect(table).not.toContain(
+      'status === ' + quote + 'queued' + quote + ' && paymentStatus !== ' + quote + 'paid' + quote
+    );
+  });
 });
