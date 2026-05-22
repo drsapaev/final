@@ -135,18 +135,31 @@ const DisplayContentManager = ({
                   {banner.active ? 'Активен' : 'Неактивен'}
                 </Badge>
                 <div className="flex space-x-1">
-                  <Button size="sm" variant="outline">
-                    <Eye size={12} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    title={`Просмотреть баннер: ${banner.title}`}
+                    aria-label={`Просмотреть баннер: ${banner.title}`}>
+                    <Eye aria-hidden="true" size={12} />
                   </Button>
-                  <Button size="sm" variant="outline">
-                    <Edit size={12} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    title={`Редактировать баннер: ${banner.title}`}
+                    aria-label={`Редактировать баннер: ${banner.title}`}>
+                    <Edit aria-hidden="true" size={12} />
                   </Button>
                   <Button
                 size="sm"
                 variant="outline"
+                type="button"
+                title={`Удалить баннер: ${banner.title}`}
+                aria-label={`Удалить баннер: ${banner.title}`}
                 onClick={() => handleDeleteContent(banner.id, 'banner')}>
-                
-                    <Trash2 size={12} />
+
+                    <Trash2 aria-hidden="true" size={12} />
                   </Button>
                 </div>
               </div>
@@ -191,15 +204,23 @@ const DisplayContentManager = ({
                 </div>
               </div>
               <div className="flex space-x-2 ml-4">
-                <Button size="sm" variant="outline">
-                  <Edit size={14} />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  title={`Редактировать объявление: ${announcement.title}`}
+                  aria-label={`Редактировать объявление: ${announcement.title}`}>
+                  <Edit aria-hidden="true" size={14} />
                 </Button>
                 <Button
               size="sm"
               variant="outline"
+              type="button"
+              title={`Удалить объявление: ${announcement.title}`}
+              aria-label={`Удалить объявление: ${announcement.title}`}
               onClick={() => handleDeleteContent(announcement.id, 'announcement')}>
-              
-                  <Trash2 size={14} />
+
+                  <Trash2 aria-hidden="true" size={14} />
                 </Button>
               </div>
             </div>
@@ -246,18 +267,31 @@ const DisplayContentManager = ({
                   {video.active ? 'Показывается' : 'Неактивен'}
                 </Badge>
                 <div className="flex space-x-1">
-                  <Button size="sm" variant="outline">
-                    <Play size={12} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    title={`Воспроизвести видео: ${video.title}`}
+                    aria-label={`Воспроизвести видео: ${video.title}`}>
+                    <Play aria-hidden="true" size={12} />
                   </Button>
-                  <Button size="sm" variant="outline">
-                    <Edit size={12} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    title={`Редактировать видео: ${video.title}`}
+                    aria-label={`Редактировать видео: ${video.title}`}>
+                    <Edit aria-hidden="true" size={12} />
                   </Button>
                   <Button
                 size="sm"
                 variant="outline"
+                type="button"
+                title={`Удалить видео: ${video.title}`}
+                aria-label={`Удалить видео: ${video.title}`}
                 onClick={() => handleDeleteContent(video.id, 'video')}>
-                
-                    <Trash2 size={12} />
+
+                    <Trash2 aria-hidden="true" size={12} />
                   </Button>
                 </div>
               </div>
