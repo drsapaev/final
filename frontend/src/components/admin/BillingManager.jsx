@@ -383,9 +383,11 @@ const BillingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Просмотр">
-              
-                    <Eye size={16} />
+              title="Просмотреть счет"
+              type="button"
+              aria-label={`Просмотреть счет ${invoice.invoice_number || invoice.id}`}>
+
+                    <Eye aria-hidden="true" size={16} />
                   </MacOSButton>
                   <MacOSButton
               variant="outline"
@@ -399,9 +401,11 @@ const BillingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Отправить">
-              
-                    <Send size={16} />
+              title="Отправить счет"
+              type="button"
+              aria-label={`Отправить счет ${invoice.invoice_number || invoice.id}`}>
+
+                    <Send aria-hidden="true" size={16} />
                   </MacOSButton>
                   <MacOSButton
               variant="outline"
@@ -418,9 +422,11 @@ const BillingManager = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Записать платеж">
-              
-                    <CreditCard size={16} />
+              title="Записать платеж"
+              type="button"
+              aria-label={`Записать платеж по счету ${invoice.invoice_number || invoice.id}`}>
+
+                    <CreditCard aria-hidden="true" size={16} />
                   </MacOSButton>
                 </div>
               </div>
@@ -449,6 +455,9 @@ const BillingManager = () => {
             <MacOSButton
           variant="outline"
           onClick={() => setShowCreateInvoice(false)}
+          type="button"
+          title="Закрыть форму создания счета"
+          aria-label="Закрыть форму создания счета"
           style={{
             padding: '6px',
             minWidth: 'auto',
@@ -459,7 +468,7 @@ const BillingManager = () => {
             justifyContent: 'center'
           }}>
           
-              <X size={16} />
+              <X aria-hidden="true" size={16} />
             </MacOSButton>
           </div>
 
@@ -602,6 +611,9 @@ const BillingManager = () => {
                 <MacOSButton
             variant="outline"
             onClick={() => removeInvoiceItem(index)}
+            type="button"
+            title={`Удалить позицию счета ${index + 1}`}
+            aria-label={`Удалить позицию счета ${index + 1}`}
             disabled={invoiceForm.items.length === 1}
             style={{
               padding: '6px',
@@ -613,7 +625,7 @@ const BillingManager = () => {
               justifyContent: 'center'
             }}>
             
-                  <Trash2 size={16} />
+                  <Trash2 aria-hidden="true" size={16} />
                 </MacOSButton>
               </div>
         )}
@@ -681,6 +693,9 @@ const BillingManager = () => {
             <MacOSButton
           variant="outline"
           onClick={() => setShowRecordPayment(false)}
+          type="button"
+          title="Закрыть форму записи платежа"
+          aria-label="Закрыть форму записи платежа"
           style={{
             padding: '6px',
             minWidth: 'auto',
@@ -691,7 +706,7 @@ const BillingManager = () => {
             justifyContent: 'center'
           }}>
           
-              <X size={16} />
+              <X aria-hidden="true" size={16} />
             </MacOSButton>
           </div>
 
