@@ -145,14 +145,17 @@ const ResponsiveModal = ({
             variant="ghost"
             size="sm"
             onClick={onClose}
+            type="button"
+            title="Закрыть модальное окно"
+            aria-label={typeof title === 'string' ? `Закрыть: ${title}` : 'Закрыть модальное окно'}
             style={{
               minWidth: 'auto',
               padding: '8px',
               color: 'white',
               border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
-            
-              <X size={isMobile ? 18 : 20} />
+
+              <X aria-hidden="true" size={isMobile ? 18 : 20} />
             </Button>
           </div>
         }

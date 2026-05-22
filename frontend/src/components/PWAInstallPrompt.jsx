@@ -92,9 +92,12 @@ const PWAInstallPrompt = () => {
             variant="ghost"
             size="small"
             onClick={handleDismiss}
+            type="button"
+            title="Закрыть предложение установки приложения"
+            aria-label="Закрыть предложение установки приложения"
             style={{ padding: '4px', minWidth: 'auto' }}
           >
-            <X size={16} />
+            <X aria-hidden="true" size={16} />
           </Button>
         </Box>
         
