@@ -9,6 +9,7 @@ Date: 2026-05-21
 - Audited controls:
   - native `button`
   - elements with interactive roles such as `role="button"`, `role="tab"`, and `role="switch"`
+  - project `Button` and `MacOSButton` components in the component-aware sweep
 - Required accessible-name sources:
   - `aria-label`
   - `aria-labelledby`
@@ -33,6 +34,25 @@ Parse errors: 0
 ```
 
 The project now has a required strict gate for icon-only controls. The historical baseline in `frontend/scripts/a11y/icon-only-controls-baseline.json` has been reduced to zero entries.
+
+Follow-up component sweep:
+
+```powershell
+cd frontend
+npm run audit:icon-controls:components
+```
+
+Result:
+
+```text
+Files scanned: 615
+Findings: 142
+Baseline entries: 142
+New findings: 0
+Stale baseline entries: 0
+```
+
+The component-aware sweep is now CI-enforced with a separate baseline in `frontend/scripts/a11y/icon-only-component-controls-baseline.json`. This prevents new icon-only `Button`/`MacOSButton` debt while the existing 142 historical component findings are cleaned up in targeted UI slices.
 
 ## Cleanup Progress
 
@@ -69,6 +89,7 @@ The project now has a required strict gate for icon-only controls. The historica
 ## CI Policy
 
 - `npm run audit:icon-controls:strict` fails when any icon-only control is added without a robust accessible name.
+- `npm run audit:icon-controls:components` fails when any new project `Button`/`MacOSButton` icon-only control is added outside the current component baseline.
 - The CI `frontend-lint` job runs the strict sweep after `npm run lint:check`.
 - `npm run audit:icon-controls` remains available for baseline-aware local review, but the committed baseline is empty.
 

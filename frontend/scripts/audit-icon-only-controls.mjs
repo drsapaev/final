@@ -21,6 +21,11 @@ const ACCESSIBLE_NAME_ATTRIBUTES = new Set([
   'aria-labelledby',
 ]);
 
+const CUSTOM_CONTROL_COMPONENTS = new Set([
+  'Button',
+  'MacOSButton',
+]);
+
 const INTERACTIVE_ROLES = new Set([
   'button',
   'checkbox',
@@ -55,6 +60,7 @@ function parseArgs(argv) {
   const options = {
     baseline: null,
     root: path.resolve(process.cwd(), 'src'),
+    includeComponents: false,
     strict: false,
     format: 'text',
     writeBaseline: null,
@@ -67,6 +73,8 @@ function parseArgs(argv) {
       options.baseline = path.resolve(process.cwd(), arg.slice('--baseline='.length));
     } else if (arg.startsWith('--root=')) {
       options.root = path.resolve(process.cwd(), arg.slice('--root='.length));
+    } else if (arg === '--include-components') {
+      options.includeComponents = true;
     } else if (arg.startsWith('--format=')) {
       options.format = arg.slice('--format='.length);
     } else if (arg.startsWith('--write-baseline=')) {
@@ -248,9 +256,13 @@ function hasInteractiveRole(openingElement) {
   return INTERACTIVE_ROLES.has(literalValueFromAttribute(role));
 }
 
-function isAuditedControl(openingElement) {
+function isAuditedControl(openingElement, options = {}) {
   const elementName = jsxNameToString(openingElement.name);
-  return elementName === 'button' || hasInteractiveRole(openingElement);
+  return (
+    elementName === 'button' ||
+    hasInteractiveRole(openingElement) ||
+    (options.includeComponents && CUSTOM_CONTROL_COMPONENTS.has(elementName))
+  );
 }
 
 function classifyControl(node) {
@@ -298,12 +310,12 @@ function visitAst(node, visitor) {
   }
 }
 
-export function auditCode(code, filePath = '<inline>') {
+export function auditCode(code, filePath = '<inline>', options = {}) {
   const ast = parseSource(code, filePath);
   const findings = [];
 
   visitAst(ast, (node) => {
-    if (node.type !== 'JSXElement' || !isAuditedControl(node.openingElement)) {
+    if (node.type !== 'JSXElement' || !isAuditedControl(node.openingElement, options)) {
       return;
     }
 
@@ -343,7 +355,7 @@ function normalizeFinding(finding) {
   return normalized;
 }
 
-export function auditProject(rootDir) {
+export function auditProject(rootDir, options = {}) {
   const files = listSourceFiles(rootDir);
   const findings = [];
   const parseErrors = [];
@@ -351,7 +363,7 @@ export function auditProject(rootDir) {
   for (const file of files) {
     const code = fs.readFileSync(file, 'utf8');
     try {
-      findings.push(...auditCode(code, file).map(normalizeFinding));
+      findings.push(...auditCode(code, file, options).map(normalizeFinding));
     } catch (error) {
       parseErrors.push({
         file,
@@ -454,7 +466,7 @@ function printTextReport(result) {
 
 function runCli() {
   const options = parseArgs(process.argv.slice(2));
-  let result = auditProject(options.root);
+  let result = auditProject(options.root, { includeComponents: options.includeComponents });
 
   if (options.writeBaseline) {
     writeBaselineFile(result, options.writeBaseline);
