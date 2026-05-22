@@ -74,6 +74,16 @@ def git_lines(args: Sequence[str]) -> tuple[str, ...]:
     return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
 
 
+def list_local_branches() -> tuple[str, ...]:
+    return git_lines(("for-each-ref", "--format=%(refname:short)", "refs/heads"))
+
+
+def list_graph_merged_branches(base: str) -> tuple[str, ...]:
+    return git_lines(
+        ("for-each-ref", f"--merged={base}", "--format=%(refname:short)", "refs/heads")
+    )
+
+
 def parse_worktree_branches(porcelain: str) -> frozenset[str]:
     return frozenset(parse_worktree_branch_paths(porcelain))
 
@@ -356,8 +366,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.prune_worktrees:
         run_command(("git", "worktree", "prune"))
 
-    branches = git_lines(("branch", "--format=%(refname:short)"))
-    graph_merged = git_lines(("branch", "--format=%(refname:short)", "--merged", args.base))
+    branches = list_local_branches()
+    graph_merged = list_graph_merged_branches(args.base)
     worktree = run_command(("git", "worktree", "list", "--porcelain"))
     worktree_branch_paths = parse_worktree_branch_paths(worktree.stdout)
     active = frozenset(worktree_branch_paths)
@@ -370,8 +380,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.sync_local_base and local_base_status:
         sync_local_base(local_base_status)
-        branches = git_lines(("branch", "--format=%(refname:short)"))
-        graph_merged = git_lines(("branch", "--format=%(refname:short)", "--merged", args.base))
+        branches = list_local_branches()
+        graph_merged = list_graph_merged_branches(args.base)
         local_base_status = inspect_local_base_status(
             base=args.base,
             branches=branches,
