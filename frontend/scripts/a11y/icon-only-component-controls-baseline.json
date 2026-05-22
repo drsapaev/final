@@ -1,29 +1,13 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T12:59:39.728Z",
+  "generatedAt": "2026-05-22T13:23:32.122Z",
   "entries": [
-    {
-      "signature": "src/components/PWAInstallPrompt.jsx:91:11:Button:missing-accessible-name",
-      "file": "src/components/PWAInstallPrompt.jsx",
-      "line": 91,
-      "column": 11,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
     {
       "signature": "src/components/PrescriptionSystem.jsx:228:19:Button:missing-accessible-name",
       "file": "src/components/PrescriptionSystem.jsx",
       "line": 228,
       "column": 19,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ResponsiveModal.jsx:144:13:Button:missing-accessible-name",
-      "file": "src/components/ResponsiveModal.jsx",
-      "line": 144,
-      "column": 13,
       "element": "Button",
       "reason": "missing-accessible-name"
     },
@@ -1026,22 +1010,6 @@
       "column": 11,
       "element": "Button",
       "reason": "title-only"
-    },
-    {
-      "signature": "src/components/ui/macos/Header.jsx:132:9:Button:missing-accessible-name",
-      "file": "src/components/ui/macos/Header.jsx",
-      "line": 132,
-      "column": 9,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ui/macos/Header.jsx:336:7:Button:missing-accessible-name",
-      "file": "src/components/ui/macos/Header.jsx",
-      "line": 336,
-      "column": 7,
-      "element": "Button",
-      "reason": "missing-accessible-name"
     },
     {
       "signature": "src/pages/DentistPanelUnified.jsx:2084:15:Button:title-only",

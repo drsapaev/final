@@ -133,6 +133,9 @@ const Header = React.forwardRef(({
           variant="ghost"
           size="small"
           onClick={onSettingsClick}
+          type="button"
+          title="Открыть настройки"
+          aria-label="Открыть настройки"
           style={{
             width: '32px',
             height: '32px',
@@ -141,8 +144,8 @@ const Header = React.forwardRef(({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-          
-          <Icon name="gear" size="small" color="accent" />
+
+          <Icon aria-hidden="true" name="gear" size="small" color="accent" />
           </Button>
         }
 
@@ -337,6 +340,9 @@ export const HeaderSearch = React.forwardRef(({
         variant="ghost"
         size="small"
         onClick={onClear}
+        type="button"
+        title="Очистить поиск"
+        aria-label="Очистить поиск"
         style={{
           width: '16px',
           height: '16px',
@@ -347,8 +353,8 @@ export const HeaderSearch = React.forwardRef(({
           justifyContent: 'center',
           marginLeft: '4px'
         }}>
-        
-          <Icon name="xmark" size="small" />
+
+          <Icon aria-hidden="true" name="xmark" size="small" />
         </Button>
       }
 
