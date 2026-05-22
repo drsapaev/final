@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T13:42:14.881Z",
+  "generatedAt": "2026-05-22T14:03:31.250Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -39,54 +39,6 @@
       "signature": "src/components/admin/BenefitSettings.jsx:831:13:MacOSButton:missing-accessible-name",
       "file": "src/components/admin/BenefitSettings.jsx",
       "line": 831,
-      "column": 13,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:374:19:MacOSButton:title-only",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 374,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:390:19:MacOSButton:title-only",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 390,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:406:19:MacOSButton:title-only",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 406,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:449:13:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 449,
-      "column": 13,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:602:17:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 602,
-      "column": 17,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/BillingManager.jsx:681:13:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/BillingManager.jsx",
-      "line": 681,
       "column": 13,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
