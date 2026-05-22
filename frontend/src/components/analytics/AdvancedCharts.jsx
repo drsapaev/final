@@ -128,6 +128,7 @@ const AdvancedCharts = ({
 
   const renderChartCard = (chartName, chartConfig) => {
     const canvasId = `advanced-chart-${chartName}`;
+    const chartLabel = chartConfig.options?.plugins?.title?.text || chartName;
 
     return (
       <Card key={chartName} className="w-full">
@@ -136,23 +137,29 @@ const AdvancedCharts = ({
             <div className="flex items-center space-x-2">
               {getChartIcon(chartConfig.type)}
               <h3 className="text-lg font-semibold">
-                {chartConfig.options?.plugins?.title?.text || chartName}
+                {chartLabel}
               </h3>
             </div>
             <div className="flex items-center space-x-2">
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
+                title={`Export ${chartLabel}`}
+                aria-label={`Export ${chartLabel}`}
                 onClick={() => onExport?.(chartName)}>
-                
-                <Download className="w-4 h-4" />
+
+                <Download aria-hidden="true" className="w-4 h-4" />
               </Button>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
+                title={`Refresh ${chartLabel}`}
+                aria-label={`Refresh ${chartLabel}`}
                 onClick={() => onRefresh?.(chartName)}>
-                
-                <RefreshCw className="w-4 h-4" />
+
+                <RefreshCw aria-hidden="true" className="w-4 h-4" />
               </Button>
             </div>
           </div>
