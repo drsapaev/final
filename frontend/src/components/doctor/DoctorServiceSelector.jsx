@@ -299,12 +299,15 @@ const DoctorServiceSelector = ({
                 gap: '8px'
               }}>
                     <MacOSButton
+                  type="button"
                   size="sm"
                   variant="ghost"
+                  title={`Decrease quantity for ${service.name}`}
+                  aria-label={`Decrease quantity for ${service.name}`}
                   onClick={() => handleQuantityChange(service.id, service.quantity - 1)}
                   disabled={service.quantity <= 1}>
-                  
-                      <Minus size={14} />
+
+                      <Minus aria-hidden="true" size={14} />
                     </MacOSButton>
                     <span style={{
                   width: '32px',
@@ -313,11 +316,14 @@ const DoctorServiceSelector = ({
                   color: 'var(--mac-text-primary)'
                 }}>{service.quantity}</span>
                     <MacOSButton
+                  type="button"
                   size="sm"
                   variant="ghost"
+                  title={`Increase quantity for ${service.name}`}
+                  aria-label={`Increase quantity for ${service.name}`}
                   onClick={() => handleQuantityChange(service.id, service.quantity + 1)}>
-                  
-                      <Plus size={14} />
+
+                      <Plus aria-hidden="true" size={14} />
                     </MacOSButton>
                   </div>
 
@@ -365,11 +371,14 @@ const DoctorServiceSelector = ({
 
                   {/* Убрать услугу */}
                   <MacOSButton
+                type="button"
                 size="sm"
                 variant="ghost"
+                title={`Remove service ${service.name}`}
+                aria-label={`Remove service ${service.name}`}
                 onClick={() => handleServiceToggle(service)}>
-                
-                    <Minus size={14} />
+
+                    <Minus aria-hidden="true" size={14} />
                   </MacOSButton>
                 </div>
               </div>
