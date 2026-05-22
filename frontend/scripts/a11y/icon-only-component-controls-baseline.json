@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T14:53:36.388Z",
+  "generatedAt": "2026-05-22T15:01:32.379Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -303,46 +303,6 @@
       "signature": "src/components/ai/MedicalImageAnalyzer.jsx:738:15:MacOSButton:missing-accessible-name",
       "file": "src/components/ai/MedicalImageAnalyzer.jsx",
       "line": 738,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/QualityControl.jsx:293:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/QualityControl.jsx",
-      "line": 293,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/QualityControl.jsx:527:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/QualityControl.jsx",
-      "line": 527,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/QualityControl.jsx:748:19:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/QualityControl.jsx",
-      "line": 748,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/QualityControl.jsx:856:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/QualityControl.jsx",
-      "line": 856,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/QualityControl.jsx:1217:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/QualityControl.jsx",
-      "line": 1217,
       "column": 15,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"

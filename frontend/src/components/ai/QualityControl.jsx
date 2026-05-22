@@ -291,11 +291,14 @@ const QualityControl = () => {
             style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove medical record"
+            aria-label={`Remove medical record ${index + 1}`}
             onClick={() => removeMedicalRecord(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
             
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -525,11 +528,14 @@ const QualityControl = () => {
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove required field"
+            aria-label={`Remove required field ${index + 1}`}
             onClick={() => removeRequiredField(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
             
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -746,11 +752,14 @@ const QualityControl = () => {
                 style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
               
                   <MacOSButton
+                type="button"
+                title="Remove symptom"
+                aria-label={`Remove symptom ${index + 1}`}
                 onClick={() => removeSymptom(index)}
                 variant="outline"
                 style={{ padding: '4px', minWidth: 'auto' }}>
                 
-                    <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+                    <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                   </MacOSButton>
                 </div>
             )}
@@ -854,11 +863,14 @@ const QualityControl = () => {
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove prescription"
+            aria-label={`Remove prescription ${index + 1}`}
             onClick={() => removePrescription(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
             
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -1215,13 +1227,16 @@ const QualityControl = () => {
             
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
               <MacOSButton
+                type="button"
+                title={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
+                aria-label={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
                 onClick={handleSubmit}
                 disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 
                 {loading ?
                 <>
-                    <Loader style={{
+                    <Loader aria-hidden="true" style={{
                     width: '20px',
                     height: '20px',
                     animation: 'spin 1s linear infinite'
@@ -1230,7 +1245,7 @@ const QualityControl = () => {
                   </> :
 
                 <>
-                    <Zap style={{ width: '20px', height: '20px' }} />
+                    <Zap aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                     Запустить AI анализ
                   </>
                 }
