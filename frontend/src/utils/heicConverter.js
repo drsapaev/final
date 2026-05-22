@@ -1,5 +1,7 @@
 import logger from '../utils/logger';
 
+const SERVICE_WORKER_CONVERSION_TIMEOUT_MS = 8000;
+
 /**
  * HEIC → JPEG конвертация на клиенте
  * Использует Service Worker для фоновой конвертации
@@ -60,14 +62,28 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
     // Создаем MessageChannel для двусторонней связи
     const messageChannel = new MessageChannel();
 
-    const convertedFileFromWorker = await new Promise((resolve, reject) => {
+    const convertedFileFromWorker = await new Promise((resolve, rejectWorker) => {
+      let isSettled = false;
+      const settle = (handler, value) => {
+        if (isSettled) return;
+        isSettled = true;
+        clearTimeout(timeoutId);
+        messageChannel.port1.close?.();
+        messageChannel.port2.close?.();
+        handler(value);
+      };
+      const reject = (value) => settle(rejectWorker, value);
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Service Worker HEIC conversion timed out'));
+      }, SERVICE_WORKER_CONVERSION_TIMEOUT_MS);
+
       // Настраиваем обработчик ответа
       messageChannel.port1.onmessage = (event) => {
         const { success, convertedFile, error } = event.data;
 
         if (success) {
           // Создаем новый File объект из Blob
-          resolve(createJPEGFile(heicFile, convertedFile));
+          settle(resolve, createJPEGFile(heicFile, convertedFile));
         } else {
           reject(new Error(error || 'Ошибка конвертации'));
         }
