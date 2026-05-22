@@ -568,6 +568,7 @@ jobs:
       run: |
         cd frontend
         npm run audit:a11y
+        npm run audit:no-mui-runtime
         npm run audit:icon-controls:strict
         echo "Strict accessibility control sweeps passed"
 
