@@ -592,16 +592,24 @@ const SystemManagement = () => {
           created_at: new Date(backup.created_at).toLocaleString(),
           actions:
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <MacOSButton size="sm" variant="outline">
-                    <Eye style={{ width: '14px', height: '14px' }} />
+                  <MacOSButton
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    title={`View backup ${backup.name}`}
+                    aria-label={`View backup ${backup.name}`}>
+                    <Eye aria-hidden="true" style={{ width: '14px', height: '14px' }} />
                   </MacOSButton>
                   <MacOSButton
+              type="button"
               onClick={() => deleteBackup(backup.name)}
               size="sm"
               variant="outline"
+              title={`Delete backup ${backup.name}`}
+              aria-label={`Delete backup ${backup.name}`}
               style={{ color: 'var(--mac-error)' }}>
 
-                    <Trash2 style={{ width: '14px', height: '14px' }} />
+                    <Trash2 aria-hidden="true" style={{ width: '14px', height: '14px' }} />
                   </MacOSButton>
                       </div>
 
