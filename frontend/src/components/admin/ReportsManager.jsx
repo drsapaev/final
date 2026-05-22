@@ -312,6 +312,9 @@ const ReportsManager = () => {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
+          type="button"
+          title={loading ? 'Generating report' : 'Generate report'}
+          aria-label={loading ? 'Generating report' : 'Generate report'}
           onClick={generateReport}
           disabled={loading}
           style={{
@@ -328,12 +331,12 @@ const ReportsManager = () => {
 
             {loading ?
           <>
-                <Loader2 style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} className="animate-spin" />
+                <Loader2 aria-hidden="true" style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} className="animate-spin" />
                 <span>Генерация...</span>
               </> :
 
           <>
-                <FileText style={{ width: '18px', height: '18px' }} />
+                <FileText aria-hidden="true" style={{ width: '18px', height: '18px' }} />
                 <span>Сгенерировать отчет</span>
               </>
           }
@@ -436,8 +439,14 @@ const ReportsManager = () => {
           header: 'Действия',
           align: 'right',
           render: (row) =>
-          <Button size="sm" variant="outline" onClick={() => downloadFile(row.filename)}>
-                    <Download style={{ width: '16px', height: '16px' }} />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            title={`Download report ${row.filename}`}
+            aria-label={`Download report ${row.filename}`}
+            onClick={() => downloadFile(row.filename)}>
+                    <Download aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   </Button>
 
         }]
@@ -541,11 +550,14 @@ const ReportsManager = () => {
           align: 'right',
           render: (row) =>
           <Button
+            type="button"
             size="sm"
             variant="ghost"
+            title={`Download report file ${row.filename}`}
+            aria-label={`Download report file ${row.filename}`}
             onClick={() => downloadFile(row.filename)}>
 
-                    <Download style={{ width: '18px', height: '18px', color: 'var(--mac-text-secondary)' }} />
+                    <Download aria-hidden="true" style={{ width: '18px', height: '18px', color: 'var(--mac-text-secondary)' }} />
                   </Button>
 
         }]
