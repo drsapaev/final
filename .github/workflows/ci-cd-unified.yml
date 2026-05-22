@@ -48,6 +48,9 @@ jobs:
       workflow_changed: ${{ steps.scope.outputs.workflow_changed }}
       skills_changed: ${{ steps.scope.outputs.skills_changed }}
       deps_changed: ${{ steps.scope.outputs.deps_changed }}
+      root_deps_changed: ${{ steps.scope.outputs.root_deps_changed }}
+      frontend_deps_changed: ${{ steps.scope.outputs.frontend_deps_changed }}
+      backend_deps_changed: ${{ steps.scope.outputs.backend_deps_changed }}
       ops_changed: ${{ steps.scope.outputs.ops_changed }}
 
     steps:
@@ -126,6 +129,17 @@ jobs:
             - 'backend/pyproject.toml'
             - 'backend/poetry.lock'
             - 'backend/pdm.lock'
+          root_deps:
+            - 'package.json'
+            - 'package-lock.json'
+          frontend_deps:
+            - 'frontend/package.json'
+            - 'frontend/package-lock.json'
+          backend_deps:
+            - 'backend/requirements*.txt'
+            - 'backend/pyproject.toml'
+            - 'backend/poetry.lock'
+            - 'backend/pdm.lock'
 
     - name: 📌 Resolve guardrail scope
       id: scope
@@ -144,6 +158,9 @@ jobs:
         PR_SKILLS: ${{ steps.changes.outputs.skills }}
         PR_DOCS: ${{ steps.changes.outputs.docs }}
         PR_DEPS: ${{ steps.changes.outputs.deps }}
+        PR_ROOT_DEPS: ${{ steps.changes.outputs.root_deps }}
+        PR_FRONTEND_DEPS: ${{ steps.changes.outputs.frontend_deps }}
+        PR_BACKEND_DEPS: ${{ steps.changes.outputs.backend_deps }}
       run: |
         if [ "$EVENT_NAME" = "pull_request" ]; then
           REQUIRED="${PR_GUARDRAILS:-false}"
@@ -158,6 +175,9 @@ jobs:
           API_DOCS_CHANGED="${PR_API_DOCS:-false}"
           OPS_CHANGED="${PR_OPS:-false}"
           PARITY_TOOLS_CHANGED="${PR_PARITY_TOOLS:-false}"
+          ROOT_DEPS_CHANGED="${PR_ROOT_DEPS:-false}"
+          FRONTEND_DEPS_CHANGED="${PR_FRONTEND_DEPS:-false}"
+          BACKEND_DEPS_CHANGED="${PR_BACKEND_DEPS:-false}"
         else
           REQUIRED="true"
           BACKEND_REQUIRED="true"
@@ -171,12 +191,25 @@ jobs:
           API_DOCS_CHANGED="true"
           OPS_CHANGED="true"
           PARITY_TOOLS_CHANGED="true"
+          ROOT_DEPS_CHANGED="true"
+          FRONTEND_DEPS_CHANGED="true"
+          BACKEND_DEPS_CHANGED="true"
         fi
 
-        if [ "$DEPS_CHANGED" = "true" ]; then
+        # Keep dependency scopes separate: frontend package-only changes should
+        # not force backend/docs/parity unless root or backend dependencies move.
+        if [ "$ROOT_DEPS_CHANGED" = "true" ]; then
           BACKEND_REQUIRED="true"
           FRONTEND_REQUIRED="true"
           FRONTEND_E2E="true"
+          API_DOCS_CHANGED="true"
+        fi
+        if [ "$FRONTEND_DEPS_CHANGED" = "true" ]; then
+          FRONTEND_REQUIRED="true"
+          FRONTEND_E2E="true"
+        fi
+        if [ "$BACKEND_DEPS_CHANGED" = "true" ]; then
+          BACKEND_REQUIRED="true"
           API_DOCS_CHANGED="true"
         fi
 
@@ -196,7 +229,7 @@ jobs:
         fi
 
         DOCS_REQUIRED="false"
-        if [ "$API_DOCS_CHANGED" = "true" ] || [ "$DEPS_CHANGED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+        if [ "$API_DOCS_CHANGED" = "true" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
           DOCS_REQUIRED="true"
         fi
 
@@ -211,6 +244,9 @@ jobs:
         echo "workflow_changed=${WORKFLOW_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "skills_changed=${SKILLS_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "deps_changed=${DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "root_deps_changed=${ROOT_DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "frontend_deps_changed=${FRONTEND_DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
+        echo "backend_deps_changed=${BACKEND_DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "ops_changed=${OPS_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "guardrails_required=${REQUIRED}"
         echo "backend_required=${BACKEND_REQUIRED}"
@@ -220,6 +256,9 @@ jobs:
         echo "parity_required=${PARITY_REQUIRED}"
         echo "docs_required=${DOCS_REQUIRED}"
         echo "frontend_e2e_required=${FRONTEND_E2E}"
+        echo "root_deps_changed=${ROOT_DEPS_CHANGED}"
+        echo "frontend_deps_changed=${FRONTEND_DEPS_CHANGED}"
+        echo "backend_deps_changed=${BACKEND_DEPS_CHANGED}"
 
   metadata-checks:
     name: 🧾 Metadata checks
