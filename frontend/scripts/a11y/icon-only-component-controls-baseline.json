@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T14:40:52.755Z",
+  "generatedAt": "2026-05-22T14:47:52.884Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -297,54 +297,6 @@
       "line": 554,
       "column": 13,
       "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:364:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 364,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:534:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 534,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:775:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 775,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:974:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 974,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:1026:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 1026,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/AnalyticsInsights.jsx:1274:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/AnalyticsInsights.jsx",
-      "line": 1274,
-      "column": 15,
-      "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },
     {
