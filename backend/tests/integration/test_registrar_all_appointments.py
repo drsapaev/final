@@ -178,5 +178,20 @@ class TestRegistrarAllAppointments:
 
         assert found_entry is not None
         assert found_entry["id"] == entry.id
+        assert found_entry["canonical_record_id"] == entry.id
+        assert found_entry["record_kind"] == "online_queue"
+        assert found_entry["source_kind"] == "desk"
+        assert found_entry["canonical_status"] == "waiting"
+        assert found_entry["queue_status"] == "waiting"
+        assert found_entry["queue_position"] == entry.number
+        assert found_entry["can_mark_paid"] is True
+        assert found_entry["can_start_visit"] is True
+        assert found_entry["can_print_ticket"] is True
+        assert found_entry["can_complete"] is False
+        assert set(found_entry["available_actions"]) == {
+            "mark_paid",
+            "start_visit",
+            "print_ticket",
+        }
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)

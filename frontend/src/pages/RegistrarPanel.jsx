@@ -19,7 +19,6 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 const API_BASE = getApiOrigin();
-const APPOINTMENT_OVERRIDE_TTL_MS = 10 * 60 * 1000;
 const REGISTRAR_TAB_LABEL_KEYS = {
   appointments: 'tabs_appointments',
   cardio: 'tabs_cardio',
@@ -74,6 +73,40 @@ const registrarWorkflowActionsStyle = {
   gap: 'var(--mac-spacing-2)',
   flexWrap: 'wrap',
   minWidth: 0
+};
+
+const normalizeRegistrarContractValue = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+};
+
+const getRegistrarRecordKind = (record) => normalizeRegistrarContractValue(
+  record?.record_kind ?? record?.source_kind ?? record?.record_type ?? record?.type
+);
+
+const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind(record)) => {
+  if (!record) return null;
+  if (record.canonical_record_id !== undefined && record.canonical_record_id !== null) {
+    return record.canonical_record_id;
+  }
+  if (recordKind === 'visit' && record.visit_id !== undefined && record.visit_id !== null) {
+    return record.visit_id;
+  }
+  if (recordKind === 'online_queue' && record.queue_entry_id !== undefined && record.queue_entry_id !== null) {
+    return record.queue_entry_id;
+  }
+  if (recordKind === 'appointment' && record.appointment_id !== undefined && record.appointment_id !== null) {
+    return record.appointment_id;
+  }
+  return record.id ?? null;
+};
+
+const hasBackendAction = (record, action) => {
+  if (action === 'mark_paid' && record?.can_mark_paid !== undefined) {
+    return Boolean(record.can_mark_paid);
+  }
+  if (!Array.isArray(record?.available_actions)) return true;
+  return record.available_actions.includes(action) || record.available_actions.includes(action.replace('_', '-'));
 };
 
 // Современные диалоги
@@ -1601,7 +1634,7 @@ const RegistrarPanel = () => {
                   source: entry.source,
                   created_at: entry.created_at, // ✅ ИСПРАВЛЕНО: Добавляем created_at
                   visit_time: entry.visit_time || null, // ✅ ДОБАВЛЕНО: Время визита
-                  record_type: entry.record_type || 'visit', // ✅ ДОБАВЛЕНО: Тип записи
+                  record_type: entry.record_type || entry.type || 'unknown', // ✅ ДОБАВЛЕНО: Тип записи
                   service_details: entry.service_details || [], // ✅ НОВОЕ: Полные данные услуг
                   queue_numbers: [{
                     id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
@@ -1645,7 +1678,7 @@ const RegistrarPanel = () => {
                     source: entry.source,
                     created_at: entry.created_at, // ✅ ИСПРАВЛЕНО: Добавляем created_at
                     visit_time: entry.visit_time || null, // ✅ ДОБАВЛЕНО: Время визита
-                    record_type: entry.record_type || 'visit', // ✅ ДОБАВЛЕНО: Тип записи
+                    record_type: entry.record_type || entry.type || 'unknown', // ✅ ДОБАВЛЕНО: Тип записи
                     service_details: entry.service_details || [], // ✅ НОВОЕ: Полные данные услуг
                     queue_numbers: [{
                       id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
@@ -1774,7 +1807,17 @@ const RegistrarPanel = () => {
       logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
 
       // ✅ ИСПРАВЛЕНО: Используем правильный эндпоинт для queue entries
-      const url = `${API_BASE}/api/v1/registrar/queue/${appointment.id}/start-visit`;
+      const recordKind = getRegistrarRecordKind(appointment);
+      const recordId = getRegistrarRecordId(appointment, recordKind);
+      if (!recordId || (recordKind !== 'visit' && recordKind !== 'online_queue' && recordKind !== 'appointment')) {
+        logger.warn('RegistrarPanel: start-visit requires backend record kind/id', { recordKind, recordId, appointment });
+        notify.error('Missing backend record data for start visit');
+        return;
+      }
+
+      const url = recordKind === 'visit' ?
+        `${API_BASE}/api/v1/registrar/visits/${recordId}/start-visit` :
+        `${API_BASE}/api/v1/registrar/queue/${recordId}/start-visit`;
       logger.info('🔍 Отправляем запрос на:', url);
 
       const response = await fetch(url, {
@@ -1841,18 +1884,26 @@ const RegistrarPanel = () => {
 
       const paymentResults = [];
       for (const record of recordsToUpdate) {
-        const recordType = record.record_type || (record.id >= 20000 ? 'visit' : 'appointment');
-        const recordId = record.id;
+        const recordType = getRegistrarRecordKind(record);
+        const recordId = getRegistrarRecordId(record, recordType);
+        if (!recordId || (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment')) {
+          logger.warn('RegistrarPanel: payment requires backend record kind/id', { recordType, recordId, record });
+          paymentResults.push({ success: false, recordId: record.id, error: 'missing_backend_record_contract' });
+          continue;
+        }
+        if (!hasBackendAction(record, 'mark_paid')) {
+          logger.warn('RegistrarPanel: backend did not expose mark_paid action', { recordType, recordId, record });
+          paymentResults.push({ success: false, recordId, error: 'action_not_available' });
+          continue;
+        }
 
         // ✅ ИСПРАВЛЕНИЕ: Проверяем статус КАЖДОЙ записи перед попыткой оплаты
-        const paymentStatus = (record.payment_status || '').toLowerCase();
-        const status = (record.status || '').toLowerCase();
+        const paymentStatus = normalizeRegistrarContractValue(record.payment_status);
+        const status = normalizeRegistrarContractValue(record.status);
         logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}`);
 
         // Пропускаем записи, которые уже оплачены
-        if (paymentStatus === 'paid' ||
-        status === 'paid' ||
-        status === 'queued') {
+        if (paymentStatus === 'paid' || (!paymentStatus && status === 'paid')) {
           logger.info(`⏭️ Запись ${recordId} уже оплачена, пропускаем`);
           paymentResults.push({ success: true, recordId, skipped: true, reason: 'already_paid' });
           continue;
@@ -1914,29 +1965,29 @@ const RegistrarPanel = () => {
         // Обновляем статус только для записей, которые были реально оплачены (не пропущены)
         const paidRecordIds = paymentResults.
         filter((r) => r.success && !r.skipped).
-        map((r) => r.recordId);
+        map((r) => String(r.recordId));
+        const paymentResultById = new Map(
+          paymentResults.
+          filter((r) => r.success && !r.skipped).
+          map((r) => [String(r.recordId), r.result || {}])
+        );
 
         logger.info('✅ Оплата успешна, обновляем локальное состояние для оплаченных записей:', paidRecordIds);
 
         // Обновляем статус только для реально оплаченных записей
         recordsToUpdate.
-        filter((record) => paidRecordIds.includes(record.id)).
+        filter((record) => paidRecordIds.includes(String(getRegistrarRecordId(record, getRegistrarRecordKind(record))))).
         forEach((record) => {
-          const recordWithQueuedStatus = {
+          const result = paymentResultById.get(String(getRegistrarRecordId(record, getRegistrarRecordKind(record)))) || {};
+          const recordWithBackendState = {
             ...record,
-            status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
-            payment_status: 'paid',
-            _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
+            status: result.status ?? result.entry?.status ?? record.status,
+            payment_status: result.payment_status ?? record.payment_status,
+            _locallyModified: false
           };
 
-          // Сохраняем локальный оверрайд для каждой записи только в памяти текущей страницы
-          appointmentOverridesRef.current[String(record.id)] = {
-            status: recordWithQueuedStatus.status,
-            payment_status: recordWithQueuedStatus.payment_status,
-            // TTL 10 минут
-            expiresAt: Date.now() + APPOINTMENT_OVERRIDE_TTL_MS
-          }; // Обновляем состояние для каждой записи
-          setAppointments((prev) => prev.map((apt) => apt.id === record.id ? recordWithQueuedStatus : apt));
+          delete appointmentOverridesRef.current[String(record.id)];
+          setAppointments((prev) => prev.map((apt) => apt.id === record.id ? recordWithBackendState : apt));
         });
 
         // Формируем информативное сообщение
@@ -1944,7 +1995,7 @@ const RegistrarPanel = () => {
         if (successCount > 0 && skippedCount > 0) {
           message = `Оплачено ${successCount} записей, ${skippedCount} уже были оплачены ранее`;
         } else if (successCount > 0) {
-          message = `Оплачено ${successCount} записей пациента и добавлены в очередь!`;
+          message = `Оплачено ${successCount} записей пациента`;
         } else if (skippedCount > 0) {
           message = 'Все записи уже оплачены';
         }
@@ -1968,7 +2019,7 @@ const RegistrarPanel = () => {
   };
 
   // Обработчики событий
-  const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '') => {
+  const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '', sourceRecord = null) => {
     try {
       if (!appointmentId || Number(appointmentId) <= 0) {
         notify.error('Некорректный идентификатор записи');
@@ -1984,19 +2035,30 @@ const RegistrarPanel = () => {
       let body;
 
       // Определяем источник записи и правильный ID
-      const isFromVisits = appointmentId >= 20000;
-      const realId = isFromVisits ? appointmentId - 20000 : appointmentId;
+      const record = sourceRecord || appointments.find((apt) => apt.id === appointmentId);
+      const recordType = getRegistrarRecordKind(record);
+      const realId = getRegistrarRecordId(record, recordType);
+      if (!realId || (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment')) {
+        logger.warn('RegistrarPanel: status update requires backend record kind/id', { appointmentId, status, recordType, realId, record });
+        notify.error('Missing backend record data for status update');
+        return null;
+      }
 
       if (status === 'complete' || status === 'done') {
-        if (isFromVisits) {
+        if (recordType === 'visit') {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/complete`;
-        } else {
+        } else if (recordType === 'appointment') {
           url = `${API_BASE}/api/v1/appointments/${realId}/complete`;
+        } else {
+          notify.error('Action is not available for this record');
+          return null;
         }
         body = JSON.stringify({ reason });
       } else if (status === 'paid' || status === 'mark-paid') {
-        if (isFromVisits) {
+        if (recordType === 'visit') {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/mark-paid`;
+        } else if (recordType === 'online_queue') {
+          url = `${API_BASE}/api/v1/registrar/queue/entry/${realId}/mark-paid`;
         } else {
           url = `${API_BASE}/api/v1/appointments/${realId}/mark-paid`;
         }
@@ -2039,7 +2101,7 @@ const RegistrarPanel = () => {
         notify.success('Отмечено как неявка (локально)');
         return { id: appointmentId, status: 'no_show' };
       } else if (status === 'in_cabinet') {
-        if (isFromVisits) {
+        if (recordType === 'visit') {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/start-visit`;
         } else {
           // Используем эндпоинт для очереди регистратора
@@ -2086,7 +2148,7 @@ const RegistrarPanel = () => {
       notify.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
       return null;
     }
-  }, [loadAppointments]);
+  }, [appointments, loadAppointments]);
 
   const handleBulkAction = useCallback(async (action, reason = '') => {
     if (appointmentsSelected.size === 0) return;
@@ -2740,14 +2802,14 @@ const RegistrarPanel = () => {
         logger.info('Редактирование записи:', row);
         break;
       case 'in_cabinet':
-        await updateAppointmentStatus(row.id, 'in_cabinet');
+        await updateAppointmentStatus(row.id, 'in_cabinet', '', row);
         notify.success('Пациент отправлен в кабинет');
         break;
       case 'call':
         await handleStartVisit(row);
         break;
       case 'complete':
-        await updateAppointmentStatus(row.id, 'done');
+        await updateAppointmentStatus(row.id, 'done', '', row);
         notify.success('Приём завершён');
         break;
       case 'payment':
@@ -3455,7 +3517,7 @@ const RegistrarPanel = () => {
                           break;
                         case 'in_cabinet':
                           logger.info('Отправка пациента в кабинет (welcome):', row);
-                          updateAppointmentStatus(row.id, 'in_cabinet');
+                          updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                           break;
                         case 'call':
                           logger.info('Вызов пациента (welcome):', row);
@@ -3463,7 +3525,7 @@ const RegistrarPanel = () => {
                           break;
                         case 'complete':
                           logger.info('Завершение приёма (welcome):', row);
-                          updateAppointmentStatus(row.id, 'done');
+                          updateAppointmentStatus(row.id, 'done', '', row);
                           break;
                         case 'print':
                           logger.info('Печать талона (welcome):', row);
@@ -3797,7 +3859,7 @@ const RegistrarPanel = () => {
                     break;
                   case 'in_cabinet':
                     logger.info('Отправка пациента в кабинет:', row);
-                    updateAppointmentStatus(row.id, 'in_cabinet');
+                    updateAppointmentStatus(row.id, 'in_cabinet', '', row);
                     break;
                   case 'call':
                     logger.info('Вызов пациента:', row);
@@ -3805,7 +3867,7 @@ const RegistrarPanel = () => {
                     break;
                   case 'complete':
                     logger.info('Завершение приёма:', row);
-                    updateAppointmentStatus(row.id, 'done');
+                    updateAppointmentStatus(row.id, 'done', '', row);
                     break;
                   case 'print':
                     logger.info('Печать талона:', row);
@@ -3911,7 +3973,12 @@ const RegistrarPanel = () => {
 
           try {
             const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find((a) => a.id === appointmentId);
-            const recordType = data?.record_type || 'visit';
+            const recordType = getRegistrarRecordKind(data);
+            if (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment') {
+              logger.warn('RegistrarPanel: cancel requires backend record kind', { appointmentId, recordType, data });
+              notify.error('Missing backend record data for cancellation');
+              return;
+            }
 
             // Определяем список ID для отмены (если это агрегированная запись - отменяем все)
             const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
@@ -3945,33 +4012,18 @@ const RegistrarPanel = () => {
               };
 
               if (recordType === 'visit') {
-                try {
-                  await tryCancelVisit();
-                } catch (visitError) {
-                  if (visitError.response?.status === 404) {
-                    logger.warn(`⚠️ Попытка отмены как 'visit' вернула 404. Пробуем как 'online_queue' (ID=${targetId})`);
-                    await tryCancelOnlineQueue();
-                  } else {
-                    throw visitError;
-                  }
-                }
-              } else if (recordType === 'appointment') {
-                await tryCancelAppointment();
-              } else if (recordType === 'online_queue') {
-                await tryCancelOnlineQueue();
-              } else {
-                // Fallback default strategy
-                try {
-                  await tryCancelVisit();
-                } catch (err) {
-                  if (err.response?.status === 404) {
-                    logger.warn('Fallback visit cancel failed 404, trying online_queue...');
-                    await tryCancelOnlineQueue();
-                  } else {
-                    throw err;
-                  }
-                }
+                await tryCancelVisit();
+                return;
               }
+              if (recordType === 'appointment') {
+                await tryCancelAppointment();
+                return;
+              }
+              if (recordType === 'online_queue') {
+                await tryCancelOnlineQueue();
+                return;
+              }
+
             };
 
             // Выполняем отмену для всех ID
@@ -4043,7 +4095,7 @@ const RegistrarPanel = () => {
           if (appointment) {
             const updated = await handlePayment(appointment, paymentData);
             if (updated) {
-              // Статус уже правильно установлен в handlePayment (status: 'queued')
+              // Статус уже установлен в handlePayment из ответа backend
               logger.info('PaymentDialog: Оплата успешна, статус обновлен:', updated);
             }
           }

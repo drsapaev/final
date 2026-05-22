@@ -42,6 +42,99 @@ def _normalize_queue_status_for_registrar(raw_status: str | None) -> str:
     return raw_status
 
 
+REGISTRAR_PAYMENT_ROLES = {"admin", "registrar", "cashier"}
+REGISTRAR_START_VISIT_ROLES = {
+    "admin",
+    "registrar",
+    "doctor",
+    "cardio",
+    "cardiology",
+    "derma",
+    "dentist",
+    "lab",
+}
+REGISTRAR_PRINT_TICKET_ROLES = {"admin", "registrar", "cashier", "doctor"}
+REGISTRAR_COMPLETE_ROLES = {"admin", "registrar", "doctor", "cashier", "receptionist"}
+REGISTRAR_START_STATUSES = {"waiting", "queued"}
+REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
+REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
+
+
+def _registrar_user_role_names(user: User | None) -> set[str]:
+    role_names: set[str] = set()
+    primary_role = getattr(user, "role", None)
+    if primary_role:
+        role_names.add(str(primary_role).strip().lower())
+
+    for role in getattr(user, "roles", None) or []:
+        role_name = getattr(role, "name", None)
+        if role_name:
+            role_names.add(str(role_name).strip().lower())
+
+    return role_names
+
+
+def _registrar_can_mark_paid(user: User | None, payment_status: str | None) -> bool:
+    if str(payment_status or "").strip().lower() == "paid":
+        return False
+    return bool(_registrar_user_role_names(user) & REGISTRAR_PAYMENT_ROLES)
+
+
+def _registrar_can_start_visit(user: User | None, queue_status: str | None) -> bool:
+    normalized_status = str(queue_status or "").strip().lower()
+    return (
+        normalized_status in REGISTRAR_START_STATUSES
+        and bool(_registrar_user_role_names(user) & REGISTRAR_START_VISIT_ROLES)
+    )
+
+
+def _registrar_can_print_ticket(
+    user: User | None,
+    *,
+    payment_status: str | None,
+    queue_status: str | None,
+) -> bool:
+    normalized_payment_status = str(payment_status or "").strip().lower()
+    normalized_queue_status = str(queue_status or "").strip().lower()
+    return (
+        (
+            normalized_payment_status == "paid"
+            or normalized_queue_status in REGISTRAR_PRINT_STATUSES
+        )
+        and bool(_registrar_user_role_names(user) & REGISTRAR_PRINT_TICKET_ROLES)
+    )
+
+
+def _registrar_can_complete(user: User | None, queue_status: str | None) -> bool:
+    normalized_status = str(queue_status or "").strip().lower()
+    return (
+        normalized_status in REGISTRAR_COMPLETE_STATUSES
+        and bool(_registrar_user_role_names(user) & REGISTRAR_COMPLETE_ROLES)
+    )
+
+
+def _registrar_available_actions(
+    *,
+    user: User | None,
+    payment_status: str | None,
+    queue_status: str | None,
+) -> list[str]:
+    actions: list[str] = []
+    if _registrar_can_mark_paid(user, payment_status):
+        actions.append("mark_paid")
+    if _registrar_can_start_visit(user, queue_status):
+        actions.append("start_visit")
+    if _registrar_can_print_ticket(
+        user,
+        payment_status=payment_status,
+        queue_status=queue_status,
+    ):
+        actions.append("print_ticket")
+    if _registrar_can_complete(user, queue_status):
+        actions.append("complete")
+    return actions
+
+
 REGISTRATION_DISCOUNT_MODES = {"none", "repeat", "benefit", "all_free"}
 
 
@@ -2772,10 +2865,23 @@ def get_today_queues(
                     visit_id=entry_visit_id,
                     legacy_paid_at=getattr(entry_data, "payment_processed_at", None),
                 )
+                canonical_status = _normalize_queue_status_for_registrar(entry_status)
+                available_actions = _registrar_available_actions(
+                    user=current_user,
+                    payment_status=payment_status,
+                    queue_status=canonical_status,
+                )
+                can_mark_paid = "mark_paid" in available_actions
+                can_start_visit = "start_visit" in available_actions
+                can_print_ticket = "print_ticket" in available_actions
+                can_complete = "complete" in available_actions
 
                 entries.append(
                     {
                         "id": record_id,
+                        "canonical_record_id": record_id,
+                        "record_kind": entry_type,
+                        "source_kind": source,
                         "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
                         "visit_id": entry_visit_id,
                         "number": queue_entry_number,  # [OK] ИСПРАВЛЕНО: реальный номер из queue_entries
@@ -2792,10 +2898,16 @@ def get_today_queues(
                         "cost": total_cost,
                         "payment_status": payment_status,
                         "payment_type": payment_type,
+                        "can_mark_paid": can_mark_paid,
+                        "can_start_visit": can_start_visit,
+                        "can_print_ticket": can_print_ticket,
+                        "can_complete": can_complete,
+                        "available_actions": available_actions,
                         "source": source,
-                        "status": _normalize_queue_status_for_registrar(
-                            entry_status
-                        ),
+                        "status": canonical_status,
+                        "canonical_status": canonical_status,
+                        "queue_status": canonical_status,
+                        "queue_position": queue_entry_number,
                         "created_at": _serialize_registrar_datetime(
                             entry_wrapper.get("created_at")
                         ),
