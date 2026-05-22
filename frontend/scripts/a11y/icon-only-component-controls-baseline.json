@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T15:07:27.690Z",
+  "generatedAt": "2026-05-22T15:15:45.638Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -312,38 +312,6 @@
       "file": "src/components/ai/SmartScheduling.jsx",
       "line": 1449,
       "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:296:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
-      "line": 296,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:436:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
-      "line": 436,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:571:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
-      "line": 571,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:750:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
-      "line": 750,
-      "column": 11,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },

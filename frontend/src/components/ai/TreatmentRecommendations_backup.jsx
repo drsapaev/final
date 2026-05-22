@@ -294,6 +294,9 @@ const TreatmentRecommendations = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+            type="button"
+            title={loading ? 'Generating treatment plan' : 'Generate treatment plan'}
+            aria-label={loading ? 'Generating treatment plan' : 'Generate treatment plan'}
             onClick={() => handleSubmit('generate-treatment-plan', treatmentPlanData)}
             disabled={loading || !treatmentPlanData.diagnosis}
             style={{ 
@@ -306,7 +309,7 @@ const TreatmentRecommendations = () => {
           >
             {loading ? (
               <>
-                <Loader style={{ 
+                <Loader aria-hidden="true" style={{
                   width: '20px', 
                   height: '20px',
                   animation: 'spin 1s linear infinite'
@@ -315,7 +318,7 @@ const TreatmentRecommendations = () => {
               </>
             ) : (
               <>
-                <Target style={{ width: '20px', height: '20px' }} />
+                <Target aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Создать план лечения
               </>
             )}
@@ -434,6 +437,9 @@ const TreatmentRecommendations = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+            type="button"
+            title={loading ? 'Optimizing medication therapy' : 'Optimize medication therapy'}
+            aria-label={loading ? 'Optimizing medication therapy' : 'Optimize medication therapy'}
             onClick={() => handleSubmit('optimize-medication', medicationData)}
             disabled={loading || !medicationData.condition}
             style={{ 
@@ -446,7 +452,7 @@ const TreatmentRecommendations = () => {
           >
             {loading ? (
               <>
-                <Loader style={{ 
+                <Loader aria-hidden="true" style={{
                   width: '20px', 
                   height: '20px',
                   animation: 'spin 1s linear infinite'
@@ -455,7 +461,7 @@ const TreatmentRecommendations = () => {
               </>
             ) : (
               <>
-                <Pill style={{ width: '20px', height: '20px' }} />
+                <Pill aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Оптимизировать терапию
               </>
             )}
@@ -569,6 +575,9 @@ const TreatmentRecommendations = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+            type="button"
+            title={loading ? 'Assessing treatment effectiveness' : 'Assess treatment effectiveness'}
+            aria-label={loading ? 'Assessing treatment effectiveness' : 'Assess treatment effectiveness'}
             onClick={() => handleSubmit('assess-treatment-effectiveness', effectivenessData)}
             disabled={loading}
             style={{ 
@@ -581,7 +590,7 @@ const TreatmentRecommendations = () => {
           >
             {loading ? (
               <>
-                <Loader style={{ 
+                <Loader aria-hidden="true" style={{
                   width: '20px', 
                   height: '20px',
                   animation: 'spin 1s linear infinite'
@@ -590,7 +599,7 @@ const TreatmentRecommendations = () => {
               </>
             ) : (
               <>
-                <TrendingUp style={{ width: '20px', height: '20px' }} />
+                <TrendingUp aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Оценить эффективность
               </>
             )}
@@ -748,6 +757,9 @@ const TreatmentRecommendations = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+            type="button"
+            title={loading ? 'Generating lifestyle recommendations' : 'Get lifestyle recommendations'}
+            aria-label={loading ? 'Generating lifestyle recommendations' : 'Get lifestyle recommendations'}
             onClick={() => handleSubmit('suggest-lifestyle-modifications', lifestyleData)}
             disabled={loading}
             style={{ 
@@ -760,7 +772,7 @@ const TreatmentRecommendations = () => {
           >
             {loading ? (
               <>
-                <Loader style={{ 
+                <Loader aria-hidden="true" style={{
                   width: '20px', 
                   height: '20px',
                   animation: 'spin 1s linear infinite'
@@ -769,7 +781,7 @@ const TreatmentRecommendations = () => {
               </>
             ) : (
               <>
-                <Activity style={{ width: '20px', height: '20px' }} />
+                <Activity aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Получить рекомендации
               </>
             )}

@@ -46,13 +46,13 @@ Result:
 
 ```text
 Files scanned: 615
-Findings: 57
-Baseline entries: 57
+Findings: 53
+Baseline entries: 53
 New findings: 0
 Stale baseline entries: 0
 ```
 
-The component-aware sweep is now CI-enforced with a separate baseline in `frontend/scripts/a11y/icon-only-component-controls-baseline.json`. This prevents new icon-only `Button`/`MacOSButton` debt while the existing 57 historical component findings are cleaned up in targeted UI slices.
+The component-aware sweep is now CI-enforced with a separate baseline in `frontend/scripts/a11y/icon-only-component-controls-baseline.json`. This prevents new icon-only `Button`/`MacOSButton` debt while the existing 53 historical component findings are cleaned up in targeted UI slices.
 
 ## Cleanup Progress
 
@@ -100,7 +100,8 @@ The component-aware sweep is now CI-enforced with a separate baseline in `fronte
 - 2026-05-22: drug interaction action labels cleanup removed 5 component findings.
 - 2026-05-22: quality control action labels cleanup removed 5 component findings.
 - 2026-05-22: treatment recommendations action labels cleanup removed 4 component findings.
-- Current component-aware baseline: 57 findings.
+- 2026-05-22: backup treatment recommendations action labels cleanup removed 4 component findings.
+- Current component-aware baseline: 53 findings.
 
 ## CI Policy
 
