@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T18:37:44.247Z",
+  "generatedAt": "2026-05-22T18:43:10.417Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -57,22 +57,6 @@
       "line": 170,
       "column": 11,
       "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/DisplayBoardSettings.jsx:578:21:Button:missing-accessible-name",
-      "file": "src/components/admin/DisplayBoardSettings.jsx",
-      "line": 578,
-      "column": 21,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/DisplayBoardSettings.jsx:581:21:Button:missing-accessible-name",
-      "file": "src/components/admin/DisplayBoardSettings.jsx",
-      "line": 581,
-      "column": 21,
-      "element": "Button",
       "reason": "missing-accessible-name"
     },
     {

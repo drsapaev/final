@@ -575,11 +575,21 @@ const DisplayBoardSettings = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline">
-                      <Edit size={14} />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      title={`Edit banner ${banner.title}`}
+                      aria-label={`Edit banner ${banner.title}`}>
+                      <Edit aria-hidden="true" size={14} />
                     </Button>
-                    <Button size="sm" variant="outline">
-                      <Trash2 size={14} />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      title={`Delete banner ${banner.title}`}
+                      aria-label={`Delete banner ${banner.title}`}>
+                      <Trash2 aria-hidden="true" size={14} />
                     </Button>
                   </div>
                 </div>
