@@ -481,11 +481,14 @@ const RiskAssessment = () => {
                   style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
                 
                     <MacOSButton
+                  type="button"
+                  title="Remove comorbidity"
+                  aria-label={`Remove comorbidity ${index + 1}`}
                   onClick={() => removeArrayItem(setPatientRiskData, 'patient_data.comorbidities', index)}
                   variant="outline"
                   style={{ padding: '4px', minWidth: 'auto' }}>
-                  
-                      <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                      <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </MacOSButton>
                   </div>
               )}
@@ -522,11 +525,14 @@ const RiskAssessment = () => {
                   style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
                 
                     <MacOSButton
+                  type="button"
+                  title="Remove risk factor"
+                  aria-label={`Remove risk factor ${index + 1}`}
                   onClick={() => removeArrayItem(setPatientRiskData, 'risk_factors', index)}
                   variant="outline"
                   style={{ padding: '4px', minWidth: 'auto' }}>
-                  
-                      <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                      <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </MacOSButton>
                   </div>
               )}
@@ -537,6 +543,9 @@ const RiskAssessment = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Assessing patient risks' : 'Assess patient risks'}
+          aria-label={loading ? 'Assessing patient risks' : 'Assess patient risks'}
           onClick={() => handleSubmit('assess-patient-risk', patientRiskData)}
           disabled={loading || !patientRiskData.condition}
           style={{
@@ -549,7 +558,7 @@ const RiskAssessment = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -558,7 +567,7 @@ const RiskAssessment = () => {
               </> :
 
           <>
-                <AlertTriangle style={{ width: '20px', height: '20px' }} />
+                <AlertTriangle aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Оценить риски
               </>
           }
@@ -707,6 +716,9 @@ const RiskAssessment = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Predicting complications' : 'Predict complications'}
+          aria-label={loading ? 'Predicting complications' : 'Predict complications'}
           onClick={() => handleSubmit('predict-complications', complicationData)}
           disabled={loading || !complicationData.procedure_or_condition || !complicationData.timeline}
           style={{
@@ -719,7 +731,7 @@ const RiskAssessment = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -728,7 +740,7 @@ const RiskAssessment = () => {
               </> :
 
           <>
-                <Activity style={{ width: '20px', height: '20px' }} />
+                <Activity aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Спрогнозировать осложнения
               </>
           }
@@ -877,6 +889,9 @@ const RiskAssessment = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Calculating mortality risk' : 'Calculate mortality risk'}
+          aria-label={loading ? 'Calculating mortality risk' : 'Calculate mortality risk'}
           onClick={() => handleSubmit('calculate-mortality-risk', mortalityData)}
           disabled={loading || !mortalityData.condition}
           style={{
@@ -889,7 +904,7 @@ const RiskAssessment = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -898,7 +913,7 @@ const RiskAssessment = () => {
               </> :
 
           <>
-                <Heart style={{ width: '20px', height: '20px' }} />
+                <Heart aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Рассчитать риск смертности
               </>
           }
@@ -1075,6 +1090,9 @@ const RiskAssessment = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Assessing surgical risks' : 'Assess surgical risks'}
+          aria-label={loading ? 'Assessing surgical risks' : 'Assess surgical risks'}
           onClick={() => handleSubmit('assess-surgical-risk', surgicalData)}
           disabled={loading || !surgicalData.surgery_type || !surgicalData.anesthesia_type}
           style={{
@@ -1087,7 +1105,7 @@ const RiskAssessment = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -1096,7 +1114,7 @@ const RiskAssessment = () => {
               </> :
 
           <>
-                <Stethoscope style={{ width: '20px', height: '20px' }} />
+                <Stethoscope aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Оценить хирургические риски
               </>
           }
@@ -1270,6 +1288,9 @@ const RiskAssessment = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Predicting readmission risk' : 'Predict readmission risk'}
+          aria-label={loading ? 'Predicting readmission risk' : 'Predict readmission risk'}
           onClick={() => handleSubmit('predict-readmission-risk', readmissionData)}
           disabled={loading || !readmissionData.patient_data.primary_diagnosis || !readmissionData.discharge_condition}
           style={{
@@ -1282,7 +1303,7 @@ const RiskAssessment = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -1291,7 +1312,7 @@ const RiskAssessment = () => {
               </> :
 
           <>
-                <UserCheck style={{ width: '20px', height: '20px' }} />
+                <UserCheck aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Спрогнозировать риск реадмиссии
               </>
           }
