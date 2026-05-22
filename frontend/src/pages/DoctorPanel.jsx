@@ -907,8 +907,12 @@ const DoctorPanel = () => {
                       <option value="recovery">Выздоравливающие</option>
                       <option value="critical">Критические</option>
                     </select>
-                    <Button variant="primary">
-                      <Plus size={16} />
+                    <Button
+                      type="button"
+                      variant="primary"
+                      title="Add patient"
+                      aria-label="Add patient">
+                      <Plus aria-hidden="true" size={16} />
                       {!isMobile && <span>Добавить</span>}
                     </Button>
                   </div>
@@ -1088,10 +1092,13 @@ const DoctorPanel = () => {
                       <option value="cancelled">Отменены</option>
                     </select>
                     <Button
+                    type="button"
                     variant="primary"
+                    title="Schedule next visit"
+                    aria-label="Schedule next visit"
                     onClick={() => setScheduleNextModal({ open: true, patient: null })}>
 
-                      <Plus size={16} />
+                      <Plus aria-hidden="true" size={16} />
                       {!isMobile && <span>Назначить следующий визит</span>}
                     </Button>
                   </div>
