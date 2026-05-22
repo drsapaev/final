@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T18:58:33.998Z",
+  "generatedAt": "2026-05-22T19:04:28.212Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -200,22 +200,6 @@
       "file": "src/components/examples/MacOSDemo.jsx",
       "line": 218,
       "column": 17,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/statistics/ModernStatistics.jsx:294:11:Button:title-only",
-      "file": "src/components/statistics/ModernStatistics.jsx",
-      "line": 294,
-      "column": 11,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/statistics/ModernStatistics.jsx:297:11:Button:title-only",
-      "file": "src/components/statistics/ModernStatistics.jsx",
-      "line": 297,
-      "column": 11,
       "element": "Button",
       "reason": "title-only"
     },
