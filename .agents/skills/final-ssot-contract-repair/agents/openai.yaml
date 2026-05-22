@@ -1,0 +1,7 @@
+interface:
+  display_name: "Final SSOT Contract Repair"
+  short_description: "Repair frontend/backend SSOT boundary leaks before BFF-lite"
+  default_prompt: "Use $final-ssot-contract-repair to fix this frontend/backend contract leak without moving business rules into React."
+
+policy:
+  allow_implicit_invocation: true

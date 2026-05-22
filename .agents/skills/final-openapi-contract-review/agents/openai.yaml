@@ -1,0 +1,7 @@
+interface:
+  display_name: "Final OpenAPI Contract Review"
+  short_description: "Review FastAPI DTOs, OpenAPI shape, and frontend API contracts"
+  default_prompt: "Use $final-openapi-contract-review to verify this FastAPI/React API contract and schema shape."
+
+policy:
+  allow_implicit_invocation: true
