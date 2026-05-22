@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T18:32:15.899Z",
+  "generatedAt": "2026-05-22T18:37:44.247Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -290,22 +290,6 @@
       "column": 25,
       "element": "MacOSButton",
       "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:910:21:Button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 910,
-      "column": 21,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DoctorPanel.jsx:1090:21:Button:missing-accessible-name",
-      "file": "src/pages/DoctorPanel.jsx",
-      "line": 1090,
-      "column": 21,
-      "element": "Button",
-      "reason": "missing-accessible-name"
     }
   ]
 }
