@@ -1,0 +1,7 @@
+interface:
+  display_name: "Final BFF-Lite Read Models"
+  short_description: "Design FastAPI screen/read-model endpoints without SSOT drift"
+  default_prompt: "Use $final-bff-lite-read-model to design a FastAPI screen/read-model endpoint for this clinic workflow."
+
+policy:
+  allow_implicit_invocation: true
