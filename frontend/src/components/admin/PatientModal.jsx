@@ -698,6 +698,7 @@ const PatientModal = ({
           <MacOSButton
             type="submit"
             disabled={isSubmitting || loading}
+            aria-label={patient ? 'Save patient changes' : 'Add patient'}
             style={{ flex: 1 }}>
 
             {isSubmitting ?

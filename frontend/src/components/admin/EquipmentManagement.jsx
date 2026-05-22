@@ -637,6 +637,7 @@ const EquipmentManagement = () => {
               <MacOSButton
               type="submit"
               disabled={saving}
+              aria-label={editingEquipment ? 'Update equipment' : 'Add equipment'}
               style={{
                 display: 'flex',
                 alignItems: 'center',

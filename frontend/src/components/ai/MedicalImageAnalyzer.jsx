@@ -738,6 +738,7 @@ const MedicalImageAnalyzer = () => {
               <MacOSButton
               onClick={analyzeImage}
               disabled={!selectedFile || analyzing}
+              aria-label="Analyze medical image"
               style={{
                 display: 'flex',
                 alignItems: 'center',

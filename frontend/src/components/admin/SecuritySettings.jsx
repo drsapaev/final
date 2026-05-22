@@ -626,6 +626,8 @@ const SecuritySettings = ({
                 variant="outline"
                 size="sm"
                 onClick={() => terminateSession(session.id)}
+                title="Terminate this session"
+                aria-label="Terminate this session"
                 style={{ color: 'var(--mac-danger)', borderColor: 'var(--mac-danger)' }}>
                 
                       <Trash2 style={{ width: '16px', height: '16px' }} />

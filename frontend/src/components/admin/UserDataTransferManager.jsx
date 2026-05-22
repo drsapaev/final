@@ -519,8 +519,10 @@ const UserDataTransferManager = () => {
       {/* Кнопка передачи */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <Button
+        type="button"
         onClick={executeTransfer}
         disabled={!sourceUser || !targetUser || selectedDataTypes.length === 0 || isTransferring}
+        aria-label="Transfer selected user data"
         style={{ padding: '12px 32px' }}>
         
           {isTransferring ?

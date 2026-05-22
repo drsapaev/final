@@ -592,6 +592,7 @@ const BackupManagement = () => {
               <MacOSButton
               type="submit"
               disabled={saving}
+              aria-label={editingBackup ? 'Update backup configuration' : 'Create backup configuration'}
               style={{
                 display: 'flex',
                 alignItems: 'center',

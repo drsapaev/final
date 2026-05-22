@@ -445,6 +445,8 @@ const QueueLimitsManager = () => {
                         onClick={cancelEditing}
                         disabled={saving}
                         variant="outline"
+                        title="Cancel queue limit editing"
+                        aria-label="Cancel queue limit editing"
                         style={{
                           padding: '8px 16px',
                           minWidth: 'auto'

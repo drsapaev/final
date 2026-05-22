@@ -171,6 +171,8 @@ const ClinicManagement = () => {
           variant="outline"
           onClick={loadSystemData}
           disabled={loading}
+          title="Refresh system status"
+          aria-label="Refresh system status"
           style={{
             padding: '6px 12px',
             minWidth: 'auto'

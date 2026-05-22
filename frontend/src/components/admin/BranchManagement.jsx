@@ -618,6 +618,7 @@ const BranchManagement = () => {
               <MacOSButton
               type="submit"
               disabled={saving}
+              aria-label={editingBranch ? 'Update branch' : 'Create branch'}
               style={{
                 display: 'flex',
                 alignItems: 'center',

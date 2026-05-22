@@ -228,6 +228,7 @@ const MacOSDemo = () => {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
+              aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
                   <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? '#ff9500' : '#5ac8fa' }} />
