@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/TelegramMiniAppPatientShell.jsx'), 'utf8').replace(/\r\n/g, '\n');
 
 const CANONICAL_SECTIONS = ['appointments', 'visits', 'queue', 'forms', 'cabinet', 'payments', 'results'];
 const ALIAS_MAPPINGS = {
@@ -127,7 +127,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const miniAppShell = sourceBetween(
       appSource,
       'function TelegramMiniAppPatientShell() {',
-      'function AppShell({ children }) {'
+      'const miniAppPageStyle = {'
     );
 
     expect(miniAppShell).toContain('/telegram/mini-app/patient/manifest');
