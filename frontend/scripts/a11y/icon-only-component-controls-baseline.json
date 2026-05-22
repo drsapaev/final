@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T15:32:23.433Z",
+  "generatedAt": "2026-05-22T15:40:24.012Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -306,30 +306,6 @@
       "column": 17,
       "element": "Button",
       "reason": "title-only"
-    },
-    {
-      "signature": "src/components/laboratory/LabResultsManager.jsx:404:25:Button:missing-accessible-name",
-      "file": "src/components/laboratory/LabResultsManager.jsx",
-      "line": 404,
-      "column": 25,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/laboratory/LabResultsManager.jsx:414:25:Button:missing-accessible-name",
-      "file": "src/components/laboratory/LabResultsManager.jsx",
-      "line": 414,
-      "column": 25,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/laboratory/LabResultsManager.jsx:605:15:Button:missing-accessible-name",
-      "file": "src/components/laboratory/LabResultsManager.jsx",
-      "line": 605,
-      "column": 15,
-      "element": "Button",
-      "reason": "missing-accessible-name"
     },
     {
       "signature": "src/components/statistics/ModernStatistics.jsx:294:11:Button:title-only",

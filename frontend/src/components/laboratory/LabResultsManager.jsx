@@ -402,21 +402,27 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                       
                       <td style={{ textAlign: 'right' }}>
                         <Button
+                      type="button"
                       size="small"
+                      title={`Edit lab result ${result.test_name || result.id}`}
+                      aria-label={`Edit lab result ${result.test_name || result.id}`}
                       onClick={() => {
                         setSelectedResult(result);
                         setResultForm(result);
                         setDialogOpen(true);
                       }}>
                       
-                          <Edit style={{ width: 16, height: 16 }} />
+                          <Edit aria-hidden="true" style={{ width: 16, height: 16 }} />
                         </Button>
                         <Button
+                      type="button"
                       size="small"
                       variant="danger"
+                      title={`Delete lab result ${result.test_name || result.id}`}
+                      aria-label={`Delete lab result ${result.test_name || result.id}`}
                       onClick={() => handleDeleteResult(result.id)}>
 
-                          <Trash2 style={{ width: 16, height: 16 }} />
+                          <Trash2 aria-hidden="true" style={{ width: 16, height: 16 }} />
                         </Button>
                       </td>
                     </tr>
@@ -602,8 +608,13 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 <Brain style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 AI Интерпретация результатов
               </Typography>
-              <Button size="small" onClick={() => setShowAIAnalysis(false)}>
-                <X style={{ width: 16, height: 16 }} />
+              <Button
+                type="button"
+                size="small"
+                title="Close lab AI analysis"
+                aria-label="Close lab AI analysis"
+                onClick={() => setShowAIAnalysis(false)}>
+                <X aria-hidden="true" style={{ width: 16, height: 16 }} />
               </Button>
             </Box>
           </DialogTitle>
