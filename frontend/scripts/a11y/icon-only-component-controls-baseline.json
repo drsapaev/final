@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T18:24:27.100Z",
+  "generatedAt": "2026-05-22T18:32:15.899Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -168,22 +168,6 @@
       "file": "src/components/admin/SecuritySettings.jsx",
       "line": 625,
       "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/SystemManagement.jsx:595:19:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/SystemManagement.jsx",
-      "line": 595,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/SystemManagement.jsx:598:19:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/SystemManagement.jsx",
-      "line": 598,
-      "column": 19,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },
