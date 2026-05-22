@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --fix",
     "lint:check": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
+    "audit:a11y": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --quiet",
     "audit:control-labels": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --quiet --rule \"jsx-a11y/control-has-associated-label: error\"",
     "audit:icon-controls": "node scripts/audit-icon-only-controls.mjs --strict --baseline=scripts/a11y/icon-only-controls-baseline.json",
     "audit:icon-controls:strict": "node scripts/audit-icon-only-controls.mjs --strict",

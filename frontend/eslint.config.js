@@ -62,15 +62,15 @@ export default [
       'react/jsx-no-undef': 'error',
       
       // Accessibility (основные правила)
-      'jsx-a11y/alt-text': 'warn',
-      'jsx-a11y/aria-props': 'warn',
-      'jsx-a11y/aria-role': 'warn',
-      'jsx-a11y/aria-unsupported-elements': 'warn',
-      'jsx-a11y/click-events-have-key-events': 'warn',
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/aria-unsupported-elements': 'error',
+      'jsx-a11y/click-events-have-key-events': 'error',
       'jsx-a11y/control-has-associated-label': 'error',
-      'jsx-a11y/interactive-supports-focus': 'warn',
-      'jsx-a11y/no-static-element-interactions': 'warn',
-      'jsx-a11y/role-has-required-aria-props': 'warn',
+      'jsx-a11y/interactive-supports-focus': 'error',
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/role-has-required-aria-props': 'error',
     },
   },
   {
