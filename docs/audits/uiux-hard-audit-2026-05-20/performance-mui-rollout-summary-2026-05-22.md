@@ -14,6 +14,7 @@ contracts.
 - [x] PR-MUI-GATE-0: no-new-MUI runtime gate.
 - [x] PR-PERF-1: initial bundle target decision.
 - [x] PR-PERF-2: first runtime bundle slice.
+- [x] HEIC follow-up: service worker reliability and CDN removal.
 - [x] Final: rollout completion summary.
 
 ## Merged PRs
@@ -24,6 +25,10 @@ contracts.
 | #1143 | `ci(frontend): prevent new mui runtime imports` | Merged |
 | #1144 | `docs(frontend): plan initial bundle reduction target` | Merged |
 | #1145 | `perf(frontend): reduce initial bundle slice` | Merged |
+| #1152 | `docs(frontend): plan heic service worker reliability` | Merged |
+| #1153 | `fix(frontend): fallback when heic service worker conversion fails` | Merged |
+| #1154 | `fix(frontend): bound heic service worker fallback wait` | Merged |
+| #1155 | `fix(frontend): remove heic service worker cdn conversion` | Merged |
 
 ## What Changed
 
@@ -36,6 +41,12 @@ contracts.
 - Moved the Telegram Mini App patient shell into its own lazy route module:
   `frontend/src/pages/TelegramMiniAppPatientShell.jsx`.
 - Updated source-inspection guardrail tests to inspect the new module location.
+- Documented the HEIC service worker reliability risk and then removed the
+  remote `https://cdn.skypack.dev/heic2any` execution path from
+  `frontend/public/sw.js`.
+- Added converter coverage for service worker explicit failure and no-response
+  timeout fallback, plus a static guard test that prevents reintroducing remote
+  service worker HEIC CDN execution.
 
 ## Final MUI Runtime Count
 
@@ -115,8 +126,10 @@ Mini App behavior in the same source logic with only the lazy boundary moved.
 
 - The initial `index-*` bundle is still large and should remain visible in
   future bundle reviews.
-- `heic2any-*` remains a large isolated lazy chunk and should only be optimized
-  through a dedicated HEIC upload-flow plan.
+- `heic2any-*` remains a large isolated lazy app fallback chunk. This is now an
+  approved local artifact path rather than a remote service worker CDN path.
+  Further HEIC work should be based on browser evidence from real HEIC/HEIF
+  uploads, not bundle-size pressure alone.
 - `AdminPanel-*` is below the previous 1000 KiB target but remains a major
   admin-only chunk.
 - Specialty panel chunks should not be split further without route, role,
@@ -142,6 +155,9 @@ Local validation across the cycle included:
 - Targeted Telegram Mini App guardrail tests after the lazy route extraction
 - Route ownership enforcement test
 - Browser smoke for `/telegram/mini-app/patient`
+- Targeted HEIC converter/upload tests covering non-HEIC upload, HEIC upload,
+  service worker explicit failure, and service worker no-response fallback
+- Static service worker HEIC policy test proving no remote CDN converter import
 - `git diff --check`
 
 GitHub checks were green before each PR was merged.
@@ -151,6 +167,7 @@ GitHub checks were green before each PR was merged.
 - Dependency category split for more precise CI execution.
 - Security-sensitive category split for stricter high-risk workflow routing.
 - Route-level lazy-load review for one safe route family at a time.
-- HEIC upload flow-specific optimization plan.
+- Optional browser smoke with a real HEIC/HEIF sample on the dermatology upload
+  flow, if a safe local fixture is available.
 - Bundle budget gate only after the current baseline proves stable.
 - Branch protection review to keep the stable aggregate gate required.

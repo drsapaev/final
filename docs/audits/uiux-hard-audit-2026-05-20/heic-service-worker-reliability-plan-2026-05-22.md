@@ -203,3 +203,34 @@ The current merged state is acceptable because non-HEIC workflows do not pay for
 HEIC conversion, and HEIC conversion remains guarded. However, the service
 worker CDN import should not be considered final for offline-capable clinic
 deployment. It needs a separate runtime decision with browser evidence.
+
+## Completion Addendum
+
+Status after the follow-up rollout on 2026-05-22:
+
+- #1153 proved and fixed service worker explicit failure fallback by awaiting
+  the message-channel conversion promise before returning from
+  `convertHEICToJPEG`.
+- #1154 added a bounded timeout for silent service worker no-response behavior,
+  so HEIC upload does not wait indefinitely if a worker is stale, missing the
+  handler, or otherwise unable to respond.
+- #1155 removed the remote `https://cdn.skypack.dev/heic2any` execution path
+  from `frontend/public/sw.js`.
+- #1155 added `frontend/src/__tests__/serviceWorkerHeicPolicy.test.js` to guard
+  against reintroducing a remote service worker HEIC converter.
+
+Current accepted behavior:
+
+1. Non-HEIC uploads do not invoke the HEIC converter.
+2. HEIC uploads use the shared frontend converter.
+3. The service worker `CONVERT_HEIC` message remains compatible, but it now
+   explicitly returns a fallback signal instead of importing converter code from
+   a third-party CDN.
+4. The app fallback dynamically imports the bundled local `heic2any` artifact.
+
+Remaining optional evidence:
+
+- Run a browser smoke with a real safe HEIC/HEIF fixture on the dermatology
+  upload flow when such a fixture is available.
+- Keep the large `heic2any-*` chunk visible in bundle reports, but do not remove
+  it unless product requirements decide to drop HEIC/HEIF support.
