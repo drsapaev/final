@@ -384,11 +384,13 @@ const AISettings = () => {
                       }
                     </span>
                     <Button
+                      type="button"
                       size="sm"
                       variant="ghost"
+                      title={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
+                      aria-label={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
                       onClick={() => toggleApiKeyVisibility(provider.id)}>
-                      
-                      {showApiKeys[provider.id] ? <EyeOff style={{ width: '14px', height: '14px' }} /> : <Eye style={{ width: '14px', height: '14px' }} />}
+                      {showApiKeys[provider.id] ? <EyeOff aria-hidden="true" style={{ width: '14px', height: '14px' }} /> : <Eye aria-hidden="true" style={{ width: '14px', height: '14px' }} />}
                     </Button>
                   </div>
                 </div>
@@ -473,12 +475,14 @@ const AISettings = () => {
                   Настроить
                 </Button>
                 <Button
+                  type="button"
                   size="sm"
                   variant="outline"
+                  title={`Test ${provider.display_name} provider`}
+                  aria-label={`Test ${provider.display_name} provider`}
                   onClick={() => handleTestProvider(provider.id)}
                   disabled={!provider.active || !provider.api_key}>
-                  
-                  <TestTube style={{ width: '14px', height: '14px' }} />
+                  <TestTube aria-hidden="true" style={{ width: '14px', height: '14px' }} />
                 </Button>
               </div>
             </Card>);
