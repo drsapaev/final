@@ -67,7 +67,7 @@ export default [
       'jsx-a11y/aria-role': 'warn',
       'jsx-a11y/aria-unsupported-elements': 'warn',
       'jsx-a11y/click-events-have-key-events': 'warn',
-      'jsx-a11y/control-has-associated-label': 'warn',
+      'jsx-a11y/control-has-associated-label': 'error',
       'jsx-a11y/interactive-supports-focus': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
       'jsx-a11y/role-has-required-aria-props': 'warn',
