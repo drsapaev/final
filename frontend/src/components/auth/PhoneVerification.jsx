@@ -266,16 +266,19 @@ const PhoneVerification = ({
           <Button
             onClick={sendVerificationCode}
             disabled={loading || !currentPhone || !validatePhone(currentPhone)}
+            type="button"
+            title={loading ? 'Отправляется код подтверждения' : 'Отправить код подтверждения'}
+            aria-label={loading ? 'Отправляется код подтверждения' : 'Отправить код подтверждения'}
             className="w-full"
           >
             {loading ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw aria-hidden="true" className="h-4 w-4 mr-2 animate-spin" />
                 Отправка...
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <Send aria-hidden="true" className="h-4 w-4 mr-2" />
                 Отправить код
               </>
             )}
