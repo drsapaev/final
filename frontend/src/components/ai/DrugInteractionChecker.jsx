@@ -262,11 +262,14 @@ const DrugInteractionChecker = () => {
               
                   {interactionData.medications.length > 1 &&
               <MacOSButton
+                type="button"
+                title="Remove medication"
+                aria-label={`Remove medication ${index + 1}`}
                 onClick={() => removeMedication(index)}
                 variant="outline"
                 style={{ padding: '4px', minWidth: 'auto' }}>
-                
-                      <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                      <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
                     </MacOSButton>
               }
                 </div>
@@ -422,6 +425,9 @@ const DrugInteractionChecker = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Checking drug interactions' : 'Check drug interactions'}
+          aria-label={loading ? 'Checking drug interactions' : 'Check drug interactions'}
           onClick={() => handleSubmit('check-drug-interactions', interactionData)}
           disabled={loading || interactionData.medications.length < 2 || !interactionData.medications[0].name}
           style={{
@@ -434,7 +440,7 @@ const DrugInteractionChecker = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -443,7 +449,7 @@ const DrugInteractionChecker = () => {
               </> :
 
           <>
-                <AlertTriangle style={{ width: '20px', height: '20px' }} />
+                <AlertTriangle aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Проверить взаимодействия
               </>
           }
@@ -690,6 +696,9 @@ const DrugInteractionChecker = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Analyzing drug safety' : 'Analyze drug safety'}
+          aria-label={loading ? 'Analyzing drug safety' : 'Analyze drug safety'}
           onClick={() => handleSubmit('analyze-drug-safety', safetyData)}
           disabled={loading || !safetyData.medication.name}
           style={{
@@ -702,7 +711,7 @@ const DrugInteractionChecker = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -711,7 +720,7 @@ const DrugInteractionChecker = () => {
               </> :
 
           <>
-                <Shield style={{ width: '20px', height: '20px' }} />
+                <Shield aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Проверить безопасность
               </>
           }
@@ -860,6 +869,9 @@ const DrugInteractionChecker = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Finding drug alternatives' : 'Find drug alternatives'}
+          aria-label={loading ? 'Finding drug alternatives' : 'Find drug alternatives'}
           onClick={() => handleSubmit('suggest-drug-alternatives', alternativesData)}
           disabled={loading || !alternativesData.medication || !alternativesData.reason}
           style={{
@@ -872,7 +884,7 @@ const DrugInteractionChecker = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -881,7 +893,7 @@ const DrugInteractionChecker = () => {
               </> :
 
           <>
-                <RefreshCw style={{ width: '20px', height: '20px' }} />
+                <RefreshCw aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Найти альтернативы
               </>
           }
@@ -1110,6 +1122,9 @@ const DrugInteractionChecker = () => {
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Calculating drug dosage' : 'Calculate drug dosage'}
+          aria-label={loading ? 'Calculating drug dosage' : 'Calculate drug dosage'}
           onClick={() => handleSubmit('calculate-drug-dosage', dosageData)}
           disabled={loading || !dosageData.medication || !dosageData.indication}
           style={{
@@ -1122,7 +1137,7 @@ const DrugInteractionChecker = () => {
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -1131,7 +1146,7 @@ const DrugInteractionChecker = () => {
               </> :
 
           <>
-                <Calculator style={{ width: '20px', height: '20px' }} />
+                <Calculator aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Рассчитать дозировку
               </>
           }
