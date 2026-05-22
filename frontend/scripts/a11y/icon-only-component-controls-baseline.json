@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T13:36:35.255Z",
+  "generatedAt": "2026-05-22T13:42:14.881Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -209,46 +209,6 @@
       "line": 606,
       "column": 15,
       "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:47:11:Button:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 47,
-      "column": 11,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:60:13:Button:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 60,
-      "column": 13,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:63:13:Button:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 63,
-      "column": 13,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:95:17:Button:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 95,
-      "column": 17,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/MobileOptimization.jsx:255:9:Button:missing-accessible-name",
-      "file": "src/components/admin/MobileOptimization.jsx",
-      "line": 255,
-      "column": 9,
-      "element": "Button",
       "reason": "missing-accessible-name"
     },
     {
