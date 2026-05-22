@@ -47,9 +47,12 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
           <Button
             variant="ghost"
             onClick={() => setIsOpen(true)}
+            type="button"
+            title="Открыть мобильное меню"
+            aria-label="Открыть мобильное меню"
             className="p-2">
-            
-            <Menu size={20} />
+
+            <Menu aria-hidden="true" size={20} />
           </Button>
           
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -57,11 +60,21 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
           </h1>
           
           <div className="flex gap-2">
-            <Button variant="ghost" className="p-2">
-              <Search size={20} />
+            <Button
+              variant="ghost"
+              type="button"
+              title="Открыть поиск"
+              aria-label="Открыть поиск"
+              className="p-2">
+              <Search aria-hidden="true" size={20} />
             </Button>
-            <Button variant="ghost" className="p-2">
-              <Plus size={20} />
+            <Button
+              variant="ghost"
+              type="button"
+              title="Добавить запись"
+              aria-label="Добавить запись"
+              className="p-2">
+              <Plus aria-hidden="true" size={20} />
             </Button>
           </div>
         </div>
@@ -95,9 +108,12 @@ export const MobileNavigation = ({ sections, currentSection, onNavigate, classNa
                 <Button
                 variant="ghost"
                 onClick={() => setIsOpen(false)}
+                type="button"
+                title="Закрыть мобильное меню"
+                aria-label="Закрыть мобильное меню"
                 className="p-2">
-                
-                  <X size={20} />
+
+                  <X aria-hidden="true" size={20} />
                 </Button>
               </div>
             </div>
@@ -255,11 +271,14 @@ export const MobileQuickActions = ({ actions, className = '' }) => {
         <Button
           key={index}
           onClick={action.onClick}
+          type="button"
+          title={action.label || action.title || `Быстрое действие ${index + 1}`}
+          aria-label={action.label || action.title || `Быстрое действие ${index + 1}`}
           className="w-14 h-14 rounded-full shadow-lg"
           variant={action.variant || 'default'}
           disabled={action.disabled}>
-          
-            <action.icon size={20} />
+
+            <action.icon aria-hidden="true" size={20} />
           </Button>
         )}
       </div>
@@ -337,6 +356,8 @@ MobileQuickActions.propTypes = {
   actions: PropTypes.arrayOf(
     PropTypes.shape({
       onClick: PropTypes.func,
+      label: PropTypes.string,
+      title: PropTypes.string,
       variant: PropTypes.string,
       disabled: PropTypes.bool,
       icon: PropTypes.elementType
