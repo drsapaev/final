@@ -1,0 +1,1143 @@
+{
+  "version": 1,
+  "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
+  "generatedAt": "2026-05-22T12:59:39.728Z",
+  "entries": [
+    {
+      "signature": "src/components/PWAInstallPrompt.jsx:91:11:Button:missing-accessible-name",
+      "file": "src/components/PWAInstallPrompt.jsx",
+      "line": 91,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/PrescriptionSystem.jsx:228:19:Button:missing-accessible-name",
+      "file": "src/components/PrescriptionSystem.jsx",
+      "line": 228,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ResponsiveModal.jsx:144:13:Button:missing-accessible-name",
+      "file": "src/components/ResponsiveModal.jsx",
+      "line": 144,
+      "column": 13,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
+      "file": "src/components/admin/AISettings.jsx",
+      "line": 386,
+      "column": 21,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/AISettings.jsx:475:17:Button:missing-accessible-name",
+      "file": "src/components/admin/AISettings.jsx",
+      "line": 475,
+      "column": 17,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/AppointmentModal.jsx:609:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/AppointmentModal.jsx",
+      "line": 609,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BackupManagement.jsx:592:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BackupManagement.jsx",
+      "line": 592,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BenefitSettings.jsx:831:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BenefitSettings.jsx",
+      "line": 831,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:374:19:MacOSButton:title-only",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 374,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:390:19:MacOSButton:title-only",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 390,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:406:19:MacOSButton:title-only",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 406,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:449:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 449,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:602:17:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 602,
+      "column": 17,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BillingManager.jsx:681:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BillingManager.jsx",
+      "line": 681,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/BranchManagement.jsx:618:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/BranchManagement.jsx",
+      "line": 618,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ClinicManagement.jsx:170:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/ClinicManagement.jsx",
+      "line": 170,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/DisplayBoardSettings.jsx:578:21:Button:missing-accessible-name",
+      "file": "src/components/admin/DisplayBoardSettings.jsx",
+      "line": 578,
+      "column": 21,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/DisplayBoardSettings.jsx:581:21:Button:missing-accessible-name",
+      "file": "src/components/admin/DisplayBoardSettings.jsx",
+      "line": 581,
+      "column": 21,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:414:19:MacOSButton:title-only",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 414,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:430:19:MacOSButton:title-only",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 430,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:446:19:MacOSButton:title-only",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 446,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:486:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 486,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:848:19:MacOSButton:title-only",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 848,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:864:19:MacOSButton:title-only",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 864,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/DynamicPricingManager.jsx:904:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/DynamicPricingManager.jsx",
+      "line": 904,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/EquipmentManagement.jsx:637:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/EquipmentManagement.jsx",
+      "line": 637,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/FinanceModal.jsx:620:15:Button:missing-accessible-name",
+      "file": "src/components/admin/FinanceModal.jsx",
+      "line": 620,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/GroupPermissionsManager.jsx:653:25:Button:missing-accessible-name",
+      "file": "src/components/admin/GroupPermissionsManager.jsx",
+      "line": 653,
+      "column": 25,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/LicenseManagement.jsx:606:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/LicenseManagement.jsx",
+      "line": 606,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:47:11:Button:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 47,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:60:13:Button:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 60,
+      "column": 13,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:63:13:Button:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 63,
+      "column": 13,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:95:17:Button:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 95,
+      "column": 17,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/MobileOptimization.jsx:255:9:Button:missing-accessible-name",
+      "file": "src/components/admin/MobileOptimization.jsx",
+      "line": 255,
+      "column": 9,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/PatientModal.jsx:698:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/PatientModal.jsx",
+      "line": 698,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/PaymentProviderSettings.jsx:320:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/PaymentProviderSettings.jsx",
+      "line": 320,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/PaymentProviderSettings.jsx:404:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/PaymentProviderSettings.jsx",
+      "line": 404,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/PhoneVerificationManager.jsx:419:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/PhoneVerificationManager.jsx",
+      "line": 419,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueLimitsManager.jsx:444:25:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/QueueLimitsManager.jsx",
+      "line": 444,
+      "column": 25,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/QueueSettings.jsx:596:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/QueueSettings.jsx",
+      "line": 596,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ReportGenerator.jsx:731:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/ReportGenerator.jsx",
+      "line": 731,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ReportsManager.jsx:314:11:Button:missing-accessible-name",
+      "file": "src/components/admin/ReportsManager.jsx",
+      "line": 314,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ReportsManager.jsx:439:11:Button:missing-accessible-name",
+      "file": "src/components/admin/ReportsManager.jsx",
+      "line": 439,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ReportsManager.jsx:543:11:Button:missing-accessible-name",
+      "file": "src/components/admin/ReportsManager.jsx",
+      "line": 543,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SecuritySettings.jsx:625:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/SecuritySettings.jsx",
+      "line": 625,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/ServiceCatalog.jsx:740:19:MacOSButton:title-only",
+      "file": "src/components/admin/ServiceCatalog.jsx",
+      "line": 740,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/ServiceCatalog.jsx:757:19:MacOSButton:title-only",
+      "file": "src/components/admin/ServiceCatalog.jsx",
+      "line": 757,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/ServiceCatalog.jsx:774:19:MacOSButton:title-only",
+      "file": "src/components/admin/ServiceCatalog.jsx",
+      "line": 774,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/admin/ServiceCatalog.jsx:858:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/ServiceCatalog.jsx",
+      "line": 858,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SystemManagement.jsx:595:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/SystemManagement.jsx",
+      "line": 595,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/SystemManagement.jsx:598:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/SystemManagement.jsx",
+      "line": 598,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/TelegramSettings.jsx:392:17:Button:missing-accessible-name",
+      "file": "src/components/admin/TelegramSettings.jsx",
+      "line": 392,
+      "column": 17,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/UserDataTransferManager.jsx:521:9:Button:missing-accessible-name",
+      "file": "src/components/admin/UserDataTransferManager.jsx",
+      "line": 521,
+      "column": 9,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/UserExportManager.jsx:520:11:Button:missing-accessible-name",
+      "file": "src/components/admin/UserExportManager.jsx",
+      "line": 520,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/UserModal.jsx:341:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/UserModal.jsx",
+      "line": 341,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:434:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 434,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:445:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 445,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:456:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 456,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:476:17:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 476,
+      "column": 17,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:468:17:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 468,
+      "column": 17,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WebhookManager.jsx:485:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WebhookManager.jsx",
+      "line": 485,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WizardSettings.jsx:449:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WizardSettings.jsx",
+      "line": 449,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/admin/WizardSettings.jsx:512:13:MacOSButton:missing-accessible-name",
+      "file": "src/components/admin/WizardSettings.jsx",
+      "line": 512,
+      "column": 13,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AIAssistant.jsx:554:13:Button:missing-accessible-name",
+      "file": "src/components/ai/AIAssistant.jsx",
+      "line": 554,
+      "column": 13,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:364:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 364,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:534:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 534,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:775:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 775,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:974:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 974,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:1026:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 1026,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/AnalyticsInsights.jsx:1274:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/AnalyticsInsights.jsx",
+      "line": 1274,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/DrugInteractionChecker.jsx:264:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/DrugInteractionChecker.jsx",
+      "line": 264,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/DrugInteractionChecker.jsx:424:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/DrugInteractionChecker.jsx",
+      "line": 424,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/DrugInteractionChecker.jsx:692:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/DrugInteractionChecker.jsx",
+      "line": 692,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/DrugInteractionChecker.jsx:862:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/DrugInteractionChecker.jsx",
+      "line": 862,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/DrugInteractionChecker.jsx:1112:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/DrugInteractionChecker.jsx",
+      "line": 1112,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/MedicalImageAnalyzer.jsx:738:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/MedicalImageAnalyzer.jsx",
+      "line": 738,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/QualityControl.jsx:293:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/QualityControl.jsx",
+      "line": 293,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/QualityControl.jsx:527:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/QualityControl.jsx",
+      "line": 527,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/QualityControl.jsx:748:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/QualityControl.jsx",
+      "line": 748,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/QualityControl.jsx:856:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/QualityControl.jsx",
+      "line": 856,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/QualityControl.jsx:1217:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/QualityControl.jsx",
+      "line": 1217,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:483:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 483,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:524:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 524,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:539:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 539,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:709:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 709,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:879:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 879,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:1077:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 1077,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/RiskAssessment.jsx:1272:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/RiskAssessment.jsx",
+      "line": 1272,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/SmartScheduling.jsx:1449:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/SmartScheduling.jsx",
+      "line": 1449,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations.jsx:302:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations.jsx",
+      "line": 302,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations.jsx:442:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations.jsx",
+      "line": 442,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations.jsx:577:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations.jsx",
+      "line": 577,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations.jsx:756:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations.jsx",
+      "line": 756,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:296:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
+      "line": 296,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:436:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
+      "line": 436,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:571:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
+      "line": 571,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/TreatmentRecommendations_backup.jsx:750:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
+      "line": 750,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:340:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 340,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:359:15:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 359,
+      "column": 15,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:323:9:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 323,
+      "column": 9,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:593:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 593,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:670:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 670,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:747:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 747,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:825:11:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 825,
+      "column": 11,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:938:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 938,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:946:17:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 946,
+      "column": 17,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ai/VoiceToText.jsx:1229:17:MacOSButton:missing-accessible-name",
+      "file": "src/components/ai/VoiceToText.jsx",
+      "line": 1229,
+      "column": 17,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/analytics/AdvancedCharts.jsx:143:15:Button:missing-accessible-name",
+      "file": "src/components/analytics/AdvancedCharts.jsx",
+      "line": 143,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/analytics/AdvancedCharts.jsx:150:15:Button:missing-accessible-name",
+      "file": "src/components/analytics/AdvancedCharts.jsx",
+      "line": 150,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/auth/PhoneVerification.jsx:266:11:Button:missing-accessible-name",
+      "file": "src/components/auth/PhoneVerification.jsx",
+      "line": 266,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:138:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 138,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:141:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 141,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:144:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 144,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:194:17:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 194,
+      "column": 17,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:197:17:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 197,
+      "column": 17,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:249:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 249,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:252:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 252,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/display/DisplayContentManager.jsx:255:19:Button:missing-accessible-name",
+      "file": "src/components/display/DisplayContentManager.jsx",
+      "line": 255,
+      "column": 19,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/doctor/DoctorServiceSelector.jsx:301:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/doctor/DoctorServiceSelector.jsx",
+      "line": 301,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/doctor/DoctorServiceSelector.jsx:315:21:MacOSButton:missing-accessible-name",
+      "file": "src/components/doctor/DoctorServiceSelector.jsx",
+      "line": 315,
+      "column": 21,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/doctor/DoctorServiceSelector.jsx:367:19:MacOSButton:missing-accessible-name",
+      "file": "src/components/doctor/DoctorServiceSelector.jsx",
+      "line": 367,
+      "column": 19,
+      "element": "MacOSButton",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/examples/MacOSDemo.jsx:218:17:Button:title-only",
+      "file": "src/components/examples/MacOSDemo.jsx",
+      "line": 218,
+      "column": 17,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/laboratory/LabResultsManager.jsx:404:25:Button:missing-accessible-name",
+      "file": "src/components/laboratory/LabResultsManager.jsx",
+      "line": 404,
+      "column": 25,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/laboratory/LabResultsManager.jsx:414:25:Button:missing-accessible-name",
+      "file": "src/components/laboratory/LabResultsManager.jsx",
+      "line": 414,
+      "column": 25,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/laboratory/LabResultsManager.jsx:605:15:Button:missing-accessible-name",
+      "file": "src/components/laboratory/LabResultsManager.jsx",
+      "line": 605,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/layout/ResponsiveNavigation.jsx:34:11:Button:missing-accessible-name",
+      "file": "src/components/layout/ResponsiveNavigation.jsx",
+      "line": 34,
+      "column": 11,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/statistics/ModernStatistics.jsx:294:11:Button:title-only",
+      "file": "src/components/statistics/ModernStatistics.jsx",
+      "line": 294,
+      "column": 11,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/statistics/ModernStatistics.jsx:297:11:Button:title-only",
+      "file": "src/components/statistics/ModernStatistics.jsx",
+      "line": 297,
+      "column": 11,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/components/ui/macos/Header.jsx:132:9:Button:missing-accessible-name",
+      "file": "src/components/ui/macos/Header.jsx",
+      "line": 132,
+      "column": 9,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/components/ui/macos/Header.jsx:336:7:Button:missing-accessible-name",
+      "file": "src/components/ui/macos/Header.jsx",
+      "line": 336,
+      "column": 7,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2084:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2084,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2093:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2093,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2102:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2102,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2111:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2111,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2120:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2120,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2129:15:Button:title-only",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2129,
+      "column": 15,
+      "element": "Button",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2655:15:Button:missing-accessible-name",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2655,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2710:15:Button:missing-accessible-name",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2710,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DentistPanelUnified.jsx:2765:15:Button:missing-accessible-name",
+      "file": "src/pages/DentistPanelUnified.jsx",
+      "line": 2765,
+      "column": 15,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DermatologistPanelUnified.jsx:2568:25:MacOSButton:title-only",
+      "file": "src/pages/DermatologistPanelUnified.jsx",
+      "line": 2568,
+      "column": 25,
+      "element": "MacOSButton",
+      "reason": "title-only"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:910:21:Button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 910,
+      "column": 21,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    },
+    {
+      "signature": "src/pages/DoctorPanel.jsx:1090:21:Button:missing-accessible-name",
+      "file": "src/pages/DoctorPanel.jsx",
+      "line": 1090,
+      "column": 21,
+      "element": "Button",
+      "reason": "missing-accessible-name"
+    }
+  ]
+}
