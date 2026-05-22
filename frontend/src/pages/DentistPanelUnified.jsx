@@ -2084,56 +2084,68 @@ const DentistPanelUnified = () => {
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open examination for ${patient.name || patient.id}`}
             onClick={() => handleExamination(patient)}
             title="Осмотр"
             style={{ padding: '8px' }}>
 
-                <Eye style={{ height: '16px', width: '16px' }} />
+                <Eye aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open diagnoses for ${patient.name || patient.id}`}
             onClick={() => handleDiagnosis(patient)}
             title="Диагнозы"
             style={{ padding: '8px' }}>
 
-                <Stethoscope style={{ height: '16px', width: '16px' }} />
+                <Stethoscope aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open visit protocol for ${patient.name || patient.id}`}
             onClick={() => handleVisitProtocol(patient)}
             title="Протокол визита"
             style={{ padding: '8px' }}>
 
-                <FileText style={{ height: '16px', width: '16px' }} />
+                <FileText aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open dental chart for ${patient.name || patient.id}`}
             onClick={() => handleDentalChart(patient)}
             title="Схема зубов"
             style={{ padding: '8px' }}>
 
-                <Tooth style={{ height: '16px', width: '16px' }} />
+                <Tooth aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open treatment for ${patient.name || patient.id}`}
             onClick={() => handleTreatment(patient)}
             title="Лечение"
             style={{ padding: '8px' }}>
 
-                <Scissors style={{ height: '16px', width: '16px' }} />
+                <Scissors aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
             size="sm"
             variant="outline"
+            type="button"
+            aria-label={`Open prosthetics for ${patient.name || patient.id}`}
             onClick={() => handleProsthetic(patient)}
             title="Протезирование"
             style={{ padding: '8px' }}>
 
-                <Smile style={{ height: '16px', width: '16px' }} />
+                <Smile aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </Card>
@@ -2652,8 +2664,13 @@ const DentistPanelUnified = () => {
               <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
-              <Button size="sm" variant="outline">
-                <Edit style={{ height: '16px', width: '16px' }} />
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                title="Edit caries treatment template"
+                aria-label="Edit caries treatment template">
+                <Edit aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
@@ -2707,8 +2724,13 @@ const DentistPanelUnified = () => {
               <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
-              <Button size="sm" variant="outline">
-                <Edit style={{ height: '16px', width: '16px' }} />
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                title="Edit endodontic treatment template"
+                aria-label="Edit endodontic treatment template">
+                <Edit aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
@@ -2762,8 +2784,13 @@ const DentistPanelUnified = () => {
               <Button size="sm" style={{ flex: 1 }} onClick={handleProtocolTemplates} type="button">
                 Использовать
               </Button>
-              <Button size="sm" variant="outline">
-                <Edit style={{ height: '16px', width: '16px' }} />
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                title="Edit professional hygiene template"
+                aria-label="Edit professional hygiene template">
+                <Edit aria-hidden="true" style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
