@@ -228,10 +228,10 @@ Current accepted behavior:
    a third-party CDN.
 4. The app fallback dynamically imports the bundled local `heic2any` artifact.
 
-Remaining optional evidence:
+Closed browser evidence:
 
-- Run a browser smoke with a real safe HEIC/HEIF fixture on the dermatology
-  upload flow when such a fixture is available.
+- A browser smoke with a real safe HEIC fixture now proves the authenticated
+  dermatology upload flow posts converted JPEG multipart data.
 - Keep the large `heic2any-*` chunk visible in bundle reports, but do not remove
   it unless product requirements decide to drop HEIC/HEIF support.
 
@@ -279,6 +279,47 @@ Interpretation:
 The real-file smoke confirms the accepted fallback behavior from the earlier
 unit tests: when service worker conversion is unavailable, the browser app can
 convert a real HEIC input through the bundled local fallback without contacting
-the removed remote CDN worker path. This is evidence for conversion reliability,
-not upload endpoint behavior; authenticated dermatology upload proof remains a
-separate browser QA task if route/session fixtures are required.
+the removed remote CDN worker path.
+
+## Authenticated Dermatology Upload Smoke
+
+Date: 2026-05-23
+
+Scope: local authenticated browser QA proof using the existing Playwright Doctor
+QA harness and the real safe HEIC fixture. No runtime code, upload endpoint,
+FormData contract, backend route, RBAC, package, Vite configuration, or clinical
+workflow behavior changed.
+
+Execution:
+
+```powershell
+cd frontend
+$env:HEIC_SMOKE_FILE = "C:\path\to\safe-fixture.heic"
+npx playwright test e2e/dermatology-heic-upload-smoke.spec.js --project=chromium --reporter=line
+Remove-Item Env:\HEIC_SMOKE_FILE
+```
+
+Observed result:
+
+```text
+Running 1 test using 1 worker
+1 passed (6.4s)
+```
+
+Verified upload behavior:
+
+- authenticated Doctor harness rendered
+  `/doctor/dermatology?patientId=42&visitId=4242&tab=photos`;
+- selected HEIC input was converted before upload;
+- mocked upload received `POST /api/v1/visits/4242/files`;
+- multipart request used `photo_before`;
+- multipart request included `visit_id=4242`;
+- multipart file name used the converted `.jpg` extension;
+- multipart file part used `Content-Type: image/jpeg`.
+
+Interpretation:
+
+The dermatology upload-flow proof closes the earlier evidence gap between
+converter-only validation and route-level upload behavior. The accepted behavior
+is now covered at three levels: unit boundary tests, real-file converter smoke,
+and authenticated browser multipart upload smoke.
