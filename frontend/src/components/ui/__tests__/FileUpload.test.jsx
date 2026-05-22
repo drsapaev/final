@@ -2,12 +2,15 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import heic2any from 'heic2any';
 
 import FileUpload from '../FileUpload';
 
+const { heic2anyMock } = vi.hoisted(() => ({
+  heic2anyMock: vi.fn(),
+}));
+
 vi.mock('heic2any', () => ({
-  default: vi.fn().mockResolvedValue(new Blob(['test'], { type: 'image/jpeg' })),
+  default: heic2anyMock,
 }));
 
 vi.mock('../../../utils/logger', () => ({
@@ -25,7 +28,8 @@ describe('FileUpload accessibility', () => {
       createObjectURL: vi.fn(() => 'blob:test'),
       revokeObjectURL: vi.fn(),
     });
-    heic2any.mockClear();
+    heic2anyMock.mockReset();
+    heic2anyMock.mockResolvedValue(new Blob(['test'], { type: 'image/jpeg' }));
   });
 
   it('links upload errors to the input', async () => {
@@ -54,6 +58,25 @@ describe('FileUpload accessibility', () => {
     expect(await screen.findByRole('button', { name: /remove test\.png/i })).toBeInTheDocument();
   });
 
+  it('does not invoke the HEIC fallback dependency for non-HEIC image uploads', async () => {
+    const onFilesSelected = vi.fn();
+    const { container } = render(<FileUpload onFilesSelected={onFilesSelected} />);
+    const input = container.querySelector('input');
+    const imageFile = new File(['test'], 'scan.png', { type: 'image/png' });
+
+    fireEvent.change(input, { target: { files: [imageFile] } });
+
+    await waitFor(() => {
+      expect(onFilesSelected).toHaveBeenCalledTimes(1);
+    });
+
+    expect(heic2anyMock).not.toHaveBeenCalled();
+
+    const [processedFiles] = onFilesSelected.mock.calls[0];
+    expect(processedFiles).toHaveLength(1);
+    expect(processedFiles[0]).toBe(imageFile);
+  });
+
   it('converts HEIC uploads to JPEG through the shared converter boundary', async () => {
     const onFilesSelected = vi.fn();
     const { container } = render(<FileUpload onFilesSelected={onFilesSelected} />);
@@ -66,7 +89,7 @@ describe('FileUpload accessibility', () => {
       expect(onFilesSelected).toHaveBeenCalledTimes(1);
     });
 
-    expect(heic2any).toHaveBeenCalledWith({
+    expect(heic2anyMock).toHaveBeenCalledWith({
       blob: heicFile,
       toType: 'image/jpeg',
       quality: 0.9,
