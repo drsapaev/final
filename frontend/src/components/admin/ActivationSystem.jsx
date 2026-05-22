@@ -495,23 +495,29 @@ const ActivationSystem = () => {
             {
               key: 'actions',
               title: 'Действия',
-              render: (activation) =>
+              render: (_actionValue, activation) =>
               <div style={{ display: 'flex', gap: '8px' }}>
                     <Button
                   size="sm"
                   variant="outline"
                   onClick={() => extendActivation((activation || {}).key)}
-                  disabled={(activation || {}).status === 'revoked'}>
+                  disabled={(activation || {}).status === 'revoked'}
+                  type="button"
+                  title="Продлить активацию"
+                  aria-label={`Продлить активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Calendar style={{ width: '14px', height: '14px' }} />
+                      <Calendar aria-hidden="true" style={{ width: '14px', height: '14px' }} />
                     </Button>
                     <Button
                   size="sm"
                   variant="outline"
                   onClick={() => revokeActivation((activation || {}).key)}
-                  disabled={(activation || {}).status === 'revoked'}>
+                  disabled={(activation || {}).status === 'revoked'}
+                  type="button"
+                  title="Отозвать активацию"
+                  aria-label={`Отозвать активацию ${(activation || {}).key || ''}`.trim()}>
                   
-                      <Shield style={{ width: '14px', height: '14px' }} />
+                      <Shield aria-hidden="true" style={{ width: '14px', height: '14px' }} />
                     </Button>
                   </div>
 
