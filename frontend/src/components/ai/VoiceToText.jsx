@@ -321,6 +321,9 @@ const VoiceToText = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
           {!isRecording ?
         <MacOSButton
+          type="button"
+          title="Start voice recording"
+          aria-label="Start voice recording"
           onClick={startRecording}
           style={{
             width: '64px',
@@ -332,12 +335,15 @@ const VoiceToText = () => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-          
-              <Mic style={{ width: '32px', height: '32px', color: 'white' }} />
+
+              <Mic aria-hidden="true" style={{ width: '32px', height: '32px', color: 'white' }} />
             </MacOSButton> :
 
         <>
               <MacOSButton
+            type="button"
+            title={isPaused ? 'Resume voice recording' : 'Pause voice recording'}
+            aria-label={isPaused ? 'Resume voice recording' : 'Pause voice recording'}
             onClick={pauseRecording}
             style={{
               width: '48px',
@@ -349,14 +355,17 @@ const VoiceToText = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-            
-                {isPaused ?
-            <Play style={{ width: '24px', height: '24px', color: 'white' }} /> :
 
-            <Pause style={{ width: '24px', height: '24px', color: 'white' }} />
+                {isPaused ?
+            <Play aria-hidden="true" style={{ width: '24px', height: '24px', color: 'white' }} /> :
+
+            <Pause aria-hidden="true" style={{ width: '24px', height: '24px', color: 'white' }} />
             }
               </MacOSButton>
               <MacOSButton
+            type="button"
+            title="Stop voice recording"
+            aria-label="Stop voice recording"
             onClick={stopRecording}
             style={{
               width: '64px',
@@ -368,8 +377,8 @@ const VoiceToText = () => {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-            
-                <Square style={{ width: '32px', height: '32px', color: 'white' }} />
+
+                <Square aria-hidden="true" style={{ width: '32px', height: '32px', color: 'white' }} />
               </MacOSButton>
             </>
         }
@@ -591,13 +600,16 @@ const VoiceToText = () => {
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Structuring medical text' : 'Structure medical text'}
+          aria-label={loading ? 'Structuring medical text' : 'Structure medical text'}
           onClick={handleStructuring}
           disabled={loading || !textInput.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -606,7 +618,7 @@ const VoiceToText = () => {
               </> :
 
           <>
-                <FileText style={{ width: '20px', height: '20px' }} />
+                <FileText aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Структурировать
               </>
           }
@@ -668,13 +680,16 @@ const VoiceToText = () => {
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Extracting medical entities' : 'Extract medical entities'}
+          aria-label={loading ? 'Extracting medical entities' : 'Extract medical entities'}
           onClick={handleEntityExtraction}
           disabled={loading || !textInput.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -683,7 +698,7 @@ const VoiceToText = () => {
               </> :
 
           <>
-                <Brain style={{ width: '20px', height: '20px' }} />
+                <Brain aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Извлечь сущности
               </>
           }
@@ -745,13 +760,16 @@ const VoiceToText = () => {
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Creating medical summary' : 'Create medical summary'}
+          aria-label={loading ? 'Creating medical summary' : 'Create medical summary'}
           onClick={handleSummaryGeneration}
           disabled={loading || !textInput.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -760,7 +778,7 @@ const VoiceToText = () => {
               </> :
 
           <>
-                <Edit3 style={{ width: '20px', height: '20px' }} />
+                <Edit3 aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Создать резюме
               </>
           }
@@ -823,13 +841,16 @@ const VoiceToText = () => {
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <MacOSButton
+          type="button"
+          title={loading ? 'Validating medical record' : 'Validate medical record'}
+          aria-label={loading ? 'Validating medical record' : 'Validate medical record'}
           onClick={handleValidation}
           disabled={loading || !textInput.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             {loading ?
           <>
-                <Loader style={{
+                <Loader aria-hidden="true" style={{
               width: '20px',
               height: '20px',
               animation: 'spin 1s linear infinite'
@@ -838,7 +859,7 @@ const VoiceToText = () => {
               </> :
 
           <>
-                <CheckCircle style={{ width: '20px', height: '20px' }} />
+                <CheckCircle aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                 Валидировать
               </>
           }
@@ -936,19 +957,25 @@ const VoiceToText = () => {
                 </h4>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
+                  type="button"
+                  title={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
+                  aria-label={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
                   onClick={() => setIsEditing(!isEditing)}
                   variant="outline"
                   style={{ padding: '4px', minWidth: 'auto' }}>
-                  
-                    <Edit3 style={{ width: '16px', height: '16px' }} />
+
+                    <Edit3 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   </MacOSButton>
                   {isEditing &&
                 <MacOSButton
+                  type="button"
+                  title="Save edited transcription"
+                  aria-label="Save edited transcription"
                   onClick={saveEditedText}
                   variant="outline"
                   style={{ padding: '4px', minWidth: 'auto' }}>
-                  
-                      <Save style={{ width: '16px', height: '16px' }} />
+
+                      <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                 }
                 </div>
@@ -1227,13 +1254,16 @@ const VoiceToText = () => {
             {activeTab === 'transcription' && audioBlob &&
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
                 <MacOSButton
+                type="button"
+                title={loading ? 'Transcribing audio' : 'Transcribe audio'}
+                aria-label={loading ? 'Transcribing audio' : 'Transcribe audio'}
                 onClick={handleTranscription}
                 disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 
                   {loading ?
                 <>
-                      <Loader style={{
+                      <Loader aria-hidden="true" style={{
                     width: '20px',
                     height: '20px',
                     animation: 'spin 1s linear infinite'
@@ -1242,7 +1272,7 @@ const VoiceToText = () => {
                     </> :
 
                 <>
-                      <Brain style={{ width: '20px', height: '20px' }} />
+                      <Brain aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                       Транскрибировать
                     </>
                 }

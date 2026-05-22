@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T14:15:34.287Z",
+  "generatedAt": "2026-05-22T14:27:32.366Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -560,86 +560,6 @@
       "file": "src/components/ai/TreatmentRecommendations_backup.jsx",
       "line": 750,
       "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:340:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 340,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:359:15:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 359,
-      "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:323:9:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 323,
-      "column": 9,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:593:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 593,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:670:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 670,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:747:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 747,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:825:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 825,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:938:19:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 938,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:946:17:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 946,
-      "column": 17,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/VoiceToText.jsx:1229:17:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/VoiceToText.jsx",
-      "line": 1229,
-      "column": 17,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },
