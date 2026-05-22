@@ -447,6 +447,9 @@ const WizardSettings = () => {
             </MacOSButton>
             
             <MacOSButton
+              type="button"
+              title={saving ? 'Saving wizard settings' : 'Save wizard settings'}
+              aria-label={saving ? 'Saving wizard settings' : 'Save wizard settings'}
               onClick={handleSave}
               disabled={!hasChanges || saving}
               style={{
@@ -461,7 +464,7 @@ const WizardSettings = () => {
 
               {saving ?
               <>
-                  <RefreshCw style={{
+                  <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
@@ -470,7 +473,7 @@ const WizardSettings = () => {
                 </> :
 
               <>
-                  <Save style={{ width: '16px', height: '16px' }} />
+                  <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   Сохранить
                 </>
               }
@@ -510,6 +513,9 @@ const WizardSettings = () => {
               Отмена
             </MacOSButton>
             <MacOSButton
+              type="button"
+              title={saving ? 'Saving wizard settings' : 'Confirm wizard settings save'}
+              aria-label={saving ? 'Saving wizard settings' : 'Confirm wizard settings save'}
               onClick={confirmSave}
               disabled={saving}
               style={{
@@ -519,7 +525,7 @@ const WizardSettings = () => {
 
               {saving ?
               <>
-                  <RefreshCw style={{
+                  <RefreshCw aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite',
@@ -529,7 +535,7 @@ const WizardSettings = () => {
                 </> :
 
               <>
-                  <Save style={{
+                  <Save aria-hidden="true" style={{
                   width: '16px',
                   height: '16px',
                   marginRight: '4px'
