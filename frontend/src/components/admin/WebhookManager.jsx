@@ -434,61 +434,79 @@ const WebhookManager = () => {
                     <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Просмотреть вызовы webhook"
+                  aria-label={`Просмотреть вызовы webhook ${webhook.name || webhook.id}`}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     loadWebhookCalls(webhook.id);
                   }}>
 
-                      <Eye style={{ width: '16px', height: '16px' }} />
+                      <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     
                     <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Протестировать webhook"
+                  aria-label={`Протестировать webhook ${webhook.name || webhook.id}`}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     setShowTestModal(true);
                   }}>
 
-                      <TestTube style={{ width: '16px', height: '16px' }} />
+                      <TestTube aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     
                     <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Редактировать webhook"
+                  aria-label={`Редактировать webhook ${webhook.name || webhook.id}`}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     setShowEditModal(true);
                   }}>
 
-                      <Edit style={{ width: '16px', height: '16px' }} />
+                      <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                     
                     {webhook.is_active ?
                 <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Приостановить webhook"
+                  aria-label={`Приостановить webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleDeactivateWebhook(webhook.id)}>
 
-                        <Pause style={{ width: '16px', height: '16px' }} />
+                        <Pause aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       </MacOSButton> :
 
                 <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Активировать webhook"
+                  aria-label={`Активировать webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleActivateWebhook(webhook.id)}>
 
-                        <Play style={{ width: '16px', height: '16px' }} />
+                        <Play aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       </MacOSButton>
                 }
                     
                     <MacOSButton
                   size="sm"
                   variant="outline"
+                  type="button"
+                  title="Удалить webhook"
+                  aria-label={`Удалить webhook ${webhook.name || webhook.id}`}
                   onClick={() => handleDeleteWebhook(webhook.id)}
                   style={{ color: 'var(--mac-error)' }}>
 
-                      <Trash2 style={{ width: '16px', height: '16px' }} />
+                      <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </MacOSButton>
                   </div>
                 </div>
