@@ -40,6 +40,35 @@ function createJPEGFile(sourceFile, convertedBlob) {
   );
 }
 
+function timeoutAfter(ms, message) {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+async function getActiveServiceWorkerRegistration() {
+  const { serviceWorker } = navigator;
+
+  if (typeof serviceWorker.getRegistration === 'function') {
+    const registration = await serviceWorker.getRegistration();
+    if (!registration?.active) {
+      throw new Error('Service Worker is not active');
+    }
+    return registration;
+  }
+
+  const registration = await Promise.race([
+    serviceWorker.ready,
+    timeoutAfter(SERVICE_WORKER_CONVERSION_TIMEOUT_MS, 'Service Worker readiness timed out')
+  ]);
+
+  if (!registration.active) {
+    throw new Error('Service Worker is not active');
+  }
+
+  return registration;
+}
+
 /**
  * Конвертирует HEIC файл в JPEG через Service Worker
  * @param {File} heicFile - HEIC файл
@@ -53,7 +82,7 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
       throw new Error('Service Worker не поддерживается');
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getActiveServiceWorkerRegistration();
 
     if (!registration.active) {
       throw new Error('Service Worker не активен');

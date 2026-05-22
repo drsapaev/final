@@ -141,4 +141,60 @@ describe('heicConverter service worker fallback', () => {
     expect(convertedFile.name).toBe('skin.jpg');
     expect(convertedFile.type).toBe('image/jpeg');
   });
+
+  it('falls back to local heic2any when no active service worker registration exists', async () => {
+    const getRegistration = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        getRegistration,
+        ready: new Promise(() => {}),
+      },
+    });
+
+    const heicFile = new File(['heic'], 'skin.heic', { type: 'image/heic' });
+    const convertedFile = await convertHEICToJPEG(heicFile, 0.9);
+
+    expect(getRegistration).toHaveBeenCalledTimes(1);
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      'HEIC conversion error:',
+      expect.objectContaining({ message: 'Service Worker is not active' })
+    );
+    expect(heic2anyMock).toHaveBeenCalledWith({
+      blob: heicFile,
+      toType: 'image/jpeg',
+      quality: 0.9,
+    });
+    expect(convertedFile).toBeInstanceOf(File);
+    expect(convertedFile.name).toBe('skin.jpg');
+    expect(convertedFile.type).toBe('image/jpeg');
+  });
+
+  it('falls back to local heic2any when service worker readiness never resolves', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: new Promise(() => {}),
+      },
+    });
+    vi.stubGlobal('MessageChannel', TestMessageChannel);
+
+    const heicFile = new File(['heic'], 'skin.heic', { type: 'image/heic' });
+    const conversionPromise = convertHEICToJPEG(heicFile, 0.9);
+
+    await vi.advanceTimersByTimeAsync(8000);
+    const convertedFile = await conversionPromise;
+
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      'HEIC conversion error:',
+      expect.objectContaining({ message: 'Service Worker readiness timed out' })
+    );
+    expect(heic2anyMock).toHaveBeenCalledWith({
+      blob: heicFile,
+      toType: 'image/jpeg',
+      quality: 0.9,
+    });
+    expect(convertedFile).toBeInstanceOf(File);
+    expect(convertedFile.name).toBe('skin.jpg');
+    expect(convertedFile.type).toBe('image/jpeg');
+  });
 });
