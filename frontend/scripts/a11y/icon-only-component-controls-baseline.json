@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T18:47:57.615Z",
+  "generatedAt": "2026-05-22T18:52:52.148Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -96,22 +96,6 @@
       "file": "src/components/admin/PatientModal.jsx",
       "line": 698,
       "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/PaymentProviderSettings.jsx:320:21:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/PaymentProviderSettings.jsx",
-      "line": 320,
-      "column": 21,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/PaymentProviderSettings.jsx:404:21:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/PaymentProviderSettings.jsx",
-      "line": 404,
-      "column": 21,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },

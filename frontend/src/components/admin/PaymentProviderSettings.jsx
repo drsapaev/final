@@ -320,6 +320,8 @@ const PaymentProviderSettings = () => {
                     <MacOSButton
                       type="button"
                       variant="outline"
+                      title={showSecrets.click ? 'Hide Click secret key' : 'Show Click secret key'}
+                      aria-label={showSecrets.click ? 'Hide Click secret key' : 'Show Click secret key'}
                       onClick={() => toggleShowSecret('click')}
                       style={{
                         position: 'absolute',
@@ -333,9 +335,9 @@ const PaymentProviderSettings = () => {
                       }}
                     >
                       {showSecrets.click ? (
-                        <EyeOff style={{ width: '16px', height: '16px' }} />
+                        <EyeOff aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       ) : (
-                        <Eye style={{ width: '16px', height: '16px' }} />
+                        <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       )}
                     </MacOSButton>
                   </div>
@@ -404,6 +406,8 @@ const PaymentProviderSettings = () => {
                     <MacOSButton
                       type="button"
                       variant="outline"
+                      title={showSecrets.payme ? 'Hide Payme secret key' : 'Show Payme secret key'}
+                      aria-label={showSecrets.payme ? 'Hide Payme secret key' : 'Show Payme secret key'}
                       onClick={() => toggleShowSecret('payme')}
                       style={{
                         position: 'absolute',
@@ -417,9 +421,9 @@ const PaymentProviderSettings = () => {
                       }}
                     >
                       {showSecrets.payme ? (
-                        <EyeOff style={{ width: '16px', height: '16px' }} />
+                        <EyeOff aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       ) : (
-                        <Eye style={{ width: '16px', height: '16px' }} />
+                        <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       )}
                     </MacOSButton>
                   </div>
