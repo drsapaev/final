@@ -419,6 +419,7 @@ const PhoneVerificationManager = () => {
           <MacOSButton
           onClick={sendAdminCode}
           disabled={loading || !adminForm.phone.trim()}
+          aria-label="Send admin verification code"
           style={{ width: '100%' }}>
           
             {loading ?

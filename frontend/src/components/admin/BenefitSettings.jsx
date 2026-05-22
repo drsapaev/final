@@ -831,6 +831,7 @@ const BenefitSettings = () => {
             <MacOSButton
               onClick={confirmSave}
               disabled={saving}
+              aria-label="Confirm benefit settings save"
               style={{
                 backgroundColor: 'var(--mac-accent-blue)',
                 border: 'none'

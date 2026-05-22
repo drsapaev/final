@@ -341,6 +341,7 @@ const UserModal = ({
           <MacOSButton
             type="submit"
             variant="primary"
+            aria-label={user ? 'Save user changes' : 'Create user'}
             disabled={isSubmitting || loading}
           >
             {isSubmitting ? (

@@ -1449,6 +1449,7 @@ const SmartScheduling = () => {
               <MacOSButton
                 onClick={handleSubmit}
                 disabled={loading}
+                aria-label="Run AI scheduling analysis"
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 
                 {loading ?

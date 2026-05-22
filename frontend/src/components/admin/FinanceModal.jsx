@@ -620,6 +620,7 @@ const FinanceModal = ({
               <Button
                 type="submit"
                 disabled={isSubmitting || loading}
+                aria-label={transaction ? 'Save transaction changes' : 'Add transaction'}
                 className="flex-1"
                 style={{ 
                   background: 'var(--accent-color)',

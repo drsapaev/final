@@ -651,8 +651,11 @@ const GroupPermissionsManager = () => {
               <div key={role.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Badge variant="success">{role.display_name}</Badge>
                         <Button
+                  type="button"
                   size="sm"
                   variant="danger"
+                  title={`Revoke ${role.display_name} from group`}
+                  aria-label={`Revoke ${role.display_name} from group`}
                   onClick={() => revokeRoleFromGroup(selectedGroup.id, role.id)}>
                   
                           <Trash2 style={{ width: '12px', height: '12px' }} />

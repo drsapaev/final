@@ -609,6 +609,7 @@ const AppointmentModal = ({
               <MacOSButton
             type="submit"
             disabled={isSubmitting || loading}
+            aria-label={appointment ? 'Save appointment changes' : 'Create appointment'}
             className="flex-1"
             style={{
               background: 'var(--accent-color)',

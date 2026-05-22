@@ -2579,6 +2579,7 @@ const DermatologistPanelUnified = () => {
                           }
                         }}
                         variant="primary"
+                        aria-label="Изменить цену процедуры"
                         title="Изменить цену процедуры">
 
                           <DollarSign size={16} />

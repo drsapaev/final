@@ -551,7 +551,14 @@ const AIAssistant = ({
               <RefreshCw style={{ width: 14, height: 14, marginRight: 6 }} />
               Обновить
             </Button>
-            <Button size="small" variant="outline" onClick={() => setIsOpen((v) => !v)}>
+            <Button
+              type="button"
+              size="small"
+              variant="outline"
+              title={isOpen ? 'Collapse AI assistant details' : 'Expand AI assistant details'}
+              aria-label={isOpen ? 'Collapse AI assistant details' : 'Expand AI assistant details'}
+              onClick={() => setIsOpen((v) => !v)}
+            >
               {isOpen ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
             </Button>
           </div>

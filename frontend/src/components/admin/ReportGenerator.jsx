@@ -732,6 +732,7 @@ const ReportGenerator = ({
             onClick={() => handleGenerate(reportFormat)}
             disabled={!effectiveSelectedReportType || effectiveLoading}
             variant="primary"
+            aria-label={`Generate selected report as ${String(reportFormat).toUpperCase()}`}
             style={{
               display: 'flex',
               alignItems: 'center',

@@ -606,6 +606,7 @@ const LicenseManagement = () => {
               <MacOSButton
               type="submit"
               disabled={saving}
+              aria-label={editingLicense ? 'Update license' : 'Add license'}
               style={{
                 display: 'flex',
                 alignItems: 'center',

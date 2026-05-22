@@ -518,8 +518,10 @@ const UserExportManager = () => {
         {/* Кнопка экспорта */}
         <div style={{ marginTop: '24px' }}>
           <Button
+          type="button"
           onClick={handleExport}
           disabled={loading}
+          aria-label="Start user data export"
           style={{ width: '100%' }}>
 
             {loading ?

@@ -390,7 +390,10 @@ const TelegramSettings = () => {
                   style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }} />
                 
                 <Button
+                  type="button"
                   variant="outline"
+                  title={showToken ? 'Hide Telegram bot token' : 'Show Telegram bot token'}
+                  aria-label={showToken ? 'Hide Telegram bot token' : 'Show Telegram bot token'}
                   onClick={() => setShowToken(!showToken)}
                   style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
                   

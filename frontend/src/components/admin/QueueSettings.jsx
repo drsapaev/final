@@ -597,6 +597,8 @@ const QueueSettings = () => {
                   variant="outline"
                   onClick={() => testQueueGeneration(specialty.key)}
                   disabled={testing}
+                  title={`Test queue generation for ${specialty.name}`}
+                  aria-label={`Test queue generation for ${specialty.name}`}
                   style={{
                     padding: '6px 12px',
                     minWidth: 'auto'
