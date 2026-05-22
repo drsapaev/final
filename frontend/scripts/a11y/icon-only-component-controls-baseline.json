@@ -1,16 +1,8 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T13:23:32.122Z",
+  "generatedAt": "2026-05-22T13:30:52.529Z",
   "entries": [
-    {
-      "signature": "src/components/PrescriptionSystem.jsx:228:19:Button:missing-accessible-name",
-      "file": "src/components/PrescriptionSystem.jsx",
-      "line": 228,
-      "column": 19,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
       "file": "src/components/admin/AISettings.jsx",
@@ -860,14 +852,6 @@
       "reason": "missing-accessible-name"
     },
     {
-      "signature": "src/components/auth/PhoneVerification.jsx:266:11:Button:missing-accessible-name",
-      "file": "src/components/auth/PhoneVerification.jsx",
-      "line": 266,
-      "column": 11,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
       "signature": "src/components/display/DisplayContentManager.jsx:138:19:Button:missing-accessible-name",
       "file": "src/components/display/DisplayContentManager.jsx",
       "line": 138,
@@ -984,14 +968,6 @@
       "file": "src/components/laboratory/LabResultsManager.jsx",
       "line": 605,
       "column": 15,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/layout/ResponsiveNavigation.jsx:34:11:Button:missing-accessible-name",
-      "file": "src/components/layout/ResponsiveNavigation.jsx",
-      "line": 34,
-      "column": 11,
       "element": "Button",
       "reason": "missing-accessible-name"
     },

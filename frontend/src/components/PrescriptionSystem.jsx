@@ -229,9 +229,12 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
                 size="sm"
                 variant="danger"
                 onClick={() => handleMedicationRemove(medication.id)}
+                type="button"
+                title={`Удалить препарат ${index + 1}`}
+                aria-label={`Удалить препарат ${index + 1}`}
                 disabled={!canEdit}>
                 
-                    <X className="w-4 h-4" />
+                    <X aria-hidden="true" className="w-4 h-4" />
                   </Button>
                 </div>
                 
