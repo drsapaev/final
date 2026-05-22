@@ -60,7 +60,7 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
     // Создаем MessageChannel для двусторонней связи
     const messageChannel = new MessageChannel();
 
-    return new Promise((resolve, reject) => {
+    const convertedFileFromWorker = await new Promise((resolve, reject) => {
       // Настраиваем обработчик ответа
       messageChannel.port1.onmessage = (event) => {
         const { success, convertedFile, error } = event.data;
@@ -80,6 +80,8 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
         quality
       }, [messageChannel.port2]);
     });
+
+    return convertedFileFromWorker;
 
   } catch (error) {
     logger.error('HEIC conversion error:', error);
