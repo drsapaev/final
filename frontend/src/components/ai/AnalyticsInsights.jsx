@@ -362,11 +362,14 @@ const AnalyticsInsights = () => {
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove medical record"
+            aria-label={`Remove medical record ${index + 1}`}
             onClick={() => removeMedicalRecord(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
-            
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -467,11 +470,14 @@ const AnalyticsInsights = () => {
             Данные для анализа аномалий
           </h4>
           <MacOSButton
+          type="button"
+          title="Add anomaly dataset entry"
+          aria-label="Add anomaly dataset entry"
           onClick={addDatasetEntry}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          
-            <Plus style={{ width: '16px', height: '16px' }} />
+
+            <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить запись
           </MacOSButton>
         </div>
@@ -532,11 +538,14 @@ const AnalyticsInsights = () => {
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove anomaly dataset entry"
+            aria-label={`Remove anomaly dataset entry ${index + 1}`}
             onClick={() => removeDatasetEntry(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
-            
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -773,11 +782,14 @@ const AnalyticsInsights = () => {
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove historical outcome"
+            aria-label={`Remove historical outcome ${index + 1}`}
             onClick={() => removeHistoricalOutcome(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
-            
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -895,11 +907,14 @@ const AnalyticsInsights = () => {
             Популяционные данные
           </h4>
           <MacOSButton
+          type="button"
+          title="Add population patient"
+          aria-label="Add population patient"
           onClick={addPopulationEntry}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          
-            <Plus style={{ width: '16px', height: '16px' }} />
+
+            <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить пациента
           </MacOSButton>
         </div>
@@ -972,11 +987,14 @@ const AnalyticsInsights = () => {
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove population patient"
+            aria-label={`Remove population patient ${index + 1}`}
             onClick={() => removePopulationEntry(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
-            
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -1001,11 +1019,14 @@ const AnalyticsInsights = () => {
             Факторы риска
           </h4>
           <MacOSButton
+          type="button"
+          title="Add risk factor"
+          aria-label="Add risk factor"
           onClick={addRiskFactor}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          
-            <Plus style={{ width: '16px', height: '16px' }} />
+
+            <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить фактор
           </MacOSButton>
         </div>
@@ -1024,11 +1045,14 @@ const AnalyticsInsights = () => {
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
               <MacOSButton
+            type="button"
+            title="Remove risk factor"
+            aria-label={`Remove risk factor ${index + 1}`}
             onClick={() => removeRiskFactor(index)}
             variant="outline"
             style={{ padding: '4px', minWidth: 'auto' }}>
-            
-                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+
+                <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
               </MacOSButton>
             </div>
         )}
@@ -1272,13 +1296,16 @@ const AnalyticsInsights = () => {
             
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
               <MacOSButton
+                type="button"
+                title={loading ? 'Running AI analytics' : 'Run AI analytics'}
+                aria-label={loading ? 'Running AI analytics' : 'Run AI analytics'}
                 onClick={handleSubmit}
                 disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 
                 {loading ?
                 <>
-                    <Loader style={{
+                    <Loader aria-hidden="true" style={{
                     width: '20px',
                     height: '20px',
                     animation: 'spin 1s linear infinite'
@@ -1287,7 +1314,7 @@ const AnalyticsInsights = () => {
                   </> :
 
                 <>
-                    <TrendingUp style={{ width: '20px', height: '20px' }} />
+                    <TrendingUp aria-hidden="true" style={{ width: '20px', height: '20px' }} />
                     Запустить AI анализ
                   </>
                 }
