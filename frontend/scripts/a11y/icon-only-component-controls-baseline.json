@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T14:33:51.142Z",
+  "generatedAt": "2026-05-22T14:40:52.755Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -432,62 +432,6 @@
       "file": "src/components/ai/QualityControl.jsx",
       "line": 1217,
       "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:483:21:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 483,
-      "column": 21,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:524:21:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 524,
-      "column": 21,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:539:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 539,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:709:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 709,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:879:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 879,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:1077:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 1077,
-      "column": 11,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/ai/RiskAssessment.jsx:1272:11:MacOSButton:missing-accessible-name",
-      "file": "src/components/ai/RiskAssessment.jsx",
-      "line": 1272,
-      "column": 11,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },
