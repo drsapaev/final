@@ -18,6 +18,27 @@ npx playwright test e2e/authenticated-role-smoke.spec.js --project=chromium --re
 npx playwright test e2e/authenticated-rbac-deny.spec.js --project=chromium --reporter=line
 ```
 
+## Manual HEIC Upload Smoke
+
+The dermatology HEIC upload smoke is opt-in because it needs a real local
+`.heic` or `.heif` fixture. It skips automatically when `HEIC_SMOKE_FILE` is not
+set, so CI does not need a private image fixture.
+
+```powershell
+cd frontend
+$env:HEIC_SMOKE_FILE = "C:\path\to\safe-fixture.heic"
+npx playwright test e2e/dermatology-heic-upload-smoke.spec.js --project=chromium --reporter=line
+Remove-Item Env:\HEIC_SMOKE_FILE
+```
+
+Expected proof:
+
+- authenticated Doctor harness renders `/doctor/dermatology?patientId=42&visitId=4242&tab=photos`;
+- the selected HEIC/HEIF file is converted before upload;
+- mocked upload receives multipart POST to `/api/v1/visits/4242/files`;
+- multipart metadata includes `photo_before`, `visit_id=4242`, converted `.jpg`
+  filename, and `Content-Type: image/jpeg`.
+
 ## Role Coverage
 
 | Role | Route | Route ID |
