@@ -61,6 +61,7 @@ describe('heicConverter service worker fallback', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -102,6 +103,34 @@ describe('heicConverter service worker fallback', () => {
     expect(loggerErrorMock).toHaveBeenCalledWith(
       'HEIC conversion error:',
       expect.objectContaining({ message: 'cdn blocked' })
+    );
+    expect(heic2anyMock).toHaveBeenCalledWith({
+      blob: heicFile,
+      toType: 'image/jpeg',
+      quality: 0.9,
+    });
+    expect(convertedFile).toBeInstanceOf(File);
+    expect(convertedFile.name).toBe('skin.jpg');
+    expect(convertedFile.type).toBe('image/jpeg');
+  });
+
+  it('falls back to local heic2any when the service worker does not respond', async () => {
+    vi.useFakeTimers();
+    const postMessage = vi.fn((message) => {
+      expect(message.type).toBe('CONVERT_HEIC');
+    });
+    stubServiceWorker(postMessage);
+
+    const heicFile = new File(['heic'], 'skin.heic', { type: 'image/heic' });
+    const conversionPromise = convertHEICToJPEG(heicFile, 0.9);
+
+    await vi.advanceTimersByTimeAsync(8000);
+    const convertedFile = await conversionPromise;
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      'HEIC conversion error:',
+      expect.objectContaining({ message: 'Service Worker HEIC conversion timed out' })
     );
     expect(heic2anyMock).toHaveBeenCalledWith({
       blob: heicFile,
