@@ -234,3 +234,51 @@ Remaining optional evidence:
   upload flow when such a fixture is available.
 - Keep the large `heic2any-*` chunk visible in bundle reports, but do not remove
   it unless product requirements decide to drop HEIC/HEIF support.
+
+## Real HEIC Fixture Smoke
+
+Date: 2026-05-22
+
+Scope: local browser conversion proof using a real safe HEIC fixture supplied
+for QA. No code, service worker, upload contract, backend, route, RBAC, package,
+or Vite configuration changed.
+
+Execution:
+
+- served the current frontend locally with Vite;
+- opened the app in Chromium through Playwright;
+- imported `frontend/src/utils/heicConverter.js` in the browser;
+- created a browser `File` from `20260509_183009.heic`;
+- called `isHEICFile(file)` and `convertHEICToJPEG(file, 0.9)`.
+
+Observed result:
+
+```json
+{
+  "detected": true,
+  "inputName": "20260509_183009.heic",
+  "inputType": "image/heic",
+  "inputSize": 572975,
+  "outputName": "20260509_183009.jpg",
+  "outputType": "image/jpeg",
+  "outputSize": 949814,
+  "elapsedMs": 1673
+}
+```
+
+Console evidence:
+
+- Vite development connection succeeded.
+- The active service worker was not available in this local smoke, so the app
+  used the local fallback path.
+- The conversion completed successfully and produced a JPEG file name, MIME
+  type, and payload.
+
+Interpretation:
+
+The real-file smoke confirms the accepted fallback behavior from the earlier
+unit tests: when service worker conversion is unavailable, the browser app can
+convert a real HEIC input through the bundled local fallback without contacting
+the removed remote CDN worker path. This is evidence for conversion reliability,
+not upload endpoint behavior; authenticated dermatology upload proof remains a
+separate browser QA task if route/session fixtures are required.
