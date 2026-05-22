@@ -42,11 +42,11 @@ const MacOSLoadingSkeleton = ({
 
   const renderTextSkeleton = () => {
     if (lines === 1) {
-      return <div className={className} style={textStyle} role="status" aria-label="Загрузка..." aria-busy="true" />;
+      return <div className={className} style={textStyle} />;
     }
 
     return (
-      <div className={className} style={containerStyle} role="status" aria-label="Загрузка..." aria-busy="true">
+      <div className={className} style={containerStyle}>
         {Array.from({ length: lines }, (_, index) => (
           <div
             key={index}
@@ -61,15 +61,15 @@ const MacOSLoadingSkeleton = ({
   };
 
   const renderCircleSkeleton = () => (
-    <div className={className} style={circleStyle} role="status" aria-label="Загрузка..." aria-busy="true" />
+    <div className={className} style={circleStyle} />
   );
 
   const renderRectSkeleton = () => (
-    <div className={className} style={rectStyle} role="status" aria-label="Загрузка..." aria-busy="true" />
+    <div className={className} style={rectStyle} />
   );
 
   const renderCardSkeleton = () => (
-    <div className={className} style={containerStyle} role="status" aria-label="Загрузка..." aria-busy="true">
+    <div className={className} style={containerStyle}>
       <div style={{ ...rectStyle, height: '16px', width: '60%' }} />
       <div style={{ ...rectStyle, height: '24px', width: '80%' }} />
       <div style={{ ...rectStyle, height: '14px', width: '40%' }} />
@@ -77,7 +77,7 @@ const MacOSLoadingSkeleton = ({
   );
 
   const renderTableSkeleton = () => (
-    <div className={className} style={containerStyle} role="status" aria-label="Загрузка..." aria-busy="true">
+    <div className={className} style={containerStyle}>
       {/* Header */}
       <div style={{ display: 'flex', gap: spacing }}>
         {Array.from({ length: 4 }, (_, index) => (
@@ -102,7 +102,7 @@ const MacOSLoadingSkeleton = ({
   );
 
   const renderListSkeleton = () => (
-    <div className={className} style={containerStyle} role="status" aria-label="Загрузка..." aria-busy="true">
+    <div className={className} style={containerStyle}>
       {Array.from({ length: lines }, (_, index) => (
         <div
           key={index}
