@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/TelegramMiniAppPatientShell.jsx'), 'utf8').replace(/\r\n/g, '\n');
 
 function sourceBetween(source, start, end) {
   const startIndex = source.indexOf(start);
@@ -40,7 +40,7 @@ describe('Telegram Mini App expired link guardrails', () => {
     const miniAppShell = sourceBetween(
       appSource,
       'function TelegramMiniAppPatientShell() {',
-      'function AppShell({ children }) {'
+      'const miniAppPageStyle = {'
     );
 
     expect(handledConfig).toContain('silent: true');
