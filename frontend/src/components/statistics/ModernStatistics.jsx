@@ -291,11 +291,11 @@ const ModernStatistics = ({
         </h2>
         
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
-          <Button variant="ghost" size="small" onClick={onRefresh} title={t.refresh}>
-            <Icon name="gear" size="small" />
+          <Button type="button" variant="ghost" size="small" onClick={onRefresh} title={t.refresh} aria-label={t.refresh}>
+            <Icon aria-hidden="true" name="gear" size="small" />
           </Button>
-          <Button variant="primary" size="small" onClick={onExport} title={t.export}>
-            <Icon name="square.and.arrow.up" size="small" style={{ color: 'white' }} />
+          <Button type="button" variant="primary" size="small" onClick={onExport} title={t.export} aria-label={t.export}>
+            <Icon aria-hidden="true" name="square.and.arrow.up" size="small" style={{ color: 'white' }} />
           </Button>
         </div>
       </div>
