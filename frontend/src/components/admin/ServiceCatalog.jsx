@@ -738,8 +738,10 @@ const ServiceCatalog = () => {
               actions:
               <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
+                  type="button"
                   size="sm"
                   variant="outline"
+                  aria-label={`View change history for ${service.name}`}
                   onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
                   style={{
                     padding: '6px',
@@ -752,11 +754,13 @@ const ServiceCatalog = () => {
                   }}
                   title="История изменений">
 
-                    <History size={14} />
+                    <History aria-hidden="true" size={14} />
                   </MacOSButton>
                   <MacOSButton
+                  type="button"
                   size="sm"
                   variant="outline"
+                  aria-label={`Edit service ${service.name}`}
                   onClick={() => setEditingService(service)}
                   style={{
                     padding: '6px',
@@ -769,11 +773,13 @@ const ServiceCatalog = () => {
                   }}
                   title="Редактировать">
 
-                    <Edit size={14} />
+                    <Edit aria-hidden="true" size={14} />
                   </MacOSButton>
                   <MacOSButton
+                  type="button"
                   size="sm"
                   variant="outline"
+                  aria-label={`Delete service ${service.name}`}
                   onClick={() => handleDeleteService(service.id)}
                   style={{
                     padding: '6px',
@@ -788,7 +794,7 @@ const ServiceCatalog = () => {
                   }}
                   title="Удалить">
 
-                    <Trash2 size={14} />
+                    <Trash2 aria-hidden="true" size={14} />
                   </MacOSButton>
                 </div>
 
@@ -856,7 +862,10 @@ const ServiceCatalog = () => {
             position: 'relative'
           }}>
             <MacOSButton
+              type="button"
               variant="outline"
+              title="Close service history"
+              aria-label="Close service history"
               onClick={() => setShowHistory(null)}
               style={{
                 position: 'absolute',
@@ -866,7 +875,7 @@ const ServiceCatalog = () => {
                 backgroundColor: 'var(--mac-bg-primary)'
               }}
             >
-              <X size={16} />
+              <X aria-hidden="true" size={16} />
             </MacOSButton>
             <ServiceAuditHistory
               serviceId={showHistory.serviceId}

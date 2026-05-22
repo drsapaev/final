@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T15:15:45.638Z",
+  "generatedAt": "2026-05-22T15:24:58.171Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -192,38 +192,6 @@
       "file": "src/components/admin/SecuritySettings.jsx",
       "line": 625,
       "column": 15,
-      "element": "MacOSButton",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/components/admin/ServiceCatalog.jsx:740:19:MacOSButton:title-only",
-      "file": "src/components/admin/ServiceCatalog.jsx",
-      "line": 740,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/ServiceCatalog.jsx:757:19:MacOSButton:title-only",
-      "file": "src/components/admin/ServiceCatalog.jsx",
-      "line": 757,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/ServiceCatalog.jsx:774:19:MacOSButton:title-only",
-      "file": "src/components/admin/ServiceCatalog.jsx",
-      "line": 774,
-      "column": 19,
-      "element": "MacOSButton",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/components/admin/ServiceCatalog.jsx:858:13:MacOSButton:missing-accessible-name",
-      "file": "src/components/admin/ServiceCatalog.jsx",
-      "line": 858,
-      "column": 13,
       "element": "MacOSButton",
       "reason": "missing-accessible-name"
     },
