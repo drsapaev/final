@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary baseline for icon-only control accessible-name findings. Remove entries as the UI is cleaned up.",
-  "generatedAt": "2026-05-22T14:27:32.366Z",
+  "generatedAt": "2026-05-22T14:33:51.142Z",
   "entries": [
     {
       "signature": "src/components/admin/AISettings.jsx:386:21:Button:missing-accessible-name",
@@ -650,78 +650,6 @@
       "column": 11,
       "element": "Button",
       "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2084:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2084,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2093:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2093,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2102:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2102,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2111:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2111,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2120:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2120,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2129:15:Button:title-only",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2129,
-      "column": 15,
-      "element": "Button",
-      "reason": "title-only"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2655:15:Button:missing-accessible-name",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2655,
-      "column": 15,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2710:15:Button:missing-accessible-name",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2710,
-      "column": 15,
-      "element": "Button",
-      "reason": "missing-accessible-name"
-    },
-    {
-      "signature": "src/pages/DentistPanelUnified.jsx:2765:15:Button:missing-accessible-name",
-      "file": "src/pages/DentistPanelUnified.jsx",
-      "line": 2765,
-      "column": 15,
-      "element": "Button",
-      "reason": "missing-accessible-name"
     },
     {
       "signature": "src/pages/DermatologistPanelUnified.jsx:2568:25:MacOSButton:title-only",
