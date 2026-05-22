@@ -5,6 +5,8 @@ from scripts.cleanup_merged_branches import (
     Evidence,
     build_cleanup_plan,
     inspect_local_base_status,
+    list_graph_merged_branches,
+    list_local_branches,
     local_branch_for_base,
     parse_ahead_behind,
     parse_pr_number_from_branch,
@@ -102,6 +104,22 @@ branch refs/heads/main
 
     def test_parse_ahead_behind(self):
         self.assertEqual(parse_ahead_behind("0\t4\n"), (0, 4))
+
+    def test_list_local_branches_uses_refs_heads_only(self):
+        with patch("scripts.cleanup_merged_branches.git_lines", return_value=("main", "codex/task")) as git_lines:
+            branches = list_local_branches()
+
+        self.assertEqual(branches, ("main", "codex/task"))
+        git_lines.assert_called_once_with(("for-each-ref", "--format=%(refname:short)", "refs/heads"))
+
+    def test_list_graph_merged_branches_uses_refs_heads_only(self):
+        with patch("scripts.cleanup_merged_branches.git_lines", return_value=("main",)) as git_lines:
+            branches = list_graph_merged_branches("origin/main")
+
+        self.assertEqual(branches, ("main",))
+        git_lines.assert_called_once_with(
+            ("for-each-ref", "--merged=origin/main", "--format=%(refname:short)", "refs/heads")
+        )
 
     def test_inspect_local_base_status_reports_behind(self):
         with patch("scripts.cleanup_merged_branches.run_command") as run_command:
