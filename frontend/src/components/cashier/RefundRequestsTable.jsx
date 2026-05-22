@@ -1,6 +1,6 @@
 /**
  * RefundRequestsTable - Table for managing refund requests
- * 
+ *
  * Features:
  * - Display pending, approved, rejected refund requests
  * - Approve/Reject actions for pending requests
@@ -13,16 +13,73 @@ import {
   DollarSign,
   Clock,
   CheckCircle,
-
   RefreshCw,
   Loader2,
   User,
-  CreditCard } from
-'lucide-react';
-import { Badge } from '../ui/macos';
+  CreditCard
+} from 'lucide-react';
+import { AppEmpty, AppError, AppLoading, Badge, Button, MacOSTable, Select } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
+
+const REFUND_FILTER_OPTIONS = [
+  { value: 'all', label: 'Все' },
+  { value: 'pending', label: 'Ожидают' },
+  { value: 'approved', label: 'Одобренные' },
+  { value: 'completed', label: 'Завершённые' },
+  { value: 'rejected', label: 'Отклонённые' }
+];
+
+const textCellStyle = {
+  color: 'var(--mac-text-primary)'
+};
+
+const mutedCellStyle = {
+  color: 'var(--mac-text-secondary)',
+  fontSize: 'var(--mac-font-size-xs)'
+};
+
+const amountCellStyle = {
+  color: 'var(--mac-success)',
+  fontWeight: 'var(--mac-font-weight-semibold)'
+};
+
+const reasonCellStyle = {
+  display: 'block',
+  maxWidth: '220px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+};
+
+const inlineClusterStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--mac-spacing-2)'
+};
+
+const actionClusterStyle = {
+  display: 'flex',
+  justifyContent: 'center',
+  gap: 'var(--mac-spacing-1)',
+  flexWrap: 'wrap'
+};
+
+const headerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 'var(--mac-spacing-3)',
+  marginBottom: 'var(--mac-spacing-4)',
+  flexWrap: 'wrap'
+};
+
+const statusIconStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--mac-spacing-1)'
+};
 
 const RefundRequestsTable = ({ onRefresh }) => {
   const [requests, setRequests] = useState([]);
@@ -172,19 +229,19 @@ const RefundRequestsTable = ({ onRefresh }) => {
     const IconComponent = config.icon;
 
     return (
-      <Badge variant={config.variant} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <IconComponent size={12} />
-                {config.label}
-            </Badge>);
-
+      <Badge variant={config.variant} style={statusIconStyle}>
+        <IconComponent size={12} aria-hidden="true" />
+        {config.label}
+      </Badge>
+    );
   };
 
   const getRefundTypeBadge = (type) => {
-    return type === 'deposit' ?
-    <Badge variant="primary" style={{ fontSize: '11px' }}>На депозит</Badge> :
-
-    <Badge variant="secondary" style={{ fontSize: '11px' }}>На карту</Badge>;
-
+    return type === 'deposit' ? (
+      <Badge variant="primary">На депозит</Badge>
+    ) : (
+      <Badge variant="secondary">На карту</Badge>
+    );
   };
 
   const formatDate = (dateStr) => {
@@ -202,233 +259,195 @@ const RefundRequestsTable = ({ onRefresh }) => {
     return amount ? `${amount.toLocaleString()} сум` : '—';
   };
 
+  const renderActions = (request) => {
+    if (processingId === request.id) {
+      return (
+        <span role="status" aria-live="polite" style={inlineClusterStyle}>
+          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+          <span style={mutedCellStyle}>Обработка</span>
+        </span>
+      );
+    }
+
+    if (request.status === 'pending') {
+      return (
+        <div style={actionClusterStyle}>
+          <Button
+            variant="success"
+            size="small"
+            onClick={() => handleApprove(request.id)}
+            title="Одобрить"
+            aria-label={`Одобрить заявку на возврат ${request.id}`}
+          >
+            <Check size={14} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="danger"
+            size="small"
+            onClick={() => handleReject(request.id)}
+            title="Отклонить"
+            aria-label={`Отклонить заявку на возврат ${request.id}`}
+          >
+            <X size={14} aria-hidden="true" />
+          </Button>
+        </div>
+      );
+    }
+
+    if (request.status === 'approved') {
+      return (
+        <Button
+          variant="primary"
+          size="small"
+          onClick={() => handleComplete(request.id)}
+          aria-label={`Отметить заявку на возврат ${request.id} как выплаченную`}
+        >
+          <CreditCard size={14} aria-hidden="true" />
+          Выплатить
+        </Button>
+      );
+    }
+
+    return <span style={mutedCellStyle}>—</span>;
+  };
+
+  const columns = [
+    {
+      key: 'id',
+      title: 'ID',
+      render: (id) => <span style={textCellStyle}>#{id}</span>
+    },
+    {
+      key: 'patient_name',
+      title: 'Пациент',
+      render: (_value, request) => (
+        <span style={inlineClusterStyle}>
+          <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
+          <span>{request.patient_name || `Пациент #${request.patient_id}`}</span>
+        </span>
+      )
+    },
+    {
+      key: 'amount',
+      title: 'Сумма',
+      render: (amount) => <span style={amountCellStyle}>{formatAmount(amount)}</span>
+    },
+    {
+      key: 'refund_type',
+      title: 'Тип',
+      render: (type) => getRefundTypeBadge(type)
+    },
+    {
+      key: 'reason',
+      title: 'Причина',
+      render: (reason) => (
+        <span style={reasonCellStyle} title={reason}>
+          {reason || '—'}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Статус',
+      render: (status) => getStatusBadge(status)
+    },
+    {
+      key: 'created_at',
+      title: 'Дата',
+      render: (createdAt) => <span style={mutedCellStyle}>{formatDate(createdAt)}</span>
+    },
+    {
+      key: 'actions',
+      title: 'Действия',
+      render: (_value, request) => renderActions(request)
+    }
+  ];
+
   return (
-    <div style={{ padding: '0' }}>
-            {/* Header */}
-            <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <DollarSign size={20} color="#10b981" />
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Заявки на возврат</h3>
-                    <Badge variant="default">{requests.length}</Badge>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {/* Filter */}
-                    <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+    <section aria-labelledby="refund-requests-title">
+      <div style={headerStyle}>
+        <div style={inlineClusterStyle}>
+          <DollarSign size={20} color="var(--mac-success)" aria-hidden="true" />
+          <h3
+            id="refund-requests-title"
             style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              fontSize: '13px',
-              background: 'white'
-            }}>
-            
-                        <option value="all">Все</option>
-                        <option value="pending">Ожидают</option>
-                        <option value="approved">Одобренные</option>
-                        <option value="completed">Завершённые</option>
-                        <option value="rejected">Отклонённые</option>
-                    </select>
+              margin: 0,
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}
+          >
+            Заявки на возврат
+          </h3>
+          <Badge variant="default">{requests.length}</Badge>
+        </div>
 
-                    <button
+        <div style={inlineClusterStyle}>
+          <Select
+            id="refund-request-filter"
+            value={filter}
+            onChange={setFilter}
+            options={REFUND_FILTER_OPTIONS}
+            size="small"
+            aria-label="Фильтр заявок на возврат"
+          />
+
+          <Button
+            variant="secondary"
+            size="small"
             onClick={loadRequests}
             disabled={loading}
             aria-label="Обновить список заявок на возврат"
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-            
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
-            </div>
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
 
-            {/* Error */}
-            {error &&
-      <div style={{
-        padding: '12px',
-        background: '#fef2f2',
-        borderRadius: '8px',
-        color: '#dc2626',
-        marginBottom: '16px',
-        fontSize: '14px'
-      }}>
-                    {error}
-                </div>
-      }
+      {error && (
+        <AppError
+          title="Не удалось загрузить заявки на возврат"
+          description={error}
+          action={
+            <Button variant="secondary" size="small" onClick={loadRequests}>
+              Повторить
+            </Button>
+          }
+          style={{ marginBottom: 'var(--mac-spacing-4)' }}
+        />
+      )}
 
-            {/* Loading */}
-            {loading &&
-      <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                    <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                    <p>Загрузка...</p>
-                </div>
-      }
+      {loading && (
+        <AppLoading
+          title="Загрузка заявок на возврат"
+          size="sm"
+          style={{ minHeight: 144 }}
+        />
+      )}
 
-            {/* Empty State */}
-            {!loading && requests.length === 0 &&
-      <div style={{
-        textAlign: 'center',
-        padding: '40px',
-        background: '#f9fafb',
-        borderRadius: '8px',
-        color: '#6b7280'
-      }}>
-                    <DollarSign size={32} style={{ opacity: 0.5, margin: '0 auto 8px' }} />
-                    <p>Нет заявок на возврат</p>
-                </div>
-      }
+      {!loading && requests.length === 0 && (
+        <AppEmpty
+          title="Нет заявок на возврат"
+          description="Когда появятся новые запросы на возврат, они будут показаны здесь."
+          icon={<DollarSign />}
+        />
+      )}
 
-            {/* Table */}
-            {!loading && requests.length > 0 &&
-      <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>ID</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Пациент</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Сумма</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Тип</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Причина</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Статус</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Дата</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {requests.map((request) =>
-            <tr
-              key={request.id}
-              style={{
-                borderBottom: '1px solid #e5e7eb',
-                background: processingId === request.id ? '#f3f4f6' : 'white'
-              }}>
-              
-                                    <td style={{ padding: '12px' }}>#{request.id}</td>
-                                    <td style={{ padding: '12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <User size={16} color="#6b7280" />
-                                            <span>{request.patient_name || `Пациент #${request.patient_id}`}</span>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '12px', fontWeight: 600, color: '#059669' }}>
-                                        {formatAmount(request.amount)}
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        {getRefundTypeBadge(request.refund_type)}
-                                    </td>
-                                    <td style={{ padding: '12px', maxWidth: '200px' }}>
-                                        <span style={{
-                  display: 'block',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }} title={request.reason}>
-                                            {request.reason || '—'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px' }}>
-                                        {getStatusBadge(request.status)}
-                                    </td>
-                                    <td style={{ padding: '12px', fontSize: '12px', color: '#6b7280' }}>
-                                        {formatDate(request.created_at)}
-                                    </td>
-                                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                                        {processingId === request.id ?
-                <Loader2 size={16} className="animate-spin" /> :
-
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                                                {request.status === 'pending' &&
-                  <>
-                                                        <button
-                      onClick={() => handleApprove(request.id)}
-                      title="Одобрить"
-                      aria-label={`Одобрить заявку на возврат ${request.id}`}
-                      style={{
-                        padding: '6px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        background: '#dcfce7',
-                        color: '#16a34a',
-                        cursor: 'pointer'
-                      }}>
-                      
-                                                            <Check size={14} />
-                                                        </button>
-                                                        <button
-                      onClick={() => handleReject(request.id)}
-                      title="Отклонить"
-                      aria-label={`Отклонить заявку на возврат ${request.id}`}
-                      style={{
-                        padding: '6px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        cursor: 'pointer'
-                      }}>
-                      
-                                                            <X size={14} />
-                                                        </button>
-                                                    </>
-                  }
-                                                {request.status === 'approved' &&
-                  <button
-                    onClick={() => handleComplete(request.id)}
-                    title="Отметить как возвращено"
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: '4px',
-                      border: 'none',
-                      background: '#3b82f6',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                    
-                                                        <CreditCard size={14} />
-                                                        Выплатить
-                                                    </button>
-                  }
-                                                {(request.status === 'completed' || request.status === 'rejected') &&
-                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
-                  }
-                                            </div>
-                }
-                                    </td>
-                                </tr>
-            )}
-                        </tbody>
-                    </table>
-                </div>
-      }
-        </div>);
-
+      {!loading && requests.length > 0 && (
+        <MacOSTable
+          columns={columns}
+          data={requests}
+          sortable={false}
+          hoverable={false}
+          size="sm"
+          variant="default"
+        />
+      )}
+    </section>
+  );
 };
 
-
 RefundRequestsTable.propTypes = {
-  ...(RefundRequestsTable.propTypes || {}),
-  onRefresh: PropTypes.any,
+  onRefresh: PropTypes.func
 };
 
 export default RefundRequestsTable;
