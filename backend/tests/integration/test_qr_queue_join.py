@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from app.models.queue_profile import QueueProfile
 from app.services.queue_service import QueueBusinessService
 
 
@@ -129,3 +130,60 @@ def test_qr_join_duplicate_is_not_recreated(client, db_session, test_doctor, mon
         .all()
     )
     assert len(entries) == 1
+
+
+@pytest.mark.queue
+def test_clinic_wide_qr_exposes_backend_selectable_specialists(
+    client, db_session, test_doctor, monkeypatch
+):
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
+
+    test_doctor.specialty = "cardio"
+    profile = QueueProfile(
+        key="cardiology",
+        title="Cardiology",
+        title_ru="Cardiology",
+        queue_tags=["cardio", "cardiology", "cardiology_common"],
+        display_order=1,
+        is_active=True,
+        show_on_qr_page=True,
+        icon="Heart",
+        color="#FF3B30",
+    )
+    db_session.add(profile)
+
+    token_value = "test-clinic-wide-qr-token"
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=token_value,
+        day=date.today(),
+        specialist_id=None,
+        department="clinic",
+        is_clinic_wide=True,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    info_resp = client.get(f"/api/v1/queue/qr-tokens/{token_value}/info")
+    assert info_resp.status_code == 200
+    info_payload = info_resp.json()
+    assert info_payload["is_clinic_wide"] is True
+    assert info_payload["selectable_specialists"] == [
+        {
+            "id": test_doctor.id,
+            "specialty": "cardiology",
+            "specialty_display": "Cardiology",
+            "icon": "❤️",
+            "color": "#FF3B30",
+            "doctor_name": "Test Cardiologist",
+            "cabinet": None,
+        }
+    ]
+
+    start_resp = client.post("/api/v1/queue/join/start", json={"token": token_value})
+    assert start_resp.status_code == 200
+    assert start_resp.json()["queue_info"]["selectable_specialists"] == info_payload[
+        "selectable_specialists"
+    ]
