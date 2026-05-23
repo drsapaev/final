@@ -19,5 +19,15 @@ describe('RegistrarPanel command contract', () => {
     expect(source).not.toContain('/registrar/queue/${realId}/start-visit');
     expect(source).not.toContain('/online-queue/entries/${targetId}/cancel');
   });
+
+  it('passes through registrar queue patient display fields before legacy patient fetch fallback', () => {
+    const source = fs.readFileSync(registrarPanelPath, 'utf8');
+
+    expect(source).toContain('if (apt.patient_id && !hasBackendPatientDisplayContract(apt))');
+    expect(source).toContain('patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name');
+    expect(source).toContain('patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year');
+    expect(source).toContain('patient_phone: fullEntry.patient_phone ?? fullEntry.phone');
+    expect(source).toContain('address: fullEntry.address ?? entry.address');
+  });
 });
 
