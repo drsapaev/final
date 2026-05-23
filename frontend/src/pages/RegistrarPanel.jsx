@@ -131,6 +131,14 @@ const hasBackendAction = (record, action) => {
   return false;
 };
 
+const getRegistrarActionForStatus = (status) => {
+  const normalizedStatus = normalizeRegistrarContractValue(status).replace('-', '_');
+  if (normalizedStatus === 'complete' || normalizedStatus === 'done') return 'complete';
+  if (normalizedStatus === 'paid' || normalizedStatus === 'mark_paid') return 'mark_paid';
+  if (normalizedStatus === 'in_cabinet') return 'start_visit';
+  return null;
+};
+
 const hasBackendPatientDisplayContract = (record) => {
   if (!record) return false;
   const hasName = Boolean(record.patient_fio || record.patient_name);
@@ -1858,6 +1866,11 @@ const RegistrarPanel = () => {
         notify.error('Missing backend record data for start visit');
         return;
       }
+      if (!hasBackendAction(appointment, 'start_visit')) {
+        logger.warn('RegistrarPanel: backend did not expose start_visit action', { recordKind, recordId, appointment });
+        notify.error('Action is not available for this record');
+        return;
+      }
 
       const url = recordKind === 'visit' ?
         `${API_BASE}/api/v1/registrar/visits/${recordId}/start-visit` :
@@ -2088,6 +2101,18 @@ const RegistrarPanel = () => {
         return null;
       }
 
+      const requiredBackendAction = getRegistrarActionForStatus(status);
+      if (!requiredBackendAction) {
+        logger.warn('RegistrarPanel: unsupported command without backend action contract', { appointmentId, status, recordType, realId, record });
+        notify.error('Action is not available for this record');
+        return null;
+      }
+      if (!hasBackendAction(record, requiredBackendAction)) {
+        logger.warn('RegistrarPanel: backend did not expose requested action', { appointmentId, status, requiredBackendAction, recordType, realId, record });
+        notify.error('Action is not available for this record');
+        return null;
+      }
+
       if (status === 'complete' || status === 'done') {
         if (recordType === 'visit') {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/complete`;
@@ -2206,7 +2231,7 @@ const RegistrarPanel = () => {
       Array.from(appointmentsSelected).map((id) => updateAppointmentStatus(id, action, reason))
     );
 
-    const successCount = results.filter((r) => r.status === 'fulfilled').length;
+    const successCount = results.filter((r) => r.status === 'fulfilled' && r.value).length;
     const failCount = results.length - successCount;
 
     if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
