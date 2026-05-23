@@ -170,6 +170,10 @@ def test_clinic_wide_qr_exposes_backend_selectable_specialists(
     assert info_resp.status_code == 200
     info_payload = info_resp.json()
     assert info_payload["is_clinic_wide"] is True
+    assert info_payload["queue_active"] is True
+    assert info_payload["allowed"] is True
+    assert info_payload["status"] in {"available", "dev_mode"}
+    assert isinstance(info_payload["message"], str)
     assert info_payload["selectable_specialists"] == [
         {
             "id": test_doctor.id,
@@ -184,6 +188,12 @@ def test_clinic_wide_qr_exposes_backend_selectable_specialists(
 
     start_resp = client.post("/api/v1/queue/join/start", json={"token": token_value})
     assert start_resp.status_code == 200
-    assert start_resp.json()["queue_info"]["selectable_specialists"] == info_payload[
-        "selectable_specialists"
-    ]
+    start_queue_info = start_resp.json()["queue_info"]
+    for key in (
+        "selectable_specialists",
+        "queue_active",
+        "allowed",
+        "status",
+        "message",
+    ):
+        assert start_queue_info[key] == info_payload[key]

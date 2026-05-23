@@ -29,6 +29,7 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     [
         ("/api/v1/auth/login", "post"),
         ("/api/v1/auth/me", "get"),
+        ("/api/v1/queue/qr-tokens/{token}/info", "get"),
         ("/api/v1/queue/join/start", "post"),
         ("/api/v1/queue/join/complete", "post"),
         ("/api/v1/registrar/records/actions", "post"),
@@ -55,6 +56,23 @@ def test_openapi_queue_join_contract_has_request_and_responses(client: TestClien
     assert operation["requestBody"].get("required") is True
     assert "responses" in operation
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
+
+
+def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/queue/qr-tokens/{token}/info"]["get"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    schema_name = response_schema["$ref"].rsplit("/", 1)[-1]
+    properties = schema["components"]["schemas"][schema_name]["properties"]
+
+    for field_name in (
+        "selectable_specialists",
+        "queue_active",
+        "allowed",
+        "status",
+        "message",
+    ):
+        assert field_name in properties
 
 
 def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
