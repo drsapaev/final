@@ -126,7 +126,7 @@ export default function DisplayBoardUnified({
   const currentBoardId = new URLSearchParams(window.location.search).get('board') || boardId;
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
 
-  // Load board state and stats from the board snapshot endpoint.
+  // /board/state is a stats/settings snapshot; live rows/calls/announcements come from WebSocket initial_state.
   async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data;if (st && typeof st === 'object') {
         setStats(extractBoardStats(st));
         setBoard({
