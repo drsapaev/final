@@ -15,6 +15,11 @@ def board_state(
     date: str = Query(..., description="YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
+    """Return the legacy board stats snapshot.
+
+    Live display rows, current calls, and announcements are owned by the
+    display board WebSocket initial_state/update stream.
+    """
     s = load_stats(db, department=department, date_str=date)
     return {
         "department": s.department,
