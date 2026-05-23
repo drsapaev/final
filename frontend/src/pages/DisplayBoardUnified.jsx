@@ -21,6 +21,16 @@ import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
 import PropTypes from 'prop-types';
+
+const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
+
+const extractBoardStats = (source) => ({
+  last_ticket: Number(source?.last_ticket || 0),
+  waiting: Number(source?.waiting || 0),
+  serving: Number(source?.serving || 0),
+  done: Number(source?.done || 0)
+});
+
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -65,10 +75,9 @@ export default function DisplayBoardUnified({
   const [announcements, setAnnouncements] = useState([]);
 
   // Состояние статистики (старое)
-  const [stats, setStats] = useState({ last_ticket: 0, waiting: 0, serving: 0, done: 0 });
+  const [stats, setStats] = useState(DEFAULT_BOARD_STATS);
   const [err, setErr] = useState('');
   const [nowStr, setNowStr] = useState(timeNow());
-  const [, setLastUpdatedAt] = useState('');
 
   // Состояние табло (старое)
   const [board, setBoard] = useState({
@@ -107,7 +116,6 @@ export default function DisplayBoardUnified({
   // Рефы
   const wsRef = useRef(null);
   const legacyWindowsLookupWarnedRef = useRef(false);
-  const loadStatsRef = useRef(() => {});
   const loadBoardStateRef = useRef(() => {});
   const loadWindowsRef = useRef(() => {});
   const connectWebSocketRef = useRef(() => {});
@@ -118,38 +126,9 @@ export default function DisplayBoardUnified({
   const currentBoardId = new URLSearchParams(window.location.search).get('board') || boardId;
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
 
-  // Загрузка статистики (старое)
-  async function loadStats() {
-    setErr('');
-    try {
-      const s = (await api.get('/queues/stats', { params: qs })).data;
-      setStats(s || { last_ticket: 0, waiting: 0, serving: 0, done: 0 });
-      setLastUpdatedAt(timeNow());
-      try {
-        localStorage.setItem(`board.stats.${qs.department}`, JSON.stringify(s || {}));
-      } catch {
-
-
-
-
-
-
-
-        // Игнорируем ошибки localStorage
-      }} catch (e) {setErr(e?.message || 'Ошибка загрузки'); // fallback из кэша
-      try {const raw = localStorage.getItem(`board.stats.${qs.department}`);if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') setStats({ ...stats, ...cached });
-        }
-      } catch {
-
-
-
-
-
-
-
-        // Игнорируем ошибки localStorage
-      }}} // Загрузка состояния табло (старое)
-  async function loadBoardState() {try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data;if (st && typeof st === 'object') {
+  // Load board state and stats from the board snapshot endpoint.
+  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data;if (st && typeof st === 'object') {
+        setStats(extractBoardStats(st));
         setBoard({
           brand: st.brand || st.title || 'Clinic',
           logo: st.logo || st.logo_url || '',
@@ -178,8 +157,9 @@ export default function DisplayBoardUnified({
 
 
           // Игнорируем ошибки localStorage
-        }}} catch {// fallback из кэша
+        }}} catch (e) {setErr(e?.message || 'Ошибка загрузки'); // fallback из кэша
       try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') {
+            setStats(extractBoardStats(cached));
             setBoard({
               brand: cached.brand || cached.title || 'Clinic',
               logo: cached.logo || cached.logo_url || '',
@@ -373,7 +353,6 @@ export default function DisplayBoardUnified({
     }
   };
 
-  loadStatsRef.current = loadStats;
   loadBoardStateRef.current = loadBoardState;
   loadWindowsRef.current = loadWindows;
   connectWebSocketRef.current = connectWebSocket;
@@ -388,18 +367,15 @@ export default function DisplayBoardUnified({
 
   // Инициализация
   useEffect(() => {
-    loadStatsRef.current();
     loadBoardStateRef.current();
     loadWindowsRef.current();
     connectWebSocketRef.current();
 
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
-    const t = isBoardView ? null : setInterval(() => loadStatsRef.current(), Math.max(5000, Number(refreshMs || 0)));
     const tb = isBoardView ? null : setInterval(() => loadBoardStateRef.current(), Math.max(15000, Number(refreshMs || 0)));
     const tw = isBoardView ? null : setInterval(() => loadWindowsRef.current(), Math.max(5000, Number(refreshMs || 0)));
 
     return () => {
-      if (t) clearInterval(t);
       if (tb) clearInterval(tb);
       if (tw) clearInterval(tw);
       clearInterval(clock);
