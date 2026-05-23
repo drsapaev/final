@@ -1973,44 +1973,6 @@ const RegistrarPanel = () => {
         } else {
           url = `${API_BASE}/api/v1/appointments/${realId}/mark-paid`;
         }
-      } else if (status === 'cancelled' || status === 'canceled') {
-        // Пока нет API для отмены, обновляем локально
-        logger.info('Отмена записи (локально):', appointmentId);
-        setAppointments((prev) => prev.map((apt) =>
-        apt.id === appointmentId ? {
-          ...apt,
-          status: 'cancelled',
-          _locallyModified: true,
-          _cancelReason: reason
-        } : apt
-        ));
-        notify.success('Запись отменена (локально)');
-        return { id: appointmentId, status: 'cancelled' };
-      } else if (status === 'confirmed') {
-        // Пока нет API для подтверждения, обновляем локально
-        logger.info('Подтверждение записи (локально):', appointmentId);
-        setAppointments((prev) => prev.map((apt) =>
-        apt.id === appointmentId ? {
-          ...apt,
-          status: 'confirmed',
-          _locallyModified: true
-        } : apt
-        ));
-        notify.success('Запись подтверждена (локально)');
-        return { id: appointmentId, status: 'confirmed' };
-      } else if (status === 'no_show') {
-        // Пока нет API для неявки, обновляем локально
-        logger.info('Неявка записи (локально):', appointmentId, 'Причина:', reason);
-        setAppointments((prev) => prev.map((apt) =>
-        apt.id === appointmentId ? {
-          ...apt,
-          status: 'no_show',
-          _locallyModified: true,
-          _noShowReason: reason
-        } : apt
-        ));
-        notify.success('Отмечено как неявка (локально)');
-        return { id: appointmentId, status: 'no_show' };
       } else if (status === 'in_cabinet') {
         if (recordType === 'visit') {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/start-visit`;
