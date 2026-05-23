@@ -3860,7 +3860,8 @@ const RegistrarPanel = () => {
               recordType,
               source: data?.source,
               fullData: data,
-              idsToCancel
+              idsToCancel,
+              reasonLength: reason?.length || 0
             });
 
             // Функция отмены одной записи
@@ -3925,6 +3926,9 @@ const RegistrarPanel = () => {
             if (failCount > 0) {
               logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
               notify.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
+              if (successCount === 0) {
+                throw new Error('Cancellation failed for all selected records');
+              }
             } else {
               logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
             }
@@ -3937,24 +3941,10 @@ const RegistrarPanel = () => {
             } else {
       notify.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
             }
-            // Don't return here, still update locally to remove from view or let the user know
+            throw error;
           }
 
-          // Локальное обновление статуса (для всех ID)
-          const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find((a) => a.id === appointmentId);
-          const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
-
-          setAppointments((prev) => prev.map((apt) =>
-          idsToCancel.includes(apt.id) ? {
-            ...apt,
-            status: 'canceled',
-            _locallyModified: true,
-            _cancelReason: reason
-          } : apt
-          ));
-
-          // Refresh data to ensure consistency
-          setTimeout(() => loadAppointments({ silent: true, source: 'cancel_complete' }), 500);
+          await loadAppointments({ silent: true, source: 'cancel_complete' });
         }} />
 
 
