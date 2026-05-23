@@ -55,9 +55,11 @@ REGISTRAR_START_VISIT_ROLES = {
 }
 REGISTRAR_PRINT_TICKET_ROLES = {"admin", "registrar", "cashier", "doctor"}
 REGISTRAR_COMPLETE_ROLES = {"admin", "registrar", "doctor", "cashier", "receptionist"}
+REGISTRAR_CANCEL_ROLES = {"admin", "registrar", "cashier", "receptionist", "doctor"}
 REGISTRAR_START_STATUSES = {"waiting", "queued"}
 REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
 REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
+REGISTRAR_CANCEL_BLOCKED_STATUSES = {"canceled", "cancelled", "completed", "done", "served"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -113,6 +115,14 @@ def _registrar_can_complete(user: User | None, queue_status: str | None) -> bool
     )
 
 
+def _registrar_can_cancel(user: User | None, queue_status: str | None) -> bool:
+    normalized_status = str(queue_status or "").strip().lower()
+    return (
+        normalized_status not in REGISTRAR_CANCEL_BLOCKED_STATUSES
+        and bool(_registrar_user_role_names(user) & REGISTRAR_CANCEL_ROLES)
+    )
+
+
 def _registrar_available_actions(
     *,
     user: User | None,
@@ -132,6 +142,8 @@ def _registrar_available_actions(
         actions.append("print_ticket")
     if _registrar_can_complete(user, queue_status):
         actions.append("complete")
+    if _registrar_can_cancel(user, queue_status):
+        actions.append("cancel")
     return actions
 
 
@@ -2913,6 +2925,7 @@ def get_today_queues(
                 can_start_visit = "start_visit" in available_actions
                 can_print_ticket = "print_ticket" in available_actions
                 can_complete = "complete" in available_actions
+                can_cancel = "cancel" in available_actions
 
                 entries.append(
                     {
@@ -2940,6 +2953,7 @@ def get_today_queues(
                         "can_start_visit": can_start_visit,
                         "can_print_ticket": can_print_ticket,
                         "can_complete": can_complete,
+                        "can_cancel": can_cancel,
                         "available_actions": available_actions,
                         "source": source,
                         "status": canonical_status,

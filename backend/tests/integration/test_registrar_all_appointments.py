@@ -187,12 +187,14 @@ class TestRegistrarAllAppointments:
         assert found_entry["queue_position"] == entry.number
         assert found_entry["can_mark_paid"] is True
         assert found_entry["can_start_visit"] is True
+        assert found_entry["can_cancel"] is True
         assert found_entry["can_print_ticket"] is True
         assert found_entry["can_complete"] is False
         assert set(found_entry["available_actions"]) == {
             "mark_paid",
             "start_visit",
             "print_ticket",
+            "cancel",
         }
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)

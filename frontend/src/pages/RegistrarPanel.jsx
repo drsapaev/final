@@ -101,6 +101,47 @@ const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind(record
   return record.id ?? null;
 };
 
+const REGISTRAR_RECORD_KINDS = new Set(['visit', 'online_queue', 'appointment']);
+
+const getRegistrarRecordRefs = (record) => {
+  if (!record) return [];
+
+  const candidates = [];
+  if (Array.isArray(record.grouped_record_refs)) {
+    candidates.push(...record.grouped_record_refs);
+  }
+  if (Array.isArray(record.grouped_records)) {
+    record.grouped_records.forEach((groupedRecord) => {
+      if (groupedRecord?.record_ref) {
+        candidates.push(groupedRecord.record_ref);
+      }
+    });
+  }
+
+  const recordKind = getRegistrarRecordKind(record);
+  const recordId = getRegistrarRecordId(record, recordKind);
+  if (recordKind && recordId !== null && recordId !== undefined) {
+    candidates.push({ record_kind: recordKind, record_id: recordId });
+  }
+
+  const seen = new Set();
+  return candidates.reduce((refs, candidate) => {
+    const kind = getRegistrarRecordKind(candidate);
+    const id = candidate?.record_id ?? candidate?.recordId ?? getRegistrarRecordId(candidate, kind);
+    const numericId = Number(id);
+    if (!REGISTRAR_RECORD_KINDS.has(kind) || !Number.isFinite(numericId) || numericId <= 0) {
+      return refs;
+    }
+    const key = `${kind}:${numericId}`;
+    if (seen.has(key)) {
+      return refs;
+    }
+    seen.add(key);
+    refs.push({ record_kind: kind, record_id: numericId });
+    return refs;
+  }, []);
+};
+
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
 
 const hasBackendAction = (record, action) => {
@@ -111,6 +152,11 @@ const hasBackendAction = (record, action) => {
     normalizedAction.replace('_', '-'),
     normalizedAction.replace('-', '_')
   ]);
+  if (Array.isArray(record.grouped_records) && record.grouped_records.length > 0) {
+    return record.grouped_records.every((groupedRecord) =>
+      hasBackendAction(groupedRecord, normalizedAction)
+    );
+  }
   if (Array.isArray(record.available_actions)) {
     return record.available_actions.some((availableAction) =>
       equivalentActions.has(String(availableAction || '').trim())
@@ -121,7 +167,8 @@ const hasBackendAction = (record, action) => {
     mark_paid: 'can_mark_paid',
     start_visit: 'can_start_visit',
     print_ticket: 'can_print_ticket',
-    complete: 'can_complete'
+    complete: 'can_complete',
+    cancel: 'can_cancel'
   };
   const flagName = actionFlagByName[normalizedAction.replace('-', '_')];
   if (flagName && record[flagName] !== undefined) {
@@ -136,6 +183,7 @@ const getRegistrarActionForStatus = (status) => {
   if (normalizedStatus === 'complete' || normalizedStatus === 'done') return 'complete';
   if (normalizedStatus === 'paid' || normalizedStatus === 'mark_paid') return 'mark_paid';
   if (normalizedStatus === 'in_cabinet') return 'start_visit';
+  if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'no_show') return 'cancel';
   return null;
 };
 
@@ -1333,6 +1381,7 @@ const RegistrarPanel = () => {
               available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
               can_mark_paid: Boolean(fullEntry.can_mark_paid),
               can_start_visit: Boolean(fullEntry.can_start_visit),
+              can_cancel: Boolean(fullEntry.can_cancel),
               can_print_ticket: Boolean(fullEntry.can_print_ticket),
               can_complete: Boolean(fullEntry.can_complete),
 
@@ -1695,292 +1744,101 @@ const RegistrarPanel = () => {
   }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open, loadAppointments]);
 
   // Функции для жесткого потока
+  const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {
+    const records = getRegistrarRecordRefs(record);
+    if (records.length === 0) {
+      logger.warn('RegistrarPanel: action requires backend record refs', { action, record });
+      notify.error('Missing backend record data for action');
+      return null;
+    }
+    if (!hasBackendAction(record, action)) {
+      logger.warn('RegistrarPanel: backend did not expose requested action', { action, record });
+      notify.error('Action is not available for this record');
+      return null;
+    }
+
+    const response = await api.post('/registrar/records/actions', {
+      ...payload,
+      action,
+      records
+    });
+    return response.data;
+  }, []);
+
   const handleStartVisit = useCallback(async (appointment) => {
     try {
-      logger.info('🔍 handleStartVisit вызван с данными:', appointment);
-      logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
-
-      // ✅ ИСПРАВЛЕНО: Используем правильный эндпоинт для queue entries
-      const recordKind = getRegistrarRecordKind(appointment);
-      const recordId = getRegistrarRecordId(appointment, recordKind);
-      if (!recordId || (recordKind !== 'visit' && recordKind !== 'online_queue' && recordKind !== 'appointment')) {
-        logger.warn('RegistrarPanel: start-visit requires backend record kind/id', { recordKind, recordId, appointment });
-        notify.error('Missing backend record data for start visit');
-        return;
-      }
-      if (!hasBackendAction(appointment, 'start_visit')) {
-        logger.warn('RegistrarPanel: backend did not expose start_visit action', { recordKind, recordId, appointment });
-        notify.error('Action is not available for this record');
-        return;
+      const result = await runRegistrarRecordAction(appointment, 'start_visit');
+      if (!result) return null;
+      if (!result.success) {
+        throw new Error(result.results?.find((item) => !item.success)?.error || 'start_visit_failed');
       }
 
-      const url = recordKind === 'visit' ?
-        `${API_BASE}/api/v1/registrar/visits/${recordId}/start-visit` :
-        `${API_BASE}/api/v1/registrar/queue/${recordId}/start-visit`;
-      logger.info('🔍 Отправляем запрос на:', url);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        logger.info('Обновленная запись:', result);
-
-        notify.success('Пациент вызван успешно!');
-
-        // Перезагружаем данные для синхронизации с сервером
-        await loadAppointments({ source: 'start_visit_success' });
-      } else {
-        const errorText = await response.text().catch(() => '');
-        logger.error('Ошибка API start-visit:', response.status, errorText);
-        throw new Error(`API ${response.status}: ${errorText}`);
-      }
+      logger.info('RegistrarPanel: start_visit completed through backend command contract', result);
+      notify.success('Patient called successfully');
+      await loadAppointments({ source: 'start_visit_success' });
+      return result;
     } catch (error) {
       logger.error('RegistrarPanel: Start visit API error:', error);
-          notify.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Could not start visit. Check connection and try again.'));
+      return null;
     }
-  }, [loadAppointments]);
+  }, [loadAppointments, runRegistrarRecordAction]);
 
   const handlePayment = async (appointment, paymentData = null) => {
     try {
-      logger.info('🔍 handlePayment вызван с данными:', appointment);
-      logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
-      logger.info('🔍 appointment.record_type:', appointment.record_type);
-      logger.info('🔍 Все ключи appointment:', Object.keys(appointment));
-      logger.info('🔍 Полный объект appointment:', JSON.stringify(appointment, null, 2));
+      const result = await runRegistrarRecordAction(appointment, 'mark_paid', {
+        amount: paymentData?.amount ?? null,
+        method: paymentData?.method ?? null
+      });
+      if (!result) return null;
 
-      // Определяем, является ли это агрегированной записью
-      const isAggregated = appointment.departments && appointment.departments instanceof Set;
-      logger.info('🔍 Это агрегированная запись:', isAggregated);
-
-      // Если это агрегированная запись, находим все оригинальные записи пациента
-      let recordsToUpdate = [appointment]; // По умолчанию только текущая запись
-      if (isAggregated) {
-        logger.info('🔍 Ищем все записи пациента:', appointment.patient_fio);
-        // Находим все записи этого пациента в оригинальном массиве
-        const allPatientRecords = appointments.filter((apt) => apt.patient_fio === appointment.patient_fio);
-        logger.info('🔍 Найдено записей пациента:', allPatientRecords.length);
-        recordsToUpdate = allPatientRecords;
-      }
-
-      logger.info('Попытка оплатить записи:', recordsToUpdate.map((r) => r.id));
-
-      // ✅ ИСПРАВЛЕНИЕ: Оплачиваем ВСЕ записи пациента, а не только первую
-      logger.info('🔍 Оплачиваем ВСЕ записи пациента:', recordsToUpdate.length);
-
-      const paymentResults = [];
-      for (const record of recordsToUpdate) {
-        const recordType = getRegistrarRecordKind(record);
-        const recordId = getRegistrarRecordId(record, recordType);
-        if (!recordId || (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment')) {
-          logger.warn('RegistrarPanel: payment requires backend record kind/id', { recordType, recordId, record });
-          paymentResults.push({ success: false, recordId: record.id, error: 'missing_backend_record_contract' });
-          continue;
-        }
-        if (!hasBackendAction(record, 'mark_paid')) {
-          logger.warn('RegistrarPanel: backend did not expose mark_paid action', { recordType, recordId, record });
-          paymentResults.push({ success: false, recordId, error: 'action_not_available' });
-          continue;
-        }
-
-        // ✅ ИСПРАВЛЕНИЕ: Проверяем статус КАЖДОЙ записи перед попыткой оплаты
-        const paymentStatus = normalizeRegistrarContractValue(record.payment_status);
-        const status = normalizeRegistrarContractValue(record.status);
-        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}`);
-
-        // Пропускаем записи, которые уже оплачены
-        if (paymentStatus === 'paid' || (!paymentStatus && status === 'paid')) {
-          logger.info(`⏭️ Запись ${recordId} уже оплачена, пропускаем`);
-          paymentResults.push({ success: true, recordId, skipped: true, reason: 'already_paid' });
-          continue;
-        }
-
-        let url;
-        if (recordType === 'visit') {
-          url = `${API_BASE}/api/v1/registrar/visits/${recordId}/mark-paid`;
-        } else if (recordType === 'online_queue') {
-          // ✅ ИСПРАВЛЕНО: Для online_queue используем специальный endpoint
-          url = `${API_BASE}/api/v1/registrar/queue/entry/${recordId}/mark-paid`;
-        } else {
-          url = `${API_BASE}/api/v1/appointments/${recordId}/mark-paid`;
-        }
-
-        logger.info(`🔍 Оплата записи ${recordId} (${recordType}):`, url);
-
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-            },
-            body: JSON.stringify({
-              amount: paymentData?.amount ?? null,
-              method: paymentData?.method ?? null
-            })
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            paymentResults.push({ success: true, recordId, result });
-            logger.info(`✅ Запись ${recordId} успешно оплачена`);
-          } else {
-            const errorText = await response.text();
-            logger.warn(`⚠️ Ошибка оплаты записи ${recordId}:`, errorText);
-            paymentResults.push({ success: false, recordId, error: errorText });
-          }
-        } catch (error) {
-          logger.error(`❌ Ошибка при оплате записи ${recordId}:`, error);
-          paymentResults.push({ success: false, recordId, error: error.message });
-        }
-      }
-
-      const successCount = paymentResults.filter((r) => r.success && !r.skipped).length;
-      const skippedCount = paymentResults.filter((r) => r.success && r.skipped).length;
-      const failedCount = paymentResults.filter((r) => !r.success).length;
-
-      logger.info(`✅ Успешно оплачено ${successCount} из ${recordsToUpdate.length} записей`);
-      if (skippedCount > 0) {
-        logger.info(`⏭️ Пропущено уже оплаченных записей: ${skippedCount}`);
-      }
-      if (failedCount > 0) {
-        logger.info(`❌ Ошибок при оплате: ${failedCount}`);
-      }
+      const successCount = Number(result.success_count || 0);
+      const skippedCount = Number(result.skipped_count || 0);
+      const failedCount = Number(result.failed_count || 0);
 
       if (successCount > 0 || skippedCount > 0) {
-        // Формируем информативное сообщение
-        let message = '';
-        if (successCount > 0 && skippedCount > 0) {
-          message = `Оплачено ${successCount} записей, ${skippedCount} уже были оплачены ранее`;
-        } else if (successCount > 0) {
-          message = `Оплачено ${successCount} записей пациента`;
-        } else if (skippedCount > 0) {
-          message = 'Все записи уже оплачены';
-        }
-
-        if (failedCount > 0) {
-          message += `. Ошибок: ${failedCount}`;
-        }
-
-        notify.success(message);
-        // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
+        const message = skippedCount > 0
+          ? 'Payment completed: ' + successCount + ', already paid: ' + skippedCount
+          : 'Payment completed: ' + successCount;
+        notify.success(failedCount > 0 ? message + '. Failed: ' + failedCount : message);
         setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
-        return paymentResults;
-      } else {
-        notify.error('Не удалось оплатить записи');
-        return paymentResults;
+        return result.results || [];
       }
+
+      notify.error(result.results?.find((item) => !item.success)?.error || 'Payment failed');
+      return result.results || [];
     } catch (error) {
       logger.error('RegistrarPanel: Payment error:', error);
-      notify.error('Ошибка при оплате');
+      notify.error(getErrorMessage(error, 'Payment failed'));
+      return null;
     }
   };
 
-  // Обработчики событий
   const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '', sourceRecord = null) => {
     try {
-      if (!appointmentId || Number(appointmentId) <= 0) {
-        notify.error('Некорректный идентификатор записи');
-        return;
-      }
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        notify.error('Требуется вход в систему');
-        return;
-      }
-      let url = '';
-      const method = 'POST';
-      let body;
-
-      // Определяем источник записи и правильный ID
       const record = sourceRecord || appointments.find((apt) => apt.id === appointmentId);
-      const recordType = getRegistrarRecordKind(record);
-      const realId = getRegistrarRecordId(record, recordType);
-      if (!realId || (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment')) {
-        logger.warn('RegistrarPanel: status update requires backend record kind/id', { appointmentId, status, recordType, realId, record });
-        notify.error('Missing backend record data for status update');
-        return null;
-      }
-
       const requiredBackendAction = getRegistrarActionForStatus(status);
       if (!requiredBackendAction) {
-        logger.warn('RegistrarPanel: unsupported command without backend action contract', { appointmentId, status, recordType, realId, record });
-        notify.error('Action is not available for this record');
-        return null;
-      }
-      if (!hasBackendAction(record, requiredBackendAction)) {
-        logger.warn('RegistrarPanel: backend did not expose requested action', { appointmentId, status, requiredBackendAction, recordType, realId, record });
+        logger.warn('RegistrarPanel: unsupported status command', { appointmentId, status, record });
         notify.error('Action is not available for this record');
         return null;
       }
 
-      if (status === 'complete' || status === 'done') {
-        if (recordType === 'visit') {
-          url = `${API_BASE}/api/v1/registrar/visits/${realId}/complete`;
-        } else if (recordType === 'appointment') {
-          url = `${API_BASE}/api/v1/appointments/${realId}/complete`;
-        } else {
-          notify.error('Action is not available for this record');
-          return null;
-        }
-        body = JSON.stringify({ reason });
-      } else if (status === 'paid' || status === 'mark-paid') {
-        if (recordType === 'visit') {
-          url = `${API_BASE}/api/v1/registrar/visits/${realId}/mark-paid`;
-        } else if (recordType === 'online_queue') {
-          url = `${API_BASE}/api/v1/registrar/queue/entry/${realId}/mark-paid`;
-        } else {
-          url = `${API_BASE}/api/v1/appointments/${realId}/mark-paid`;
-        }
-      } else if (status === 'in_cabinet') {
-        if (recordType === 'visit') {
-          url = `${API_BASE}/api/v1/registrar/visits/${realId}/start-visit`;
-        } else {
-          // Используем эндпоинт для очереди регистратора
-          url = `${API_BASE}/api/v1/registrar/queue/${realId}/start-visit`;
-        }
-      } else {
-        logger.info('Неподдерживаемый статус:', status);
-        notify.error('Изменение данного статуса не поддерживается');
-        return;
+      const result = await runRegistrarRecordAction(record, requiredBackendAction, { reason });
+      if (!result) return null;
+      if (!result.success) {
+        throw new Error(result.results?.find((item) => !item.success)?.error || 'status_update_failed');
       }
-
-      logger.info('Обновляем статус записи:', appointmentId, 'на', status, 'URL:', url);
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body
-      });
-
-      logger.info('Ответ API обновления статуса:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        logger.error('Ошибка API обновления статуса:', response.status, errText);
-        throw new Error(errText || `API ${response.status}`);
-      }
-
-      const updatedAppointment = await response.json();
-      logger.info('Обновленная запись:', updatedAppointment);
 
       await loadAppointments({ source: 'status_update' });
-      notify.success('Статус обновлен');
-      return updatedAppointment;
+      notify.success('Status updated');
+      return result;
     } catch (error) {
       logger.error('RegistrarPanel: Update status error:', error);
-      notify.error(getErrorMessage(error, 'Не удалось обновить статус. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, 'Could not update status. Check connection and try again.'));
       return null;
     }
-  }, [appointments, loadAppointments]);
+  }, [appointments, loadAppointments, runRegistrarRecordAction]);
 
   const handleBulkAction = useCallback(async (action, reason = '') => {
     if (appointmentsSelected.size === 0) return;
@@ -3790,120 +3648,26 @@ const RegistrarPanel = () => {
         onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
         appointment={cancelDialog.row}
         onCancel={async (appointmentId, reason) => {
-          // ✅ FIX: Call backend to cancel visit OR appointment OR queue entry
-          // Supports cancelling multiple aggregated IDs (for multi-QR entries)
-
-          // ⭐ TODO: BATCH API MIGRATION
-          // После тестирования batch API замените текущую логику на:
-          // const patientId = data?.patient_id;
-          // const date = formatDateForAPI(data?.date);
-          // if (patientId && date) {
-          //   const result = await cancelAllPatientEntries(patientId, date, reason);
-          //   if (result.success) { ... }
-          // }
-          // См. docs/BATCH_UPDATE_ARCHITECTURE.md
-
           try {
-            const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find((a) => a.id === appointmentId);
-            const recordType = getRegistrarRecordKind(data);
-            if (recordType !== 'visit' && recordType !== 'online_queue' && recordType !== 'appointment') {
-              logger.warn('RegistrarPanel: cancel requires backend record kind', { appointmentId, recordType, data });
-              notify.error('Missing backend record data for cancellation');
-              return;
-            }
-
-            // Определяем список ID для отмены (если это агрегированная запись - отменяем все)
-            const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
-
-            logger.info(`🔍 Отмена записи(ей). IDs: [${idsToCancel.join(', ')}]`, {
-              recordType,
-              source: data?.source,
-              fullData: data,
-              idsToCancel,
-              reasonLength: reason?.length || 0
-            });
-
-            // Функция отмены одной записи
-            const cancelSingleRecord = async (targetId) => {
-              const tryCancelVisit = async () => {
-                await api.post(`/visits/${targetId}/status`, null, {
-                  params: { status_new: 'canceled' }
-                });
-              };
-
-              const tryCancelOnlineQueue = async () => {
-                await api.post(`/online-queue/entries/${targetId}/cancel`);
-              };
-
-              const tryCancelAppointment = async () => {
-                try {
-                  await api.put(`/appointments/${targetId}`, { status: 'canceled' });
-                } catch {
-                  logger.warn('PUT failed, trying DELETE for appointment cancellation');
-                  await api.delete(`/appointments/${targetId}`);
-                }
-              };
-
-              if (recordType === 'visit') {
-                await tryCancelVisit();
-                return;
-              }
-              if (recordType === 'appointment') {
-                await tryCancelAppointment();
-                return;
-              }
-              if (recordType === 'online_queue') {
-                await tryCancelOnlineQueue();
-                return;
-              }
-
-            };
-
-            // Выполняем отмену для всех ID
-            // Используем Promise.allSettled или loop для попытки отмены всех
-            // Для надежности используем последовательную отмену
-            const cancelResults = [];
-            for (const id of idsToCancel) {
-              try {
-                await cancelSingleRecord(id);
-                cancelResults.push({ id, success: true });
-              } catch (err) {
-                // ✅ FIX: Не прерываем цикл при 404 (запись уже отменена или не существует)
-                if (err.response?.status === 404) {
-                  logger.warn(`⚠️ ID ${id} не найден (возможно уже отменён), продолжаем...`);
-                  cancelResults.push({ id, success: true, alreadyCancelled: true });
-                } else {
-                  logger.error(`❌ Ошибка отмены ID ${id}:`, err);
-                  cancelResults.push({ id, success: false, error: err });
-                }
-              }
-            }
-
-            const successCount = cancelResults.filter((r) => r.success).length;
-            const failCount = cancelResults.filter((r) => !r.success).length;
-
-            if (failCount > 0) {
-              logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
-              notify.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
+            const data = appointmentId === cancelDialog.row?.id
+              ? cancelDialog.row
+              : appointments.find((a) => a.id === appointmentId);
+            const result = await runRegistrarRecordAction(data, 'cancel', { reason });
+            if (!result) return;
+            if (!result.success) {
+              const successCount = Number(result.success_count || 0);
+              const failedCount = Number(result.failed_count || 0);
               if (successCount === 0) {
-                throw new Error('Cancellation failed for all selected records');
+                throw new Error(result.results?.find((item) => !item.success)?.error || 'cancel_failed');
               }
-            } else {
-              logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
+              notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
+            await loadAppointments({ silent: true, source: 'cancel_complete' });
           } catch (error) {
-            logger.error('❌ Критическая ошибка отмены визита на сервере:', error);
-
-            // Если это 404 после всех попыток
-            if (error.response?.status === 404) {
-        notify.error(`Не удалось найти запись ${appointmentId} в базе данных`);
-            } else {
-      notify.error(getErrorMessage(error, 'Не удалось обновить статус на сервере. Проверьте соединение и попробуйте снова.'));
-            }
+            logger.error('RegistrarPanel: cancellation failed:', error);
+            notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
             throw error;
           }
-
-          await loadAppointments({ silent: true, source: 'cancel_complete' });
         }} />
 
 
