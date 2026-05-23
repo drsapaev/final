@@ -31,6 +31,7 @@ function setupQueueApiMock({
     department_name: 'Кардиология',
     specialist_name: 'Кардиолог',
     target_date: '2026-02-21',
+    selectable_specialists: availableSpecialists,
   });
   queueApiMocks.startQueueJoinSession.mockResolvedValue({
     session_token: 'session-token',
@@ -40,6 +41,7 @@ function setupQueueApiMock({
       department_name: 'Кардиология',
       specialist_name: 'Кардиолог',
       target_date: '2026-02-21',
+      selectable_specialists: availableSpecialists,
     },
   });
   queueApiMocks.completeQueueJoinSession.mockResolvedValue({
@@ -173,6 +175,8 @@ describe('QueueJoin Accessibility & UX', () => {
         specialist_ids: [6],
       })
     );
+    expect(queueApiMocks.fetchPublicQueueProfiles).not.toHaveBeenCalled();
+    expect(queueApiMocks.fetchAvailableSpecialists).not.toHaveBeenCalled();
   });
 
   it('provides retry action from error state and recovers to info step', async () => {

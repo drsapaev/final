@@ -13,67 +13,10 @@ import {
 } from 'lucide-react';
 import { A11Y_COLORS } from '../constants/a11yTokens';
 import {
-  fetchAvailableSpecialists,
-  fetchPublicQueueProfiles,
   fetchQrTokenInfo,
   startQueueJoinSession,
   completeQueueJoinSession,
 } from '../api/queue';
-
-const normalizeSpecialtyKey = (value) => {
-  const normalized = String(value || '').toLowerCase().trim();
-  if (!normalized) return '';
-  if (normalized === 'cardio') return 'cardiology';
-  if (normalized === 'derma') return 'dermatology';
-  if (normalized === 'dentist' || normalized === 'dentistry') return 'stomatology';
-  if (normalized === 'laboratory') return 'lab';
-  return normalized;
-};
-
-const mergeVisibleSpecialists = (profilesPayload, specialistsPayload) => {
-  const profileItems = Array.isArray(profilesPayload?.specialists) ? profilesPayload.specialists : [];
-  const specialistItems = Array.isArray(specialistsPayload) ? specialistsPayload : [];
-
-  if (specialistItems.length === 0) {
-    return [];
-  }
-
-  const profileBySpecialty = new Map(
-    profileItems
-      .map((profile) => [normalizeSpecialtyKey(profile.specialty), profile])
-      .filter(([specialty]) => specialty)
-  );
-  const visibleSpecialties = new Set(profileBySpecialty.keys());
-  const merged = [];
-  const seenIds = new Set();
-
-  specialistItems.forEach((specialist) => {
-    const normalizedSpecialty = normalizeSpecialtyKey(specialist.specialty);
-    if (!normalizedSpecialty) return;
-    if (visibleSpecialties.size > 0 && !visibleSpecialties.has(normalizedSpecialty)) {
-      return;
-    }
-    if (specialist.id === undefined || specialist.id === null || seenIds.has(specialist.id)) {
-      return;
-    }
-
-    const profile = profileBySpecialty.get(normalizedSpecialty);
-    merged.push({
-      ...specialist,
-      specialty: normalizedSpecialty,
-      specialty_display:
-        profile?.specialty_display ||
-        specialist.specialty_display ||
-        specialist.name ||
-        specialist.specialty,
-      icon: profile?.icon || specialist.icon || '👨‍⚕️',
-      color: profile?.color || specialist.color || A11Y_COLORS.primary,
-    });
-    seenIds.add(specialist.id);
-  });
-
-  return merged;
-};
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -190,62 +133,33 @@ const QueueJoin = () => {
     localStorage.setItem(formStorageKey, JSON.stringify(formData));
   }, [formData, formStorageKey]);
 
-  // ⭐ SSOT: Загрузка списка доступных специалистов из QueueProfiles (Admin Panel controlled)
-  const loadSpecialists = useCallback(async () => {
-    setIsSpecialistsLoading(true);
-    try {
-      const [profilesResult, specialistsResult] = await Promise.allSettled([
-        fetchPublicQueueProfiles(),
-        fetchAvailableSpecialists(),
-      ]);
-
-      const profilesPayload =
-        profilesResult.status === 'fulfilled' ? profilesResult.value : null;
-      const specialistsPayload =
-        specialistsResult.status === 'fulfilled' ? specialistsResult.value : [];
-
-      const filteredSpecialists = mergeVisibleSpecialists(
-        profilesPayload,
-        specialistsPayload
-      ).filter((specialist) => {
-        const specialty = normalizeSpecialtyKey(specialist.specialty);
-        return specialty !== 'ecg' && specialty !== 'general';
-      });
-
-      setAvailableSpecialists(filteredSpecialists);
-    } catch {
-      setAvailableSpecialists([]);
-    } finally {
-      setIsSpecialistsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!token) {
-      setIsSpecialistsLoading(false);
-      return;
-    }
-    loadSpecialists();
-  }, [loadSpecialists, token]);
-
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
+    setIsSpecialistsLoading(true);
     try {
       const sessionData = await startQueueJoinSession(token);
+      const nextQueueInfo = sessionData.queue_info || {};
+      const selectableSpecialists = Array.isArray(nextQueueInfo.selectable_specialists)
+        ? nextQueueInfo.selectable_specialists
+        : [];
 
       setSessionToken(sessionData.session_token);
       localStorage.setItem(`queue_session_${token}`, sessionData.session_token);
-      setQueueInfo(sessionData.queue_info);
+      setQueueInfo(nextQueueInfo);
+      setAvailableSpecialists(selectableSpecialists);
 
-      if (sessionData.queue_info?.is_clinic_wide) {
+      if (nextQueueInfo.is_clinic_wide) {
         setStep('select-specialists');
       } else {
         setStep('info');
       }
 
     } catch (error) {
+      setAvailableSpecialists([]);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
+    } finally {
+      setIsSpecialistsLoading(false);
     }
   }, [getApiErrorMessage, token]);
 
@@ -253,45 +167,60 @@ const QueueJoin = () => {
     if (!token) {
       setError(MISSING_QUEUE_TOKEN_MESSAGE);
       setStep('error');
+      setIsSpecialistsLoading(false);
       return;
     }
 
     try {
       setStep('loading');
+      setIsSpecialistsLoading(true);
       const tokenInfo = await fetchQrTokenInfo(token);
       setQueueInfo(tokenInfo);
+      setAvailableSpecialists(
+        Array.isArray(tokenInfo.selectable_specialists)
+          ? tokenInfo.selectable_specialists
+          : []
+      );
 
       if (!tokenInfo.queue_active) {
         setError(QUEUE_JOIN_MESSAGES.queueInactive);
         setStep('error');
+        setIsSpecialistsLoading(false);
         return;
       }
 
       if (tokenInfo.status === 'before_start_time') {
         setQueueInfo(tokenInfo);
         setStep('waiting');
+        setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'after_end_time') {
         setError(QUEUE_JOIN_MESSAGES.registrationClosedAt(tokenInfo.end_time));
         setStep('error');
+        setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'closed_reception_opened') {
         setError(QUEUE_JOIN_MESSAGES.receptionAlreadyOpened);
         setStep('error');
+        setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'limit_reached') {
         setError(QUEUE_JOIN_MESSAGES.limitReached(tokenInfo.max_entries));
         setStep('error');
+        setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.allowed === false) {
         setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationUnavailable);
         setStep('error');
+        setIsSpecialistsLoading(false);
         return;
       }
 
       await startJoinSession();
 
     } catch (error) {
+      setAvailableSpecialists([]);
+      setIsSpecialistsLoading(false);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
       setStep('error');
     }
@@ -302,6 +231,8 @@ const QueueJoin = () => {
     if (!token) {
       setSessionToken(null);
       setQueueInfo(null);
+      setAvailableSpecialists([]);
+      setIsSpecialistsLoading(false);
       setError(MISSING_QUEUE_TOKEN_MESSAGE);
       setStep('error');
       return;
@@ -1221,7 +1152,7 @@ const QueueJoin = () => {
                   <span>Ҳозирча QR орқали танлаш учун мутахассислар мавжуд эмас.</span>
                   <button
                     type="button"
-                    onClick={loadSpecialists}
+                    onClick={loadTokenInfo}
                     style={{
                       alignSelf: 'center',
                       background: A11Y_COLORS.primary,

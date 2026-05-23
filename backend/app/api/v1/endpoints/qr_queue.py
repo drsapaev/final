@@ -102,6 +102,7 @@ class QRTokenInfoResponse(BaseModel):
     expires_at: Optional[str] = None
     is_clinic_wide: Optional[bool] = False  # Флаг общего QR
     target_date: Optional[str] = None  # Дата очереди
+    selectable_specialists: Optional[List[Dict[str, Any]]] = None
 
 
 class JoinSessionStartRequest(BaseModel):
