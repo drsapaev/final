@@ -31,6 +31,7 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
         ("/api/v1/auth/me", "get"),
         ("/api/v1/queue/join/start", "post"),
         ("/api/v1/queue/join/complete", "post"),
+        ("/api/v1/registrar/records/actions", "post"),
         ("/api/v1/payments/init", "post"),
         ("/api/v1/payments/{payment_id}", "get"),
         ("/api/v1/health", "get"),

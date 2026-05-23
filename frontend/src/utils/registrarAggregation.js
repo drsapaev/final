@@ -10,6 +10,24 @@ export const getRecordAmount = (appointment) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+const normalizeRecordKind = (appointment) => String(
+  appointment?.record_kind ?? appointment?.source_kind ?? appointment?.record_type ?? appointment?.type ?? ''
+).trim().toLowerCase();
+
+const buildRecordRef = (appointment) => {
+  const recordKind = normalizeRecordKind(appointment);
+  const recordId = appointment?.canonical_record_id
+    ?? (recordKind === 'visit' ? appointment?.visit_id : null)
+    ?? (recordKind === 'online_queue' ? appointment?.queue_entry_id : null)
+    ?? (recordKind === 'appointment' ? appointment?.appointment_id : null)
+    ?? appointment?.id;
+
+  if (!['visit', 'online_queue', 'appointment'].includes(recordKind)) return null;
+  const numericId = Number(recordId);
+  if (!Number.isFinite(numericId) || numericId <= 0) return null;
+  return { record_kind: recordKind, record_id: numericId };
+};
+
 export const aggregatePatientsForAllDepartments = (appointments = []) => {
   const patientGroups = {};
 
@@ -37,6 +55,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     const normalizedDiscountMode = normalizeRegistrationMode(appointment.discount_mode);
     const normalizedPayment = normalizePaymentStatus(appointment.payment_status);
     const appointmentCost = getRecordAmount(appointment);
+    const recordRef = buildRecordRef(appointment);
 
     if (!patientGroups[patientKey]) {
       const initialVisitId = appointment.visit_id || appointment.visitId || appointment.id;
@@ -81,6 +100,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         grouped_payment_statuses: [],
         grouped_payment_types: [],
         grouped_records: [],
+        grouped_record_refs: [],
         aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id],
       };
     } else {
@@ -150,7 +170,23 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     if (appointment.payment_type) {
       patientGroups[patientKey].grouped_payment_types.push(appointment.payment_type);
     }
+    if (recordRef) {
+      const refKey = `${recordRef.record_kind}:${recordRef.record_id}`;
+      const existingRefKeys = new Set(
+        patientGroups[patientKey].grouped_record_refs.map((ref) => `${ref.record_kind}:${ref.record_id}`),
+      );
+      if (!existingRefKeys.has(refKey)) {
+        patientGroups[patientKey].grouped_record_refs.push(recordRef);
+      }
+    }
     patientGroups[patientKey].grouped_records.push({
+      record_ref: recordRef,
+      available_actions: Array.isArray(appointment.available_actions) ? [...appointment.available_actions] : [],
+      can_mark_paid: Boolean(appointment.can_mark_paid),
+      can_start_visit: Boolean(appointment.can_start_visit),
+      can_cancel: Boolean(appointment.can_cancel),
+      can_print_ticket: Boolean(appointment.can_print_ticket),
+      can_complete: Boolean(appointment.can_complete),
       discount_mode: normalizedDiscountMode,
       approval_status: appointment.approval_status,
       payment_status: normalizedPayment,

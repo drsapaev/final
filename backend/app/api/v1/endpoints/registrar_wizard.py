@@ -23,15 +23,21 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+from app.crud.appointment import appointment as crud_appointment
 from app.services.feature_flags import is_feature_enabled
 from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
 )
 from app.services.notifications import notification_sender_service
+from app.services.online_queue_new_service import (
+    OnlineQueueNewDomainError,
+    OnlineQueueNewService,
+)
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.queue_service import queue_service
 from app.services.queue_session import get_or_create_session_id
 from app.services.service_mapping import get_service_code, normalize_service_code
+from app.services.visits_api_service import VisitsApiService
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +88,41 @@ class CartResponse(BaseModel):
 class MarkPaidRequest(BaseModel):
     amount: Optional[Decimal] = None
     method: Optional[str] = Field(default="cash")
+
+
+class RegistrarRecordRef(BaseModel):
+    record_kind: str
+    record_id: int
+
+
+class RegistrarRecordActionRequest(BaseModel):
+    action: str
+    record_kind: Optional[str] = None
+    record_id: Optional[int] = None
+    records: Optional[List[RegistrarRecordRef]] = None
+    reason: Optional[str] = None
+    amount: Optional[Decimal] = None
+    method: Optional[str] = Field(default="cash")
+
+
+class RegistrarRecordActionItemResponse(BaseModel):
+    record_kind: str
+    record_id: int
+    success: bool
+    skipped: bool = False
+    status: Optional[str] = None
+    payment_status: Optional[str] = None
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+
+
+class RegistrarRecordActionResponse(BaseModel):
+    action: str
+    success: bool
+    success_count: int
+    skipped_count: int
+    failed_count: int
+    results: List[RegistrarRecordActionItemResponse]
 
 
 class RepeatEligibilityCandidate(BaseModel):
@@ -2373,14 +2414,281 @@ def _preserve_operational_status_on_payment(raw_status: str | None) -> str:
     return raw_status
 
 
+REGISTRAR_COMMAND_ROLE_BY_ACTION = {
+    "mark_paid": {"admin", "registrar", "cashier"},
+    "start_visit": {
+        "admin",
+        "registrar",
+        "doctor",
+        "cardio",
+        "cardiology",
+        "cardiologist",
+        "derma",
+        "dermatologist",
+        "dentist",
+        "lab",
+    },
+    "complete": {"admin", "registrar", "doctor", "cashier", "receptionist"},
+    "cancel": {"admin", "registrar", "cashier", "receptionist", "doctor"},
+}
+
+REGISTRAR_SUPPORTED_RECORD_KINDS = {"visit", "online_queue", "appointment"}
+
+
+def _registrar_user_role_names(user: User | None) -> set[str]:
+    role_names: set[str] = set()
+    primary_role = getattr(user, "role", None)
+    if primary_role:
+        role_names.add(str(primary_role).strip().lower())
+
+    for role in getattr(user, "roles", None) or []:
+        role_name = getattr(role, "name", None)
+        if role_name:
+            role_names.add(str(role_name).strip().lower())
+
+    return role_names
+
+
+def _normalize_registrar_action(action: str | None) -> str:
+    return str(action or "").strip().lower().replace("-", "_")
+
+
+def _normalize_registrar_record_kind(record_kind: str | None) -> str:
+    return str(record_kind or "").strip().lower()
+
+
+def _ensure_registrar_command_role(user: User | None, action: str) -> None:
+    allowed_roles = REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
+    if not allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported registrar action: {action}",
+        )
+    if not (_registrar_user_role_names(user) & allowed_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action is not available for this user",
+        )
+
+
+def _registrar_command_item(
+    *,
+    record_kind: str,
+    record_id: int,
+    success: bool,
+    skipped: bool = False,
+    status_value: str | None = None,
+    payment_status: str | None = None,
+    error: str | None = None,
+    result: dict[str, Any] | None = None,
+) -> RegistrarRecordActionItemResponse:
+    return RegistrarRecordActionItemResponse(
+        record_kind=record_kind,
+        record_id=record_id,
+        success=success,
+        skipped=skipped,
+        status=status_value,
+        payment_status=payment_status,
+        error=error,
+        result=result,
+    )
+
+
+def _run_single_registrar_record_action(
+    *,
+    db: Session,
+    current_user: User,
+    record: RegistrarRecordRef,
+    action: str,
+    request: RegistrarRecordActionRequest,
+) -> RegistrarRecordActionItemResponse:
+    record_kind = _normalize_registrar_record_kind(record.record_kind)
+    record_id = record.record_id
+
+    if record_kind not in REGISTRAR_SUPPORTED_RECORD_KINDS:
+        return _registrar_command_item(
+            record_kind=record_kind,
+            record_id=record_id,
+            success=False,
+            error="unsupported_record_kind",
+        )
+
+    try:
+        if action == "mark_paid":
+            if record_kind == "visit":
+                result = mark_visit_as_paid(
+                    record_id,
+                    payment_req=MarkPaidRequest(
+                        amount=request.amount,
+                        method=request.method,
+                    ),
+                    db=db,
+                    current_user=current_user,
+                )
+            elif record_kind == "online_queue":
+                result = mark_queue_entry_as_paid(
+                    record_id,
+                    payment_req=MarkPaidRequest(
+                        amount=request.amount,
+                        method=request.method,
+                    ),
+                    db=db,
+                    current_user=current_user,
+                )
+            else:
+                appointment = crud_appointment.get(db, id=record_id)
+                if not appointment:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Appointment not found",
+                    )
+                if str(appointment.status or "").lower() == "paid":
+                    return _registrar_command_item(
+                        record_kind=record_kind,
+                        record_id=record_id,
+                        success=True,
+                        skipped=True,
+                        status_value=appointment.status,
+                        payment_status="paid",
+                    )
+                appointment = crud_appointment.mark_paid(db, appointment_id=record_id)
+                if not appointment:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Appointment not found",
+                    )
+                result = {
+                    "id": appointment.id,
+                    "status": appointment.status,
+                    "payment_status": "paid",
+                }
+            return _registrar_command_item(
+                record_kind=record_kind,
+                record_id=record_id,
+                success=True,
+                status_value=str(result.get("status") or ""),
+                payment_status=str(result.get("payment_status") or "") or None,
+                result=result,
+            )
+
+        if action == "cancel":
+            if record_kind == "visit":
+                visit = VisitsApiService(db).set_status(
+                    visit_id=record_id,
+                    status_new="canceled",
+                )
+                if request.reason:
+                    visit.notes = (visit.notes or "") + f"\nCanceled: {request.reason}"
+                    db.commit()
+                    db.refresh(visit)
+                result = {"id": visit.id, "status": visit.status}
+            elif record_kind == "online_queue":
+                entry = OnlineQueueNewService(db).cancel_entry(entry_id=record_id)
+                result = {"id": entry.id, "status": entry.status}
+            else:
+                appointment = crud_appointment.cancel_appointment(
+                    db,
+                    appointment_id=record_id,
+                )
+                if not appointment:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Appointment not found",
+                    )
+                result = {"id": appointment.id, "status": appointment.status}
+            return _registrar_command_item(
+                record_kind=record_kind,
+                record_id=record_id,
+                success=True,
+                status_value=str(result.get("status") or ""),
+                result=result,
+            )
+
+        if action == "start_visit":
+            if record_kind == "appointment":
+                appointment = crud_appointment.start_visit(db, appointment_id=record_id)
+                if not appointment:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Appointment not found",
+                    )
+                result = {"id": appointment.id, "status": appointment.status}
+            elif record_kind == "visit":
+                result = start_visit(record_id, db=db, current_user=current_user)
+            else:
+                from app.api.v1.endpoints.registrar_integration import start_queue_visit
+
+                result = start_queue_visit(
+                    record_id,
+                    db=db,
+                    current_user=current_user,
+                )
+            status_value = None
+            if isinstance(result, dict):
+                status_value = result.get("status") or (
+                    result.get("entry") or {}
+                ).get("status")
+            return _registrar_command_item(
+                record_kind=record_kind,
+                record_id=record_id,
+                success=True,
+                status_value=str(status_value or ""),
+                result=result if isinstance(result, dict) else None,
+            )
+
+        if action == "complete":
+            if record_kind == "appointment":
+                appointment = crud_appointment.complete_visit(db, appointment_id=record_id)
+                if not appointment:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Appointment not found",
+                    )
+                result = {"id": appointment.id, "status": appointment.status}
+            elif record_kind == "visit":
+                result = complete_visit(record_id, db=db, current_user=current_user)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Complete is not available for online queue records",
+                )
+            return _registrar_command_item(
+                record_kind=record_kind,
+                record_id=record_id,
+                success=True,
+                status_value=str(result.get("status") or ""),
+                result=result if isinstance(result, dict) else None,
+            )
+
+    except OnlineQueueNewDomainError as exc:
+        return _registrar_command_item(
+            record_kind=record_kind,
+            record_id=record_id,
+            success=False,
+            error=exc.detail,
+        )
+    except HTTPException as exc:
+        return _registrar_command_item(
+            record_kind=record_kind,
+            record_id=record_id,
+            success=False,
+            error=str(exc.detail),
+        )
+
+    return _registrar_command_item(
+        record_kind=record_kind,
+        record_id=record_id,
+        success=False,
+        error="unsupported_action",
+    )
+
+
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,
     payment_req: Optional[MarkPaidRequest] = Body(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
     """Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)"""
     try:
@@ -2527,9 +2835,7 @@ def mark_queue_entry_as_paid(
     entry_id: int,
     payment_req: Optional[MarkPaidRequest] = Body(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
     """
     Отметить запись OnlineQueueEntry как оплаченную.
@@ -2792,6 +3098,89 @@ def start_visit(
 """
 
 # ===================== ПОДТВЕРЖДЕНИЕ ВИЗИТОВ =====================
+
+
+@router.post(
+    "/registrar/records/actions",
+    response_model=RegistrarRecordActionResponse,
+)
+def run_registrar_record_action(
+    request: RegistrarRecordActionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Cashier",
+            "Receptionist",
+            "Doctor",
+            "cardio",
+            "cardiology",
+            "cardiologist",
+            "derma",
+            "dermatologist",
+            "dentist",
+            "Lab",
+        )
+    ),
+) -> RegistrarRecordActionResponse:
+    """Run registrar-owned record commands through a single backend contract."""
+
+    action = _normalize_registrar_action(request.action)
+    _ensure_registrar_command_role(current_user, action)
+
+    records: list[RegistrarRecordRef] = []
+    if request.records:
+        records.extend(request.records)
+    if request.record_kind and request.record_id is not None:
+        records.append(
+            RegistrarRecordRef(
+                record_kind=request.record_kind,
+                record_id=request.record_id,
+            )
+        )
+
+    unique_records: list[RegistrarRecordRef] = []
+    seen: set[tuple[str, int]] = set()
+    for record in records:
+        record_kind = _normalize_registrar_record_kind(record.record_kind)
+        key = (record_kind, record.record_id)
+        if record.record_id <= 0 or key in seen:
+            continue
+        seen.add(key)
+        unique_records.append(
+            RegistrarRecordRef(record_kind=record_kind, record_id=record.record_id)
+        )
+
+    if not unique_records:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No registrar records provided",
+        )
+
+    results = [
+        _run_single_registrar_record_action(
+            db=db,
+            current_user=current_user,
+            record=record,
+            action=action,
+            request=request,
+        )
+        for record in unique_records
+    ]
+
+    success_count = len([item for item in results if item.success and not item.skipped])
+    skipped_count = len([item for item in results if item.success and item.skipped])
+    failed_count = len([item for item in results if not item.success])
+
+    return RegistrarRecordActionResponse(
+        action=action,
+        success=failed_count == 0,
+        success_count=success_count,
+        skipped_count=skipped_count,
+        failed_count=failed_count,
+        results=results,
+    )
 
 
 class ConfirmVisitRequest(BaseModel):
