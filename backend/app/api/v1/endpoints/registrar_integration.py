@@ -1273,7 +1273,45 @@ def start_queue_visit(
     """
     try:
         from app.models.appointment import Appointment
+        from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
+
+        queue_entry = (
+            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        )
+        if queue_entry:
+            linked_visit = None
+            if queue_entry.visit_id:
+                linked_visit = (
+                    db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
+                )
+
+            queue_entry.status = "in_progress"
+            if linked_visit:
+                linked_visit.status = "in_progress"
+
+            logger.info(
+                "start_queue_visit: started queue entry %d; linked_visit_id=%s; status=%s",
+                queue_entry.id,
+                queue_entry.visit_id,
+                queue_entry.status,
+            )
+
+            db.commit()
+            db.refresh(queue_entry)
+            if linked_visit:
+                db.refresh(linked_visit)
+
+            return {
+                "success": True,
+                "message": "Прием начат успешно",
+                "entry": {
+                    "id": queue_entry.id,
+                    "status": queue_entry.status,
+                    "patient_id": queue_entry.patient_id,
+                    "visit_id": queue_entry.visit_id,
+                },
+            }
 
         # Сначала ищем в Visit
         visit = db.query(Visit).filter(Visit.id == entry_id).first()

@@ -11,6 +11,7 @@ from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue
 from app.models.online_queue import OnlineQueueEntry
 from app.models.payment import Payment
+from app.models.visit import Visit
 
 
 @pytest.mark.integration
@@ -195,3 +196,62 @@ class TestRegistrarAllAppointments:
         }
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)
+
+    def test_start_queue_visit_uses_queue_entry_id_when_visit_id_collides(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+    ):
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        collision_id = 900001
+        unrelated_visit = Visit(
+            id=collision_id,
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="09:00",
+            status="pending_confirmation",
+            discount_mode="none",
+            department="cardiology",
+            source="desk",
+        )
+        entry = OnlineQueueEntry(
+            id=collision_id,
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=None,
+            source="desk",
+            status="waiting",
+        )
+        db_session.add_all([unrelated_visit, entry])
+        db_session.commit()
+
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry.id}/start-visit",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["entry"]["id"] == entry.id
+        assert payload["entry"]["status"] == "in_progress"
+
+        db_session.refresh(entry)
+        db_session.refresh(unrelated_visit)
+        assert entry.status == "in_progress"
+        assert unrelated_visit.status == "pending_confirmation"
