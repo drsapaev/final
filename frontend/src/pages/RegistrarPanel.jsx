@@ -101,12 +101,43 @@ const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind(record
   return record.id ?? null;
 };
 
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
+
 const hasBackendAction = (record, action) => {
-  if (action === 'mark_paid' && record?.can_mark_paid !== undefined) {
-    return Boolean(record.can_mark_paid);
+  if (!record) return false;
+  const normalizedAction = String(action || '').trim();
+  const equivalentActions = new Set([
+    normalizedAction,
+    normalizedAction.replace('_', '-'),
+    normalizedAction.replace('-', '_')
+  ]);
+  if (Array.isArray(record.available_actions)) {
+    return record.available_actions.some((availableAction) =>
+      equivalentActions.has(String(availableAction || '').trim())
+    );
   }
-  if (!Array.isArray(record?.available_actions)) return true;
-  return record.available_actions.includes(action) || record.available_actions.includes(action.replace('_', '-'));
+
+  const actionFlagByName = {
+    mark_paid: 'can_mark_paid',
+    start_visit: 'can_start_visit',
+    print_ticket: 'can_print_ticket',
+    complete: 'can_complete'
+  };
+  const flagName = actionFlagByName[normalizedAction.replace('-', '_')];
+  if (flagName && record[flagName] !== undefined) {
+    return Boolean(record[flagName]);
+  }
+
+  return false;
+};
+
+const hasBackendPatientDisplayContract = (record) => {
+  if (!record) return false;
+  const hasName = Boolean(record.patient_fio || record.patient_name);
+  const hasPhone = hasOwn(record, 'patient_phone') || hasOwn(record, 'phone');
+  const hasBirthYear = hasOwn(record, 'patient_birth_year') || hasOwn(record, 'birth_year');
+  const hasAddress = hasOwn(record, 'address');
+  return hasName && hasPhone && hasBirthYear && hasAddress;
 };
 
 // Современные диалоги
@@ -1095,7 +1126,7 @@ const RegistrarPanel = () => {
       let enrichedApt = { ...apt };
 
       // Обогащаем данными пациента
-      if (apt.patient_id) {
+      if (apt.patient_id && !hasBackendPatientDisplayContract(apt)) {
         const patient = await fetchPatientData(apt.patient_id);
         if (patient) {
           // ✅ ИСПРАВЛЕНО: Формируем patient_fio безопасно, используя все доступные поля
@@ -1143,7 +1174,7 @@ const RegistrarPanel = () => {
         ...enrichedApt,
         visit_type: enrichedApt.visit_type ?? null,
         payment_type: enrichedApt.payment_type ?? null,
-        payment_status: enrichedApt.payment_status ?? 'pending',
+        payment_status: enrichedApt.payment_status ?? null,
         services: enrichedApt.services || [],
         cost: Number(enrichedApt.cost ?? 0)
       };
@@ -1258,14 +1289,18 @@ const RegistrarPanel = () => {
             const entryId = fullEntry?.id;
             if (!entryId) return null; // Skip entries without ID
 
-            const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ?
-            fullEntry.number :
-            0;
-            const queueTime = entry.queue_time || fullEntry.queue_time || fullEntry.created_at || new Date().toISOString();
+            const queueNum = fullEntry.queue_position ?? fullEntry.number ?? 0;
+            const queueTag = fullEntry.queue_tag ?? queue.queue_tag ?? queue.specialty ?? null;
+            const queueName = fullEntry.queue_name ?? queue.specialist_name ?? queue.specialty ?? null;
+            const queueTime = entry.queue_time || fullEntry.queue_time || fullEntry.created_at || null;
+            const canonicalStatus = fullEntry.canonical_status ?? fullEntry.queue_status ?? fullEntry.status ?? null;
 
             return {
               // SSOT passthrough
               id: entryId,
+              canonical_record_id: fullEntry.canonical_record_id ?? entry.canonical_record_id ?? entryId,
+              record_kind: fullEntry.record_kind ?? entry.record_kind ?? null,
+              source_kind: fullEntry.source_kind ?? entry.source_kind ?? null,
               visit_id: fullEntry.visit_id || entry.visit_id || null,
               appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId,
               queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
@@ -1277,38 +1312,43 @@ const RegistrarPanel = () => {
               services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
               service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
               cost: fullEntry.cost || 0,
-              payment_status: fullEntry.payment_status || 'pending',
+              payment_status: fullEntry.payment_status ?? null,
               source: fullEntry.source || entry.source || 'desk',
-              status: fullEntry.status || 'waiting',
-              record_type: entry.type || fullEntry.type || entry.record_type || 'unknown',
-              created_at: fullEntry.created_at || new Date().toISOString(),
+              status: canonicalStatus,
+              canonical_status: fullEntry.canonical_status ?? canonicalStatus,
+              queue_status: fullEntry.queue_status ?? canonicalStatus,
+              record_type: fullEntry.record_type ?? fullEntry.type ?? entry.record_type ?? entry.type ?? null,
+              created_at: fullEntry.created_at || null,
               queue_time: queueTime,
-              discount_mode: fullEntry.discount_mode || 'none',
+              discount_mode: fullEntry.discount_mode ?? null,
               approval_status: fullEntry.approval_status || null,
+              available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
+              can_mark_paid: Boolean(fullEntry.can_mark_paid),
+              can_start_visit: Boolean(fullEntry.can_start_visit),
+              can_print_ticket: Boolean(fullEntry.can_print_ticket),
+              can_complete: Boolean(fullEntry.can_complete),
 
               // Queue info
               queue_number: queueNum,
               queue_numbers: [{
                 number: queueNum,
-                // ⚠️ TEMPORARY ADAPTER: queue_tag derived from queue.specialty
-                // until backend provides explicit queue_tag per entry
-                queue_tag: queue.specialty || null,
-                specialty: queue.specialty || null,
-                status: fullEntry.status || 'waiting',
+                queue_tag: queueTag,
+                queue_name: queueName,
+                specialty: queueTag,
+                status: canonicalStatus,
                 queue_time: queueTime
               }],
-              specialty: queue.specialty || null,
-              // ⚠️ TEMPORARY ADAPTER: Fallback to specialty
-              queue_tag: queue.specialty || null,
-              department: queue.specialty || null,
+              specialty: queueTag,
+              queue_tag: queueTag,
+              queue_name: queueName,
+              department: fullEntry.department ?? queueTag,
               department_key: fullEntry.department_key || null,
 
               // Derived fields (minimal)
-              visit_type: fullEntry.discount_mode === 'all_free' ? 'free' :
-              fullEntry.discount_mode === 'benefit' ? 'benefit' : 'paid',
-              payment_type: 'cash', // Backend doesn't return this yet
-              date: dateParam,
-              appointment_date: dateParam,
+              visit_type: fullEntry.visit_type ?? fullEntry.discount_mode ?? null,
+              payment_type: fullEntry.payment_type ?? null,
+              date: fullEntry.date ?? data.date ?? dateParam,
+              appointment_date: fullEntry.appointment_date ?? data.date ?? dateParam,
 
               // ⭐ SSOT: session_id for visual grouping (presentation only)
               // DO NOT parse this value - it's an opaque string from backend
@@ -1622,10 +1662,14 @@ const RegistrarPanel = () => {
                   patient_birth_year: entry.patient_birth_year || null,
                   address: entry.address || '',
                   doctor_id: null,
-                  department: targetQueue.specialty,
-                  appointment_date: data.date,
+                  department: entry.department ?? entry.queue_tag ?? targetQueue.queue_tag ?? targetQueue.specialty,
+                  queue_tag: entry.queue_tag ?? targetQueue.queue_tag ?? targetQueue.specialty ?? null,
+                  queue_name: entry.queue_name ?? targetQueue.specialist_name ?? targetQueue.specialty ?? null,
+                  appointment_date: entry.appointment_date ?? data.date,
                   appointment_time: null,
-                  status: entry.status,
+                  status: entry.canonical_status ?? entry.queue_status ?? entry.status ?? null,
+                  canonical_status: entry.canonical_status ?? entry.queue_status ?? entry.status ?? null,
+                  queue_status: entry.queue_status ?? entry.canonical_status ?? entry.status ?? null,
                   services: entry.services || [], // ✅ ИСПРАВЛЕНО: Берем services из entry
                   service_codes: entry.service_codes || [], // ✅ ИСПРАВЛЕНО: Берем service_codes из entry
                   cost: entry.cost || 0, // ✅ ДОБАВЛЕНО: Стоимость
