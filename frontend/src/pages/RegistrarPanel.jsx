@@ -1853,34 +1853,6 @@ const RegistrarPanel = () => {
       }
 
       if (successCount > 0 || skippedCount > 0) {
-        // Обновляем статус только для записей, которые были реально оплачены (не пропущены)
-        const paidRecordIds = paymentResults.
-        filter((r) => r.success && !r.skipped).
-        map((r) => String(r.recordId));
-        const paymentResultById = new Map(
-          paymentResults.
-          filter((r) => r.success && !r.skipped).
-          map((r) => [String(r.recordId), r.result || {}])
-        );
-
-        logger.info('✅ Оплата успешна, обновляем локальное состояние для оплаченных записей:', paidRecordIds);
-
-        // Обновляем статус только для реально оплаченных записей
-        recordsToUpdate.
-        filter((record) => paidRecordIds.includes(String(getRegistrarRecordId(record, getRegistrarRecordKind(record))))).
-        forEach((record) => {
-          const result = paymentResultById.get(String(getRegistrarRecordId(record, getRegistrarRecordKind(record)))) || {};
-          const recordWithBackendState = {
-            ...record,
-            status: result.status ?? result.entry?.status ?? record.status,
-            payment_status: result.payment_status ?? record.payment_status,
-            _locallyModified: false
-          };
-
-          delete appointmentOverridesRef.current[String(record.id)];
-          setAppointments((prev) => prev.map((apt) => apt.id === record.id ? recordWithBackendState : apt));
-        });
-
         // Формируем информативное сообщение
         let message = '';
         if (successCount > 0 && skippedCount > 0) {
@@ -3945,8 +3917,8 @@ const RegistrarPanel = () => {
           if (appointment) {
             const updated = await handlePayment(appointment, paymentData);
             if (updated) {
-              // Статус уже установлен в handlePayment из ответа backend
-              logger.info('PaymentDialog: Оплата успешна, статус обновлен:', updated);
+              // Canonical state is refreshed by handlePayment via loadAppointments.
+              logger.info('PaymentDialog: Оплата успешна, данные обновлены:', updated);
             }
           }
         }}
