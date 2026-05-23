@@ -1731,14 +1731,6 @@ const RegistrarPanel = () => {
         const result = await response.json();
         logger.info('Обновленная запись:', result);
 
-        // Обновляем список записей с новым статусом
-        setAppointments((prev) => prev.map((apt) =>
-        apt.id === appointment.id ? {
-          ...apt,
-          status: result.entry?.status || 'in_progress',
-          _locallyModified: false
-        } : apt
-        ));
         notify.success('Пациент вызван успешно!');
 
         // Перезагружаем данные для синхронизации с сервером
@@ -2007,11 +1999,6 @@ const RegistrarPanel = () => {
 
       const updatedAppointment = await response.json();
       logger.info('Обновленная запись:', updatedAppointment);
-
-      // Обновляем локальное состояние
-      setAppointments((prev) => prev.map((apt) =>
-      apt.id === appointmentId ? { ...apt, status: updatedAppointment.status || status } : apt
-      ));
 
       await loadAppointments({ source: 'status_update' });
       notify.success('Статус обновлен');
