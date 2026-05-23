@@ -714,6 +714,13 @@ class QRQueueService:
                     expires_aware = qr_token.expires_at
                 expires_at_str = expires_aware.isoformat()
 
+            time_check = self._check_online_time_restrictions(token)
+            time_check.setdefault(
+                "status",
+                "available" if time_check.get("allowed") else "unavailable",
+            )
+            time_check.setdefault("message", "")
+
             result = {
                 "token": token,
                 "specialist_id": qr_token.specialist_id,
@@ -732,6 +739,7 @@ class QRQueueService:
                     else []
                 ),
             }
+            result.update(time_check)
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] Ответ сформирован успешно: {result}"
             )

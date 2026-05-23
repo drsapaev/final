@@ -4,8 +4,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queueApiMocks = vi.hoisted(() => ({
-  fetchAvailableSpecialists: vi.fn(),
-  fetchPublicQueueProfiles: vi.fn(),
   fetchQrTokenInfo: vi.fn(),
   startQueueJoinSession: vi.fn(),
   completeQueueJoinSession: vi.fn(),
@@ -16,32 +14,38 @@ vi.mock('../../api/queue', () => queueApiMocks);
 import QueueJoin from '../QueueJoin';
 
 function setupQueueApiMock({
-  specialists = [
+  selectableSpecialists = [
     { id: 1, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
   ],
-  availableSpecialists = specialists,
   clinicWide = false,
+  allowed = true,
+  status = 'available',
+  message = 'Р—Р°РїРёСЃСЊ РґРѕСЃС‚СѓРїРЅР°',
 } = {}) {
-  queueApiMocks.fetchPublicQueueProfiles.mockResolvedValue({ specialists });
-  queueApiMocks.fetchAvailableSpecialists.mockResolvedValue(availableSpecialists);
   queueApiMocks.fetchQrTokenInfo.mockResolvedValue({
     queue_active: true,
-    allowed: true,
+    allowed,
+    status,
+    message,
     queue_length: 2,
     department_name: 'Кардиология',
     specialist_name: 'Кардиолог',
     target_date: '2026-02-21',
-    selectable_specialists: availableSpecialists,
+    selectable_specialists: selectableSpecialists,
   });
   queueApiMocks.startQueueJoinSession.mockResolvedValue({
     session_token: 'session-token',
     queue_info: {
       is_clinic_wide: clinicWide,
+      queue_active: true,
+      allowed,
+      status,
+      message,
       queue_length: 2,
       department_name: 'Кардиология',
       specialist_name: 'Кардиолог',
       target_date: '2026-02-21',
-      selectable_specialists: availableSpecialists,
+      selectable_specialists: selectableSpecialists,
     },
   });
   queueApiMocks.completeQueueJoinSession.mockResolvedValue({
@@ -95,8 +99,6 @@ describe('QueueJoin Accessibility & UX', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/QR-код не найден/i);
     expect(queueApiMocks.fetchQrTokenInfo).not.toHaveBeenCalled();
     expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
-    expect(queueApiMocks.fetchPublicQueueProfiles).not.toHaveBeenCalled();
-    expect(queueApiMocks.fetchAvailableSpecialists).not.toHaveBeenCalled();
   });
 
   it('exposes labeled required fields and announces validation errors', async () => {
@@ -139,19 +141,28 @@ describe('QueueJoin Accessibility & UX', () => {
   });
 
   it('shows meaningful empty state when no specialists are available for clinic-wide QR', async () => {
-    setupQueueApiMock({ specialists: [], availableSpecialists: [], clinicWide: true });
+    setupQueueApiMock({ selectableSpecialists: [], clinicWide: true });
     renderQueueJoin('clinic-wide-token');
 
     expect(await screen.findByText(/ҳозирча qr орқали танлаш учун мутахассислар мавжуд эмас/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /янгилаш/i })).toBeInTheDocument();
   });
 
+  it('renders backend-provided unavailable message without local queue rule assembly', async () => {
+    setupQueueApiMock({
+      allowed: false,
+      status: 'limit_reached',
+      message: 'Backend says registration is full',
+    });
+    renderQueueJoin('backend-status-token');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Backend says registration is full');
+    expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+  });
+
   it('submits real doctor ids for clinic-wide QR instead of queue profile ids', async () => {
     setupQueueApiMock({
-      specialists: [
-        { id: 101, specialty: 'cardiology', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
-      ],
-      availableSpecialists: [
+      selectableSpecialists: [
         { id: 6, specialty: 'cardio', specialty_display: 'Кардиолог', icon: '❤️', color: '#FF3B30' },
       ],
       clinicWide: true,
@@ -175,8 +186,6 @@ describe('QueueJoin Accessibility & UX', () => {
         specialist_ids: [6],
       })
     );
-    expect(queueApiMocks.fetchPublicQueueProfiles).not.toHaveBeenCalled();
-    expect(queueApiMocks.fetchAvailableSpecialists).not.toHaveBeenCalled();
   });
 
   it('provides retry action from error state and recovers to info step', async () => {

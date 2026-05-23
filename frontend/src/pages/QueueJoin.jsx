@@ -183,7 +183,7 @@ const QueueJoin = () => {
       );
 
       if (!tokenInfo.queue_active) {
-        setError(QUEUE_JOIN_MESSAGES.queueInactive);
+        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.queueInactive);
         setStep('error');
         setIsSpecialistsLoading(false);
         return;
@@ -195,17 +195,17 @@ const QueueJoin = () => {
         setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'after_end_time') {
-        setError(QUEUE_JOIN_MESSAGES.registrationClosedAt(tokenInfo.end_time));
+        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationClosedAt(tokenInfo.end_time));
         setStep('error');
         setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'closed_reception_opened') {
-        setError(QUEUE_JOIN_MESSAGES.receptionAlreadyOpened);
+        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.receptionAlreadyOpened);
         setStep('error');
         setIsSpecialistsLoading(false);
         return;
       } else if (tokenInfo.status === 'limit_reached') {
-        setError(QUEUE_JOIN_MESSAGES.limitReached(tokenInfo.max_entries));
+        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.limitReached(tokenInfo.max_entries));
         setStep('error');
         setIsSpecialistsLoading(false);
         return;
