@@ -149,6 +149,8 @@ class TestRegistrarAllAppointments:
             patient_id=test_patient.id,
             patient_name=test_patient.short_name(),
             phone=test_patient.phone,
+            birth_year=1985,
+            address="Clinic Street 1",
             visit_id=None,
             source="desk",
             status="waiting",
@@ -198,6 +200,10 @@ class TestRegistrarAllAppointments:
         }
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)
+        assert found_entry["patient_name"] == test_patient.short_name()
+        assert found_entry["phone"] == test_patient.phone
+        assert found_entry["patient_birth_year"] == 1985
+        assert found_entry["address"] == "Clinic Street 1"
 
     def test_start_queue_visit_uses_queue_entry_id_when_visit_id_collides(
         self,
