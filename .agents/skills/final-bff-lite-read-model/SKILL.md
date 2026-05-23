@@ -27,6 +27,40 @@ Read the smallest relevant set:
 
 If command behavior is involved, switch to `final-ssot-contract-repair` first.
 
+## Project Reality: final
+
+`final` currently does not have a `ui` backend read-model layer:
+
+- No `backend/app/api/v1/endpoints/ui/` package
+- No `backend/app/schemas/ui/`
+- No `backend/app/services/read_models/`
+- No `api_router.include_router(..., prefix="/ui", ...)` in `backend/app/api/v1/api.py`
+
+Existing endpoints already do several read-model-like aggregations and are the first place to reuse before adding `/api/v1/ui/*`:
+
+- `backend/app/api/v1/endpoints/qr_queue.py`
+  - `/queue/available-specialists`
+  - `/queue/qr-tokens/{token}/info`
+  - `/queue/join/start`
+  - `/queue/join/complete`
+  - `/queue/status/{specialist_id}`
+- `backend/app/api/v1/endpoints/registrar_integration.py`
+  - `/registrar/services` (already groups services and applies routing hints)
+  - `/registrar/doctors`
+  - `/registrar/queues/today`
+- `backend/app/api/v1/endpoints/board.py`
+  - `/board/state`
+- `backend/app/api/v1/endpoints/queues.py`
+  - `/stats`
+
+Frontend currently assembles multiple requests on several screens:
+
+- `frontend/src/pages/QueueJoin.jsx` combines public profiles + specialists + token info + join session.
+- `frontend/src/pages/DisplayBoardUnified.jsx` combines `/queues/stats` and `/board/state`.
+- `frontend/src/pages/RegistrarPanel.jsx`, `CardiologistPanelUnified.jsx`, `DermatologistPanelUnified.jsx`, `DentistPanelUnified.jsx`, `LabPanel.jsx` each load many registrar/queue artifacts with separate calls.
+
+Rule for this project: do not add read-model endpoints just to “align architecture”; start only when frontend orchestration is clearly fragile, duplicated, or error-prone and existing canonical routes cannot be safely extended.
+
 ## Allowed Read-Model Responsibilities
 
 `/api/v1/ui/*` endpoints may:

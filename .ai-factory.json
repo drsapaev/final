@@ -1,5 +1,5 @@
 {
-  "version": "2.12.0",
+  "version": "2.13.2",
   "agents": [
     {
       "id": "codex",
@@ -30,6 +30,7 @@
         "aif-security-checklist",
         "aif-skill-generator",
         "aif-verify",
+        "aif-distillation",
         "legacy/aif-deploy"
       ],
       "managedSkills": {
@@ -54,8 +55,8 @@
           "installedHash": "3849c3df2a7640048e658251f776e1ab26ca8b82509d2c2f8f7f7c49061748da"
         },
         "aif-commit": {
-          "sourceHash": "fcd8c2378d507a86620bd0f9d26031769cc01ea4cec86b5e2cad4ebe00dd48c5",
-          "installedHash": "aec25c6854630df205f38c1a952dd3ee178a7b0ffa197f1d3a5c87385c68f564"
+          "sourceHash": "d97834ad84f1559d51cdecc1523320e6d79feca84c3c2342254c0bce12a45c5b",
+          "installedHash": "9878fcd8afb1225155b87528e9b38db4b8cb805b1897ff51fa15075012490827"
         },
         "aif-dockerize": {
           "sourceHash": "8e24073d2388601114e8bba95a402bc43c9bcd9896c238aff785ff930f5e35db",
@@ -132,6 +133,10 @@
         "aif-verify": {
           "sourceHash": "0b671c4544f0cd3aef3ac2cdc08f37699ec08029333301d4521c2ecc7e0a3a95",
           "installedHash": "076d1616d800805f25fbbe08f310e553a11a81ae9d86306a44a2cec6d49d3e05"
+        },
+        "aif-distillation": {
+          "sourceHash": "d5266762267acd73e1f5c5486e4b48eaf5a9c20300b18d6b81645b6c914bd091",
+          "installedHash": "8917a93baa227108d67f91ed52ca3bab2731711c0b32ced3c1b811a45ed54968"
         }
       },
       "agentsDir": ".codex/agents",
