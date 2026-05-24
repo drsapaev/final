@@ -93,6 +93,34 @@ def _serialize_queue_doctor(doctor: Optional[Doctor], current_user: User, specia
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
 
+def _doctor_queue_available_actions(entry: OnlineQueueEntry) -> list[str]:
+    status_value = (entry.status or "").strip().lower()
+    actions_by_status = {
+        "waiting": ["call", "no_show"],
+        "called": ["send_to_diagnostics", "complete", "no_show"],
+        "diagnostics": [
+            "notify_diagnostics_return",
+            "complete",
+            "mark_incomplete",
+        ],
+        "no_show": ["restore_next"],
+    }
+    return actions_by_status.get(status_value, [])
+
+
+def _doctor_queue_action_flags(entry: OnlineQueueEntry) -> dict[str, bool]:
+    actions = set(_doctor_queue_available_actions(entry))
+    return {
+        "can_call": "call" in actions,
+        "can_no_show": "no_show" in actions,
+        "can_send_to_diagnostics": "send_to_diagnostics" in actions,
+        "can_complete": "complete" in actions,
+        "can_notify_diagnostics_return": "notify_diagnostics_return" in actions,
+        "can_mark_incomplete": "mark_incomplete" in actions,
+        "can_restore_next": "restore_next" in actions,
+    }
+
+
 class ScheduleNextVisitService(BaseModel):
     service_id: int
     quantity: int = 1
@@ -257,6 +285,8 @@ def get_doctor_queue_today(
                 "date": today.isoformat(),
                 "entries": [],
                 "stats": {"total": 0, "waiting": 0, "called": 0, "served": 0},
+                "can_call_next": False,
+                "next_call_entry_id": None,
             }
 
         # Получаем записи очереди
@@ -270,7 +300,13 @@ def get_doctor_queue_today(
 
         # Формируем данные для врача
         queue_entries = []
+        next_call_entry_id = None
         for entry in entries:
+            available_actions = _doctor_queue_available_actions(entry)
+            action_flags = _doctor_queue_action_flags(entry)
+            if next_call_entry_id is None and action_flags["can_call"]:
+                next_call_entry_id = entry.id
+
             patient_data = None
             if entry.patient:
                 patient_data = {
@@ -304,6 +340,8 @@ def get_doctor_queue_today(
                         entry.called_at.isoformat() if entry.called_at else None
                     ),
                     "patient": patient_data,
+                    "available_actions": available_actions,
+                    **action_flags,
                 }
             )
 
@@ -330,6 +368,8 @@ def get_doctor_queue_today(
             "date": today.isoformat(),
             "entries": queue_entries,
             "stats": stats,
+            "can_call_next": next_call_entry_id is not None,
+            "next_call_entry_id": next_call_entry_id,
         }
 
     except HTTPException:
@@ -407,6 +447,12 @@ def call_patient(
             )
 
         # Обновляем статус на "вызван"
+        if "call" not in _doctor_queue_available_actions(queue_entry):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Р’С‹Р·РІР°С‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ waiting, С‚РµРєСѓС‰РёР№: {queue_entry.status}",
+            )
+
         queue_entry.status = "called"
         queue_entry.called_at = datetime.utcnow()
 

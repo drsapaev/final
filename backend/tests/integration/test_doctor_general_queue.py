@@ -65,6 +65,12 @@ class TestDoctorGeneralQueue:
         assert len(payload["entries"]) == 1
         assert payload["entries"][0]["id"] == entry.id
         assert payload["entries"][0]["patient_name"] == test_patient.short_name()
+        assert payload["can_call_next"] is True
+        assert payload["next_call_entry_id"] == entry.id
+        assert set(payload["entries"][0]["available_actions"]) == {"call", "no_show"}
+        assert payload["entries"][0]["can_call"] is True
+        assert payload["entries"][0]["can_no_show"] is True
+        assert payload["entries"][0]["can_complete"] is False
 
     def test_general_queue_returns_empty_payload_without_configuration(
         self,
@@ -90,11 +96,69 @@ class TestDoctorGeneralQueue:
             "called": 0,
             "served": 0,
         }
+        assert payload["can_call_next"] is False
+        assert payload["next_call_entry_id"] is None
         assert payload["doctor"]["id"] == test_doctor_user.id
         assert payload["doctor"]["name"] == (
             test_doctor_user.full_name or test_doctor_user.username
         )
         assert payload["doctor"]["specialty"] == "general"
+
+    def test_call_patient_rejects_non_callable_queue_status(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="served",
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/call",
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        db_session.refresh(entry)
+        assert entry.status == "served"
 
     def test_complete_queue_entry_prefers_queue_entry_over_id_collision_with_visit(
         self,
