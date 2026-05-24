@@ -57,6 +57,22 @@ describe('RegistrarPanel command contract', () => {
     expect(source).not.toContain('const loadDynamicDepartments = useCallback');
   });
 
+  it('does not fetch unused queue settings in the Registrar metadata bundle', () => {
+    const source = readRegistrarPanelSource();
+    const loadIntegratedDataBlock = extractSourceBlock(
+      source,
+      'const loadIntegratedData = useCallback(async () => {',
+      'const fetchPatientData = useCallback(async (patientId) => {',
+    );
+
+    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/doctors')");
+    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/services')");
+    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/departments?active_only=true')");
+    expect(loadIntegratedDataBlock).not.toContain("api.get('/registrar/queue-settings')");
+    expect(loadIntegratedDataBlock).not.toContain('queueResult');
+    expect(loadIntegratedDataBlock).not.toContain('queueRes');
+  });
+
   it('does not add a BFF-lite registrar workbench endpoint', () => {
     const source = readRegistrarPanelSource();
 
