@@ -14,6 +14,24 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
 
+## Evidence-Based Small PR Protocol
+
+Use `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md` as the repository-owned SSOT for the cyclic agent workflow. The short rule is: fresh main, clean branch, small scope, explicit gate, evidence before merge, green before next, no silent scope creep, and fix red checks in the same PR.
+
+Hard rules for all repo-aware agents:
+
+- Always start execution PR work from a fresh `origin/main` unless the user explicitly asks for a different base.
+- Inspect the workspace before editing; never work on dirty files without understanding whether the changes are yours, user-owned, or unrelated.
+- One PR must have one clear purpose. Do not mix unrelated runtime, UI, migration, CI, dependency, and docs changes.
+- Define allowed paths, denied paths, validation, and stop conditions before the first edit.
+- Never silently expand scope. If the task needs denied files or a broader contract change, stop and report or open a new plan.
+- Every PR needs evidence: local validation, `git diff --check`, PR body scope/impact notes, and GitHub checks when a PR is opened.
+- Do not start the next PR cycle until the current PR is green, merged, branches are cleaned up, and local `main` is synced.
+- If CI is red, fix the same PR instead of opening unrelated follow-up PRs.
+- Never discard user changes, use destructive git reset/checkout, touch secrets, live production data, or production deploy settings without explicit instruction.
+
+Small PR means small blast radius, not shallow reasoning. Even tiny changes need scope, risk, validation, and rollback clarity.
+
 ## Skill Routing Policy
 
 Installed repo skills live in `.agents/skills`. User-level skills may live under `$HOME/.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
