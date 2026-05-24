@@ -21,6 +21,7 @@
 | [PROJECT_AUDIT.md](./PROJECT_AUDIT.md) | Current recovery audit with verified risks and status |
 | [RECOVERY_PLAN.md](./RECOVERY_PLAN.md) | Recovery phases, completed work, and production-ready criteria |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Recovery-oriented architecture map and boundaries |
+| [architecture/BFF_LITE_DECISION_CHECKPOINT.md](./architecture/BFF_LITE_DECISION_CHECKPOINT.md) | Current BFF-lite decision gate: postpone `/api/v1/ui/*`, extend existing endpoints first |
 | [ROLES_AND_ROUTING.md](./ROLES_AND_ROUTING.md) | Role-based access control |
 | [QUEUE_SYSTEM_ARCHITECTURE.md](./QUEUE_SYSTEM_ARCHITECTURE.md) | Current queue SSOT aligned to current `main` |
 | [runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md](./runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md) | Current staging contour and role acceptance flow |
