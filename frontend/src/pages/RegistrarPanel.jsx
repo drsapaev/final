@@ -1534,41 +1534,16 @@ const RegistrarPanel = () => {
     }
   }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab, demoAppointments, appointmentsCount]);
 
-  // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: загрузка отделений из БД
-  const loadDynamicDepartments = useCallback(async () => {
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE}/api/v1/departments/active`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const departments = await response.json();
-        // Backend returns {success: true, data: [...], count: N}
-        const departmentsArray = departments.data || [];
-        setDynamicDepartments(departmentsArray);
-        logger.info('✅ Загружены динамические отделения:', departmentsArray.map((d) => d.key));
-      }
-    } catch (error) {
-      logger.error('Ошибка загрузки отделений:', error);
-    }
-  }, []);
-
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
     const handleDepartmentsUpdate = (event) => {
       logger.info('RegistrarPanel: Получено обновление отделений, перезагружаю...', event.detail);
-      loadDynamicDepartments();
+      loadIntegratedData();
     };
 
     window.addEventListener('departments:updated', handleDepartmentsUpdate);
     return () => window.removeEventListener('departments:updated', handleDepartmentsUpdate);
-  }, [loadDynamicDepartments]);
+  }, [loadIntegratedData]);
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
@@ -1579,10 +1554,9 @@ const RegistrarPanel = () => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
     logger.info('🚀 Starting initial data load (guarded)...');
-    loadDynamicDepartments(); // ✅ Загружаем отделения
     loadAppointments({ source: 'initial_load' });
     loadIntegratedData();
-  }, [loadAppointments, loadIntegratedData, loadDynamicDepartments]);
+  }, [loadAppointments, loadIntegratedData]);
 
   // Слушаем глобальные события обновления очереди для синхронизации статусов
   useEffect(() => {
