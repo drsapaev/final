@@ -184,7 +184,7 @@ function hydrateVersion(version) {
 
 export default function LabTemplateWorkbench({
   templates,
-  selectedTemplate,
+  selectedTemplate = null,
   onSelectTemplate,
   onTemplatesChanged,
   notify
@@ -706,8 +706,4 @@ LabTemplateWorkbench.propTypes = {
   onSelectTemplate: PropTypes.func.isRequired,
   onTemplatesChanged: PropTypes.func.isRequired,
   notify: PropTypes.func.isRequired
-};
-
-LabTemplateWorkbench.defaultProps = {
-  selectedTemplate: null
 };

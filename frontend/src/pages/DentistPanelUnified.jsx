@@ -3336,6 +3336,7 @@ const DentistPanelUnified = () => {
         return (
           <QueueIntegration
             specialistId={user?.doctor_id || user?.specialist_id || ''}
+            specialty="dentistry"
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment) => {
               setSelectedPatient(appointment);

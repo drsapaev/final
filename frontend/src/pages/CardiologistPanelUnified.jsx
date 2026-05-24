@@ -31,6 +31,7 @@ import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import QueueIntegration from '../components/QueueIntegration';
 import { getApiBaseUrl } from '../api/runtime';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import AIChatWidget from '../components/ai/AIChatWidget';
@@ -1530,6 +1531,10 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           {/* Прием пациента */}
+          {activeTab === 'queue' &&
+          <QueueIntegration specialty="cardiology" />
+          }
+
           {activeTab === 'visit' && selectedPatient &&
           <div style={{
             width: '100%',

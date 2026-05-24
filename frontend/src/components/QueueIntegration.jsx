@@ -5,12 +5,36 @@ import { fetchAvailableSpecialists } from '../api/queue';
 import auth from '../stores/auth.js';
 import logger from '../utils/logger';
 
+const QUEUE_SPECIALTY_ALIASES = {
+  cardiology: ['cardiology', 'cardio'],
+  cardio: ['cardiology', 'cardio'],
+  dermatology: ['dermatology', 'derma'],
+  derma: ['dermatology', 'derma'],
+  dentistry: ['dentistry', 'dental', 'dentist', 'stomatology'],
+  dental: ['dentistry', 'dental', 'dentist', 'stomatology'],
+  dentist: ['dentistry', 'dental', 'dentist', 'stomatology'],
+};
+
+function normalizeQueueSpecialty(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function matchesQueueSpecialty(item, requestedSpecialty) {
+  const normalizedRequested = normalizeQueueSpecialty(requestedSpecialty);
+  if (!normalizedRequested) return false;
+
+  const aliases = QUEUE_SPECIALTY_ALIASES[normalizedRequested] || [normalizedRequested];
+  const itemSpecialty = normalizeQueueSpecialty(item?.specialty || item?.department);
+  return aliases.includes(itemSpecialty);
+}
+
 /**
  * Легкий адаптер, который подключает макос-панели к новому ModernQueueManager.
  * Вся бизнес-логика очереди вынесена на backend и в кастомные хуки.
  */
 const QueueIntegration = ({
   specialistId = '',
+  specialty = '',
   onPatientSelect,
   onStartVisit,
 }) => {
@@ -64,8 +88,17 @@ const QueueIntegration = ({
       }
     }
 
+    if (specialty) {
+      const matchedBySpecialty = availableSpecialists.find((item) =>
+        matchesQueueSpecialty(item, specialty)
+      );
+      if (matchedBySpecialty) {
+        return matchedBySpecialty;
+      }
+    }
+
     return availableSpecialists[0] || null;
-  }, [availableSpecialists, authProfile?.doctor_id, authProfile?.specialist_id, specialistId]);
+  }, [availableSpecialists, authProfile?.doctor_id, authProfile?.specialist_id, specialistId, specialty]);
 
   const queueDoctors = useMemo(() => (
     availableSpecialists.map((item) => ({
@@ -104,6 +137,7 @@ const QueueIntegration = ({
 QueueIntegration.propTypes = {
   specialist: PropTypes.string,
   department: PropTypes.string,
+  specialty: PropTypes.string,
   onPatientSelect: PropTypes.func,
   onStartVisit: PropTypes.func,
   specialistId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

@@ -245,18 +245,18 @@ function buildLabPrintPayload(instance, appointment) {
 }
 
 export default function LabReportWorkbench({
-  selectedAppointment,
+  selectedAppointment = null,
   templates,
-  templateResolution,
-  templateResolutionLoading,
-  reportHistory,
-  recentReports,
-  activeInstance,
+  templateResolution = null,
+  templateResolutionLoading = false,
+  reportHistory = [],
+  recentReports = [],
+  activeInstance = null,
   onInstanceChange,
   onOpenInstance,
   onRefreshHistory,
-  onRefreshRecentReports,
-  onQueueChanged,
+  onRefreshRecentReports = undefined,
+  onQueueChanged = undefined,
   notify
 }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -1011,15 +1011,4 @@ LabReportWorkbench.propTypes = {
   onRefreshRecentReports: PropTypes.func,
   onQueueChanged: PropTypes.func,
   notify: PropTypes.func.isRequired
-};
-
-LabReportWorkbench.defaultProps = {
-  selectedAppointment: null,
-  templateResolution: null,
-  templateResolutionLoading: false,
-  reportHistory: [],
-  recentReports: [],
-  onRefreshRecentReports: undefined,
-  onQueueChanged: undefined,
-  activeInstance: null
 };

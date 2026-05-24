@@ -72,11 +72,11 @@ function historySeverityBadge(item) {
 
 export default function LabQueueWorkbench({
   appointments,
-  loading,
+  loading = false,
   onRefresh,
   onOpenAppointment,
-  selectedAppointment,
-  reportHistory
+  selectedAppointment = null,
+  reportHistory = []
 }) {
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
@@ -241,10 +241,4 @@ LabQueueWorkbench.propTypes = {
   onOpenAppointment: PropTypes.func.isRequired,
   selectedAppointment: PropTypes.object,
   reportHistory: PropTypes.array
-};
-
-LabQueueWorkbench.defaultProps = {
-  loading: false,
-  selectedAppointment: null,
-  reportHistory: []
 };

@@ -25,6 +25,7 @@ import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
@@ -1562,6 +1563,10 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* Прием пациента - EMR система */}
+          {activeTab === 'queue' &&
+          <QueueIntegration specialty="dermatology" />
+          }
+
           {activeTab === 'visit' && currentAppointment &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>

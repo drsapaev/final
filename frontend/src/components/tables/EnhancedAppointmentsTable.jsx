@@ -75,6 +75,19 @@ const getBackendActionAvailability = (row, action, flagName) => {
   return aliases.some((alias) => actions.has(alias));
 };
 
+const getEnhancedAppointmentRowKey = (row, index) => {
+  const parts = [
+    row?.record_type || row?.source_type || row?.source || row?.entity_type || 'appointment',
+    row?.appointment_id ?? row?.visit_id ?? row?.queue_entry_id ?? row?.queue_id ?? row?.payment_id ?? row?.id ?? 'no-id',
+    row?.session_id || row?.queue_number || row?.number || '',
+    row?.doctor_id || row?.specialist_id || row?.department_id || row?.department || '',
+    row?.appointment_time || row?.visit_time || row?.time || row?.start_time || '',
+    index
+  ];
+
+  return parts.map((part) => String(part)).join(':');
+};
+
 const EnhancedAppointmentsTable = ({
   data = [],
   loading = false,
@@ -1619,7 +1632,7 @@ const EnhancedAppointmentsTable = ({
 
               return (
                 <tr
-                  key={row.id}
+                  key={getEnhancedAppointmentRowKey(row, index)}
                   className="enhanced-table-row"
                   style={{
                     backgroundColor: selectedRows.has(row.id) ?

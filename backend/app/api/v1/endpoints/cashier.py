@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+CASHIER_PENDING_EXCLUDED_VISIT_STATUSES = (
+    "canceled",
+    "cancelled",
+    "paid",
+    "completed",
+    "done",
+    "closed",
+)
+
+
 def _preserve_cashier_visit_status(raw_status: str | None) -> str:
     """Payment belongs to Payment/discount_mode; legacy visit.status='paid' becomes operational waiting."""
     if not raw_status or raw_status == "paid":
@@ -287,7 +297,7 @@ async def get_pending_payments(
         
         # Базовый запрос - получаем все визиты (не отменённые и не оплаченные)
         # Исключаем визиты со статусами: canceled, paid, completed, done, closed
-        excluded_statuses = ["canceled", "cancelled", "paid", "completed", "done", "closed"]
+        excluded_statuses = CASHIER_PENDING_EXCLUDED_VISIT_STATUSES
         
         # ✅ ОПТИМИЗАЦИЯ: Используем joinedload для eager loading services
         # Примечание: Visit.patient relationship не существует, поэтому используем batch loading
@@ -544,7 +554,9 @@ async def get_cashier_stats(
 
         
         # Считаем pending из Visit
-        pending_query = db.query(Visit).filter(Visit.status != "canceled")
+        pending_query = db.query(Visit).options(joinedload(Visit.services)).filter(
+            ~Visit.status.in_(CASHIER_PENDING_EXCLUDED_VISIT_STATUSES)
+        )
         if date_from:
             pending_query = pending_query.filter(Visit.created_at >= datetime.combine(date_from, datetime.min.time()))
         if date_to:
