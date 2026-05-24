@@ -3,6 +3,14 @@
 - Update a backend endpoint and its frontend consumer.
 - Preserve documented compatibility behavior for existing callers.
 
+## Cyclic Execution Evidence
+
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only scoped endpoint, consumer, and tests changed
+- Branch: fix/registrar-services-contract
+- Scope gate: allowed registrar endpoint, frontend consumer, and targeted regression tests; denied unrelated admin panels, migrations, and generated output
+- Red-check handling: fix failed targeted tests or CI checks in this same PR before merge
+
 ## Contract Impact
 
 - Canonical surface: GET /api/v1/registrar/services

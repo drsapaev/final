@@ -171,6 +171,7 @@ Clean surgical PR example:
 
 Before requesting review, the PR author confirms:
 
+- Cyclic Execution Evidence is complete with fresh main, clean workspace, branch, scope gate, and red-check handling.
 - Contract Impact is complete or marked `not applicable` with reason.
 - RBAC proof is complete for any endpoint, guard, route, or role change.
 - Notification/WS policy proof is complete for event or realtime changes.
@@ -198,7 +199,7 @@ CI check:
 - `.github/workflows/pr-review-quality-gate.yml` runs on pull requests into `main`.
 - The workflow runs `python scripts/run_pr_review_gate_checks.py --body-env PR_BODY`.
 - The runner executes checker unit tests, validates documented sample PR bodies, and then validates the live PR body.
-- The check fails when required sections are missing or left as empty placeholders.
+- The check fails when required sections are missing or left as empty placeholders, including the cyclic execution evidence required by `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md`.
 - `not applicable` is accepted when paired with a short reason, so docs-only and surgical PRs can stay lightweight.
 
 After-review evidence:

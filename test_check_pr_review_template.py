@@ -9,6 +9,14 @@ VALID_DOCS_ONLY_BODY = """
 - Add docs-only PR review process gate.
 - No runtime behavior changed.
 
+## Cyclic Execution Evidence
+
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only docs/process files changed
+- Branch: docs/pr-review-process-gate
+- Scope gate: allowed docs/runbooks/** and checker files; denied runtime
+- Red-check handling: fix any failed PR gate in this same PR before merge
+
 ## Contract Impact
 
 not applicable - docs/process only, no API or frontend consumer contract changed.
@@ -45,6 +53,14 @@ VALID_RUNTIME_BODY = """
 
 - Add a registrar service payload mapping regression.
 - Keep legacy aliases documented.
+
+## Cyclic Execution Evidence
+
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only scoped endpoint, consumer, and tests changed
+- Branch: fix/registrar-services-contract
+- Scope gate: allowed registrar endpoint, consumer, and targeted tests; denied unrelated panels and migrations
+- Red-check handling: fix any failed targeted test or CI check in this same PR before merge
 
 ## Contract Impact
 
@@ -112,6 +128,10 @@ class PRReviewTemplateValidationTests(unittest.TestCase):
 
 Describe the change in 2-4 bullets.
 
+## Cyclic Execution Evidence
+
+- Fresh main sync:
+
 ## Contract Impact
 
 - Canonical surface:
@@ -139,8 +159,26 @@ Describe the change in 2-4 bullets.
 
         result = validate_pr_body(body)
 
-        self.assertEqual(len(result.errors), 7)
+        self.assertEqual(len(result.errors), 8)
         self.assertTrue(any("## Contract Impact" in error for error in result.errors))
+
+    def test_rejects_missing_cyclic_execution_evidence(self):
+        body = VALID_DOCS_ONLY_BODY.replace("## Cyclic Execution Evidence", "## Cycle")
+
+        result = validate_pr_body(body)
+
+        self.assertIn("Missing required section: ## Cyclic Execution Evidence", result.errors)
+
+    def test_rejects_partial_cyclic_execution_evidence(self):
+        body = VALID_DOCS_ONLY_BODY.replace(
+            "- Clean workspace: inspected before edits; only docs/process files changed",
+            "- Clean workspace:",
+        )
+
+        result = validate_pr_body(body)
+
+        self.assertTrue(any("## Cyclic Execution Evidence" in error for error in result.errors))
+        self.assertTrue(any("Clean workspace" in error for error in result.errors))
 
     def test_html_comments_do_not_count_as_section_answers(self):
         body = VALID_DOCS_ONLY_BODY.replace(

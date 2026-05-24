@@ -17,6 +17,7 @@ The dedicated PR gate workflow runs `scripts/run_pr_review_gate_checks.py`, whic
 Use `docs/runbooks/pr-review-samples/docs-only-pr.md` when the PR changes only documentation, templates, or process files.
 
 Expected pattern:
+- Cyclic Execution Evidence states fresh main, clean workspace, branch, scope gate, and red-check handling.
 - Runtime sections use `not applicable` with a specific reason.
 - Scope Gate names allowed and denied paths.
 - Validation explains what was checked and what was intentionally not checked.
@@ -26,6 +27,7 @@ Expected pattern:
 Use `docs/runbooks/pr-review-samples/runtime-contract-pr.md` when the PR changes an endpoint, payload shape, frontend consumer, or role-sensitive surface.
 
 Expected pattern:
+- Cyclic Execution Evidence states fresh main, clean workspace, branch, scope gate, and red-check handling.
 - Contract Impact names the canonical surface and frontend consumer.
 - RBAC / Permissions includes positive and negative auth proof.
 - Frontend Resilience states empty, partial, and fallback behavior.

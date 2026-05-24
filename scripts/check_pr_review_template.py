@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 REQUIRED_SECTIONS = (
     "Summary",
+    "Cyclic Execution Evidence",
     "Contract Impact",
     "RBAC / Permissions",
     "Notification / Realtime",
@@ -21,6 +22,13 @@ REQUIRED_SECTIONS = (
 )
 
 REQUIRED_FIELDS_BY_SECTION = {
+    "Cyclic Execution Evidence": (
+        "Fresh main sync",
+        "Clean workspace",
+        "Branch",
+        "Scope gate",
+        "Red-check handling",
+    ),
     "Contract Impact": (
         "Canonical surface",
         "Request shape",
@@ -64,6 +72,11 @@ REQUIRED_FIELDS_BY_SECTION = {
 
 PLACEHOLDER_PATTERNS = (
     r"describe the change in 2-4 bullets",
+    r"fresh main sync:\s*$",
+    r"clean workspace:\s*$",
+    r"branch:\s*$",
+    r"scope gate:\s*$",
+    r"red-check handling:\s*$",
     r"canonical surface:\s*$",
     r"request shape:\s*$",
     r"response shape:\s*$",
