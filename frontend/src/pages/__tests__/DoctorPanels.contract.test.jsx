@@ -58,6 +58,15 @@ describe('Doctor panels SSOT contract', () => {
     expect(actionBlock).not.toContain("rowPaymentStatus === 'paid' :");
   });
 
+  it('routes start visit commands through the doctor command surface', () => {
+    for (const filePath of DOCTOR_PANEL_FILES) {
+      const source = read(filePath);
+
+      expect(source).toContain('/doctor/queue/${row.id}/start-visit');
+      expect(source).not.toContain('/registrar/queue/${row.id}/start-visit');
+    }
+  });
+
   it('does not introduce BFF-lite endpoints while repairing doctor contracts', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);

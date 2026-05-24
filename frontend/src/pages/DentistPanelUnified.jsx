@@ -727,7 +727,7 @@ const DentistPanelUnified = () => {
         // Вызвать пациента
         try {
           const token = tokenManager.getAccessToken();
-          const response = await fetch(`${API_V1_BASE}/registrar/queue/${row.id}/start-visit`, {
+          const response = await fetch(`${API_V1_BASE}/doctor/queue/${row.id}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
