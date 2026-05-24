@@ -865,7 +865,7 @@ const RegistrarPanel = () => {
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
   const resolveRescheduleVisitId = useCallback((appointmentRow) => {
-    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || appointmentRow?.appointment_id || appointmentRow?.appointment_ids?.[0] || appointmentRow?.id || null;
+    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || null;
   }, []);
   const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
     if (!appointmentRow) return;
@@ -1344,7 +1344,7 @@ const RegistrarPanel = () => {
               record_kind: fullEntry.record_kind ?? entry.record_kind ?? null,
               source_kind: fullEntry.source_kind ?? entry.source_kind ?? null,
               visit_id: fullEntry.visit_id || entry.visit_id || null,
-              appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId,
+              appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
               queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
               patient_id: fullEntry.patient_id || entry.patient_id,
               patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? 'Неизвестный пациент',
@@ -3815,6 +3815,10 @@ const RegistrarPanel = () => {
               try {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                if (!targetVisitId) {
+                  notify.error('Cannot reschedule without a canonical visit id');
+                  return;
+                }
                 logger.info(`Перенос визита ${targetVisitId} на завтра`);
                 await rescheduleTomorrow(targetVisitId);
                 notify.success('Визит успешно перенесен на завтра');
@@ -3848,6 +3852,10 @@ const RegistrarPanel = () => {
               try {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
+                if (!targetVisitId) {
+                  notify.error('Cannot reschedule without a canonical visit id');
+                  return;
+                }
                 logger.info(`Перенос визита ${targetVisitId} на ${dateStr}`);
                 await rescheduleVisit(targetVisitId, dateStr);
                 notify.success(`Визит перенесен на ${dateStr}`);
