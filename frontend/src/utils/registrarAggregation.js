@@ -34,6 +34,10 @@ const normalizeRecordKind = (appointment) => String(
   appointment?.record_kind ?? appointment?.source_kind ?? appointment?.record_type ?? appointment?.type ?? ''
 ).trim().toLowerCase();
 
+const pickCanonicalVisitId = (appointment) => appointment?.visit_id ?? appointment?.visitId ?? null;
+
+const pickCanonicalAppointmentId = (appointment) => appointment?.appointment_id ?? null;
+
 const buildRecordRef = (appointment) => {
   const recordKind = normalizeRecordKind(appointment);
   const recordId = appointment?.canonical_record_id
@@ -78,16 +82,17 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     const recordRef = buildRecordRef(appointment);
 
     if (!patientGroups[patientKey]) {
-      const initialVisitId = appointment.visit_id || appointment.visitId || appointment.id;
+      const initialVisitId = pickCanonicalVisitId(appointment);
+      const initialAppointmentId = pickCanonicalAppointmentId(appointment);
       const initialQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
 
       patientGroups[patientKey] = {
         id: appointment.id,
         visit_id: initialVisitId,
-        appointment_id: appointment.appointment_id || appointment.id,
+        appointment_id: initialAppointmentId,
         queue_entry_id: initialQueueEntryId,
         visit_ids: initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : [],
-        appointment_ids: appointment.id !== null && appointment.id !== undefined ? [appointment.id] : [],
+        appointment_ids: initialAppointmentId !== null && initialAppointmentId !== undefined ? [initialAppointmentId] : [],
         queue_entry_ids: initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : [],
         patient_id: appointment.patient_id,
         patient_fio: appointment.patient_fio,
@@ -128,7 +133,8 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
       patientGroups[patientKey].aggregated_ids.push(...newIds);
       patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
 
-      const nextVisitId = appointment.visit_id || appointment.visitId || appointment.id;
+      const nextVisitId = pickCanonicalVisitId(appointment);
+      const nextAppointmentId = pickCanonicalAppointmentId(appointment);
       const nextQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
 
       if (nextVisitId !== null && nextVisitId !== undefined) {
@@ -139,11 +145,11 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         }
       }
 
-      if (appointment.id !== null && appointment.id !== undefined) {
-        patientGroups[patientKey].appointment_ids.push(appointment.id);
+      if (nextAppointmentId !== null && nextAppointmentId !== undefined) {
+        patientGroups[patientKey].appointment_ids.push(nextAppointmentId);
         patientGroups[patientKey].appointment_ids = [...new Set(patientGroups[patientKey].appointment_ids)];
         if (!patientGroups[patientKey].appointment_id) {
-          patientGroups[patientKey].appointment_id = appointment.id;
+          patientGroups[patientKey].appointment_id = nextAppointmentId;
         }
       }
 

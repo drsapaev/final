@@ -5,6 +5,10 @@ import {
   sortRegistrarRowsForPresentation
 } from '../registrarAggregation';
 
+const pickOverride = (overrides, key, fallback) => (
+  Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : fallback
+);
+
 const makeAppointment = (overrides = {}) => ({
   id: overrides.id ?? 1,
   patient_id: overrides.patient_id ?? 10,
@@ -12,8 +16,8 @@ const makeAppointment = (overrides = {}) => ({
   patient_birth_year: overrides.patient_birth_year ?? 1990,
   patient_phone: overrides.patient_phone ?? '+998900000000',
   address: overrides.address ?? 'Тестовый адрес',
-  visit_id: overrides.visit_id ?? overrides.id ?? 1,
-  appointment_id: overrides.appointment_id ?? overrides.id ?? 1,
+  visit_id: pickOverride(overrides, 'visit_id', overrides.id ?? 1),
+  appointment_id: pickOverride(overrides, 'appointment_id', overrides.id ?? 1),
   queue_entry_id: overrides.queue_entry_id ?? null,
   visit_type: overrides.visit_type ?? null,
   payment_type: overrides.payment_type ?? null,
@@ -170,6 +174,33 @@ describe('aggregatePatientsForAllDepartments', () => {
         can_start_visit: true,
         can_cancel: false,
       },
+    ]);
+  });
+
+  it('does not synthesize visit or appointment ids from online queue row ids', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 900001,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        canonical_record_id: 900001,
+        visit_id: null,
+        appointment_id: null,
+        queue_entry_id: 900001,
+        available_actions: ['cancel'],
+        can_cancel: true,
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].visit_id).toBeNull();
+    expect(result[0].appointment_id).toBeNull();
+    expect(result[0].visit_ids).toEqual([]);
+    expect(result[0].appointment_ids).toEqual([]);
+    expect(result[0].queue_entry_id).toBe(900001);
+    expect(result[0].queue_entry_ids).toEqual([900001]);
+    expect(result[0].grouped_record_refs).toEqual([
+      { record_kind: 'online_queue', record_id: 900001 },
     ]);
   });
 
