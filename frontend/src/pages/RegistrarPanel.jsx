@@ -1020,17 +1020,15 @@ const RegistrarPanel = () => {
 
         // ✅ ОПТИМИЗАЦИЯ: Загружаем все данные параллельно с Promise.allSettled
         logger.info('🚀 Загружаем данные параллельно...');
-        const [doctorsResult, servicesResult, queueResult, departmentsResult] = await Promise.allSettled([
+        const [doctorsResult, servicesResult, departmentsResult] = await Promise.allSettled([
         api.get('/registrar/doctors'),
         api.get('/registrar/services'),
-        api.get('/registrar/queue-settings'),
         api.get('/registrar/departments?active_only=true')]
         );
 
         // Обрабатываем результаты
         const doctorsRes = doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false };
         const servicesRes = servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false };
-        const queueRes = queueResult.status === 'fulfilled' ? queueResult.value : { ok: false };
         const departmentsRes = departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false };
 
         // Логируем результаты
@@ -1044,11 +1042,6 @@ const RegistrarPanel = () => {
         } else {
           logger.error('❌ Ошибка загрузки услуг:', servicesResult.reason?.message);
         }
-        if (queueResult.status === 'fulfilled') {
-          logger.info('📊 Ответ настроек очереди: OK');
-        } else {
-          logger.error('❌ Ошибка загрузки настроек очереди:', queueResult.reason?.message);
-        }
         if (departmentsResult.status === 'fulfilled') {
           logger.info('📊 Ответ отделений: OK', departmentsRes.data);
         } else {
@@ -1058,11 +1051,10 @@ const RegistrarPanel = () => {
         logger.info('🔄 Обрабатываем ответы API...');
 
         // Проверяем, что все ответы успешны
-        const allSuccess = doctorsRes && doctorsRes.data && servicesRes && servicesRes.data && queueRes && queueRes.data;
+        const allSuccess = doctorsRes && doctorsRes.data && servicesRes && servicesRes.data;
         logger.info('📊 Статус ответов:', {
           doctors: doctorsRes && doctorsRes.data ? 'OK' : 'ERROR',
           services: servicesRes && servicesRes.data ? 'OK' : 'ERROR',
-          queueSettings: queueRes && queueRes.data ? 'OK' : 'ERROR',
           allSuccess
         });
 
@@ -1113,15 +1105,6 @@ const RegistrarPanel = () => {
           logger.warn('❌ API услуг недоступен, оставляем пустое состояние');
         }
 
-        if (queueRes && queueRes.data) {
-          try {
-            logger.info('✅ Настройки очереди обновлены из API');
-          } catch (error) {
-            logger.warn('Ошибка обработки данных настроек очереди:', error.message);
-          }
-        } else {
-          logger.warn('❌ API настроек очереди недоступен, оставляем пустое состояние');
-        }
 
         logger.info('🎯 Загрузка интегрированных данных завершена');
       } catch (fetchError) {
