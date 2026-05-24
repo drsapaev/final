@@ -183,6 +183,7 @@ class TestRegistrarAllAppointments:
         assert found_entry["id"] == entry.id
         assert found_entry["canonical_record_id"] == entry.id
         assert found_entry["record_kind"] == "online_queue"
+        assert found_entry["appointment_id"] is None
         assert found_entry["source_kind"] == "desk"
         assert found_entry["canonical_status"] == "waiting"
         assert found_entry["queue_status"] == "waiting"

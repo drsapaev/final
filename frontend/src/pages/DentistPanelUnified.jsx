@@ -122,7 +122,7 @@ function buildPatientsFromAppointments(appointments) {
     patientsById.set(patientId, {
       id: patientId,
       patient_id: patientId,
-      appointment_id: appointment.appointment_id || appointment.id || null,
+      appointment_id: appointment.appointment_id || null,
       visit_id: normalizeNumericId(appointment.visit_id),
       name: patientName,
       patient_name: patientName,
@@ -669,8 +669,8 @@ const DentistPanelUnified = () => {
   }, [activeTab, loadDentistryAppointments]);
 
   const ensureCanonicalVisitId = useCallback(async (row) => {
-    const appointmentId = row?.appointment_id || row?.id;
-    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+    const appointmentId = row?.appointment_id || null;
+    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId) {
       setAppointmentsTableData((prev) => prev.map((appointment) =>
@@ -703,7 +703,7 @@ const DentistPanelUnified = () => {
       // Создаем объект пациента для переключения на прием
       const patientData = {
         id: row.id,
-        appointment_id: row.appointment_id || row.id,
+        appointment_id: row.appointment_id || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
         phone: row.patient_phone,
@@ -770,7 +770,7 @@ const DentistPanelUnified = () => {
 
           const patient = {
             id: row.id,
-            appointment_id: row.appointment_id || row.id,
+            appointment_id: row.appointment_id || null,
             visit_id: visitId,
             patient_name: row.patient_fio,
             phone: row.patient_phone,
@@ -962,7 +962,7 @@ const DentistPanelUnified = () => {
           const patientObj = {
             id: matchingAppointment.appointment_id || matchingAppointment.id || patientIdFromUrl || visitIdFromUrl,
             patient_id: matchingAppointment.patient_id || patientIdFromUrl || matchingAppointment.id,
-            appointment_id: matchingAppointment.appointment_id || matchingAppointment.id || null,
+            appointment_id: matchingAppointment.appointment_id || null,
             visit_id: visitIdFromUrl || normalizeNumericId(matchingAppointment.visit_id) || null,
             patient_name: patientName,
             patient_fio: patientName,
