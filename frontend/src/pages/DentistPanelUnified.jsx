@@ -573,6 +573,18 @@ const DentistPanelUnified = () => {
                     service_codes: entry.service_codes || [],
                     payment_type: entry.payment_type || null,
                     payment_status: entry.payment_status || 'pending',
+                    available_actions: entry.available_actions || [],
+                    can_mark_paid: Boolean(entry.can_mark_paid),
+                    can_start_visit: Boolean(entry.can_start_visit),
+                    can_print_ticket: Boolean(entry.can_print_ticket),
+                    can_complete: Boolean(entry.can_complete),
+                    can_cancel: Boolean(entry.can_cancel),
+                    canonical_record_id: entry.canonical_record_id || entry.id,
+                    record_kind: entry.record_kind,
+                    source_kind: entry.source_kind,
+                    canonical_status: entry.canonical_status || entry.status,
+                    queue_status: entry.queue_status || entry.status,
+                    queue_position: entry.queue_position,
                     doctor: entry.doctor_name || 'Врач',
                     specialty: queue.specialty,
                     created_at: entry.created_at,
@@ -590,75 +602,6 @@ const DentistPanelUnified = () => {
           let appointmentsData = allAppointments.filter((apt) =>
             isDentistrySpecialty(apt.specialty)
           );
-
-          // 2. Получаем актуальный payment_status из БД через all-appointments
-          const today = new Date().toISOString().split('T')[0];
-          try {
-            const appointmentsResponse = await fetch(`${API_V1_BASE}/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (appointmentsResponse.ok) {
-              const appointmentsDBResponse = await appointmentsResponse.json();
-              const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || []; // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
-              logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
-
-              // Создаем карту id -> payment_status
-              const appointmentMetaMap = new Map();
-              appointmentsDBData.forEach((apt) => {
-                const appointmentMeta = {
-                  payment_status: apt.payment_status || 'pending',
-                  payment_type: apt.payment_type || null,
-                  visit_id: apt.visit_id || null,
-                  appointment_id: apt.appointment_id || (apt.source === 'appointments' ? apt.id : null)
-                };
-                if (apt.id) {
-                  appointmentMetaMap.set(apt.id, appointmentMeta);
-                }
-                if (apt.patient_id && apt.appointment_date) {
-                  const key = `${apt.patient_id}_${apt.appointment_date}`;
-                  appointmentMetaMap.set(key, appointmentMeta);
-                }
-              });
-
-              // Обновляем payment_status в наших записях
-              allAppointments = allAppointments.map((apt) => {
-                let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
-                if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
-                  const key = `${apt.patient_id}_${apt.appointment_date}`;
-                  appointmentMeta = appointmentMetaMap.get(key);
-                }
-                return {
-                  ...apt,
-                  appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
-                  visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
-                  payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
-                  payment_type: appointmentMeta?.payment_type || apt.payment_type || null
-                };
-              });
-              appointmentsData = appointmentsData.map((apt) => {
-                let appointmentMeta = appointmentMetaMap.get(apt.appointment_id || apt.id);
-                if (!appointmentMeta && apt.patient_id && apt.appointment_date) {
-                  const key = `${apt.patient_id}_${apt.appointment_date}`;
-                  appointmentMeta = appointmentMetaMap.get(key);
-                }
-                return {
-                  ...apt,
-                  appointment_id: appointmentMeta?.appointment_id || apt.appointment_id,
-                  visit_id: appointmentMeta?.visit_id || apt.visit_id || null,
-                  payment_status: appointmentMeta?.payment_status || apt.payment_status || 'pending',
-                  payment_type: appointmentMeta?.payment_type || apt.payment_type || null
-                };
-              });
-
-              logger.info('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
-            }
-          } catch (err) {
-            logger.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
-          }
 
           // Добавляем информацию о всех услугах пациента в каждую запись
           const enrichedAppointmentsData = appointmentsData.map((apt) => {
