@@ -73,6 +73,25 @@ describe('RegistrarPanel command contract', () => {
     expect(loadIntegratedDataBlock).not.toContain('queueRes');
   });
 
+  it('filters displayed services by backend department metadata before legacy code prefixes', () => {
+    const source = readRegistrarPanelSource();
+    const filterBlock = extractSourceBlock(
+      source,
+      'const filterServicesByDepartment = useCallback((appointment, departmentKey) => {',
+      'const filteredAppointments = useMemo(() => {',
+    );
+
+    expect(source).toContain('service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : []');
+    expect(filterBlock).toContain('const filterByBackendDepartment = (appointmentServices) => {');
+    expect(filterBlock).toContain('serviceMeta?.department_key ?? serviceMeta?.departmentKey');
+    expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointment.services || [])')).toBeLessThan(
+      filterBlock.indexOf('const departmentCodePrefixes = {'),
+    );
+    expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointmentServices)')).toBeLessThan(
+      filterBlock.indexOf('const serviceToCodeMap = new Map()'),
+    );
+  });
+
   it('does not add a BFF-lite registrar workbench endpoint', () => {
     const source = readRegistrarPanelSource();
 

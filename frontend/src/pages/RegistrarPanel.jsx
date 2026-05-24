@@ -1353,6 +1353,7 @@ const RegistrarPanel = () => {
               address: fullEntry.address ?? entry.address ?? '',
               services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
               service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
+              service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : [],
               cost: fullEntry.cost || 0,
               payment_status: fullEntry.payment_status ?? null,
               source: fullEntry.source || entry.source || 'desk',
@@ -1969,6 +1970,80 @@ const RegistrarPanel = () => {
     };
 
     // ⭐ Для QR-записей с queue_numbers - собираем услуги из всех queue_numbers
+    const normalizeDepartmentKey = (value) => value ? String(value).toLowerCase().trim() : null;
+    const targetDepartmentKey = normalizeDepartmentKey(departmentKey);
+
+    const getServiceIdentity = (serviceItem) => {
+      if (serviceItem && typeof serviceItem === 'object') {
+        return {
+          id: serviceItem.id ?? serviceItem.service_id ?? null,
+          code: serviceItem.service_code ?? serviceItem.code ?? null,
+          name: serviceItem.name ?? serviceItem.service_name ?? null,
+          departmentKey: serviceItem.department_key ?? serviceItem.departmentKey ?? null
+        };
+      }
+
+      return {
+        id: typeof serviceItem === 'number' || typeof serviceItem === 'string' && !isNaN(serviceItem) ? Number(serviceItem) : null,
+        code: typeof serviceItem === 'string' ? serviceItem : null,
+        name: typeof serviceItem === 'string' ? serviceItem : null,
+        departmentKey: null
+      };
+    };
+
+    const serviceMatchesIdentity = (candidate, identity) => {
+      if (!candidate || typeof candidate !== 'object') return false;
+      const candidateId = candidate.id ?? candidate.service_id ?? null;
+      if (identity.id != null && candidateId != null && Number(candidateId) === Number(identity.id)) return true;
+
+      const candidateCode = candidate.service_code ?? candidate.code ?? null;
+      if (identity.code && candidateCode && String(candidateCode).toUpperCase() === String(identity.code).toUpperCase()) return true;
+
+      const candidateName = candidate.name ?? candidate.service_name ?? null;
+      if (identity.name && candidateName && String(candidateName).trim() === String(identity.name).trim()) return true;
+
+      return false;
+    };
+
+    const findBackendServiceMeta = (serviceItem, index) => {
+      const identity = getServiceIdentity(serviceItem);
+      if (identity.departmentKey) return identity;
+
+      const serviceDetails = Array.isArray(appointment.service_details) ? appointment.service_details : [];
+      const indexedDetail = serviceDetails[index];
+      if (indexedDetail?.department_key) return indexedDetail;
+
+      const detailMatch = serviceDetails.find((detail) => serviceMatchesIdentity(detail, identity));
+      if (detailMatch?.department_key) return detailMatch;
+
+      if (services && typeof services === 'object') {
+        for (const groupServices of Object.values(services)) {
+          if (!Array.isArray(groupServices)) continue;
+          const serviceMatch = groupServices.find((service) => serviceMatchesIdentity(service, identity));
+          if (serviceMatch?.department_key) return serviceMatch;
+        }
+      }
+
+      return null;
+    };
+
+    const filterByBackendDepartment = (appointmentServices) => {
+      if (!targetDepartmentKey || !Array.isArray(appointmentServices) || appointmentServices.length === 0) {
+        return null;
+      }
+
+      let sawBackendDepartment = false;
+      const filtered = appointmentServices.filter((serviceItem, index) => {
+        const serviceMeta = findBackendServiceMeta(serviceItem, index);
+        const serviceDepartmentKey = normalizeDepartmentKey(serviceMeta?.department_key ?? serviceMeta?.departmentKey);
+        if (!serviceDepartmentKey) return false;
+        sawBackendDepartment = true;
+        return serviceDepartmentKey === targetDepartmentKey;
+      });
+
+      return sawBackendDepartment ? filtered : null;
+    };
+
     if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers) && appointment.queue_numbers.length > 0) {
 
       // ⭐ Если НЕТ departmentKey (вкладка "Все отделения") - используем уже имеющиеся services
@@ -1997,6 +2072,11 @@ const RegistrarPanel = () => {
 
       // ⭐ Для конкретной вкладки - фильтруем из существующих services по категории
       // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, фильтруя по категории отделения
+      const backendFilteredServices = filterByBackendDepartment(appointment.services || []);
+      if (backendFilteredServices) {
+        return backendFilteredServices;
+      }
+
       const departmentCodePrefixes = {
         'cardio': ['K'], // K01, K11 и т.д. - все кардиоуслуги кроме ECG
         'echokg': ['K10', 'ECG'], // Только ЭКГ (K10)
@@ -2054,6 +2134,11 @@ const RegistrarPanel = () => {
     const appointmentServices = appointment.services || [];
 
     // Создаем маппинг service -> service_code
+    const backendFilteredServices = filterByBackendDepartment(appointmentServices);
+    if (backendFilteredServices) {
+      return backendFilteredServices;
+    }
+
     const serviceToCodeMap = new Map();
 
     appointmentServices.forEach((service, index) => {
