@@ -227,6 +227,33 @@ const getAppointmentPaymentActionContext = (appointment) => {
   return `appointment ${appointmentId} for ${patientName}`;
 };
 
+const PAYMENT_ACTION_CAN_FIELD = {
+  cancel: 'can_cancel',
+  refund: 'can_refund',
+  print_receipt: 'can_print_receipt',
+  confirm: 'can_confirm'
+};
+
+const hasBackendPaymentAction = (paymentRow, action) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(paymentRow?.available_actions)) {
+    return paymentRow.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = PAYMENT_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(paymentRow || {}, canField)) {
+    return Boolean(paymentRow[canField]);
+  }
+
+  return true;
+};
+
 const CashierPanel = () => {void
   useBreakpoint();
   const location = useLocation();
@@ -1399,7 +1426,7 @@ const CashierPanel = () => {void
                           size="sm"
                           variant="outline"
                           onClick={() => openCancelDialog(row.id)}
-                          disabled={row.status === 'cancelled'}
+                          disabled={!hasBackendPaymentAction(row, 'cancel')}
                           aria-label={`Cancel ${getPaymentActionContext(row)}`}>
 
                                   ❌ Отмена
@@ -1409,7 +1436,7 @@ const CashierPanel = () => {void
                           size="sm"
                           variant="outline"
                           onClick={() => openRefundDialog(row)}
-                          disabled={row.status === 'cancelled' || row.status === 'refunded'}
+                          disabled={!hasBackendPaymentAction(row, 'refund')}
                           aria-label={`Refund ${getPaymentActionContext(row)}`}
                           title="Возврат средств">
 
