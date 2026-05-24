@@ -1281,16 +1281,23 @@ def start_queue_visit(
 ):
     """
     Начать прием для записи в очереди (статус в процессе)
-    Работает с Visit и Appointment записями
+    Legacy queue endpoint accepts only OnlineQueueEntry IDs.
     """
     try:
-        from app.models.appointment import Appointment
         from app.models.online_queue import OnlineQueueEntry
         from app.models.visit import Visit
 
         queue_entry = (
             db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
+        if not queue_entry:
+            # This legacy queue route must not fall back to Visit or Appointment IDs:
+            # numeric IDs can collide across tables and mutate the wrong record.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Queue entry not found",
+            )
+
         if queue_entry:
             linked_visit = None
             if queue_entry.visit_id:
@@ -1324,61 +1331,6 @@ def start_queue_visit(
                     "visit_id": queue_entry.visit_id,
                 },
             }
-
-        # Сначала ищем в Visit
-        visit = db.query(Visit).filter(Visit.id == entry_id).first()
-        if visit:
-            # Обновляем статус визита
-            visit.status = "in_progress"
-
-            logger.info(
-                "[FIX:PAYMENT_STATUS] start_queue_visit preserves registration type for visit %d; operational status is %s",
-                visit.id,
-                visit.status,
-            )
-
-            db.commit()
-            db.refresh(visit)
-
-            return {
-                "success": True,
-                "message": "Прием начат успешно",
-                "entry": {
-                    "id": visit.id,
-                    "status": visit.status,
-                    "patient_id": visit.patient_id,
-                },
-            }
-
-        # Если не найден в Visit, ищем в Appointment
-        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
-        if appointment:
-            # Обновляем статус appointment
-            appointment.status = "in_progress"
-
-            logger.info(
-                "[FIX:PAYMENT_STATUS] start_queue_visit preserves appointment visit_type for appointment %d; operational status is %s",
-                appointment.id,
-                appointment.status,
-            )
-
-            db.commit()
-            db.refresh(appointment)
-
-            return {
-                "success": True,
-                "message": "Прием начат успешно",
-                "entry": {
-                    "id": appointment.id,
-                    "status": appointment.status,
-                    "patient_id": appointment.patient_id,
-                },
-            }
-
-        # Если не найден ни в Visit, ни в Appointment
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
-        )
 
     except HTTPException:
         raise
