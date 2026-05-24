@@ -487,6 +487,17 @@ const ModernQueueManager = ({
                 {t.refreshQueue}
               </Button>
 
+              <Button
+                variant="primary"
+                size="default"
+                onClick={callPatient}
+                disabled={!effectiveDoctor || loading}
+                className="mqm-button-icon"
+                title="Backend call-next command">
+                <Icon name="bell.fill" size="small" style={{ color: 'white' }} />
+                {t.call}
+              </Button>
+
               <button
                 type="button"
                 style={{
@@ -530,7 +541,6 @@ const ModernQueueManager = ({
             queueData={queueData}
             effectiveDoctor={effectiveDoctor}
             onGenerateQR={generateQR}
-            onCallPatient={callPatient}
             loading={loading}
             t={t} />
 

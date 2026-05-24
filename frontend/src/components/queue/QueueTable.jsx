@@ -1,4 +1,4 @@
-import { Badge, Button, Icon } from '../ui/macos';
+import { Badge, Icon } from '../ui/macos';
 import PropTypes from 'prop-types';
 
 /**
@@ -8,7 +8,6 @@ import PropTypes from 'prop-types';
 const QueueTable = ({
     queueData,
     effectiveDoctor,
-    onCallPatient,
     loading,
     t
 }) => {
@@ -247,17 +246,6 @@ const QueueTable = ({
                                 padding: '12px 16px',
                                 textAlign: 'right'
                             }}>
-                                {entry.status === 'waiting' && (
-                                    <Button
-                                        size="sm"
-                                        variant="primary"
-                                        onClick={() => onCallPatient(entry)}
-                                        disabled={loading}
-                                    >
-                                        <Icon name="bell.fill" size="small" style={{ marginRight: '4px' }} />
-                                        {t?.call || 'Вызвать'}
-                                    </Button>
-                                )}
                                 {entry.status === 'called' && (
                                     <Badge variant="info">
                                         <Icon name="bell.fill" size="small" style={{ marginRight: '4px' }} />
@@ -281,7 +269,6 @@ QueueTable.propTypes = {
     }),
     effectiveDoctor: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     onGenerateQR: PropTypes.func,
-    onCallPatient: PropTypes.func,
     loading: PropTypes.bool,
     t: PropTypes.object
 };
@@ -290,7 +277,6 @@ QueueTable.defaultProps = {
     queueData: null,
     effectiveDoctor: null,
     onGenerateQR: () => { },
-    onCallPatient: () => { },
     loading: false,
     t: {}
 };
