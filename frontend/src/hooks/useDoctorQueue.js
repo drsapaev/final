@@ -13,6 +13,28 @@ const ZERO_STATS = {
     total: 0
 };
 
+const hasBackendQueueAction = (entry, action, flagName) => {
+    if (!entry) return false;
+    if (Array.isArray(entry.available_actions)) {
+        return entry.available_actions.includes(action);
+    }
+    if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
+        return Boolean(entry[flagName]);
+    }
+    return false;
+};
+
+const selectNextCallEntryId = (queuePayload) => {
+    const backendEntryId = queuePayload?.next_call_entry_id;
+    if (backendEntryId !== undefined && backendEntryId !== null) {
+        return backendEntryId;
+    }
+
+    const entries = Array.isArray(queuePayload?.entries) ? queuePayload.entries : [];
+    const callableEntry = entries.find((entry) => hasBackendQueueAction(entry, 'call', 'can_call'));
+    return callableEntry?.id ?? null;
+};
+
 /**
  * @param {string} specialty - Каноническая specialty/queue tag для панели врача
  */
@@ -21,6 +43,10 @@ const useDoctorQueue = (specialty = 'general') => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(ZERO_STATS);
+    const [queueControls, setQueueControls] = useState({
+        canCallNext: false,
+        nextCallEntryId: null
+    });
     const normalizedSpecialty = specialty || 'general';
 
     // Загрузка очереди
@@ -32,8 +58,13 @@ const useDoctorQueue = (specialty = 'general') => {
             const response = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
             const entries = Array.isArray(response.data?.entries) ? response.data.entries : [];
             const apiStats = response.data?.stats || {};
+            const nextCallEntryId = selectNextCallEntryId(response.data);
 
             setQueue(entries);
+            setQueueControls({
+                canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId),
+                nextCallEntryId
+            });
             setStats({
                 waiting: apiStats.waiting ?? entries.filter((entry) => entry.status === 'waiting').length,
                 called: apiStats.called ?? entries.filter((entry) => entry.status === 'called').length,
@@ -50,6 +81,7 @@ const useDoctorQueue = (specialty = 'general') => {
             logger.error('[useDoctorQueue] Error loading queue:', err);
             setQueue([]);
             setStats(ZERO_STATS);
+            setQueueControls({ canCallNext: false, nextCallEntryId: null });
             setError(err.response?.data?.detail || err.message || 'Ошибка загрузки очереди');
         } finally {
             setLoading(false);
@@ -60,12 +92,12 @@ const useDoctorQueue = (specialty = 'general') => {
     const callNext = useCallback(async () => {
         try {
             const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-            const waitingEntry = currentQueue.data?.entries?.find((entry) => entry.status === 'waiting');
-            if (!waitingEntry) {
+            const nextCallEntryId = selectNextCallEntryId(currentQueue.data);
+            if (!nextCallEntryId) {
                 return { success: false, message: 'Нет ожидающих пациентов' };
             }
 
-            const response = await api.post(`/doctor/queue/${waitingEntry.id}/call`);
+            const response = await api.post(`/doctor/queue/${nextCallEntryId}/call`);
             await loadQueue(); // Обновляем очередь
             return response.data;
         } catch (err) {
@@ -146,6 +178,8 @@ const useDoctorQueue = (specialty = 'general') => {
         loading,
         error,
         stats,
+        canCallNext: queueControls.canCallNext,
+        nextCallEntryId: queueControls.nextCallEntryId,
         loadQueue,
         callNext,
         markNoShow,

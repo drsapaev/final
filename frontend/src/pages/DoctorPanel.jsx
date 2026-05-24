@@ -51,6 +51,18 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+
+const hasBackendQueueAction = (entry, action, flagName) => {
+  if (!entry) return false;
+  if (Array.isArray(entry.available_actions)) {
+    return entry.available_actions.includes(action);
+  }
+  if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
+    return Boolean(entry[flagName]);
+  }
+  return false;
+};
+
 const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet } = useBreakpoint();void
@@ -87,6 +99,7 @@ const DoctorPanel = () => {
     stats: queueStats,
     loading: queueLoading,
     error: queueError,
+    canCallNext,
     loadQueue,
     callNext,
     markNoShow,
@@ -1239,7 +1252,7 @@ const DoctorPanel = () => {
                         logger.error('Ошибка вызова:', err);
                       }
                     }}
-                    disabled={queueStats.waiting === 0}>
+                    disabled={!canCallNext}>
 
                       <Phone size={16} />
                       {!isMobile && <span style={{ marginLeft: '4px' }}>Вызвать следующего</span>}
@@ -1354,8 +1367,9 @@ const DoctorPanel = () => {
                       }
                           </td>
                           <td style={tdStyle}>
-                            {/* Кнопки в зависимости от статуса */}
-                            {entry.status === 'waiting' &&
+                            {/* Backend-owned queue action contract */}
+                            {hasBackendQueueAction(entry, 'no_show', 'can_no_show') &&
+                            !hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics') &&
                       <>
                                 <button
                           {...getQueueActionA11yProps('Mark no-show', entry)}
@@ -1368,7 +1382,7 @@ const DoctorPanel = () => {
                                 </button>
                               </>
                       }
-                            {entry.status === 'called' &&
+                            {hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics') &&
                       <>
                                 <button
                           {...getQueueActionA11yProps('Send to diagnostics', entry)}
@@ -1399,7 +1413,7 @@ const DoctorPanel = () => {
                                 </button>
                               </>
                       }
-                            {entry.status === 'diagnostics' &&
+                            {hasBackendQueueAction(entry, 'notify_diagnostics_return', 'can_notify_diagnostics_return') &&
                       <>
                                 <button
                           {...getQueueActionA11yProps('Call back from diagnostics', entry)}
@@ -1430,7 +1444,7 @@ const DoctorPanel = () => {
                                 </button>
                               </>
                       }
-                            {entry.status === 'no_show' &&
+                            {hasBackendQueueAction(entry, 'restore_next', 'can_restore_next') &&
                       <button
                         {...getQueueActionA11yProps('Restore as next patient', entry)}
                         aria-label={`Restore as next patient for ${getQueuePatientContext(entry)}`}
