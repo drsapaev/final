@@ -21,4 +21,15 @@ describe('Queue manager command contract', () => {
     expect(tableSource).not.toContain('onCallPatient(entry)');
     expect(tableSource).not.toContain("entry.status === 'waiting' && (");
   });
+
+  it('uses backend-provided available specialists for queue doctor options', () => {
+    const managerSource = read('components/queue/ModernQueueManager.jsx');
+
+    expect(managerSource).toContain('specialists,');
+    expect(managerSource).toContain('if (!Array.isArray(specialists) || specialists.length === 0) return []');
+    expect(managerSource).toContain('d.specialty_display || d.specialty');
+    expect(managerSource).not.toContain("fetch('/api/v1/queues/profiles/public')");
+    expect(managerSource).not.toContain('allowedSpecialties');
+    expect(managerSource).not.toContain('normalizeSpecialty');
+  });
 });
