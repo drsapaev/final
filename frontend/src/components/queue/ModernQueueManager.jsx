@@ -24,6 +24,7 @@ const ModernQueueManager = ({
     queueData,
     statistics,
     qrData,
+    specialists,
     loadQueueSnapshot,
     generateDoctorQRCode,
     generateClinicQRCode,
@@ -240,95 +241,23 @@ const ModernQueueManager = ({
     }
   };
 
-  // Мемоизация списка врачей для выпадающего списка
-  // ⭐ SSOT: queueProfiles загружаются из API и используются для фильтрации
-  const [queueProfiles, setQueueProfiles] = useState([]);
-
-  // ⭐ SSOT: Load queue profiles for filtering (show_on_qr_page=true)
-  useEffect(() => {
-    const loadQueueProfiles = async () => {
-      try {
-        // Используем публичный endpoint который возвращает только профили с show_on_qr_page=true
-        const response = await fetch('/api/v1/queues/profiles/public');
-        if (response.ok) {
-          const data = await response.json();
-          setQueueProfiles(data.specialists || []);
-          logger.log('[ModernQueueManager] SSOT: Loaded queue profiles for filtering:', data.specialists?.length || 0);
-        }
-      } catch (error) {
-        logger.error('[ModernQueueManager] Error loading queue profiles:', error);
-      }
-    };
-    loadQueueProfiles();
-  }, []);
-
   const doctorOptions = useMemo(() => {
-    if (!doctors || doctors.length === 0) return [];
+    if (!Array.isArray(specialists) || specialists.length === 0) return [];
 
-    // ⭐ SSOT: Получаем список специальностей из queueProfiles (с show_on_qr_page=true)
-    const allowedSpecialties = new Set(
-      queueProfiles.map((p) => p.specialty?.toLowerCase())
-    );
-
-    // Маппинг специальностей на русские названия (можно расширить)
-    const specialtyNames = {
-      'cardiology': 'Кардиолог',
-      'cardio': 'Кардиолог',
-      'dermatology': 'Дерматолог',
-      'derma': 'Дерматолог',
-      'stomatology': 'Стоматолог',
-      'dentist': 'Стоматолог',
-      'dentistry': 'Стоматолог',
-      'laboratory': 'Лаборатория',
-      'lab': 'Лаборатория',
-      'neurology': 'Невролог',
-      'pediatrics': 'Педиатр',
-      'therapy': 'Терапевт',
-      'surgery': 'Хирург',
-      'ophthalmology': 'Окулист',
-      'ent': 'ЛОР',
-      'gynecology': 'Гинеколог',
-      'urology': 'Уролог',
-      'endocrinology': 'Эндокринолог',
-      'traumatology': 'Травматолог',
-      'ultrasound': 'УЗИ',
-      'ecg': 'ЭКГ',
-      'procedures': 'Процедуры',
-      'cosmetology': 'Косметология',
-      'general': 'Общая очередь'
-    };
-
-    const normalizeSpecialty = (spec) => {
-      const s = spec?.toLowerCase();
-      if (s === 'cardio') return 'cardiology';
-      if (s === 'derma') return 'dermatology';
-      if (s === 'dentist' || s === 'dentistry') return 'stomatology';
-      if (s === 'lab') return 'laboratory';
-      return s;
-    };
-
-    return doctors.
-    filter((d) => d.id !== undefined && d.id !== null) // Только врачи с canonical id
-    .filter((d) => {
-      // ⭐ SSOT Filter: Показываем только тех врачей, чья специальность есть в queueProfiles
-      if (allowedSpecialties.size === 0) return true; // Если профили не загружены - показываем всех
-      const normalizedSpec = normalizeSpecialty(d.specialty);
-      return allowedSpecialties.has(normalizedSpec);
-    }).
+    return specialists.
+    filter((d) => d.id !== undefined && d.id !== null).
     map((d) => {
-      const normalizedSpec = normalizeSpecialty(d.specialty);
-
-      const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
+      const doctorName = d.doctor_name || d.full_name || d.user?.full_name || d.name || `Врач #${d.id}`;
+      const specialtyLabel = d.specialty_display || d.specialty || '';
       const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
-
       return {
         id: d.id,
-        label: `${d.full_name || d.user?.full_name || d.name || `Врач #${d.id}`}${specialtyLabel ? ` • ${specialtyLabel}` : ''}${cabinetInfo}`,
-        specialty: normalizedSpec
+        label: `${doctorName}${specialtyLabel ? ` • ${specialtyLabel}` : ''}${cabinetInfo}`,
+        specialty: d.specialty
       };
     }).
     sort((a, b) => a.label.localeCompare(b.label));
-  }, [doctors, queueProfiles]);
+  }, [specialists]);
 
   return (
     <div className="modern-queue-manager">
