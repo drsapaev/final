@@ -22,6 +22,11 @@ DEMO_MARKER = "DEV-DEMO"
 DEMO_TIMEZONE = "Asia/Tashkent"
 DEFAULT_DEMO_PASSCODE_PREFIX = "demo"
 DEFAULT_DEMO_PASSCODE_SUFFIX = str(10_000 + 2_345)
+QUEUE_TAG_ALIASES = {
+    "cardiology": ("cardiology", "cardio"),
+    "dermatology": ("dermatology", "derma"),
+    "dental": ("dental", "dentistry"),
+}
 
 
 @dataclass(frozen=True)
@@ -500,6 +505,7 @@ def _upsert_visit(
     from app.models.visit import Visit, VisitService
 
     notes = f"{DEMO_MARKER}:{marker}"
+    created_at = datetime.combine(date.today(), time.fromisoformat(visit_time))
     visit = db.query(Visit).filter(Visit.notes == notes).first()
     if visit is None:
         visit = Visit(patient_id=patient.id, notes=notes)
@@ -510,6 +516,7 @@ def _upsert_visit(
     visit.status = status
     visit.visit_date = date.today()
     visit.visit_time = visit_time
+    visit.created_at = created_at
     visit.department = department_key
     visit.department_id = doctor.department_id
     visit.source = "desk"
@@ -535,13 +542,15 @@ def _upsert_visit(
 def _upsert_daily_queue(db: Session, *, doctor: Any, queue_tag: str, cabinet: str) -> Any:
     from app.models.online_queue import DailyQueue
 
+    candidate_tags = QUEUE_TAG_ALIASES.get(queue_tag, (queue_tag,))
     queue = (
         db.query(DailyQueue)
         .filter(
             DailyQueue.day == date.today(),
             DailyQueue.specialist_id == doctor.id,
-            DailyQueue.queue_tag == queue_tag,
+            DailyQueue.queue_tag.in_(candidate_tags),
         )
+        .order_by(DailyQueue.id.asc())
         .first()
     )
     if queue is None:
@@ -552,6 +561,7 @@ def _upsert_daily_queue(db: Session, *, doctor: Any, queue_tag: str, cabinet: st
         )
         db.add(queue)
     queue.active = True
+    queue.queue_tag = queue_tag
     queue.opened_at = datetime.utcnow() - timedelta(hours=1)
     queue.cabinet_number = cabinet
     queue.cabinet_floor = 2
@@ -624,16 +634,17 @@ def _upsert_payment(
         db.add(payment)
         db.flush()
     payment.visit_id = visit.id
+    payment.created_at = visit.created_at or datetime.now()
     payment.amount = amount
     payment.currency = "UZS"
     payment.method = method
     payment.status = status
     payment.note = f"{DEMO_MARKER} {status} payment"
-    payment.paid_at = datetime.utcnow() if status in {"paid", "refunded"} else None
+    payment.paid_at = payment.created_at if status in {"paid", "refunded"} else None
     if status == "refunded":
         payment.refunded_amount = amount
         payment.refund_reason = "Demo refund scenario"
-        payment.refunded_at = datetime.utcnow()
+        payment.refunded_at = payment.created_at
         payment.refunded_by = cashier_id
     else:
         payment.refunded_amount = None
@@ -691,6 +702,16 @@ def seed_visits_queues_payments(
             service=services["S01"],
             status="closed",
             visit_time="11:00",
+        ),
+        "dentist_waiting": _upsert_visit(
+            db,
+            marker="visit-dentist-waiting",
+            patient=patients["DEMO-PAT-008"],
+            doctor=doctors["dentist@example.com"],
+            department_key="dental",
+            service=services["S01"],
+            status="open",
+            visit_time="11:30",
         ),
         "emr_draft": _upsert_visit(
             db,
@@ -771,6 +792,41 @@ def seed_visits_queues_payments(
         visit=visits["emr_signed"],
         service=services["K01"],
         status="served",
+    )
+
+    derma_queue = _upsert_daily_queue(
+        db,
+        doctor=doctors["derma@example.com"],
+        queue_tag="dermatology",
+        cabinet="301",
+    )
+    dentist_queue = _upsert_daily_queue(
+        db,
+        doctor=doctors["dentist@example.com"],
+        queue_tag="dental",
+        cabinet="401",
+    )
+    _commit(db)
+
+    _upsert_queue_entry(
+        db,
+        queue=derma_queue,
+        number=1,
+        marker="queue-derma-waiting",
+        patient=patients["DEMO-PAT-002"],
+        visit=visits["unpaid"],
+        service=services["D01"],
+        status="waiting",
+    )
+    _upsert_queue_entry(
+        db,
+        queue=dentist_queue,
+        number=1,
+        marker="queue-dentist-waiting",
+        patient=patients["DEMO-PAT-008"],
+        visit=visits["dentist_waiting"],
+        service=services["S01"],
+        status="waiting",
     )
 
     _upsert_payment(

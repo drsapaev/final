@@ -6,10 +6,10 @@ import PropTypes from 'prop-types';
  * Displays the current queue entries in a table format
  */
 const QueueTable = ({
-    queueData,
-    effectiveDoctor,
-    loading,
-    t
+    queueData = null,
+    effectiveDoctor = null,
+    loading = false,
+    t = {}
 }) => {
     // If no queue data or no doctor selected
     if (!effectiveDoctor) {
@@ -271,14 +271,6 @@ QueueTable.propTypes = {
     onGenerateQR: PropTypes.func,
     loading: PropTypes.bool,
     t: PropTypes.object
-};
-
-QueueTable.defaultProps = {
-    queueData: null,
-    effectiveDoctor: null,
-    onGenerateQR: () => { },
-    loading: false,
-    t: {}
 };
 
 export default QueueTable;
