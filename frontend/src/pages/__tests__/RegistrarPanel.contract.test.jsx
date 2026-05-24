@@ -32,12 +32,36 @@ describe('RegistrarPanel command contract', () => {
 
   it('passes through registrar queue patient display fields before legacy patient fetch fallback', () => {
     const source = readRegistrarPanelSource();
+    const enrichmentBlock = extractSourceBlock(
+      source,
+      'const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {',
+      'const loadAppointments = useCallback(async (options = {}) => {',
+    );
 
     expect(source).toContain('if (apt.patient_id && !hasBackendPatientDisplayContract(apt))');
     expect(source).toContain('patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name');
     expect(source).toContain('patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year');
     expect(source).toContain('patient_phone: fullEntry.patient_phone ?? fullEntry.phone');
     expect(source).toContain('address: fullEntry.address ?? entry.address');
+    expect(enrichmentBlock).toContain('if (apt.patient_id && !hasBackendPatientDisplayContract(apt))');
+    expect(enrichmentBlock.indexOf('!hasBackendPatientDisplayContract(apt)')).toBeLessThan(
+      enrichmentBlock.indexOf('fetchPatientData(apt.patient_id)'),
+    );
+  });
+
+  it('loads Registrar metadata departments through one registrar endpoint', () => {
+    const source = readRegistrarPanelSource();
+
+    expect(source).toContain("api.get('/registrar/departments?active_only=true')");
+    expect(source).not.toContain('/api/v1/departments/active');
+    expect(source).not.toContain('const loadDynamicDepartments = useCallback');
+  });
+
+  it('does not add a BFF-lite registrar workbench endpoint', () => {
+    const source = readRegistrarPanelSource();
+
+    expect(source).not.toContain('/api/v1/ui/');
+    expect(source).not.toContain('/ui/registrar/workbench');
   });
 
   it('gates record commands through backend-provided available_actions and can flags', () => {
