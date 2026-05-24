@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from app.models.clinic import Doctor
+from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.visit import Visit
@@ -247,6 +248,93 @@ class TestDoctorGeneralQueue:
         db_session.refresh(unrelated_visit)
         assert entry.status == "served"
         assert unrelated_visit.status == "open"
+
+    def test_complete_does_not_mutate_unrelated_queue_entry_on_appointment_collision(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        other_patient = Patient(
+            first_name="Collision",
+            last_name="Queue",
+            middle_name="Patient",
+            phone="+998901111111",
+            birth_date=date(1985, 4, 4),
+            address="Queue patient address",
+        )
+        db_session.add(other_patient)
+        db_session.commit()
+        db_session.refresh(other_patient)
+
+        collision_id = 9002
+        appointment = Appointment(
+            id=collision_id,
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            appointment_date=date.today(),
+            appointment_time="12:00",
+            status="paid",
+            visit_type="paid",
+            payment_type="cash",
+            services=["consultation"],
+        )
+        entry = OnlineQueueEntry(
+            id=collision_id,
+            queue_id=queue.id,
+            number=2,
+            patient_id=other_patient.id,
+            patient_name=other_patient.short_name(),
+            phone=other_patient.phone,
+            source="registrar",
+            status="diagnostics",
+        )
+        db_session.add_all([appointment, entry])
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{collision_id}/complete",
+            json={"patient_id": test_patient.id, "notes": "appointment complete"},
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["status"] == "completed"
+
+        db_session.refresh(appointment)
+        db_session.refresh(entry)
+        assert appointment.status == "completed"
+        assert entry.status == "diagnostics"
 
     def test_cardiologist_role_can_complete_queue_entry(
         self,
