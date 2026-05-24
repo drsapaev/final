@@ -67,6 +67,17 @@ describe('Doctor panels SSOT contract', () => {
     }
   });
 
+  it('does not treat queue row ids as appointment ids for legacy appointment flow', () => {
+    for (const filePath of DOCTOR_PANEL_FILES) {
+      const source = read(filePath);
+
+      expect(source).not.toContain('entry.appointment_id || entry.id');
+      expect(source).not.toContain('row?.appointment_id || row?.id');
+      expect(source).not.toContain('row.appointment_id || row.id');
+      expect(source).not.toContain('appointment.appointment_id || appointment.id');
+    }
+  });
+
   it('does not introduce BFF-lite endpoints while repairing doctor contracts', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);

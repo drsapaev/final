@@ -116,7 +116,7 @@ function buildDermatologyPatientFromAppointment(appointment) {
   return {
     id: patientId,
     patient_id: patientId,
-    appointment_id: appointment.appointment_id || appointment.id || null,
+    appointment_id: appointment.appointment_id || null,
     visit_id: normalizeNumericId(appointment.visit_id),
     patient_name: patientName,
     patient_fio: patientName,
@@ -409,7 +409,7 @@ const DermatologistPanelUnified = () => {
                 queue.entries.forEach((entry) => {
                   allAppointments.push({
                     id: entry.id,
-                    appointment_id: entry.appointment_id || entry.id,
+                    appointment_id: entry.appointment_id || null,
                     patient_id: entry.patient_id,
                     patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                     patient_phone: entry.phone || '',
@@ -516,8 +516,8 @@ const DermatologistPanelUnified = () => {
   }, [activeTab, loadDermatologyAppointments]);
 
   const ensureCanonicalVisitId = useCallback(async (row) => {
-    const appointmentId = row?.appointment_id || row?.id;
-    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+    const appointmentId = row?.appointment_id || null;
+    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId) {
       setAppointments((prev) => prev.map((appointment) =>
@@ -577,8 +577,8 @@ const DermatologistPanelUnified = () => {
 
       // Создаем объект пациента для переключения на прием
       const patientData = {
-        id: row.appointment_id || row.id,
-        appointment_id: row.appointment_id || row.id,
+        id: row.id,
+        appointment_id: row.appointment_id || null,
         visit_id: normalizeNumericId(visitId),
         patient_id: row.patient_id,
         patient_name: row.patient_fio,
@@ -651,8 +651,8 @@ const DermatologistPanelUnified = () => {
           }
 
           const patient = {
-            id: row.appointment_id || row.id,
-            appointment_id: row.appointment_id || row.id,
+            id: row.id,
+            appointment_id: row.appointment_id || null,
             visit_id: normalizeNumericId(visitId),
             patient_id: row.patient_id,
             patient_name: row.patient_fio,
@@ -1004,9 +1004,7 @@ const DermatologistPanelUnified = () => {
   }, [location.search, getPatientIdFromUrl, getVisitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments]);
 
   useEffect(() => {
-    const appointmentId =
-      currentAppointment?.appointment_id ||
-      (currentAppointment?.source !== 'url' ? currentAppointment?.id : null);
+    const appointmentId = currentAppointment?.appointment_id || null;
     if (!appointmentId) {
       setEmr(null);
       setPrescription(null);
@@ -1084,7 +1082,11 @@ const DermatologistPanelUnified = () => {
 
   const savePrescription = async (prescriptionData) => {
     try {
-      const appointmentId = currentAppointment?.appointment_id || currentAppointment?.id;
+      const appointmentId = currentAppointment?.appointment_id || null;
+      if (!appointmentId) {
+        notify.error('Не удалось определить запись для сохранения рецепта');
+        return;
+      }
       const response = await fetch(`${API_V1_BASE}/appointments/${appointmentId}/prescription`, {
         method: 'POST',
         headers: {

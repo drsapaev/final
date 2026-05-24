@@ -423,8 +423,8 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   const ensureCanonicalVisitId = useCallback(async (row) => {
-    const appointmentId = row?.appointment_id || row?.id;
-    const visitId = row?.visit_id || await resolveCanonicalVisitId(appointmentId);
+    const appointmentId = row?.appointment_id || null;
+    const visitId = row?.visit_id || (appointmentId ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId) {
       setAppointments((prev) => prev.map((appointment) =>
@@ -462,7 +462,7 @@ const MacOSCardiologistPanelUnified = () => {
         return prev;
       }
 
-      const nextAppointmentId = matchingAppointment.appointment_id || matchingAppointment.id || prev?.appointment_id || null;
+      const nextAppointmentId = matchingAppointment.appointment_id || prev?.appointment_id || null;
       const nextVisitId = matchingAppointment.visit_id || visitIdFromUrl || prev?.visit_id || null;
       const nextPatientName = matchingAppointment.patient_fio || prev?.patient_name || prev?.patient_fio || '';
       const nextPatient = {
@@ -544,8 +544,8 @@ const MacOSCardiologistPanelUnified = () => {
           data.queues.forEach((queue) => {
             if (queue.entries) {
               queue.entries.forEach((entry) => {
-                const appointmentId = entry.appointment_id || entry.id;
-                const recordKey = `${entry.patient_id}_${appointmentId}_${queue.specialty}`;
+                const appointmentId = entry.appointment_id || null;
+                const recordKey = `${entry.patient_id}_${entry.canonical_record_id || entry.id}_${queue.specialty}`;
 
                 // Пропускаем дубликаты (один и тот же пациент с одним и тем же appointment_id в одной специальности)
                 if (seenIds.has(recordKey)) {
@@ -554,8 +554,8 @@ const MacOSCardiologistPanelUnified = () => {
                 seenIds.add(recordKey);
 
                 allAppointments.push({
-                  id: appointmentId, // Приоритет appointment_id
-                  appointment_id: appointmentId, // Явно указываем appointment_id
+                  id: entry.id,
+                  appointment_id: appointmentId,
                   visit_id: entry.visit_id || null,
                   patient_id: entry.patient_id,
                   patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
@@ -795,7 +795,7 @@ const MacOSCardiologistPanelUnified = () => {
   const handleAppointmentRowClick = async (row) => {
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
-      const appointmentId = row.appointment_id || row.id;
+      const appointmentId = row.appointment_id || null;
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
         setMessage({ type: 'error', text: 'Не удалось определить канонический visit_id для пациента' });
@@ -803,8 +803,8 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       const patientData = {
-        id: row.id, // Это appointment ID
-        appointment_id: appointmentId, // Явно указываем appointment_id
+        id: row.id,
+        appointment_id: appointmentId,
         visit_id: visitId,
         patient_id: row.patient_id,
         patient_name: row.patient_fio,
@@ -840,7 +840,7 @@ const MacOSCardiologistPanelUnified = () => {
         break;
       case 'view_emr':{
           // Просмотр EMR для завершённой записи
-          const appointmentId = row.appointment_id || row.id;
+          const appointmentId = row.appointment_id || null;
           const visitId = await ensureCanonicalVisitId(row);
           if (!visitId) {
             setMessage({ type: 'error', text: 'Не удалось открыть EMR без канонического visit_id' });
@@ -926,7 +926,7 @@ const MacOSCardiologistPanelUnified = () => {
             // Переходим на вкладку визита для завершения
             const patient = {
               id: row.id,
-              appointment_id: row.appointment_id || row.id,
+              appointment_id: row.appointment_id || null,
               visit_id: visitId,
               patient_id: row.patient_id,
               patient_name: row.patient_fio,

@@ -2691,7 +2691,7 @@ def get_today_queues(
 
                 # [OK] УПРОЩЕНО: Добавляем appointment_id для Visit (если был создан соответствующий Appointment)
                 # Используем проверки вместо try/except (Single Source of Truth)
-                appointment_id_value = record_id
+                appointment_id_value = record_id if entry_type == "appointment" else None
                 if entry_type == "visit" and patient_id:
                     # Проверяем, есть ли Appointment для этого Visit
                     visit_date = getattr(entry_data, 'visit_date', None) or today
