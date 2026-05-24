@@ -160,5 +160,24 @@ describe('RegistrarPanel command contract', () => {
     expect(source).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
     expect(source).toContain('return sortRegistrarRowsForPresentation(appointments)');
   });
+
+  it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
+    const source = readRegistrarPanelSource();
+    const resolverBlock = extractSourceBlock(
+      source,
+      'const resolveRescheduleVisitId = useCallback((appointmentRow) => {',
+      'const removeRescheduledAppointmentFromView = useCallback',
+    );
+
+    expect(source).toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || null');
+    expect(source).not.toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId');
+    expect(resolverBlock).toContain('appointmentRow?.visit_ids?.[0]');
+    expect(resolverBlock).toContain('appointmentRow?.visit_id');
+    expect(resolverBlock).toContain('appointmentRow?.visitId');
+    expect(resolverBlock).not.toContain('appointment_id');
+    expect(resolverBlock).not.toContain('appointment_ids');
+    expect(resolverBlock).not.toContain('appointmentRow?.id');
+    expect(source).toContain('Cannot reschedule without a canonical visit id');
+  });
 });
 
