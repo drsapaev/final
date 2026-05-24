@@ -1608,12 +1608,14 @@ const EnhancedAppointmentsTable = ({
               );
               const canPay = !isDoctorView && (backendCanPay ?? legacyCanPay);
               const canCall = backendCanCall ?? (
-                isDoctorView ?
-                  rowStatus === 'queued' || rowStatus === 'waiting' || rowPaymentStatus === 'paid' :
-                  rowStatus === 'queued' || rowStatus === 'waiting'
+                isDoctorView ? false : rowStatus === 'queued' || rowStatus === 'waiting'
               );
-              const canPrint = backendCanPrint ?? (rowPaymentStatus === 'paid' || rowStatus === 'queued' || rowStatus === 'waiting');
-              const canComplete = backendCanComplete ?? (rowStatus === 'in_cabinet' || rowStatus === 'called');
+              const canPrint = backendCanPrint ?? (
+                isDoctorView ? false : rowPaymentStatus === 'paid' || rowStatus === 'queued' || rowStatus === 'waiting'
+              );
+              const canComplete = backendCanComplete ?? (
+                isDoctorView ? false : rowStatus === 'in_cabinet' || rowStatus === 'called'
+              );
 
               return (
                 <tr
