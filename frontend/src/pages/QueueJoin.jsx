@@ -40,10 +40,6 @@ const formatSpecialistLabel = (specialist) => {
 const MISSING_QUEUE_TOKEN_MESSAGE = 'QR-код не найден. Откройте ссылку из клиники или отсканируйте QR-код заново.';
 const QUEUE_JOIN_MESSAGES = {
   sessionStartFailed: 'Не удалось начать сессию очереди.',
-  queueInactive: 'Очередь сейчас не активна.',
-  registrationClosedAt: (endTime) => `Запись закрылась в ${endTime}.`,
-  receptionAlreadyOpened: 'Запись закрыта: прием уже начался.',
-  limitReached: (maxEntries) => `Лимит записи достигнут (${maxEntries}).`,
   registrationUnavailable: 'Запись в очередь недоступна.',
   qrTokenUnavailable: 'QR-токен не найден или срок его действия истек.',
   requiredFields: 'Заполните обязательные поля.',
@@ -182,34 +178,14 @@ const QueueJoin = () => {
           : []
       );
 
-      if (!tokenInfo.queue_active) {
-        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.queueInactive);
-        setStep('error');
-        setIsSpecialistsLoading(false);
-        return;
-      }
-
       if (tokenInfo.status === 'before_start_time') {
         setQueueInfo(tokenInfo);
         setStep('waiting');
         setIsSpecialistsLoading(false);
         return;
-      } else if (tokenInfo.status === 'after_end_time') {
-        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationClosedAt(tokenInfo.end_time));
-        setStep('error');
-        setIsSpecialistsLoading(false);
-        return;
-      } else if (tokenInfo.status === 'closed_reception_opened') {
-        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.receptionAlreadyOpened);
-        setStep('error');
-        setIsSpecialistsLoading(false);
-        return;
-      } else if (tokenInfo.status === 'limit_reached') {
-        setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.limitReached(tokenInfo.max_entries));
-        setStep('error');
-        setIsSpecialistsLoading(false);
-        return;
-      } else if (tokenInfo.allowed === false) {
+      }
+
+      if (!tokenInfo.queue_active || tokenInfo.allowed === false) {
         setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationUnavailable);
         setStep('error');
         setIsSpecialistsLoading(false);

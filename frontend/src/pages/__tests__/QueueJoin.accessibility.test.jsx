@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +14,9 @@ const queueApiMocks = vi.hoisted(() => ({
 vi.mock('../../api/queue', () => queueApiMocks);
 
 import QueueJoin from '../QueueJoin';
+
+const queueJoinSourcePath = path.resolve(process.cwd(), 'src/pages/QueueJoin.jsx');
+const readQueueJoinSource = () => fs.readFileSync(queueJoinSourcePath, 'utf8');
 
 function setupQueueApiMock({
   selectableSpecialists = [
@@ -158,6 +163,16 @@ describe('QueueJoin Accessibility & UX', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Backend says registration is full');
     expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+  });
+
+  it('does not recreate unavailable queue policy messages from status codes', () => {
+    const source = readQueueJoinSource();
+
+    expect(source).not.toContain('QUEUE_JOIN_MESSAGES.registrationClosedAt');
+    expect(source).not.toContain('QUEUE_JOIN_MESSAGES.receptionAlreadyOpened');
+    expect(source).not.toContain('QUEUE_JOIN_MESSAGES.limitReached');
+    expect(source).not.toContain('QUEUE_JOIN_MESSAGES.queueInactive');
+    expect(source).toContain('setError(tokenInfo.message || QUEUE_JOIN_MESSAGES.registrationUnavailable)');
   });
 
   it('submits real doctor ids for clinic-wide QR instead of queue profile ids', async () => {
