@@ -30,7 +30,33 @@ alembic current
 Expected:
 - `alembic current` points to head revision.
 
-## 3. Start Services
+## 3. Reset And Seed A Disposable Dev DB
+For manual UI testing, use a local disposable PostgreSQL database such as
+`clinic_dev`:
+
+```powershell
+cd C:\final\backend
+$env:ENV="dev"
+$env:DATABASE_URL="postgresql+psycopg://clinic:<dev_password>@localhost:5432/clinic_dev"
+$env:DISABLE_2FA_REQUIREMENT="1"
+
+python -m app.scripts.reset_dev_db `
+  --mode schema `
+  --seed demo `
+  --confirm-dev-reset `
+  --confirm-dev-seed `
+  --confirm-db-name clinic_dev
+```
+
+Seed-only rerun:
+
+```powershell
+python -m app.scripts.dev_seed --profile demo --confirm-dev-seed
+```
+
+See `docs/dev/POSTGRES_DEV_DATABASE.md` and `docs/dev/DEMO_USERS.md`.
+
+## 4. Start Services
 Backend:
 ```powershell
 cd c:\final\backend
@@ -44,7 +70,7 @@ npm install
 npm run dev
 ```
 
-## 4. Validate Quality Gates Locally
+## 5. Validate Quality Gates Locally
 Backend contracts:
 ```powershell
 cd c:\final\backend
@@ -58,6 +84,8 @@ npm run test:run -- src/pages/__tests__/Login.accessibility.test.jsx src/pages/_
 ```
 
 ## Related Runbooks
+- `docs/dev/POSTGRES_DEV_DATABASE.md`
+- `docs/dev/DEMO_USERS.md`
 - `docs/runbooks/POSTGRES_DR_RUNBOOK.md`
 - `docs/runbooks/OBSERVABILITY_SLA_RUNBOOK.md`
 - `docs/runbooks/LOAD_TESTING_RUNBOOK.md`
