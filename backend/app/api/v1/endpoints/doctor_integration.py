@@ -627,6 +627,29 @@ def complete_patient_visit(
         queue_entry = (
             db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
+        requested_patient_id = None
+        if isinstance(visit_data, dict):
+            raw_patient_id = visit_data.get("patient_id")
+            try:
+                requested_patient_id = (
+                    int(raw_patient_id) if raw_patient_id is not None else None
+                )
+            except (TypeError, ValueError):
+                requested_patient_id = None
+
+        if (
+            queue_entry
+            and requested_patient_id is not None
+            and queue_entry.patient_id is not None
+            and queue_entry.patient_id != requested_patient_id
+        ):
+            # Some legacy doctor flows pass appointment/visit IDs to this route.
+            # If the numeric ID collides with an unrelated queue entry, do not
+            # mutate the queue entry; allow the typed legacy fallback below.
+            logger.warning(
+                "complete_patient_visit: route id matched a queue entry for a different patient than the request payload; trying legacy record fallback"
+            )
+            queue_entry = None
 
         visit = None
         if not queue_entry:
