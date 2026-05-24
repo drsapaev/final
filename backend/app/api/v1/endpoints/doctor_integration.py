@@ -647,10 +647,7 @@ def complete_patient_visit(
             # If the numeric ID collides with an unrelated queue entry, do not
             # mutate the queue entry; allow the typed legacy fallback below.
             logger.warning(
-                "complete_patient_visit: queue entry id %s belongs to patient %s, request payload targets patient %s; trying legacy record fallback",
-                entry_id,
-                queue_entry.patient_id,
-                requested_patient_id,
+                "complete_patient_visit: route id matched a queue entry for a different patient than the request payload; trying legacy record fallback"
             )
             queue_entry = None
 
