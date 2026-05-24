@@ -37,6 +37,18 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert instance_response.status_code == 200
     instance = instance_response.json()
     assert instance["status"] == "DRAFT"
+    assert set(instance["available_actions"]) == {
+        "edit",
+        "save_draft",
+        "mark_ready",
+        "finalize",
+    }
+    assert instance["can_edit"] is True
+    assert instance["can_save_draft"] is True
+    assert instance["can_mark_ready"] is True
+    assert instance["can_finalize"] is True
+    assert instance["can_revise"] is False
+    assert instance["can_print"] is False
     assert instance["signer_snapshot"]["lab_technician_name"] == "Test Admin"
     assert instance["signer_snapshot"]["approver_name"] == "Test Admin"
 
@@ -77,6 +89,10 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert summary["flagged_findings_count"] == 0
     assert summary["critical_findings_count"] == 0
     assert summary["max_flag_severity"] is None
+    assert summary["can_edit"] is True
+    assert summary["can_finalize"] is True
+    assert summary["can_revise"] is False
+    assert summary["can_print"] is False
 
     visit_history_response = client.get(
         "/api/v1/lab/report-instances",
@@ -142,14 +158,27 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
         headers=auth_headers,
     )
     assert finalize_response.status_code == 200
-    assert finalize_response.json()["status"] == "FINALIZED"
+    finalized = finalize_response.json()
+    assert finalized["status"] == "FINALIZED"
+    assert set(finalized["available_actions"]) == {"revise", "print"}
+    assert finalized["can_edit"] is False
+    assert finalized["can_save_draft"] is False
+    assert finalized["can_mark_ready"] is False
+    assert finalized["can_finalize"] is False
+    assert finalized["can_revise"] is True
+    assert finalized["can_print"] is True
 
     print_once_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
         headers=auth_headers,
     )
     assert print_once_response.status_code == 200
-    assert print_once_response.json()["status"] == "PRINTED"
+    printed = print_once_response.json()
+    assert printed["status"] == "PRINTED"
+    assert set(printed["available_actions"]) == {"revise", "print"}
+    assert printed["can_edit"] is False
+    assert printed["can_revise"] is True
+    assert printed["can_print"] is True
 
     print_twice_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",

@@ -100,6 +100,35 @@ function matchesHistoryFilter(item, filter) {
   return true;
 }
 
+const LAB_REPORT_ACTION_CAN_FIELD = {
+  edit: 'can_edit',
+  save_draft: 'can_save_draft',
+  mark_ready: 'can_mark_ready',
+  finalize: 'can_finalize',
+  revise: 'can_revise',
+  print: 'can_print'
+};
+
+function hasLabReportAction(instance, action) {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!instance || !normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(instance.available_actions)) {
+    return instance.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = LAB_REPORT_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(instance, canField)) {
+    return Boolean(instance[canField]);
+  }
+
+  return false;
+}
+
 function getServiceContextItems(appointment) {
   const serviceDetails = appointment?.service_details || [];
   if (serviceDetails.length > 0) {
@@ -278,6 +307,12 @@ export default function LabReportWorkbench({
     });
   }, [historySeverityFilter, recentReports]);
   const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
+  const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit');
+  const canSaveDraft = hasLabReportAction(activeInstance, 'save_draft');
+  const canMarkReady = hasLabReportAction(activeInstance, 'mark_ready');
+  const canFinalize = hasLabReportAction(activeInstance, 'finalize');
+  const canRevise = hasLabReportAction(activeInstance, 'revise');
+  const canPrint = hasLabReportAction(activeInstance, 'print');
 
   const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
@@ -702,29 +737,29 @@ export default function LabReportWorkbench({
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {activeInstance.status !== 'FINALIZED' && activeInstance.status !== 'PRINTED' && (
+                  {(canSaveDraft || canMarkReady || canFinalize) && (
                     <>
-                      <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
+                      <Button variant="outline" onClick={handleSaveDraft} disabled={saving || !canSaveDraft}>
                         <Icon name="square.and.arrow.down" size={16} />
                         {busyAction === 'save' ? 'Сохраняю...' : 'Сохранить черновик'}
                       </Button>
-                      <Button variant="outline" onClick={handleMarkReady} disabled={saving}>
+                      <Button variant="outline" onClick={handleMarkReady} disabled={saving || !canMarkReady}>
                         <Icon name="checkmark.circle" size={16} />
                         {busyAction === 'ready' ? 'Перевожу...' : 'Отметить готовым'}
                       </Button>
-                      <Button variant="primary" onClick={handleFinalize} disabled={saving}>
+                      <Button variant="primary" onClick={handleFinalize} disabled={saving || !canFinalize}>
                         <Icon name="lock.circle" size={16} />
                         {busyAction === 'finalize' ? 'Финализирую...' : 'Финализировать'}
                       </Button>
                     </>
                   )}
-                  {(activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED') && (
+                  {(canRevise || canPrint) && (
                     <>
-                      <Button variant="outline" onClick={handleRevise} disabled={saving}>
+                      <Button variant="outline" onClick={handleRevise} disabled={saving || !canRevise}>
                         <Icon name="arrow.triangle.branch" size={16} />
                         {busyAction === 'revise' ? 'Создаю ревизию...' : 'Создать ревизию'}
                       </Button>
-                      <Button variant="primary" onClick={handlePrint} disabled={saving}>
+                      <Button variant="primary" onClick={handlePrint} disabled={saving || !canPrint}>
                         <Icon name="printer" size={16} />
                         {busyAction === 'print' ? 'Отправляю...' : 'Печать результата'}
                       </Button>
@@ -826,7 +861,7 @@ export default function LabReportWorkbench({
                                 className="macos-input"
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'}
+                                disabled={!canEditActiveInstance}
                               >
                                 <option value="">Выберите значение</option>
                                 {currentValue && !choiceOptions.includes(currentValue) && (
@@ -845,7 +880,7 @@ export default function LabReportWorkbench({
                                 rows={3}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'}
+                                disabled={!canEditActiveInstance}
                               />
                             ) : (
                               <input
@@ -853,7 +888,7 @@ export default function LabReportWorkbench({
                                 aria-label={`Lab result for ${field.label}`}
                                 value={currentValue}
                                 onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'}
+                                disabled={!canEditActiveInstance}
                               />
                             )}
                             <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>

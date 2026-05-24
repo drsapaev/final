@@ -108,6 +108,7 @@ def _template_out(template) -> LabReportTemplateOut:
 def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOut:
     sections = service.materialize_instance(instance)
     critical_findings = service.summarize_critical_findings(sections)
+    available_actions = service.instance_available_actions(instance)
     return LabReportInstanceOut(
         id=instance.id,
         order_id=instance.order_id,
@@ -143,6 +144,8 @@ def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOu
         critical_findings=[
             LabCriticalFindingOut(**finding) for finding in critical_findings
         ],
+        available_actions=available_actions,
+        **service.instance_action_flags(instance),
     )
 
 
@@ -151,6 +154,7 @@ def _instance_summary_out(
 ) -> LabReportInstanceSummaryOut:
     sections = service.materialize_instance(instance)
     severity_metrics = service.summarize_instance_severity(sections)
+    available_actions = service.instance_available_actions(instance)
     return LabReportInstanceSummaryOut(
         id=instance.id,
         patient_id=instance.patient_id,
@@ -166,6 +170,8 @@ def _instance_summary_out(
         flagged_findings_count=severity_metrics["flagged_findings_count"],
         critical_findings_count=severity_metrics["critical_findings_count"],
         max_flag_severity=severity_metrics["max_flag_severity"],
+        available_actions=available_actions,
+        **service.instance_action_flags(instance),
     )
 
 
