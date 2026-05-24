@@ -3,6 +3,14 @@
 - Add or update documentation/process guidance.
 - No runtime behavior, API contract, migration, or user-facing flow changed.
 
+## Cyclic Execution Evidence
+
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only docs/process files changed
+- Branch: docs/example-process-pr
+- Scope gate: allowed docs/process files; denied backend runtime, frontend runtime, migrations, and generated output
+- Red-check handling: fix any failed docs/gate check in this same PR before merge
+
 ## Contract Impact
 
 not applicable - documentation/process only, no API, websocket, event, or frontend consumer contract changed.

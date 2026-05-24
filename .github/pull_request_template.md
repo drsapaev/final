@@ -10,6 +10,16 @@ Before requesting review:
 
 Describe the change in 2-4 bullets.
 
+## Cyclic Execution Evidence
+
+- Fresh main sync:
+- Clean workspace:
+- Branch:
+- Scope gate:
+- Red-check handling:
+
+See `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md` for the Evidence-Based Small PR Protocol.
+
 ## Contract Impact
 
 - Canonical surface:
