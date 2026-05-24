@@ -53,6 +53,8 @@ function formatAppointmentEntry(queue, entry) {
     appointment_time: entry.visit_time || '09:00',
     status: entry.status || 'waiting',
     status_source: 'queue',
+    lab_report_status: null,
+    report_status_source: null,
     report_instance_id: null,
     report_template_name: '',
     flagged_findings_count: 0,
@@ -115,8 +117,11 @@ function mergeQueueEntriesWithLabInstances(queueEntries, labInstances) {
     }
     return {
       ...appointment,
-      status: linkedInstance.status || appointment.status,
-      status_source: 'lab-report',
+      status: appointment.status,
+      queue_status: appointment.queue_status || appointment.status,
+      status_source: 'queue',
+      lab_report_status: linkedInstance.status || null,
+      report_status_source: 'lab-report',
       report_instance_id: linkedInstance.id || null,
       report_template_name: linkedInstance.template?.name || '',
       flagged_findings_count: linkedInstance.flagged_findings_count || 0,
