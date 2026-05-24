@@ -241,6 +241,13 @@ class LabReportInstanceOut(BaseModel):
     template_version: LabReportTemplateVersionOut
     sections: list[LabReportRenderedSectionOut]
     critical_findings: list[LabCriticalFindingOut] = Field(default_factory=list)
+    available_actions: list[str] = Field(default_factory=list)
+    can_edit: bool = False
+    can_save_draft: bool = False
+    can_mark_ready: bool = False
+    can_finalize: bool = False
+    can_revise: bool = False
+    can_print: bool = False
 
 
 class LabReportInstanceSummaryOut(BaseModel):
@@ -258,6 +265,13 @@ class LabReportInstanceSummaryOut(BaseModel):
     flagged_findings_count: int = 0
     critical_findings_count: int = 0
     max_flag_severity: int | None = None
+    available_actions: list[str] = Field(default_factory=list)
+    can_edit: bool = False
+    can_save_draft: bool = False
+    can_mark_ready: bool = False
+    can_finalize: bool = False
+    can_revise: bool = False
+    can_print: bool = False
 
 
 class LabReportBulkSaveResponse(BaseModel):

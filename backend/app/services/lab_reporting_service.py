@@ -672,6 +672,25 @@ class LabReportingService:
         self.repository.commit()
         return self.get_instance(instance.id)
 
+    def instance_available_actions(self, instance: LabReportInstance) -> list[str]:
+        actions: list[str] = []
+        if instance.status not in FINAL_INSTANCE_STATUSES:
+            actions.extend(["edit", "save_draft", "mark_ready", "finalize"])
+        if instance.status in FINAL_INSTANCE_STATUSES:
+            actions.extend(["revise", "print"])
+        return actions
+
+    def instance_action_flags(self, instance: LabReportInstance) -> dict[str, bool]:
+        actions = set(self.instance_available_actions(instance))
+        return {
+            "can_edit": "edit" in actions,
+            "can_save_draft": "save_draft" in actions,
+            "can_mark_ready": "mark_ready" in actions,
+            "can_finalize": "finalize" in actions,
+            "can_revise": "revise" in actions,
+            "can_print": "print" in actions,
+        }
+
     def _normalize_version_payload(self, sections_payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized_sections: list[dict[str, Any]] = []
         for section in sorted(

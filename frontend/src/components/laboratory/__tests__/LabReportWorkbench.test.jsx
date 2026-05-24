@@ -1,11 +1,17 @@
 import React from 'react';
 import '@testing-library/jest-dom';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.jsx');
 
 vi.mock('../../../api/labReporting', () => ({
   labReportingApi: {
@@ -84,5 +90,16 @@ describe('LabReportWorkbench', () => {
     fireEvent.click(reportButton);
 
     expect(onOpenInstance).toHaveBeenCalledWith(22);
+  });
+
+  it('uses backend-provided action availability instead of local finalized status rules', () => {
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    expect(source).toContain('function hasLabReportAction(instance, action)');
+    expect(source).toContain("const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit')");
+    expect(source).toContain("const canFinalize = hasLabReportAction(activeInstance, 'finalize')");
+    expect(source).toContain("const canRevise = hasLabReportAction(activeInstance, 'revise')");
+    expect(source).not.toContain("activeInstance.status !== 'FINALIZED' && activeInstance.status !== 'PRINTED'");
+    expect(source).not.toContain("activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'");
   });
 });
