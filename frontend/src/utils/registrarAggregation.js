@@ -10,6 +10,26 @@ export const getRecordAmount = (appointment) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+export const getRegistrarPresentationSortTime = (record) => {
+  const value = record?.queue_time || record?.created_at || null;
+  if (!value) return 0;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+export const compareRegistrarPresentationOrder = (a, b) => {
+  const aTime = getRegistrarPresentationSortTime(a);
+  const bTime = getRegistrarPresentationSortTime(b);
+  if (aTime === bTime) {
+    return Number(a?.id || 0) - Number(b?.id || 0);
+  }
+  return aTime - bTime;
+};
+
+export const sortRegistrarRowsForPresentation = (records = []) => (
+  [...records].sort(compareRegistrarPresentationOrder)
+);
+
 const normalizeRecordKind = (appointment) => String(
   appointment?.record_kind ?? appointment?.source_kind ?? appointment?.record_type ?? appointment?.type ?? ''
 ).trim().toLowerCase();

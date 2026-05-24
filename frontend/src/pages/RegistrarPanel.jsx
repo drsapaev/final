@@ -223,7 +223,10 @@ import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 import { formatNetworkErrorMessage, isNetworkFetchError } from '../utils/networkErrorMessages';
 import { getErrorMessage } from '../utils/errorHandler';
-import { aggregatePatientsForAllDepartments as aggregateRegistrarPatients } from '../utils/registrarAggregation';
+import {
+  aggregatePatientsForAllDepartments as aggregateRegistrarPatients,
+  sortRegistrarRowsForPresentation
+} from '../utils/registrarAggregation';
 
 // ⭐ SSOT: Centralized service code resolver
 import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
@@ -2225,11 +2228,7 @@ const RegistrarPanel = () => {
       });
 
       // Сортируем по queue_time ASC
-      const sorted = entriesForTab.sort((a, b) => {
-        const aTime = (a.queue_time ? new Date(a.queue_time) : new Date(a.created_at || 0)).getTime();
-        const bTime = (b.queue_time ? new Date(b.queue_time) : new Date(b.created_at || 0)).getTime();
-        return aTime - bTime;
-      });
+      const sorted = sortRegistrarRowsForPresentation(entriesForTab);
 
       logger.info('⭐ FIX 16: Вкладка', activeTab, '- найдено', sorted.length, 'записей из',
       rawEntries?.length || 0, 'rawEntries');
@@ -2257,22 +2256,11 @@ const RegistrarPanel = () => {
     // Для вкладки "Все отделения" (activeTab === null или undefined) - агрегируем пациентов
     if (!activeTab) {
       // Сначала фильтруем по статусу, если задан
-      const filtered = appointments.filter((appointment) => {
+      const filtered = sortRegistrarRowsForPresentation(appointments.filter((appointment) => {
         // Фильтр по статусу (если задан)
         if (statusFilter && appointment.status !== statusFilter) return false;
         return true;
-      });
-
-      // ⭐ ВАЖНО: Сортируем по queue_time ASC (согласно cursor.yaml), иначе по created_at
-      filtered.sort((a, b) => {
-        // Приоритет: queue_time > created_at
-        const aTime = (a.queue_time ? new Date(a.queue_time) : a.created_at ? new Date(a.created_at) : null)?.getTime() || 0;
-        const bTime = (b.queue_time ? new Date(b.queue_time) : b.created_at ? new Date(b.created_at) : null)?.getTime() || 0;
-        if (aTime === bTime) {
-          return (a.id || 0) - (b.id || 0);
-        }
-        return aTime - bTime; // От раннего к позднему (ASC)
-      });
+      }));
 
       // Затем агрегируем пациентов
       logger.info(`📊 Для вкладки "Все отделения": ${filtered.length} записей до агрегации`);
@@ -2307,27 +2295,12 @@ const RegistrarPanel = () => {
 
           return inFio || inPhone || inServices || inId;
         });
-        // ✅ ИСПРАВЛЕНИЕ: Сортируем результат поиска по времени регистрации
-        return searched.sort((a, b) => {
-          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-          if (aTime === bTime) {
-            return (a.id || 0) - (b.id || 0);
-          }
-          return aTime - bTime;
-        });
+        // Presentation-only order: backend queue_time first, then created_at.
+        return sortRegistrarRowsForPresentation(searched);
       }
 
       // ⭐ ВАЖНО: Сортируем агрегированных пациентов по queue_time ASC (согласно cursor.yaml)
-      const sortedAggregated = aggregatedPatients.sort((a, b) => {
-        // Приоритет: queue_time > created_at
-        const aTime = (a.queue_time ? new Date(a.queue_time) : a.created_at ? new Date(a.created_at) : null)?.getTime() || 0;
-        const bTime = (b.queue_time ? new Date(b.queue_time) : b.created_at ? new Date(b.created_at) : null)?.getTime() || 0;
-        if (aTime === bTime) {
-          return (a.id || 0) - (b.id || 0);
-        }
-        return aTime - bTime; // От раннего к позднему (ASC)
-      });
+      const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients);
 
       // ✅ ИСПРАВЛЕНО: Применяем правильное форматирование услуг для вкладки "Все отделения"
       // Это гарантирует, что для QR-записей будут показаны все коды услуг (K01, S01 и т.д.)
@@ -2337,16 +2310,8 @@ const RegistrarPanel = () => {
       }));
     }
 
-    // ⭐ ВАЖНО: Сортируем все записи по queue_time ASC (согласно cursor.yaml), иначе по created_at
-    return appointments.sort((a, b) => {
-      // Приоритет: queue_time > created_at
-      const aTime = (a.queue_time ? new Date(a.queue_time) : a.created_at ? new Date(a.created_at) : null)?.getTime() || 0;
-      const bTime = (b.queue_time ? new Date(b.queue_time) : b.created_at ? new Date(b.created_at) : null)?.getTime() || 0;
-      if (aTime === bTime) {
-        return (a.id || 0) - (b.id || 0);
-      }
-      return aTime - bTime; // От раннего к позднему (ASC)
-    });
+    // Presentation-only order on a copy; backend remains owner of queue facts.
+    return sortRegistrarRowsForPresentation(appointments);
   }, [appointments, rawEntries, activeTab, statusFilter, searchQuery, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
