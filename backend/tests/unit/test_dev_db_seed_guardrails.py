@@ -9,7 +9,7 @@ from app.scripts.reset_dev_db import (
 )
 
 
-LOCAL_URL = "postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinic_dev"
+LOCAL_URL = "postgresql+psycopg://clinic@localhost:5432/clinic_dev"
 
 
 def test_preflight_accepts_local_postgres_dev_db(monkeypatch):
@@ -46,7 +46,7 @@ def test_preflight_refuses_non_postgres(monkeypatch):
     monkeypatch.setenv("ENV", "dev")
 
     with pytest.raises(DevDatabaseSafetyError, match="non-PostgreSQL"):
-        build_preflight("mysql+pymysql://clinic:pwd@localhost/clinic_dev", mode="schema")
+        build_preflight("mysql+pymysql://clinic@localhost/clinic_dev", mode="schema")
 
 
 @pytest.mark.parametrize(
@@ -58,7 +58,7 @@ def test_preflight_refuses_suspicious_database_names(monkeypatch, database):
 
     with pytest.raises(DevDatabaseSafetyError, match="suspicious database"):
         build_preflight(
-            f"postgresql+psycopg://clinic:clinicpwd@localhost:5432/{database}",
+            f"postgresql+psycopg://clinic@localhost:5432/{database}",
             mode="schema",
         )
 
@@ -68,7 +68,7 @@ def test_preflight_refuses_remote_host_without_explicit_flag(monkeypatch):
 
     with pytest.raises(DevDatabaseSafetyError, match="remote database host"):
         build_preflight(
-            "postgresql+psycopg://clinic:clinicpwd@db.example.test:5432/clinic_dev",
+            "postgresql+psycopg://clinic@db.example.test:5432/clinic_dev",
             mode="schema",
         )
 
@@ -77,7 +77,7 @@ def test_preflight_allows_remote_host_with_explicit_flag(monkeypatch):
     monkeypatch.setenv("ENV", "dev")
 
     preflight = build_preflight(
-        "postgresql+psycopg://clinic:clinicpwd@db.example.test:5432/clinic_dev",
+        "postgresql+psycopg://clinic@db.example.test:5432/clinic_dev",
         mode="schema",
         allow_remote_dev_db=True,
     )

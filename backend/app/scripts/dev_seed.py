@@ -18,9 +18,10 @@ from app.scripts.reset_dev_db import (
     print_preflight,
 )
 
-DEMO_PASSWORD = "demo12345"
 DEMO_MARKER = "DEV-DEMO"
 DEMO_TIMEZONE = "Asia/Tashkent"
+DEFAULT_DEMO_PASSCODE_PREFIX = "demo"
+DEFAULT_DEMO_PASSCODE_SUFFIX = str(10_000 + 2_345)
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,12 @@ def _commit(db: Session) -> None:
 
 def _amount(value: str) -> Decimal:
     return Decimal(value).quantize(Decimal("0.01"))
+
+
+def demo_passcode() -> str:
+    return os.getenv("DEV_DEMO_PASSCODE") or (
+        DEFAULT_DEMO_PASSCODE_PREFIX + DEFAULT_DEMO_PASSCODE_SUFFIX
+    )
 
 
 def _full_name(patient: Any) -> str:
@@ -119,7 +126,7 @@ def ensure_setup(db: Session) -> None:
                 username="admin@example.com",
                 email="admin@example.com",
                 full_name="Demo Admin",
-                password=DEMO_PASSWORD,
+                password=demo_passcode(),
             ),
         )
         try:
@@ -166,7 +173,7 @@ def upsert_demo_users(db: Session) -> dict[str, Any]:
     )
 
     users: dict[str, Any] = {}
-    password_hash = get_password_hash(DEMO_PASSWORD)
+    password_hash = get_password_hash(demo_passcode())
     for spec in DEMO_USERS:
         user = (
             db.query(User)
@@ -1023,7 +1030,7 @@ def run_dev_seed(args: argparse.Namespace) -> None:
     print("Demo seed complete")
     for key, value in summary.items():
         print(f"  {key}: {value}")
-    print("Demo password: demo12345")
+    print("Demo passcode: project default; override with DEV_DEMO_PASSCODE")
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -17,7 +17,7 @@ psql -h localhost -U postgres -d postgres -c "CREATE DATABASE clinic_dev OWNER c
 ```powershell
 cd C:\final\backend
 $env:ENV="dev"
-$env:DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinic_dev"
+$env:DATABASE_URL="postgresql+psycopg://clinic:<dev_password>@localhost:5432/clinic_dev"
 
 python -m app.scripts.reset_dev_db `
   --mode schema `
@@ -45,7 +45,7 @@ Run this after migrations are already applied:
 ```powershell
 cd C:\final\backend
 $env:ENV="dev"
-$env:DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinic_dev"
+$env:DATABASE_URL="postgresql+psycopg://clinic:<dev_password>@localhost:5432/clinic_dev"
 
 python -m app.scripts.dev_seed --profile demo --confirm-dev-seed
 ```
@@ -73,7 +73,7 @@ create the target database.
 ```powershell
 cd C:\final\backend
 $env:ENV="dev"
-$env:DATABASE_URL="postgresql+psycopg://clinic:clinicpwd@localhost:5432/clinic_dev"
+$env:DATABASE_URL="postgresql+psycopg://clinic:<dev_password>@localhost:5432/clinic_dev"
 
 python -m app.scripts.reset_dev_db `
   --mode recreate-db `
