@@ -59,17 +59,6 @@ const BenefitSettings = () => {
     } catch (error) {
       logger.error('Error loading benefit settings:', error);
       setError(error.response?.data?.detail || 'Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
-      // Fallback данные при ошибке
-      const fallbackData = {
-        repeat_visit_days: 21,
-        repeat_visit_discount: 0,
-        benefit_consultation_free: true,
-        all_free_auto_approve: false,
-        updated_at: new Date().toISOString()
-      };
-      setSettings(fallbackData);
-      setOriginalSettings(fallbackData);
-      setLastUpdated(new Date());
       toast.error('Ошибка загрузки настроек льгот');
     } finally {
       setLoading(false);
