@@ -1902,6 +1902,20 @@ const DermatologistPanelUnified = () => {
           }
 
           {/* Фото до/после */}
+          {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
+          <MacOSCard style={{ padding: '48px' }}>
+              <MacOSEmptyState
+              icon={Calendar}
+              title="Выберите визит"
+              description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
+              action={
+              <MacOSButton variant="outline" onClick={() => handleTabChange('appointments')} style={{ marginTop: '16px' }}>
+                    Перейти к записям
+                  </MacOSButton>
+              } />
+            </MacOSCard>
+          }
+
           {activeTab === 'photos' && (currentAppointment || selectedPatient) &&
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <MacOSCard style={{ padding: '24px' }}>

@@ -88,6 +88,19 @@ describe('Doctor panels SSOT contract', () => {
     }
   });
 
+  it('renders a safe visit empty state when specialty visit tabs have no selected context', () => {
+    const cardiology = read('pages/CardiologistPanelUnified.jsx');
+    const dermatology = read('pages/DermatologistPanelUnified.jsx');
+
+    expect(cardiology).toContain("activeTab === 'visit' && !selectedPatient");
+    expect(cardiology).toContain('title="Выберите визит"');
+    expect(cardiology).toContain("goToTab('appointments')");
+
+    expect(dermatology).toContain("activeTab === 'visit' && !currentAppointment && !selectedPatient");
+    expect(dermatology).toContain('title="Выберите визит"');
+    expect(dermatology).toContain("handleTabChange('appointments')");
+  });
+
   it('keeps the active doctor queue page action visibility backend-owned', () => {
     const source = read('pages/DoctorPanel.jsx');
     const actionBlock = extractBlock(

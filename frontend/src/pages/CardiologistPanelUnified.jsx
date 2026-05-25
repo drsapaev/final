@@ -1669,6 +1669,20 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           {/* ЭКГ */}
+          {activeTab === 'visit' && !selectedPatient &&
+          <MacOSCard style={{ padding: '48px' }}>
+              <MacOSEmptyState
+              icon={Calendar}
+              title="Выберите визит"
+              description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
+              action={
+              <MacOSButton variant="outline" onClick={() => goToTab('appointments')} style={{ marginTop: '16px' }}>
+                    Перейти к записям
+                  </MacOSButton>
+              } />
+            </MacOSCard>
+          }
+
           {activeTab === 'ecg' &&
           <div style={{
             width: '100%',
