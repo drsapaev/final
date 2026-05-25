@@ -142,6 +142,19 @@ const getRegistrarRecordRefs = (record) => {
   }, []);
 };
 
+const getRegistrarSelectionKey = (record) => {
+  const refs = getRegistrarRecordRefs(record);
+  if (refs.length > 0) {
+    return refs.map((ref) => `${ref.record_kind}:${ref.record_id}`).join('|');
+  }
+  return record?.id !== undefined && record?.id !== null ? `legacy:${record.id}` : null;
+};
+
+const findRegistrarRecordBySelectionKey = (records, selectionKey) => {
+  if (!selectionKey) return null;
+  return (records || []).find((record) => getRegistrarSelectionKey(record) === selectionKey) || null;
+};
+
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
 
 const hasBackendAction = (record, action) => {
@@ -1775,12 +1788,17 @@ const RegistrarPanel = () => {
     }
   };
 
-  const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '', sourceRecord = null) => {
+  const updateAppointmentStatus = useCallback(async (recordSelectionKey, status, reason = '', sourceRecord = null) => {
     try {
-      const record = sourceRecord || appointments.find((apt) => apt.id === appointmentId);
+      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, recordSelectionKey);
       const requiredBackendAction = getRegistrarActionForStatus(status);
       if (!requiredBackendAction) {
-        logger.warn('RegistrarPanel: unsupported status command', { appointmentId, status, record });
+        logger.warn('RegistrarPanel: unsupported status command', { recordSelectionKey, status, record });
+        notify.error('Action is not available for this record');
+        return null;
+      }
+      if (!record) {
+        logger.warn('RegistrarPanel: selected record is missing for status command', { recordSelectionKey, status });
         notify.error('Action is not available for this record');
         return null;
       }
@@ -1809,12 +1827,22 @@ const RegistrarPanel = () => {
       if (!ok) return;
     }
 
+    const selectedRecords = Array.from(appointmentsSelected)
+      .map((selectionKey) => findRegistrarRecordBySelectionKey(filteredAppointmentsRef.current, selectionKey))
+      .filter(Boolean);
+
+    if (selectedRecords.length === 0) {
+      notify.error('Action is not available for this record');
+      setAppointmentsSelected(new Set());
+      return;
+    }
+
     const results = await Promise.allSettled(
-      Array.from(appointmentsSelected).map((id) => updateAppointmentStatus(id, action, reason))
+      selectedRecords.map((record) => updateAppointmentStatus(getRegistrarSelectionKey(record), action, reason, record))
     );
 
     const successCount = results.filter((r) => r.status === 'fulfilled' && r.value).length;
-    const failCount = results.length - successCount;
+    const failCount = appointmentsSelected.size - successCount;
 
     if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
     if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
@@ -1853,9 +1881,11 @@ const RegistrarPanel = () => {
           e.preventDefault();
           logger.info('Ctrl+A: Выбрать все записи');
           // ✅ ИСПРАВЛЕНО: Используем filteredAppointments из ref
-          const allIds = filteredAppointmentsRef.current.map((a) => a.id);
-          setAppointmentsSelected(new Set(allIds));
-          logger.info('Выбрано записей:', allIds.length);
+          const allSelectionKeys = filteredAppointmentsRef.current
+            .map((appointment) => getRegistrarSelectionKey(appointment))
+            .filter(Boolean);
+          setAppointmentsSelected(new Set(allSelectionKeys));
+          logger.info('Выбрано записей:', allSelectionKeys.length);
         } else if (e.key === 'd') {
           e.preventDefault();
           logger.info('Ctrl+D: Снять выделение');
