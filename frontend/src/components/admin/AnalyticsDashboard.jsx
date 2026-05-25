@@ -30,119 +30,55 @@ const AnalyticsDashboard = ({
   useState('revenue');void
   useState('month');
 
-  // Моковые данные для демонстрации
-  const mockData = {
+  // Empty shape only; operational analytics must come from backend data.
+  const emptyData = {
     overview: {
-      totalRevenue: 12500000,
-      totalPatients: 1247,
-      totalAppointments: 3421,
-      averageRating: 4.7,
-      revenueGrowth: 12.5,
-      patientGrowth: 8.3,
-      appointmentGrowth: 15.2,
-      ratingGrowth: 0.3
+      totalRevenue: 0,
+      totalPatients: 0,
+      totalAppointments: 0,
+      averageRating: 0,
+      revenueGrowth: 0,
+      patientGrowth: 0,
+      appointmentGrowth: 0,
+      ratingGrowth: 0
     },
     revenue: {
-      daily: [
-      { date: '2024-01-01', amount: 450000 },
-      { date: '2024-01-02', amount: 520000 },
-      { date: '2024-01-03', amount: 380000 },
-      { date: '2024-01-04', amount: 610000 },
-      { date: '2024-01-05', amount: 490000 },
-      { date: '2024-01-06', amount: 420000 },
-      { date: '2024-01-07', amount: 580000 }],
+      daily: [],
 
-      byCategory: [
-      { category: 'Консультации', amount: 4500000, percentage: 36 },
-      { category: 'Диагностика', amount: 3200000, percentage: 25.6 },
-      { category: 'Лечение', amount: 2800000, percentage: 22.4 },
-      { category: 'Процедуры', amount: 1200000, percentage: 9.6 },
-      { category: 'Анализы', amount: 800000, percentage: 6.4 }],
+      byCategory: [],
 
-      byDoctor: [
-      { doctor: 'Иванов И.И.', amount: 2100000, appointments: 45 },
-      { doctor: 'Петрова М.С.', amount: 1800000, appointments: 38 },
-      { doctor: 'Козлова А.В.', amount: 1600000, appointments: 42 },
-      { doctor: 'Сидоров Д.А.', amount: 1400000, appointments: 35 }]
+      byDoctor: []
 
     },
     appointments: {
-      byStatus: [
-      { status: 'Завершено', count: 2856, percentage: 83.5 },
-      { status: 'Ожидает', count: 342, percentage: 10 },
-      { status: 'Отменено', count: 223, percentage: 6.5 }],
+      byStatus: [],
 
-      byDay: [
-      { day: 'Пн', count: 89 },
-      { day: 'Вт', count: 95 },
-      { day: 'Ср', count: 78 },
-      { day: 'Чт', count: 102 },
-      { day: 'Пт', count: 88 },
-      { day: 'Сб', count: 45 },
-      { day: 'Вс', count: 12 }],
+      byDay: [],
 
-      byTime: [
-      { time: '09:00-12:00', count: 245, percentage: 35 },
-      { time: '12:00-15:00', count: 198, percentage: 28 },
-      { time: '15:00-18:00', count: 156, percentage: 22 },
-      { time: '18:00-21:00', count: 102, percentage: 15 }]
+      byTime: []
 
     },
     patients: {
-      byAge: [
-      { range: '0-18', count: 234, percentage: 18.8 },
-      { range: '19-35', count: 456, percentage: 36.6 },
-      { range: '36-50', count: 312, percentage: 25.0 },
-      { range: '51-65', count: 178, percentage: 14.3 },
-      { range: '65+', count: 67, percentage: 5.4 }],
+      byAge: [],
 
-      byGender: [
-      { gender: 'Женщины', count: 748, percentage: 60 },
-      { gender: 'Мужчины', count: 499, percentage: 40 }],
+      byGender: [],
 
-      newVsReturning: [
-      { type: 'Новые', count: 456, percentage: 36.6 },
-      { type: 'Повторные', count: 791, percentage: 63.4 }]
+      newVsReturning: []
 
     },
     performance: {
-      doctors: [
-      {
-        doctor: 'Иванов И.И.',
-        appointments: 45,
-        revenue: 2100000,
-        rating: 4.8,
-        efficiency: 92
-      },
-      {
-        doctor: 'Петрова М.С.',
-        appointments: 38,
-        revenue: 1800000,
-        rating: 4.6,
-        efficiency: 88
-      },
-      {
-        doctor: 'Козлова А.В.',
-        appointments: 42,
-        revenue: 1600000,
-        rating: 4.7,
-        efficiency: 90
-      }],
+      doctors: [],
 
-      departments: [
-      { department: 'Кардиология', appointments: 856, revenue: 4200000 },
-      { department: 'Дерматология', appointments: 642, revenue: 3200000 },
-      { department: 'Неврология', appointments: 534, revenue: 2800000 },
-      { department: 'Педиатрия', appointments: 789, revenue: 2300000 }]
+      departments: []
 
     }
   };
 
-  const currentData = data.overview || mockData.overview;
-  const revenueData = data.revenue || mockData.revenue;
-  const appointmentsData = data.appointments || mockData.appointments;
-  const patientsData = data.patients || mockData.patients;void (
-  data.performance || mockData.performance);
+  const currentData = data.overview || emptyData.overview;
+  const revenueData = data.revenue || emptyData.revenue;
+  const appointmentsData = data.appointments || emptyData.appointments;
+  const patientsData = data.patients || emptyData.patients;void (
+  data.performance || emptyData.performance);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('ru-RU', {
