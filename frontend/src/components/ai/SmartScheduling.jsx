@@ -36,6 +36,13 @@ import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
 import logger from '../../utils/logger';
+
+const parseOptionalInteger = (value) => {
+  if (value === '') return '';
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? '' : parsed;
+};
+
 const SmartScheduling = () => {
   const [activeTab, setActiveTab] = useState('schedule-optimization');
   const [loading, setLoading] = useState(false);
@@ -55,15 +62,15 @@ const SmartScheduling = () => {
   });
 
   const [constraints, setConstraints] = useState({
-    working_hours: { start: '09:00', end: '18:00' },
-    break_requirements: { lunch_break: 60, short_breaks: 15 },
-    max_patients_per_day: 15,
+    working_hours: { start: '', end: '' },
+    break_requirements: { lunch_break: '', short_breaks: '' },
+    max_patients_per_day: '',
     appointment_types: []
   });
 
   const [appointmentData, setAppointmentData] = useState({
     patient: {},
-    type: 'consultation',
+    type: '',
     complaint: '',
     doctor_specialty: '',
     is_first_visit: false
@@ -80,9 +87,9 @@ const SmartScheduling = () => {
 
   const [patientRequirements, setPatientRequirements] = useState({
     preferences: {},
-    urgency: 'normal',
-    type: 'consultation',
-    estimated_duration: 30
+    urgency: '',
+    type: '',
+    estimated_duration: ''
   });
 
   const [availableSlots, setAvailableSlots] = useState([]);
@@ -98,8 +105,8 @@ const SmartScheduling = () => {
   });
 
   const [staffingRequirements, setStaffingRequirements] = useState({
-    min_staff_per_shift: 1,
-    coverage_hours: '24/7',
+    min_staff_per_shift: '',
+    coverage_hours: '',
     skill_requirements: [],
     compliance_rules: {}
   });
@@ -199,7 +206,7 @@ const SmartScheduling = () => {
       ...prev,
       current_schedule: [
       ...prev.current_schedule,
-      { time: '', type: 'free', duration: 30 }]
+      { time: '', type: '', duration: '' }]
 
     }));
   };
@@ -217,14 +224,14 @@ const SmartScheduling = () => {
   const addHistoricalRecord = () => {
     setHistoricalData((prev) => [
     ...prev,
-    { type: 'consultation', actual_duration: 30, complaint: '', date: '' }]
+    { type: '', actual_duration: '', complaint: '', date: '' }]
     );
   };
 
   const addAvailableSlot = () => {
     setAvailableSlots((prev) => [
     ...prev,
-    { date: '', time: '', duration: 30, current_load: 0 }]
+    { date: '', time: '', duration: '', current_load: '' }]
     );
   };
 
@@ -235,8 +242,8 @@ const SmartScheduling = () => {
       name: '',
       specialty: '',
       appointments: [],
-      total_working_hours: 8,
-      patient_load: 0
+      total_working_hours: '',
+      patient_load: ''
     }]
     );
   };
@@ -246,7 +253,7 @@ const SmartScheduling = () => {
       ...prev,
       staff: [
       ...prev.staff,
-      { name: '', role: '', experience: 0, preferences: {} }]
+      { name: '', role: '', experience: '', preferences: {} }]
 
     }));
   };
@@ -331,7 +338,7 @@ const SmartScheduling = () => {
             value={scheduleData.doctor.experience_years}
             onChange={(e) => setScheduleData((prev) => ({
               ...prev,
-              doctor: { ...prev.doctor, experience_years: parseInt(e.target.value) || 0 }
+              doctor: { ...prev.doctor, experience_years: parseOptionalInteger(e.target.value) }
             }))}
             placeholder="10"
             style={{ width: '100%' }} />
@@ -416,7 +423,7 @@ const SmartScheduling = () => {
             value={constraints.max_patients_per_day}
             onChange={(e) => setConstraints((prev) => ({
               ...prev,
-              max_patients_per_day: parseInt(e.target.value) || 15
+              max_patients_per_day: parseOptionalInteger(e.target.value)
             }))}
             style={{ width: '100%' }} />
           
@@ -436,7 +443,7 @@ const SmartScheduling = () => {
             value={constraints.break_requirements.lunch_break}
             onChange={(e) => setConstraints((prev) => ({
               ...prev,
-              break_requirements: { ...prev.break_requirements, lunch_break: parseInt(e.target.value) || 60 }
+              break_requirements: { ...prev.break_requirements, lunch_break: parseOptionalInteger(e.target.value) }
             }))}
             style={{ width: '100%' }} />
           
@@ -483,13 +490,14 @@ const SmartScheduling = () => {
             }}
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={slot.type}
             onChange={(e) => {
               const newSchedule = [...scheduleData.current_schedule];
               newSchedule[index].type = e.target.value;
               setScheduleData((prev) => ({ ...prev, current_schedule: newSchedule }));
             }}
+            placeholder="Выберите тип"
             options={[
             { value: 'free', label: 'Свободно' },
             { value: 'appointment', label: 'Прием' },
@@ -503,7 +511,7 @@ const SmartScheduling = () => {
             value={slot.duration}
             onChange={(e) => {
               const newSchedule = [...scheduleData.current_schedule];
-              newSchedule[index].duration = parseInt(e.target.value) || 30;
+              newSchedule[index].duration = parseOptionalInteger(e.target.value);
               setScheduleData((prev) => ({ ...prev, current_schedule: newSchedule }));
             }}
             placeholder="мин"
@@ -552,6 +560,7 @@ const SmartScheduling = () => {
             <MacOSSelect
             value={appointmentData.type}
             onChange={(e) => setAppointmentData((prev) => ({ ...prev, type: e.target.value }))}
+            placeholder="Выберите тип"
             options={[
             { value: 'consultation', label: 'Консультация' },
             { value: 'follow-up', label: 'Повторный прием' },
@@ -643,13 +652,14 @@ const SmartScheduling = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {historicalData.map((record, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSSelect
+            <MacOSSelect
             value={record.type}
             onChange={(e) => {
               const newData = [...historicalData];
               newData[index].type = e.target.value;
               setHistoricalData(newData);
             }}
+            placeholder="Выберите тип"
             options={[
             { value: 'consultation', label: 'Консультация' },
             { value: 'follow-up', label: 'Повторный' },
@@ -662,7 +672,7 @@ const SmartScheduling = () => {
             value={record.actual_duration}
             onChange={(e) => {
               const newData = [...historicalData];
-              newData[index].actual_duration = parseInt(e.target.value) || 30;
+              newData[index].actual_duration = parseOptionalInteger(e.target.value);
               setHistoricalData(newData);
             }}
             placeholder="мин"
@@ -782,6 +792,7 @@ const SmartScheduling = () => {
             <MacOSSelect
             value={patientRequirements.urgency}
             onChange={(e) => setPatientRequirements((prev) => ({ ...prev, urgency: e.target.value }))}
+            placeholder="Выберите срочность"
             options={[
             { value: 'normal', label: 'Обычная' },
             { value: 'urgent', label: 'Срочная' },
@@ -803,6 +814,7 @@ const SmartScheduling = () => {
             <MacOSSelect
             value={patientRequirements.type}
             onChange={(e) => setPatientRequirements((prev) => ({ ...prev, type: e.target.value }))}
+            placeholder="Выберите тип"
             options={[
             { value: 'consultation', label: 'Консультация' },
             { value: 'follow-up', label: 'Повторный прием' },
@@ -824,7 +836,7 @@ const SmartScheduling = () => {
             <MacOSInput
             type="number"
             value={patientRequirements.estimated_duration}
-            onChange={(e) => setPatientRequirements((prev) => ({ ...prev, estimated_duration: parseInt(e.target.value) || 30 }))}
+            onChange={(e) => setPatientRequirements((prev) => ({ ...prev, estimated_duration: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -885,7 +897,7 @@ const SmartScheduling = () => {
             value={slot.duration}
             onChange={(e) => {
               const newSlots = [...availableSlots];
-              newSlots[index].duration = parseInt(e.target.value) || 30;
+              newSlots[index].duration = parseOptionalInteger(e.target.value);
               setAvailableSlots(newSlots);
             }}
             placeholder="мин"
@@ -896,7 +908,7 @@ const SmartScheduling = () => {
             value={slot.current_load}
             onChange={(e) => {
               const newSlots = [...availableSlots];
-              newSlots[index].current_load = parseInt(e.target.value) || 0;
+              newSlots[index].current_load = parseOptionalInteger(e.target.value);
               setAvailableSlots(newSlots);
             }}
             placeholder="%"
@@ -1013,7 +1025,7 @@ const SmartScheduling = () => {
             value={doctor.total_working_hours}
             onChange={(e) => {
               const newDoctors = [...doctorsData];
-              newDoctors[index].total_working_hours = parseInt(e.target.value) || 8;
+              newDoctors[index].total_working_hours = parseOptionalInteger(e.target.value);
               setDoctorsData(newDoctors);
             }}
             placeholder="Часы"
@@ -1024,7 +1036,7 @@ const SmartScheduling = () => {
             value={doctor.patient_load}
             onChange={(e) => {
               const newDoctors = [...doctorsData];
-              newDoctors[index].patient_load = parseInt(e.target.value) || 0;
+              newDoctors[index].patient_load = parseOptionalInteger(e.target.value);
               setDoctorsData(newDoctors);
             }}
             placeholder="%"
@@ -1137,7 +1149,7 @@ const SmartScheduling = () => {
             value={staff.experience}
             onChange={(e) => {
               const newStaff = [...departmentData.staff];
-              newStaff[index].experience = parseInt(e.target.value) || 0;
+              newStaff[index].experience = parseOptionalInteger(e.target.value);
               setDepartmentData((prev) => ({ ...prev, staff: newStaff }));
             }}
             placeholder="Опыт"
@@ -1182,7 +1194,7 @@ const SmartScheduling = () => {
             <MacOSInput
             type="number"
             value={staffingRequirements.min_staff_per_shift}
-            onChange={(e) => setStaffingRequirements((prev) => ({ ...prev, min_staff_per_shift: parseInt(e.target.value) || 1 }))}
+            onChange={(e) => setStaffingRequirements((prev) => ({ ...prev, min_staff_per_shift: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -1199,6 +1211,7 @@ const SmartScheduling = () => {
             <MacOSSelect
             value={staffingRequirements.coverage_hours}
             onChange={(e) => setStaffingRequirements((prev) => ({ ...prev, coverage_hours: e.target.value }))}
+            placeholder="Выберите покрытие"
             options={[
             { value: '24/7', label: '24/7' },
             { value: '8-20', label: '8:00-20:00' },
