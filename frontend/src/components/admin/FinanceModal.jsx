@@ -41,7 +41,7 @@ const FinanceModal = ({
           patientId: transaction.patientId || '',
           doctorId: transaction.doctorId || '',
           paymentMethod: transaction.paymentMethod || 'cash',
-          status: transaction.status || 'completed',
+          status: transaction.status ?? '',
           transactionDate: transaction.transactionDate || '',
           notes: transaction.notes || '',
           reference: transaction.reference || ''
@@ -509,6 +509,7 @@ const FinanceModal = ({
                       borderColor: 'var(--border-color)'
                     }}
                   >
+                    <option value="">Статус не передан</option>
                     <option value="pending">Ожидает</option>
                     <option value="completed">Завершена</option>
                     <option value="cancelled">Отменена</option>

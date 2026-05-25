@@ -4,6 +4,22 @@ import FinanceModal from '../FinanceModal.jsx';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
+const renderFinanceModal = (props = {}) => render(
+  <MacOSThemeProvider>
+    <ThemeProvider>
+      <FinanceModal
+        isOpen
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        loading={false}
+        patients={[]}
+        doctors={[]}
+        {...props}
+      />
+    </ThemeProvider>
+  </MacOSThemeProvider>
+);
+
 describe('FinanceModal', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -21,20 +37,7 @@ describe('FinanceModal', () => {
   });
 
   it('shows an integer UZS amount hint and no longer enforces a 1000-step browser constraint', () => {
-    render(
-      <MacOSThemeProvider>
-        <ThemeProvider>
-          <FinanceModal
-            isOpen
-            onClose={vi.fn()}
-            onSave={vi.fn()}
-            loading={false}
-            patients={[]}
-            doctors={[]}
-          />
-        </ThemeProvider>
-      </MacOSThemeProvider>
-    );
+    renderFinanceModal();
 
     const amountInput = screen.getByPlaceholderText('100000');
 
@@ -42,5 +45,24 @@ describe('FinanceModal', () => {
     expect(amountInput).toHaveAttribute('step', '1');
     expect(amountInput).toHaveAttribute('inputmode', 'numeric');
     expect(screen.getByText('Введите сумму целым числом в UZS. Например: 12500.')).toBeInTheDocument();
+  });
+
+  it('does not initialize an existing transaction with missing status as completed', () => {
+    renderFinanceModal({
+      transaction: {
+        id: 601,
+        type: 'income',
+        category: 'РљРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ',
+        amount: 90000,
+        description: 'Backend row without status',
+        paymentMethod: 'cash',
+        transactionDate: '2026-03-27',
+      },
+    });
+
+    const statusSelect = screen.getByDisplayValue('Статус не передан');
+
+    expect(statusSelect).toHaveValue('');
+    expect(statusSelect).not.toHaveValue('completed');
   });
 });
