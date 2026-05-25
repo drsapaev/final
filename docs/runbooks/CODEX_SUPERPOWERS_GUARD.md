@@ -72,17 +72,17 @@ For `gate` or `gate_known_root_cause`, run:
 
 ```powershell
 cd C:\final\ai\langgraph
-python scripts\agent_gate.py "<task>"
+.\scripts\run_agent_gate.ps1 "<task>"
 ```
 
 or:
 
 ```powershell
 cd C:\final\ai\langgraph
-python scripts\agent_gate.py "<task>" --known-root-cause "<relative/path.py>"
+.\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<relative/path.py>"
 ```
 
-If the gate cannot run, stop and report instead of improvising.
+Use the launcher instead of bare `python` or `py`; it validates Python 3.11+ and skips broken local launcher state. For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1`. If the gate cannot run, stop and report instead of improvising.
 
 ## Skill Routing
 

@@ -57,11 +57,14 @@ For `gate` or `gate_known_root_cause` modes, run:
 
 ```powershell
 cd C:\final\ai\langgraph
-python scripts\agent_gate.py "<user task>"
+.\scripts\run_agent_gate.ps1 "<user task>"
 
 # Or with known root cause:
-python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py>"
+.\scripts\run_agent_gate.ps1 "<user task>" --known-root-cause "<relative/path.py>"
 ```
+
+Use `scripts\run_agent_gate.ps1` instead of bare `python` or `py`; it validates Python 3.11+ and falls back around broken `.venv`/PATH launcher state.
+For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1` over bare `python` or `py`.
 
 **Gate Rules:**
 - Execute only inside `First-touch files` from gate output
@@ -533,19 +536,11 @@ From `C:\final\ai\langgraph`:
 
 ```powershell
 # Execution gate for risky tasks
-python scripts\agent_gate.py "<task>"
-python scripts\agent_gate.py "<task>" --known-root-cause "<path>"
-
-# Planning and analysis
-python scripts\dev_brain.py plan "<task>"
-python scripts\dev_brain.py dossier "<task>"
-python scripts\dev_brain.py handoff "<task>"
-
-# Smoke tests
-python scripts\planner_smoke.py
-python scripts\dossier_smoke.py
-python scripts\handoff_smoke.py
+.\scripts\run_agent_gate.ps1 "<task>"
+.\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<path>"
 ```
+
+Historical `dev_brain.py`, `planner_smoke.py`, `dossier_smoke.py`, and `handoff_smoke.py` commands are not verified in this checkout. Use the AGENTS.md plan/dossier/handoff rules directly unless those files are restored and validated.
 
 Use `handoff` as the default input contract for the next agent when a real code change is risky or multi-file.
 

@@ -165,15 +165,17 @@ Run the local gate only when the selected mode is `gate` or `gate_known_root_cau
 
 ```powershell
 cd C:\final\ai\langgraph
-python scripts\agent_gate.py "<user task>"
+.\scripts\run_agent_gate.ps1 "<user task>"
 ```
 
 - For `gate_known_root_cause`, run:
 
 ```powershell
 cd C:\final\ai\langgraph
-python scripts\agent_gate.py "<user task>" --known-root-cause "<relative/path.py>"
+.\scripts\run_agent_gate.ps1 "<user task>" --known-root-cause "<relative/path.py>"
 ```
+
+Use `scripts\run_agent_gate.ps1` instead of calling `python` or `py` directly. The launcher validates a Python 3.11+ interpreter, skips broken `.venv`/Windows Store aliases, and can fall back to the bundled pgAdmin Python.
 
 - If the gate says handoff is required, read the generated `Ready-to-send execution prompt` before editing.
 - Execute only inside the prompt's `First-touch files`.
@@ -296,13 +298,15 @@ EMR, Lab, Rollout-sensitive areas:
 From `C:\final\ai\langgraph`:
 
 ```powershell
-python scripts\agent_gate.py "<task>"
-python scripts\agent_gate.py "<task>" --known-root-cause "<relative/path.py>"
+.\scripts\run_agent_gate.ps1 "<task>"
+.\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<relative/path.py>"
 ```
 
 Current checkout note:
 
-- `scripts\agent_gate.py` is the only verified local dev-brain command.
+- For local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1` over bare `python` or `py` unless a tool already provides a narrower launcher.
+- `scripts\run_agent_gate.ps1` is the verified launcher for `scripts\agent_gate.py`; do not rely on bare `python` or `py` in local shells.
+- `scripts\agent_gate.py` is the only verified local dev-brain Python entrypoint.
 - Do not run historical `scripts\dev_brain.py`, `scripts\planner_smoke.py`, `scripts\dossier_smoke.py`, or `scripts\handoff_smoke.py` unless those files are restored and verified in the current checkout.
 - For `plan`, `dossier`, or `handoff` modes, produce the artifact directly from repo-grounded evidence and use `agent_gate.py` only when an execution boundary is needed.
 - Use handoff as the default input contract for the next agent when a real code change is risky or multi-file.
