@@ -186,7 +186,7 @@ const buildReceiptPrintPayload = (paymentRow) => {
       total: totalAmount,
       method: methodCode,
       method_name: resolvePaymentMethodLabel(paymentRow?.method),
-      status: paymentRow?.status || 'paid',
+      status: paymentRow?.status ?? null,
       paid_amount: totalAmount,
       change: 0
     },

@@ -47,4 +47,16 @@ describe('CashierPanel payment action contract', () => {
     expect(actionCellBlock).not.toContain("row.status ===");
     expect(actionCellBlock).not.toContain('payment_status');
   });
+
+  it('does not invent a paid status in receipt print payloads', () => {
+    const source = readCashierPanelSource();
+    const receiptBlock = extractSourceBlock(
+      source,
+      'const buildReceiptPrintPayload = (paymentRow) => {',
+      'const getPaymentStatusMeta = (status) => {',
+    );
+
+    expect(receiptBlock).toContain('status: paymentRow?.status ?? null');
+    expect(receiptBlock).not.toContain("status: paymentRow?.status || 'paid'");
+  });
 });
