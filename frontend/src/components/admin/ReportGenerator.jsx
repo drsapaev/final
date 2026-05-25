@@ -27,14 +27,6 @@ import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 
-const DEFAULT_REPORT_TYPES = [
-  'patient_report',
-  'appointments_report',
-  'financial_report',
-  'queue_report',
-  'doctor_performance_report'
-];
-
 const REPORT_ENDPOINTS = {
   patient_report: 'patient',
   appointments_report: 'appointments',
@@ -134,19 +126,9 @@ const ReportGenerator = ({
           return;
         }
 
-        if (normalized.length > 0) {
-          setAvailableReportTypes(normalized);
-          if (!selectedReportType && !internalSelectedReportType) {
-            setInternalSelectedReportType(normalized[0].type);
-          }
-        } else {
-          const fallback = DEFAULT_REPORT_TYPES
-            .map(normalizeReportType)
-            .filter(Boolean);
-          setAvailableReportTypes(fallback);
-          if (!selectedReportType && !internalSelectedReportType && fallback[0]) {
-            setInternalSelectedReportType(fallback[0].type);
-          }
+        setAvailableReportTypes(normalized);
+        if (!normalized.some((type) => type.type === internalSelectedReportType)) {
+          setInternalSelectedReportType('');
         }
       } catch (error) {
         logger.warn('Не удалось загрузить доступные отчеты для генератора:', error);
@@ -155,12 +137,9 @@ const ReportGenerator = ({
           return;
         }
 
-        const fallback = DEFAULT_REPORT_TYPES
-          .map(normalizeReportType)
-          .filter(Boolean);
-        setAvailableReportTypes(fallback);
-        if (!selectedReportType && !internalSelectedReportType && fallback[0]) {
-          setInternalSelectedReportType(fallback[0].type);
+        setAvailableReportTypes([]);
+        if (!selectedReportType) {
+          setInternalSelectedReportType('');
         }
       }
     };
