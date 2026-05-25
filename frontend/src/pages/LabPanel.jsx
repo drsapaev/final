@@ -94,6 +94,12 @@ function normalizeListPayload(payload) {
   return [];
 }
 
+function isAbortLikeError(error) {
+  const name = String(error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return name === 'aborterror' || message.includes('aborted');
+}
+
 function mergeQueueEntriesWithLabInstances(queueEntries, labInstances) {
   if (!queueEntries.length || !labInstances.length) {
     return queueEntries;
@@ -310,6 +316,10 @@ export default function LabPanel() {
         setSelectedTemplate(null);
       }
     } catch (error) {
+      if (isAbortLikeError(error)) {
+        logger.info('[LabPanel] loadTemplates aborted');
+        return;
+      }
       logger.error('[LabPanel] loadTemplates failed', error);
       notify(
         'error',
