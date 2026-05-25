@@ -45,6 +45,7 @@ def _create_existing_entry(
     doctor_id: int,
     number: int,
     queue_tag: str,
+    entry_id: int | None = None,
     status: str = "waiting",
     source: str = "desk",
 ) -> OnlineQueueEntry:
@@ -59,6 +60,7 @@ def _create_existing_entry(
     db_session.refresh(queue)
 
     entry = OnlineQueueEntry(
+        id=entry_id,
         queue_id=queue.id,
         number=number,
         patient_id=patient_id,
@@ -71,6 +73,30 @@ def _create_existing_entry(
     db_session.commit()
     db_session.refresh(entry)
     return entry
+
+
+def _create_visit_with_id(
+    db_session,
+    *,
+    visit_id: int,
+    patient_id: int,
+    doctor_id: int,
+    status: str = "open",
+) -> Visit:
+    visit = Visit(
+        id=visit_id,
+        patient_id=patient_id,
+        doctor_id=doctor_id,
+        visit_date=date.today(),
+        visit_time="11:30",
+        status=status,
+        discount_mode="none",
+        department="cardiology",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(visit)
+    return visit
 
 
 def _create_other_patient(db_session) -> Patient:
@@ -330,3 +356,147 @@ def test_registrar_batch_update_rejects_visit_for_other_patient(
     assert response.status_code == 400
     db_session.refresh(unrelated_visit)
     assert unrelated_visit.status == "open"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_update_rejects_ambiguous_untyped_entry_id(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    collision_id = 700000 + test_patient.id
+    queue_entry = _create_existing_entry(
+        db_session,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        number=31,
+        queue_tag="cardiology",
+        entry_id=collision_id,
+        status="waiting",
+    )
+    visit = _create_visit_with_id(
+        db_session,
+        visit_id=collision_id,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        status="open",
+    )
+    target_day = date.today().isoformat()
+
+    response = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
+        headers=registrar_auth_headers,
+        json={
+            "entries": [
+                {
+                    "id": collision_id,
+                    "action": "update",
+                    "status": "cancelled",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    db_session.refresh(queue_entry)
+    db_session.refresh(visit)
+    assert queue_entry.status == "waiting"
+    assert visit.status == "open"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_update_uses_typed_visit_when_ids_collide(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    collision_id = 710000 + test_patient.id
+    queue_entry = _create_existing_entry(
+        db_session,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        number=32,
+        queue_tag="cardiology",
+        entry_id=collision_id,
+        status="waiting",
+    )
+    visit = _create_visit_with_id(
+        db_session,
+        visit_id=collision_id,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        status="open",
+    )
+    target_day = date.today().isoformat()
+
+    response = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
+        headers=registrar_auth_headers,
+        json={
+            "entries": [
+                {
+                    "id": collision_id,
+                    "entry_type": "visit",
+                    "action": "update",
+                    "status": "cancelled",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(queue_entry)
+    db_session.refresh(visit)
+    assert queue_entry.status == "waiting"
+    assert visit.status == "cancelled"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_cancel_all_uses_typed_actions_when_ids_collide(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    collision_id = 720000 + test_patient.id
+    queue_entry = _create_existing_entry(
+        db_session,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        number=33,
+        queue_tag="cardiology",
+        entry_id=collision_id,
+        status="waiting",
+    )
+    visit = _create_visit_with_id(
+        db_session,
+        visit_id=collision_id,
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        status="open",
+    )
+    target_day = date.today().isoformat()
+
+    response = client.delete(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
+        headers=registrar_auth_headers,
+        params={"reason": "collision bulk cancel"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["cancelled_count"] == 2
+    db_session.refresh(queue_entry)
+    db_session.refresh(visit)
+    assert queue_entry.status == "cancelled"
+    assert queue_entry.cancel_reason == "collision bulk cancel"
+    assert visit.status == "cancelled"
