@@ -56,10 +56,19 @@ REGISTRAR_START_VISIT_ROLES = {
 REGISTRAR_PRINT_TICKET_ROLES = {"admin", "registrar", "cashier", "doctor"}
 REGISTRAR_COMPLETE_ROLES = {"admin", "registrar", "doctor", "cashier", "receptionist"}
 REGISTRAR_CANCEL_ROLES = {"admin", "registrar", "cashier", "receptionist", "doctor"}
+REGISTRAR_DOCTOR_SECONDARY_ACTION_ROLES = {
+    "doctor",
+    "cardio",
+    "cardiology",
+    "derma",
+    "dentist",
+}
 REGISTRAR_START_STATUSES = {"waiting", "queued"}
 REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
 REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
 REGISTRAR_CANCEL_BLOCKED_STATUSES = {"canceled", "cancelled", "completed", "done", "served"}
+REGISTRAR_VIEW_EMR_STATUSES = {"completed", "done", "served"}
+REGISTRAR_SCHEDULE_NEXT_STATUSES = {"completed", "done", "served"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -123,11 +132,53 @@ def _registrar_can_cancel(user: User | None, queue_status: str | None) -> bool:
     )
 
 
+def _registrar_can_view_emr(
+    user: User | None,
+    *,
+    payment_status: str | None,
+    queue_status: str | None,
+    visit_id: int | None,
+) -> bool:
+    normalized_status = str(queue_status or "").strip().lower()
+    normalized_payment_status = str(payment_status or "").strip().lower()
+    status_allows_view = (
+        normalized_status in REGISTRAR_VIEW_EMR_STATUSES
+        or (normalized_status == "in_visit" and normalized_payment_status == "paid")
+    )
+    return (
+        visit_id is not None
+        and status_allows_view
+        and bool(
+            _registrar_user_role_names(user)
+            & REGISTRAR_DOCTOR_SECONDARY_ACTION_ROLES
+        )
+    )
+
+
+def _registrar_can_schedule_next(
+    user: User | None,
+    *,
+    queue_status: str | None,
+    patient_id: int | None,
+) -> bool:
+    normalized_status = str(queue_status or "").strip().lower()
+    return (
+        patient_id is not None
+        and normalized_status in REGISTRAR_SCHEDULE_NEXT_STATUSES
+        and bool(
+            _registrar_user_role_names(user)
+            & REGISTRAR_DOCTOR_SECONDARY_ACTION_ROLES
+        )
+    )
+
+
 def _registrar_available_actions(
     *,
     user: User | None,
     payment_status: str | None,
     queue_status: str | None,
+    visit_id: int | None = None,
+    patient_id: int | None = None,
 ) -> list[str]:
     actions: list[str] = []
     if _registrar_can_mark_paid(user, payment_status):
@@ -144,6 +195,19 @@ def _registrar_available_actions(
         actions.append("complete")
     if _registrar_can_cancel(user, queue_status):
         actions.append("cancel")
+    if _registrar_can_view_emr(
+        user,
+        payment_status=payment_status,
+        queue_status=queue_status,
+        visit_id=visit_id,
+    ):
+        actions.append("view_emr")
+    if _registrar_can_schedule_next(
+        user,
+        queue_status=queue_status,
+        patient_id=patient_id,
+    ):
+        actions.append("schedule_next")
     return actions
 
 
@@ -2992,12 +3056,16 @@ def get_today_queues(
                     user=current_user,
                     payment_status=payment_status,
                     queue_status=canonical_status,
+                    visit_id=entry_visit_id,
+                    patient_id=patient_id,
                 )
                 can_mark_paid = "mark_paid" in available_actions
                 can_start_visit = "start_visit" in available_actions
                 can_print_ticket = "print_ticket" in available_actions
                 can_complete = "complete" in available_actions
                 can_cancel = "cancel" in available_actions
+                can_view_emr = "view_emr" in available_actions
+                can_schedule_next = "schedule_next" in available_actions
 
                 entries.append(
                     {
@@ -3026,6 +3094,8 @@ def get_today_queues(
                         "can_print_ticket": can_print_ticket,
                         "can_complete": can_complete,
                         "can_cancel": can_cancel,
+                        "can_view_emr": can_view_emr,
+                        "can_schedule_next": can_schedule_next,
                         "available_actions": available_actions,
                         "source": source,
                         "status": canonical_status,
