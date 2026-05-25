@@ -209,6 +209,15 @@ else {
 
 if ($lightRagActive) {
     $lightRagQuery = Join-Path $repoRoot "ai\lightrag\scripts\run_query.ps1"
+    $lightRagArtifactCheck = Join-Path $repoRoot "ai\lightrag\scripts\run_artifact_check.ps1"
+
+    Invoke-MatrixStep "LightRAG artifact integrity" {
+        & $lightRagArtifactCheck --warn-stale
+        if (-not $?) {
+            throw "LightRAG artifact check command failed"
+        }
+    } -WarnOnly
+
     Invoke-MatrixStep "LightRAG registrar ownership query" {
         Invoke-QueryProbe `
             -Layer "LightRAG" `

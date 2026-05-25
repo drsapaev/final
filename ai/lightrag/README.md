@@ -18,6 +18,7 @@ Run from the repository root:
 .\ai\lightrag\scripts\run_query.ps1 "fix registrar payment status persistence ownership"
 .\ai\lightrag\scripts\run_acceptance.ps1
 .\ai\lightrag\scripts\run_artifacts.ps1
+.\ai\lightrag\scripts\run_artifact_check.ps1
 ```
 
 `run_acceptance.ps1` performs ingest, checks the relationship scenarios, and updates `docs/devbrain/DEVBRAIN_STATUS.md` only after acceptance passes.
@@ -32,6 +33,8 @@ Run from the repository root:
 - `metadata.json`
 
 By default artifacts are written under `ai/lightrag/indexes/lightrag_graph/artifacts/`, which is ignored by git. Set `LIGHTRAG_ARTIFACT_DIR` or pass `--output-dir` to write elsewhere. The vector store is a local sparse term-hash store for no-key DevBrain retrieval; it is not a provider embedding index.
+
+`run_artifact_check.ps1` is read-only. It verifies required artifact files, JSON/JSONL integrity, metadata counts, source graph alignment, gitignored status, and whether `metadata.commit` matches the current `HEAD`. Use `--warn-stale` when stale artifacts should be reported as a warning instead of a failure.
 
 ## Git Policy
 
