@@ -461,7 +461,7 @@ const ModernQueueManager = ({
             </h3>
             {queueData &&
             <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
-                {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time || '09:00'}`}
+                {queueData.is_open ? t.receptionOpen : queueData.online_start_time ? `Откроется в ${queueData.online_start_time}` : 'Откроется'}
               </Badge>
             }
           </div>
