@@ -212,7 +212,7 @@ const PaymentWidget = ({
               ...confirmResponse.data,
               payment_id: response.data.payment_id,
               provider: selectedProvider,
-              status: 'paid',
+              status: confirmResponse.data?.status ?? null,
               confirmed: true
             };
 
