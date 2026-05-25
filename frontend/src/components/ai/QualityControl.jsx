@@ -32,6 +32,19 @@ import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
 import logger from '../../utils/logger';
+
+const parseOptionalInteger = (value) => {
+  if (value === '') return '';
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? '' : parsed;
+};
+
+const parseCommaSeparated = (value) =>
+  value.
+    split(',').
+    map((item) => item.trim()).
+    filter(Boolean);
+
 const QualityControl = () => {
   const [activeTab, setActiveTab] = useState('quality-analysis');
   const [loading, setLoading] = useState(false);
@@ -39,9 +52,7 @@ const QualityControl = () => {
   const [error, setError] = useState(null);
 
   // Состояния для анализа качества документации
-  const [medicalRecords, setMedicalRecords] = useState([
-  { id: '1', type: 'consultation', diagnosis: 'Гипертония', treatment: 'Каптоприл', symptoms: 'Головная боль' }]
-  );
+  const [medicalRecords, setMedicalRecords] = useState([]);
   const [qualityStandards, setQualityStandards] = useState({
     completeness_threshold: 90,
     required_signatures: true,
@@ -51,10 +62,10 @@ const QualityControl = () => {
 
   // Состояния для выявления пробелов
   const [patientRecord, setPatientRecord] = useState({
-    patient_id: '12345',
-    name: 'Иванов И.И.',
-    diagnosis: 'Артериальная гипертензия',
-    symptoms: 'Головная боль, головокружение'
+    patient_id: '',
+    name: '',
+    diagnosis: '',
+    symptoms: ''
   });
   const [requiredFields, setRequiredFields] = useState([
   'diagnosis', 'symptoms', 'treatment', 'allergies', 'vital_signs', 'family_history']
@@ -62,35 +73,33 @@ const QualityControl = () => {
 
   // Состояния для предложений улучшений
   const [recordAnalysis, setRecordAnalysis] = useState({
-    completeness_score: 75,
-    missing_fields: ['allergies', 'family_history'],
-    quality_issues: ['incomplete_vital_signs', 'missing_icd_codes']
+    completeness_score: '',
+    missing_fields: [],
+    quality_issues: []
   });
   const [bestPractices, setBestPractices] = useState({
-    documentation_standards: 'WHO guidelines',
-    template_usage: true,
-    real_time_documentation: true,
-    quality_metrics: ['completeness', 'accuracy', 'timeliness']
+    documentation_standards: '',
+    template_usage: false,
+    real_time_documentation: false,
+    quality_metrics: []
   });
 
   // Состояния для валидации клинической согласованности
-  const [diagnosis, setDiagnosis] = useState('Артериальная гипертензия I степени');
-  const [symptoms, setSymptoms] = useState(['головная боль', 'головокружение', 'повышенное АД']);
+  const [diagnosis, setDiagnosis] = useState('');
+  const [symptoms, setSymptoms] = useState([]);
   const [treatment, setTreatment] = useState({
-    medications: [{ name: 'каптоприл', dosage: '25 мг', frequency: '2 раза в день' }],
-    lifestyle: ['диета с ограничением соли', 'физические упражнения']
+    medications: [],
+    lifestyle: []
   });
 
   // Состояния для аудита безопасности назначений
-  const [prescriptions, setPrescriptions] = useState([
-  { medication: 'каптоприл', dosage: '25 мг', frequency: '2 раза в день', duration: '30 дней' }]
-  );
+  const [prescriptions, setPrescriptions] = useState([]);
   const [patientProfile, setPatientProfile] = useState({
-    age: 65,
-    gender: 'мужской',
-    weight: 80,
-    allergies: ['пенициллин'],
-    comorbidities: ['диабет 2 типа'],
+    age: '',
+    gender: '',
+    weight: '',
+    allergies: [],
+    comorbidities: [],
     current_medications: []
   });
 
@@ -580,7 +589,7 @@ const QualityControl = () => {
             <MacOSInput
             type="number"
             value={recordAnalysis.completeness_score}
-            onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, completeness_score: parseInt(e.target.value) || 75 }))}
+            onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, completeness_score: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -597,7 +606,7 @@ const QualityControl = () => {
             <MacOSInput
             type="text"
             value={recordAnalysis.missing_fields.join(', ')}
-            onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, missing_fields: e.target.value.split(',').map((f) => f.trim()) }))}
+            onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, missing_fields: parseCommaSeparated(e.target.value) }))}
             placeholder="Через запятую"
             style={{ width: '100%' }} />
           
@@ -639,6 +648,7 @@ const QualityControl = () => {
             <MacOSSelect
             value={bestPractices.documentation_standards}
             onChange={(e) => setBestPractices((prev) => ({ ...prev, documentation_standards: e.target.value }))}
+            placeholder="Выберите стандарт"
             options={[
             { value: 'WHO guidelines', label: 'WHO guidelines' },
             { value: 'HL7 FHIR', label: 'HL7 FHIR' },
@@ -911,7 +921,7 @@ const QualityControl = () => {
             <MacOSInput
             type="number"
             value={patientProfile.age}
-            onChange={(e) => setPatientProfile((prev) => ({ ...prev, age: parseInt(e.target.value) || 0 }))}
+            onChange={(e) => setPatientProfile((prev) => ({ ...prev, age: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -928,6 +938,7 @@ const QualityControl = () => {
             <MacOSSelect
             value={patientProfile.gender}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, gender: e.target.value }))}
+            placeholder="Выберите пол"
             options={[
             { value: 'мужской', label: 'Мужской' },
             { value: 'женский', label: 'Женский' }]
@@ -948,7 +959,7 @@ const QualityControl = () => {
             <MacOSInput
             type="number"
             value={patientProfile.weight}
-            onChange={(e) => setPatientProfile((prev) => ({ ...prev, weight: parseInt(e.target.value) || 0 }))}
+            onChange={(e) => setPatientProfile((prev) => ({ ...prev, weight: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -965,7 +976,7 @@ const QualityControl = () => {
             <MacOSInput
             type="text"
             value={patientProfile.allergies.join(', ')}
-            onChange={(e) => setPatientProfile((prev) => ({ ...prev, allergies: e.target.value.split(',').map((a) => a.trim()) }))}
+            onChange={(e) => setPatientProfile((prev) => ({ ...prev, allergies: parseCommaSeparated(e.target.value) }))}
             placeholder="Через запятую"
             style={{ width: '100%' }} />
           
@@ -983,7 +994,7 @@ const QualityControl = () => {
             <MacOSInput
             type="text"
             value={patientProfile.comorbidities.join(', ')}
-            onChange={(e) => setPatientProfile((prev) => ({ ...prev, comorbidities: e.target.value.split(',').map((c) => c.trim()) }))}
+            onChange={(e) => setPatientProfile((prev) => ({ ...prev, comorbidities: parseCommaSeparated(e.target.value) }))}
             placeholder="Через запятую"
             style={{ width: '100%' }} />
           
