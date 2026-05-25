@@ -251,7 +251,9 @@ export default function LabPanel() {
       if (!token) {
         throw new Error('Требуется авторизация для загрузки лабораторной очереди.');
       }
-      const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
+      const queueParams = new URLSearchParams({ department: 'lab' });
+      const queueUrl = `${API_V1_BASE}/registrar/queues/today?${queueParams.toString()}`;
+      const response = await fetch(queueUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -262,7 +264,6 @@ export default function LabPanel() {
       }
       const payload = await response.json();
       const queueEntries = (payload?.queues || [])
-        .filter((queue) => ['lab', 'laboratory'].includes(queue.specialty))
         .flatMap((queue) => (queue.entries || []).map((entry) => formatAppointmentEntry(queue, entry)));
       const visitIds = queueEntries
         .map((item) => item.visit_id)

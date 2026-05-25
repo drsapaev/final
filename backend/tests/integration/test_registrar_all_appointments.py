@@ -206,6 +206,70 @@ class TestRegistrarAllAppointments:
         assert found_entry["patient_birth_year"] == 1985
         assert found_entry["address"] == "Clinic Street 1"
 
+    def test_today_queues_department_filter_limits_lab_rows(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+    ):
+        cardio_queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology",
+            active=True,
+        )
+        lab_queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="lab",
+            active=True,
+        )
+        db_session.add_all([cardio_queue, lab_queue])
+        db_session.commit()
+        db_session.refresh(cardio_queue)
+        db_session.refresh(lab_queue)
+
+        cardio_entry = OnlineQueueEntry(
+            queue_id=cardio_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="desk",
+            status="waiting",
+        )
+        lab_entry = OnlineQueueEntry(
+            queue_id=lab_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="desk",
+            status="waiting",
+        )
+        db_session.add_all([cardio_entry, lab_entry])
+        db_session.commit()
+
+        response = client.get(
+            "/api/v1/registrar/queues/today?department=lab",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        specialties = {queue["specialty"] for queue in payload["queues"]}
+        entry_ids = {
+            entry["id"]
+            for queue in payload["queues"]
+            for entry in queue["entries"]
+        }
+
+        assert specialties == {"laboratory"}
+        assert lab_entry.id in entry_ids
+        assert cardio_entry.id not in entry_ids
+
     def test_start_queue_visit_uses_queue_entry_id_when_visit_id_collides(
         self,
         client,
