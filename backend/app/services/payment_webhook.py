@@ -58,6 +58,31 @@ class PaymentWebhookService:
         return appointment_id, visit_id
 
     @staticmethod
+    def _resolve_click_merchant_target(
+        db: Session, merchant_trans_id: Any
+    ) -> tuple[str | None, int | None]:
+        target_id = PaymentWebhookService._optional_int(merchant_trans_id)
+        if target_id is None:
+            return None, None
+
+        from app.models.appointment import Appointment
+        from app.models.visit import Visit
+
+        appointment_exists = (
+            db.query(Appointment.id).filter(Appointment.id == target_id).first()
+            is not None
+        )
+        visit_exists = (
+            db.query(Visit.id).filter(Visit.id == target_id).first() is not None
+        )
+
+        if appointment_exists and visit_exists:
+            return "ambiguous", target_id
+        if visit_exists:
+            return "visit", target_id
+        return "appointment", target_id
+
+    @staticmethod
     def verify_payme_signature(
         data: dict[str, Any], signature: str, secret_key: str
     ) -> bool:
@@ -351,20 +376,36 @@ class PaymentWebhookService:
             if status == "success":
                 try:
                     # Извлекаем ID записи или визита из данных вебхука
-                    appointment_id = None
-                    visit_id = None
-
-                    if hasattr(webhook_data, "merchant_trans_id"):
-                        # Пытаемся найти appointment_id или visit_id в merchant_trans_id
-                        try:
-                            # Предполагаем, что merchant_trans_id может быть appointment_id
-                            appointment_id = int(webhook_data.merchant_trans_id)
-                        except (ValueError, TypeError):
-                            # Если merchant_trans_id не является числом, пропускаем
-                            pass
+                    target_type, target_id = (
+                        PaymentWebhookService._resolve_click_merchant_target(
+                            db, webhook_data.merchant_trans_id
+                        )
+                    )
+                    appointment_id = target_id if target_type == "appointment" else None
+                    visit_id = target_id if target_type == "visit" else None
 
                     # Приоритет: сначала ищем appointment_id, потом visit_id
-                    if appointment_id:
+                    if target_type == "ambiguous":
+                        repository.update_webhook(
+                            webhook.id,
+                            {
+                                "status": "failed",
+                                "processed_at": datetime.utcnow(),
+                                "error_message": (
+                                    "Ambiguous Click merchant_trans_id matches both "
+                                    "Appointment.id and Visit.id"
+                                ),
+                            },
+                        )
+                        logger.warning(
+                            "payment_webhook_click_ambiguous_merchant_target",
+                            extra={
+                                "payment_provider": "click",
+                                "webhook_record_id": webhook.id,
+                                "merchant_trans_id": webhook_data.merchant_trans_id,
+                            },
+                        )
+                    elif appointment_id:
                         # Обрабатываем платёж для существующей записи
                         success, message = (
                             VisitPaymentIntegrationService.process_payment_for_appointment(
