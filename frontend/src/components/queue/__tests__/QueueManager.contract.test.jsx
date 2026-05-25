@@ -32,4 +32,22 @@ describe('Queue manager command contract', () => {
     expect(managerSource).not.toContain('allowedSpecialties');
     expect(managerSource).not.toContain('normalizeSpecialty');
   });
+
+  it('keeps registrar online queue doctor selection explicit before doctor-specific commands load', () => {
+    const registrarSource = read('pages/RegistrarPanel.jsx');
+    const managerSource = read('components/queue/ModernQueueManager.jsx');
+    const tableSource = read('components/queue/QueueTable.jsx');
+
+    expect(registrarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
+    expect(registrarSource).toContain("selectedDoctor={searchParams.get('doctor') || ''}");
+
+    expect(managerSource).toContain("const [internalDoctor, setInternalDoctor] = useState('')");
+    expect(managerSource).toContain("const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor");
+    expect(managerSource).toContain('if (!effectiveDoctor) {');
+    expect(managerSource).not.toContain('setInternalDoctor(doctorOptions[0]');
+    expect(managerSource).not.toContain('setInternalDoctor(specialists[0]');
+
+    expect(tableSource).toContain('if (!effectiveDoctor) {');
+    expect(tableSource).toContain("t?.selectDoctor || 'Выберите специалиста'");
+  });
 });
