@@ -85,6 +85,7 @@ async def get_patient_entries(
         "online_queue_entries": [
             {
                 "id": e.id,
+                "entry_type": "online_queue",
                 "number": e.number,
                 "status": e.status,
                 "queue_tag": e.queue_tag,
@@ -97,6 +98,7 @@ async def get_patient_entries(
         "visits": [
             {
                 "id": v.id,
+                "entry_type": "visit",
                 "status": v.status,
                 "doctor_id": v.doctor_id,
                 "visit_date": str(v.visit_date) if v.visit_date else None,
@@ -213,6 +215,7 @@ async def cancel_all_patient_entries(
     for entry in entries_data["online_queue_entries"]:
         cancel_actions.append({
             "id": entry.id,
+            "entry_type": "online_queue",
             "action": "cancel",
             "reason": reason
         })
@@ -220,6 +223,7 @@ async def cancel_all_patient_entries(
     for visit in entries_data["visits"]:
         cancel_actions.append({
             "id": visit.id,
+            "entry_type": "visit",
             "action": "cancel",
             "reason": reason
         })

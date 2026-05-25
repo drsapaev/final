@@ -34,6 +34,8 @@ from app.services.service_mapping import (
 
 logger = logging.getLogger(__name__)
 
+EntryActionType = Literal["online_queue", "visit"]
+
 _BATCH_CREATE_RESOURCE_MAPPING = {
     "ecg": "ecg_resource",
     "echokg": "ecg_resource",
@@ -53,6 +55,7 @@ _BATCH_CREATE_RESOURCE_MAPPING = {
 class EntryAction(BaseModel):
     """Действие над одной записью в batch-операции"""
     id: int | None = None  # None для создания новой
+    entry_type: EntryActionType | None = None
     action: Literal["update", "cancel", "create"]
 
     # Для update/create:
@@ -266,29 +269,23 @@ class BatchPatientService:
         if not action.id:
             return EntryResult(id=0, status="error", error="ID required for cancel")
 
-        # Пробуем найти в OnlineQueueEntry
-        entry = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == action.id,
-            OnlineQueueEntry.patient_id == patient_id,
-        ).join(
-            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
-        ).filter(
-            DailyQueue.day == target_date,
-        ).first()
+        # Resolve within patient/date before mutating to avoid id collisions.
+        entry_type, target, error = self._resolve_existing_entry_target(
+            patient_id=patient_id,
+            target_date=target_date,
+            action=action,
+        )
+        if error:
+            return EntryResult(id=action.id, status="error", error=error)
 
-        if entry:
+        if entry_type == "online_queue":
+            entry = target
             entry.status = "cancelled"
             entry.cancel_reason = action.reason
             return EntryResult(id=action.id, status="cancelled")
 
-        # Пробуем найти в Visit
-        visit = self.db.query(Visit).filter(
-            Visit.id == action.id,
-            Visit.patient_id == patient_id,
-            Visit.visit_date == target_date,
-        ).first()
-
-        if visit:
+        if entry_type == "visit":
+            visit = target
             visit.status = "cancelled"
             return EntryResult(id=action.id, status="cancelled")
 
@@ -308,17 +305,17 @@ class BatchPatientService:
         if not action.id:
             return EntryResult(id=0, status="error", error="ID required for update")
 
-        # Пробуем найти в OnlineQueueEntry
-        entry = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == action.id,
-            OnlineQueueEntry.patient_id == patient_id,
-        ).join(
-            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
-        ).filter(
-            DailyQueue.day == target_date,
-        ).first()
+        # Resolve within patient/date before mutating to avoid id collisions.
+        entry_type, target, error = self._resolve_existing_entry_target(
+            patient_id=patient_id,
+            target_date=target_date,
+            action=action,
+        )
+        if error:
+            return EntryResult(id=action.id, status="error", error=error)
 
-        if entry:
+        if entry_type == "online_queue":
+            entry = target
             if action.service_id:
                 entry.service_id = action.service_id
             if action.service_code:
@@ -327,14 +324,8 @@ class BatchPatientService:
                 entry.status = action.status
             return EntryResult(id=action.id, status="updated")
 
-        # Пробуем найти в Visit
-        visit = self.db.query(Visit).filter(
-            Visit.id == action.id,
-            Visit.patient_id == patient_id,
-            Visit.visit_date == target_date,
-        ).first()
-
-        if visit:
+        if entry_type == "visit":
+            visit = target
             if action.doctor_id:
                 visit.doctor_id = action.doctor_id
             if action.status:
@@ -346,6 +337,68 @@ class BatchPatientService:
             status="error",
             error="Entry not found"
         )
+
+    def _resolve_existing_entry_target(
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction,
+    ) -> tuple[EntryActionType | None, Any | None, str | None]:
+        entry = self._find_online_queue_entry_for_action(
+            patient_id=patient_id,
+            target_date=target_date,
+            action=action,
+        )
+        visit = self._find_visit_for_action(
+            patient_id=patient_id,
+            target_date=target_date,
+            action=action,
+        )
+
+        if action.entry_type == "online_queue":
+            if entry:
+                return "online_queue", entry, None
+            return None, None, "Entry not found"
+
+        if action.entry_type == "visit":
+            if visit:
+                return "visit", visit, None
+            return None, None, "Entry not found"
+
+        if entry and visit:
+            return None, None, "Ambiguous entry id; include entry_type"
+        if entry:
+            return "online_queue", entry, None
+        if visit:
+            return "visit", visit, None
+        return None, None, "Entry not found"
+
+    def _find_online_queue_entry_for_action(
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction,
+    ) -> OnlineQueueEntry | None:
+        return self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.id == action.id,
+            OnlineQueueEntry.patient_id == patient_id,
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date,
+        ).first()
+
+    def _find_visit_for_action(
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction,
+    ) -> Visit | None:
+        return self.db.query(Visit).filter(
+            Visit.id == action.id,
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
+        ).first()
 
     def _create_entry(
         self,
