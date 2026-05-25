@@ -136,7 +136,7 @@ export default function LabQueueWorkbench({
                           {appointment.patient_fio || 'Пациент без имени'}
                         </div>
                       <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
-                        Визит: {appointment.visit_id || 'будет создан автоматически'} | Телефон: {appointment.patient_phone || 'не указан'}
+                        Визит: {appointment.visit_id || 'не привязан'} | Телефон: {appointment.patient_phone || 'не указан'}
                       </div>
                     </div>
                       <Badge variant={getLabStatusVariant(appointment.status)}>
