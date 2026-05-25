@@ -127,6 +127,17 @@ RULES: tuple[Rule, ...] = (
         "routing SSOT ownership",
     ),
     Rule(
+        r"\b(registrar\b.*\b(payment|billing|status|persistence)|"
+        r"(payment|billing|status|persistence)\b.*\bregistrar)\b",
+        (
+            "backend/app/services/billing_service.py",
+            "backend/app/services/billing_api_service.py",
+            "backend/app/models/payment.py",
+            "backend/app/api/v1/endpoints/billing.py",
+        ),
+        "registrar backend payment/status persistence ownership",
+    ),
+    Rule(
         r"\b(queue_time|queue fairness|specialist|dailyqueue|online queue|queue mapping)\b",
         (
             "backend/app/services/queue_service.py",
@@ -134,6 +145,16 @@ RULES: tuple[Rule, ...] = (
             "backend/tests/unit/test_queue_time_window.py",
         ),
         "queue fairness and queue-time ownership",
+    ),
+    Rule(
+        r"\b(notification|notifications|preferences|mute|snooze|dnd|anti-noise|anti noise)\b",
+        (
+            "backend/app/services/notifications.py",
+            "backend/app/services/notifications_api_service.py",
+            "backend/app/schemas/notification.py",
+            "backend/app/models/notification.py",
+        ),
+        "notification catalog/settings runtime policy ownership",
     ),
     Rule(
         r"\b(telegram|bot webhook|telegram webhook)\b",
