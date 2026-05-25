@@ -34,6 +34,18 @@ class VisitsApiService:
         md = MetaData()
         return Table("visit_services", md, autoload_with=self.repository.get_bind())
 
+    def _patients(self) -> Table:
+        md = MetaData()
+        return Table("patients", md, autoload_with=self.repository.get_bind())
+
+    def _doctors(self) -> Table:
+        md = MetaData()
+        return Table("doctors", md, autoload_with=self.repository.get_bind())
+
+    def _users(self) -> Table:
+        md = MetaData()
+        return Table("users", md, autoload_with=self.repository.get_bind())
+
     def list_visits(
         self,
         *,
@@ -156,6 +168,86 @@ class VisitsApiService:
         ).mappings().first()
         if not visit_row:
             raise HTTPException(404, "Visit not found")
+        visit = dict(visit_row)
+
+        patient_id = visit.get("patient_id")
+        if patient_id:
+            patients_table = self._patients()
+            patient_row = self.repository.execute(
+                select(
+                    patients_table.c.id,
+                    patients_table.c.last_name,
+                    patients_table.c.first_name,
+                    patients_table.c.middle_name,
+                    patients_table.c.birth_date,
+                    patients_table.c.phone,
+                    patients_table.c.address,
+                ).where(patients_table.c.id == patient_id)
+            ).mappings().first()
+            if patient_row:
+                patient = dict(patient_row)
+                patient_name = " ".join(
+                    str(patient.get(key) or "").strip()
+                    for key in ("last_name", "first_name", "middle_name")
+                ).strip()
+                birth_date = patient.get("birth_date")
+                birth_year = getattr(birth_date, "year", None)
+                visit.update(
+                    {
+                        "patient_name": patient_name,
+                        "patient_fio": patient_name,
+                        "patient_phone": patient.get("phone"),
+                        "patient_birth_year": birth_year,
+                        "birth_year": birth_year,
+                        "address": patient.get("address"),
+                        "patient": {
+                            "id": patient.get("id"),
+                            "full_name": patient_name,
+                            "phone": patient.get("phone"),
+                            "birth_year": birth_year,
+                            "address": patient.get("address"),
+                        },
+                    }
+                )
+
+        doctor_id = visit.get("doctor_id")
+        if doctor_id:
+            doctors_table = self._doctors()
+            users_table = self._users()
+            doctor_row = self.repository.execute(
+                select(
+                    doctors_table.c.id,
+                    doctors_table.c.specialty,
+                    doctors_table.c.cabinet,
+                    users_table.c.full_name.label("doctor_full_name"),
+                    users_table.c.username.label("doctor_username"),
+                )
+                .select_from(
+                    doctors_table.outerjoin(
+                        users_table, users_table.c.id == doctors_table.c.user_id
+                    )
+                )
+                .where(doctors_table.c.id == doctor_id)
+            ).mappings().first()
+            if doctor_row:
+                doctor = dict(doctor_row)
+                doctor_name = (
+                    doctor.get("doctor_full_name")
+                    or doctor.get("doctor_username")
+                    or f"Doctor #{doctor_id}"
+                )
+                visit.update(
+                    {
+                        "doctor_name": doctor_name,
+                        "room": doctor.get("cabinet"),
+                        "doctor": {
+                            "id": doctor.get("id"),
+                            "name": doctor_name,
+                            "specialty": doctor.get("specialty"),
+                            "cabinet": doctor.get("cabinet"),
+                        },
+                    }
+                )
 
         services = (
             self.repository.execute(
@@ -166,7 +258,7 @@ class VisitsApiService:
             .mappings()
             .all()
         )
-        return {"visit": dict(visit_row), "services": [dict(item) for item in services]}
+        return {"visit": visit, "services": [dict(item) for item in services]}
 
     def add_service(self, *, visit_id: int, item) -> dict[str, Any]:
         visits_table = self._visits()

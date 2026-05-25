@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -39,6 +39,16 @@ class VisitOut(BaseModel):
     notes: Optional[str] = None
     planned_date: Optional[date] = None  # <-- новая поддержка
     source: Optional[str] = None
+    patient_name: Optional[str] = None
+    patient_fio: Optional[str] = None
+    patient_phone: Optional[str] = None
+    patient_birth_year: Optional[int] = None
+    birth_year: Optional[int] = None
+    address: Optional[str] = None
+    patient: Optional[dict[str, Any]] = None
+    doctor_name: Optional[str] = None
+    room: Optional[str] = None
+    doctor: Optional[dict[str, Any]] = None
 
 
 class VisitServiceIn(BaseModel):

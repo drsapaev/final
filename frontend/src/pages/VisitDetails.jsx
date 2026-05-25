@@ -6,6 +6,36 @@ import RescheduleDialog from '../components/RescheduleDialog';
 
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+
+function normalizeVisitDetailPayload(data) {
+  if (!data) return null;
+  const baseVisit = data.visit && typeof data.visit === 'object' ? data.visit : data;
+  const services = Array.isArray(data.services) ? data.services : baseVisit.services;
+  return {
+    ...baseVisit,
+    services: Array.isArray(services) ? services : [],
+  };
+}
+
+function resolvePatientName(visit) {
+  return (
+    visit?.patient?.full_name ||
+    visit?.patient_fio ||
+    visit?.patient_name ||
+    (visit?.patient_id ? `Пациент #${visit.patient_id}` : '—')
+  );
+}
+
+function resolveDoctorName(visit) {
+  const doctorName = visit?.doctor?.name || visit?.doctor_name;
+  const cabinet = visit?.doctor?.cabinet || visit?.room;
+  if (doctorName && cabinet) return `${doctorName} / ${cabinet}`;
+  return doctorName || cabinet || (visit?.doctor_id ? `Врач #${visit.doctor_id}` : '—');
+}
+
+function resolveVisitSchedule(visit) {
+  return visit?.scheduled_at || visit?.planned_date || visit?.visit_date || null;
+}
 /**
  * VisitDetails page
  * - Shows visit information
@@ -30,7 +60,7 @@ function VisitDetails() {
     getVisit(id).
     then((data) => {
       if (!mounted) return;
-      setVisit(data || null);
+      setVisit(normalizeVisitDetailPayload(data));
     }).
     catch((err) => {
       logger.error('getVisit error:', err);
@@ -54,12 +84,13 @@ function VisitDetails() {
     setLoading(true);
     setError('');
     try {
-      const baseDate = visit.scheduled_at ? new Date(visit.scheduled_at) : new Date();
+      const scheduledAt = resolveVisitSchedule(visit);
+      const baseDate = scheduledAt ? new Date(scheduledAt) : new Date();
       const tomorrow = new Date(baseDate);
       tomorrow.setDate(baseDate.getDate() + 1);
       const iso = tomorrow.toISOString();
       const res = await rescheduleVisit(visit.id, iso);
-      setVisit((prev) => ({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
+      setVisit((prev) => normalizeVisitDetailPayload({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
     } catch (err) {
       logger.error('rescheduleTomorrow error:', err);
       setError(getErrorMessage(err, 'Не удалось перенести приём. Проверьте соединение и попробуйте снова.'));
@@ -110,7 +141,7 @@ function VisitDetails() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="text-sm text-gray-500">Пациент</div>
-            <div className="font-medium">{visit.patient?.full_name || visit.patient_name || '—'}</div>
+            <div className="font-medium">{resolvePatientName(visit)}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Статус</div>
@@ -118,11 +149,11 @@ function VisitDetails() {
           </div>
           <div>
             <div className="text-sm text-gray-500">Запланировано</div>
-            <div className="font-medium">{visit.scheduled_at ? new Date(visit.scheduled_at).toLocaleString() : '—'}</div>
+            <div className="font-medium">{resolveVisitSchedule(visit) ? new Date(resolveVisitSchedule(visit)).toLocaleString() : '—'}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Врач / кабинет</div>
-            <div className="font-medium">{visit.doctor?.name || visit.room || '—'}</div>
+            <div className="font-medium">{resolveDoctorName(visit)}</div>
           </div>
         </div>
 
