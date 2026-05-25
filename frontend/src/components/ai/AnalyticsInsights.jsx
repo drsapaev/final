@@ -34,6 +34,19 @@ import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
 import logger from '../../utils/logger';
+
+const parseOptionalInteger = (value) => {
+  if (value === '') return '';
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? '' : parsed;
+};
+
+const parseOptionalFloat = (value) => {
+  if (value === '') return '';
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? '' : parsed;
+};
+
 const AnalyticsInsights = () => {
   const [activeTab, setActiveTab] = useState('trends');
   const [loading, setLoading] = useState(false);
@@ -182,12 +195,12 @@ const AnalyticsInsights = () => {
     setMedicalData((prev) => [
     ...prev,
     {
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
-      type: 'consultation',
+      id: '',
+      date: '',
+      type: '',
       diagnosis: '',
-      patient_age: 30,
-      department: 'general'
+      patient_age: '',
+      department: ''
     }]
     );
   };
@@ -200,10 +213,10 @@ const AnalyticsInsights = () => {
     setDataset((prev) => [
     ...prev,
     {
-      id: Date.now().toString(),
-      value: 0,
-      timestamp: new Date().toISOString(),
-      type: 'measurement',
+      id: '',
+      value: '',
+      timestamp: '',
+      type: '',
       patient_id: ''
     }]
     );
@@ -216,7 +229,7 @@ const AnalyticsInsights = () => {
   const addHistoricalOutcome = () => {
     setHistoricalOutcomes((prev) => [
     ...prev,
-    { condition: '', treatment: '', result: 'success', duration: '', patient_age: 30 }]
+    { condition: '', treatment: '', result: '', duration: '', patient_age: '' }]
     );
   };
 
@@ -228,12 +241,11 @@ const AnalyticsInsights = () => {
     setPopulationData((prev) => [
     ...prev,
     {
-      id: `P${Date.now()}`,
-      age: 30,
-      gender: 'male',
+      id: '',
+      age: '',
+      gender: '',
       conditions: [],
-      lifestyle: 'active',
-      smoking: false
+      lifestyle: ''
     }]
     );
   };
@@ -280,7 +292,7 @@ const AnalyticsInsights = () => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalData.map((record, index) =>
-        <div key={record.id} style={{
+        <div key={record.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
           gap: '8px',
@@ -296,13 +308,14 @@ const AnalyticsInsights = () => {
             }}
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={record.type}
             onChange={(e) => {
               const newData = [...medicalData];
               newData[index].type = e.target.value;
               setMedicalData(newData);
             }}
+            placeholder="Выберите тип"
             options={[
             { value: 'consultation', label: 'Консультация' },
             { value: 'procedure', label: 'Процедура' },
@@ -327,19 +340,20 @@ const AnalyticsInsights = () => {
             value={record.patient_age}
             onChange={(e) => {
               const newData = [...medicalData];
-              newData[index].patient_age = parseInt(e.target.value) || 0;
+              newData[index].patient_age = parseOptionalInteger(e.target.value);
               setMedicalData(newData);
             }}
             placeholder="Возраст"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={record.department}
             onChange={(e) => {
               const newData = [...medicalData];
               newData[index].department = e.target.value;
               setMedicalData(newData);
             }}
+            placeholder="Выберите отделение"
             options={[
             { value: 'general', label: 'Общий' },
             { value: 'cardiology', label: 'Кардиология' },
@@ -471,7 +485,7 @@ const AnalyticsInsights = () => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {dataset.map((entry, index) =>
-        <div key={entry.id} style={{
+        <div key={entry.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
           gap: '8px',
@@ -482,7 +496,7 @@ const AnalyticsInsights = () => {
             value={entry.value}
             onChange={(e) => {
               const newDataset = [...dataset];
-              newDataset[index].value = parseFloat(e.target.value) || 0;
+              newDataset[index].value = parseOptionalFloat(e.target.value);
               setDataset(newDataset);
             }}
             placeholder="Значение"
@@ -493,18 +507,19 @@ const AnalyticsInsights = () => {
             value={entry.timestamp.slice(0, 16)}
             onChange={(e) => {
               const newDataset = [...dataset];
-              newDataset[index].timestamp = e.target.value + ':00';
+              newDataset[index].timestamp = e.target.value ? `${e.target.value}:00` : '';
               setDataset(newDataset);
             }}
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={entry.type}
             onChange={(e) => {
               const newDataset = [...dataset];
               newDataset[index].type = e.target.value;
               setDataset(newDataset);
             }}
+            placeholder="Выберите тип"
             options={[
             { value: 'blood_pressure', label: 'АД' },
             { value: 'temperature', label: 'Температура' },
@@ -615,7 +630,7 @@ const AnalyticsInsights = () => {
             <MacOSInput
             type="number"
             value={patientData.age}
-            onChange={(e) => setPatientData((prev) => ({ ...prev, age: parseInt(e.target.value) || 0 }))}
+            onChange={(e) => setPatientData((prev) => ({ ...prev, age: parseOptionalInteger(e.target.value) }))}
             style={{ width: '100%' }} />
           
           </div>
@@ -632,6 +647,7 @@ const AnalyticsInsights = () => {
             <MacOSSelect
             value={patientData.gender}
             onChange={(e) => setPatientData((prev) => ({ ...prev, gender: e.target.value }))}
+            placeholder="Выберите пол"
             options={[
             { value: 'male', label: 'Мужской' },
             { value: 'female', label: 'Женский' }]
@@ -732,13 +748,14 @@ const AnalyticsInsights = () => {
             placeholder="Лечение"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={outcome.result}
             onChange={(e) => {
               const newOutcomes = [...historicalOutcomes];
               newOutcomes[index].result = e.target.value;
               setHistoricalOutcomes(newOutcomes);
             }}
+            placeholder="Выберите исход"
             options={[
             { value: 'success', label: 'Успех' },
             { value: 'partial', label: 'Частичный' },
@@ -763,7 +780,7 @@ const AnalyticsInsights = () => {
             value={outcome.patient_age}
             onChange={(e) => {
               const newOutcomes = [...historicalOutcomes];
-              newOutcomes[index].patient_age = parseInt(e.target.value) || 0;
+              newOutcomes[index].patient_age = parseOptionalInteger(e.target.value);
               setHistoricalOutcomes(newOutcomes);
             }}
             placeholder="Возраст"
@@ -908,7 +925,7 @@ const AnalyticsInsights = () => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {populationData.map((patient, index) =>
-        <div key={patient.id} style={{
+        <div key={patient.id || index} style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(6, 1fr)',
           gap: '8px',
@@ -930,19 +947,20 @@ const AnalyticsInsights = () => {
             value={patient.age}
             onChange={(e) => {
               const newData = [...populationData];
-              newData[index].age = parseInt(e.target.value) || 0;
+              newData[index].age = parseOptionalInteger(e.target.value);
               setPopulationData(newData);
             }}
             placeholder="Возраст"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={patient.gender}
             onChange={(e) => {
               const newData = [...populationData];
               newData[index].gender = e.target.value;
               setPopulationData(newData);
             }}
+            placeholder="Выберите пол"
             options={[
             { value: 'male', label: 'М' },
             { value: 'female', label: 'Ж' }]
@@ -960,13 +978,14 @@ const AnalyticsInsights = () => {
             placeholder="Заболевания"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSSelect
+            <MacOSSelect
             value={patient.lifestyle}
             onChange={(e) => {
               const newData = [...populationData];
               newData[index].lifestyle = e.target.value;
               setPopulationData(newData);
             }}
+            placeholder="Выберите образ жизни"
             options={[
             { value: 'active', label: 'Активный' },
             { value: 'sedentary', label: 'Малоподвижный' },
