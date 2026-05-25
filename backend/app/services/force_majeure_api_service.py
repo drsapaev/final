@@ -194,6 +194,15 @@ class ForceMajeureApiService:
         payload["processed_by_name"] = current_user.full_name
         return payload
 
+    @staticmethod
+    def _refund_request_available_actions(status: str | None) -> list[str]:
+        normalized_status = (status or "").strip().lower()
+        if normalized_status == RefundRequestStatus.PENDING.value:
+            return ["approve", "reject"]
+        if normalized_status == RefundRequestStatus.APPROVED.value:
+            return ["reject", "complete"]
+        return []
+
     def get_deposits(
         self,
         *,
@@ -298,6 +307,7 @@ class ForceMajeureApiService:
 
     def _serialize_refund_request(self, req) -> dict[str, Any]:
         processed_by_name = req.processor.full_name if req.processor else None
+        available_actions = self._refund_request_available_actions(req.status)
         return {
             "id": req.id,
             "patient_id": req.patient_id,
@@ -314,6 +324,10 @@ class ForceMajeureApiService:
             "created_at": req.created_at,
             "processed_at": req.processed_at,
             "processed_by_name": processed_by_name,
+            "available_actions": available_actions,
+            "can_approve": "approve" in available_actions,
+            "can_reject": "reject" in available_actions,
+            "can_complete": "complete" in available_actions,
         }
 
     def _serialize_deposit(self, deposit) -> dict[str, Any]:
