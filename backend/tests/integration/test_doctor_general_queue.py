@@ -71,7 +71,154 @@ class TestDoctorGeneralQueue:
         assert set(payload["entries"][0]["available_actions"]) == {"call", "no_show"}
         assert payload["entries"][0]["can_call"] is True
         assert payload["entries"][0]["can_no_show"] is True
+        assert payload["entries"][0]["can_start_visit"] is False
         assert payload["entries"][0]["can_complete"] is False
+
+    def test_general_queue_exposes_backend_owned_start_and_complete_actions(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        called_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="called",
+        )
+        in_progress_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="in_progress",
+        )
+        db_session.add_all([called_entry, in_progress_entry])
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.get("/api/v1/doctor/general/queue/today", headers=headers)
+
+        assert response.status_code == 200
+        entries = response.json()["entries"]
+        called_payload = entries[0]
+        in_progress_payload = entries[1]
+
+        assert called_payload["status"] == "called"
+        assert "start_visit" in called_payload["available_actions"]
+        assert "complete" not in called_payload["available_actions"]
+        assert called_payload["can_start_visit"] is True
+        assert called_payload["can_complete"] is False
+
+        assert in_progress_payload["status"] == "in_progress"
+        assert set(in_progress_payload["available_actions"]) == {"complete"}
+        assert in_progress_payload["can_start_visit"] is False
+        assert in_progress_payload["can_complete"] is True
+
+    def test_queue_commands_reject_statuses_without_backend_action(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        waiting_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="waiting",
+        )
+        called_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="called",
+        )
+        db_session.add_all([waiting_entry, called_entry])
+        db_session.commit()
+        db_session.refresh(waiting_entry)
+        db_session.refresh(called_entry)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        start_response = client.post(
+            f"/api/v1/doctor/queue/{waiting_entry.id}/start-visit",
+            headers=headers,
+        )
+        complete_response = client.post(
+            f"/api/v1/doctor/queue/{called_entry.id}/complete",
+            headers=headers,
+        )
+
+        assert start_response.status_code == 400
+        assert complete_response.status_code == 400
+        db_session.refresh(waiting_entry)
+        db_session.refresh(called_entry)
+        assert waiting_entry.status == "waiting"
+        assert called_entry.status == "called"
 
     def test_general_queue_returns_empty_payload_without_configuration(
         self,
@@ -450,7 +597,7 @@ class TestDoctorGeneralQueue:
             patient_name=test_patient.short_name(),
             phone=test_patient.phone,
             source="registrar",
-            status="waiting",
+            status="in_progress",
         )
         db_session.add(entry)
         db_session.commit()

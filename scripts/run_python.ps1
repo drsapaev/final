@@ -1,4 +1,5 @@
 param(
+    [string[]] $RequireModule = @(),
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $PythonArgs
 )
@@ -25,11 +26,13 @@ function New-Candidate {
 function Test-PythonCandidate {
     param(
         [Parameter(Mandatory = $true)]
-        [pscustomobject] $Candidate
+        [pscustomobject] $Candidate,
+        [string[]] $RequiredModules = @()
     )
 
     try {
-        $probe = "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 2)"
+        $modules = ($RequiredModules -join ",")
+        $probe = "import importlib.util, sys; modules = [name for name in r'''$modules'''.split(',') if name]; ok = sys.version_info >= (3, 11) and all(importlib.util.find_spec(name) is not None for name in modules); raise SystemExit(0 if ok else 2)"
         & $Candidate.Command @($Candidate.PrefixArgs) -c $probe *> $null
         return ($LASTEXITCODE -eq 0)
     }
@@ -76,6 +79,7 @@ $candidates = [System.Collections.Generic.List[object]]::new()
 Add-FileCandidate $candidates "REPO_PYTHON" $env:REPO_PYTHON
 Add-FileCandidate $candidates "AGENT_GATE_PYTHON" $env:AGENT_GATE_PYTHON
 Add-FileCandidate $candidates "repo .venv" (Join-Path $repoRoot ".venv\Scripts\python.exe")
+Add-FileCandidate $candidates "backend .venv" (Join-Path $repoRoot "backend\.venv\Scripts\python.exe")
 Add-CommandCandidate $candidates "py -3.11 launcher" "py.exe" @("-3.11")
 Add-CommandCandidate $candidates "py -3 launcher" "py.exe" @("-3")
 Add-CommandCandidate $candidates "PATH python.exe" "python.exe"
@@ -107,7 +111,7 @@ $uniqueCandidates = foreach ($candidate in $candidates) {
 }
 
 foreach ($candidate in $uniqueCandidates) {
-    if (Test-PythonCandidate $candidate) {
+    if (Test-PythonCandidate $candidate -RequiredModules $RequireModule) {
         Write-Host "[repo-python] Using Python: $($candidate.Label) ($($candidate.Command) $($candidate.PrefixArgs -join ' '))"
         & $candidate.Command @($candidate.PrefixArgs) @PythonArgs
         exit $LASTEXITCODE
@@ -119,11 +123,11 @@ $attempted = $uniqueCandidates | ForEach-Object {
 }
 
 Write-Error @"
-No working Python 3.11+ interpreter was found.
+No working Python 3.11+ interpreter was found$(if ($RequireModule.Count -gt 0) { " with required module(s): $($RequireModule -join ', ')" } else { "" }).
 
 Tried:
 $($attempted -join [Environment]::NewLine)
 
 Set REPO_PYTHON to a valid python.exe, set AGENT_GATE_PYTHON for gate-only runs,
-or recreate .venv with Python 3.11+.
+or recreate .venv/backend\.venv with Python 3.11+ and the required packages.
 "@
