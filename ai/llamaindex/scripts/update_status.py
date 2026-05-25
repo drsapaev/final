@@ -79,7 +79,7 @@ def update_status(
         text,
     )
     text = re.sub(
-        r"\| LlamaIndex \| `TBD` \| `TBD` \| Missing unless verified\. \|",
+        r"(?m)^\| LlamaIndex \| `[^`]*` \| `[^`]*` \| .* \|$",
         f"| LlamaIndex | `{commit}` | `{verified_at}` | Active local fallback; smoke passed without external API. |",
         text,
     )

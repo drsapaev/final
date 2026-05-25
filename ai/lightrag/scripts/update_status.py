@@ -91,7 +91,7 @@ def update_status(
         )
 
     text = re.sub(
-        r"\| LightRAG \| `TBD` \| `TBD` \| Missing unless verified\. \|",
+        r"(?m)^\| LightRAG \| `[^`]*` \| `[^`]*` \| .* \|$",
         f"| LightRAG | `{commit}` | `{verified_at}` | Active relationship fallback; acceptance passed without external API. |",
         text,
     )

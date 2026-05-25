@@ -43,8 +43,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc`
-- Last verification date: `2026-05-25T17:31:50+00:00`
+- Last indexed commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
+- Last verification date: `2026-05-25T17:47:52+00:00`
 - Indexed document count: `1501`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
@@ -61,8 +61,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/lightrag/scripts/ingest.py`
   - `Test-Path ai/lightrag/indexes/lightrag_graph/graph.json`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc`
-- Last verification date: `2026-05-25T17:42:04+00:00`
+- Last indexed commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
+- Last verification date: `2026-05-25T17:47:58+00:00`
 - Indexed document count: `1499`
 - Relationship concept count: `9`
 - Relationship edge count: `4658`
@@ -107,8 +107,8 @@ The checker is read-only. It runs `ai/langgraph/scripts/run_agent_gate.ps1` agai
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc` | `2026-05-25T17:31:50+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc` | `2026-05-25T17:41:16+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7` | `2026-05-25T17:47:52+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7` | `2026-05-25T17:47:58+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
