@@ -82,73 +82,8 @@ const SecuritySettings = ({
     confirm: false
   });
 
-  // Моковые данные для активных сессий
-  const [activeSessions] = useState([
-  {
-    id: 1,
-    device: 'Chrome на Windows',
-    location: 'Ташкент, Узбекистан',
-    ip: '192.168.1.100',
-    lastActive: '2024-02-10T15:30:00Z',
-    current: true
-  },
-  {
-    id: 2,
-    device: 'Safari на iPhone',
-    location: 'Ташкент, Узбекистан',
-    ip: '192.168.1.101',
-    lastActive: '2024-02-10T14:15:00Z',
-    current: false
-  },
-  {
-    id: 3,
-    device: 'Firefox на Mac',
-    location: 'Самарканд, Узбекистан',
-    ip: '10.0.0.50',
-    lastActive: '2024-02-09T09:45:00Z',
-    current: false
-  }]
-  );
-
-  // Моковые данные для логов безопасности
-  const [securityLogs] = useState([
-  {
-    id: 1,
-    action: 'Вход в систему',
-    user: 'admin@clinic.uz',
-    ip: '192.168.1.100',
-    timestamp: '2024-02-10T15:30:00Z',
-    status: 'success',
-    details: 'Успешный вход с Chrome на Windows'
-  },
-  {
-    id: 2,
-    action: 'Неудачная попытка входа',
-    user: 'admin@clinic.uz',
-    ip: '192.168.1.105',
-    timestamp: '2024-02-10T15:25:00Z',
-    status: 'failed',
-    details: 'Неверный пароль'
-  },
-  {
-    id: 3,
-    action: 'Изменение пароля',
-    user: 'admin@clinic.uz',
-    ip: '192.168.1.100',
-    timestamp: '2024-02-10T14:00:00Z',
-    status: 'success',
-    details: 'Пароль успешно изменен'
-  },
-  {
-    id: 4,
-    action: 'Подозрительная активность',
-    user: 'unknown@example.com',
-    ip: '203.0.113.1',
-    timestamp: '2024-02-10T13:45:00Z',
-    status: 'blocked',
-    details: 'Множественные неудачные попытки входа'
-  }]
-  );
+  const [activeSessions] = useState([]);
+  const [securityLogs] = useState([]);
 
   // Инициализация формы
   useEffect(() => {
@@ -559,6 +494,7 @@ const SecuritySettings = ({
               <MacOSButton
               variant="outline"
               onClick={terminateAllOtherSessions}
+              disabled={activeSessions.length === 0}
               size="sm">
               
                 <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -567,6 +503,15 @@ const SecuritySettings = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {activeSessions.length === 0 &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
+                margin: 0
+              }}>
+                Нет backend-данных об активных сессиях.
+              </p>
+              }
               {activeSessions.map((session) =>
             <div key={session.id} style={{
               display: 'flex',
@@ -774,6 +719,15 @@ const SecuritySettings = ({
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {securityLogs.length === 0 &&
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
+                margin: 0
+              }}>
+                Нет backend-данных о событиях безопасности.
+              </p>
+              }
               {securityLogs.map((log) => {
               const StatusIcon = getStatusIcon(log.status);
               return (
