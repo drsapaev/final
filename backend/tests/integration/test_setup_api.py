@@ -115,3 +115,34 @@ def test_setup_initialize_rejects_second_run(client):
 
     second = client.post("/api/v1/setup/initialize", json=build_payload())
     assert second.status_code == 409, second.text
+
+
+@pytest.mark.integration
+def test_setup_initialize_rejects_when_active_admin_already_exists(client, db_session):
+    db_session.add(
+        User(
+            username="legacy_admin",
+            hashed_password="legacy-hash",
+            full_name="Legacy Admin",
+            email="legacy-admin@example.com",
+            role="Admin",
+            is_active=True,
+            is_superuser=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/setup/initialize",
+        json=build_payload(
+            admin={
+                "username": "attacker_admin",
+                "password": "strongpass123",
+                "full_name": "Attacker Admin",
+                "email": "attacker@example.com",
+            }
+        ),
+    )
+
+    assert response.status_code == 409, response.text
+    assert db_session.query(User).filter(User.role == "Admin").count() == 1
