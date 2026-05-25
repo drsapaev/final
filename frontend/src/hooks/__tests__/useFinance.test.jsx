@@ -77,6 +77,34 @@ describe('useFinance', () => {
     );
   });
 
+  it('preserves missing backend transaction status as unknown instead of completed', async () => {
+    api.get.mockResolvedValueOnce({
+      data: [
+        {
+          id: 601,
+          type: 'income',
+          category: 'РљРѕРЅСЃСѓР»СЊС‚Р°С†РёСЏ',
+          amount: 90000,
+          description: 'Backend row without status',
+          patient_id: null,
+          doctor_id: null,
+          payment_method: 'cash',
+          transaction_date: '2026-03-27',
+          notes: null,
+          reference: 'FIN-601'
+        }
+      ]
+    });
+
+    const { result } = renderHook(() => useFinance());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.allTransactions).toHaveLength(1);
+    expect(result.current.allTransactions[0].status).toBeNull();
+    expect(result.current.allTransactions[0].status).not.toBe('completed');
+  });
+
   it('persists create, update, and delete mutations across reloads using cached finance state', async () => {
     api.get
       .mockResolvedValueOnce({ data: [] })
