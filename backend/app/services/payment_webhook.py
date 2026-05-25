@@ -114,7 +114,18 @@ class PaymentWebhookService:
         """Верификация подписи Click"""
         try:
             # Создаём строку для подписи
-            sign_string = f"{data['click_trans_id']}{data['service_id']}{data['merchant_trans_id']}{data['amount']}{data['action']}{data['sign_time']}"
+            fields = [
+                "click_trans_id",
+                "service_id",
+                "merchant_id",
+                "amount",
+                "action",
+                "error",
+                "error_note",
+                "sign_time",
+            ]
+            sign_string = "".join(str(data.get(field, "")) for field in fields)
+            sign_string += secret_key
 
             # Создаём подпись
             expected_signature = hashlib.md5(sign_string.encode("utf-8")).hexdigest()

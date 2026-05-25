@@ -14,9 +14,12 @@ def _valid_click_webhook_data(merchant_trans_id: str = "888") -> dict[str, str]:
     return {
         "click_trans_id": "click-tx-1",
         "service_id": "svc",
+        "merchant_id": "merchant",
         "merchant_trans_id": merchant_trans_id,
         "amount": "750.00",
         "action": "0",
+        "error": "",
+        "error_note": "",
         "sign_time": "2026-02-14 10:00:00",
         "sign_string": "sig",
     }
@@ -43,18 +46,33 @@ class TestPaymentWebhookService:
         data = {
             "click_trans_id": "1",
             "service_id": "2",
+            "merchant_id": "merchant",
             "merchant_trans_id": "3",
             "amount": "400",
             "action": "0",
+            "error": "",
+            "error_note": "",
             "sign_time": "2026-02-14 10:00:00",
         }
-        sign_string = (
-            f"{data['click_trans_id']}{data['service_id']}{data['merchant_trans_id']}"
-            f"{data['amount']}{data['action']}{data['sign_time']}"
-        )
-        data["sign_string"] = hashlib.md5(sign_string.encode("utf-8")).hexdigest()
+        data["sign_string"] = "5b39d6700b1e202b3cf4091d49f9fb0a"
 
-        assert PaymentWebhookService.verify_click_signature(data, "unused-secret") is True
+        assert PaymentWebhookService.verify_click_signature(data, "provider-key") is True
+
+    def test_verify_click_signature_rejects_public_fields_without_secret(self):
+        data = {
+            "click_trans_id": "1",
+            "service_id": "2",
+            "merchant_id": "merchant",
+            "merchant_trans_id": "3",
+            "amount": "400",
+            "action": "0",
+            "error": "",
+            "error_note": "",
+            "sign_time": "2026-02-14 10:00:00",
+        }
+        data["sign_string"] = "17b433fe7039561699fd526dc2986280"
+
+        assert PaymentWebhookService.verify_click_signature(data, "provider-key") is False
 
     def test_get_webhook_summary_uses_repository_counts(self, db_session):
         repository = SimpleNamespace(
