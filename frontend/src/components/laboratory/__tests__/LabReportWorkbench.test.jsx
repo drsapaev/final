@@ -7,6 +7,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
+import { labReportingApi } from '../../../api/labReporting';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
@@ -28,6 +29,7 @@ vi.mock('../../../api/labReporting', () => ({
 
 describe('LabReportWorkbench', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -101,5 +103,76 @@ describe('LabReportWorkbench', () => {
     expect(source).toContain("const canRevise = hasLabReportAction(activeInstance, 'revise')");
     expect(source).not.toContain("activeInstance.status !== 'FINALIZED' && activeInstance.status !== 'PRINTED'");
     expect(source).not.toContain("activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'");
+  });
+
+  it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {
+    const onOpenInstance = vi.fn();
+    const notify = vi.fn();
+
+    render(
+      <MacOSThemeProvider>
+        <ThemeProvider>
+          <LabReportWorkbench
+            selectedAppointment={{
+              id: 17,
+              patient_id: 444,
+              visit_id: 728,
+              patient_fio: 'Test Patient',
+              service_codes: ['CBC'],
+              service_details: [{ id: 5, code: 'CBC', name: 'CBC' }],
+            }}
+            templates={[
+              {
+                id: 3,
+                name: 'CBC template',
+                family: 'hematology',
+                published_version_id: 33,
+              },
+            ]}
+            templateResolution={{
+              visit_id: 728,
+              service_codes: ['CBC'],
+              default_template: {
+                id: 3,
+                name: 'CBC template',
+                family: 'hematology',
+                published_version_id: 33,
+              },
+              allowed_templates: [
+                {
+                  id: 3,
+                  name: 'CBC template',
+                  family: 'hematology',
+                  published_version_id: 33,
+                },
+              ],
+              unmapped_service_codes: [],
+            }}
+            templateResolutionLoading={false}
+            reportHistory={[]}
+            recentReports={[]}
+            activeInstance={null}
+            onInstanceChange={vi.fn()}
+            onOpenInstance={onOpenInstance}
+            onRefreshHistory={vi.fn()}
+            onRefreshRecentReports={vi.fn()}
+            onQueueChanged={vi.fn()}
+            notify={notify}
+          />
+        </ThemeProvider>
+      </MacOSThemeProvider>
+    );
+
+    await screen.findByText((content) =>
+      content.includes('Единственный допустимый бланк найден')
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(labReportingApi.createInstance).not.toHaveBeenCalled();
+    expect(onOpenInstance).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalledWith(
+      'success',
+      expect.stringContaining('автоматически')
+    );
   });
 });

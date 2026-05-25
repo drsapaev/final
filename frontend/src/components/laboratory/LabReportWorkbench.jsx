@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
@@ -266,7 +266,6 @@ export default function LabReportWorkbench({
   const [busyAction, setBusyAction] = useState('');
   const [printFeedback, setPrintFeedback] = useState(null);
   const [historySeverityFilter, setHistorySeverityFilter] = useState('all');
-  const autoActionRef = useRef('');
 
   const publishedTemplates = useMemo(
     () => templates.filter((template) => template.published_version_id || template.draft_version_id),
@@ -280,7 +279,6 @@ export default function LabReportWorkbench({
   const serviceContextPresent = (templateResolution?.service_codes || []).length > 0;
   const templateOptions = serviceContextPresent ? resolvedTemplates : publishedTemplates;
   const resolutionHasBlockingGap = serviceContextPresent && resolvedTemplates.length === 0;
-  const resolvedVisitId = templateResolution?.visit_id || selectedAppointment?.visit_id || null;
   const singleAllowedTemplate =
     serviceContextPresent && templateOptions.length === 1 ? templateOptions[0] : null;
 
@@ -381,10 +379,6 @@ export default function LabReportWorkbench({
   }, [activeInstance]);
 
   useEffect(() => {
-    autoActionRef.current = '';
-  }, [selectedAppointment?.id, selectedAppointment?.appointment_id, resolvedVisitId]);
-
-  useEffect(() => {
     if (activeInstance || !selectedAppointment) {
       return;
     }
@@ -397,56 +391,6 @@ export default function LabReportWorkbench({
       return defaultTemplateId ? String(defaultTemplateId) : '';
     });
   }, [activeInstance, selectedAppointment, templateOptions, templateResolution?.default_template?.id]);
-
-  useEffect(() => {
-    if (
-      activeInstance
-      || !selectedAppointment
-      || !singleAllowedTemplate
-      || templateResolutionLoading
-      || resolutionHasBlockingGap
-      || saving
-    ) {
-      return;
-    }
-
-    const templateId = String(singleAllowedTemplate.id);
-    const existingInstance = reportHistory
-      .filter(
-        (item) =>
-          String(item.template?.id || item.template_id) === templateId
-          && String(item.visit_id || '') === String(resolvedVisitId || '')
-      )
-      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0];
-    const autoKey = `${selectedAppointment.id || selectedAppointment.appointment_id || 'patient'}:${resolvedVisitId || 'no-visit'}:${templateId}:${existingInstance?.id || 'new'}`;
-    if (autoActionRef.current === autoKey) {
-      return;
-    }
-    autoActionRef.current = autoKey;
-    setSelectedTemplateId(templateId);
-
-    if (existingInstance) {
-      notify('info', 'Открываю уже созданный бланк для этого визита.');
-      void onOpenInstance(existingInstance.id);
-      return;
-    }
-
-    void handleCreateInstance(templateId, {
-      successMessage: `Бланк "${singleAllowedTemplate.name}" создан автоматически.`
-    });
-  }, [
-    activeInstance,
-    handleCreateInstance,
-    notify,
-    onOpenInstance,
-    reportHistory,
-    resolvedVisitId,
-    resolutionHasBlockingGap,
-    saving,
-    selectedAppointment,
-    singleAllowedTemplate,
-    templateResolutionLoading
-  ]);
 
   function updateField(fieldKey, value) {
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
@@ -690,7 +634,7 @@ export default function LabReportWorkbench({
               )}
               {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
                 <Alert severity="info">
-                  Единственный допустимый бланк найден: <strong>{singleAllowedTemplate.name}</strong>. Открываю его автоматически.
+                  Единственный допустимый бланк найден: <strong>{singleAllowedTemplate.name}</strong>. Нажмите «Создать бланк», чтобы открыть его для заполнения.
                 </Alert>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
