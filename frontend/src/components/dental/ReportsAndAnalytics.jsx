@@ -49,115 +49,60 @@ import PropTypes from 'prop-types';
  * Отчеты и аналитика для стоматологической ЭМК
  * Включает статистику по пациентам, врачам, клинике, процедурам
  */
+const EMPTY_ANALYTICS_DATA = {
+  overview: {
+    totalPatients: 0,
+    totalAppointments: 0,
+    totalRevenue: 0,
+    averageRating: 0,
+    growthRate: null
+  },
+  patients: {
+    newPatients: 0,
+    returningPatients: 0,
+    ageGroups: [],
+    genderDistribution: []
+  },
+  doctors: [],
+  procedures: [],
+  revenue: {
+    monthly: [],
+    byCategory: []
+  },
+  appointments: {
+    total: 0,
+    completed: 0,
+    cancelled: 0,
+    noShow: 0,
+    byStatus: [],
+    byDay: []
+  }
+};
+
+const hasAnalyticsData = (data) =>
+  Boolean(
+    data?.overview?.totalPatients ||
+    data?.overview?.totalAppointments ||
+    data?.overview?.totalRevenue ||
+    data?.patients?.ageGroups?.length ||
+    data?.patients?.genderDistribution?.length ||
+    data?.doctors?.length ||
+    data?.procedures?.length ||
+    data?.revenue?.monthly?.length ||
+    data?.revenue?.byCategory?.length ||
+    data?.appointments?.byStatus?.length
+  );
+
 const ReportsAndAnalytics = ({
+  initialData = null,
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');void
   useState('all');void
   useState('all');
-  const [loading, setLoading] = useState(false);
-
-  // Моковые данные для демонстрации
-  const [analyticsData] = useState({
-    overview: {
-      totalPatients: 1247,
-      totalAppointments: 3421,
-      totalRevenue: 2847500,
-      averageRating: 4.8,
-      growthRate: 12.5
-    },
-    patients: {
-      newPatients: 89,
-      returningPatients: 1158,
-      ageGroups: [
-      { age: '0-18', count: 234, percentage: 18.8 },
-      { age: '19-35', count: 456, percentage: 36.6 },
-      { age: '36-50', count: 312, percentage: 25.0 },
-      { age: '51-65', count: 189, percentage: 15.2 },
-      { age: '65+', count: 56, percentage: 4.5 }],
-
-      genderDistribution: [
-      { gender: 'Мужчины', count: 623, percentage: 50.0 },
-      { gender: 'Женщины', count: 624, percentage: 50.0 }]
-
-    },
-    doctors: [
-    {
-      id: 1,
-      name: 'Иванов И.И.',
-      specialty: 'Терапевт',
-      patients: 456,
-      appointments: 1234,
-      revenue: 987500,
-      rating: 4.9,
-      efficiency: 95
-    },
-    {
-      id: 2,
-      name: 'Петрова А.С.',
-      specialty: 'Хирург',
-      patients: 234,
-      appointments: 567,
-      revenue: 756300,
-      rating: 4.7,
-      efficiency: 88
-    },
-    {
-      id: 3,
-      name: 'Сидоров В.В.',
-      specialty: 'Ортодонт',
-      patients: 189,
-      appointments: 445,
-      revenue: 654200,
-      rating: 4.8,
-      efficiency: 92
-    }],
-
-    procedures: [
-    { name: 'Лечение кариеса', count: 1234, revenue: 987500, growth: 15.2 },
-    { name: 'Профессиональная гигиена', count: 567, revenue: 234500, growth: 8.7 },
-    { name: 'Удаление зуба', count: 234, revenue: 456700, growth: -5.3 },
-    { name: 'Протезирование', count: 123, revenue: 567800, growth: 22.1 },
-    { name: 'Имплантация', count: 89, revenue: 445600, growth: 18.9 }],
-
-    revenue: {
-      monthly: [
-      { month: 'Янв', revenue: 234500 },
-      { month: 'Фев', revenue: 267800 },
-      { month: 'Мар', revenue: 289400 },
-      { month: 'Апр', revenue: 312600 },
-      { month: 'Май', revenue: 298700 },
-      { month: 'Июн', revenue: 325400 }],
-
-      byCategory: [
-      { category: 'Терапия', revenue: 987500, percentage: 34.7 },
-      { category: 'Хирургия', revenue: 756300, percentage: 26.6 },
-      { category: 'Протезирование', revenue: 654200, percentage: 23.0 },
-      { category: 'Ортодонтия', revenue: 445600, percentage: 15.7 }]
-
-    },
-    appointments: {
-      total: 3421,
-      completed: 3201,
-      cancelled: 156,
-      noShow: 64,
-      byStatus: [
-      { status: 'Завершено', count: 3201, percentage: 93.6 },
-      { status: 'Отменено', count: 156, percentage: 4.6 },
-      { status: 'Не явился', count: 64, percentage: 1.9 }],
-
-      byDay: [
-      { day: 'Пн', count: 456 },
-      { day: 'Вт', count: 523 },
-      { day: 'Ср', count: 489 },
-      { day: 'Чт', count: 567 },
-      { day: 'Пт', count: 612 },
-      { day: 'Сб', count: 234 },
-      { day: 'Вс', count: 140 }]
-
-    }
-  });
+  const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
+  const reportHasData = hasAnalyticsData(analyticsData);
 
   // Обработчики
   const handleDateRangeChange = (range) => {
@@ -165,14 +110,7 @@ const ReportsAndAnalytics = ({
     // Здесь можно добавить логику загрузки данных для выбранного периода
   };
 
-  const handleExportReport = (type) => {
-    setLoading(true);
-    // Симуляция экспорта
-    setTimeout(() => {
-      setLoading(false);
-      alert(`Отчет ${type} экспортирован успешно!`);
-    }, 2000);
-  };
+  const handleExportReport = () => {};
 
   // Рендер карточки метрики
   const renderMetricCard = (title, value, change, icon, color = 'blue') =>
@@ -556,11 +494,11 @@ const ReportsAndAnalytics = ({
             
             <button
               onClick={() => handleExportReport('PDF')}
-              disabled={loading}
+              disabled={!reportHasData}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-              
+
               <Download className="h-4 w-4" />
-              {loading ? 'Экспорт...' : 'Экспорт PDF'}
+              Экспорт PDF
             </button>
             
             <button
@@ -613,6 +551,7 @@ const ReportsAndAnalytics = ({
 
 ReportsAndAnalytics.propTypes = {
   ...(ReportsAndAnalytics.propTypes || {}),
+  initialData: PropTypes.object,
   onClose: PropTypes.any,
 };
 
