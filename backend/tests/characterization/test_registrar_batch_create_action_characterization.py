@@ -5,7 +5,9 @@ from datetime import date
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.service import Service
+from app.models.visit import Visit
 from app.services.batch_patient_service import (
     BatchPatientService,
     BatchUpdateRequest,
@@ -69,6 +71,19 @@ def _create_existing_entry(
     db_session.commit()
     db_session.refresh(entry)
     return entry
+
+
+def _create_other_patient(db_session) -> Patient:
+    patient = Patient(
+        first_name="Other",
+        last_name="Batch",
+        phone="+998901110022",
+        birth_date=date(1991, 1, 1),
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+    return patient
 
 
 @pytest.mark.integration
@@ -233,3 +248,85 @@ def test_registrar_batch_create_action_characterization_duplicate_scenario_creat
     assert patient_entries[1].number == 9
     assert patient_entries[1].source == "batch_update"
     assert patient_entries[1].service_codes == [normalize_service_code(service.service_code)]
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_cancel_rejects_queue_entry_for_other_patient(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    other_patient = _create_other_patient(db_session)
+    unrelated_entry = _create_existing_entry(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        number=22,
+        queue_tag="cardiology",
+        status="waiting",
+    )
+    target_day = date.today().isoformat()
+
+    response = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
+        headers=registrar_auth_headers,
+        json={
+            "entries": [
+                {
+                    "id": unrelated_entry.id,
+                    "action": "cancel",
+                    "reason": "wrong patient collision",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    db_session.refresh(unrelated_entry)
+    assert unrelated_entry.status == "waiting"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_batch_update_rejects_visit_for_other_patient(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    other_patient = _create_other_patient(db_session)
+    unrelated_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="11:30",
+        status="open",
+        discount_mode="none",
+        department="cardiology",
+    )
+    db_session.add(unrelated_visit)
+    db_session.commit()
+    db_session.refresh(unrelated_visit)
+    target_day = date.today().isoformat()
+
+    response = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/{target_day}",
+        headers=registrar_auth_headers,
+        json={
+            "entries": [
+                {
+                    "id": unrelated_visit.id,
+                    "action": "update",
+                    "status": "cancelled",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    db_session.refresh(unrelated_visit)
+    assert unrelated_visit.status == "open"

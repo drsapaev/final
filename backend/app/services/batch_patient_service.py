@@ -185,9 +185,13 @@ class BatchPatientService:
             for entry_action in request.entries:
                 try:
                     if entry_action.action == "cancel":
-                        result = self._cancel_entry(entry_action)
+                        result = self._cancel_entry(
+                            patient_id, target_date, entry_action
+                        )
                     elif entry_action.action == "update":
-                        result = self._update_entry(entry_action)
+                        result = self._update_entry(
+                            patient_id, target_date, entry_action
+                        )
                     elif entry_action.action == "create":
                         result = self._create_entry(
                             patient_id, target_date, entry_action
@@ -252,14 +256,24 @@ class BatchPatientService:
                 error=str(e)
             )
 
-    def _cancel_entry(self, action: EntryAction) -> EntryResult:
+    def _cancel_entry(
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction,
+    ) -> EntryResult:
         """Отменяет запись"""
         if not action.id:
             return EntryResult(id=0, status="error", error="ID required for cancel")
 
         # Пробуем найти в OnlineQueueEntry
         entry = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == action.id
+            OnlineQueueEntry.id == action.id,
+            OnlineQueueEntry.patient_id == patient_id,
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date,
         ).first()
 
         if entry:
@@ -269,7 +283,9 @@ class BatchPatientService:
 
         # Пробуем найти в Visit
         visit = self.db.query(Visit).filter(
-            Visit.id == action.id
+            Visit.id == action.id,
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
         ).first()
 
         if visit:
@@ -282,14 +298,24 @@ class BatchPatientService:
             error="Entry not found"
         )
 
-    def _update_entry(self, action: EntryAction) -> EntryResult:
+    def _update_entry(
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction,
+    ) -> EntryResult:
         """Обновляет запись"""
         if not action.id:
             return EntryResult(id=0, status="error", error="ID required for update")
 
         # Пробуем найти в OnlineQueueEntry
         entry = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.id == action.id
+            OnlineQueueEntry.id == action.id,
+            OnlineQueueEntry.patient_id == patient_id,
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date,
         ).first()
 
         if entry:
@@ -303,7 +329,9 @@ class BatchPatientService:
 
         # Пробуем найти в Visit
         visit = self.db.query(Visit).filter(
-            Visit.id == action.id
+            Visit.id == action.id,
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
         ).first()
 
         if visit:
