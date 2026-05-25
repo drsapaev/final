@@ -35,7 +35,7 @@ const ScheduleNextModal = ({
   const [formData, setFormData] = useState({
     patient_id: '',
     visit_date: '',
-    visit_time: '09:00',
+    visit_time: '',
     services: [{ service_id: '', quantity: 1 }],
     discount_mode: 'none',
     all_free: false,
@@ -241,7 +241,7 @@ const ScheduleNextModal = ({
     setFormData({
       patient_id: '',
       visit_date: '',
-      visit_time: '09:00',
+      visit_time: '',
       services: [{ service_id: '', quantity: 1 }],
       discount_mode: 'none',
       all_free: false,
