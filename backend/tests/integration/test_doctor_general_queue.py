@@ -336,6 +336,74 @@ class TestDoctorGeneralQueue:
         assert appointment.status == "completed"
         assert entry.status == "diagnostics"
 
+    def test_complete_skips_unrelated_visit_when_appointment_id_collides(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+        test_doctor,
+    ):
+        other_patient = Patient(
+            first_name="Unrelated",
+            last_name="Visit",
+            middle_name="Collision",
+            phone="+998901222222",
+            birth_date=date(1982, 6, 6),
+            address="Unrelated visit address",
+        )
+        db_session.add(other_patient)
+        db_session.commit()
+        db_session.refresh(other_patient)
+
+        collision_id = 9003
+        unrelated_visit = Visit(
+            id=collision_id,
+            patient_id=other_patient.id,
+            doctor_id=None,
+            visit_date=date.today(),
+            status="open",
+            discount_mode="none",
+            source="desk",
+        )
+        appointment = Appointment(
+            id=collision_id,
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="12:30",
+            status="paid",
+            visit_type="paid",
+            payment_type="cash",
+            services=["consultation"],
+        )
+        db_session.add_all([unrelated_visit, appointment])
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{collision_id}/complete",
+            json={"patient_id": test_patient.id, "notes": "appointment complete"},
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["entry_id"] == collision_id
+        assert payload["status"] == "completed"
+
+        db_session.refresh(unrelated_visit)
+        db_session.refresh(appointment)
+        assert unrelated_visit.status == "open"
+        assert appointment.status == "completed"
+
     def test_cardiologist_role_can_complete_queue_entry(
         self,
         client,

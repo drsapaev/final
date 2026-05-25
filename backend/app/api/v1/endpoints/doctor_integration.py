@@ -654,6 +654,16 @@ def complete_patient_visit(
         visit = None
         if not queue_entry:
             visit = db.query(Visit).filter(Visit.id == entry_id).first()
+            if (
+                visit
+                and requested_patient_id is not None
+                and visit.patient_id is not None
+                and visit.patient_id != requested_patient_id
+            ):
+                logger.warning(
+                    "complete_patient_visit: route id matched a Visit for a different patient than the request payload; trying appointment fallback"
+                )
+                visit = None
         if visit:
             # Обновляем статус визита
             visit.status = "completed"
@@ -697,6 +707,16 @@ def complete_patient_visit(
             appointment = (
                 db.query(Appointment).filter(Appointment.id == entry_id).first()
             )
+            if (
+                appointment
+                and requested_patient_id is not None
+                and appointment.patient_id is not None
+                and appointment.patient_id != requested_patient_id
+            ):
+                logger.warning(
+                    "complete_patient_visit: route id matched an Appointment for a different patient than the request payload"
+                )
+                appointment = None
         if appointment:
             # Обновляем статус appointment
             appointment.status = "completed"
