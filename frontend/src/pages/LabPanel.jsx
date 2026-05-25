@@ -51,7 +51,7 @@ function formatAppointmentEntry(queue, entry) {
     queue_status: entry.status || null,
     specialty: queue.specialty,
     created_at: entry.created_at,
-    appointment_time: entry.visit_time || '09:00',
+    appointment_time: entry.visit_time || '',
     status: entry.status || null,
     status_source: 'queue',
     latest_lab_report: latestLabReport,
