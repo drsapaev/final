@@ -58,9 +58,11 @@ Before any runtime/code task, print the `AGENTS.md` execution pre-work block.
 - Use `gate` for queue, EMR, RBAC, payment, Telegram, routing, frontend/backend contract, or multi-file UX work.
 - Use `gate_known_root_cause` only when the root-cause file is already confirmed.
 - Gate command for risky tasks:
-  `cd C:\final\ai\langgraph && python scripts\agent_gate.py "<task>"`
+  `cd C:\final\ai\langgraph && .\scripts\run_agent_gate.ps1 "<task>"`
 - Gate command with known root cause:
-  `cd C:\final\ai\langgraph && python scripts\agent_gate.py "<task>" --known-root-cause "<relative/path>"`
+  `cd C:\final\ai\langgraph && .\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<relative/path>"`
+- Use the launcher instead of bare `python` or `py`; it validates Python 3.11+ and skips broken local launcher state.
+- For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1`.
 - If the gate emits a handoff, read and obey the generated `Ready-to-send execution prompt` before editing.
 - If the gate fails, stop and report instead of editing.
 
@@ -325,7 +327,7 @@ This backlog is evidence-led and must be refined as tasks uncover better facts.
 ### Phase 1B: STOP & SECURE (Blocking P0)
 
 - [x] Task 6: Audit auth router precedence and 2FA-bypass surfaces.
-  Run the gate before edits: `cd C:\final\ai\langgraph && python scripts\agent_gate.py "audit auth router precedence and bypass surfaces" --known-root-cause "backend/app/api/v1/api.py"`. Build an endpoint map for `/api/v1/auth/*`, `/api/v1/authentication/*`, and 2FA verification paths. Identify which endpoints can return `access_token` before OTP and which frontend/API docs call them. Do not edit code in this task unless the gate handoff explicitly permits a narrow first-touch file.
+  Run the gate before edits: `cd C:\final\ai\langgraph && .\scripts\run_agent_gate.ps1 "audit auth router precedence and bypass surfaces" --known-root-cause "backend/app/api/v1/api.py"`. Build an endpoint map for `/api/v1/auth/*`, `/api/v1/authentication/*`, and 2FA verification paths. Identify which endpoints can return `access_token` before OTP and which frontend/API docs call them. Do not edit code in this task unless the gate handoff explicitly permits a narrow first-touch file.
   Files: `backend/app/api/v1/api.py`, `backend/app/api/v1/endpoints/auth*.py`, `backend/app/api/v1/endpoints/minimal_auth.py`, `backend/app/api/v1/endpoints/simple_auth.py`, `backend/app/api/v1/endpoints/authentication.py`, `backend/app/api/deps.py`, `frontend/src/components/auth/LoginFormStyled.jsx`, `backend/tests/test_2fa_enforcement.py`
   LOGGING REQUIREMENTS: log route path, router owner, whether it returns `access_token`, 2FA requirement, canonical/legacy status, and validation target; do not log passwords or tokens.
 

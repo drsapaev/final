@@ -309,22 +309,39 @@ def migration_read_only_references(
     return unique_existing(repo_root, tracked, references)
 
 
-def migration_validation_targets(new_revision_pattern: str) -> list[str]:
+def powershell_quote(value: Path | str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def repo_location_command(repo_root: Path) -> str:
+    return f"Set-Location -LiteralPath {powershell_quote(repo_root)}"
+
+
+def python_launcher_command(repo_root: Path) -> str:
+    launcher = repo_root / "scripts" / "run_python.ps1"
+    return f"& {powershell_quote(launcher)}"
+
+
+def migration_validation_targets(repo_root: Path, new_revision_pattern: str) -> list[str]:
     placeholder = new_revision_pattern.replace("*", "<slug>")
+    python_launcher = python_launcher_command(repo_root)
     return [
-        f"python -m py_compile {placeholder}",
-        "cd backend; alembic heads",
-        "cd backend; alembic history --verbose",
-        "cd backend; alembic upgrade head  # against a disposable/test Postgres database",
+        f"{repo_location_command(repo_root)}; {python_launcher} -m py_compile {placeholder}",
+        f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic heads",
+        f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic history --verbose",
+        f"Set-Location -LiteralPath {powershell_quote(repo_root / 'backend')}; alembic upgrade head  # against a disposable/test Postgres database",
     ]
 
 
-def validation_targets(files: list[str]) -> list[str]:
+def validation_targets(repo_root: Path, files: list[str]) -> list[str]:
     targets: list[str] = []
     py_files = [path for path in files if path.endswith(".py")]
     if py_files:
         joined = " ".join(py_files)
-        targets.append(f"python -m py_compile {joined}")
+        targets.append(
+            f"{repo_location_command(repo_root)}; "
+            f"{python_launcher_command(repo_root)} -m py_compile {joined}"
+        )
 
     frontend_tests = [
         path.removeprefix("frontend/")
@@ -489,7 +506,7 @@ def main(argv: list[str] | None = None) -> int:
             tracked,
             list(REFERENCE_FILES) + read_only_references,
         )
-        validations = migration_validation_targets(new_revision)
+        validations = migration_validation_targets(repo_root, new_revision)
         stops = unique_paths(
             stop_conditions(first_touch) + list(MIGRATION_STOP_CONDITIONS)
         )
@@ -531,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     references = unique_existing(repo_root, tracked, list(REFERENCE_FILES))
-    validations = validation_targets(first_touch)
+    validations = validation_targets(repo_root, first_touch)
     stops = stop_conditions(first_touch)
 
     print(
