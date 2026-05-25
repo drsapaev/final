@@ -41,18 +41,12 @@ const AnalyticsInsights = () => {
   const [error, setError] = useState(null);
 
   // Состояния для анализа трендов
-  const [medicalData, setMedicalData] = useState([
-  { id: '1', date: '2024-01-15', type: 'consultation', diagnosis: 'Гипертония', patient_age: 55, department: 'cardiology' },
-  { id: '2', date: '2024-01-16', type: 'procedure', diagnosis: 'Диабет 2 типа', patient_age: 62, department: 'endocrinology' }]
-  );
+  const [medicalData, setMedicalData] = useState([]);
   const [timePeriod, setTimePeriod] = useState('month');
   const [analysisType, setAnalysisType] = useState('disease_trends');
 
   // Состояния для выявления аномалий
-  const [dataset, setDataset] = useState([
-  { id: '1', value: 120, timestamp: '2024-01-15T10:00:00', type: 'blood_pressure', patient_id: 'P001' },
-  { id: '2', value: 180, timestamp: '2024-01-15T11:00:00', type: 'blood_pressure', patient_id: 'P002' }]
-  );
+  const [dataset, setDataset] = useState([]);
   const [baselineData, setBaselineData] = useState({
     blood_pressure_normal: { systolic: 120, diastolic: 80 },
     temperature_normal: 36.6,
@@ -62,42 +56,36 @@ const AnalyticsInsights = () => {
 
   // Состояния для прогнозирования исходов
   const [patientData, setPatientData] = useState({
-    age: 45,
-    gender: 'male',
-    diagnosis: 'Артериальная гипертензия',
-    comorbidities: ['диабет 2 типа'],
-    treatment_start_date: '2024-01-10',
-    baseline_bp: '160/95',
-    medications: ['каптоприл', 'метформин']
+    age: '',
+    gender: '',
+    diagnosis: '',
+    comorbidities: [],
+    treatment_start_date: '',
+    baseline_bp: '',
+    medications: []
   });
-  const [historicalOutcomes, setHistoricalOutcomes] = useState([
-  { condition: 'гипертония', treatment: 'каптоприл', result: 'success', duration: '4 weeks', patient_age: 50 },
-  { condition: 'гипертония', treatment: 'каптоприл', result: 'partial', duration: '8 weeks', patient_age: 60 }]
-  );
+  const [historicalOutcomes, setHistoricalOutcomes] = useState([]);
 
   // Состояния для генерации отчетов
   const [analyticsData, setAnalyticsData] = useState({
-    period: 'Q1 2024',
-    total_patients: 1250,
-    departments: ['cardiology', 'endocrinology', 'neurology'],
+    period: '',
+    total_patients: '',
+    departments: [],
     key_metrics: {
-      patient_satisfaction: 4.2,
-      average_wait_time: 25,
-      treatment_success_rate: 0.85
+      patient_satisfaction: '',
+      average_wait_time: '',
+      treatment_success_rate: ''
     },
     trends: {
-      patient_growth: 0.15,
-      revenue_growth: 0.12,
-      efficiency_improvement: 0.08
+      patient_growth: '',
+      revenue_growth: '',
+      efficiency_improvement: ''
     }
   });
   const [reportType, setReportType] = useState('quarterly_performance');
 
   // Состояния для выявления паттернов рисков
-  const [populationData, setPopulationData] = useState([
-  { id: 'P001', age: 45, gender: 'male', conditions: ['hypertension'], lifestyle: 'sedentary', smoking: true },
-  { id: 'P002', age: 62, gender: 'female', conditions: ['diabetes'], lifestyle: 'active', smoking: false }]
-  );
+  const [populationData, setPopulationData] = useState([]);
   const [riskFactors, setRiskFactors] = useState(['smoking', 'sedentary_lifestyle', 'obesity', 'family_history', 'age']);
 
   const tabs = [
