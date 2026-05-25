@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "description": "DevBrain LightRAG relationship manifest. Generated graph storage must stay out of git.",
+  "sources": [
+    {"path": "AGENTS.md", "type": "file", "label": "repo operating rules"},
+    {"path": "docs/devbrain/PROJECT_MEMORY.md", "type": "file", "label": "canonical project memory"},
+    {"path": "docs/devbrain/DEVBRAIN_STATUS.md", "type": "file", "label": "DevBrain status"},
+    {"path": ".ai-factory/DESCRIPTION.md", "type": "file", "label": "AI Factory description"},
+    {"path": ".ai-factory/ARCHITECTURE.md", "type": "file", "label": "AI Factory architecture"},
+    {"path": ".ai-factory/RULES.md", "type": "file", "label": "AI Factory rules"},
+    {"path": ".ai-factory/PLAN.md", "type": "file", "label": "AI Factory plan"},
+    {"path": ".ai-factory/ROADMAP.md", "type": "file", "label": "AI Factory roadmap"},
+    {"path": "docs/runbooks/AGENT_CYCLIC_WORKFLOW.md", "type": "file", "label": "cyclic agent workflow"},
+    {"path": "docs/runbooks/CODEX_SUPERPOWERS_GUARD.md", "type": "file", "label": "Codex Superpowers guard"},
+    {"path": "docs/runbooks/MESSAGING_CONTRACT.md", "type": "file", "label": "messaging contract"},
+    {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
+    {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
+    {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},
+    {"path": "backend/app/repositories", "type": "dir", "label": "backend repositories", "extensions": [".py"]},
+    {"path": "backend/app/models", "type": "dir", "label": "backend SQLAlchemy models", "extensions": [".py"]},
+    {"path": "backend/app/schemas", "type": "dir", "label": "backend schemas", "extensions": [".py"]},
+    {"path": "backend/alembic/versions", "type": "dir", "label": "Alembic versions", "extensions": [".py"]},
+    {"path": "backend/tests/unit", "type": "dir", "label": "backend unit tests", "extensions": [".py"]},
+    {"path": "backend/tests/integration", "type": "dir", "label": "backend integration tests", "extensions": [".py"]},
+    {"path": "frontend/src/api", "type": "dir", "label": "frontend API clients", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/routing", "type": "dir", "label": "frontend route registry and guards", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/contexts", "type": "dir", "label": "frontend contexts", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/components", "type": "dir", "label": "frontend components", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/pages", "type": "dir", "label": "frontend pages", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/hooks", "type": "dir", "label": "frontend hooks", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/services", "type": "dir", "label": "frontend services", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/utils", "type": "dir", "label": "frontend utils", "extensions": [".js", ".jsx", ".ts", ".tsx"]}
+  ],
+  "priority_focus_sources": [
+    {
+      "id": "runtime_origin_resolution",
+      "title": "frontend runtime API/WS origin resolution",
+      "terms": ["runtime", "api", "ws", "websocket", "origin", "baseurl", "buildwsurl", "buildapiurl"],
+      "canonical_anchors": ["frontend/src/api/runtime.js", "frontend/src/api/ws.js", "frontend/src/api/__tests__/runtime.test.js"],
+      "first_touch": ["frontend/src/api/runtime.js"],
+      "verification": ["frontend/src/api/__tests__/runtime.test.js", "frontend/src/contexts/__tests__/NotificationWebSocketContext.test.jsx"]
+    },
+    {
+      "id": "registrar_payment_status",
+      "title": "registrar payment/status persistence ownership",
+      "terms": ["registrar", "payment", "status", "billing", "persistence", "receipt", "cashier"],
+      "canonical_anchors": ["backend/app/services/billing_service.py", "backend/app/services/billing_api_service.py", "backend/app/models/billing.py", "backend/app/models/payment.py", "frontend/src/api/registrarBatch.js", "frontend/src/services/panelPrint.js"],
+      "first_touch": ["backend/app/services/billing_service.py", "backend/app/services/billing_api_service.py", "backend/app/models/payment.py"],
+      "verification": ["backend/tests/unit/test_billing_api_service.py", "backend/tests/unit/test_billing_service_timezone.py", "backend/tests/integration/test_payment_init_e2e.py", "frontend/src/services/__tests__/panelPrint.test.js"]
+    },
+    {
+      "id": "queue_identity_fairness",
+      "title": "queue identity/fairness ownership",
+      "terms": ["queue", "identity", "fairness", "specialist", "doctor", "doctor.id", "profile", "queue_time"],
+      "canonical_anchors": ["backend/app/services/queue_service.py", "backend/app/services/queue_domain_service.py", "backend/app/models/online_queue.py", "backend/app/schemas/queue.py", "frontend/src/api/queue.js", "frontend/src/services/queue.js"],
+      "first_touch": ["backend/app/services/queue_service.py", "backend/app/models/online_queue.py"],
+      "verification": ["backend/tests/unit/test_queue_api_service.py", "backend/tests/unit/test_queue_domain_service.py", "backend/tests/unit/test_online_queue_new_service.py", "frontend/src/api/__tests__/queue.test.js"]
+    },
+    {
+      "id": "telegram_token_security_storage",
+      "title": "Telegram token/security/storage ownership",
+      "terms": ["telegram", "token", "security", "storage", "webhook", "staff", "link", "single-use"],
+      "canonical_anchors": ["backend/app/models/telegram_config.py", "backend/app/api/v1/endpoints/admin_telegram.py", "backend/app/api/v1/endpoints/telegram_webhook.py", "backend/tests/unit/test_telegram_webhook_security.py", "frontend/src/components/TelegramManager.jsx"],
+      "first_touch": ["backend/app/models/telegram_config.py", "backend/alembic/versions", "backend/app/api/v1/endpoints/admin_telegram.py", "backend/app/api/v1/endpoints/telegram_webhook.py"],
+      "verification": ["backend/tests/unit/test_telegram_webhook_security.py", "backend/tests/unit/test_telegram_bot_management_api_service.py", "frontend/src/__tests__/telegramMiniAppDeepLinkGuardrails.test.js"]
+    },
+    {
+      "id": "notification_catalog_anti_noise",
+      "title": "notification catalog/settings/anti-noise ownership",
+      "terms": ["notification", "preferences", "mute", "snooze", "dnd", "anti-noise", "catalog", "settings", "policy"],
+      "canonical_anchors": ["backend/app/models/notification.py", "backend/app/schemas/notification.py", "backend/app/services/notifications.py", "backend/app/services/notifications_api_service.py", "frontend/src/api/services.js", "frontend/src/contexts/NotificationCenterContext.jsx", "frontend/src/components/notifications/RoleNotificationCenter.jsx"],
+      "first_touch": ["backend/app/services/notifications.py", "backend/app/services/notifications_api_service.py", "backend/app/schemas/notification.py"],
+      "verification": ["backend/tests/unit/test_notification_platform_contract.py", "backend/tests/unit/test_notification_endpoint_inventory.py", "backend/tests/integration/test_notification_catalog_slice1.py", "frontend/src/__tests__/notificationGuardrails.test.js", "frontend/src/api/__tests__/services.notifications.test.js"]
+    },
+    {
+      "id": "alembic_migration_ownership",
+      "title": "Alembic migration ownership",
+      "terms": ["alembic", "migration", "sqlalchemy", "model", "table", "revision", "postgres"],
+      "canonical_anchors": ["AGENTS.md", "backend/alembic/env.py", "backend/alembic/versions", "backend/app/models"],
+      "first_touch": ["backend/alembic/versions/00XX_*.py"],
+      "verification": ["backend/alembic/env.py", "backend/alembic/versions", "backend/tests/unit/test_migration_service.py"]
+    },
+    {
+      "id": "route_registry_ssot",
+      "title": "route registry SSOT",
+      "terms": ["route", "routing", "registry", "alias", "guard", "rbac"],
+      "canonical_anchors": ["frontend/src/routing/routeRegistry.js", "frontend/src/routing/routeSelectors.js", "frontend/src/routing/routeGuards.jsx"],
+      "first_touch": ["frontend/src/routing/routeRegistry.js"],
+      "verification": ["frontend/src/routing/__tests__/routeContract.test.js", "frontend/src/routing/__tests__/routeOwnershipEnforcement.test.js"]
+    },
+    {
+      "id": "emr_lab_ownership",
+      "title": "EMR/lab ownership",
+      "terms": ["emr", "lab", "clinical", "report", "diagnostic", "template"],
+      "canonical_anchors": ["backend/app/services/emr_v2_service.py", "backend/app/services/lab_reporting_service.py", "backend/app/services/lab_api_service.py", "frontend/src/api/labReporting.js"],
+      "first_touch": ["backend/app/services/emr_v2_service.py", "backend/app/services/lab_reporting_service.py"],
+      "verification": ["backend/tests/unit/test_emr_v2_service.py", "backend/tests/unit/test_lab_reporting_service.py"]
+    },
+    {
+      "id": "service_catalog_truth",
+      "title": "service catalog truth",
+      "terms": ["service", "catalog", "price", "code", "mapping", "truth"],
+      "canonical_anchors": ["backend/app/models/service.py", "backend/app/schemas/service.py", "backend/app/services/services_api_service.py", "backend/app/services/service_mapping.py", "frontend/src/api/services.js", "frontend/src/utils/serviceCodeResolver.js"],
+      "first_touch": ["backend/app/services/services_api_service.py", "backend/app/models/service.py"],
+      "verification": ["backend/tests/unit/test_service_repository_boundary.py", "backend/tests/unit/test_services_router_service_wiring.py", "backend/tests/integration/test_admin_service_code_prefix_consistency.py"]
+    }
+  ]
+}
