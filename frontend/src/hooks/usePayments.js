@@ -62,7 +62,7 @@ export const usePayments = () => {
     /**
      * Get payment history
      */
-    const getPayments = useCallback(async ({ date_from, date_to, page = 1, size = 20, search } = {}) => {
+    const getPayments = useCallback(async ({ date_from, date_to, page = 1, size = 20, search, status } = {}) => {
         setLoading(true);
         setError(null);
 
@@ -72,7 +72,8 @@ export const usePayments = () => {
                 size,
                 ...(date_from && { date_from }),
                 ...(date_to && { date_to }),
-                ...(search && { search })
+                ...(search && { search }),
+                ...(status && { status })
             };
 
             const response = await api.get('/cashier/payments', { params });
