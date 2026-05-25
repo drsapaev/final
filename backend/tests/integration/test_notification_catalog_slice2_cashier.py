@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from app.core.security import get_password_hash
 from app.models.notification import NotificationDelivery, NotificationEvent
@@ -8,6 +9,45 @@ from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
+
+
+def _create_patient_visit(db_session, *, suffix: str) -> tuple[Patient, Visit]:
+    patient_user = User(
+        username=f"cashier_actions_patient_{suffix}",
+        email=f"cashier_actions_patient_{suffix}@test.local",
+        full_name=f"Cashier Actions Patient {suffix}",
+        hashed_password=get_password_hash("patient123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(patient_user)
+    db_session.commit()
+    db_session.refresh(patient_user)
+
+    patient = Patient(
+        first_name=f"Action{suffix}",
+        last_name="Patient",
+        phone=f"+99890120{suffix.zfill(4)[-4:]}",
+        birth_date=date(1990, 1, 1),
+        user_id=patient_user.id,
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+
+    visit = Visit(
+        patient_id=patient.id,
+        status="waiting",
+        discount_mode="none",
+        approval_status="none",
+        source="desk",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(visit)
+
+    return patient, visit
 
 
 def _payment_event_deliveries(db_session, *, recipient_id: int):
@@ -152,3 +192,111 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
     assert event.payload_snapshot["metadata"]["change_type"] == "cancelled"
     assert event.payload_snapshot["metadata"]["payment_status"] == "cancelled"
     assert event.payload_snapshot["metadata"]["reason"] == "patient requested cancel"
+
+
+def test_cashier_payment_history_exposes_backend_owned_actions(
+    client,
+    db_session,
+    auth_headers,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0001")
+    pending_payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("30000"),
+        method="cash",
+        status="pending",
+    )
+    paid_payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("50000"),
+        method="cash",
+        status="paid",
+    )
+    refunded_payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("70000"),
+        method="cash",
+        status="refunded",
+        refunded_amount=Decimal("70000"),
+    )
+    db_session.add_all([pending_payment, paid_payment, refunded_payment])
+    db_session.commit()
+
+    response = client.get("/api/v1/cashier/payments?size=10", headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    rows = {item["id"]: item for item in response.json()["items"]}
+
+    pending_row = rows[pending_payment.id]
+    assert pending_row["can_confirm"] is True
+    assert pending_row["can_cancel"] is True
+    assert pending_row["can_refund"] is False
+    assert pending_row["can_print_receipt"] is True
+    assert set(pending_row["available_actions"]) == {"confirm", "cancel", "print_receipt"}
+
+    paid_row = rows[paid_payment.id]
+    assert paid_row["can_confirm"] is False
+    assert paid_row["can_cancel"] is True
+    assert paid_row["can_refund"] is True
+    assert paid_row["can_print_receipt"] is True
+    assert set(paid_row["available_actions"]) == {"cancel", "refund", "print_receipt"}
+
+    refunded_row = rows[refunded_payment.id]
+    assert refunded_row["can_confirm"] is False
+    assert refunded_row["can_cancel"] is False
+    assert refunded_row["can_refund"] is False
+    assert refunded_row["can_print_receipt"] is True
+    assert refunded_row["available_actions"] == ["print_receipt"]
+
+
+def test_cashier_confirm_refunded_payment_is_rejected_without_mutation(
+    client,
+    db_session,
+    auth_headers,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0002")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("40000"),
+        method="cash",
+        status="refunded",
+        refunded_amount=Decimal("40000"),
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400, response.text
+    db_session.refresh(payment)
+    assert payment.status == "refunded"
+
+
+def test_cashier_confirm_completed_payment_does_not_downgrade_status(
+    client,
+    db_session,
+    auth_headers,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0003")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("45000"),
+        method="cash",
+        status="completed",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(payment)
+    assert payment.status == "completed"
