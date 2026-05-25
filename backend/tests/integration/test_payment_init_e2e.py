@@ -98,6 +98,43 @@ class TestPaymentInitE2E:
         assert data["payment_url"]
         self._assert_payment_created(db_session, data["payment_id"], "kaspi", "KZT")
 
+    def test_test_init_requires_auth(self, client, test_visit, db_session):
+        before_count = db_session.query(Payment).count()
+
+        response = client.post(
+            "/api/v1/payments/test-init",
+            json={
+                "visit_id": test_visit.id,
+                "amount": 150000,
+                "currency": "UZS",
+                "provider": "click",
+                "description": "unauth test init",
+            },
+        )
+
+        assert response.status_code == 401
+        assert db_session.query(Payment).count() == before_count
+
+    def test_test_init_allows_authorized_payment_staff(
+        self, client, auth_headers, test_visit, db_session
+    ):
+        response = client.post(
+            "/api/v1/payments/test-init",
+            headers=auth_headers,
+            json={
+                "visit_id": test_visit.id,
+                "amount": 150000,
+                "currency": "UZS",
+                "provider": "click",
+                "description": "authorized test init",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        self._assert_payment_created(db_session, data["payment_id"], "click", "UZS")
+
     def test_visit_payments_list_includes_new_payment(
         self, client, auth_headers, test_visit, db_session
     ):
