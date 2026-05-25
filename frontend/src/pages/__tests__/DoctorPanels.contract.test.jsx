@@ -53,7 +53,12 @@ describe('Doctor panels SSOT contract', () => {
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'call', 'can_start_visit')");
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'print', 'can_print_ticket')");
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'complete', 'can_complete')");
-    expect(actionBlock).toContain('isDoctorView ? false : rowStatus');
+    expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
+    expect(actionBlock).toContain('const canCall = backendCanCall === true');
+    expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
+    expect(actionBlock).toContain('const canComplete = backendCanComplete === true');
+    expect(actionBlock).not.toContain('rowStatus');
+    expect(actionBlock).not.toContain('rowPaymentStatus');
     expect(actionBlock).not.toContain('isDoctorView ?\n                  rowStatus');
     expect(actionBlock).not.toContain("rowPaymentStatus === 'paid' :");
   });
