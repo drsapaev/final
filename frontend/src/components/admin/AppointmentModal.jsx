@@ -27,7 +27,7 @@ const AppointmentModal = ({
     appointmentDate: '',
     appointmentTime: '',
     duration: 30,
-    status: 'pending',
+    status: '',
     reason: '',
     notes: '',
     phone: '',
@@ -50,25 +50,20 @@ const AppointmentModal = ({
           appointmentDate: appointment.appointmentDate || '',
           appointmentTime: appointment.appointmentTime || '',
           duration: appointment.duration || 30,
-          status: appointment.status || 'pending',
+          status: appointment.status || '',
           reason: appointment.reason || appointment.notes || '',
           notes: appointment.notes || '',
           phone: appointment.phone || '',
           email: appointment.email || ''
         });
       } else {
-        // Устанавливаем завтрашний день по умолчанию
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
         setFormData({
           patientId: '',
           doctorId: '',
-          appointmentDate: tomorrowStr,
-          appointmentTime: '09:00',
+          appointmentDate: '',
+          appointmentTime: '',
           duration: 30,
-          status: 'pending',
+          status: '',
           reason: '',
           notes: '',
           phone: '',
@@ -131,12 +126,14 @@ const AppointmentModal = ({
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
         duration: parseInt(formData.duration),
-        status: formData.status,
         reason: formData.reason.trim(),
         notes: formData.notes.trim() || null,
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null
       };
+      if (formData.status) {
+        appointmentData.status = formData.status;
+      }
 
       await onSave(appointmentData);
       onClose();
@@ -399,6 +396,7 @@ const AppointmentModal = ({
               value={formData.status}
               onChange={(e) => handleChange('status', e.target.value)}
               options={[
+              { value: '', label: 'По умолчанию backend' },
               { value: 'pending', label: 'Ожидает' },
               { value: 'confirmed', label: 'Подтверждена' },
               { value: 'paid', label: 'Оплачена' },
