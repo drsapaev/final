@@ -107,6 +107,16 @@ function normalizeNumericId(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function resolveDoctorQueueEntryId(row) {
+  const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
+  if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined) {
+    return explicitQueueEntryId;
+  }
+
+  const recordKind = String(row?.record_kind ?? row?.record_type ?? row?.type ?? '').trim().toLowerCase();
+  return recordKind === 'online_queue' && row?.id !== null && row?.id !== undefined ? row.id : null;
+}
+
 function buildPatientsFromAppointments(appointments) {
   const patientsById = new Map();
 
@@ -554,6 +564,7 @@ const DentistPanelUnified = () => {
             data.queues.forEach((queue) => {
               if (queue.entries) {
                 queue.entries.forEach((entry) => {
+                  const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
                   allAppointments.push({
                     id: entry.id,
                     appointment_id: entry.appointment_id || null,
@@ -575,10 +586,12 @@ const DentistPanelUnified = () => {
                     payment_status: entry.payment_status || 'pending',
                     available_actions: entry.available_actions || [],
                     can_mark_paid: Boolean(entry.can_mark_paid),
-                    can_start_visit: Boolean(entry.can_start_visit),
+                    can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
                     can_print_ticket: Boolean(entry.can_print_ticket),
-                    can_complete: Boolean(entry.can_complete),
+                    can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
                     can_cancel: Boolean(entry.can_cancel),
+                    queue_entry_id: entry.queue_entry_id ?? null,
+                    doctor_queue_entry_id: doctorQueueEntryId,
                     canonical_record_id: entry.canonical_record_id || entry.id,
                     record_kind: entry.record_kind,
                     source_kind: entry.source_kind,
@@ -708,6 +721,7 @@ const DentistPanelUnified = () => {
         patient_name: row.patient_fio,
         phone: row.patient_phone,
         number: row.id,
+        doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
         source: 'appointments'
       };
       setSelectedPatient(patientData);
@@ -726,8 +740,14 @@ const DentistPanelUnified = () => {
       case 'call':
         // Вызвать пациента
         try {
+          const queueEntryId = resolveDoctorQueueEntryId(row);
+          if (queueEntryId === null) {
+            logger.warn('[Dentist] Cannot start visit without OnlineQueueEntry id', row);
+            notify.error('Cannot start visit without a queue entry id');
+            break;
+          }
           const token = tokenManager.getAccessToken();
-          const response = await fetch(`${API_V1_BASE}/doctor/queue/${row.id}/start-visit`, {
+          const response = await fetch(`${API_V1_BASE}/doctor/queue/${queueEntryId}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -775,6 +795,7 @@ const DentistPanelUnified = () => {
             patient_name: row.patient_fio,
             phone: row.patient_phone,
             number: row.id,
+            doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
             source: 'appointments',
             status: 'in_cabinet'
           };

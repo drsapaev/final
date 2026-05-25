@@ -67,6 +67,16 @@ function countAppointmentsByStatuses(appointments, statuses) {
   return appointments.filter((appointment) => statuses.includes(appointment.status)).length;
 }
 
+function resolveDoctorQueueEntryId(row) {
+  const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
+  if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined) {
+    return explicitQueueEntryId;
+  }
+
+  const recordKind = String(row?.record_kind ?? row?.record_type ?? row?.type ?? '').trim().toLowerCase();
+  return recordKind === 'online_queue' && row?.id !== null && row?.id !== undefined ? row.id : null;
+}
+
 /**
  * Унифицированная панель кардиолога
  * Объединяет: очередь + специализированные функции + AI + ЭКГ/ЭхоКГ
@@ -546,6 +556,7 @@ const MacOSCardiologistPanelUnified = () => {
             if (queue.entries) {
               queue.entries.forEach((entry) => {
                 const appointmentId = entry.appointment_id || null;
+                const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
                 const recordKey = `${entry.patient_id}_${entry.canonical_record_id || entry.id}_${queue.specialty}`;
 
                 // Пропускаем дубликаты (один и тот же пациент с одним и тем же appointment_id в одной специальности)
@@ -575,10 +586,12 @@ const MacOSCardiologistPanelUnified = () => {
                   payment_status: entry.payment_status || 'pending',
                   available_actions: entry.available_actions || [],
                   can_mark_paid: Boolean(entry.can_mark_paid),
-                  can_start_visit: Boolean(entry.can_start_visit),
+                  can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
                   can_print_ticket: Boolean(entry.can_print_ticket),
-                  can_complete: Boolean(entry.can_complete),
+                  can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
                   can_cancel: Boolean(entry.can_cancel),
+                  queue_entry_id: entry.queue_entry_id ?? null,
+                  doctor_queue_entry_id: doctorQueueEntryId,
                   canonical_record_id: entry.canonical_record_id || entry.id,
                   record_kind: entry.record_kind,
                   source_kind: entry.source_kind,
@@ -811,6 +824,7 @@ const MacOSCardiologistPanelUnified = () => {
         patient_name: row.patient_fio,
         phone: row.patient_phone,
         number: row.id,
+        doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
         source: 'appointments',
         status: row.status || 'waiting',
         payment_status: row.payment_status || 'pending',
@@ -857,6 +871,7 @@ const MacOSCardiologistPanelUnified = () => {
             patient_name: row.patient_fio,
             phone: row.patient_phone,
             number: row.id,
+            doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
             source: 'appointments',
             status: row.status || 'waiting',
             payment_status: row.payment_status || 'pending',
@@ -876,8 +891,14 @@ const MacOSCardiologistPanelUnified = () => {
       case 'call':
         // Вызвать пациента
         try {
+          const queueEntryId = resolveDoctorQueueEntryId(row);
+          if (queueEntryId === null) {
+            logger.warn('[Cardiology] Cannot start visit without OnlineQueueEntry id', row);
+            setMessage({ type: 'error', text: 'Cannot start visit without a queue entry id' });
+            break;
+          }
           const token = tokenManager.getAccessToken();
-          const response = await fetch(`${API_V1_BASE}/doctor/queue/${row.id}/start-visit`, {
+          const response = await fetch(`${API_V1_BASE}/doctor/queue/${queueEntryId}/start-visit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -933,6 +954,7 @@ const MacOSCardiologistPanelUnified = () => {
               patient_name: row.patient_fio,
               phone: row.patient_phone,
               number: row.id,
+              doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
               source: 'appointments',
               status: 'in_cabinet',
               payment_status: row.payment_status,
@@ -996,6 +1018,11 @@ const MacOSCardiologistPanelUnified = () => {
 
     try {
       setLoading(true);
+      const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
+      if (queueEntryId === null) {
+        setMessage({ type: 'error', text: 'Cannot complete visit without a queue entry id' });
+        return;
+      }
 
       const visitPayload = {
         patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
@@ -1005,7 +1032,7 @@ const MacOSCardiologistPanelUnified = () => {
         services: selectedServices,
         notes: visitData.notes
       };
-      await queueService.completeVisit(selectedPatient.id, visitPayload);
+      await queueService.completeVisit(queueEntryId, visitPayload);
       setMessage({ type: 'success', text: 'Прием завершен успешно' });
 
       // Очищаем форму и возвращаемся в очередь

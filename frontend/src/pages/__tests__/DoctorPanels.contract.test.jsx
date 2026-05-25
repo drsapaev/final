@@ -35,10 +35,11 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).toContain('payment_type: entry.payment_type');
       expect(source).toContain('available_actions: entry.available_actions || []');
       expect(source).toContain('can_mark_paid: Boolean(entry.can_mark_paid)');
-      expect(source).toContain('can_start_visit: Boolean(entry.can_start_visit)');
+      expect(source).toContain('can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null');
       expect(source).toContain('can_print_ticket: Boolean(entry.can_print_ticket)');
-      expect(source).toContain('can_complete: Boolean(entry.can_complete)');
+      expect(source).toContain('can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null');
       expect(source).toContain('can_cancel: Boolean(entry.can_cancel)');
+      expect(source).toContain('doctor_queue_entry_id: doctorQueueEntryId');
     }
   });
 
@@ -58,11 +59,16 @@ describe('Doctor panels SSOT contract', () => {
     expect(actionBlock).not.toContain("rowPaymentStatus === 'paid' :");
   });
 
-  it('routes start visit commands through the doctor command surface', () => {
+  it('routes queue commands through the doctor command surface using only OnlineQueueEntry ids', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);
 
-      expect(source).toContain('/doctor/queue/${row.id}/start-visit');
+      expect(source).toContain('function resolveDoctorQueueEntryId(row)');
+      expect(source).toContain("recordKind === 'online_queue'");
+      expect(source).toContain('/doctor/queue/${queueEntryId}/start-visit');
+      expect(source).not.toContain('/doctor/queue/${row.id}/start-visit');
+      expect(source).not.toContain('completeVisit(selectedPatient.id');
+      expect(source).not.toContain('const entryId = selectedPatient?.id || currentAppointment?.id');
       expect(source).not.toContain('/registrar/queue/${row.id}/start-visit');
     }
   });
