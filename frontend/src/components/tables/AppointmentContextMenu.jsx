@@ -14,6 +14,30 @@ import {
   Eye } from
 'lucide-react';
 
+const ACTION_ALIASES = {
+  in_cabinet: ['in_cabinet', 'in-cabinet', 'start_visit', 'start-visit', 'call'],
+  call: ['call', 'start_visit', 'start-visit'],
+  complete: ['complete', 'complete_visit', 'complete-visit'],
+  payment: ['payment', 'mark_paid', 'mark-paid'],
+  print: ['print', 'print_ticket', 'print-ticket'],
+  reschedule: ['reschedule', 'move', 'transfer'],
+  cancel: ['cancel', 'cancel_visit', 'cancel-visit']
+};
+
+const hasBackendAction = (row, action, flagName) => {
+  if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
+    return Boolean(row[flagName]);
+  }
+
+  if (!Array.isArray(row?.available_actions)) {
+    return false;
+  }
+
+  const actions = new Set(row.available_actions.map((item) => String(item).trim().toLowerCase()));
+  const aliases = ACTION_ALIASES[action] || [action];
+  return aliases.some((alias) => actions.has(alias));
+};
+
 const AppointmentContextMenu = ({
   row,
   position,
@@ -25,8 +49,6 @@ const AppointmentContextMenu = ({
   const [isVisible, setIsVisible] = useState(false);
 
   const isDark = theme === 'dark';
-  const status = (row.status || '').toLowerCase();
-  const paymentStatus = (row.payment_status || '').toLowerCase();
   const colors = {
     bg: isDark ? '#1f2937' : '#ffffff',
     border: isDark ? '#4b5563' : '#e5e7eb',
@@ -84,21 +106,21 @@ const AppointmentContextMenu = ({
     label: 'В кабинет',
     icon: User,
     color: colors.accent,
-    visible: status === 'confirmed' || status === 'queued'
+    visible: hasBackendAction(row, 'in_cabinet', 'can_start_visit')
   },
   {
     id: 'call',
     label: 'Вызвать',
     icon: Clock,
     color: colors.success,
-    visible: status === 'queued'
+    visible: hasBackendAction(row, 'call', 'can_start_visit')
   },
   {
     id: 'complete',
     label: 'Завершить',
     icon: CheckCircle,
     color: colors.success,
-    visible: status === 'in_cabinet'
+    visible: hasBackendAction(row, 'complete', 'can_complete')
   },
   { type: 'divider' },
   {
@@ -106,16 +128,14 @@ const AppointmentContextMenu = ({
     label: 'Оплата',
     icon: CreditCard,
     color: colors.success,
-    visible: (() => {
-      return status !== 'paid' && paymentStatus !== 'paid' && (status === 'paid_pending' || !paymentStatus);
-    })()
+    visible: hasBackendAction(row, 'payment', 'can_mark_paid')
   },
   {
     id: 'print',
     label: 'Печать талона',
     icon: Printer,
     color: colors.accent,
-    visible: paymentStatus === 'paid' || status === 'queued'
+    visible: hasBackendAction(row, 'print', 'can_print_ticket')
   },
   { type: 'divider' },
   {
@@ -123,14 +143,14 @@ const AppointmentContextMenu = ({
     label: 'Перенести',
     icon: Calendar,
     color: colors.warning,
-    visible: status !== 'done' && status !== 'in_cabinet'
+    visible: hasBackendAction(row, 'reschedule', 'can_reschedule')
   },
   {
     id: 'cancel',
     label: 'Отменить',
     icon: X,
     color: colors.error,
-    visible: status !== 'canceled' && status !== 'cancelled' && status !== 'done'
+    visible: hasBackendAction(row, 'cancel', 'can_cancel')
   },
   { type: 'divider' },
   {
