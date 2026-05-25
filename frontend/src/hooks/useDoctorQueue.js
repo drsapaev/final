@@ -62,7 +62,7 @@ const useDoctorQueue = (specialty = 'general') => {
 
             setQueue(entries);
             setQueueControls({
-                canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId),
+                canCallNext: response.data?.can_call_next === true,
                 nextCallEntryId
             });
             setStats({

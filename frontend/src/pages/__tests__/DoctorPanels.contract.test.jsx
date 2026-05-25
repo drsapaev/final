@@ -154,9 +154,11 @@ describe('Doctor panels SSOT contract', () => {
     expect(source).toContain('const selectNextCallEntryId =');
     expect(source).toContain('queuePayload?.next_call_entry_id');
     expect(source).toContain("hasBackendQueueAction(entry, 'call', 'can_call')");
+    expect(source).toContain('canCallNext: response.data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
     expect(callNextBlock).toContain('selectNextCallEntryId(currentQueue.data)');
     expect(callNextBlock).toContain('/doctor/queue/${nextCallEntryId}/call');
+    expect(source).not.toContain('canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId)');
     expect(callNextBlock).not.toContain("entry.status === 'waiting'");
     expect(callNextBlock).not.toContain('waitingEntry');
   });
