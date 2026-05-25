@@ -44,7 +44,7 @@ const ReportsManager = () => {
 
   // Состояние для генерации отчетов
   const [reportForm, setReportForm] = useState({
-    type: 'patient_report',
+    type: '',
     format: 'excel',
     start_date: '',
     end_date: '',
@@ -67,18 +67,17 @@ const ReportsManager = () => {
   const loadAvailableReports = async () => {
     try {
       const response = await api.get('/reports/available-reports');
-      setAvailableReports(response.data?.reports || []);
+      const reports = response.data?.reports || [];
+      setAvailableReports(reports);
+      setReportForm((prev) => ({
+        ...prev,
+        type: reports.some((report) => report.type === prev.type) ? prev.type : ''
+      }));
     } catch (error) {
-      logger.error('Ошибка загрузки доступных отчетов:', error);
-      setError('Не удалось загрузить данные'); // Set error state
-      // Set default reports if API fails
-      setAvailableReports([
-      { type: 'patient_report', name: 'Отчет по пациентам' },
-      { type: 'appointments_report', name: 'Отчет по записям' },
-      { type: 'financial_report', name: 'Финансовый отчет' },
-      { type: 'queue_report', name: 'Отчет по очереди' },
-      { type: 'doctor_performance_report', name: 'Отчет по врачам' }]
-      );
+      logger.error('Failed to load available reports:', error);
+      setError('Failed to load report catalog');
+      setAvailableReports([]);
+      setReportForm((prev) => ({ ...prev, type: '' }));
     }
   };
 
@@ -114,10 +113,14 @@ const ReportsManager = () => {
   };
 
   const generateReport = async () => {
+    const endpoint = getReportEndpoint(reportForm.type);
+    if (!reportForm.type || !endpoint) {
+      toast.error('Select an available report type');
+      return;
+    }
+
     setLoading(true);
     try {
-      const endpoint = getReportEndpoint(reportForm.type);
-
       const response = await api.post(`/reports/${endpoint}`, {
         start_date: reportForm.start_date || null,
         end_date: reportForm.end_date || null,
@@ -153,7 +156,7 @@ const ReportsManager = () => {
       'queue_report': 'queue',
       'doctor_performance_report': 'doctor-performance'
     };
-    return endpoints[type] || 'patient';
+    return endpoints[type] || null;
   };
 
 
@@ -316,7 +319,7 @@ const ReportsManager = () => {
           title={loading ? 'Generating report' : 'Generate report'}
           aria-label={loading ? 'Generating report' : 'Generate report'}
           onClick={generateReport}
-          disabled={loading}
+          disabled={loading || !reportForm.type}
           style={{
             width: '100%',
             height: '44px',
