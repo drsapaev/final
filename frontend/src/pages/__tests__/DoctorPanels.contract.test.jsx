@@ -64,14 +64,21 @@ describe('Doctor panels SSOT contract', () => {
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'call', 'can_start_visit')");
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'print', 'can_print_ticket')");
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'complete', 'can_complete')");
+    expect(actionBlock).toContain("getBackendActionAvailability(row, 'view_emr', 'can_view_emr')");
+    expect(actionBlock).toContain("getBackendActionAvailability(row, 'schedule_next', 'can_schedule_next')");
     expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
     expect(actionBlock).toContain('const canCall = backendCanCall === true');
     expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
     expect(actionBlock).toContain('const canComplete = backendCanComplete === true');
+    expect(actionBlock).toContain('const canViewEmr = backendCanViewEmr === true');
+    expect(actionBlock).toContain('const canScheduleNext = isDoctorView && backendCanScheduleNext === true');
     expect(actionBlock).not.toContain('rowStatus');
     expect(actionBlock).not.toContain('rowPaymentStatus');
     expect(actionBlock).not.toContain('isDoctorView ?\n                  rowStatus');
     expect(actionBlock).not.toContain("rowPaymentStatus === 'paid' :");
+    expect(table).not.toContain("row.status === 'served' || row.status === 'completed'");
+    expect(table).not.toContain("row.status === 'in_visit' && row.payment_status === 'paid'");
+    expect(table).not.toContain("isDoctorView && row.status === 'done'");
   });
 
   it('routes queue commands through the doctor command surface using only OnlineQueueEntry ids', () => {

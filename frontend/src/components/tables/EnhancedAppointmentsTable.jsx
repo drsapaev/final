@@ -58,7 +58,9 @@ const ACTION_ALIASES = {
   payment: ['payment', 'mark_paid', 'mark-paid'],
   call: ['call', 'start_visit', 'start-visit'],
   print: ['print', 'print_ticket', 'print-ticket'],
-  complete: ['complete', 'complete_visit', 'complete-visit']
+  complete: ['complete', 'complete_visit', 'complete-visit'],
+  view_emr: ['view_emr', 'view-emr'],
+  schedule_next: ['schedule_next', 'schedule-next']
 };
 
 const getBackendActionAvailability = (row, action, flagName) => {
@@ -1608,10 +1610,14 @@ const EnhancedAppointmentsTable = ({
               const backendCanCall = getBackendActionAvailability(row, 'call', 'can_start_visit');
               const backendCanPrint = getBackendActionAvailability(row, 'print', 'can_print_ticket');
               const backendCanComplete = getBackendActionAvailability(row, 'complete', 'can_complete');
+              const backendCanViewEmr = getBackendActionAvailability(row, 'view_emr', 'can_view_emr');
+              const backendCanScheduleNext = getBackendActionAvailability(row, 'schedule_next', 'can_schedule_next');
               const canPay = !isDoctorView && backendCanPay === true;
               const canCall = backendCanCall === true;
               const canPrint = backendCanPrint === true;
               const canComplete = backendCanComplete === true;
+              const canViewEmr = backendCanViewEmr === true;
+              const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
 
               return (
                 <tr
@@ -2242,8 +2248,7 @@ const EnhancedAppointmentsTable = ({
                         </button>
 
                         {/* Просмотр EMR (только для завершённых записей) */}
-                        {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
-                      row.status === 'in_visit' && row.payment_status === 'paid') &&
+                        {canViewEmr &&
                         <button
                         className="action-button"
                         onMouseDown={(e) => {
@@ -2299,7 +2304,7 @@ const EnhancedAppointmentsTable = ({
                         </button>
 
                         {/* Назначить следующий визит */}
-                        {isDoctorView && row.status === 'done' &&
+                        {canScheduleNext &&
                       <button
                         className="action-button"
                         onMouseDown={(e) => {

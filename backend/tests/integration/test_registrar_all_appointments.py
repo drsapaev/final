@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.api.v1.endpoints.registrar_integration import _registrar_available_actions
 from app.api.v1.endpoints.registrar_integration import _serialize_registrar_datetime
 from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue
@@ -199,12 +200,48 @@ class TestRegistrarAllAppointments:
             "print_ticket",
             "cancel",
         }
+        assert found_entry["can_view_emr"] is False
+        assert found_entry["can_schedule_next"] is False
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)
         assert found_entry["patient_name"] == test_patient.short_name()
         assert found_entry["phone"] == test_patient.phone
         assert found_entry["patient_birth_year"] == 1985
         assert found_entry["address"] == "Clinic Street 1"
+
+    def test_today_queues_secondary_doctor_actions_are_backend_owned(self):
+        user = type("UserStub", (), {"role": "cardio", "roles": []})()
+
+        actions = _registrar_available_actions(
+            user=user,
+            payment_status="paid",
+            queue_status="served",
+            visit_id=123,
+            patient_id=456,
+        )
+
+        assert "view_emr" in actions
+        assert "schedule_next" in actions
+
+        waiting_actions = _registrar_available_actions(
+            user=user,
+            payment_status="paid",
+            queue_status="waiting",
+            visit_id=123,
+            patient_id=456,
+        )
+        assert "view_emr" not in waiting_actions
+        assert "schedule_next" not in waiting_actions
+
+        registrar_actions = _registrar_available_actions(
+            user=type("UserStub", (), {"role": "registrar", "roles": []})(),
+            payment_status="paid",
+            queue_status="served",
+            visit_id=123,
+            patient_id=456,
+        )
+        assert "view_emr" not in registrar_actions
+        assert "schedule_next" not in registrar_actions
 
     def test_today_queues_department_filter_limits_lab_rows(
         self,
