@@ -38,6 +38,9 @@ class SetupService:
         return SetupStatusOut(initialized=self.is_initialized())
 
     def is_initialized(self) -> bool:
+        if self.repo.count_active_admins() > 0:
+            return True
+
         clinic_setting = self.repo.get_setting(CLINIC_IDENTITY_KEY)
         clinic_name = None
         if clinic_setting:
@@ -45,7 +48,6 @@ class SetupService:
         return bool(
             clinic_name
             and self.repo.count_branches() > 0
-            and self.repo.count_active_admins() > 0
         )
 
     def initialize(self, payload: SetupInitializeIn) -> SetupInitializeOut:
