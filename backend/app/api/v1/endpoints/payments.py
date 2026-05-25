@@ -266,9 +266,12 @@ def cancel_payment(
 
 @router.post("/test-init", response_model=PaymentInitResponse)
 def test_init_payment(
-    payment_request: PaymentInitRequest, db: Session = Depends(get_db)
+    payment_request: PaymentInitRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(deps.require_roles("Admin", "Registrar", "Cashier")),
 ) -> PaymentInitResponse:
-    """Тестовая инициализация платежа БЕЗ аутентификации"""
+    """Test payment initialization for authorized payment staff."""
+    # Runtime write path: keep this aligned with /payments/init RBAC.
     service = PaymentTestInitService(db, get_payment_manager())
     try:
         result = service.init_test_payment(
