@@ -1093,7 +1093,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
             </div>
             <div class="meta-item">
               <strong>Статус</strong>
-              <span>${escapeHtml(payment?.status || 'paid')}</span>
+              <span>${escapeHtml(payment?.status ?? 'unknown')}</span>
             </div>
           </div>
           <table>
