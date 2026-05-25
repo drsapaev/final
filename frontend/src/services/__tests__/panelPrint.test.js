@@ -17,7 +17,11 @@ import {
   fetchTicketPrintSettings,
   TICKET_PRINT_SETTINGS_DEFAULTS,
 } from '../../api/ticketPrintSettings';
-import { buildPanelTicketPrintableHtml, resolvePanelTicketPayloads } from '../panelPrint';
+import {
+  buildPanelReceiptPrintableHtml,
+  buildPanelTicketPrintableHtml,
+  resolvePanelTicketPayloads,
+} from '../panelPrint';
 
 describe('panelPrint ticket renderer', () => {
   beforeEach(() => {
@@ -170,5 +174,22 @@ describe('panelPrint ticket renderer', () => {
     });
 
     expect(payload.cabinet).toBe('204');
+  });
+
+  it('does not invent a paid payment status in receipt print html', () => {
+    const html = buildPanelReceiptPrintableHtml({
+      payment: {
+        number: 'R-17',
+        total: 150000,
+      },
+      patient: {
+        full_name: 'Ivan Petrov',
+      },
+      services: [],
+    });
+
+    expect(html).toContain('<span>unknown</span>');
+    expect(html).not.toContain('<span>paid</span>');
+    expect(html).not.toContain("payment?.status || 'paid'");
   });
 });
