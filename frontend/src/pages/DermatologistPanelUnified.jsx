@@ -436,7 +436,7 @@ const DermatologistPanelUnified = () => {
                     services: entry.services || [],
                     service_codes: entry.service_codes || [],
                     payment_type: entry.payment_type || null,
-                    payment_status: entry.payment_status || 'pending',
+                    payment_status: entry.payment_status ?? null,
                     available_actions: entry.available_actions || [],
                     can_mark_paid: Boolean(entry.can_mark_paid),
                     can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
@@ -448,15 +448,15 @@ const DermatologistPanelUnified = () => {
                     canonical_record_id: entry.canonical_record_id || entry.id,
                     record_kind: entry.record_kind,
                     source_kind: entry.source_kind,
-                    canonical_status: entry.canonical_status || entry.status,
-                    queue_status: entry.queue_status || entry.status,
+                    canonical_status: entry.canonical_status ?? null,
+                    queue_status: entry.queue_status ?? null,
                     queue_position: entry.queue_position,
                     doctor: entry.doctor_name || 'Врач',
                     specialty: queue.specialty,
                     created_at: entry.created_at,
                     appointment_date: entry.created_at ? entry.created_at.split('T')[0] : today,
                     appointment_time: entry.visit_time || '09:00',
-                    status: entry.status || 'waiting',
+                    status: entry.status ?? null,
                     cost: entry.cost || 0,
                     visit_id: entry.visit_id || null
                   });
@@ -600,7 +600,7 @@ const DermatologistPanelUnified = () => {
         number: row.id,
         doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
         source: 'appointments',
-        status: row.status || 'waiting',
+        status: row.status ?? null,
         specialty: row.specialty || 'dermatology'
       };
       setSelectedPatient(patientData);
