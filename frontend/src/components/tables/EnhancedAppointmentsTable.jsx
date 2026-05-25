@@ -1604,31 +1604,14 @@ const EnhancedAppointmentsTable = ({
             paginatedData.map((row, index) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id);
-              const rowStatus = String(row.status || '').toLowerCase();
-              const rowPaymentStatus = String(row.payment_status || '').toLowerCase();
               const backendCanPay = getBackendActionAvailability(row, 'payment', 'can_mark_paid');
               const backendCanCall = getBackendActionAvailability(row, 'call', 'can_start_visit');
               const backendCanPrint = getBackendActionAvailability(row, 'print', 'can_print_ticket');
               const backendCanComplete = getBackendActionAvailability(row, 'complete', 'can_complete');
-              const legacyCanPay = (
-                rowStatus === 'paid_pending' ||
-                rowPaymentStatus === 'pending' ||
-                rowStatus === 'scheduled' && rowPaymentStatus !== 'paid' ||
-                rowStatus === 'confirmed' && rowPaymentStatus !== 'paid' ||
-                rowStatus === 'waiting' && rowPaymentStatus !== 'paid' ||
-                rowStatus === 'queued' && rowPaymentStatus !== 'paid' ||
-                !rowPaymentStatus && rowStatus !== 'paid' && rowStatus !== 'done' && rowStatus !== 'served' && rowStatus !== 'completed' && rowStatus !== 'cancelled'
-              );
-              const canPay = !isDoctorView && (backendCanPay ?? legacyCanPay);
-              const canCall = backendCanCall ?? (
-                isDoctorView ? false : rowStatus === 'queued' || rowStatus === 'waiting'
-              );
-              const canPrint = backendCanPrint ?? (
-                isDoctorView ? false : rowPaymentStatus === 'paid' || rowStatus === 'queued' || rowStatus === 'waiting'
-              );
-              const canComplete = backendCanComplete ?? (
-                isDoctorView ? false : rowStatus === 'in_cabinet' || rowStatus === 'called'
-              );
+              const canPay = !isDoctorView && backendCanPay === true;
+              const canCall = backendCanCall === true;
+              const canPrint = backendCanPrint === true;
+              const canComplete = backendCanComplete === true;
 
               return (
                 <tr
