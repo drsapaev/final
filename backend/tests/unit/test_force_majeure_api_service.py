@@ -75,6 +75,48 @@ class TestForceMajeureApiService:
             )
         assert exc_info.value.status_code == 400
 
+    def test_refund_request_serialization_exposes_backend_owned_actions(self):
+        service = ForceMajeureApiService(db=None, repository=SimpleNamespace())
+
+        def make_request(status):
+            return SimpleNamespace(
+                status=status,
+                processed_by=None,
+                processed_at=None,
+                patient=None,
+                processor=None,
+                id=1,
+                patient_id=2,
+                payment_id=3,
+                original_amount=Decimal("10"),
+                refund_amount=Decimal("10"),
+                commission_amount=Decimal("0"),
+                refund_type="deposit",
+                reason="r",
+                is_automatic=False,
+                bank_card_number=None,
+                created_at=None,
+            )
+
+        pending = service._serialize_refund_request(make_request("pending"))
+        approved = service._serialize_refund_request(make_request("approved"))
+        rejected = service._serialize_refund_request(make_request("rejected"))
+
+        assert pending["available_actions"] == ["approve", "reject"]
+        assert pending["can_approve"] is True
+        assert pending["can_reject"] is True
+        assert pending["can_complete"] is False
+
+        assert approved["available_actions"] == ["reject", "complete"]
+        assert approved["can_approve"] is False
+        assert approved["can_reject"] is True
+        assert approved["can_complete"] is True
+
+        assert rejected["available_actions"] == []
+        assert rejected["can_approve"] is False
+        assert rejected["can_reject"] is False
+        assert rejected["can_complete"] is False
+
     def test_use_deposit_for_payment_checks_balance(self):
         deposit = SimpleNamespace(
             balance=Decimal("50"),
