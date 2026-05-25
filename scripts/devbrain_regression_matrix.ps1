@@ -134,6 +134,48 @@ function Get-RecordedIndexedCommits {
     return $commits
 }
 
+function Test-DevBrainBookkeepingOnlySince {
+    param([Parameter(Mandatory = $true)][string] $RecordedCommit)
+
+    $changedFiles = @(
+        git diff --name-only $RecordedCommit HEAD |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+    )
+
+    if ($changedFiles.Count -eq 0) {
+        return $true
+    }
+
+    $allowedPatterns = @(
+        "^docs/devbrain/DEVBRAIN_STATUS\.md$",
+        "^ai/llamaindex/scripts/update_status\.py$",
+        "^ai/lightrag/scripts/update_status\.py$",
+        "^scripts/devbrain_regression_matrix\.ps1$"
+    )
+
+    foreach ($file in $changedFiles) {
+        $allowed = $false
+        foreach ($pattern in $allowedPatterns) {
+            if ($file -match $pattern) {
+                $allowed = $true
+                break
+            }
+        }
+
+        if (-not $allowed) {
+            Write-Output "Freshness-relevant changed file since indexed commit: $file"
+            return $false
+        }
+    }
+
+    Write-Output "Only DevBrain status/freshness bookkeeping changed since indexed commit:"
+    foreach ($file in $changedFiles) {
+        Write-Output "- $file"
+    }
+    return $true
+}
+
 function Test-IndexedCommitFreshness {
     Push-Location $repoRoot
     try {
@@ -160,6 +202,11 @@ function Test-IndexedCommitFreshness {
             git merge-base --is-ancestor $recorded $head 2>$null
             $isAncestor = $LASTEXITCODE -eq 0
             if ($isAncestor) {
+                if (Test-DevBrainBookkeepingOnlySince -RecordedCommit $recorded) {
+                    Write-Output "PASS: $layer index is acceptable; only DevBrain bookkeeping changed after indexing"
+                    continue
+                }
+
                 Add-Warn "STALE / NEEDS REINDEX: $layer indexed commit $recorded is behind HEAD $head"
             }
             else {

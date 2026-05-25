@@ -54,8 +54,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
-- Last verification date: `2026-05-25T18:53:26+00:00`
+- Last indexed commit: `74ccec23cfb5397ec3a06771a576868ae6b9c720`
+- Last verification date: `2026-05-25T19:42:47+00:00`
 - Indexed document count: `1501`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
@@ -76,8 +76,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `./ai/lightrag/scripts/run_artifacts.ps1`
   - `./ai/lightrag/scripts/run_artifact_check.ps1`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
-- Last verification date: `2026-05-25T18:53:26+00:00`
+- Last indexed commit: `74ccec23cfb5397ec3a06771a576868ae6b9c720`
+- Last verification date: `2026-05-25T19:44:03+00:00`
 - Indexed document count: `1499`
 - Relationship concept count: `9`
 - Relationship edge count: `4658`
@@ -90,7 +90,7 @@ LightRAG or LlamaIndex may be treated as active project retrieval only after all
 
 1. `simple locate`
    - Expected: reliably finds canonical files for a narrow known task.
-   - Status: `passed via ai/llamaindex smoke in no-key fallback mode`.
+   - Status: `passed via LightRAG acceptance`.
 2. `Telegram mixed-contract`
    - Expected: separates Bot API/UX/webhook work from token storage, security, and migration ownership.
    - Status: `passed via LightRAG acceptance`.
@@ -144,13 +144,15 @@ Excellent DevBrain status requires:
 - graph-heavy probes return relevant anchors
 - no `STALE / NEEDS REINDEX` warning for trusted retrieval use
 
+If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STATUS.md` or retrieval status/freshness tooling changed, the regression matrix treats that as bookkeeping-only and does not require a full reindex. Any source, runbook, backend, frontend, migration, memory, or manifest change still requires reindex before trusted retrieval use.
+
 ## Last Indexed Commit Placeholders
 
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `13055c56eaba571cc86501cf3bdda65d8f160f9f` | `2026-05-25T18:53:26+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `13055c56eaba571cc86501cf3bdda65d8f160f9f` | `2026-05-25T18:53:26+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `74ccec23cfb5397ec3a06771a576868ae6b9c720` | `2026-05-25T19:42:47+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `74ccec23cfb5397ec3a06771a576868ae6b9c720` | `2026-05-25T19:44:03+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
