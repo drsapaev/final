@@ -69,6 +69,10 @@ class RefundRequestResponse(BaseModel):
     created_at: datetime
     processed_at: Optional[datetime] = None
     processed_by_name: Optional[str] = None
+    available_actions: List[str] = Field(default_factory=list)
+    can_approve: bool = False
+    can_reject: bool = False
+    can_complete: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -81,6 +81,32 @@ const statusIconStyle = {
   gap: 'var(--mac-spacing-1)'
 };
 
+const REFUND_ACTION_CAN_FIELD = {
+  approve: 'can_approve',
+  reject: 'can_reject',
+  complete: 'can_complete'
+};
+
+const hasBackendRefundAction = (request, action) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(request?.available_actions)) {
+    return request.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = REFUND_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(request || {}, canField)) {
+    return Boolean(request[canField]);
+  }
+
+  return false;
+};
+
 const RefundRequestsTable = ({ onRefresh }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +127,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       if (filter !== 'all') {
-        params.append('status', filter);
+        params.append('status_filter', filter);
       }
 
       const response = await fetch(`/api/v1/force-majeure/refund-requests?${params}`, {
@@ -129,92 +155,48 @@ const RefundRequestsTable = ({ onRefresh }) => {
     loadRequests();
   }, [loadRequests]);
 
-  // Approve request
-  const handleApprove = async (requestId) => {
+  const processRefundRequest = async (requestId, action, extraPayload = {}) => {
     setProcessingId(requestId);
     try {
       const token = getAuthToken();
-      const response = await fetch(`/api/v1/force-majeure/refund-requests/${requestId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        logger.log('[RefundRequestsTable] Approved request:', requestId);
-        await loadRequests();
-        if (onRefresh) onRefresh();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to approve');
-      }
-    } catch (err) {
-      logger.error('[RefundRequestsTable] Approve error:', err);
-      alert('Ошибка: ' + err.message);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  // Reject request
-  const handleReject = async (requestId, reason = 'Отклонено кассиром') => {
-    setProcessingId(requestId);
-    try {
-      const token = getAuthToken();
-      const response = await fetch(`/api/v1/force-majeure/refund-requests/${requestId}/reject`, {
+      const response = await fetch(`/api/v1/force-majeure/refund-requests/${requestId}/process`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ action, ...extraPayload })
       });
 
       if (response.ok) {
-        logger.log('[RefundRequestsTable] Rejected request:', requestId);
+        logger.log('[RefundRequestsTable] Processed request:', { requestId, action });
         await loadRequests();
         if (onRefresh) onRefresh();
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to reject');
+        throw new Error(errorData.detail || 'Failed to process refund request');
       }
     } catch (err) {
-      logger.error('[RefundRequestsTable] Reject error:', err);
+      logger.error('[RefundRequestsTable] Process error:', err);
       alert('Ошибка: ' + err.message);
     } finally {
       setProcessingId(null);
     }
   };
 
+  // Approve request
+  const handleApprove = async (requestId) => {
+    await processRefundRequest(requestId, 'approve');
+  };
+
+  // Reject request
+  const handleReject = async (requestId, reason = 'Отклонено кассиром') => {
+    await processRefundRequest(requestId, 'reject', { rejection_reason: reason });
+  };
+
   // Complete request (mark as refunded)
   const handleComplete = async (requestId) => {
-    setProcessingId(requestId);
-    try {
-      const token = getAuthToken();
-      const response = await fetch(`/api/v1/force-majeure/refund-requests/${requestId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        logger.log('[RefundRequestsTable] Completed request:', requestId);
-        await loadRequests();
-        if (onRefresh) onRefresh();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to complete');
-      }
-    } catch (err) {
-      logger.error('[RefundRequestsTable] Complete error:', err);
-      alert('Ошибка: ' + err.message);
-    } finally {
-      setProcessingId(null);
-    }
+    await processRefundRequest(requestId, 'complete');
   };
 
   const getStatusBadge = (status) => {
@@ -269,42 +251,47 @@ const RefundRequestsTable = ({ onRefresh }) => {
       );
     }
 
-    if (request.status === 'pending') {
+    const canApprove = hasBackendRefundAction(request, 'approve');
+    const canReject = hasBackendRefundAction(request, 'reject');
+    const canComplete = hasBackendRefundAction(request, 'complete');
+
+    if (canApprove || canReject || canComplete) {
       return (
         <div style={actionClusterStyle}>
-          <Button
-            variant="success"
-            size="small"
-            onClick={() => handleApprove(request.id)}
-            title="Одобрить"
-            aria-label={`Одобрить заявку на возврат ${request.id}`}
-          >
-            <Check size={14} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="danger"
-            size="small"
-            onClick={() => handleReject(request.id)}
-            title="Отклонить"
-            aria-label={`Отклонить заявку на возврат ${request.id}`}
-          >
-            <X size={14} aria-hidden="true" />
-          </Button>
+          {canApprove && (
+            <Button
+              variant="success"
+              size="small"
+              onClick={() => handleApprove(request.id)}
+              title="Одобрить"
+              aria-label={`Одобрить заявку на возврат ${request.id}`}
+            >
+              <Check size={14} aria-hidden="true" />
+            </Button>
+          )}
+          {canReject && (
+            <Button
+              variant="danger"
+              size="small"
+              onClick={() => handleReject(request.id)}
+              title="Отклонить"
+              aria-label={`Отклонить заявку на возврат ${request.id}`}
+            >
+              <X size={14} aria-hidden="true" />
+            </Button>
+          )}
+          {canComplete && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => handleComplete(request.id)}
+              aria-label={`Отметить заявку на возврат ${request.id} как выплаченную`}
+            >
+              <CreditCard size={14} aria-hidden="true" />
+              Выплатить
+            </Button>
+          )}
         </div>
-      );
-    }
-
-    if (request.status === 'approved') {
-      return (
-        <Button
-          variant="primary"
-          size="small"
-          onClick={() => handleComplete(request.id)}
-          aria-label={`Отметить заявку на возврат ${request.id} как выплаченную`}
-        >
-          <CreditCard size={14} aria-hidden="true" />
-          Выплатить
-        </Button>
       );
     }
 
