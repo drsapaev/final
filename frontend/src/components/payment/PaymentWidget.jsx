@@ -266,7 +266,7 @@ const PaymentWidget = ({
           onSuccess({
             ...paymentData,
             ...response.data,
-            status: response.data.status || 'paid'
+            status: response.data.status
           });
         }
       }
