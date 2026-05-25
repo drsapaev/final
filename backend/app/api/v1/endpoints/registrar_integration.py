@@ -1404,6 +1404,18 @@ def get_today_queues(
         else:
             today = date.today()
 
+        department_filter: set[str] | None = None
+        if department:
+            normalized_department = str(department).strip().lower()
+            department_aliases = {
+                "lab": {"lab", "laboratory"},
+                "laboratory": {"lab", "laboratory"},
+            }
+            department_filter = department_aliases.get(
+                normalized_department,
+                {normalized_department},
+            )
+
         # Получаем все визиты на сегодня (новая система)
         visits = db.query(Visit).filter(Visit.visit_date == today).all()
 
@@ -2052,6 +2064,10 @@ def get_today_queues(
         queue_number = 1
 
         for specialty, data in queues_by_specialty.items():
+            specialty_key = str(specialty or "").strip().lower()
+            if department_filter and specialty_key not in department_filter:
+                continue
+
             doctor = data["doctor"]
             entries_list = data["entries"]
 

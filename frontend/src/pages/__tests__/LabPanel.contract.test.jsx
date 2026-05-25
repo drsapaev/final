@@ -40,4 +40,17 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).not.toContain('/api/v1/ui/');
     expect(source).not.toContain('/ui/lab');
   });
+
+  it('uses the backend registrar department contract for lab queue rows', () => {
+    const source = readLabPanelSource();
+    const loadBlock = extractBlock(
+      source,
+      'const loadLabAppointments = useCallback(async () => {',
+      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+    );
+
+    expect(loadBlock).toContain("new URLSearchParams({ department: 'lab' })");
+    expect(loadBlock).toContain('/registrar/queues/today?${queueParams.toString()}');
+    expect(loadBlock).not.toContain(".filter((queue) => ['lab', 'laboratory'].includes(queue.specialty))");
+  });
 });
