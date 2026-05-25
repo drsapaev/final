@@ -18,6 +18,10 @@ from app.services.phrase_suggest_api_service import PhraseSuggestApiService
 
 router = APIRouter()
 
+PHRASE_CLINICAL_ROLES = ("Admin", "Doctor", "cardio", "derma", "dentist")
+phrase_clinical_access = deps.require_roles(*PHRASE_CLINICAL_ROLES)
+phrase_admin_access = deps.require_roles("Admin")
+
 
 # ============================================
 # SCHEMAS
@@ -69,7 +73,8 @@ class IndexPhraseResponse(BaseModel):
 @router.post("/phrase-suggest", response_model=PhraseSuggestResponse)
 async def suggest_phrases(
     request: PhraseSuggestRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> PhraseSuggestResponse:
     """
     Получить подсказки фраз из истории врача.
@@ -108,7 +113,8 @@ async def suggest_phrases(
 @router.post("/phrase-index", response_model=IndexPhraseResponse)
 async def index_phrases(
     request: IndexPhraseRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> IndexPhraseResponse:
     """
     Проиндексировать фразы из EMR записи.
@@ -140,7 +146,8 @@ async def index_phrases(
 @router.get("/phrase-stats/{doctor_id}")
 async def get_phrase_stats(
     doctor_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> Dict[str, Any]:
     """
     Получить статистику фраз врача.
@@ -163,7 +170,8 @@ class ReadinessResponse(BaseModel):
 @router.get("/readiness/{doctor_id}", response_model=ReadinessResponse)
 async def check_readiness(
     doctor_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> ReadinessResponse:
     """
     Проверить готовность врача к автоподсказкам.
@@ -205,7 +213,8 @@ class TelemetryResponse(BaseModel):
 @router.post("/telemetry", response_model=TelemetryResponse)
 async def record_telemetry(
     request: TelemetryRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> TelemetryResponse:
     """
     Записать событие показа/принятия подсказки.
@@ -242,7 +251,8 @@ class TelemetryStatsResponse(BaseModel):
 @router.get("/telemetry-stats/{doctor_id}", response_model=TelemetryStatsResponse)
 async def get_telemetry_stats(
     doctor_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> TelemetryStatsResponse:
     """
     Получить статистику telemetry врача.
@@ -279,7 +289,8 @@ class FieldPreferencesResponse(BaseModel):
 @router.get("/preferences/{doctor_id}", response_model=FieldPreferencesResponse)
 async def get_field_preferences(
     doctor_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> FieldPreferencesResponse:
     """
     Получить per-field preferences для врача.
@@ -304,7 +315,8 @@ async def get_field_preferences(
 @router.post("/preferences", response_model=FieldPreferencesResponse)
 async def update_field_preferences(
     request: FieldPreferencesRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_clinical_access),
 ) -> FieldPreferencesResponse:
     """
     Обновить per-field preferences.
@@ -347,7 +359,8 @@ class BatchIndexResponse(BaseModel):
 @router.post("/batch-index", response_model=BatchIndexResponse)
 async def batch_index_emrs(
     request: BatchIndexRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_admin_access),
 ) -> BatchIndexResponse:
     """
     Batch-индексация EMR всех врачей.
@@ -399,7 +412,8 @@ class DoctorIndexResponse(BaseModel):
 @router.post("/index-doctor", response_model=DoctorIndexResponse)
 async def index_doctor_emrs(
     request: DoctorIndexRequest,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    _current_user=Depends(phrase_admin_access),
 ) -> DoctorIndexResponse:
     """
     Проиндексировать все EMR одного врача.
