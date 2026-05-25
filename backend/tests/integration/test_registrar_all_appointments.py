@@ -270,6 +270,97 @@ class TestRegistrarAllAppointments:
         assert lab_entry.id in entry_ids
         assert cardio_entry.id not in entry_ids
 
+    def test_today_queues_lab_rows_include_latest_lab_report_summary(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        test_visit,
+    ):
+        lab_queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="lab",
+            active=True,
+        )
+        db_session.add(lab_queue)
+        db_session.commit()
+        db_session.refresh(lab_queue)
+
+        lab_entry = OnlineQueueEntry(
+            queue_id=lab_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=test_visit.id,
+            source="desk",
+            status="waiting",
+        )
+        db_session.add(lab_entry)
+        db_session.commit()
+
+        templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+        assert templates_response.status_code == 200, templates_response.text
+        template = next(
+            item for item in templates_response.json() if item["code"] == "cbc_oak"
+        )
+
+        first_response = client.post(
+            "/api/v1/lab/report-instances",
+            headers=auth_headers,
+            json={
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": template["id"],
+            },
+        )
+        assert first_response.status_code == 200, first_response.text
+
+        latest_response = client.post(
+            "/api/v1/lab/report-instances",
+            headers=auth_headers,
+            json={
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": template["id"],
+            },
+        )
+        assert latest_response.status_code == 200, latest_response.text
+        latest = latest_response.json()
+
+        ready_response = client.post(
+            f"/api/v1/lab/report-instances/{latest['id']}/mark-ready",
+            headers=auth_headers,
+        )
+        assert ready_response.status_code == 200, ready_response.text
+
+        response = client.get(
+            "/api/v1/registrar/queues/today?department=lab",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        found_entry = next(
+            entry
+            for queue in payload["queues"]
+            for entry in queue["entries"]
+            if entry["id"] == lab_entry.id
+        )
+        latest_lab_report = found_entry["latest_lab_report"]
+
+        assert latest_lab_report["id"] == latest["id"]
+        assert latest_lab_report["status"] == "READY"
+        assert latest_lab_report["template_id"] == template["id"]
+        assert latest_lab_report["template_name"] == template["name"]
+        assert latest_lab_report["flagged_findings_count"] == 0
+        assert latest_lab_report["critical_findings_count"] == 0
+        assert latest_lab_report["can_finalize"] is True
+        assert "finalize" in latest_lab_report["available_actions"]
+
     def test_start_queue_visit_uses_queue_entry_id_when_visit_id_collides(
         self,
         client,

@@ -18,20 +18,22 @@ const extractBlock = (source, startMarker, endMarker) => {
 };
 
 describe('LabPanel queue/report status contract', () => {
-  it('keeps queue status separate from lab report status when merging report instances', () => {
+  it('keeps queue status separate from backend-provided lab report summary', () => {
     const source = readLabPanelSource();
-    const mergeBlock = extractBlock(
+    const formatBlock = extractBlock(
       source,
-      'function mergeQueueEntriesWithLabInstances(queueEntries, labInstances) {',
-      'function buildTemplateResolutionPayload(appointment) {',
+      'function formatAppointmentEntry(queue, entry) {',
+      'function normalizeListPayload(payload) {',
     );
 
-    expect(mergeBlock).toContain('status: appointment.status');
-    expect(mergeBlock).toContain('queue_status: appointment.queue_status || appointment.status');
-    expect(mergeBlock).toContain("status_source: 'queue'");
-    expect(mergeBlock).toContain('lab_report_status: linkedInstance.status || null');
-    expect(mergeBlock).toContain("report_status_source: 'lab-report'");
-    expect(mergeBlock).not.toContain('status: linkedInstance.status || appointment.status');
+    expect(formatBlock).toContain('const latestLabReport = entry.latest_lab_report || null');
+    expect(formatBlock).toContain("status_source: 'queue'");
+    expect(formatBlock).toContain('queue_status: entry.status ||');
+    expect(formatBlock).toContain('lab_report_status: latestLabReport?.status || null');
+    expect(formatBlock).toContain("report_status_source: latestLabReport ? 'lab-report' : null");
+    const lines = formatBlock.split('\n').map((line) => line.trim());
+    expect(lines).not.toContain('status: latestLabReport?.status || entry.status,');
+    expect(lines).not.toContain('status: latestLabReport?.status || null,');
   });
 
   it('does not add BFF-lite endpoints for the lab queue contract repair', () => {
@@ -52,5 +54,18 @@ describe('LabPanel queue/report status contract', () => {
     expect(loadBlock).toContain("new URLSearchParams({ department: 'lab' })");
     expect(loadBlock).toContain('/registrar/queues/today?${queueParams.toString()}');
     expect(loadBlock).not.toContain(".filter((queue) => ['lab', 'laboratory'].includes(queue.specialty))");
+  });
+
+  it('does not fetch report instances by visit_ids to enrich normal queue rows', () => {
+    const source = readLabPanelSource();
+    const loadBlock = extractBlock(
+      source,
+      'const loadLabAppointments = useCallback(async () => {',
+      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+    );
+
+    expect(loadBlock).not.toContain('visit_ids');
+    expect(loadBlock).not.toContain('mergeQueueEntriesWithLabInstances');
+    expect(source).not.toContain('function mergeQueueEntriesWithLabInstances');
   });
 });

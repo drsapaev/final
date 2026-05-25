@@ -31,6 +31,7 @@ function getLabPanelTabPanelId(tabId) {
 }
 
 function formatAppointmentEntry(queue, entry) {
+  const latestLabReport = entry.latest_lab_report || null;
   return {
     id: entry.id,
     appointment_id: entry.appointment_id || null,
@@ -53,29 +54,15 @@ function formatAppointmentEntry(queue, entry) {
     appointment_time: entry.visit_time || '09:00',
     status: entry.status || 'waiting',
     status_source: 'queue',
-    lab_report_status: null,
-    report_status_source: null,
-    report_instance_id: null,
-    report_template_name: '',
-    flagged_findings_count: 0,
-    critical_findings_count: 0,
-    max_flag_severity: null
+    latest_lab_report: latestLabReport,
+    lab_report_status: latestLabReport?.status || null,
+    report_status_source: latestLabReport ? 'lab-report' : null,
+    report_instance_id: latestLabReport?.id || null,
+    report_template_name: latestLabReport?.template_name || '',
+    flagged_findings_count: latestLabReport?.flagged_findings_count || 0,
+    critical_findings_count: latestLabReport?.critical_findings_count || 0,
+    max_flag_severity: latestLabReport?.max_flag_severity ?? null
   };
-}
-
-function pickLatestInstance(left, right) {
-  if (!left) {
-    return right;
-  }
-  if (!right) {
-    return left;
-  }
-  const leftTime = new Date(left.created_at || 0).getTime();
-  const rightTime = new Date(right.created_at || 0).getTime();
-  if (rightTime !== leftTime) {
-    return rightTime > leftTime ? right : left;
-  }
-  return (right.id || 0) > (left.id || 0) ? right : left;
 }
 
 function normalizeListPayload(payload) {
@@ -98,43 +85,6 @@ function isAbortLikeError(error) {
   const name = String(error?.name || '').toLowerCase();
   const message = String(error?.message || '').toLowerCase();
   return name === 'aborterror' || message.includes('aborted');
-}
-
-function mergeQueueEntriesWithLabInstances(queueEntries, labInstances) {
-  if (!queueEntries.length || !labInstances.length) {
-    return queueEntries;
-  }
-  const latestByVisit = new Map();
-  labInstances.forEach((instance) => {
-    if (!instance.visit_id) {
-      return;
-    }
-    latestByVisit.set(
-      instance.visit_id,
-      pickLatestInstance(latestByVisit.get(instance.visit_id), instance)
-    );
-  });
-  return queueEntries.map((appointment) => {
-    const linkedInstance = appointment.visit_id
-      ? latestByVisit.get(appointment.visit_id)
-      : null;
-    if (!linkedInstance) {
-      return appointment;
-    }
-    return {
-      ...appointment,
-      status: appointment.status,
-      queue_status: appointment.queue_status || appointment.status,
-      status_source: 'queue',
-      lab_report_status: linkedInstance.status || null,
-      report_status_source: 'lab-report',
-      report_instance_id: linkedInstance.id || null,
-      report_template_name: linkedInstance.template?.name || '',
-      flagged_findings_count: linkedInstance.flagged_findings_count || 0,
-      critical_findings_count: linkedInstance.critical_findings_count || 0,
-      max_flag_severity: linkedInstance.max_flag_severity ?? null
-    };
-  });
 }
 
 function buildTemplateResolutionPayload(appointment) {
@@ -265,34 +215,19 @@ export default function LabPanel() {
       const payload = await response.json();
       const queueEntries = (payload?.queues || [])
         .flatMap((queue) => (queue.entries || []).map((entry) => formatAppointmentEntry(queue, entry)));
-      const visitIds = queueEntries
-        .map((item) => item.visit_id)
-        .filter(Boolean);
-      let mergedEntries = queueEntries;
-      if (visitIds.length > 0) {
-        try {
-          const linkedInstances = await labReportingApi.listInstances({
-            visit_ids: visitIds,
-            limit: Math.min(Math.max(visitIds.length * 4, 100), 500)
-          });
-          mergedEntries = mergeQueueEntriesWithLabInstances(queueEntries, normalizeListPayload(linkedInstances));
-        } catch (linkError) {
-          logger.warn('[LabPanel] queue/report status sync failed', linkError);
-        }
-      }
-      setAppointments(mergedEntries);
+      setAppointments(queueEntries);
       setSelectedAppointment((current) => {
         if (!current) {
           return current;
         }
-        const refreshed = mergedEntries.find(
+        const refreshed = queueEntries.find(
           (item) =>
             item.id === current.id
             || (current.appointment_id && item.appointment_id === current.appointment_id)
         );
         return refreshed || current;
       });
-      logger.info('[LabPanel] loaded lab queue entries', mergedEntries.length);
+      logger.info('[LabPanel] loaded lab queue entries', queueEntries.length);
     } catch (error) {
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
