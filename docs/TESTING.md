@@ -2,6 +2,13 @@
 
 # Testing
 
+## Local Windows Python Launchers
+
+- General Python: `C:\final\scripts\run_python.ps1 <python args>`
+- Backend pytest: `C:\final\scripts\run_backend_pytest.ps1 <tests...>`
+
+Use these instead of bare `python`, `py`, or pgAdmin Python in local Windows shells. The backend pytest launcher selects a Python 3.11+ interpreter that has `pytest`, runs from `backend/`, and sets `PYTHONPATH` to the backend root.
+
 ## Targeted Checks Run During Recovery
 
 | Area | Representative checks |

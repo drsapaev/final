@@ -305,6 +305,7 @@ From `C:\final\ai\langgraph`:
 Current checkout note:
 
 - For local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1` over bare `python` or `py` unless a tool already provides a narrower launcher.
+- For backend pytest in this Windows checkout, prefer `C:\final\scripts\run_backend_pytest.ps1 <tests...>`; it selects a Python 3.11+ interpreter with `pytest` installed and runs from `backend/` with `PYTHONPATH` set.
 - `scripts\run_agent_gate.ps1` is the verified launcher for `scripts\agent_gate.py`; do not rely on bare `python` or `py` in local shells.
 - `scripts\agent_gate.py` is the only verified local dev-brain Python entrypoint.
 - Do not run historical `scripts\dev_brain.py`, `scripts\planner_smoke.py`, `scripts\dossier_smoke.py`, or `scripts\handoff_smoke.py` unless those files are restored and verified in the current checkout.
