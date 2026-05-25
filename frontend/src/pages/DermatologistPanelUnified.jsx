@@ -455,7 +455,7 @@ const DermatologistPanelUnified = () => {
                     specialty: queue.specialty,
                     created_at: entry.created_at,
                     appointment_date: entry.created_at ? entry.created_at.split('T')[0] : today,
-                    appointment_time: entry.visit_time || '09:00',
+                    appointment_time: entry.visit_time || '',
                     status: entry.status ?? null,
                     cost: entry.cost || 0,
                     visit_id: entry.visit_id || null
