@@ -251,7 +251,7 @@ const hasBackendPaymentAction = (paymentRow, action) => {
     return Boolean(paymentRow[canField]);
   }
 
-  return true;
+  return false;
 };
 
 const CashierPanel = () => {void
@@ -1419,6 +1419,7 @@ const CashierPanel = () => {void
                                   size="sm"
                                   variant="outline"
                                   onClick={() => confirmPayment(row.id)}
+                                  disabled={!hasBackendPaymentAction(row, 'confirm')}
                                   aria-label={`Confirm ${getPaymentActionContext(row)}`}>
                                   ✅ Принять
                                 </Button>
@@ -1447,6 +1448,7 @@ const CashierPanel = () => {void
                           size="sm"
                           variant="outline"
                           onClick={() => handlePrintReceipt(row)}
+                          disabled={!hasBackendPaymentAction(row, 'print_receipt')}
                           aria-label={`Print receipt for ${getPaymentActionContext(row)}`}
                           title="Печать чека">
 

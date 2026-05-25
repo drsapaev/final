@@ -44,6 +44,38 @@ def _preserve_cashier_visit_status(raw_status: str | None) -> str:
     return raw_status
 
 
+def _cashier_payment_status(payment: Payment) -> str:
+    return str(payment.status or "").strip().lower()
+
+
+def _cashier_payment_available_amount(payment: Payment) -> Decimal:
+    return Decimal(str(payment.amount or 0)) - Decimal(str(payment.refunded_amount or 0))
+
+
+def _cashier_payment_action_contract(payment: Payment) -> dict[str, Any]:
+    payment_status = _cashier_payment_status(payment)
+    can_confirm = payment_status not in {"paid", "completed", "cancelled", "refunded", "void"}
+    can_cancel = payment_status not in {"cancelled", "refunded", "void"}
+    can_refund = payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
+    can_print_receipt = True
+
+    action_flags = {
+        "confirm": can_confirm,
+        "cancel": can_cancel,
+        "refund": can_refund,
+        "print_receipt": can_print_receipt,
+    }
+    return {
+        "available_actions": [
+            action for action, allowed in action_flags.items() if allowed
+        ],
+        "can_confirm": can_confirm,
+        "can_cancel": can_cancel,
+        "can_refund": can_refund,
+        "can_print_receipt": can_print_receipt,
+    }
+
+
 # ===================== МОДЕЛИ ДЛЯ КАССИРА =====================
 
 class PendingPaymentItem(BaseModel):
@@ -80,6 +112,11 @@ class PaymentHistoryItem(BaseModel):
     paid_at: Optional[datetime] = None
     note: Optional[str] = None
     cashier_name: Optional[str] = None
+    available_actions: List[str] = Field(default_factory=list)
+    can_confirm: bool = False
+    can_cancel: bool = False
+    can_refund: bool = False
+    can_print_receipt: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -802,6 +839,7 @@ async def get_payments(
                 paid_at=payment.paid_at if hasattr(payment, 'paid_at') else None,
                 note=payment.note if hasattr(payment, 'note') else None,
                 cashier_name=None,
+                **_cashier_payment_action_contract(payment),
             ))
             
         import math
@@ -1003,7 +1041,7 @@ async def cancel_payment(
             detail="Платеж не найден"
         )
     
-    if payment.status == "cancelled":
+    if _cashier_payment_status(payment) in {"cancelled", "refunded", "void"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Платеж уже отменен"
@@ -1141,10 +1179,12 @@ async def confirm_payment(
     if not payment:
          raise HTTPException(status_code=404, detail="Платеж не найден")
     
-    if payment.status == 'paid':
+    payment_status = _cashier_payment_status(payment)
+
+    if payment_status in {'paid', 'completed'}:
          return {"success": True, "message": "Платеж уже оплачен"}
 
-    if payment.status == 'cancelled':
+    if payment_status in {'cancelled', 'refunded', 'void'}:
          raise HTTPException(status_code=400, detail="Нельзя подтвердить отмененный платеж")
 
     # Обновляем статус платежа
