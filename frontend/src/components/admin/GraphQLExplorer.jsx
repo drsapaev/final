@@ -281,10 +281,12 @@ const GraphQLExplorer = () => {
 
   const loadSchema = async () => {
     try {
+      const accessToken = tokenManager.getAccessToken();
       const response = await fetch('/api/graphql', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
         },
         body: JSON.stringify({
           query: `
