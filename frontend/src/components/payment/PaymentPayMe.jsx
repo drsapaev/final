@@ -175,14 +175,13 @@ const PaymentPayMe = ({
         setPaymentState('success');
 
         // Получаем данные для печати талонов
-        await loadPrintTickets();
+        const tickets = Array.isArray(data.print_tickets) ? data.print_tickets : [];
+        setPrintTickets(tickets);
 
         notify.success('Платёж успешно завершён!');
 
         // Показываем принтер талонов если есть талоны для печати
-        if (printTickets.length > 0) {
-          setShowTicketPrinter(true);
-        }
+        setShowTicketPrinter(tickets.length > 0);
 
         if (onSuccess) {
           onSuccess(data);
@@ -204,45 +203,6 @@ const PaymentPayMe = ({
 
   // ===================== ПЕЧАТЬ ТАЛОНОВ =====================
 
-  const loadPrintTickets = async () => {
-    try {
-      // Получаем данные о талонах из последнего ответа API
-      // Данные должны приходить в onSuccess callback
-      // Пока оставляем mock данные для тестирования множественных талонов
-      const mockTickets = [
-      {
-        visit_id: 1,
-        queue_tag: 'cardiology_common',
-        queue_name: 'Кардиолог',
-        queue_number: 15,
-        queue_id: 1,
-        patient_id: 1,
-        patient_name: 'Юля Михайловна',
-        doctor_name: 'Д-р Петров',
-        department: 'Кардиология',
-        visit_date: new Date().toISOString().split('T')[0],
-        visit_time: '10:30'
-      },
-      {
-        visit_id: 1,
-        queue_tag: 'dermatology',
-        queue_name: 'Дерматолог',
-        queue_number: 8,
-        queue_id: 2,
-        patient_id: 1,
-        patient_name: 'Юля Михайловна',
-        doctor_name: 'Д-р Смирнова',
-        department: 'Дерматология',
-        visit_date: new Date().toISOString().split('T')[0],
-        visit_time: '10:30'
-      }];
-
-
-      setPrintTickets(mockTickets);
-    } catch (error) {
-      logger.error('Error loading print tickets:', error);
-    }
-  };
 
   const printTicket = (ticket) => {
     const opened = printPanelTicketInBrowser({
