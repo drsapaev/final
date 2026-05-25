@@ -190,6 +190,74 @@ def _serialize_registrar_datetime(value: Any) -> str | None:
     return str(value)
 
 
+def _is_newer_lab_report_instance(candidate: Any, current: Any | None) -> bool:
+    if current is None:
+        return True
+
+    def sort_key(instance: Any) -> tuple[float, int]:
+        created_at = getattr(instance, "created_at", None)
+        if isinstance(created_at, datetime):
+            timestamp = created_at.timestamp()
+        else:
+            timestamp = 0.0
+        return (timestamp, getattr(instance, "id", 0) or 0)
+
+    return sort_key(candidate) > sort_key(current)
+
+
+def _lab_report_summary_for_registrar(service: Any, instance: Any) -> dict[str, Any]:
+    sections = service.materialize_instance(instance)
+    severity = service.summarize_instance_severity(sections)
+    available_actions = service.instance_available_actions(instance)
+    template = getattr(instance, "template", None)
+    return {
+        "id": instance.id,
+        "status": instance.status,
+        "template_id": instance.template_id,
+        "template_version_id": instance.template_version_id,
+        "template_name": getattr(template, "name", None),
+        "created_at": _serialize_registrar_datetime(instance.created_at),
+        "finalized_at": _serialize_registrar_datetime(instance.finalized_at),
+        "printed_at": _serialize_registrar_datetime(instance.printed_at),
+        "flagged_findings_count": severity["flagged_findings_count"],
+        "critical_findings_count": severity["critical_findings_count"],
+        "max_flag_severity": severity["max_flag_severity"],
+        "available_actions": available_actions,
+        **service.instance_action_flags(instance),
+    }
+
+
+def _latest_lab_report_summaries_by_visit(
+    db: Session,
+    visit_ids: set[int],
+) -> dict[int, dict[str, Any]]:
+    if not visit_ids:
+        return {}
+
+    from app.services.lab_reporting_service import LabReportingService
+
+    service = LabReportingService(db)
+    instances = service.list_instances(
+        patient_id=None,
+        visit_ids=sorted(visit_ids),
+        status=None,
+        limit=max(len(visit_ids) * 20, 500),
+        offset=0,
+    )
+    latest_by_visit: dict[int, Any] = {}
+    for instance in instances:
+        visit_id = getattr(instance, "visit_id", None)
+        if not visit_id:
+            continue
+        if _is_newer_lab_report_instance(instance, latest_by_visit.get(visit_id)):
+            latest_by_visit[visit_id] = instance
+
+    return {
+        visit_id: _lab_report_summary_for_registrar(service, instance)
+        for visit_id, instance in latest_by_visit.items()
+    }
+
+
 def _resolve_payment_truth(
     db: Session,
     *,
@@ -2062,6 +2130,37 @@ def get_today_queues(
         # Формируем результат
         result = []
         queue_number = 1
+        include_lab_report_summary = bool(
+            department_filter and department_filter.intersection({"lab", "laboratory"})
+        )
+        visible_entry_wrappers = []
+        if include_lab_report_summary:
+            for specialty, data in queues_by_specialty.items():
+                specialty_key = str(specialty or "").strip().lower()
+                if department_filter and specialty_key not in department_filter:
+                    continue
+                visible_entry_wrappers.extend(data["entries"])
+
+        visible_visit_ids: set[int] = set()
+        for entry_wrapper in visible_entry_wrappers:
+            entry_type = entry_wrapper.get("type")
+            entry_data = entry_wrapper.get("data")
+            entry_visit_id = (
+                entry_wrapper.get("visit_id")
+                or getattr(entry_data, "visit_id", None)
+                or (
+                    getattr(entry_data, "id", None)
+                    if entry_type == "visit"
+                    else None
+                )
+            )
+            if entry_visit_id:
+                visible_visit_ids.add(entry_visit_id)
+
+        latest_lab_reports_by_visit = _latest_lab_report_summaries_by_visit(
+            db,
+            visible_visit_ids,
+        )
 
         for specialty, data in queues_by_specialty.items():
             specialty_key = str(specialty or "").strip().lower()
@@ -2878,6 +2977,11 @@ def get_today_queues(
                     or getattr(entry_data, "visit_id", None)
                     or (record_id if entry_type == "visit" else None)
                 )
+                latest_lab_report = (
+                    latest_lab_reports_by_visit.get(entry_visit_id)
+                    if entry_visit_id
+                    else None
+                )
                 payment_status, payment_type = _resolve_payment_truth(
                     db,
                     visit_id=entry_visit_id,
@@ -2938,6 +3042,7 @@ def get_today_queues(
                         "approval_status": getattr(
                             entry_data, "approval_status", None
                         ),
+                        "latest_lab_report": latest_lab_report,
                         "type": entry_type,  # ✅ ИСПРАВЛЕНО: Добавляем type для frontend (online_queue, visit, appointment)
                         "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment' (для совместимости)
                         "queue_entry_id": entry_wrapper.get("queue_entry_id"),  # ✅ SSOT FIX: ID OnlineQueueEntry для QR-записей
