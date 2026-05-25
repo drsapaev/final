@@ -14,6 +14,14 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
 
+## Project Memory / DevBrain Status
+
+- Use `docs/devbrain/PROJECT_MEMORY.md` as the compact canonical memory anchor for project-wide ownership decisions, failure patterns, and strict domain guardrails.
+- Use `docs/devbrain/DEVBRAIN_STATUS.md` to verify which DevBrain layers are active, documented, dormant, or missing in the current checkout.
+- Before graph-heavy, risky, or ownership-sensitive work, consult both files together with the current filesystem state.
+- Do not assume LlamaIndex or LightRAG are active unless `DEVBRAIN_STATUS.md` and filesystem checks confirm the required directories, storage, commands, and indexed commit evidence.
+- Keep `AGENTS.md` short and operational; move durable history, ownership notes, and retrieval status details into the DevBrain docs instead of expanding this file into a full history dump.
+
 ## Evidence-Based Small PR Protocol
 
 Use `docs/runbooks/AGENT_CYCLIC_WORKFLOW.md` as the repository-owned SSOT for the cyclic agent workflow. The short rule is: fresh main, clean branch, small scope, explicit gate, evidence before merge, green before next, no silent scope creep, and fix red checks in the same PR.
@@ -53,8 +61,8 @@ Installed repo skills live in `.agents/skills`. User-level skills may live under
 
 ## LightRAG Status
 
-- Treat LightRAG as an active dev-brain retrieval layer for graph-heavy workflows, but not as a fully accepted `unified brain` yet.
-- Do not call the stack a `unified brain` until keyed ingest has passed the acceptance gate.
+- Treat LightRAG as unavailable until `docs/devbrain/DEVBRAIN_STATUS.md` and filesystem checks prove that graph storage, query commands, and indexed commit evidence exist in the current checkout.
+- Do not call the stack a `unified brain` until keyed ingest has passed the acceptance gate and the status file records that result.
 - Acceptance order:
   1. `simple locate` as a sanity check.
   2. `Telegram mixed-contract` as an intermediate check.
