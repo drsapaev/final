@@ -23,6 +23,17 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 | LlamaIndex | active local fallback | `ai/llamaindex` exists; smoke passed without external API; generated storage remains gitignored. |
 | LightRAG | active relationship fallback | `ai/lightrag` exists; relationship graph acceptance passed; generated graph storage remains gitignored. |
 
+## Current Main Acceptance
+
+- Main merge commit: `f4ea5b73dc13858c0baf2d8456bdc7a8f1096fe3`
+- Retrieval layer commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
+- Inventory: `passed`
+- Guardrail acceptance: `pass: 5`, `warn: 0`, `fail: 0`
+- LlamaIndex: `active local fallback`
+- LightRAG: `active relationship fallback`
+- Unified DevBrain status: `portable accepted in this checkout`
+- Limitation: `not a production autonomous brain`
+
 ## Active / Documented / Dormant / Missing Status
 
 | Component | Status | Operational meaning |
