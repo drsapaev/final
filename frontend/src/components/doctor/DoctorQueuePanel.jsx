@@ -26,6 +26,22 @@ import {
   MacOSAlert } from
 '../ui/macos';
 
+const QUEUE_ACTION_ALIASES = {
+  call: ['call'],
+  start_visit: ['start_visit', 'start', 'in_cabinet'],
+  complete: ['complete']
+};
+
+const hasBackendQueueAction = (entry, action, flagName) => {
+  if (flagName && entry?.[flagName] === true) {
+    return true;
+  }
+
+  const actions = Array.isArray(entry?.available_actions) ? entry.available_actions : [];
+  const aliases = QUEUE_ACTION_ALIASES[action] || [action];
+  return aliases.some((alias) => actions.includes(alias));
+};
+
 /**
  * Панель очереди для врача - показывает пациентов из регистратуры
  * Основа: passport.md стр. 1417-1427
@@ -102,6 +118,10 @@ const DoctorQueuePanel = ({
           number: 'A001',
           patient_name: 'Иван Иванов',
           status: 'waiting',
+          available_actions: ['call', 'no_show'],
+          can_call: true,
+          can_start_visit: false,
+          can_complete: false,
           source: 'online',
           phone: '+998 90 123-45-67',
           created_at: '2024-01-15T09:00:00Z'
@@ -111,6 +131,10 @@ const DoctorQueuePanel = ({
           number: 'A002',
           patient_name: 'Мария Петрова',
           status: 'waiting',
+          available_actions: ['call', 'no_show'],
+          can_call: true,
+          can_start_visit: false,
+          can_complete: false,
           source: 'desk',
           phone: '+998 90 765-43-21',
           created_at: '2024-01-15T09:15:00Z'
@@ -508,6 +532,9 @@ const DoctorQueuePanel = ({
             const status = statusConfig[entry.status] || statusConfig.waiting;
             const source = sourceConfig[entry.source] || sourceConfig.desk;
             const StatusIcon = status.icon;
+            const canCall = hasBackendQueueAction(entry, 'call', 'can_call');
+            const canStartVisit = hasBackendQueueAction(entry, 'start_visit', 'can_start_visit');
+            const canComplete = hasBackendQueueAction(entry, 'complete', 'can_complete');
 
             return (
               <div
@@ -630,7 +657,7 @@ const DoctorQueuePanel = ({
 
                       {/* Действия */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {entry.status === 'waiting' &&
+                        {canCall &&
                       <MacOSButton
                         onClick={(e) => {
                           e.stopPropagation();
@@ -642,7 +669,7 @@ const DoctorQueuePanel = ({
                           </MacOSButton>
                       }
 
-                        {entry.status === 'called' &&
+                        {canStartVisit &&
                       <MacOSButton
                         variant="outline"
                         onClick={(e) => {
@@ -655,7 +682,7 @@ const DoctorQueuePanel = ({
                           </MacOSButton>
                       }
 
-                        {entry.status === 'in_progress' &&
+                        {canComplete &&
                       <MacOSButton
                         variant="success"
                         onClick={(e) => {

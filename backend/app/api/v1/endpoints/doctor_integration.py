@@ -97,7 +97,8 @@ def _doctor_queue_available_actions(entry: OnlineQueueEntry) -> list[str]:
     status_value = (entry.status or "").strip().lower()
     actions_by_status = {
         "waiting": ["call", "no_show"],
-        "called": ["send_to_diagnostics", "complete", "no_show"],
+        "called": ["start_visit", "send_to_diagnostics", "no_show"],
+        "in_progress": ["complete"],
         "diagnostics": [
             "notify_diagnostics_return",
             "complete",
@@ -112,6 +113,7 @@ def _doctor_queue_action_flags(entry: OnlineQueueEntry) -> dict[str, bool]:
     actions = set(_doctor_queue_available_actions(entry))
     return {
         "can_call": "call" in actions,
+        "can_start_visit": "start_visit" in actions,
         "can_no_show": "no_show" in actions,
         "can_send_to_diagnostics": "send_to_diagnostics" in actions,
         "can_complete": "complete" in actions,
@@ -556,6 +558,15 @@ def start_patient_visit(
             )
 
         # Обновляем статус
+        if "start_visit" not in _doctor_queue_available_actions(queue_entry):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Start visit is not available for current queue status: "
+                    f"{queue_entry.status}"
+                ),
+            )
+
         queue_entry.status = "in_progress"
 
         # Создаем или обновляем визит в таблице visits
@@ -743,6 +754,15 @@ def complete_patient_visit(
                 )
 
             # Отмечаем запись очереди как обслуженную
+            if "complete" not in _doctor_queue_available_actions(queue_entry):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Complete visit is not available for current queue status: "
+                        f"{queue_entry.status}"
+                    ),
+                )
+
             queue_entry.status = "served"
             db.commit()
             db.refresh(queue_entry)
