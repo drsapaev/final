@@ -25,8 +25,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 
 ## Current Main Acceptance
 
-- Main merge commit: `f4ea5b73dc13858c0baf2d8456bdc7a8f1096fe3`
-- Retrieval layer commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
+- Main merge commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
+- Retrieval layer commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
 - Inventory: `passed`
 - Guardrail acceptance: `pass: 5`, `warn: 0`, `fail: 0`
 - LlamaIndex: `active local fallback`
@@ -54,8 +54,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
-- Last verification date: `2026-05-25T17:47:52+00:00`
+- Last indexed commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
+- Last verification date: `2026-05-25T18:53:26+00:00`
 - Indexed document count: `1501`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
@@ -72,8 +72,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/lightrag/scripts/ingest.py`
   - `Test-Path ai/lightrag/indexes/lightrag_graph/graph.json`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7`
-- Last verification date: `2026-05-25T17:47:58+00:00`
+- Last indexed commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
+- Last verification date: `2026-05-25T18:53:26+00:00`
 - Indexed document count: `1499`
 - Relationship concept count: `9`
 - Relationship edge count: `4658`
@@ -86,7 +86,7 @@ LightRAG or LlamaIndex may be treated as active project retrieval only after all
 
 1. `simple locate`
    - Expected: reliably finds canonical files for a narrow known task.
-   - Status: `passed via LightRAG acceptance`.
+   - Status: `passed via ai/llamaindex smoke in no-key fallback mode`.
 2. `Telegram mixed-contract`
    - Expected: separates Bot API/UX/webhook work from token storage, security, and migration ownership.
    - Status: `passed via LightRAG acceptance`.
@@ -113,13 +113,31 @@ Use the local guardrail acceptance checker before changing DevBrain routing rule
 
 The checker is read-only. It runs `ai/langgraph/scripts/run_agent_gate.ps1` against critical routing scenarios and prints `PASS`, `WARN`, or `FAIL` per scenario. It does not require LlamaIndex or LightRAG, does not run product tests, and exits non-zero only when a core guardrail expectation is clearly violated.
 
+## How To Run Full DevBrain Regression Matrix
+
+Use the local regression matrix before trusting DevBrain for graph-heavy, risky, or ownership-sensitive work:
+
+```powershell
+.\scripts\devbrain_regression_matrix.ps1
+```
+
+The matrix is read-only. It runs inventory, guardrail acceptance, LlamaIndex simple locate, LightRAG registrar/payment, Alembic migration, notification anti-noise, and queue identity probes when the corresponding retrieval layers are active. It does not run ingest, does not require API keys, and does not update generated storage or status files.
+
+Excellent DevBrain status requires:
+
+- inventory green
+- acceptance green
+- retrieval freshness checked
+- graph-heavy probes return relevant anchors
+- no `STALE / NEEDS REINDEX` warning for trusted retrieval use
+
 ## Last Indexed Commit Placeholders
 
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7` | `2026-05-25T17:47:52+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `3e11d2c1bc9b9f01a2c26a6ea3bf2504b76387a7` | `2026-05-25T17:47:58+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `13055c56eaba571cc86501cf3bdda65d8f160f9f` | `2026-05-25T18:53:26+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `13055c56eaba571cc86501cf3bdda65d8f160f9f` | `2026-05-25T18:53:26+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
