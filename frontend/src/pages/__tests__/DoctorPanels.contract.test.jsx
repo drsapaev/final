@@ -31,8 +31,11 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).not.toContain('appointmentMetaMap');
       expect(source).not.toContain('appointmentsDBData');
 
-      expect(source).toContain('payment_status: entry.payment_status');
+      expect(source).toContain('payment_status: entry.payment_status ?? null');
       expect(source).toContain('payment_type: entry.payment_type');
+      expect(source).toContain('queue_status: entry.queue_status ?? null');
+      expect(source).toContain('canonical_status: entry.canonical_status ?? null');
+      expect(source).toContain('status: entry.status ?? null');
       expect(source).toContain('available_actions: entry.available_actions || []');
       expect(source).toContain('can_mark_paid: Boolean(entry.can_mark_paid)');
       expect(source).toContain('can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null');
@@ -40,6 +43,13 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).toContain('can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null');
       expect(source).toContain('can_cancel: Boolean(entry.can_cancel)');
       expect(source).toContain('doctor_queue_entry_id: doctorQueueEntryId');
+
+      expect(source).not.toContain("payment_status: entry.payment_status || 'pending'");
+      expect(source).not.toContain("status: entry.status || 'waiting'");
+      expect(source).not.toContain("payment_status: row.payment_status || 'pending'");
+      expect(source).not.toContain("status: row.status || 'waiting'");
+      expect(source).not.toContain('queue_status: entry.queue_status || entry.status');
+      expect(source).not.toContain('canonical_status: entry.canonical_status || entry.status');
     }
   });
 
