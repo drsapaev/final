@@ -199,7 +199,7 @@ const DoctorPanel = () => {
       ? patients.find((patient) => Number(patient.id) === normalizedPatientId)
       : null;
     const visitDate = confirmation.visit_date || submittedFormData?.visit_date || '';
-    const visitTime = confirmation.visit_time || submittedFormData?.visit_time || '09:00';
+    const visitTime = confirmation.visit_time || submittedFormData?.visit_time || '';
 
     const nextAppointment = {
       id: result?.visit_id || Date.now(),
