@@ -105,6 +105,13 @@ describe('LabReportWorkbench', () => {
     expect(source).not.toContain("activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'");
   });
 
+  it('does not invent draft status in the print payload when backend status is missing', () => {
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    expect(source).toContain('status: instance?.status || null');
+    expect(source).not.toContain("status: instance?.status || 'DRAFT'");
+  });
+
   it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {
     const onOpenInstance = vi.fn();
     const notify = vi.fn();

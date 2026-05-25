@@ -202,7 +202,7 @@ function buildLabPrintPayload(instance, appointment) {
       patient_id: instance?.patient_id || appointmentSnapshot?.patient_id || null,
       template_id: instance?.template_id || null,
       template_name: templateName,
-      status: instance?.status || 'DRAFT',
+      status: instance?.status || null,
       created_at: instance?.created_at || null,
       finalized_at: instance?.finalized_at || null,
       printed_at: instance?.printed_at || null
