@@ -16,7 +16,7 @@ const normalizeTransaction = (transaction = {}) => ({
   patientName: transaction.patient_name ?? transaction.patientName ?? null,
   doctorName: transaction.doctor_name ?? transaction.doctorName ?? null,
   paymentMethod: transaction.payment_method || transaction.paymentMethod || 'cash',
-  status: transaction.status || 'completed',
+  status: transaction.status ?? null,
   transactionDate: transaction.transaction_date || transaction.transactionDate || '',
   notes: transaction.notes || '',
   reference: transaction.reference || '',
