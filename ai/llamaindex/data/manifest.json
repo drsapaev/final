@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "DevBrain portable retrieval manifest. Keep generated indexes out of git.",
+  "sources": [
+    {"path": "AGENTS.md", "type": "file", "label": "repo operating rules"},
+    {"path": "docs/devbrain/PROJECT_MEMORY.md", "type": "file", "label": "canonical project memory"},
+    {"path": "docs/devbrain/DEVBRAIN_STATUS.md", "type": "file", "label": "DevBrain status"},
+    {"path": ".ai-factory/DESCRIPTION.md", "type": "file", "label": "AI Factory description"},
+    {"path": ".ai-factory/ARCHITECTURE.md", "type": "file", "label": "AI Factory architecture"},
+    {"path": ".ai-factory/RULES.md", "type": "file", "label": "AI Factory rules"},
+    {"path": ".ai-factory/PLAN.md", "type": "file", "label": "AI Factory plan"},
+    {"path": ".ai-factory/ROADMAP.md", "type": "file", "label": "AI Factory roadmap"},
+
+    {"path": "docs/runbooks/AGENT_CYCLIC_WORKFLOW.md", "type": "file", "label": "cyclic agent workflow"},
+    {"path": "docs/runbooks/CODEX_SUPERPOWERS_GUARD.md", "type": "file", "label": "Codex Superpowers guard"},
+    {"path": "docs/runbooks/PR_REVIEW_QUALITY_GATES.md", "type": "file", "label": "PR review quality gates"},
+    {"path": "docs/runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md", "type": "file", "label": "local-only external services policy"},
+    {"path": "docs/runbooks/MESSAGING_CONTRACT.md", "type": "file", "label": "messaging contract"},
+    {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
+
+    {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
+    {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},
+    {"path": "backend/app/repositories", "type": "dir", "label": "backend repositories", "extensions": [".py"]},
+    {"path": "backend/app/models", "type": "dir", "label": "backend SQLAlchemy models", "extensions": [".py"]},
+    {"path": "backend/app/schemas", "type": "dir", "label": "backend schemas", "extensions": [".py"]},
+    {"path": "backend/alembic/versions", "type": "dir", "label": "Alembic versions", "extensions": [".py"]},
+    {"path": "backend/tests/unit", "type": "dir", "label": "backend unit tests", "extensions": [".py"]},
+    {"path": "backend/tests/integration", "type": "dir", "label": "backend integration tests", "extensions": [".py"]},
+
+    {"path": "frontend/src/api", "type": "dir", "label": "frontend API clients", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/routing", "type": "dir", "label": "frontend route registry and guards", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/contexts", "type": "dir", "label": "frontend contexts", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/components", "type": "dir", "label": "frontend components", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/pages", "type": "dir", "label": "frontend pages", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/hooks", "type": "dir", "label": "frontend hooks", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/services", "type": "dir", "label": "frontend services", "extensions": [".js", ".jsx", ".ts", ".tsx"]},
+    {"path": "frontend/src/utils", "type": "dir", "label": "frontend utils", "extensions": [".js", ".jsx", ".ts", ".tsx"]}
+  ]
+}

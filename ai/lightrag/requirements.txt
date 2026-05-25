@@ -1,0 +1,3 @@
+# Optional dependencies for richer provider-backed retrieval.
+# Current scripts work without installing these packages.
+httpx>=0.27,<1

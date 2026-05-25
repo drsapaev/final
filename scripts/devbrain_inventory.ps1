@@ -95,12 +95,75 @@ $gateScript = Add-ExistingPath "LangGraph agent gate" "ai/langgraph/scripts/agen
 $aiFactory = Add-ExistingPath "AI Factory file memory" ".ai-factory" $active $missing
 $skills = Add-ExistingPath "Repo/user skills directory" ".agents/skills" $active $missing
 
-$llamaIndex = Add-ExistingPath "LlamaIndex local layer" "ai/llamaindex" $stale $missing
-$lightRag = Add-ExistingPath "LightRAG local layer" "ai/lightrag" $stale $missing
-$lightRagGraph = Add-ExistingPath "LightRAG graph storage" "ai/lightrag/indexes/lightrag_graph" $stale $missing
+$llamaIndexRoot = Join-Path $repoRoot "ai\llamaindex"
+$llamaIndex = Test-Path -LiteralPath $llamaIndexRoot
+$llamaIndexRequiredFiles = @(
+    "ai/llamaindex/README.md",
+    "ai/llamaindex/data/manifest.json",
+    "ai/llamaindex/scripts/ingest.py",
+    "ai/llamaindex/scripts/query.py",
+    "ai/llamaindex/scripts/smoke.py",
+    "ai/llamaindex/scripts/run_smoke.ps1"
+)
+$llamaIndexMissingRequired = @(
+    $llamaIndexRequiredFiles |
+        Where-Object { -not (Test-Path -LiteralPath (Join-Path $repoRoot $_)) }
+)
+$llamaIndexIndex = Test-Path -LiteralPath (Join-Path $repoRoot "ai/llamaindex/storage/devbrain_index.json")
+$statusFile = Join-Path $repoRoot "docs/devbrain/DEVBRAIN_STATUS.md"
+$llamaIndexStatusActive = $false
+if (Test-Path -LiteralPath $statusFile) {
+    $llamaIndexStatusActive = Select-String -LiteralPath $statusFile -Pattern "Current status: ``active local fallback``" -Quiet
+}
 
-Add-ScriptProbe "LightRAG" "ai/lightrag" @("*query*", "*ingest*", "*lightrag*") $lightRag
-Add-ScriptProbe "LlamaIndex" "ai/llamaindex" @("*query*", "*ingest*", "*llamaindex*", "*llama_index*") $llamaIndex
+if (-not $llamaIndex) {
+    $missing.Add("LlamaIndex local layer (ai/llamaindex)") | Out-Null
+    $missing.Add("LlamaIndex query/ingest scripts (ai/llamaindex)") | Out-Null
+}
+elseif ($llamaIndexMissingRequired.Count -gt 0) {
+    $stale.Add("LlamaIndex local layer present but required files are missing: $($llamaIndexMissingRequired -join ', ')") | Out-Null
+}
+elseif ($llamaIndexIndex -and $llamaIndexStatusActive) {
+    $active.Add("LlamaIndex local fallback retrieval (ai/llamaindex)") | Out-Null
+}
+else {
+    $stale.Add("LlamaIndex local layer present; run ai/llamaindex/scripts/run_smoke.ps1 to verify and update status") | Out-Null
+}
+
+$lightRagRoot = Join-Path $repoRoot "ai\lightrag"
+$lightRag = Test-Path -LiteralPath $lightRagRoot
+$lightRagRequiredFiles = @(
+    "ai/lightrag/README.md",
+    "ai/lightrag/data/manifest.json",
+    "ai/lightrag/scripts/ingest.py",
+    "ai/lightrag/scripts/query.py",
+    "ai/lightrag/scripts/acceptance.py",
+    "ai/lightrag/scripts/run_acceptance.ps1"
+)
+$lightRagMissingRequired = @(
+    $lightRagRequiredFiles |
+        Where-Object { -not (Test-Path -LiteralPath (Join-Path $repoRoot $_)) }
+)
+$lightRagGraph = Test-Path -LiteralPath (Join-Path $repoRoot "ai/lightrag/indexes/lightrag_graph/graph.json")
+$lightRagStatusActive = $false
+if (Test-Path -LiteralPath $statusFile) {
+    $lightRagStatusActive = Select-String -LiteralPath $statusFile -Pattern "Current status: ``active relationship fallback``" -Quiet
+}
+
+if (-not $lightRag) {
+    $missing.Add("LightRAG local layer (ai/lightrag)") | Out-Null
+    $missing.Add("LightRAG graph storage (ai/lightrag/indexes/lightrag_graph)") | Out-Null
+    $missing.Add("LightRAG query/ingest scripts (ai/lightrag)") | Out-Null
+}
+elseif ($lightRagMissingRequired.Count -gt 0) {
+    $stale.Add("LightRAG local layer present but required files are missing: $($lightRagMissingRequired -join ', ')") | Out-Null
+}
+elseif ($lightRagGraph -and $lightRagStatusActive) {
+    $active.Add("LightRAG relationship fallback retrieval (ai/lightrag)") | Out-Null
+}
+else {
+    $stale.Add("LightRAG local layer present; run ai/lightrag/scripts/run_acceptance.ps1 to verify and update status") | Out-Null
+}
 
 $historicalWorkflowScripts = @(
     "scripts/dev_brain.py",
@@ -133,14 +196,20 @@ else {
     $retrievalStatus += "LangGraph gate incomplete"
 }
 
-if ($llamaIndex) {
+if ($llamaIndex -and $llamaIndexIndex -and $llamaIndexStatusActive) {
+    $retrievalStatus += "LlamaIndex active local fallback"
+}
+elseif ($llamaIndex) {
     $retrievalStatus += "LlamaIndex present, needs verification"
 }
 else {
     $retrievalStatus += "LlamaIndex missing"
 }
 
-if ($lightRag -and $lightRagGraph) {
+if ($lightRag -and $lightRagGraph -and $lightRagStatusActive) {
+    $retrievalStatus += "LightRAG active relationship fallback"
+}
+elseif ($lightRag -and $lightRagGraph) {
     $retrievalStatus += "LightRAG graph present, needs verification"
 }
 elseif ($lightRag) {
@@ -151,7 +220,13 @@ else {
 }
 
 $unifiedBrainStatus = "not active"
-if ($llamaIndex -or ($lightRag -and $lightRagGraph)) {
+if ($llamaIndex -and $llamaIndexIndex -and $llamaIndexStatusActive -and $lightRag -and $lightRagGraph -and $lightRagStatusActive) {
+    $unifiedBrainStatus = "portable retrieval layers active; still not a production autonomous brain"
+}
+elseif ($llamaIndex -and $llamaIndexIndex -and $llamaIndexStatusActive -and -not ($lightRag -and $lightRagGraph)) {
+    $unifiedBrainStatus = "partial retrieval active; LightRAG missing"
+}
+elseif ($llamaIndex -or ($lightRag -and $lightRagGraph)) {
     $unifiedBrainStatus = "needs verification"
 }
 

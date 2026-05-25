@@ -20,8 +20,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 | --- | --- | --- |
 | LangGraph gate | active | `Test-Path ai/langgraph/scripts/run_agent_gate.ps1` and run through the launcher. |
 | AI Factory dossiers/logs | active file-backed | Check `.ai-factory/dossiers`, `.ai-factory/logs`, `.ai-factory/patches`. |
-| LlamaIndex | missing unless verified | Do not assume active unless `ai/llamaindex` and index/query commands exist. |
-| LightRAG | missing unless verified | Do not assume active unless graph storage and query commands exist. |
+| LlamaIndex | active local fallback | `ai/llamaindex` exists; smoke passed without external API; generated storage remains gitignored. |
+| LightRAG | active relationship fallback | `ai/lightrag` exists; relationship graph acceptance passed; generated graph storage remains gitignored. |
 
 ## Active / Documented / Dormant / Missing Status
 
@@ -30,36 +30,44 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 | `agent_gate.py` | active | Use only for gate and gate-known-root-cause modes. |
 | `run_agent_gate.ps1` | active | Preferred launcher; do not call bare `python` for the gate. |
 | Historical `dev_brain.py` workflows | dormant | Do not run unless restored and verified. |
-| LlamaIndex docs/references | documented | Not an active retrieval source without local index evidence. |
+| LlamaIndex portable retrieval | active local fallback | Uses `ai/llamaindex` scripts; no-key smoke passed; generated storage is gitignored. |
 | LightRAG evidence log | active evidence | Historical readiness/evaluation record, not proof of active graph storage. |
-| LightRAG graph/query path | missing unless verified | Must be proven by filesystem checks and query command before use. |
+| LightRAG relationship graph | active relationship fallback | Uses `ai/lightrag` scripts; acceptance passed; generated graph storage is gitignored. |
 
 ## LlamaIndex Status
 
-- Current status: `missing unless verified`.
+- Current status: `active local fallback`.
 - Required checks:
   - `Test-Path ai/llamaindex`
-  - index storage exists
-  - query command exists and runs locally
-  - last indexed commit is recorded below
-- Last indexed commit: `TBD`
-- Last verification date: `TBD`
-- Acceptance result: `not accepted in this checkout`
+  - `Test-Path ai/llamaindex/scripts/query.py`
+  - `Test-Path ai/llamaindex/scripts/ingest.py`
+  - `Test-Path ai/llamaindex/storage/devbrain_index.json`
+  - `./ai/llamaindex/scripts/run_smoke.ps1`
+- Last indexed commit: `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc`
+- Last verification date: `2026-05-25T17:31:50+00:00`
+- Indexed document count: `1501`
+- Acceptance result: `simple locate smoke passed in no-key fallback mode`
+- Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
+- Smoke result: `frontend/src/api/runtime.js`
 
 ## LightRAG Status
 
-- Current status: `missing unless verified`.
+- Current status: `active relationship fallback`.
 - Evidence file: `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md`.
-- The evidence file is a readiness/regression log, not itself graph storage.
+- Relationship graph storage: `ai/lightrag/indexes/lightrag_graph/graph.json` (gitignored).
 - Required checks:
   - `Test-Path ai/lightrag`
-  - graph storage exists
-  - ingest manifest exists
-  - query command exists and runs locally
-  - last indexed commit is recorded below
-- Last indexed commit: `TBD`
-- Last verification date: `TBD`
-- Acceptance result: `not accepted as unified brain in this checkout`
+  - `Test-Path ai/lightrag/scripts/query.py`
+  - `Test-Path ai/lightrag/scripts/ingest.py`
+  - `Test-Path ai/lightrag/indexes/lightrag_graph/graph.json`
+  - `./ai/lightrag/scripts/run_acceptance.ps1`
+- Last indexed commit: `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc`
+- Last verification date: `2026-05-25T17:42:04+00:00`
+- Indexed document count: `1499`
+- Relationship concept count: `9`
+- Relationship edge count: `4658`
+- Acceptance result: `simple locate, Telegram mixed-contract, registrar payment/status persistence, Alembic migration, notification anti-noise, and queue identity scenarios passed`
+- Provider mode: `no-key fallback; DeepSeek bridge optional when DEEPSEEK_API_KEY is set`
 
 ## Acceptance Gates
 
@@ -67,21 +75,40 @@ LightRAG or LlamaIndex may be treated as active project retrieval only after all
 
 1. `simple locate`
    - Expected: reliably finds canonical files for a narrow known task.
-   - Status: `TBD`.
+   - Status: `passed via LightRAG acceptance`.
 2. `Telegram mixed-contract`
    - Expected: separates Bot API/UX/webhook work from token storage, security, and migration ownership.
-   - Status: `TBD`.
+   - Status: `passed via LightRAG acceptance`.
 3. `registrar payment/status persistence ownership`
    - Expected: maps frontend table/status symptoms to backend service, persistence, API DTO/read model, frontend adapter, and validation targets.
-   - Status: `TBD`.
+   - Status: `passed via LightRAG acceptance`.
+4. `Alembic migration ownership`
+   - Expected: maps SQLAlchemy/table gaps to new Alembic revision ownership and migration validation.
+   - Status: `passed via LightRAG acceptance`.
+5. `notification catalog anti-noise ownership`
+   - Expected: maps notification preferences, mute, snooze, and DND work to catalog/settings/runtime policy ownership.
+   - Status: `passed via LightRAG acceptance`.
+6. `queue identity/fairness ownership`
+   - Expected: maps queue specialist/doctor identity work to backend queue/service ownership and validation.
+   - Status: `passed via LightRAG acceptance`.
+
+## How To Verify Guardrail Behavior
+
+Use the local guardrail acceptance checker before changing DevBrain routing rules:
+
+```powershell
+.\scripts\devbrain_acceptance.ps1
+```
+
+The checker is read-only. It runs `ai/langgraph/scripts/run_agent_gate.ps1` against critical routing scenarios and prints `PASS`, `WARN`, or `FAIL` per scenario. It does not require LlamaIndex or LightRAG, does not run product tests, and exits non-zero only when a core guardrail expectation is clearly violated.
 
 ## Last Indexed Commit Placeholders
 
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `TBD` | `TBD` | Missing unless verified. |
-| LightRAG | `TBD` | `TBD` | Missing unless verified. |
+| LlamaIndex | `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc` | `2026-05-25T17:31:50+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `c43a25dc08f0d76b2d0c55daa112b36cfa90efbc` | `2026-05-25T17:41:16+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
