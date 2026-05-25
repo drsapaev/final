@@ -19,5 +19,6 @@ if (-not (Test-Path -LiteralPath $gateScript)) {
     throw "agent_gate.py not found next to this launcher: $gateScript"
 }
 
-& $pythonLauncher $gateScript @GateArgs
+$pythonArgs = @($gateScript) + $GateArgs
+& $pythonLauncher -PythonArgs $pythonArgs
 exit $LASTEXITCODE
