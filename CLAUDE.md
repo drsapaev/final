@@ -65,6 +65,7 @@ cd C:\final\ai\langgraph
 
 Use `scripts\run_agent_gate.ps1` instead of bare `python` or `py`; it validates Python 3.11+ and falls back around broken `.venv`/PATH launcher state.
 For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1` over bare `python` or `py`.
+For backend pytest in this Windows checkout, prefer `C:\final\scripts\run_backend_pytest.ps1 <tests...>`.
 
 **Gate Rules:**
 - Execute only inside `First-touch files` from gate output
