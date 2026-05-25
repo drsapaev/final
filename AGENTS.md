@@ -18,6 +18,7 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 
 - Use `docs/devbrain/PROJECT_MEMORY.md` as the compact canonical memory anchor for project-wide ownership decisions, failure patterns, and strict domain guardrails.
 - Use `docs/devbrain/DEVBRAIN_STATUS.md` to verify which DevBrain layers are active, documented, dormant, or missing in the current checkout.
+- For durable memory routing, follow `docs/devbrain/MEMORY_ROUTING.md`.
 - Before graph-heavy, risky, or ownership-sensitive work, consult both files together with the current filesystem state.
 - Do not assume LlamaIndex or LightRAG are active unless `DEVBRAIN_STATUS.md` and filesystem checks confirm the required directories, storage, commands, and indexed commit evidence.
 - Keep `AGENTS.md` short and operational; move durable history, ownership notes, and retrieval status details into the DevBrain docs instead of expanding this file into a full history dump.

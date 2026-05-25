@@ -67,6 +67,16 @@ If no user-facing panel or frontend data flow changed, replace this section with
 - Migration/docs/test impact:
 - Rollback note:
 
+## DevBrain Memory Impact
+
+- [ ] no durable memory update needed
+- [ ] PROJECT_MEMORY updated
+- [ ] DEVBRAIN_STATUS updated
+- [ ] AI Factory dossier/log/patch updated
+- [ ] agent_gate routing rule updated
+- [ ] indexes/artifacts refreshed locally
+- [ ] regression matrix run
+
 ## Validation
 
 - Targeted tests or smoke run:

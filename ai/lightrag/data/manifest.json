@@ -5,6 +5,7 @@
     {"path": "AGENTS.md", "type": "file", "label": "repo operating rules"},
     {"path": "docs/devbrain/PROJECT_MEMORY.md", "type": "file", "label": "canonical project memory"},
     {"path": "docs/devbrain/DEVBRAIN_STATUS.md", "type": "file", "label": "DevBrain status"},
+    {"path": "docs/devbrain/MEMORY_ROUTING.md", "type": "file", "label": "DevBrain memory routing"},
     {"path": ".ai-factory/DESCRIPTION.md", "type": "file", "label": "AI Factory description"},
     {"path": ".ai-factory/ARCHITECTURE.md", "type": "file", "label": "AI Factory architecture"},
     {"path": ".ai-factory/RULES.md", "type": "file", "label": "AI Factory rules"},

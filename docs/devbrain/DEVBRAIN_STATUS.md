@@ -54,9 +54,9 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `74ccec23cfb5397ec3a06771a576868ae6b9c720`
-- Last verification date: `2026-05-25T19:42:47+00:00`
-- Indexed document count: `1501`
+- Last indexed commit: `33add307554f11ab4ca3087ca9cd8476da5d0b7f`
+- Last verification date: `2026-05-25T20:08:12+00:00`
+- Indexed document count: `1502`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
 - Smoke result: `frontend/src/api/runtime.js`
@@ -76,11 +76,11 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `./ai/lightrag/scripts/run_artifacts.ps1`
   - `./ai/lightrag/scripts/run_artifact_check.ps1`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `74ccec23cfb5397ec3a06771a576868ae6b9c720`
-- Last verification date: `2026-05-25T19:44:03+00:00`
-- Indexed document count: `1499`
+- Last indexed commit: `33add307554f11ab4ca3087ca9cd8476da5d0b7f`
+- Last verification date: `2026-05-25T20:08:14+00:00`
+- Indexed document count: `1500`
 - Relationship concept count: `9`
-- Relationship edge count: `4658`
+- Relationship edge count: `4666`
 - Acceptance result: `simple locate, Telegram mixed-contract, registrar payment/status persistence, Alembic migration, notification anti-noise, and queue identity scenarios passed`
 - Provider mode: `no-key fallback; DeepSeek bridge optional when DEEPSEEK_API_KEY is set`
 
@@ -135,6 +135,16 @@ For generated LightRAG graph artifacts, run:
 
 This read-only checker validates `entities.jsonl`, `relationships.jsonl`, `vector_store.jsonl`, `doc_store.jsonl`, `graph_store.json`, and `metadata.json`. It fails when artifacts are missing, malformed, not gitignored, misaligned with `graph.json`, or stale against the current `HEAD`. Use `--warn-stale` only when stale artifacts are acceptable for exploratory local work.
 
+## How To Refresh DevBrain Memory
+
+Use the local refresh wrapper after durable memory, runbook, manifest, routing, or ownership-anchor changes:
+
+```powershell
+.\scripts\devbrain_refresh_memory.ps1
+```
+
+The wrapper runs LlamaIndex smoke, LightRAG acceptance, LightRAG artifact export/check, and the regression matrix when the corresponding scripts exist. Missing optional retrieval scripts are reported as `WARN`/`skip`; the regression matrix is the core command and must pass.
+
 Excellent DevBrain status requires:
 
 - inventory green
@@ -151,8 +161,8 @@ If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STAT
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `74ccec23cfb5397ec3a06771a576868ae6b9c720` | `2026-05-25T19:42:47+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `74ccec23cfb5397ec3a06771a576868ae6b9c720` | `2026-05-25T19:44:03+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `33add307554f11ab4ca3087ca9cd8476da5d0b7f` | `2026-05-25T20:08:12+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `33add307554f11ab4ca3087ca9cd8476da5d0b7f` | `2026-05-25T20:08:14+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
