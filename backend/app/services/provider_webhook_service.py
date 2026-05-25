@@ -225,6 +225,16 @@ class ProviderWebhookService:
                 )
                 if method == "CheckPerformTransaction":
                     return {"result": {"allow": True}, "id": request_id}
+                payment_id = getattr(existing_transaction, "payment_id", None)
+                payment_status = None
+                if method in {"PerformTransaction", "CancelTransaction"}:
+                    with transaction_ctx(self.db):
+                        payment_status = self._apply_existing_payme_transaction_state(
+                            existing_transaction,
+                            method=method,
+                            params=params,
+                        )
+                        payment_id = getattr(existing_transaction, "payment_id", None)
                 if method == "CreateTransaction":
                     return {
                         "result": {
@@ -233,8 +243,8 @@ class ProviderWebhookService:
                             "state": 1,
                         },
                         "id": request_id,
-                        "payment_id": getattr(existing_transaction, "payment_id", None),
-                        "payment_status": None,
+                        "payment_id": payment_id,
+                        "payment_status": payment_status,
                         "payment_provider": "payme",
                     }
                 if method == "PerformTransaction":
@@ -245,8 +255,8 @@ class ProviderWebhookService:
                             "state": 2,
                         },
                         "id": request_id,
-                        "payment_id": getattr(existing_transaction, "payment_id", None),
-                        "payment_status": None,
+                        "payment_id": payment_id,
+                        "payment_status": payment_status,
                         "payment_provider": "payme",
                     }
                 if method == "CancelTransaction":
@@ -257,15 +267,15 @@ class ProviderWebhookService:
                             "state": -1,
                         },
                         "id": request_id,
-                        "payment_id": getattr(existing_transaction, "payment_id", None),
-                        "payment_status": None,
+                        "payment_id": payment_id,
+                        "payment_status": payment_status,
                         "payment_provider": "payme",
                     }
                 return {
                     "result": {},
                     "id": request_id,
-                    "payment_id": getattr(existing_transaction, "payment_id", None),
-                    "payment_status": None,
+                    "payment_id": payment_id,
+                    "payment_status": payment_status,
                     "payment_provider": "payme",
                 }
 
@@ -408,6 +418,42 @@ class ProviderWebhookService:
                 "error": {"code": -32603, "message": f"Internal server error: {exc}"},
                 "id": request_id,
             }
+
+    def _apply_existing_payme_transaction_state(
+        self,
+        transaction: Any,
+        *,
+        method: str,
+        params: dict[str, Any],
+    ) -> str | None:
+        if method == "PerformTransaction":
+            provider_status = "completed"
+        elif method == "CancelTransaction":
+            provider_status = "cancelled" if params.get("reason") == 1 else "refunded"
+        else:
+            return None
+
+        payment_status = self._map_provider_status_to_payment_status(provider_status)
+        transaction.status = provider_status
+        transaction.provider_data = {
+            **(transaction.provider_data or {}),
+            "method": method,
+            "transaction_id": params.get("id"),
+            "params": params,
+        }
+
+        payment_id = getattr(transaction, "payment_id", None)
+        if payment_id:
+            payment = self.repository.get_payment_by_id(payment_id)
+            if payment:
+                payment.status = payment_status
+                if payment_status == "paid" and not payment.paid_at:
+                    payment.paid_at = datetime.utcnow()
+                payment.provider_data = {
+                    **(payment.provider_data or {}),
+                    **(transaction.provider_data or {}),
+                }
+        return payment_status
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Kaspi Pay платежной системы."""
