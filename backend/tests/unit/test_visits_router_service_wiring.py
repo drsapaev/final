@@ -93,6 +93,10 @@ def test_get_visit_endpoint_delegates_to_service(
                 "notes": "visit card",
                 "planned_date": None,
                 "source": "desk",
+                "patient_name": "Karimov Aziz",
+                "patient_fio": "Karimov Aziz",
+                "doctor_name": "Demo Cardiologist",
+                "room": "201",
             },
             "services": [
                 {
@@ -112,6 +116,8 @@ def test_get_visit_endpoint_delegates_to_service(
     payload = response.json()
     assert payload["visit"]["id"] == 42
     assert payload["visit"]["notes"] == "visit card"
+    assert payload["visit"]["patient_name"] == "Karimov Aziz"
+    assert payload["visit"]["doctor_name"] == "Demo Cardiologist"
     assert payload["services"][0]["name"] == "Consultation"
     assert captured["visit_id"] == 42
 
