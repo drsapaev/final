@@ -71,6 +71,44 @@ const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) => {
   return record.queue_entry_id ?? getFirstQueueNumberId(record) ?? record.id ?? null;
 };
 
+const getRemovedQueueEntryIds = (originalQueueIds, cartItems = []) => {
+  const currentQueueIds = new Set(
+    cartItems
+      .map((item) => item.original_queue_id)
+      .filter((id) => id)
+  );
+
+  return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
+};
+
+const cancelRemovedQueueEntries = async (originalQueueIds, cartItems, contextLabel) => {
+  const removedQueueIds = getRemovedQueueEntryIds(originalQueueIds, cartItems);
+  if (removedQueueIds.length === 0) {
+    logger.log(`[AppointmentWizardV2] no removed queue entries to cancel (${contextLabel})`);
+    return;
+  }
+
+  logger.log(`[AppointmentWizardV2] cancelling removed queue entries (${contextLabel}): ${removedQueueIds.join(', ')}`);
+  const results = await Promise.allSettled(
+    removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))
+  );
+  const failedIds = results
+    .map((result, index) => ({ result, id: removedQueueIds[index] }))
+    .filter(({ result }) => result.status === 'rejected')
+    .map(({ id }) => id);
+
+  if (failedIds.length > 0) {
+    logger.error('[AppointmentWizardV2] failed to cancel removed queue entries', {
+      contextLabel,
+      failedIds
+    });
+    toast.warning('Не удалось отменить часть удаленных записей очереди. Обновите очередь.');
+    return;
+  }
+
+  logger.log(`[AppointmentWizardV2] removed queue entries cancelled (${contextLabel})`);
+};
+
 const normalizeServiceSelectionValue = (serviceValue) => {
   if (serviceValue == null) return '';
 
@@ -2185,9 +2223,7 @@ const AppointmentWizardV2 = ({
 
             if (removedQueueIds.length > 0) {
               logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
-              // Non-blocking cleanup
-              Promise.all(removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))).
-              catch((e) => logger.error('❌ Ошибка отмены записей:', e));
+              await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'patient-update');
             }
 
             onComplete?.({ success: true, message: 'Данные пациента обновлены' });
@@ -2262,9 +2298,7 @@ const AppointmentWizardV2 = ({
 
         if (removedQueueIds.length > 0) {
           logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
-          // Non-blocking cleanup
-          Promise.all(removedQueueIds.map((id) => api.post(`/online-queue/entries/${id}/cancel`))).
-          catch((e) => logger.error('❌ Ошибка отмены записей:', e));
+          await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'cart-update');
         }
 
         onComplete?.(result);
