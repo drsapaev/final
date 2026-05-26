@@ -2217,6 +2217,7 @@ def full_update_online_entry(
                 visit = (
                     db.query(Visit)
                     .filter(
+                    Visit.id == entry.visit_id,
                     Visit.patient_id == patient_id_for_visit,
                         Visit.visit_date == visit_date,
                     )
@@ -2235,6 +2236,7 @@ def full_update_online_entry(
                 visit = (
                     db.query(Visit)
                     .filter(
+                    Visit.id == entry.visit_id,
                     Visit.patient_id == patient_id_for_visit,
                     Visit.visit_date == visit_date,
                         Visit.discount_mode == "all_free",
