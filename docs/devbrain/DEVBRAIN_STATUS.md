@@ -23,10 +23,11 @@ Operational status file for the repository's DevBrain layers. Agents must verify
 | LlamaIndex | active local fallback | `ai/llamaindex` exists; smoke passed without external API; generated storage remains gitignored. |
 | LightRAG | active relationship fallback | `ai/lightrag` exists; relationship graph acceptance passed; generated graph storage remains gitignored. |
 
-## Current Main Acceptance
+## Current Checkout Acceptance
 
-- Main merge commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
-- Retrieval layer commit: `13055c56eaba571cc86501cf3bdda65d8f160f9f`
+- Base main commit before this status refresh: `b7804330d2fb494aa608ea839bb59339cbaa2dfa`
+- Retrieval layer commit: `69e2d9e2e7da88835ce15ba71a42b67aed0d4ac2`
+- Merge handling: use a normal merge commit so the retrieval layer commit remains in main ancestry.
 - Inventory: `passed`
 - Guardrail acceptance: `pass: 5`, `warn: 0`, `fail: 0`
 - LlamaIndex: `active local fallback`
@@ -54,9 +55,9 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `0300371731a12113f97af93305710960e61fe076`
-- Last verification date: `2026-05-26T05:22:28+00:00`
-- Indexed document count: `1503`
+- Last indexed commit: `69e2d9e2e7da88835ce15ba71a42b67aed0d4ac2`
+- Last verification date: `2026-05-26T05:58:44+00:00`
+- Indexed document count: `1504`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
 - Smoke result: `frontend/src/api/runtime.js`
@@ -76,11 +77,11 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `./ai/lightrag/scripts/run_artifacts.ps1`
   - `./ai/lightrag/scripts/run_artifact_check.ps1`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `0300371731a12113f97af93305710960e61fe076`
-- Last verification date: `2026-05-26T05:22:30+00:00`
-- Indexed document count: `1501`
+- Last indexed commit: `69e2d9e2e7da88835ce15ba71a42b67aed0d4ac2`
+- Last verification date: `2026-05-26T05:58:47+00:00`
+- Indexed document count: `1502`
 - Relationship concept count: `9`
-- Relationship edge count: `4671`
+- Relationship edge count: `4679`
 - Acceptance result: `simple locate, Telegram mixed-contract, registrar payment/status persistence, Alembic migration, notification anti-noise, and queue identity scenarios passed`
 - Provider mode: `no-key fallback; DeepSeek bridge optional when DEEPSEEK_API_KEY is set`
 
@@ -161,8 +162,8 @@ If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STAT
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `0300371731a12113f97af93305710960e61fe076` | `2026-05-26T05:22:28+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `0300371731a12113f97af93305710960e61fe076` | `2026-05-26T05:22:30+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `69e2d9e2e7da88835ce15ba71a42b67aed0d4ac2` | `2026-05-26T05:58:44+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `69e2d9e2e7da88835ce15ba71a42b67aed0d4ac2` | `2026-05-26T05:58:47+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
