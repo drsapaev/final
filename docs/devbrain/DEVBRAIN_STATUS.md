@@ -54,9 +54,9 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `b816f94f01ca07048f7625ac1eeb484d575c541c`
-- Last verification date: `2026-05-25T20:09:43+00:00`
-- Indexed document count: `1502`
+- Last indexed commit: `83ccaa04be4547c41d78acf6869e6517fb262c4f`
+- Last verification date: `2026-05-26T04:33:35+00:00`
+- Indexed document count: `1503`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
 - Smoke result: `frontend/src/api/runtime.js`
@@ -76,11 +76,11 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `./ai/lightrag/scripts/run_artifacts.ps1`
   - `./ai/lightrag/scripts/run_artifact_check.ps1`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `b816f94f01ca07048f7625ac1eeb484d575c541c`
-- Last verification date: `2026-05-25T20:09:44+00:00`
-- Indexed document count: `1500`
+- Last indexed commit: `83ccaa04be4547c41d78acf6869e6517fb262c4f`
+- Last verification date: `2026-05-26T04:33:37+00:00`
+- Indexed document count: `1501`
 - Relationship concept count: `9`
-- Relationship edge count: `4666`
+- Relationship edge count: `4671`
 - Acceptance result: `simple locate, Telegram mixed-contract, registrar payment/status persistence, Alembic migration, notification anti-noise, and queue identity scenarios passed`
 - Provider mode: `no-key fallback; DeepSeek bridge optional when DEEPSEEK_API_KEY is set`
 
@@ -161,8 +161,8 @@ If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STAT
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `b816f94f01ca07048f7625ac1eeb484d575c541c` | `2026-05-25T20:09:43+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `b816f94f01ca07048f7625ac1eeb484d575c541c` | `2026-05-25T20:09:44+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `83ccaa04be4547c41d78acf6869e6517fb262c4f` | `2026-05-26T04:33:35+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `83ccaa04be4547c41d78acf6869e6517fb262c4f` | `2026-05-26T04:33:37+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
