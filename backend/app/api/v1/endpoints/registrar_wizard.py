@@ -2871,22 +2871,6 @@ def mark_queue_entry_as_paid(
             visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
             logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
         
-        # 2. Если visit_id нет, ищем по patient_id и дате
-        if not visit and entry.patient_id:
-            from datetime import date
-            today = date.today()
-            visit = (
-                db.query(Visit)
-                .filter(
-                    Visit.patient_id == entry.patient_id,
-                    Visit.visit_date == today,
-                )
-                .order_by(Visit.created_at.desc())
-                .first()
-            )
-            if visit:
-                logger.info(f"mark_queue_entry_as_paid: Найден Visit {visit.id} через patient_id и дату")
-
         requested_method = (
             str(payment_req.method).strip().lower()
             if payment_req and payment_req.method
