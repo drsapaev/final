@@ -14,6 +14,10 @@ Route memory to the narrowest durable layer that can use it.
 
 Do not put raw chat history into `AGENTS.md`. Convert it into a small fact, decision, failure pattern, runbook step, evidence log, or routing rule first.
 
+## Capture Template
+
+Use `docs/devbrain/MEMORY_CAPTURE_TEMPLATE.md` before promoting a chat observation, PR lesson, audit finding, or routing failure into durable DevBrain memory. The template forces the agent to name evidence, target layer, reindex need, validation command, and stop conditions before editing memory.
+
 ## Memory Targets
 
 ### `AGENTS.md`
@@ -176,6 +180,7 @@ Run the refresh wrapper after changes to:
 - `AGENTS.md`;
 - `docs/devbrain/PROJECT_MEMORY.md`;
 - `docs/devbrain/MEMORY_ROUTING.md`;
+- `docs/devbrain/MEMORY_CAPTURE_TEMPLATE.md`;
 - `docs/runbooks/*` used by agents;
 - `.ai-factory/*` logs/dossiers/patches that should be retrievable;
 - `ai/llamaindex/data/manifest.json`;
