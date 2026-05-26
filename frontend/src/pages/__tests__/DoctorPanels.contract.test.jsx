@@ -129,6 +129,22 @@ describe('Doctor panels SSOT contract', () => {
     expect(dermatology).toContain("handleTabChange('appointments')");
   });
 
+  it('keeps dermatology prescription availability backend-owned', () => {
+    const dermatology = read('pages/DermatologistPanelUnified.jsx');
+    const prescriptionSystem = read('components/PrescriptionSystem.jsx');
+
+    expect(dermatology).toContain('/appointments/${appointmentId}/status');
+    expect(dermatology).toContain('setCanCreatePrescription(statusData.can_create_prescription === true)');
+    expect(dermatology).toContain('canCreatePrescription={canCreatePrescription}');
+
+    expect(prescriptionSystem).toContain('canCreatePrescription');
+    expect(prescriptionSystem).toContain('const prescriptionEligible = canCreatePrescription === true');
+    expect(prescriptionSystem).toContain('const canEdit = prescriptionEligible');
+    expect(prescriptionSystem).not.toContain("from '../constants/appointmentStatus'");
+    expect(prescriptionSystem).not.toContain('canCreatePrescription(appointment?.status');
+    expect(prescriptionSystem).not.toContain('appointment?.status !== APPOINTMENT_STATUS.COMPLETED');
+  });
+
   it('keeps the active doctor queue page action visibility backend-owned', () => {
     const source = read('pages/DoctorPanel.jsx');
     const actionBlock = extractBlock(
