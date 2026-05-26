@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
 from app.models.appointment import Appointment
+from app.models.online_queue import OnlineQueueEntry
+from app.models.payment import Payment
+from app.models.visit import Visit
 
 
 @pytest.mark.integration
@@ -59,6 +62,68 @@ def test_registrar_record_action_rejects_doctor_mark_paid(
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_queue_mark_paid_without_visit_id_does_not_pay_unrelated_patient_visit(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_doctor,
+):
+    unrelated_visit = Visit(
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="12:00",
+        status="open",
+        discount_mode="none",
+        department="cardiology",
+        created_at=datetime.utcnow(),
+    )
+    entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=99,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=None,
+        source="online",
+        status="waiting",
+    )
+    db_session.add_all([unrelated_visit, entry])
+    db_session.commit()
+    db_session.refresh(unrelated_visit)
+    db_session.refresh(entry)
+
+    response = client.post(
+        "/api/v1/registrar/records/actions",
+        headers=registrar_auth_headers,
+        json={
+            "action": "mark_paid",
+            "record_kind": "online_queue",
+            "record_id": entry.id,
+            "method": "cash",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["results"][0]["payment_status"] == "paid"
+
+    db_session.refresh(entry)
+    db_session.refresh(unrelated_visit)
+    assert entry.discount_mode == "paid"
+    assert unrelated_visit.status == "open"
+    assert (
+        db_session.query(Payment)
+        .filter(Payment.visit_id == unrelated_visit.id)
+        .count()
+        == 0
+    )
 
 
 @pytest.mark.integration
