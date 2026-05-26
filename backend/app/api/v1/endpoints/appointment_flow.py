@@ -234,6 +234,7 @@ def create_or_update_emr(
     appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
         db,
         appointment_id,
+        allow_visit_fallback=False,
     )
 
     # Проверяем статус записи
@@ -340,6 +341,7 @@ def save_emr(
     appointment, visit_id, appointment_flow_api_service = _resolve_appointment_and_visit(
         db,
         appointment_id,
+        allow_visit_fallback=False,
     )
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
@@ -401,7 +403,11 @@ def create_or_update_prescription(
     Создать или обновить рецепт
     """
     _maybe_raise_legacy_write_freeze()
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        allow_visit_fallback=False,
+    )
 
     # Проверяем, что есть сохраненная EMR
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
@@ -465,7 +471,11 @@ def save_prescription(
     """
     Сохранить рецепт (перевести из черновика)
     """
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        allow_visit_fallback=False,
+    )
     prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
     if not prescription:
         prescription = crud_emr.prescription.get_by_appointment(
@@ -511,7 +521,11 @@ def complete_visit(
     Завершить прием (переход in_visit -> completed)
     """
     _maybe_raise_legacy_write_freeze()
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        allow_visit_fallback=False,
+    )
 
     # Проверяем, что прием активен
     if appointment.status != AppointmentStatus.IN_VISIT:
@@ -529,7 +543,7 @@ def complete_visit(
 
     # Завершаем прием
     completed_appointment = crud_appointment.complete_visit(
-        db, appointment_id=appointment_id
+        db, appointment_id=appointment.id
     )
     return completed_appointment
 
