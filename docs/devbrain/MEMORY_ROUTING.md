@@ -18,6 +18,14 @@ Do not put raw chat history into `AGENTS.md`. Convert it into a small fact, deci
 
 Use `docs/devbrain/MEMORY_CAPTURE_TEMPLATE.md` before promoting a chat observation, PR lesson, audit finding, or routing failure into durable DevBrain memory. The template forces the agent to name evidence, target layer, reindex need, validation command, and stop conditions before editing memory.
 
+For local note creation, use:
+
+```powershell
+.\scripts\devbrain_new_memory_note.ps1 -Target logs -Title "short memory note title"
+```
+
+Use `-Preview` to verify the target path without writing a note. The helper only creates a routed AI Factory note; it does not promote facts into `PROJECT_MEMORY.md`, update `agent_gate.py`, refresh indexes, or mark retrieval status fresh.
+
 ## Memory Targets
 
 ### `AGENTS.md`
