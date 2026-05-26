@@ -68,6 +68,28 @@ function notifyQueueUpdate(specialty, action = 'update') {
   window.dispatchEvent(event);
 }
 
+function hasBackendQueueAction(entry, action, flagName) {
+  if (!entry) return false;
+  if (Array.isArray(entry.available_actions)) {
+    return entry.available_actions.includes(action);
+  }
+  if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
+    return Boolean(entry[flagName]);
+  }
+  return false;
+}
+
+function selectNextCallEntry(queue) {
+  const entries = Array.isArray(queue?.entries) ? queue.entries : [];
+  const backendEntryId = queue?.next_call_entry_id;
+
+  if (backendEntryId !== undefined && backendEntryId !== null) {
+    return entries.find((entry) => entry.id === backendEntryId) || { id: backendEntryId };
+  }
+
+  return entries.find((entry) => hasBackendQueueAction(entry, 'call', 'can_call')) || null;
+}
+
 export const queueService = {
   // Очередь врача на сегодня по специальности
   getTodayQueue: async (specialty) => {
@@ -106,11 +128,11 @@ export const queueService = {
   callNextWaiting: async (specialty) => {
     const queue = await apiRequest(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
     if (!queue?.entries?.length) return { success: false, message: 'Очередь пуста' };
-    const waiting = queue.entries.find((e) => e.status === 'waiting');
-    if (!waiting) return { success: false, message: 'Нет ожидающих пациентов' };
-    await apiRequest(`/doctor/queue/${waiting.id}/call`, { method: 'POST' });
+    const nextEntry = selectNextCallEntry(queue);
+    if (!nextEntry?.id) return { success: false, message: 'Нет ожидающих пациентов' };
+    await apiRequest(`/doctor/queue/${nextEntry.id}/call`, { method: 'POST' });
     // Уведомляем об обновлении
     notifyQueueUpdate(specialty, 'nextPatientCalled');
-    return { success: true, entry: waiting };
+    return { success: true, entry: nextEntry };
   }
 };
