@@ -551,6 +551,91 @@ class TestDoctorGeneralQueue:
         assert unrelated_visit.status == "open"
         assert appointment.status == "completed"
 
+    def test_complete_queue_entry_with_matching_appointment_persists_visit_and_appointment(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            id=9004,
+            queue_id=queue.id,
+            number=4,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="diagnostics",
+        )
+        appointment = Appointment(
+            id=9104,
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            appointment_date=date.today(),
+            appointment_time="13:00",
+            status="paid",
+            visit_type="paid",
+            payment_type="cash",
+            services=["consultation"],
+        )
+        db_session.add_all([entry, appointment])
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/complete",
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["entry_id"] == entry.id
+        assert payload["status"] == "completed"
+
+        db_session.refresh(entry)
+        db_session.refresh(appointment)
+        visit = (
+            db_session.query(Visit)
+            .filter(
+                Visit.patient_id == test_patient.id,
+                Visit.doctor_id == doctor.id,
+                Visit.visit_date == date.today(),
+            )
+            .one()
+        )
+
+        assert entry.status == "served"
+        assert visit.status == "completed"
+        assert appointment.status == "completed"
+
     def test_cardiologist_role_can_complete_queue_entry(
         self,
         client,
