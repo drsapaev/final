@@ -275,6 +275,7 @@ const DermatologistPanelUnified = () => {
   const [currentAppointment, setCurrentAppointment] = useState(null);
   const [emr, setEmr] = useState(null);
   const [prescription, setPrescription] = useState(null);
+  const [canCreatePrescription, setCanCreatePrescription] = useState(false);
   const [doctorPrice, setDoctorPrice] = useState('');
 
   // Состояние для PriceOverrideManager
@@ -1027,10 +1028,12 @@ const DermatologistPanelUnified = () => {
     if (!appointmentId) {
       setEmr(null);
       setPrescription(null);
+      setCanCreatePrescription(false);
       return;
     }
 
     let isMounted = true;
+    setCanCreatePrescription(false);
 
     const loadCanonicalStatus = async () => {
       try {
@@ -1051,6 +1054,7 @@ const DermatologistPanelUnified = () => {
 
         setEmr(statusData.emr || null);
         setPrescription(statusData.prescription || null);
+        setCanCreatePrescription(statusData.can_create_prescription === true);
 
         const normalizedStatusVisitId = normalizeNumericId(statusData.visit_id);
         const normalizedCurrentVisitId = normalizeNumericId(currentAppointment?.visit_id);
@@ -1653,6 +1657,7 @@ const DermatologistPanelUnified = () => {
                   appointment={currentAppointment}
                   emr={emr}
                   prescription={prescription}
+                  canCreatePrescription={canCreatePrescription}
                   onSave={savePrescription}
                   onPrint={printPrescription} />
 
@@ -1886,6 +1891,7 @@ const DermatologistPanelUnified = () => {
                 appointment={currentAppointment}
                 emr={emr}
                 prescription={prescription}
+                canCreatePrescription={canCreatePrescription}
                 onSave={savePrescription} />
 
                 </MacOSCard>
