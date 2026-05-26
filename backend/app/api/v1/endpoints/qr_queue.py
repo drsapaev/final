@@ -2244,6 +2244,7 @@ def full_update_online_entry(
                         visit.id,
                     )
             
+            has_paid_invoice = False
             if visit:
                 # ✅ ИСПРАВЛЕНО: Обновляем существующий Visit (не создаем новый)
                 logger.info(
