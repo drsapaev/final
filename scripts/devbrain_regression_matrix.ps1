@@ -282,7 +282,15 @@ if ($llamaIndexActive) {
             -Layer "LlamaIndex" `
             -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
             -Query "How do I run the project locally with the clinic_dev PostgreSQL database?" `
-            -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "clinic_dev")
+            -ExpectedPatterns @("docs/runbooks/LOCAL_DEV_ONBOARDING\.md", "clinic_dev")
+    } -WarnOnly
+
+    Invoke-MatrixStep "LlamaIndex dev clinic launcher query" {
+        Invoke-QueryProbe `
+            -Layer "LlamaIndex" `
+            -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
+            -Query "start_dev_clinic check_dev_clinic stop_dev_clinic local dev launcher scripts" `
+            -ExpectedPatterns @("scripts/start_dev_clinic\.ps1", "scripts/check_dev_clinic\.ps1", "scripts/stop_dev_clinic\.ps1")
     } -WarnOnly
 
     Invoke-MatrixStep "LlamaIndex memory probe query" {
@@ -314,7 +322,7 @@ if ($lightRagActive) {
             -Layer "LightRAG" `
             -ScriptPath $lightRagQuery `
             -Query "run project locally with clinic_dev PostgreSQL dev database backend 18000 frontend 5173" `
-            -ExpectedPatterns @("local_dev_runtime_contour", "docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md")
+            -ExpectedPatterns @("local_dev_runtime_contour", "scripts/start_dev_clinic\.ps1", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md")
     } -WarnOnly
 
     Invoke-MatrixStep "LightRAG memory probe query" {

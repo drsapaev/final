@@ -57,13 +57,47 @@ python -m app.scripts.dev_seed --profile demo --confirm-dev-seed
 See `docs/dev/POSTGRES_DEV_DATABASE.md` and `docs/dev/DEMO_USERS.md`.
 
 ## 4. Start Services
-Backend:
+Use the checked local launcher for the normal clinic dev runtime:
+
+```powershell
+cd C:\final
+.\scripts\start_dev_clinic.ps1
+```
+
+Defaults:
+
+- backend: `http://localhost:18000`
+- frontend: `http://localhost:5173`
+- database: `clinic_dev`
+- logs: `%TEMP%\final-backend-dev.*.log` and `%TEMP%\final-frontend-dev.*.log`
+- PID state: `%TEMP%\final-dev-clinic.pids.json`
+
+The launcher does not edit `backend/.env`, reset the database, seed data, or run
+migrations. It derives the configured backend `DATABASE_URL`, overrides only the
+backend process environment to use `clinic_dev`, then validates backend health,
+frontend root, and frontend proxy health.
+
+Check the running dev services:
+
+```powershell
+cd C:\final
+.\scripts\check_dev_clinic.ps1
+```
+
+Stop launcher-owned dev services:
+
+```powershell
+cd C:\final
+.\scripts\stop_dev_clinic.ps1
+```
+
+Manual backend fallback:
 ```powershell
 cd c:\final\backend
 python run_server.py
 ```
 
-Frontend:
+Manual frontend fallback:
 ```powershell
 cd c:\final\frontend
 npm install

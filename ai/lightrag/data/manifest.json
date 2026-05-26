@@ -23,6 +23,9 @@
     {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
     {"path": "docs/dev/POSTGRES_DEV_DATABASE.md", "type": "file", "label": "PostgreSQL clinic_dev workflow"},
     {"path": "docs/dev/DEMO_USERS.md", "type": "file", "label": "local demo users"},
+    {"path": "scripts/start_dev_clinic.ps1", "type": "file", "label": "dev clinic launcher"},
+    {"path": "scripts/check_dev_clinic.ps1", "type": "file", "label": "dev clinic health checker"},
+    {"path": "scripts/stop_dev_clinic.ps1", "type": "file", "label": "dev clinic stopper"},
     {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
     {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},
     {"path": "backend/app/repositories", "type": "dir", "label": "backend repositories", "extensions": [".py"]},
@@ -60,10 +63,10 @@
     {
       "id": "local_dev_runtime_contour",
       "title": "local dev runtime and clinic_dev ownership",
-      "terms": ["local", "dev", "runtime", "clinic_dev", "postgres", "postgresql", "database_url", "backend", "frontend", "18000", "5173", "seed", "reset"],
-      "canonical_anchors": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md", "AGENTS.md"],
-      "first_touch": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md"],
-      "verification": ["scripts/devbrain_regression_matrix.ps1", "backend/tests/unit/test_dev_db_seed_guardrails.py"]
+      "terms": ["local", "dev", "runtime", "clinic_dev", "postgres", "postgresql", "database_url", "backend", "frontend", "18000", "5173", "start_dev_clinic", "check_dev_clinic", "stop_dev_clinic", "seed", "reset"],
+      "canonical_anchors": ["scripts/start_dev_clinic.ps1", "scripts/check_dev_clinic.ps1", "scripts/stop_dev_clinic.ps1", "docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md", "AGENTS.md"],
+      "first_touch": ["scripts/start_dev_clinic.ps1", "scripts/check_dev_clinic.ps1", "scripts/stop_dev_clinic.ps1", "docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md"],
+      "verification": ["scripts/check_dev_clinic.ps1", "scripts/devbrain_regression_matrix.ps1", "backend/tests/unit/test_dev_db_seed_guardrails.py"]
     },
     {
       "id": "runtime_origin_resolution",
