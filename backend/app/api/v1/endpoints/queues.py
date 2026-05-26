@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_roles
 from app.services.online_queue import DayStats, issue_next_ticket, load_stats
 
 router = APIRouter(tags=["queues"])
@@ -33,6 +33,7 @@ def next_ticket(
     d: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    _current_user=Depends(require_roles("Admin", "Registrar")),
 ):
     date_str = d or date
     if not date_str:
