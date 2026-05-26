@@ -175,52 +175,6 @@ const EnhancedAppointmentsTable = ({
     return SESSION_COLORS[Math.abs(hash) % SESSION_COLORS.length];
   }, []);
 
-  // ⭐ SSOT: Presentation-Only Grouping (1 patient = 1 visual row)
-  // This does NOT modify data - only groups for rendering
-  // All original entries are preserved in group.rows[]
-  void useMemo(() => {
-    if (!Array.isArray(data) || data.length === 0) return [];
-
-    const map = new Map();
-
-    data.forEach((entry) => {
-      const patientId = entry.patient_id || entry.id;
-
-      if (!map.has(patientId)) {
-        map.set(patientId, {
-          patient_id: patientId,
-          patient_fio: entry.patient_fio || entry.patient_name || 'Неизвестный пациент',
-          patient_phone: entry.patient_phone || entry.phone || '',
-          patient_birth_year: entry.patient_birth_year,
-          address: entry.address || '',
-          rows: [] // Original SSOT entries
-        });
-      }
-
-      // Push ORIGINAL entry (no modification)
-      map.get(patientId).rows.push(entry);
-    });
-
-    // Sort rows within each group by queue_time
-    const grouped = Array.from(map.values());
-    grouped.forEach((group) => {
-      group.rows.sort((a, b) => {
-        const timeA = a.queue_time ? new Date(a.queue_time).getTime() : 0;
-        const timeB = b.queue_time ? new Date(b.queue_time).getTime() : 0;
-        return timeA - timeB;
-      });
-
-      // Compute display values (presentation only)
-      group.status = group.rows[0]?.status || 'waiting';
-      group.cost = group.rows.reduce((sum, r) => sum + (r.cost || 0), 0);
-      group.payment_status = group.rows.every((r) => r.payment_status === 'paid') ? 'paid' : 'pending';
-      group.visit_type = group.rows[0]?.visit_type || 'paid';
-      group.entry_ids = group.rows.map((r) => r.id);
-    });
-
-    return grouped;
-  }, [data]);
-
   // ⭐ SSOT: Display helper for services with queue numbers
   // Format: "K01 (1), D01 (2), L10 (3)"
   void useCallback((rows) => {
