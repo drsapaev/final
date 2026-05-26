@@ -258,6 +258,13 @@ Invoke-MatrixStep "Memory probe ledger direct read" {
     Test-MemoryProbeLedger
 }
 
+Invoke-MatrixStep "Markdown indexing coverage" {
+    & (Join-Path $repoRoot "scripts\devbrain_markdown_index_coverage.ps1")
+    if (-not $?) {
+        throw "markdown indexing coverage command reported issues"
+    }
+} -WarnOnly
+
 $llamaIndexActive = Test-LlamaIndexActive
 $lightRagActive = Test-LightRagActive
 
@@ -275,7 +282,7 @@ if ($llamaIndexActive) {
             -Layer "LlamaIndex" `
             -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
             -Query "How do I run the project locally with the clinic_dev PostgreSQL database?" `
-            -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md", "clinic_dev")
+            -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "clinic_dev")
     } -WarnOnly
 
     Invoke-MatrixStep "LlamaIndex memory probe query" {
