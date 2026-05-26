@@ -637,9 +637,6 @@ const DermatologistPanelUnified = () => {
 
           if (response.ok) {
             logger.info('[Dermatology] Пациент вызван:', row.patient_fio);
-            setAppointments((prev) => prev.map((a) =>
-            a.id === row.id ? { ...a, status: 'called' } : a
-            ));
             await loadDermatologyAppointments();
           }
         } catch (error) {
