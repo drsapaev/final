@@ -116,6 +116,23 @@ function Invoke-QueryProbe {
     }
 }
 
+function Test-MemoryProbeLedger {
+    $ledger = Join-Path $repoRoot ".ai-factory\logs\memory-probes.md"
+    $expected = "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow."
+
+    if (-not (Test-Path -LiteralPath $ledger)) {
+        throw "memory probe ledger not found: $ledger"
+    }
+
+    $text = Get-Content -Raw -LiteralPath $ledger
+    if ($text -notmatch [regex]::Escape($expected)) {
+        throw "active memory probe control fact not found in ledger"
+    }
+
+    Write-Output "Active memory probe: `"$expected`""
+    Write-Output "Stored in: .ai-factory/logs/memory-probes.md"
+}
+
 function Get-RecordedIndexedCommits {
     if (-not (Test-Path -LiteralPath $statusFile)) {
         throw "DevBrain status file not found: $statusFile"
@@ -237,6 +254,10 @@ Invoke-MatrixStep "Guardrail acceptance" {
     }
 }
 
+Invoke-MatrixStep "Memory probe ledger direct read" {
+    Test-MemoryProbeLedger
+}
+
 $llamaIndexActive = Test-LlamaIndexActive
 $lightRagActive = Test-LightRagActive
 
@@ -262,7 +283,7 @@ if ($llamaIndexActive) {
             -Layer "LlamaIndex" `
             -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
             -Query "What is the active memory probe control fact?" `
-            -ExpectedPatterns @("\.ai-factory/logs/memory-probes\.md", "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow")
+            -ExpectedPatterns @("docs/devbrain/MEMORY_PROBE_PROTOCOL\.md", "\.ai-factory/logs/memory-probes\.md")
     } -WarnOnly
 }
 else {
@@ -294,7 +315,7 @@ if ($lightRagActive) {
             -Layer "LightRAG" `
             -ScriptPath $lightRagQuery `
             -Query "active memory probe control fact memory-probes" `
-            -ExpectedPatterns @("memory_probe_protocol", "\.ai-factory/logs/memory-probes\.md", "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow")
+            -ExpectedPatterns @("memory_probe_protocol", "\.ai-factory/logs/memory-probes\.md")
     } -WarnOnly
 
     Invoke-MatrixStep "LightRAG registrar ownership query" {
