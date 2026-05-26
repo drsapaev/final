@@ -256,6 +256,14 @@ if ($llamaIndexActive) {
             -Query "How do I run the project locally with the clinic_dev PostgreSQL database?" `
             -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md", "clinic_dev")
     } -WarnOnly
+
+    Invoke-MatrixStep "LlamaIndex memory probe query" {
+        Invoke-QueryProbe `
+            -Layer "LlamaIndex" `
+            -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
+            -Query "What is the active memory probe control fact?" `
+            -ExpectedPatterns @("\.ai-factory/logs/memory-probes\.md", "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow")
+    } -WarnOnly
 }
 else {
     Write-Section "LlamaIndex simple locate query"
@@ -279,6 +287,14 @@ if ($lightRagActive) {
             -ScriptPath $lightRagQuery `
             -Query "run project locally with clinic_dev PostgreSQL dev database backend 18000 frontend 5173" `
             -ExpectedPatterns @("local_dev_runtime_contour", "docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md")
+    } -WarnOnly
+
+    Invoke-MatrixStep "LightRAG memory probe query" {
+        Invoke-QueryProbe `
+            -Layer "LightRAG" `
+            -ScriptPath $lightRagQuery `
+            -Query "active memory probe control fact memory-probes" `
+            -ExpectedPatterns @("memory_probe_protocol", "\.ai-factory/logs/memory-probes\.md", "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow")
     } -WarnOnly
 
     Invoke-MatrixStep "LightRAG registrar ownership query" {
