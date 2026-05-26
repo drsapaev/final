@@ -28,6 +28,11 @@ For local note creation, use:
 
 Use `-Preview` to verify the target path without writing a note. The helper only creates a routed AI Factory note; it does not promote facts into `PROJECT_MEMORY.md`, update `agent_gate.py`, refresh indexes, or mark retrieval status fresh.
 
+For intentional memory-health canaries, use
+`docs/devbrain/MEMORY_PROBE_PROTOCOL.md`. Memory probe entries belong in
+`.ai-factory/logs/memory-probes.md` unless a repeated lesson from the probe must
+be promoted through the normal routing table.
+
 ## Memory Targets
 
 ### `AGENTS.md`

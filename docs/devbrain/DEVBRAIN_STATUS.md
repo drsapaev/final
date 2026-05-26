@@ -55,8 +55,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `Test-Path ai/llamaindex/scripts/ingest.py`
   - `Test-Path ai/llamaindex/storage/devbrain_index.json`
   - `./ai/llamaindex/scripts/run_smoke.ps1`
-- Last indexed commit: `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3`
-- Last verification date: `2026-05-26T16:11:23+00:00`
+- Last indexed commit: `fd1423a1b5a55096b2bed3f8ec4e88e3c55b46f9`
+- Last verification date: `2026-05-26T17:03:26+00:00`
 - Indexed document count: `1509`
 - Acceptance result: `simple locate smoke passed in no-key fallback mode`
 - Smoke query: `Where is runtime API/WS origin resolution implemented on the frontend?`
@@ -77,8 +77,8 @@ Operational status file for the repository's DevBrain layers. Agents must verify
   - `./ai/lightrag/scripts/run_artifacts.ps1`
   - `./ai/lightrag/scripts/run_artifact_check.ps1`
   - `./ai/lightrag/scripts/run_acceptance.ps1`
-- Last indexed commit: `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3`
-- Last verification date: `2026-05-26T16:11:25+00:00`
+- Last indexed commit: `fd1423a1b5a55096b2bed3f8ec4e88e3c55b46f9`
+- Last verification date: `2026-05-26T17:03:28+00:00`
 - Indexed document count: `1507`
 - Relationship concept count: `10`
 - Relationship edge count: `6213`
@@ -162,8 +162,8 @@ If the indexed commit is behind `HEAD` only because `docs/devbrain/DEVBRAIN_STAT
 | Retrieval layer | Last indexed commit | Last verified by | Notes |
 | --- | --- | --- | --- |
 | AI Factory file memory | `file-backed; no index` | `TBD` | Update relevant logs/dossiers manually. |
-| LlamaIndex | `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3` | `2026-05-26T16:11:23+00:00` | Active local fallback; smoke passed without external API. |
-| LightRAG | `10dc91c19c6a6536157c6b4ce9f102dbf86fe9b3` | `2026-05-26T16:11:25+00:00` | Active relationship fallback; acceptance passed without external API. |
+| LlamaIndex | `fd1423a1b5a55096b2bed3f8ec4e88e3c55b46f9` | `2026-05-26T17:03:26+00:00` | Active local fallback; smoke passed without external API. |
+| LightRAG | `fd1423a1b5a55096b2bed3f8ec4e88e3c55b46f9` | `2026-05-26T17:03:28+00:00` | Active relationship fallback; acceptance passed without external API. |
 
 ## Known Limitations
 
