@@ -1067,7 +1067,7 @@ const EnhancedAppointmentsTable = ({
           }
         }
         // Fallback: используем общий статус записи только если queue_numbers отсутствует
-        queueStatus = queueStatus || row.status || 'waiting';
+        queueStatus = queueStatus || row.status || null;
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
@@ -1092,10 +1092,16 @@ const EnhancedAppointmentsTable = ({
             icon: '❌',
             text: 'Не явился',
             pulse: false
+          },
+          unknown: {
+            bg: 'var(--mac-text-secondary, #8e8e93)',
+            icon: '?',
+            text: 'Неизвестно',
+            pulse: false
           }
         };
 
-        const config = statusConfig[queueStatus] || statusConfig.waiting;
+        const config = statusConfig[queueStatus] || statusConfig.unknown;
 
         return (
           <span
@@ -1121,7 +1127,7 @@ const EnhancedAppointmentsTable = ({
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
       if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
         const firstQueue = row.queue_numbers[0];
-        const queueStatus = firstQueue.status || row.status || 'waiting';
+        const queueStatus = firstQueue.status || row.status || null;
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
@@ -1146,10 +1152,16 @@ const EnhancedAppointmentsTable = ({
             icon: '❌',
             text: 'Не явился',
             pulse: false
+          },
+          unknown: {
+            bg: 'var(--mac-text-secondary, #8e8e93)',
+            icon: '?',
+            text: 'Неизвестно',
+            pulse: false
           }
         };
 
-        const config = statusConfig[queueStatus] || statusConfig.waiting;
+        const config = statusConfig[queueStatus] || statusConfig.unknown;
 
         return (
           <span
