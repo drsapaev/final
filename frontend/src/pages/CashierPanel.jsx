@@ -200,16 +200,31 @@ const buildReceiptPrintPayload = (paymentRow) => {
 };
 
 const getPaymentStatusMeta = (status) => {
-  const normalizedStatus = String(status || 'pending').trim().toLowerCase();
+  const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
     paid: { variant: 'success', ariaLabel: 'Payment status: paid' },
     partial: { variant: 'info', ariaLabel: 'Payment status: partially paid' },
     cancelled: { variant: 'danger', ariaLabel: 'Payment status: cancelled' },
     refunded: { variant: 'danger', ariaLabel: 'Payment status: refunded' },
     pending: { variant: 'warning', ariaLabel: 'Payment status: pending' },
+    unknown: { variant: 'secondary', ariaLabel: 'Payment status: unknown' },
   };
 
-  return statusMap[normalizedStatus] || statusMap.pending;
+  return statusMap[normalizedStatus] || statusMap.unknown;
+};
+
+const getPaymentStatusLabel = (status) => {
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  const statusMap = {
+    paid: 'Оплачено',
+    partial: 'Частично',
+    cancelled: 'Отменён',
+    refunded: 'Возвращено',
+    pending: 'Ожидает',
+    unknown: 'Неизвестно',
+  };
+
+  return statusMap[normalizedStatus] || statusMap.unknown;
 };
 
 const getPaymentActionContext = (paymentRow) => {
@@ -1407,11 +1422,7 @@ const CashierPanel = () => {void
                                   variant={getPaymentStatusMeta(row.status).variant}
                                   role="status"
                                   aria-label={getPaymentStatusMeta(row.status).ariaLabel}>
-                                  {row.status === 'paid' ? 'Оплачено' :
-                          row.status === 'partial' ? 'Частично' :
-                          row.status === 'cancelled' ? 'Отменён' :
-                          row.status === 'refunded' ? 'Возвращено' :
-                          'Ожидает'}
+                                  {getPaymentStatusLabel(row.status)}
                                 </Badge>
                               </td>
                               <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
