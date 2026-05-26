@@ -2,6 +2,8 @@
 
 This file is the routing table for durable project memory. It keeps DevBrain useful as project memory, retrieval, routing, guardrails, and evidence without turning every observation into global policy.
 
+For component responsibilities and boundaries, use `docs/devbrain/DEV_BRAIN_ROLE_MAP.md`.
+
 ## Core Rule
 
 Route memory to the narrowest durable layer that can use it.
