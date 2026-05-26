@@ -17,9 +17,12 @@
     {"path": "docs/runbooks/AGENT_CYCLIC_WORKFLOW.md", "type": "file", "label": "cyclic agent workflow"},
     {"path": "docs/runbooks/CODEX_SUPERPOWERS_GUARD.md", "type": "file", "label": "Codex Superpowers guard"},
     {"path": "docs/runbooks/PR_REVIEW_QUALITY_GATES.md", "type": "file", "label": "PR review quality gates"},
+    {"path": "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "type": "file", "label": "local dev onboarding and runtime contour"},
     {"path": "docs/runbooks/LOCAL_ONLY_EXTERNAL_SERVICES_POLICY.md", "type": "file", "label": "local-only external services policy"},
     {"path": "docs/runbooks/MESSAGING_CONTRACT.md", "type": "file", "label": "messaging contract"},
     {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
+    {"path": "docs/dev/POSTGRES_DEV_DATABASE.md", "type": "file", "label": "PostgreSQL clinic_dev workflow"},
+    {"path": "docs/dev/DEMO_USERS.md", "type": "file", "label": "local demo users"},
 
     {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
     {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},

@@ -248,6 +248,14 @@ if ($llamaIndexActive) {
             -Query "Where is runtime API/WS origin resolution implemented on the frontend?" `
             -ExpectedPatterns @("frontend/src/api/runtime\.js", "frontend/src/api/ws\.js")
     } -WarnOnly
+
+    Invoke-MatrixStep "LlamaIndex local dev runtime query" {
+        Invoke-QueryProbe `
+            -Layer "LlamaIndex" `
+            -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
+            -Query "How do I run the project locally with the clinic_dev PostgreSQL database?" `
+            -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md", "clinic_dev")
+    } -WarnOnly
 }
 else {
     Write-Section "LlamaIndex simple locate query"
@@ -263,6 +271,14 @@ if ($lightRagActive) {
         if (-not $?) {
             throw "LightRAG artifact check command failed"
         }
+    } -WarnOnly
+
+    Invoke-MatrixStep "LightRAG local dev runtime query" {
+        Invoke-QueryProbe `
+            -Layer "LightRAG" `
+            -ScriptPath $lightRagQuery `
+            -Query "run project locally with clinic_dev PostgreSQL dev database backend 18000 frontend 5173" `
+            -ExpectedPatterns @("local_dev_runtime_contour", "docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md")
     } -WarnOnly
 
     Invoke-MatrixStep "LightRAG registrar ownership query" {
