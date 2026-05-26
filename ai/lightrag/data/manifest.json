@@ -15,8 +15,11 @@
     {"path": ".ai-factory/ROADMAP.md", "type": "file", "label": "AI Factory roadmap"},
     {"path": "docs/runbooks/AGENT_CYCLIC_WORKFLOW.md", "type": "file", "label": "cyclic agent workflow"},
     {"path": "docs/runbooks/CODEX_SUPERPOWERS_GUARD.md", "type": "file", "label": "Codex Superpowers guard"},
+    {"path": "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "type": "file", "label": "local dev onboarding and runtime contour"},
     {"path": "docs/runbooks/MESSAGING_CONTRACT.md", "type": "file", "label": "messaging contract"},
     {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
+    {"path": "docs/dev/POSTGRES_DEV_DATABASE.md", "type": "file", "label": "PostgreSQL clinic_dev workflow"},
+    {"path": "docs/dev/DEMO_USERS.md", "type": "file", "label": "local demo users"},
     {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
     {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},
     {"path": "backend/app/repositories", "type": "dir", "label": "backend repositories", "extensions": [".py"]},
@@ -35,6 +38,14 @@
     {"path": "frontend/src/utils", "type": "dir", "label": "frontend utils", "extensions": [".js", ".jsx", ".ts", ".tsx"]}
   ],
   "priority_focus_sources": [
+    {
+      "id": "local_dev_runtime_contour",
+      "title": "local dev runtime and clinic_dev ownership",
+      "terms": ["local", "dev", "runtime", "clinic_dev", "postgres", "postgresql", "database_url", "backend", "frontend", "18000", "5173", "seed", "reset"],
+      "canonical_anchors": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md", "AGENTS.md"],
+      "first_touch": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md"],
+      "verification": ["scripts/devbrain_regression_matrix.ps1", "backend/tests/unit/test_dev_db_seed_guardrails.py"]
+    },
     {
       "id": "runtime_origin_resolution",
       "title": "frontend runtime API/WS origin resolution",

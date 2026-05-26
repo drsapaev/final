@@ -14,6 +14,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 ## Known Ownership Chains
 
 - DB persistence: `SQLAlchemy model -> schema/table contract -> Alembic revision -> DB validation -> tests`.
+- Local dev runtime: `clinic_dev Postgres -> Alembic upgrade/reset/seed -> backend 18000 -> frontend 5173 -> browser smoke`.
 - Registrar payment/status: `backend service/persistence -> API DTO/read model -> frontend adapter/table -> print/payment UI`.
 - Queue identity/fairness: `profile/specialist/doctor mapping -> queue service ordering -> API contract -> frontend presentation`.
 - Notifications: `event catalog -> producer service -> user preference/anti-noise policy -> delivery adapter -> frontend consumer`.
@@ -37,6 +38,16 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - If the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use narrow override and report it.
 - Do not silently expand scope. Stop when the required file set exceeds the declared first-touch boundary.
 - Every PR needs evidence: local validation, `git diff --check`, PR scope/impact notes, and green GitHub checks when opened.
+
+## Local Dev Runtime Contour
+
+- Manual local UI/dev runs use PostgreSQL, not SQLite.
+- Use a disposable local database such as `clinic_dev` for local manual testing and browser QA.
+- Canonical local ports are backend `18000` and frontend `5173`.
+- Dev DB reset/seed belongs to the manual CLI tooling documented in `docs/dev/POSTGRES_DEV_DATABASE.md` and `docs/runbooks/LOCAL_DEV_ONBOARDING.md`.
+- Set `DATABASE_URL` explicitly to a PostgreSQL URL for `clinic_dev`; do not rely on fallback database behavior.
+- Dev reset/seed commands must keep safety confirmations such as `--confirm-dev-reset`, `--confirm-dev-seed`, and `--confirm-db-name clinic_dev`.
+- Local 2FA bypass flags are manual smoke-test aids only and must not be used in production-like environments.
 
 ## Migration / Alembic Ownership Rules
 
