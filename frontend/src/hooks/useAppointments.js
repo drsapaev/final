@@ -33,16 +33,21 @@ const buildAppointmentPayload = (appointmentData, doctors = []) => {
     (doctor) => doctor.id === Number(appointmentData.doctorId)
   );
 
-  return {
+  const payload = {
     patient_id: Number(appointmentData.patientId),
     doctor_id: Number(appointmentData.doctorId),
     department: selectedDoctor?.specialty || null,
     appointment_date: appointmentData.appointmentDate,
     appointment_time: appointmentData.appointmentTime,
     notes: appointmentData.reason?.trim() || appointmentData.notes?.trim() || '',
-    status: appointmentData.status || 'pending',
     services: [],
   };
+
+  if (appointmentData.status) {
+    payload.status = appointmentData.status;
+  }
+
+  return payload;
 };
 
 const useAppointments = (doctors = []) => {
