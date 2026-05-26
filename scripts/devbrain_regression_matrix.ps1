@@ -116,6 +116,23 @@ function Invoke-QueryProbe {
     }
 }
 
+function Test-MemoryProbeLedger {
+    $ledger = Join-Path $repoRoot ".ai-factory\logs\memory-probes.md"
+    $expected = "Memory probe protocol was created after PR #1332 optimized the PR Lifecycle Recommendation workflow."
+
+    if (-not (Test-Path -LiteralPath $ledger)) {
+        throw "memory probe ledger not found: $ledger"
+    }
+
+    $text = Get-Content -Raw -LiteralPath $ledger
+    if ($text -notmatch [regex]::Escape($expected)) {
+        throw "active memory probe control fact not found in ledger"
+    }
+
+    Write-Output "Active memory probe: `"$expected`""
+    Write-Output "Stored in: .ai-factory/logs/memory-probes.md"
+}
+
 function Get-RecordedIndexedCommits {
     if (-not (Test-Path -LiteralPath $statusFile)) {
         throw "DevBrain status file not found: $statusFile"
@@ -237,6 +254,17 @@ Invoke-MatrixStep "Guardrail acceptance" {
     }
 }
 
+Invoke-MatrixStep "Memory probe ledger direct read" {
+    Test-MemoryProbeLedger
+}
+
+Invoke-MatrixStep "Markdown indexing coverage" {
+    & (Join-Path $repoRoot "scripts\devbrain_markdown_index_coverage.ps1")
+    if (-not $?) {
+        throw "markdown indexing coverage command reported issues"
+    }
+} -WarnOnly
+
 $llamaIndexActive = Test-LlamaIndexActive
 $lightRagActive = Test-LightRagActive
 
@@ -247,6 +275,22 @@ if ($llamaIndexActive) {
             -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
             -Query "Where is runtime API/WS origin resolution implemented on the frontend?" `
             -ExpectedPatterns @("frontend/src/api/runtime\.js", "frontend/src/api/ws\.js")
+    } -WarnOnly
+
+    Invoke-MatrixStep "LlamaIndex local dev runtime query" {
+        Invoke-QueryProbe `
+            -Layer "LlamaIndex" `
+            -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
+            -Query "How do I run the project locally with the clinic_dev PostgreSQL database?" `
+            -ExpectedPatterns @("docs/dev/POSTGRES_DEV_DATABASE\.md", "clinic_dev")
+    } -WarnOnly
+
+    Invoke-MatrixStep "LlamaIndex memory probe query" {
+        Invoke-QueryProbe `
+            -Layer "LlamaIndex" `
+            -ScriptPath (Join-Path $repoRoot "ai\llamaindex\scripts\run_query.ps1") `
+            -Query "What is the active memory probe control fact?" `
+            -ExpectedPatterns @("docs/devbrain/MEMORY_PROBE_PROTOCOL\.md", "\.ai-factory/logs/memory-probes\.md")
     } -WarnOnly
 }
 else {
@@ -263,6 +307,22 @@ if ($lightRagActive) {
         if (-not $?) {
             throw "LightRAG artifact check command failed"
         }
+    } -WarnOnly
+
+    Invoke-MatrixStep "LightRAG local dev runtime query" {
+        Invoke-QueryProbe `
+            -Layer "LightRAG" `
+            -ScriptPath $lightRagQuery `
+            -Query "run project locally with clinic_dev PostgreSQL dev database backend 18000 frontend 5173" `
+            -ExpectedPatterns @("local_dev_runtime_contour", "docs/dev/POSTGRES_DEV_DATABASE\.md", "docs/runbooks/LOCAL_DEV_ONBOARDING\.md")
+    } -WarnOnly
+
+    Invoke-MatrixStep "LightRAG memory probe query" {
+        Invoke-QueryProbe `
+            -Layer "LightRAG" `
+            -ScriptPath $lightRagQuery `
+            -Query "active memory probe control fact memory-probes" `
+            -ExpectedPatterns @("memory_probe_protocol", "\.ai-factory/logs/memory-probes\.md")
     } -WarnOnly
 
     Invoke-MatrixStep "LightRAG registrar ownership query" {
