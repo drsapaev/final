@@ -65,6 +65,36 @@ $env:DISABLE_2FA_REQUIREMENT="1"
 
 Do not use that flag in production-like environments.
 
+## Non-Destructive Local Launch
+
+For normal manual UI testing against `clinic_dev`, prefer the local launcher:
+
+```powershell
+cd C:\final
+.\scripts\start_dev_clinic.ps1
+```
+
+The launcher:
+
+- starts backend on `18000` and frontend on `5173`
+- overrides `DATABASE_URL` only for the backend process, targeting `clinic_dev`
+- does not edit `backend/.env`
+- does not reset, seed, or migrate the database
+- writes logs under `%TEMP%`
+- prints/records PIDs in `%TEMP%\final-dev-clinic.pids.json`
+- checks backend health and frontend proxy health
+
+Use:
+
+```powershell
+.\scripts\check_dev_clinic.ps1
+.\scripts\stop_dev_clinic.ps1
+```
+
+If ports are still occupied by processes not launched through the PID file, use
+`.\scripts\stop_dev_clinic.ps1 -ForcePorts` only after confirming those
+processes are the local dev clinic runtime.
+
 ## Recreate Database Mode
 
 Use this only when the connected PostgreSQL role has enough privilege to drop and
