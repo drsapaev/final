@@ -7,16 +7,22 @@
     {"path": "docs/devbrain/DEVBRAIN_STATUS.md", "type": "file", "label": "DevBrain status"},
     {"path": "docs/devbrain/MEMORY_ROUTING.md", "type": "file", "label": "DevBrain memory routing"},
     {"path": "docs/devbrain/MEMORY_CAPTURE_TEMPLATE.md", "type": "file", "label": "DevBrain memory capture template"},
+    {"path": "docs/devbrain/MEMORY_PROBE_PROTOCOL.md", "type": "file", "label": "DevBrain memory probe protocol"},
     {"path": "docs/devbrain/DEV_BRAIN_ROLE_MAP.md", "type": "file", "label": "DevBrain component role map"},
+    {"path": "docs/devbrain/MARKDOWN_INDEXING_POLICY.md", "type": "file", "label": "DevBrain markdown indexing policy"},
     {"path": ".ai-factory/DESCRIPTION.md", "type": "file", "label": "AI Factory description"},
     {"path": ".ai-factory/ARCHITECTURE.md", "type": "file", "label": "AI Factory architecture"},
     {"path": ".ai-factory/RULES.md", "type": "file", "label": "AI Factory rules"},
     {"path": ".ai-factory/PLAN.md", "type": "file", "label": "AI Factory plan"},
     {"path": ".ai-factory/ROADMAP.md", "type": "file", "label": "AI Factory roadmap"},
+    {"path": ".ai-factory/logs/memory-probes.md", "type": "file", "label": "DevBrain memory probe ledger"},
     {"path": "docs/runbooks/AGENT_CYCLIC_WORKFLOW.md", "type": "file", "label": "cyclic agent workflow"},
     {"path": "docs/runbooks/CODEX_SUPERPOWERS_GUARD.md", "type": "file", "label": "Codex Superpowers guard"},
+    {"path": "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "type": "file", "label": "local dev onboarding and runtime contour"},
     {"path": "docs/runbooks/MESSAGING_CONTRACT.md", "type": "file", "label": "messaging contract"},
     {"path": "docs/runbooks/CLINIC_STATE_SEPARATION_AUDIT.md", "type": "file", "label": "state separation audit"},
+    {"path": "docs/dev/POSTGRES_DEV_DATABASE.md", "type": "file", "label": "PostgreSQL clinic_dev workflow"},
+    {"path": "docs/dev/DEMO_USERS.md", "type": "file", "label": "local demo users"},
     {"path": "backend/app/api/v1/endpoints", "type": "dir", "label": "backend API endpoints", "extensions": [".py"]},
     {"path": "backend/app/services", "type": "dir", "label": "backend services", "extensions": [".py"]},
     {"path": "backend/app/repositories", "type": "dir", "label": "backend repositories", "extensions": [".py"]},
@@ -35,6 +41,30 @@
     {"path": "frontend/src/utils", "type": "dir", "label": "frontend utils", "extensions": [".js", ".jsx", ".ts", ".tsx"]}
   ],
   "priority_focus_sources": [
+    {
+      "id": "devbrain_markdown_indexing_policy",
+      "title": "DevBrain markdown indexing policy",
+      "terms": ["markdown", "indexing", "coverage", "manifest", "llamaindex", "lightrag", "refresh", "durable", "memory"],
+      "canonical_anchors": ["docs/devbrain/MARKDOWN_INDEXING_POLICY.md", "docs/devbrain/MEMORY_ROUTING.md", "ai/llamaindex/data/manifest.json", "ai/lightrag/data/manifest.json"],
+      "first_touch": ["docs/devbrain/MARKDOWN_INDEXING_POLICY.md", "ai/llamaindex/data/manifest.json", "ai/lightrag/data/manifest.json"],
+      "verification": ["scripts/devbrain_markdown_index_coverage.ps1", "scripts/devbrain_regression_matrix.ps1", "scripts/devbrain_refresh_memory.ps1"]
+    },
+    {
+      "id": "memory_probe_protocol",
+      "title": "DevBrain memory probe protocol and active canary ledger",
+      "terms": ["memory", "probe", "memory-probes", "control", "fact", "canary", "ledger", "active", "retrieval"],
+      "canonical_anchors": ["docs/devbrain/MEMORY_PROBE_PROTOCOL.md", ".ai-factory/logs/memory-probes.md", "docs/devbrain/MEMORY_ROUTING.md"],
+      "first_touch": [".ai-factory/logs/memory-probes.md", "docs/devbrain/MEMORY_PROBE_PROTOCOL.md"],
+      "verification": ["scripts/devbrain_regression_matrix.ps1", "scripts/devbrain_refresh_memory.ps1"]
+    },
+    {
+      "id": "local_dev_runtime_contour",
+      "title": "local dev runtime and clinic_dev ownership",
+      "terms": ["local", "dev", "runtime", "clinic_dev", "postgres", "postgresql", "database_url", "backend", "frontend", "18000", "5173", "seed", "reset"],
+      "canonical_anchors": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md", "AGENTS.md"],
+      "first_touch": ["docs/dev/POSTGRES_DEV_DATABASE.md", "docs/runbooks/LOCAL_DEV_ONBOARDING.md", "docs/dev/DEMO_USERS.md"],
+      "verification": ["scripts/devbrain_regression_matrix.ps1", "backend/tests/unit/test_dev_db_seed_guardrails.py"]
+    },
     {
       "id": "runtime_origin_resolution",
       "title": "frontend runtime API/WS origin resolution",
