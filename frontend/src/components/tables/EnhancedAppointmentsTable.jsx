@@ -2176,7 +2176,15 @@ const EnhancedAppointmentsTable = ({
                         <QueueActionButtons
                           entry={{
                             queue_entry_id: row.queue_entry_id,
-                            status: row.status
+                            status: row.status,
+                            queue_status: row.queue_status,
+                            available_actions: row.available_actions,
+                            can_no_show: row.can_no_show,
+                            can_send_to_diagnostics: row.can_send_to_diagnostics,
+                            can_notify_diagnostics_return: row.can_notify_diagnostics_return,
+                            can_restore_next: row.can_restore_next,
+                            can_incomplete: row.can_incomplete,
+                            can_complete: getBackendActionAvailability(row, 'complete', 'can_complete')
                           }}
                           onStatusChange={(action, entry, result) => {
                             logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);

@@ -17,6 +17,35 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 
+const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
+
+const QUEUE_ACTION_ALIASES = {
+  no_show: ['no_show'],
+  restore_next: ['restore_next'],
+  send_to_diagnostics: ['send_to_diagnostics', 'diagnostics'],
+  notify_diagnostics_return: ['notify_diagnostics_return', 'call_from_diagnostics'],
+  incomplete: ['incomplete'],
+  complete: ['complete']
+};
+
+const QUEUE_COMPLETED_STATUSES = new Set(['served', 'completed', 'done']);
+const QUEUE_INCOMPLETE_STATUSES = new Set(['incomplete']);
+const QUEUE_CANCELLED_STATUSES = new Set(['cancelled']);
+
+const hasBackendQueueAction = (entry, action, flagName) => {
+  if (entry?.[flagName] === true) {
+    return true;
+  }
+
+  if (!Array.isArray(entry?.available_actions)) {
+    return false;
+  }
+
+  const availableActions = new Set(entry.available_actions.map(normalizeQueueAction));
+  const aliases = QUEUE_ACTION_ALIASES[action] || [action];
+  return aliases.some((alias) => availableActions.has(normalizeQueueAction(alias)));
+};
+
 /**
  * Кнопки действий для одной записи в очереди
  * @param {object} entry - Запись из очереди (appointment/queue entry)
@@ -69,14 +98,6 @@ export const QueueActionButtons = ({
     return null;
   }
 
-  if (!status) {
-    logger.warn('[QueueActionButtons] Missing queue status, skipping queue action controls', {
-      entry,
-      entryId
-    });
-    return null;
-  }
-
   const handleAction = async (action, payload = {}) => {
     if (loading) return;
     setLoading(true);
@@ -124,6 +145,104 @@ export const QueueActionButtons = ({
 
   // Кнопки в зависимости от статуса
   const renderButtons = () => {
+    const buttons = [];
+
+    if (hasBackendQueueAction(entry, 'no_show', 'can_no_show')) {
+      buttons.push(
+        <button
+          key="no-show"
+          style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+          onClick={() => handleAction('no-show')}
+          disabled={loading}
+          aria-label="Отметить неявку"
+          title="Отметить неявку">
+
+                    <XCircle size={iconSize} />
+                </button>);
+    }
+
+    if (hasBackendQueueAction(entry, 'send_to_diagnostics', 'can_send_to_diagnostics')) {
+      buttons.push(
+        <button
+          key="diagnostics"
+          style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+          onClick={() => handleAction('diagnostics')}
+          disabled={loading}
+          aria-label="Направить на обследование"
+          title="На обследование">
+
+                    <Stethoscope size={iconSize} />
+                </button>);
+    }
+
+    if (hasBackendQueueAction(entry, 'notify_diagnostics_return', 'can_notify_diagnostics_return')) {
+      buttons.push(
+        <button
+          key="call-from-diagnostics"
+          style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+          onClick={() => handleAction('call-from-diagnostics')}
+          disabled={loading}
+          aria-label="Вернуть с диагностики и вызвать повторно"
+          title="Вернуть с диагностики (Вызвать повторно)">
+
+                    <Bell size={iconSize} />
+                </button>);
+    }
+
+    if (hasBackendQueueAction(entry, 'complete', 'can_complete')) {
+      buttons.push(
+        <button
+          key="complete"
+          style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+          onClick={() => handleAction('complete')}
+          disabled={loading}
+          aria-label="Завершить приём"
+          title="Завершить приём">
+
+                    <CheckCircle size={iconSize} />
+                </button>);
+    }
+
+    if (hasBackendQueueAction(entry, 'incomplete', 'can_incomplete')) {
+      buttons.push(
+        <button
+          key="incomplete"
+          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+          onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
+          disabled={loading}
+          aria-label="Отметить, что пациент не вернулся"
+          title="Не вернулся">
+
+                    <AlertCircle size={iconSize} />
+                </button>);
+    }
+
+    if (hasBackendQueueAction(entry, 'restore_next', 'can_restore_next')) {
+      buttons.push(
+        <button
+          key="restore-next"
+          style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+          onClick={() => handleAction('restore-next')}
+          disabled={loading}
+          aria-label="Восстановить пациента следующим в очереди"
+          title="Восстановить следующим">
+
+                    <RotateCcw size={iconSize} />
+                </button>);
+    }
+
+    if (buttons.length > 0) {
+      return <>{buttons}</>;
+    }
+
+    if (
+      !QUEUE_COMPLETED_STATUSES.has(status) &&
+      !QUEUE_INCOMPLETE_STATUSES.has(status) &&
+      !QUEUE_CANCELLED_STATUSES.has(status)
+    ) {
+      return null;
+    }
+
     switch (status) {
       case 'waiting':
         return (
