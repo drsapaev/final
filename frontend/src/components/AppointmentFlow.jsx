@@ -1,43 +1,14 @@
-import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button, Badge } from './ui/native';
-import logger from '../utils/logger';
+import { Card, Badge } from './ui/native';
 import {
   APPOINTMENT_STATUS,
   STATUS_LABELS,
-  STATUS_COLORS,
-  canStartVisit } from
+  STATUS_COLORS } from
 
 '../constants/appointmentStatus';
 
-const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleStartVisit = async () => {
-    if (!canStartVisit(appointment?.status)) return;
-
-    setIsProcessing(true);
-    try {
-      await onStartVisit(appointment);
-    } catch (error) {
-      logger.error('AppointmentFlow: Start visit error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handlePayment = async () => {
-    setIsProcessing(true);
-    try {
-      await onPayment(appointment);
-    } catch (error) {
-      logger.error('AppointmentFlow: Payment error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
+const AppointmentFlow = ({ appointment }) => {
   const getStepIcon = (step) => {
     switch (step) {
       case 'payment':
@@ -92,25 +63,21 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
     id: 'payment',
     title: 'Оплата',
     description: 'Ожидание оплаты записи',
-    action: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'Оплатить' : null
   },
   {
     id: 'visit',
     title: 'Начать прием',
     description: 'Отправить пациента к врачу',
-    action: canStartVisit(appointment?.status) ? 'Начать прием' : null
   },
   {
     id: 'emr',
     title: 'ЭМК',
     description: 'Электронная медицинская карта',
-    action: null
   },
   {
     id: 'prescription',
     title: 'Рецепт',
     description: 'Назначение препаратов',
-    action: null
   }];
 
 
@@ -163,17 +130,6 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
                   <p className="text-sm opacity-75">{step.description}</p>
                 </div>
                 
-                {step.action &&
-                <div className="flex-shrink-0">
-                    <Button
-                    size="sm"
-                    onClick={step.id === 'payment' ? handlePayment : handleStartVisit}
-                    disabled={isProcessing}>
-
-                      {isProcessing ? 'Обработка...' : step.action}
-                    </Button>
-                  </div>
-                }
               </div>
             </div>);
 
@@ -224,9 +180,7 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
 };
 
 AppointmentFlow.propTypes = {
-  appointment: PropTypes.object,
-  onStartVisit: PropTypes.func,
-  onPayment: PropTypes.func
+  appointment: PropTypes.object
 };
 
 export default AppointmentFlow;
