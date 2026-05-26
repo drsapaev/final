@@ -44,6 +44,33 @@ const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
 const LEGACY_DRAFT_KEY = 'appointment_wizard_draft';
 
+const normalizeWizardContractValue = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+};
+
+const getWizardRecordKind = (record) => normalizeWizardContractValue(
+  record?.record_kind ?? record?.record_type ?? record?.type
+);
+
+const getWizardSourceKind = (record) => normalizeWizardContractValue(
+  record?.source_kind ?? record?.source
+);
+
+const getFirstQueueNumberId = (record) => {
+  if (!Array.isArray(record?.queue_numbers) || record.queue_numbers.length === 0) {
+    return null;
+  }
+  return record.queue_numbers[0]?.id ?? null;
+};
+
+const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) => {
+  if (!record || recordKind !== 'online_queue' || effectiveSource !== 'online') {
+    return null;
+  }
+  return record.queue_entry_id ?? getFirstQueueNumberId(record) ?? record.id ?? null;
+};
+
 const normalizeServiceSelectionValue = (serviceValue) => {
   if (serviceValue == null) return '';
 
@@ -1610,13 +1637,15 @@ const AppointmentWizardV2 = ({
       // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
       // Расширено для поддержки всех типов записей: online, desk, visit, appointment
       // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
+      const initialRecordKind = getWizardRecordKind(initialData);
+      const initialSourceKind = getWizardSourceKind(initialData);
       const hasQueueEntries = editMode && initialData && (
       Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0 ||
-      initialData.source === 'online' ||
-      initialData.source === 'desk' ||
-      initialData.record_type === 'online_queue' ||
-      initialData.record_type === 'visit' ||
-      initialData.record_type === 'appointment');
+      initialSourceKind === 'online' ||
+      initialSourceKind === 'desk' ||
+      initialRecordKind === 'online_queue' ||
+      initialRecordKind === 'visit' ||
+      initialRecordKind === 'appointment');
 
 
       const originalServiceIds = new Set();
@@ -1624,15 +1653,17 @@ const AppointmentWizardV2 = ({
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
-        const effectiveSource = initialData.source || (
-        initialData.record_type === 'visit' || initialData.record_type === 'appointment' ? 'desk' : 'online');
+        const effectiveSource = initialSourceKind || (
+        initialRecordKind === 'visit' || initialRecordKind === 'appointment' ? 'desk' : 'online');
 
         // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
         const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
         logger.log(`📝 Редактирование ${recordType}, проверяем новые услуги...`, {
           source: initialData.source,
+          source_kind: initialData.source_kind,
           effectiveSource,
           record_type: initialData.record_type,
+          record_kind: initialData.record_kind,
           queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length :
           initialData.queue_numbers ? 1 : 0,
           service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
@@ -1640,9 +1671,9 @@ const AppointmentWizardV2 = ({
         });
 
         // ⭐ SSOT: Для чистых QR-записей (online_queue) обновляем существующую запись вместо создания новой
-        const isOnlineQueueEntry = initialData.record_type === 'online_queue' && effectiveSource === 'online';
+        const isOnlineQueueEntry = initialRecordKind === 'online_queue' && effectiveSource === 'online';
         // ✅ SSOT FIX: queue_entry_id приходит из backend для QR-визитов, иначе из queue_numbers
-        const queueEntryId = initialData.queue_entry_id || initialData.queue_numbers?.[0]?.id || initialData.id;
+        const queueEntryId = resolveOnlineQueueEntryId(initialData, initialRecordKind, effectiveSource);
 
         if (isOnlineQueueEntry && queueEntryId) {
           logger.log(`⭐ SSOT: QR-запись ID=${queueEntryId}, обновляем через full-update endpoint...`);
