@@ -42,7 +42,7 @@ from app.services.queue_service import (
     QueueNotFoundError,
     QueueValidationError,
 )
-from app.services.service_mapping import get_service_code
+from app.services.service_mapping import get_queue_group_for_service, get_service_code
 from app.services.queue_session import get_or_create_session_id
 
 router = APIRouter()
@@ -2122,25 +2122,20 @@ def full_update_online_entry(
                         .first()
                     )
                     if service:
-                        # Определяем department по category_code услуги
-                        # ✅ SSOT: Используем service_mapping.get_service_category() вместо дублирующей логики
-                        from app.services.service_mapping import get_service_category
-
+                        # Resolve department through the queue-group SSOT.
                         service_code = service.service_code or get_service_code(
                             service.id, db
                         )
-                        category, _ = get_service_category(service_code)
-                        if category and category.value == 'K':
-                            department = 'cardiology'
-                            break
-                        elif category and category.value == 'D':
-                            department = 'dermatology'
-                            break
-                        elif category and category.value == 'S':
-                            department = 'stomatology'
-                            break
-                        elif category and category.value == 'L':
-                            department = 'laboratory'
+                        queue_group = get_queue_group_for_service(service_code)
+                        service_group_to_dept = {
+                            'cardiology': 'cardiology',
+                            'ecg': 'cardiology',
+                            'dermatology': 'dermatology',
+                            'dental': 'stomatology',
+                            'laboratory': 'laboratory',
+                        }
+                        department = service_group_to_dept.get(queue_group)
+                        if department:
                             break
             
             # Если department все еще не определен, используем значение по умолчанию
