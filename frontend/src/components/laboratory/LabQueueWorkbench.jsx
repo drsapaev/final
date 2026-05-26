@@ -34,10 +34,7 @@ const activeQueueStatuses = new Set([
   'confirmed',
   'pending',
   'called',
-  'in_progress',
-  'DRAFT',
-  'IN_PROGRESS',
-  'READY'
+  'in_progress'
 ]);
 
 function formatServices(appointment) {
