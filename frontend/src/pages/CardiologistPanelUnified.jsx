@@ -907,11 +907,6 @@ const MacOSCardiologistPanelUnified = () => {
           });
 
           if (response.ok) {
-            // Обновляем статус в локальном состоянии
-            setAppointments((prev) => prev.map((a) =>
-            a.id === row.id ? { ...a, status: 'called' } : a
-            ));
-            // Вызываем обновление списка
             await loadMacOSCardiologyAppointments();
             setMessage({ type: 'success', text: `Пациент ${row.patient_fio} вызван` });
           }
