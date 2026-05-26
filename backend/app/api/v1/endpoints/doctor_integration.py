@@ -732,22 +732,6 @@ def complete_patient_visit(
             # Обновляем статус appointment
             appointment.status = "completed"
 
-            # ✅ Сохраняем payment state только из реального Payment.
-            from app.models.payment import Payment
-
-            payment = (
-                db.query(Payment)
-                .filter(Payment.visit_id == appointment.id)
-                .order_by(Payment.created_at.desc())
-                .first()
-            )
-            if payment and (
-                payment.status
-                and payment.status.lower() == 'paid'
-                or payment.paid_at
-            ):
-                appointment.discount_mode = "paid"
-
             db.commit()
             db.refresh(appointment)
 
@@ -859,13 +843,14 @@ def complete_patient_visit(
 
                 if appointment:
                     appointment.status = "completed"
-                    # Сохраняем discount_mode для appointment
+                    # Appointment has no discount_mode; use its explicit payment marker.
                     if (
-                        not appointment.discount_mode
-                        or appointment.discount_mode == "none"
+                        visit.discount_mode == "paid"
+                        and not appointment.payment_processed_at
                     ):
-                        if visit.discount_mode == "paid":
-                            appointment.discount_mode = "paid"
+                        appointment.payment_processed_at = (
+                            visit.payment_processed_at or datetime.utcnow()
+                        )
 
                 if visit_data:
                     # Сохраняем медицинские данные, если переданы
