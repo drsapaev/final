@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
-import { APPOINTMENT_STATUS, canCreatePrescription } from '../constants/appointmentStatus';
-
 import logger from '../utils/logger';
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов
@@ -14,7 +12,14 @@ const createEmptyPrescription = () => ({
   printedAt: null
 });
 
-const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescription, onSave, onPrint }) => {
+const PrescriptionSystem = ({
+  appointment,
+  emr,
+  prescription: initialPrescription,
+  canCreatePrescription,
+  onSave,
+  onPrint
+}) => {
   const [prescription, setPrescription] = useState(() => createEmptyPrescription());
 
   const [isSaving, setIsSaving] = useState(false);
@@ -120,18 +125,13 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
   };
 
   // Проверки доступности
-  const hasReadyEmr = Boolean(emr && !emr.isDraft);
-  const prescriptionEligible = canCreatePrescription(appointment?.status, hasReadyEmr);
-  const canEdit = prescriptionEligible && appointment?.status !== APPOINTMENT_STATUS.COMPLETED;
-  const prescriptionEligibilityLabel = !emr
-    ? 'Сначала создайте ЭМК'
-    : emr.isDraft
-      ? 'Сохраните ЭМК, чтобы открыть рецепт'
-      : prescriptionEligible
-        ? 'Рецепт доступен для текущего статуса'
-        : 'Рецепт недоступен для текущего статуса';
+  const prescriptionEligible = canCreatePrescription === true;
+  const canEdit = prescriptionEligible;
+  const prescriptionEligibilityLabel = prescriptionEligible
+    ? 'Рецепт доступен'
+    : 'Рецепт недоступен';
 
-  if (!emr) {
+  if (!emr && !prescriptionEligible) {
     return (
       <Card className="p-6">
         <div className="text-center py-8">
@@ -145,7 +145,7 @@ const PrescriptionSystem = ({ appointment, emr, prescription: initialPrescriptio
 
   }
 
-  if (emr.isDraft) {
+  if (emr?.isDraft && !prescriptionEligible) {
     return (
       <Card className="p-6">
         <div className="text-center py-8">
@@ -449,6 +449,7 @@ PrescriptionSystem.propTypes = {
     isDraft: PropTypes.bool,
     printedAt: PropTypes.string
   }),
+  canCreatePrescription: PropTypes.bool,
   onSave: PropTypes.func,
   onPrint: PropTypes.func
 };
