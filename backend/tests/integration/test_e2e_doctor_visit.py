@@ -24,7 +24,7 @@ from app.models.emr import EMR
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 # =============================================================================
@@ -186,6 +186,44 @@ class TestDoctorVisitFlow:
             data = response.json()
             # Проверяем что вызван пациент
             assert "patient" in data or "entry" in data or "number" in data
+
+    def test_delete_visit_service_rejects_child_from_different_visit(
+        self,
+        client: TestClient,
+        db_session,
+        auth_headers,
+        doctor_with_queue,
+        test_service,
+    ):
+        """Nested service delete must not trust visit_service_id alone."""
+        first_visit = doctor_with_queue["entries"][0]["visit"]
+        other_visit = doctor_with_queue["entries"][1]["visit"]
+
+        first_service = VisitService(
+            visit_id=first_visit.id,
+            service_id=test_service.id,
+            quantity=1,
+            price=test_service.price,
+        )
+        other_service = VisitService(
+            visit_id=other_visit.id,
+            service_id=test_service.id,
+            quantity=1,
+            price=test_service.price,
+        )
+        db_session.add_all([first_service, other_service])
+        db_session.commit()
+        db_session.refresh(first_service)
+        db_session.refresh(other_service)
+
+        response = client.delete(
+            f"/api/v1/doctor/visits/{first_visit.id}/services/{other_service.id}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 404, response.text
+        assert db_session.get(VisitService, first_service.id) is not None
+        assert db_session.get(VisitService, other_service.id) is not None
 
     def test_doctor_can_start_visit(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue, db_session

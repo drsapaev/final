@@ -1671,15 +1671,23 @@ def remove_service_from_visit(
             )
 
         # Удаляем услугу
-        success = crud_visit.remove_visit_service(
-            db=db, visit_service_id=visit_service_id
+        visit_service = (
+            db.query(VisitService)
+            .filter(
+                VisitService.id == visit_service_id,
+                VisitService.visit_id == visit.id,
+            )
+            .first()
         )
 
-        if not success:
+        if not visit_service:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Услуга в визите не найдена",
             )
+
+        db.delete(visit_service)
+        db.commit()
 
         return {"success": True, "message": "Услуга удалена из визита"}
 
