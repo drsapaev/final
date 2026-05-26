@@ -98,18 +98,18 @@ describe('LabReportWorkbench', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     expect(source).toContain('function hasLabReportAction(instance, action)');
-    expect(source).toContain("const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit')");
-    expect(source).toContain("const canFinalize = hasLabReportAction(activeInstance, 'finalize')");
-    expect(source).toContain("const canRevise = hasLabReportAction(activeInstance, 'revise')");
-    expect(source).not.toContain("activeInstance.status !== 'FINALIZED' && activeInstance.status !== 'PRINTED'");
-    expect(source).not.toContain("activeInstance.status === 'FINALIZED' || activeInstance.status === 'PRINTED'");
+    expect(source).toContain('const canEditActiveInstance = hasLabReportAction(activeInstance, \'edit\')');
+    expect(source).toContain('const canFinalize = hasLabReportAction(activeInstance, \'finalize\')');
+    expect(source).toContain('const canRevise = hasLabReportAction(activeInstance, \'revise\')');
+    expect(source).not.toContain('activeInstance.status !== \'FINALIZED\' && activeInstance.status !== \'PRINTED\'');
+    expect(source).not.toContain('activeInstance.status === \'FINALIZED\' || activeInstance.status === \'PRINTED\'');
   });
 
   it('does not invent draft status in the print payload when backend status is missing', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     expect(source).toContain('status: instance?.status || null');
-    expect(source).not.toContain("status: instance?.status || 'DRAFT'");
+    expect(source).not.toContain('status: instance?.status || \'DRAFT\'');
   });
 
   it('does not auto-create or auto-open a report when exactly one template is allowed', async () => {

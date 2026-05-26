@@ -21,7 +21,7 @@ describe('RegistrarPanel command contract', () => {
   it('uses the backend registrar record action endpoint for queue/payment/status commands', () => {
     const source = readRegistrarPanelSource();
 
-    expect(source).toContain("api.post('/registrar/records/actions'");
+    expect(source).toContain('api.post(\'/registrar/records/actions\'');
     expect(source).not.toContain('/registrar/visits/${recordId}/mark-paid');
     expect(source).not.toContain('/registrar/queue/entry/${recordId}/mark-paid');
     expect(source).not.toContain('/appointments/${recordId}/mark-paid');
@@ -52,7 +52,7 @@ describe('RegistrarPanel command contract', () => {
   it('loads Registrar metadata departments through one registrar endpoint', () => {
     const source = readRegistrarPanelSource();
 
-    expect(source).toContain("api.get('/registrar/departments?active_only=true')");
+    expect(source).toContain('api.get(\'/registrar/departments?active_only=true\')');
     expect(source).not.toContain('/api/v1/departments/active');
     expect(source).not.toContain('const loadDynamicDepartments = useCallback');
   });
@@ -65,10 +65,10 @@ describe('RegistrarPanel command contract', () => {
       'const fetchPatientData = useCallback(async (patientId) => {',
     );
 
-    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/doctors')");
-    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/services')");
-    expect(loadIntegratedDataBlock).toContain("api.get('/registrar/departments?active_only=true')");
-    expect(loadIntegratedDataBlock).not.toContain("api.get('/registrar/queue-settings')");
+    expect(loadIntegratedDataBlock).toContain('api.get(\'/registrar/doctors\')');
+    expect(loadIntegratedDataBlock).toContain('api.get(\'/registrar/services\')');
+    expect(loadIntegratedDataBlock).toContain('api.get(\'/registrar/departments?active_only=true\')');
+    expect(loadIntegratedDataBlock).not.toContain('api.get(\'/registrar/queue-settings\')');
     expect(loadIntegratedDataBlock).not.toContain('queueResult');
     expect(loadIntegratedDataBlock).not.toContain('queueRes');
   });
@@ -113,13 +113,13 @@ describe('RegistrarPanel command contract', () => {
     );
 
     expect(hasBackendActionBlock).toContain('record.available_actions');
-    expect(hasBackendActionBlock).toContain("mark_paid: 'can_mark_paid'");
-    expect(hasBackendActionBlock).toContain("start_visit: 'can_start_visit'");
-    expect(hasBackendActionBlock).toContain("print_ticket: 'can_print_ticket'");
-    expect(hasBackendActionBlock).toContain("complete: 'can_complete'");
-    expect(hasBackendActionBlock).toContain("cancel: 'can_cancel'");
+    expect(hasBackendActionBlock).toContain('mark_paid: \'can_mark_paid\'');
+    expect(hasBackendActionBlock).toContain('start_visit: \'can_start_visit\'');
+    expect(hasBackendActionBlock).toContain('print_ticket: \'can_print_ticket\'');
+    expect(hasBackendActionBlock).toContain('complete: \'can_complete\'');
+    expect(hasBackendActionBlock).toContain('cancel: \'can_cancel\'');
     expect(runActionBlock.indexOf('if (!hasBackendAction(record, action))')).toBeLessThan(
-      runActionBlock.indexOf("api.post('/registrar/records/actions'"),
+      runActionBlock.indexOf('api.post(\'/registrar/records/actions\''),
     );
   });
 

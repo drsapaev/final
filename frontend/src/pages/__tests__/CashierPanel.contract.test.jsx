@@ -36,15 +36,15 @@ describe('CashierPanel payment action contract', () => {
     const source = readCashierPanelSource();
     const actionCellBlock = extractSourceBlock(
       source,
-      "onClick={() => confirmPayment(row.id)}",
+      'onClick={() => confirmPayment(row.id)}',
       '<td colSpan="7"',
     );
 
-    expect(actionCellBlock).toContain("disabled={!hasBackendPaymentAction(row, 'confirm')}");
-    expect(actionCellBlock).toContain("disabled={!hasBackendPaymentAction(row, 'cancel')}");
-    expect(actionCellBlock).toContain("disabled={!hasBackendPaymentAction(row, 'refund')}");
-    expect(actionCellBlock).toContain("disabled={!hasBackendPaymentAction(row, 'print_receipt')}");
-    expect(actionCellBlock).not.toContain("row.status ===");
+    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'confirm\')}');
+    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'cancel\')}');
+    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'refund\')}');
+    expect(actionCellBlock).toContain('disabled={!hasBackendPaymentAction(row, \'print_receipt\')}');
+    expect(actionCellBlock).not.toContain('row.status ===');
     expect(actionCellBlock).not.toContain('payment_status');
   });
 
@@ -57,6 +57,6 @@ describe('CashierPanel payment action contract', () => {
     );
 
     expect(receiptBlock).toContain('status: paymentRow?.status ?? null');
-    expect(receiptBlock).not.toContain("status: paymentRow?.status || 'paid'");
+    expect(receiptBlock).not.toContain('status: paymentRow?.status || \'paid\'');
   });
 });

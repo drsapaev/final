@@ -265,7 +265,8 @@ const MacOSMetricCard = ({
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
-        aria-busy={loading}>
+        aria-busy={loading}
+        aria-label={typeof title === 'string' ? title : undefined}>
         
         {content}
       </div>);
