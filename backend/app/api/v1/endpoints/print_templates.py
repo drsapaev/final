@@ -28,6 +28,31 @@ router = APIRouter()
 
 # Путь к шаблонам
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "print"
+MAX_PRINT_TEMPLATE_UPLOAD_BYTES = 5 * 1024 * 1024
+PRINT_TEMPLATE_READ_CHUNK_BYTES = 1024 * 1024
+
+
+def _read_print_template_bounded(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    while True:
+        chunk = file.file.read(PRINT_TEMPLATE_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > MAX_PRINT_TEMPLATE_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=(
+                    "Print template upload is too large "
+                    f"(maximum {MAX_PRINT_TEMPLATE_UPLOAD_BYTES // 1024 // 1024} MB)"
+                ),
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 def _safe_template_type(value: str) -> str:
@@ -272,7 +297,7 @@ def upload_template_file(
         file_path = _template_path(filename)
 
         # Сохраняем файл
-        content = file.file.read()
+        content = _read_print_template_bounded(file)
 
         # Валидируем шаблон
         try:
