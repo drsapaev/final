@@ -9,7 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.emr import EMR
+from app.models.lab import LabOrder, LabResult
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.emr_lab_integration import emr_lab_integration
@@ -17,7 +20,7 @@ from app.services.emr_lab_integration import emr_lab_integration
 router = APIRouter()
 
 
-def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+def _doctor_allowed_doctor_ids(db: Session, current_user: User) -> set[int]:
     doctor = (
         db.query(Doctor)
         .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
@@ -32,7 +35,11 @@ def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
     # when the value does not target another real Doctor row.
     if not assigned_doctor:
         allowed_doctor_ids.add(current_user.id)
+    return allowed_doctor_ids
 
+
+def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, current_user)
     rows = (
         db.query(Visit.patient_id)
         .filter(
@@ -54,6 +61,46 @@ def _ensure_doctor_can_read_patient_lab_data(
     if current_user.is_superuser:
         return
     if patient_id not in _doctor_allowed_patient_ids(db, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_doctor_can_integrate_lab_results(
+    db: Session,
+    emr_id: int,
+    lab_result_ids: list[int],
+    current_user: User,
+) -> None:
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+
+    emr_record = db.query(EMR).filter(EMR.id == emr_id).first()
+    if not emr_record:
+        raise HTTPException(status_code=404, detail="EMR not found")
+
+    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, current_user)
+    appointment = (
+        db.query(Appointment)
+        .filter(
+            Appointment.id == emr_record.appointment_id,
+            Appointment.doctor_id.in_(allowed_doctor_ids),
+        )
+        .first()
+    )
+    if not appointment:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    result_rows = (
+        db.query(LabResult.id, LabOrder.patient_id)
+        .join(LabOrder, LabResult.order_id == LabOrder.id)
+        .filter(LabResult.id.in_(lab_result_ids))
+        .all()
+    )
+    if any(
+        patient_id != appointment.patient_id
+        for _result_id, patient_id in result_rows
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
 
@@ -115,6 +162,9 @@ async def integrate_lab_results_with_emr(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Интегрировать лабораторные результаты с EMR"""
+    _ensure_doctor_can_integrate_lab_results(
+        db, emr_id, lab_result_ids, current_user
+    )
     try:
         result = await emr_lab_integration.integrate_lab_results_with_emr(
             db=db, emr_id=emr_id, lab_result_ids=lab_result_ids
