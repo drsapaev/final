@@ -625,7 +625,7 @@ const AppointmentsTable = ({
                     size="md"
                     style={{ minWidth: '80px' }}>
                     
-                 {appointment.status || 'scheduled'}
+                 {appointment.status || 'status unavailable'}
                </Badge>
              </td>
                 <td data-sticky="true" style={{
