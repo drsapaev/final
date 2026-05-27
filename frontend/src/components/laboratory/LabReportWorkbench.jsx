@@ -383,14 +383,22 @@ export default function LabReportWorkbench({
       return;
     }
     const defaultTemplateId =
-      templateResolution?.default_template?.id || templateOptions[0]?.id || '';
+      templateResolution?.default_template?.id
+      || (!serviceContextPresent ? templateOptions[0]?.id : '')
+      || '';
     setSelectedTemplateId((current) => {
       if (current && templateOptions.some((template) => String(template.id) === String(current))) {
         return current;
       }
       return defaultTemplateId ? String(defaultTemplateId) : '';
     });
-  }, [activeInstance, selectedAppointment, templateOptions, templateResolution?.default_template?.id]);
+  }, [
+    activeInstance,
+    selectedAppointment,
+    serviceContextPresent,
+    templateOptions,
+    templateResolution?.default_template?.id
+  ]);
 
   function updateField(fieldKey, value) {
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
@@ -657,7 +665,7 @@ export default function LabReportWorkbench({
                 <Button
                   variant="primary"
                   onClick={() => handleCreateInstance()}
-                  disabled={saving || templateResolutionLoading || resolutionHasBlockingGap}
+                  disabled={saving || templateResolutionLoading || resolutionHasBlockingGap || !selectedTemplateId}
                 >
                   <Icon name="plus.rectangle.on.folder" size={16} />
                   {busyAction === 'create' ? 'Создаю...' : 'Создать бланк'}

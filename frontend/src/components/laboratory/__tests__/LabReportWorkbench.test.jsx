@@ -182,4 +182,59 @@ describe('LabReportWorkbench', () => {
       expect.stringContaining('автоматически')
     );
   });
+
+  it('does not auto-select a service-scoped template unless backend provides default_template', async () => {
+    render(
+      <MacOSThemeProvider>
+        <ThemeProvider>
+          <LabReportWorkbench
+            selectedAppointment={{
+              id: 17,
+              patient_id: 444,
+              visit_id: 728,
+              patient_fio: 'Test Patient',
+              service_codes: ['CBC'],
+              service_details: [{ id: 5, code: 'CBC', name: 'CBC' }],
+            }}
+            templates={[
+              {
+                id: 3,
+                name: 'CBC template',
+                family: 'hematology',
+                published_version_id: 33,
+              },
+            ]}
+            templateResolution={{
+              visit_id: 728,
+              service_codes: ['CBC'],
+              default_template: null,
+              allowed_templates: [
+                {
+                  id: 3,
+                  name: 'CBC template',
+                  family: 'hematology',
+                  published_version_id: 33,
+                },
+              ],
+              unmapped_service_codes: [],
+            }}
+            templateResolutionLoading={false}
+            reportHistory={[]}
+            recentReports={[]}
+            activeInstance={null}
+            onInstanceChange={vi.fn()}
+            onOpenInstance={vi.fn()}
+            onRefreshHistory={vi.fn()}
+            onRefreshRecentReports={vi.fn()}
+            onQueueChanged={vi.fn()}
+            notify={vi.fn()}
+          />
+        </ThemeProvider>
+      </MacOSThemeProvider>
+    );
+
+    expect(screen.getByRole('combobox')).toHaveValue('');
+    expect(screen.getByRole('combobox').closest('div')?.querySelector('button')).toBeDisabled();
+    expect(labReportingApi.createInstance).not.toHaveBeenCalled();
+  });
 });
