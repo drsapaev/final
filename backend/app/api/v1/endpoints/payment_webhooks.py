@@ -2,9 +2,11 @@
 API endpoints для обработки webhook от платежных провайдеров
 """
 
+import json
+from json import JSONDecodeError
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -16,6 +18,38 @@ from app.services.notifications import notification_sender_service
 from app.services.provider_webhook_service import ProviderWebhookService
 
 router = APIRouter()
+
+MAX_PAYMENT_WEBHOOK_BODY_BYTES = 256 * 1024
+
+
+async def _read_payment_webhook_json(request: Request) -> Dict[str, Any]:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    async for chunk in request.stream():
+        total_size += len(chunk)
+        if total_size > MAX_PAYMENT_WEBHOOK_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Payment webhook payload is too large",
+            )
+        chunks.append(chunk)
+
+    try:
+        payload = json.loads(b"".join(chunks).decode("utf-8") or "{}")
+    except (JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment webhook JSON",
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment webhook JSON must be an object",
+        )
+
+    return payload
 
 
 async def _emit_payment_notification_from_webhook_result(
@@ -107,7 +141,7 @@ async def click_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Webhook для Click платежной системы"""
-    webhook_data = await request.json()
+    webhook_data = await _read_payment_webhook_json(request)
     result = ProviderWebhookService(db).process_click_webhook(webhook_data)
     await _emit_payment_notification_from_webhook_result(
         db=db,
@@ -122,7 +156,7 @@ async def payme_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Webhook для Payme платежной системы (JSON-RPC)"""
-    webhook_data = await request.json()
+    webhook_data = await _read_payment_webhook_json(request)
     auth_header = request.headers.get("Authorization")
     result = ProviderWebhookService(db).process_payme_webhook(webhook_data, auth_header)
     await _emit_payment_notification_from_webhook_result(
@@ -138,7 +172,7 @@ async def kaspi_webhook(
     request: Request, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Webhook для Kaspi Pay платежной системы"""
-    webhook_data = await request.json()
+    webhook_data = await _read_payment_webhook_json(request)
     result = ProviderWebhookService(db).process_kaspi_webhook(webhook_data)
     await _emit_payment_notification_from_webhook_result(
         db=db,
