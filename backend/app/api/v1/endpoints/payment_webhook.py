@@ -1,6 +1,9 @@
 # app/api/v1/endpoints/payment_webhook.py
+import json
 import logging
+from json import JSONDecodeError
 from typing import Any, List
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -20,6 +23,58 @@ from app.services.payment_webhook_api_service import (
 
 router = APIRouter(prefix="/webhooks", tags=["payment_webhooks"])
 logger = logging.getLogger(__name__)
+
+MAX_LEGACY_PAYMENT_WEBHOOK_BODY_BYTES = 256 * 1024
+
+
+async def _read_legacy_payment_webhook_body(request: Request) -> bytes:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    async for chunk in request.stream():
+        total_size += len(chunk)
+        if total_size > MAX_LEGACY_PAYMENT_WEBHOOK_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Payment webhook payload is too large",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
+async def _read_legacy_payment_webhook_json(request: Request) -> dict[str, Any]:
+    raw_body = await _read_legacy_payment_webhook_body(request)
+
+    try:
+        data = json.loads(raw_body.decode("utf-8") or "{}")
+    except (JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment webhook JSON",
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment webhook JSON must be an object",
+        )
+
+    return data
+
+
+async def _read_legacy_payment_webhook_form(request: Request) -> dict[str, str]:
+    raw_body = await _read_legacy_payment_webhook_body(request)
+
+    try:
+        decoded_body = raw_body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment webhook form encoding",
+        ) from exc
+
+    return dict(parse_qsl(decoded_body, keep_blank_values=True))
 
 
 def _finalize_public_webhook_result(
@@ -126,7 +181,7 @@ async def payme_webhook(request: Request, db: Session = Depends(get_db)):
     service = PaymentWebhookApiService(db)
     try:
         # Получаем данные из запроса
-        data = await request.json()
+        data = await _read_legacy_payment_webhook_json(request)
 
         # Получаем подпись из заголовков
         signature = request.headers.get("X-Payme-Signature")
@@ -160,8 +215,7 @@ async def click_webhook(request: Request, db: Session = Depends(get_db)):
     service = PaymentWebhookApiService(db)
     try:
         # Получаем данные из формы
-        form_data = await request.form()
-        data = dict(form_data)
+        data = await _read_legacy_payment_webhook_form(request)
         return _finalize_public_webhook_result(
             provider="click",
             result=service.process_click_webhook(data=data),
