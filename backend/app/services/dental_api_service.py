@@ -44,6 +44,17 @@ class DentalApiService:
         service_id = getattr(service, "id", None)
         return str(service_id) if service_id is not None else None
 
+    def _visit_belongs_to_doctor(self, *, visit, doctor, user_id: int) -> bool:
+        visit_doctor_id = getattr(visit, "doctor_id", None)
+        if visit_doctor_id == getattr(doctor, "id", None):
+            return True
+
+        get_doctor = getattr(self.repository, "get_doctor", None)
+        assigned_doctor = get_doctor(user_id) if get_doctor else None
+        # Some legacy visit writers stored User.id in doctor_id. Allow that only
+        # when the value does not target another real Doctor row.
+        return assigned_doctor is None and visit_doctor_id == user_id
+
     async def create_dental_price_override(self, *, override_data, user: User) -> DoctorPriceOverride:
         visit = self.repository.get_visit(override_data.visit_id)
         if not visit:
@@ -66,6 +77,9 @@ class DentalApiService:
                 403,
                 "Только стоматолог может указывать цену после лечения",
             )
+
+        if not self._visit_belongs_to_doctor(visit=visit, doctor=doctor, user_id=user.id):
+            raise DentalApiDomainError(403, "Access denied")
 
         price_override = DoctorPriceOverride(
             visit_id=override_data.visit_id,

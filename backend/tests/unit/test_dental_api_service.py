@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -28,6 +29,88 @@ class TestDentalApiService:
                 user=SimpleNamespace(id=5),
             )
         assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_create_dental_price_override_rejects_foreign_visit(self):
+        class Repository:
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, doctor_id=99)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(
+                    id=service_id,
+                    allow_doctor_price_override=True,
+                    price=Decimal("120"),
+                )
+
+            def get_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7, specialty="dental")
+
+            def get_doctor(self, doctor_id):
+                return None
+
+        service = DentalApiService(db=None, repository=Repository())
+        with pytest.raises(DentalApiDomainError) as exc_info:
+            await service.create_dental_price_override(
+                override_data=SimpleNamespace(
+                    visit_id=1,
+                    service_id=2,
+                    new_price=Decimal("100"),
+                    reason="reason",
+                    details=None,
+                ),
+                user=SimpleNamespace(id=10),
+            )
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_create_dental_price_override_accepts_owned_visit(self):
+        class Repository:
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(
+                    id=service_id,
+                    allow_doctor_price_override=True,
+                    price=Decimal("120"),
+                )
+
+            def get_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7, specialty="dental", user=None)
+
+            def get_doctor(self, doctor_id):
+                return None
+
+            def add(self, obj):
+                self.created = obj
+
+            def commit(self):
+                pass
+
+            def refresh(self, obj):
+                obj.id = 55
+
+            def list_registrars(self):
+                return []
+
+        repository = Repository()
+        service = DentalApiService(db=None, repository=repository)
+
+        result = await service.create_dental_price_override(
+            override_data=SimpleNamespace(
+                visit_id=1,
+                service_id=2,
+                new_price=Decimal("100"),
+                reason="reason",
+                details=None,
+            ),
+            user=SimpleNamespace(id=10),
+        )
+
+        assert result is repository.created
+        assert result.doctor_id == 7
 
     def test_get_dental_price_overrides_raises_when_doctor_missing(self):
         class Repository:

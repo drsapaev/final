@@ -46,7 +46,7 @@ class TestDermaApiService:
 
         class Repository:
             def get_visit(self, visit_id):
-                return SimpleNamespace(id=visit_id)
+                return SimpleNamespace(id=visit_id, doctor_id=7)
 
             def get_service(self, service_id):
                 return SimpleNamespace(
@@ -57,6 +57,9 @@ class TestDermaApiService:
 
             def get_doctor_by_user_id(self, user_id):
                 return SimpleNamespace(id=7, specialty="dermatology")
+
+            def get_doctor(self, doctor_id):
+                return None
 
             def create_price_override(self, **kwargs):
                 return created
@@ -74,3 +77,37 @@ class TestDermaApiService:
         )
 
         assert result is created
+
+    def test_create_price_override_rejects_foreign_visit(self):
+        class Repository:
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, doctor_id=99)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(
+                    id=service_id,
+                    allow_doctor_price_override=True,
+                    price=Decimal("120"),
+                )
+
+            def get_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7, specialty="dermatology")
+
+            def get_doctor(self, doctor_id):
+                return None
+
+        service = DermaApiService(db=None, repository=Repository())
+
+        with pytest.raises(DermaApiDomainError) as exc_info:
+            service.create_price_override(
+                override_data=SimpleNamespace(
+                    visit_id=1,
+                    service_id=2,
+                    new_price=Decimal("100"),
+                    reason="manual",
+                    details=None,
+                ),
+                user_id=10,
+            )
+
+        assert exc_info.value.status_code == 403
