@@ -31,3 +31,19 @@ def test_admin_user_create_accepts_reserved_test_domain(
     )
     assert saved_user is not None
     assert saved_user.email == "qa_admin_api@test.local"
+
+
+def test_admin_can_list_users(client, auth_headers):
+    response = client.get("/api/v1/users/users", headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    assert "users" in response.json()
+
+
+def test_patient_cannot_list_users(client, patient_token):
+    response = client.get(
+        "/api/v1/users/users",
+        headers={"Authorization": f"Bearer {patient_token}"},
+    )
+
+    assert response.status_code == 403
