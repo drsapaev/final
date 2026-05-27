@@ -101,7 +101,11 @@ const QueueTable = ({
             'no_show': { variant: 'secondary', label: 'Не явился', icon: 'person.crop.circle.badge.xmark' }
         };
 
-        const config = statusMap[status] || statusMap['waiting'];
+        const config = statusMap[status] || {
+            variant: 'secondary',
+            label: status || '—',
+            icon: 'questionmark.circle'
+        };
 
         return (
             <Badge variant={config.variant}>
