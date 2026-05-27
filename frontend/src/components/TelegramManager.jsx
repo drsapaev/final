@@ -66,6 +66,10 @@ import { api } from '../api/client.js';
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
   const [templates, setTemplates] = useState([]);
+  const [onboardingRequests, setOnboardingRequests] = useState([]);
+  const [onboardingTotal, setOnboardingTotal] = useState(0);
+  const [onboardingReviewForms, setOnboardingReviewForms] = useState({});
+  const [onboardingActionId, setOnboardingActionId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -86,15 +90,19 @@ const TelegramManager = () => {
   const loadTelegramData = async () => {
     try {
       setLoading(true);
-      const [statusRes, integrationRes, templatesRes] = await Promise.all([
+      const [statusRes, integrationRes, templatesRes, onboardingRes] = await Promise.all([
         api.get('/telegram/bot-status'),
         api.get('/admin/telegram/integration-status').catch(() => ({ data: null })),
-        api.get('/admin/telegram/templates')
+        api.get('/admin/telegram/templates'),
+        api.get('/telegram/onboarding/requests', {
+          params: { status_filter: 'pending_review', limit: 20 }
+        }).catch(() => ({ data: { items: [], total: 0 } }))
       ]);
 
       const statusData = statusRes?.data || {};
       const integrationData = integrationRes?.data || {};
       const templatesData = templatesRes?.data || {};
+      const onboardingData = onboardingRes?.data || {};
 
       setBotStatus({
         bot_active: Boolean(integrationData.active ?? statusData.active ?? statusData.configured),
@@ -128,10 +136,95 @@ const TelegramManager = () => {
       }));
 
       setTemplates(normalizedTemplates);
+      setOnboardingRequests(Array.isArray(onboardingData.items) ? onboardingData.items : []);
+      setOnboardingTotal(Number(onboardingData.total ?? 0));
     } catch (e) {
       setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных Telegram');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOnboardingRequests = async () => {
+    try {
+      const response = await api.get('/telegram/onboarding/requests', {
+        params: { status_filter: 'pending_review', limit: 20 }
+      });
+      const data = response?.data || {};
+      setOnboardingRequests(Array.isArray(data.items) ? data.items : []);
+      setOnboardingTotal(Number(data.total ?? 0));
+    } catch (_err) {
+      setError('Could not load REQUEST_REVIEW patient requests.');
+    }
+  };
+
+  const updateOnboardingReviewForm = (requestId, field, value) => {
+    setOnboardingReviewForms((current) => ({
+      ...current,
+      [requestId]: {
+        ...(current[requestId] || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleOnboardingReviewAction = async (requestId, action) => {
+    const request = onboardingRequests.find((item) => item.id === requestId) || {};
+    const form = onboardingReviewForms[requestId] || {};
+    const reviewMessage = (form.reviewMessage || '').trim();
+    const actionKey = `${action}:${requestId}`;
+    let endpoint = `/telegram/onboarding/requests/${requestId}/${action}`;
+    let payload = { reviewMessage: reviewMessage || undefined };
+
+    if (action === 'link-existing') {
+      const patientId = Number(form.patientId);
+      if (!Number.isInteger(patientId) || patientId <= 0) {
+        setError('Enter an existing patient ID before linking.');
+        return;
+      }
+      payload = { patientId, reviewMessage: reviewMessage || undefined };
+    } else if (action === 'create-patient') {
+      const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
+      const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
+      const nameParts = splitOnboardingContactName(contactName);
+      const lastName = (form.lastName || nameParts.lastName || '').trim();
+      const firstName = (form.firstName || nameParts.firstName || '').trim();
+      const middleName = (form.middleName || nameParts.middleName || '').trim();
+      const phone = (form.phone || contactPhone || '').trim();
+
+      if (!lastName || !firstName) {
+        setError('Enter first and last name before creating a Patient.');
+        return;
+      }
+
+      endpoint = `/telegram/onboarding/requests/${requestId}/create-patient`;
+      payload = {
+        patient: {
+          last_name: lastName,
+          first_name: firstName,
+          ...(middleName ? { middle_name: middleName } : {}),
+          ...(phone ? { phone } : {})
+        },
+        reviewMessage: reviewMessage || undefined
+      };
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      setOnboardingActionId(actionKey);
+      await api.post(endpoint, payload);
+      setSuccess('REQUEST_REVIEW request updated.');
+      setOnboardingReviewForms((current) => {
+        const next = { ...current };
+        delete next[requestId];
+        return next;
+      });
+      await loadOnboardingRequests();
+    } catch (_err) {
+      setError('Could not update REQUEST_REVIEW request. Check staff role and request status.');
+    } finally {
+      setOnboardingActionId('');
     }
   };
 
@@ -523,6 +616,40 @@ const TelegramManager = () => {
     { value: 'photo', label: 'Фото' },
     { value: 'document', label: 'Документ' }
   ];
+  const getOnboardingValue = (request, camelKey, snakeKey, fallback = '') =>
+    request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
+  const splitOnboardingContactName = (value) => {
+    const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+    return {
+      lastName: parts[0] || '',
+      firstName: parts[1] || '',
+      middleName: parts.slice(2).join(' ')
+    };
+  };
+  const formatOnboardingDate = (value) => {
+    if (!value) return 'not selected';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const formatOnboardingCreatedAt = (value) => {
+    if (!value) return 'new';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'new';
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  const onboardingStatusVariant = (status) => {
+    if (status === 'pending_review') return 'warning';
+    if (status === 'linked_existing' || status === 'created_patient') return 'success';
+    if (status === 'needs_more_info') return 'primary';
+    if (status === 'rejected' || status === 'expired') return 'danger';
+    return 'default';
+  };
   const iconActionStyle = {
     width: 32,
     minHeight: 32,
@@ -652,7 +779,7 @@ const TelegramManager = () => {
                         Read-only
                       </Badge>
                     </Box>
-                    <Box display="flex" flexDirection="column" gap={1.25}>
+                    <Box display="flex" sx={{ flexDirection: 'column' }} gap={1.25}>
                       {staffCapabilitySummary.map((item) => {
                         const Icon = item.icon;
                         return (
@@ -1126,6 +1253,205 @@ const TelegramManager = () => {
                   Новый шаблон
                 </Button>
               </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} mb={2}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    REQUEST_REVIEW patient requests
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Unknown Telegram users can submit only an onboarding request. Staff must link an existing patient or ask for safe extra details before any protected workflow opens.
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={1} alignItems="center">
+                  <Badge variant={onboardingTotal > 0 ? 'warning' : 'success'} size="small">
+                    {onboardingTotal} pending
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    size="small"
+                    onClick={loadOnboardingRequests}
+                    aria-label="Refresh REQUEST_REVIEW requests">
+                    <RefreshCw size={16} />
+                    Refresh
+                  </Button>
+                </Box>
+              </Box>
+
+              {!onboardingRequests.length ? (
+                <Alert severity="info">
+                  No pending REQUEST_REVIEW requests. Unknown patients still get a safe appointment request CTA instead of confirmed booking.
+                </Alert>
+              ) : (
+                <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <Table style={{ minWidth: 1080 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeaderCell>Request</TableHeaderCell>
+                        <TableHeaderCell>Contact</TableHeaderCell>
+                        <TableHeaderCell>Desired visit</TableHeaderCell>
+                        <TableHeaderCell>Review</TableHeaderCell>
+                        <TableHeaderCell align="right">Actions</TableHeaderCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {onboardingRequests.map((request) => {
+                        const requestId = request.id;
+                        const form = onboardingReviewForms[requestId] || {};
+                        const contactName = getOnboardingValue(request, 'contactName', 'contact_name', 'No name');
+                        const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', 'No phone');
+                        const contactNameParts = splitOnboardingContactName(contactName);
+                        const createLastName = (form.lastName || contactNameParts.lastName || '').trim();
+                        const createFirstName = (form.firstName || contactNameParts.firstName || '').trim();
+                        const canCreatePatient = Boolean(createLastName && createFirstName);
+                        const desiredService = getOnboardingValue(request, 'desiredService', 'desired_service', 'Service not selected');
+                        const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', 'Branch not selected');
+                        const desiredDate = getOnboardingValue(request, 'desiredDate', 'desired_date', '');
+                        const desiredTime = getOnboardingValue(request, 'desiredTime', 'desired_time', '');
+                        const desiredDoctorId = getOnboardingValue(request, 'desiredDoctorId', 'desired_doctor_id', '');
+                        const note = getOnboardingValue(request, 'note', 'note', '');
+                        const createdAt = getOnboardingValue(request, 'createdAt', 'created_at', '');
+                        const status = request.status || 'pending_review';
+                        const linkActionId = `link-existing:${requestId}`;
+                        const createPatientActionId = `create-patient:${requestId}`;
+                        const moreInfoActionId = `request-more-info:${requestId}`;
+                        const rejectActionId = `reject:${requestId}`;
+                        const actionBusy = onboardingActionId.endsWith(`:${requestId}`);
+
+                        return (
+                          <TableRow key={requestId} hover>
+                            <TableCell>
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
+                                <Typography variant="body2" fontWeight={600}>
+                                  #{requestId}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatOnboardingCreatedAt(createdAt)}
+                                </Typography>
+                                <Badge variant={onboardingStatusVariant(status)} size="small">
+                                  {status}
+                                </Badge>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
+                                <Typography variant="body2">{contactName}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {contactPhone}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
+                                <Typography variant="body2">{desiredService}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {desiredBranch}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatOnboardingDate(desiredDate)} {desiredTime}
+                                  {desiredDoctorId ? `, doctor #${desiredDoctorId}` : ''}
+                                </Typography>
+                                {note && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Note: {note}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={1}>
+                                <Input
+                                  label="Existing patient ID"
+                                  value={form.patientId || ''}
+                                  onChange={(event) => updateOnboardingReviewForm(requestId, 'patientId', event.target.value)}
+                                  inputMode="numeric"
+                                  placeholder="12345"
+                                  style={{ width: 180 }} />
+                                <Box display="flex" gap={1} sx={{ flexWrap: 'wrap' }}>
+                                  <Input
+                                    label="Last name"
+                                    value={form.lastName ?? contactNameParts.lastName}
+                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'lastName', event.target.value)}
+                                    placeholder="Last"
+                                    style={{ width: 150 }} />
+                                  <Input
+                                    label="First name"
+                                    value={form.firstName ?? contactNameParts.firstName}
+                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'firstName', event.target.value)}
+                                    placeholder="First"
+                                    style={{ width: 150 }} />
+                                  <Input
+                                    label="Phone"
+                                    value={form.phone ?? contactPhone}
+                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'phone', event.target.value)}
+                                    placeholder="+998..."
+                                    style={{ width: 180 }} />
+                                </Box>
+                                <Textarea
+                                  label="Patient-facing safe message"
+                                  value={form.reviewMessage || ''}
+                                  maxLength={512}
+                                  minRows={2}
+                                  maxRows={4}
+                                  onChange={(event) => updateOnboardingReviewForm(requestId, 'reviewMessage', event.target.value)}
+                                  placeholder="Ask for safe contact details or explain decision"
+                                  style={{ minWidth: 280 }} />
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Box display="inline-flex" sx={{ flexDirection: 'column' }} gap={1} alignItems="stretch">
+                                <Button
+                                  type="button"
+                                  variant="contained"
+                                  size="small"
+                                  disabled={actionBusy || !form.patientId}
+                                  onClick={() => handleOnboardingReviewAction(requestId, 'link-existing')}>
+                                  <UserCheck size={16} />
+                                  {onboardingActionId === linkActionId ? 'Linking...' : 'Link existing'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  size="small"
+                                  disabled={actionBusy || !canCreatePatient}
+                                  onClick={() => handleOnboardingReviewAction(requestId, 'create-patient')}>
+                                  <Plus size={16} />
+                                  {onboardingActionId === createPatientActionId ? 'Creating...' : 'Create patient'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  size="small"
+                                  disabled={actionBusy}
+                                  onClick={() => handleOnboardingReviewAction(requestId, 'request-more-info')}>
+                                  <MessageSquare size={16} />
+                                  {onboardingActionId === moreInfoActionId ? 'Sending...' : 'Need info'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outlined"
+                                  size="small"
+                                  disabled={actionBusy}
+                                  onClick={() => handleOnboardingReviewAction(requestId, 'reject')}>
+                                  <Trash2 size={16} />
+                                  {onboardingActionId === rejectActionId ? 'Rejecting...' : 'Reject'}
+                                </Button>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </Grid>

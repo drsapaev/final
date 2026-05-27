@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -12,6 +12,7 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -380,6 +381,110 @@ class TelegramPatientFormSubmission(Base):
     patient: Mapped[Patient] = relationship("Patient", foreign_keys=[patient_id])
     telegram_user: Mapped[TelegramUser | None] = relationship(
         "TelegramUser", foreign_keys=[telegram_user_id]
+    )
+
+
+class PatientOnboardingRequest(Base):
+    """REQUEST_REVIEW storage for unlinked Telegram/Mini App appointment requests."""
+
+    __tablename__ = "patient_onboarding_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ("
+            "'pending_review', "
+            "'linked_existing', "
+            "'created_patient', "
+            "'needs_more_info', "
+            "'rejected', "
+            "'cancelled', "
+            "'expired'"
+            ")",
+            name="ck_patient_onboarding_requests_status_allowed",
+        ),
+        CheckConstraint(
+            "desired_time IS NULL OR desired_time <> ''",
+            name="ck_patient_onboarding_requests_desired_time_not_empty",
+        ),
+        Index(
+            "ix_patient_onboarding_requests_status_created_at",
+            "status",
+            "created_at",
+        ),
+        Index(
+            "ix_patient_onboarding_requests_telegram_user_status",
+            "telegram_user_id",
+            "status",
+        ),
+        Index(
+            "ix_patient_onboarding_requests_telegram_chat_id",
+            "telegram_chat_id",
+        ),
+        Index(
+            "ix_patient_onboarding_requests_expires_at",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    telegram_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("telegram_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), default="pending_review", nullable=False
+    )
+    language_code: Mapped[str] = mapped_column(
+        String(16), default="ru", nullable=False
+    )
+    contact_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    contact_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    desired_service: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    desired_branch: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    desired_doctor_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("doctors.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    desired_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    desired_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    resolved_patient_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("patients.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    telegram_user: Mapped[TelegramUser | None] = relationship(
+        "TelegramUser", foreign_keys=[telegram_user_id]
+    )
+    reviewed_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[reviewed_by_user_id]
+    )
+    resolved_patient: Mapped[Patient | None] = relationship(
+        "Patient", foreign_keys=[resolved_patient_id]
     )
 
 

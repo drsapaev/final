@@ -55,8 +55,20 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.models.webhook import WebhookCall, WebhookCallStatus, WebhookEvent
 from app.schemas import appointment as appointment_schemas
+from app.schemas.patient_onboarding import (
+    PatientOnboardingAuthRequest,
+    PatientOnboardingStatusResponse,
+    PatientOnboardingSubmitRequest,
+    PatientOnboardingSubmitResponse,
+    RegistrarCreatePatientFromOnboardingRequest,
+    RegistrarLinkExistingPatientRequest,
+    RegistrarOnboardingActionResponse,
+    RegistrarOnboardingListResponse,
+    RegistrarReviewMessageRequest,
+)
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import LabReportingService
+from app.services.patient_onboarding_service import PatientOnboardingService
 from app.services.payment_reconciliation_api_service import (
     PaymentReconciliationApiService,
 )
@@ -758,6 +770,24 @@ TELEGRAM_LOCALIZED_TEXTS = {
         TELEGRAM_LANGUAGE_RU: "Открыть запись в кабинете",
         TELEGRAM_LANGUAGE_UZ: "Kabinetda yozilish uchun ochish",
     },
+    "onboarding_entry_button": {
+        TELEGRAM_LANGUAGE_RU: "Оставить заявку на запись",
+        TELEGRAM_LANGUAGE_UZ: "Qabul uchun so'rov qoldirish",
+    },
+    "unlinked_protected_action": {
+        TELEGRAM_LANGUAGE_RU: (
+            "Пока Telegram не привязан к карте пациента.\n\n"
+            "Очередь, оплаты, документы и результаты доступны только после проверки "
+            "регистратурой. Вы можете оставить безопасную заявку на запись: сотрудники "
+            "свяжут её с существующей картой или создадут новую карту вручную."
+        ),
+        TELEGRAM_LANGUAGE_UZ: (
+            "Telegram hozircha bemor kartasiga bog'lanmagan.\n\n"
+            "Navbat, to'lovlar, hujjatlar va natijalar faqat registratura tekshiruvidan "
+            "keyin ochiladi. Siz qabul uchun xavfsiz so'rov qoldirishingiz mumkin: "
+            "xodimlar uni mavjud karta bilan bog'laydi yoki yangi kartani qo'lda yaratadi."
+        ),
+    },
     "queue_entry_button": {
         TELEGRAM_LANGUAGE_RU: "🎫 Открыть мою очередь",
         TELEGRAM_LANGUAGE_UZ: "🎫 Mening navbatimni ochish",
@@ -913,6 +943,7 @@ SUCCESSFUL_DELIVERY_STATUSES = {"delivered", "seen", "read", "archived"}
 PENDING_DELIVERY_STATUSES = {"pending", "dispatched"}
 MAX_TELEGRAM_LAB_REPORTS = 3
 PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX = "pma"
+PATIENT_ONBOARDING_ENTRY_TOKEN_PREFIX = "pmo"
 PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR = "_"
 PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS = 10 * 60
 PATIENT_MINI_APP_ENTRY_TOKEN_SECTIONS = {
@@ -1049,6 +1080,25 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
     return f"{body}{PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR}{signature}"
 
 
+def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointments") -> str:
+    expires_at = datetime.utcnow() + timedelta(
+        seconds=PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS
+    )
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(
+        [
+            PATIENT_ONBOARDING_ENTRY_TOKEN_PREFIX,
+            _patient_mini_app_token_section(section),
+            _base36_encode(int(chat_id)),
+            _base36_encode(
+                int(expires_at.replace(tzinfo=timezone.utc).timestamp())
+            ),
+            _base36_encode(secrets.randbits(48)),
+        ]
+    )
+    signature = _patient_mini_app_entry_token_signature(body)
+    return f"{body}{PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR}{signature}"
+
+
 def _parse_patient_mini_app_entry_token(
     token: str,
     *,
@@ -1056,6 +1106,42 @@ def _parse_patient_mini_app_entry_token(
 ) -> dict[str, Any] | None:
     parts = str(token or "").split(PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR)
     if len(parts) != 6 or parts[0] != PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX:
+        return None
+
+    section = _patient_mini_app_token_section(parts[1])
+    if expected_section and section != _patient_mini_app_token_section(expected_section):
+        return None
+
+    body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(parts[:5])
+    if not hmac.compare_digest(
+        parts[5],
+        _patient_mini_app_entry_token_signature(body),
+    ):
+        return None
+
+    try:
+        chat_id = _base36_decode(parts[2])
+        expires_at = datetime.fromtimestamp(_base36_decode(parts[3]), tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+    if expires_at < datetime.now(timezone.utc):
+        return None
+
+    return {
+        "chat_id": chat_id,
+        "section": section,
+        "expires_at": expires_at,
+    }
+
+
+def _parse_patient_onboarding_entry_token(
+    token: str,
+    *,
+    expected_section: str | None = None,
+) -> dict[str, Any] | None:
+    parts = str(token or "").split(PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR)
+    if len(parts) != 6 or parts[0] != PATIENT_ONBOARDING_ENTRY_TOKEN_PREFIX:
         return None
 
     section = _patient_mini_app_token_section(parts[1])
@@ -1212,8 +1298,50 @@ def _telegram_service_entry_markup(
     }
 
 
+def _telegram_onboarding_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
+    entry_url = _patient_entry_url("booking")
+    if not entry_url:
+        return None
+
+    if not entry_url.lower().startswith("https://"):
+        entry_token = _build_patient_onboarding_entry_token(
+            chat_id,
+            "appointments",
+        )
+        entry_url = _append_patient_mini_app_entry_token(entry_url, entry_token)
+
+    language = _telegram_chat_language(db, chat_id)
+    return {
+        "inline_keyboard": [
+            [
+                _telegram_entry_button(
+                    _localized_text("onboarding_entry_button", language),
+                    entry_url,
+                )
+            ]
+        ]
+    }
+
+
+def _telegram_protected_or_onboarding_markup(
+    db: Session,
+    chat_id: int,
+    section: str,
+    button_text_key: str,
+) -> Dict[str, Any] | None:
+    protected_markup = _telegram_service_entry_markup(
+        db,
+        chat_id,
+        section,
+        button_text_key,
+    )
+    if protected_markup:
+        return protected_markup
+    return _telegram_onboarding_entry_markup(db, chat_id)
+
+
 def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "payment",
@@ -1222,7 +1350,7 @@ def _telegram_payment_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
 
 
 def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "booking",
@@ -1231,7 +1359,7 @@ def _telegram_booking_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] 
 
 
 def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "queue",
@@ -1240,7 +1368,7 @@ def _telegram_queue_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | 
 
 
 def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "visits",
@@ -1249,7 +1377,7 @@ def _telegram_visits_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] |
 
 
 def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "forms",
@@ -1258,7 +1386,7 @@ def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> Dict[str,
 
 
 def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "documents",
@@ -1267,7 +1395,7 @@ def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> Dict[
 
 
 def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "doctors",
@@ -1276,7 +1404,7 @@ def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> Dict[st
 
 
 def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> Dict[str, Any] | None:
-    return _telegram_service_entry_markup(
+    return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
         "cabinet",
@@ -3184,7 +3312,7 @@ def _queue_entry_cabinet(
 def _clinic_queue_message(db: Session, chat_id: int) -> str:
     telegram_user, patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        return _telegram_chat_text(db, chat_id, "needs_link")
+        return _telegram_chat_text(db, chat_id, "unlinked_protected_action")
 
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
@@ -3233,7 +3361,7 @@ def _clinic_queue_message(db: Session, chat_id: int) -> str:
 def _clinic_visits_message(db: Session, chat_id: int) -> str:
     telegram_user, patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        return _telegram_chat_text(db, chat_id, "needs_link")
+        return _telegram_chat_text(db, chat_id, "unlinked_protected_action")
 
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
@@ -3374,7 +3502,7 @@ def _billing_totals(
 def _clinic_payments_message(db: Session, chat_id: int) -> str:
     telegram_user, patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        return _telegram_chat_text(db, chat_id, "needs_link")
+        return _telegram_chat_text(db, chat_id, "unlinked_protected_action")
 
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
@@ -3511,8 +3639,8 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
             db,
             bot_service,
             chat_id,
-            _telegram_chat_text(db, chat_id, "needs_link"),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_chat_text(db, chat_id, "unlinked_protected_action"),
+            _telegram_onboarding_entry_markup(db, chat_id) or _telegram_chat_menu(db, chat_id),
             "telegram_patient_results_needs_link",
         )
         return
@@ -3599,7 +3727,7 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
 def _clinic_status_message(db: Session, chat_id: int) -> str:
     telegram_user, patient = _patient_for_telegram_chat(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        return _telegram_chat_text(db, chat_id, "needs_link")
+        return _telegram_chat_text(db, chat_id, "unlinked_protected_action")
 
     language = _telegram_chat_language(db, chat_id)
     return _localized_text("profile_linked", language).format(
@@ -3613,7 +3741,7 @@ def _clinic_status_message(db: Session, chat_id: int) -> str:
 def _clinic_results_message(db: Session, chat_id: int) -> str:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
     if not telegram_user or not telegram_user.patient_id:
-        return _telegram_chat_text(db, chat_id, "needs_link")
+        return _telegram_chat_text(db, chat_id, "unlinked_protected_action")
 
     return _telegram_chat_text(db, chat_id, "results_hint")
 
@@ -3734,12 +3862,21 @@ async def _handle_contact_link(
 
     patient = _find_patient_by_phone(db, str(contact.get("phone_number") or ""))
     if not patient:
+        existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+            db, int(chat_id)
+        )
+        _upsert_ticket_qr_telegram_user(
+            db,
+            message,
+            notifications_enabled=False if existing_telegram_user is None else None,
+        )
+        db.commit()
         await _send_patient_bot_reply(
             db,
             bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "patient_not_found"),
-            _telegram_chat_menu(db, chat_id),
+            _telegram_onboarding_entry_markup(db, chat_id) or _telegram_chat_menu(db, chat_id),
             "telegram_patient_not_found",
         )
         return True
@@ -3949,6 +4086,12 @@ async def _handle_clinic_bot_update(
 
     async def patient_forms_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+        reply_text = (
+            _localized_text("patient_forms", language)
+            if telegram_user and telegram_user.patient_id
+            else _localized_text("unlinked_protected_action", language)
+        )
         reply_markup = (
             _telegram_patient_forms_entry_markup(db, chat_id)
             or _localized_services_menu(language)
@@ -3957,13 +4100,19 @@ async def _handle_clinic_bot_update(
             db,
             bot_service,
             chat_id,
-            _localized_text("patient_forms", language),
+            reply_text,
             reply_markup,
             "telegram_patient_forms_placeholder",
         )
 
     async def patient_documents_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+        reply_text = (
+            _localized_text("patient_documents", language)
+            if telegram_user and telegram_user.patient_id
+            else _localized_text("unlinked_protected_action", language)
+        )
         reply_markup = (
             _telegram_patient_documents_entry_markup(db, chat_id)
             or _localized_services_menu(language)
@@ -3972,7 +4121,7 @@ async def _handle_clinic_bot_update(
             db,
             bot_service,
             chat_id,
-            _localized_text("patient_documents", language),
+            reply_text,
             reply_markup,
             "telegram_patient_documents_placeholder",
         )
@@ -3994,6 +4143,12 @@ async def _handle_clinic_bot_update(
 
     async def patient_cabinet_handler(chat_id: int) -> None:
         language = _telegram_chat_language(db, chat_id)
+        telegram_user, _patient = _patient_for_telegram_chat(db, chat_id)
+        reply_text = (
+            _localized_text("patient_cabinet", language)
+            if telegram_user and telegram_user.patient_id
+            else _localized_text("unlinked_protected_action", language)
+        )
         reply_markup = (
             _telegram_patient_cabinet_entry_markup(db, chat_id)
             or _localized_services_menu(language)
@@ -4002,7 +4157,7 @@ async def _handle_clinic_bot_update(
             db,
             bot_service,
             chat_id,
-            _localized_text("patient_cabinet", language),
+            reply_text,
             reply_markup,
             "telegram_patient_cabinet_placeholder",
         )
@@ -4146,6 +4301,11 @@ async def _handle_clinic_bot_update(
 
     if await _handle_contact_link(message, db, bot_service):
         return True
+
+    existing_telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    if existing_telegram_user is None:
+        _upsert_ticket_qr_telegram_user(db, message, notifications_enabled=False)
+        db.commit()
 
     text = _message_text(message)
     command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text else ""
@@ -4404,6 +4564,107 @@ def _resolve_mini_app_patient_scope_from_auth(
     raise TelegramMiniAppInitDataError("init_data_required")
 
 
+def _telegram_user_from_mini_app_init_data(
+    db: Session,
+    init_data_payload: str,
+) -> TelegramUser:
+    bot_token = _get_configured_bot_token(db)
+    if not bot_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason": "bot_token_required"},
+        )
+
+    init_data = validate_telegram_mini_app_init_data(
+        init_data_payload,
+        bot_token=bot_token,
+    )
+    user = init_data.user if isinstance(init_data.user, dict) else {}
+    try:
+        chat_id = int(user.get("id"))
+    except (TypeError, ValueError) as exc:
+        raise TelegramMiniAppSessionScopeError("telegram_user_id_required") from exc
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
+    if not telegram_user:
+        raise TelegramMiniAppSessionScopeError("telegram_link_required")
+    if not getattr(telegram_user, "active", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_inactive")
+    if getattr(telegram_user, "blocked", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_blocked")
+    return telegram_user
+
+
+def _onboarding_scope_for_telegram_user(
+    telegram_user: TelegramUser,
+) -> TelegramMiniAppSessionScope:
+    return TelegramMiniAppSessionScope(
+        scope_type="onboarding",  # type: ignore[arg-type]
+        telegram_user_id=int(telegram_user.id),
+        telegram_chat_id=int(telegram_user.chat_id),
+        patient_id=None,
+    )
+
+
+def _resolve_mini_app_onboarding_scope_from_init_data(
+    db: Session,
+    init_data_payload: str,
+) -> TelegramMiniAppSessionScope:
+    telegram_user = _telegram_user_from_mini_app_init_data(db, init_data_payload)
+    return _onboarding_scope_for_telegram_user(telegram_user)
+
+
+def _resolve_mini_app_onboarding_scope_from_entry_token(
+    db: Session,
+    entry_token: str,
+    *,
+    expected_section: str | None = None,
+) -> TelegramMiniAppSessionScope:
+    parsed = _parse_patient_onboarding_entry_token(
+        entry_token,
+        expected_section=expected_section,
+    )
+    if not parsed:
+        raise TelegramMiniAppSessionScopeError("entry_token_invalid")
+
+    telegram_user = crud_telegram.get_telegram_user_by_chat_id(
+        db,
+        int(parsed["chat_id"]),
+    )
+    if not telegram_user:
+        raise TelegramMiniAppSessionScopeError("telegram_link_required")
+    if not getattr(telegram_user, "active", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_inactive")
+    if getattr(telegram_user, "blocked", False):
+        raise TelegramMiniAppSessionScopeError("telegram_link_blocked")
+    return _onboarding_scope_for_telegram_user(telegram_user)
+
+
+def _resolve_mini_app_onboarding_scope_from_auth(
+    db: Session,
+    *,
+    init_data_payload: str | None = None,
+    entry_token: str | None = None,
+    expected_section: str | None = None,
+) -> tuple[TelegramMiniAppSessionScope, str]:
+    normalized_init_data = str(init_data_payload or "").strip()
+    if normalized_init_data:
+        return _resolve_mini_app_onboarding_scope_from_init_data(
+            db,
+            normalized_init_data,
+        ), "init_data"
+
+    normalized_entry_token = str(entry_token or "").strip()
+    if normalized_entry_token:
+        return _resolve_mini_app_onboarding_scope_from_entry_token(
+            db,
+            normalized_entry_token,
+            expected_section=expected_section,
+        ), "entry_token"
+
+    raise TelegramMiniAppInitDataError("init_data_required")
+
+
 def _mini_app_patient_manifest_payload(
     db: Session,
     scope: TelegramMiniAppSessionScope,
@@ -4478,6 +4739,73 @@ def _mini_app_patient_manifest_payload(
     }
 
 
+def _mini_app_patient_onboarding_manifest_payload(
+    db: Session,
+    scope: TelegramMiniAppSessionScope,
+    *,
+    auth_source: str,
+) -> dict[str, Any]:
+    telegram_user = (
+        db.query(TelegramUser)
+        .filter(TelegramUser.id == int(scope.telegram_user_id))
+        .first()
+    )
+    language_code = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
+    onboarding_status = (
+        PatientOnboardingService(db).own_status_response(telegram_user)
+        if telegram_user is not None
+        else {
+            "request": None,
+            "messageKey": "patient_onboarding_not_found",
+            "safeNextAction": "submit_onboarding_request",
+        }
+    )
+    return {
+        "scope": {
+            "type": "onboarding",
+        },
+        "auth": {
+            "source": auth_source,
+            "entry_token_fallback": auth_source == "entry_token",
+        },
+        "language": {
+            "code": language_code,
+            "label": "O'zbekcha"
+            if language_code == TELEGRAM_LANGUAGE_UZ
+            else "Русский",
+        },
+        "patient": {
+            "linked": False,
+            "name": None,
+        },
+        "onboarding": onboarding_status,
+        "capabilities": {
+            "appointments": {
+                "status": "request_review_enabled",
+                "preview_enabled": False,
+                "create_enabled": False,
+                "onboarding_request_enabled": True,
+            },
+            "forms": {"status": "staff_approval_required", "read_enabled": False},
+            "cabinet": {"status": "staff_approval_required", "read_enabled": False},
+            "visits": {"status": "staff_approval_required", "read_enabled": False},
+            "queue": {"status": "staff_approval_required", "read_enabled": False},
+            "payments": {"status": "staff_approval_required", "view_enabled": False},
+            "results": {"status": "staff_approval_required", "read_enabled": False},
+            "documents": {"status": "staff_approval_required", "read_enabled": False},
+        },
+        "policy": {
+            "plain_telegram_chat_allowed": False,
+            "medical_details_in_chat": False,
+            "entry_token_ttl_seconds": PATIENT_MINI_APP_ENTRY_TOKEN_TTL_SECONDS,
+            "patient_auto_create_allowed": False,
+            "confirmed_appointment_create_allowed": False,
+        },
+    }
+
+
 def _build_mini_app_patient_manifest_from_request(
     request_body: TelegramMiniAppPatientManifestRequest,
     db: Session,
@@ -4489,18 +4817,32 @@ def _build_mini_app_patient_manifest_from_request(
             entry_token=request_body.entry_token,
             expected_section=request_body.section,
         )
-    except TelegramMiniAppInitDataError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": exc.reason},
-        ) from exc
-    except TelegramMiniAppSessionScopeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"reason": exc.reason},
-        ) from exc
-
-    return _mini_app_patient_manifest_payload(db, scope, auth_source=auth_source)
+        return _mini_app_patient_manifest_payload(db, scope, auth_source=auth_source)
+    except (TelegramMiniAppInitDataError, TelegramMiniAppSessionScopeError):
+        try:
+            onboarding_scope, onboarding_auth_source = (
+                _resolve_mini_app_onboarding_scope_from_auth(
+                    db,
+                    init_data_payload=request_body.init_data,
+                    entry_token=request_body.entry_token,
+                    expected_section=request_body.section,
+                )
+            )
+        except TelegramMiniAppInitDataError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"reason": exc.reason},
+            ) from exc
+        except TelegramMiniAppSessionScopeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"reason": exc.reason},
+            ) from exc
+        return _mini_app_patient_onboarding_manifest_payload(
+            db,
+            onboarding_scope,
+            auth_source=onboarding_auth_source,
+        )
 
 
 def _iso_date_value(value: date | datetime | None) -> str | None:
@@ -4774,6 +5116,195 @@ def _save_mini_app_patient_form_submission_from_request(
         ) from exc
 
     return result
+
+
+def _telegram_user_from_onboarding_request_auth(
+    db: Session,
+    request_body: PatientOnboardingAuthRequest,
+) -> TelegramUser:
+    try:
+        scope, _auth_source = _resolve_mini_app_onboarding_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "appointments",
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+
+    telegram_user = (
+        db.query(TelegramUser)
+        .filter(TelegramUser.id == int(scope.telegram_user_id))
+        .first()
+    )
+    if telegram_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": "telegram_link_required"},
+        )
+    return telegram_user
+
+
+@router.post(
+    "/mini-app/onboarding/requests",
+    response_model=PatientOnboardingSubmitResponse,
+    operation_id="telegram_mini_app_submit_patient_onboarding_request",
+)
+def submit_mini_app_patient_onboarding_request(
+    request_body: PatientOnboardingSubmitRequest,
+    db: Session = Depends(get_db),
+):
+    """Submit a REQUEST_REVIEW onboarding request without creating a Patient."""
+
+    telegram_user = _telegram_user_from_onboarding_request_auth(db, request_body)
+    row, created = PatientOnboardingService(db).submit(
+        telegram_user=telegram_user,
+        payload=request_body,
+    )
+    return PatientOnboardingService(db).submit_response(row, created=created)
+
+
+@router.post(
+    "/mini-app/onboarding/status",
+    response_model=PatientOnboardingStatusResponse,
+    operation_id="telegram_mini_app_read_patient_onboarding_status",
+)
+def read_mini_app_patient_onboarding_status(
+    request_body: PatientOnboardingAuthRequest,
+    db: Session = Depends(get_db),
+):
+    """Return the caller's own onboarding request status."""
+
+    telegram_user = _telegram_user_from_onboarding_request_auth(db, request_body)
+    return PatientOnboardingService(db).own_status_response(telegram_user)
+
+
+@router.get(
+    "/onboarding/requests",
+    response_model=RegistrarOnboardingListResponse,
+    operation_id="telegram_registrar_list_patient_onboarding_requests",
+)
+def list_registrar_patient_onboarding_requests(
+    status_filter: str = "pending_review",
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """List patient onboarding requests for registrar review."""
+
+    allowed_statuses = {
+        "pending_review",
+        "linked_existing",
+        "created_patient",
+        "needs_more_info",
+        "rejected",
+        "cancelled",
+        "expired",
+    }
+    if status_filter and status_filter not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "onboarding_status_invalid"},
+        )
+    safe_limit = max(1, min(int(limit), 100))
+    safe_offset = max(0, int(offset))
+    return PatientOnboardingService(db).list_pending(
+        status_filter=status_filter,
+        limit=safe_limit,
+        offset=safe_offset,
+    )
+
+
+@router.post(
+    "/onboarding/requests/{request_id}/link-existing",
+    response_model=RegistrarOnboardingActionResponse,
+    operation_id="telegram_registrar_link_existing_patient_onboarding_request",
+)
+def link_existing_patient_onboarding_request(
+    request_id: int,
+    request_body: RegistrarLinkExistingPatientRequest,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Link a reviewed onboarding request to an existing patient."""
+
+    return PatientOnboardingService(db).link_existing_patient(
+        request_id=request_id,
+        patient_id=request_body.patient_id,
+        actor=current_user,
+        review_message=request_body.review_message,
+    )
+
+
+@router.post(
+    "/onboarding/requests/{request_id}/create-patient",
+    response_model=RegistrarOnboardingActionResponse,
+    operation_id="telegram_registrar_create_patient_from_onboarding_request",
+)
+def create_patient_from_onboarding_request(
+    request: Request,
+    request_id: int,
+    request_body: RegistrarCreatePatientFromOnboardingRequest,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Create a Patient only after staff review, then link Telegram."""
+
+    return PatientOnboardingService(db).create_patient_from_request(
+        request=request,
+        request_id=request_id,
+        payload=request_body,
+        actor=current_user,
+    )
+
+
+@router.post(
+    "/onboarding/requests/{request_id}/request-more-info",
+    response_model=RegistrarOnboardingActionResponse,
+    operation_id="telegram_registrar_request_more_info_onboarding_request",
+)
+def request_more_info_for_onboarding_request(
+    request_id: int,
+    request_body: RegistrarReviewMessageRequest,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Ask the patient for more safe intake details."""
+
+    return PatientOnboardingService(db).request_more_info(
+        request_id=request_id,
+        actor=current_user,
+        review_message=request_body.review_message,
+    )
+
+
+@router.post(
+    "/onboarding/requests/{request_id}/reject",
+    response_model=RegistrarOnboardingActionResponse,
+    operation_id="telegram_registrar_reject_patient_onboarding_request",
+)
+def reject_patient_onboarding_request(
+    request_id: int,
+    request_body: RegistrarReviewMessageRequest,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Reject an onboarding request with a safe patient-facing reason."""
+
+    return PatientOnboardingService(db).reject(
+        request_id=request_id,
+        actor=current_user,
+        review_message=request_body.review_message,
+    )
 
 
 @router.post(
