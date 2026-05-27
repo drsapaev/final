@@ -1,12 +1,110 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
+from app.models.patient import Patient
 from app.models.service import Service
+from app.models.user import User
+from app.models.visit import Visit
 from app.models.visit import VisitService
+
+
+def _suffix() -> str:
+    return uuid4().hex[:10]
+
+
+def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
+    suffix = _suffix()
+    user = User(
+        username=f"lab_report_{label}_{suffix}",
+        email=f"lab-report-{label}-{suffix}@test.local",
+        full_name=f"Lab Report {label}",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="therapy",
+        active=True,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    return user, doctor
+
+
+def _create_patient(db_session) -> Patient:
+    suffix = _suffix()
+    patient = Patient(
+        first_name="Lab",
+        last_name=f"Report{suffix}",
+        phone=f"+99890{suffix[:7]}",
+        birth_date=date(1990, 1, 1),
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+    return patient
+
+
+def _doctor_headers(client, user: User) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": user.username, "password": "doctor123"},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def _create_visit(db_session, *, patient_id: int, doctor_id: int) -> Visit:
+    visit = Visit(
+        patient_id=patient_id,
+        doctor_id=doctor_id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(visit)
+    return visit
+
+
+def _create_lab_report_instance(
+    client,
+    *,
+    auth_headers: dict[str, str],
+    patient_id: int,
+    visit_id: int,
+) -> dict:
+    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    assert templates_response.status_code == 200
+    cbc_template = next(
+        template for template in templates_response.json() if template["code"] == "cbc_oak"
+    )
+    response = client.post(
+        "/api/v1/lab/report-instances",
+        headers=auth_headers,
+        json={
+            "patient_id": patient_id,
+            "visit_id": visit_id,
+            "template_id": cbc_template["id"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 @pytest.mark.integration
@@ -186,6 +284,75 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     )
     assert print_twice_response.status_code == 200
     assert print_twice_response.json()["status"] == "PRINTED"
+
+
+@pytest.mark.integration
+def test_doctor_lab_report_reads_are_limited_to_own_visits(
+    client,
+    auth_headers,
+    db_session,
+) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="other")
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    own_visit = _create_visit(
+        db_session,
+        patient_id=own_patient.id,
+        doctor_id=own_doctor.id,
+    )
+    other_visit = _create_visit(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+    )
+    own_instance = _create_lab_report_instance(
+        client,
+        auth_headers=auth_headers,
+        patient_id=own_patient.id,
+        visit_id=own_visit.id,
+    )
+    other_instance = _create_lab_report_instance(
+        client,
+        auth_headers=auth_headers,
+        patient_id=other_patient.id,
+        visit_id=other_visit.id,
+    )
+    doctor_headers = _doctor_headers(client, own_user)
+
+    own_detail = client.get(
+        f"/api/v1/lab/report-instances/{own_instance['id']}",
+        headers=doctor_headers,
+    )
+    assert own_detail.status_code == 200, own_detail.text
+
+    other_detail = client.get(
+        f"/api/v1/lab/report-instances/{other_instance['id']}",
+        headers=doctor_headers,
+    )
+    assert other_detail.status_code == 403
+
+    list_response = client.get(
+        "/api/v1/lab/report-instances",
+        headers=doctor_headers,
+    )
+    assert list_response.status_code == 200, list_response.text
+    listed_ids = {item["id"] for item in list_response.json()}
+    assert own_instance["id"] in listed_ids
+    assert other_instance["id"] not in listed_ids
+
+    other_visit_list = client.get(
+        "/api/v1/lab/report-instances",
+        params=[("visit_ids", str(other_visit.id))],
+        headers=doctor_headers,
+    )
+    assert other_visit_list.status_code == 403
+
+    other_pdf = client.get(
+        f"/api/v1/lab/report-instances/{other_instance['id']}/pdf",
+        headers=doctor_headers,
+    )
+    assert other_pdf.status_code == 403
 
 
 @pytest.mark.integration

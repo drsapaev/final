@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.clinic import Doctor
+from app.models.visit import Visit
 from app.schemas.lab_reporting import (
     LabCatalogAnalyteOut,
     LabCatalogReferenceRangeOut,
@@ -41,6 +43,47 @@ router = APIRouter(prefix="/lab", tags=["lab-reporting"])
 
 def _handle_domain_error(exc: LabReportingDomainError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _doctor_allowed_visit_ids(
+    db: Session,
+    current_user,
+    requested_visit_ids: list[int] | None = None,
+) -> list[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    allowed_doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_doctor_ids.add(current_user.id)
+
+    query = db.query(Visit.id).filter(Visit.doctor_id.in_(allowed_doctor_ids))
+    if requested_visit_ids:
+        requested_ids = {int(visit_id) for visit_id in requested_visit_ids}
+        allowed_ids = {row[0] for row in query.filter(Visit.id.in_(requested_ids)).all()}
+        if allowed_ids != requested_ids:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return sorted(allowed_ids)
+
+    return [row[0] for row in query.all()]
+
+
+def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) -> None:
+    if getattr(current_user, "role", None) != "Doctor":
+        return
+    if getattr(current_user, "is_superuser", False):
+        return
+    if not instance.visit_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    _doctor_allowed_visit_ids(db, current_user, requested_visit_ids=[instance.visit_id])
 
 
 def _template_summary_out(template) -> LabReportTemplateSummaryOut:
@@ -383,11 +426,22 @@ def list_lab_report_instances(
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     service = LabReportingService(db)
+    scoped_visit_ids = visit_ids
+    if getattr(user, "role", None) == "Doctor" and not getattr(
+        user, "is_superuser", False
+    ):
+        scoped_visit_ids = _doctor_allowed_visit_ids(
+            db,
+            user,
+            requested_visit_ids=visit_ids,
+        )
+        if not scoped_visit_ids:
+            return []
     return [
         _instance_summary_out(service, instance)
         for instance in service.list_instances(
             patient_id=patient_id,
-            visit_ids=visit_ids,
+            visit_ids=scoped_visit_ids,
             status=status,
             limit=limit,
             offset=offset,
@@ -420,7 +474,9 @@ def get_lab_report_instance(
 ):
     service = LabReportingService(db)
     try:
-        return _instance_out(service, service.get_instance(instance_id))
+        instance = service.get_instance(instance_id)
+        _ensure_doctor_can_read_lab_instance(db, instance, user)
+        return _instance_out(service, instance)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -521,6 +577,7 @@ def download_lab_report_pdf(
     service = LabReportingService(db)
     try:
         instance = service.get_instance(instance_id)
+        _ensure_doctor_can_read_lab_instance(db, instance, user)
         if instance.status not in {"FINALIZED", "PRINTED"}:
             raise LabReportingDomainError(409, "Only finalized reports can be exported to PDF")
         materialized_sections = service.materialize_instance(instance)
