@@ -37,6 +37,7 @@ APPOINTMENT_DOCTOR_ROLES = {
     "Dentist",
 }
 APPOINTMENT_PATIENT_ROLES = {"Patient"}
+APPOINTMENT_PENDING_PAYMENT_ROLES = {"Admin", "Registrar", "Cashier"}
 
 
 def _appointments_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -102,6 +103,98 @@ def _ensure_appointment_record_access(
         if patient:
             return
 
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _appointment_doctor_scope_ids(db: Session, current_user: User) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    allowed_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    if not assigned_doctor:
+        allowed_ids.add(current_user.id)
+    return allowed_ids
+
+
+def _appointment_patient_scope_id(db: Session, current_user: User) -> int:
+    current_patient = getattr(current_user, "patient", None)
+    if getattr(current_patient, "id", None) is not None:
+        return current_patient.id
+
+    patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+    if not patient:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return patient.id
+
+
+def _scope_appointment_list_filters(
+    db: Session,
+    *,
+    patient_id: int | None,
+    doctor_id: int | None,
+    current_user: User,
+) -> tuple[int | None, int | None]:
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return patient_id, doctor_id
+
+    if role in APPOINTMENT_DOCTOR_ROLES:
+        if doctor_id is None:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return patient_id, doctor_id
+
+    if role in APPOINTMENT_PATIENT_ROLES:
+        own_patient_id = _appointment_patient_scope_id(db, current_user)
+        if patient_id is not None and patient_id != own_patient_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return own_patient_id, doctor_id
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_appointment_create_access(
+    db: Session,
+    appointment_in: appointment_schemas.AppointmentCreate,
+    current_user: User,
+) -> None:
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    if role in APPOINTMENT_DOCTOR_ROLES:
+        if appointment_in.doctor_id not in _appointment_doctor_scope_ids(
+            db, current_user
+        ):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    if role in APPOINTMENT_PATIENT_ROLES:
+        if appointment_in.patient_id != _appointment_patient_scope_id(
+            db, current_user
+        ):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_pending_payment_access(current_user: User) -> None:
+    if getattr(current_user, "role", None) in APPOINTMENT_PENDING_PAYMENT_ROLES:
+        return
+    if getattr(current_user, "is_superuser", False):
+        return
     raise HTTPException(status_code=403, detail="Access denied")
 
 
@@ -178,6 +271,13 @@ def list_appointments(
     Получить список записей на прием с возможностью фильтрации и пагинации
     """
     from app.models.patient import Patient
+
+    patient_id, doctor_id = _scope_appointment_list_filters(
+        db,
+        patient_id=patient_id,
+        doctor_id=doctor_id,
+        current_user=current_user,
+    )
 
     appointments = appointment_crud.get_appointments(
         db,
@@ -272,6 +372,8 @@ def create_appointment(
     Создать новую запись на прием
     """
     # Проверяем, не занято ли время у врача
+    _ensure_appointment_create_access(db, appointment_in, current_user)
+
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -299,6 +401,8 @@ async def get_pending_payments(
     Получить объединенный список записей (appointments и visits), ожидающие оплаты
     Группирует visits одного пациента в одну запись
     """
+    _ensure_pending_payment_access(current_user)
+
     try:
         from collections import defaultdict
 
@@ -782,6 +886,8 @@ async def get_pending_payments(
     Получить объединенный список записей (appointments и visits), ожидающие оплаты
     Группирует visits одного пациента в одну запись
     """
+    _ensure_pending_payment_access(current_user)
+
     try:
         from collections import defaultdict
 
