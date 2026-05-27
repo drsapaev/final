@@ -65,7 +65,7 @@ const UnifiedSettings = () => {
       });
 
       if (activeTab === 'password' && formData.currentPassword && formData.newPassword) {
-        await api.post('/auth/password-change', {
+        await api.post('/authentication/password-change', {
           current_password: formData.currentPassword,
           new_password: formData.newPassword,
         });
