@@ -67,10 +67,10 @@ export const paymentService = {
    */
   async generateReceipt(paymentId, format = 'pdf') {
     try {
-      const response = await api.post(`/payments/${paymentId}/receipt`, {
-        format
+      const response = await api.get(`/payments/${paymentId}/receipt`, {
+        params: { format_type: format }
       });
-      
+
       return {
         success: true,
         data: response.data
