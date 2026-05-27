@@ -7,6 +7,8 @@
 - Неавторизованные запросы (401)
 - Own-data тесты (Patient видит только свои данные)
 """
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -349,6 +351,58 @@ class TestOwnDataRBAC:
 
 
 # ===================== АУДИТ-ЛОГИ 403 =====================
+
+    def test_patient_route_ids_are_limited_to_own_patient(
+        self, client: TestClient, patient_token: str, db_session: Session
+    ):
+        patient_user = db_session.query(User).filter(User.username == "patient_test").one()
+        own_patient = Patient(
+            user_id=patient_user.id,
+            last_name="Own",
+            first_name="Patient",
+            phone="+998909801001",
+            birth_date=date(1990, 1, 1),
+        )
+        other_patient = Patient(
+            last_name="Other",
+            first_name="Patient",
+            phone="+998909801002",
+            birth_date=date(1991, 1, 1),
+        )
+        db_session.add_all([own_patient, other_patient])
+        db_session.commit()
+        db_session.refresh(own_patient)
+        db_session.refresh(other_patient)
+
+        other_appointment = Appointment(
+            patient_id=other_patient.id,
+            appointment_date=date.today(),
+            appointment_time="10:00",
+            status="scheduled",
+        )
+        db_session.add(other_appointment)
+        db_session.commit()
+
+        headers = {"Authorization": f"Bearer {patient_token}"}
+
+        own_response = client.get(
+            f"/api/v1/patients/{own_patient.id}",
+            headers=headers,
+        )
+        assert own_response.status_code == 200
+
+        other_response = client.get(
+            f"/api/v1/patients/{other_patient.id}",
+            headers=headers,
+        )
+        assert other_response.status_code == 403
+
+        appointments_response = client.get(
+            f"/api/v1/patients/{other_patient.id}/appointments",
+            headers=headers,
+        )
+        assert appointments_response.status_code == 403
+
 
 class TestAuditLog403:
     """Тесты логирования попыток несанкционированного доступа"""

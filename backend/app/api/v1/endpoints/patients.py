@@ -20,6 +20,13 @@ from app.schemas import lab as lab_schemas
 router = APIRouter()
 
 
+def _ensure_patient_self_access(current_user: User, patient_id: int) -> None:
+    if current_user.role != "Patient":
+        return
+    if not current_user.patient or current_user.patient.id != patient_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/appointments", response_model=List[appointment_schemas.Appointment])
 def get_my_appointments(
     db: Session = Depends(deps.get_db),
@@ -116,6 +123,7 @@ def get_patient(
     """
     Получить пациента по ID
     """
+    _ensure_patient_self_access(current_user, patient_id)
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
@@ -164,6 +172,7 @@ def get_patient_appointments(
     """
     Получить все записи пациента
     """
+    _ensure_patient_self_access(current_user, patient_id)
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
