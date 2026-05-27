@@ -243,6 +243,18 @@ const getAppointmentPaymentActionContext = (appointment) => {
 };
 
 const resolveCashierVisitIds = (appointment) => {
+  const paymentVisitIds = Array.isArray(appointment?.payment_visit_ids)
+    ? appointment.payment_visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
+    : [];
+
+  if (paymentVisitIds.length > 0) {
+    return [...new Set(paymentVisitIds)];
+  }
+
+  if (appointment?.payment_visit_id !== null && appointment?.payment_visit_id !== undefined) {
+    return [appointment.payment_visit_id];
+  }
+
   const groupedVisitIds = Array.isArray(appointment?.visit_ids)
     ? appointment.visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
     : [];
@@ -259,6 +271,55 @@ const resolveCashierVisitIds = (appointment) => {
 const resolveSingleCashierVisitId = (appointment) => {
   const visitIds = resolveCashierVisitIds(appointment);
   return visitIds.length === 1 ? visitIds[0] : null;
+};
+
+const isBackendGroupedCashierPayment = (appointment) =>
+  appointment?.payment_contract === 'grouped_visits' ||
+  appointment?.can_create_grouped_payment === true;
+
+const canCreateDirectCashierPayment = (appointment) => {
+  if (Object.prototype.hasOwnProperty.call(appointment || {}, 'can_create_direct_payment')) {
+    return appointment.can_create_direct_payment === true;
+  }
+
+  return resolveSingleCashierVisitId(appointment) !== null;
+};
+
+const canCreateCashierPayment = (appointment) =>
+  canCreateDirectCashierPayment(appointment) || appointment?.can_create_grouped_payment === true;
+
+const createGroupedCashierPayment = async (appointment, paymentData) => {
+  const token = tokenManager.getAccessToken();
+  if (!token) {
+    throw new Error('Missing access token for grouped cashier payment.');
+  }
+
+  const visitIds = resolveCashierVisitIds(appointment);
+  if (visitIds.length === 0 || appointment?.can_create_grouped_payment !== true) {
+    throw new Error('Backend did not provide a grouped cashier payment contract for this row.');
+  }
+
+  const response = await fetch(`${getApiOrigin()}/api/v1/cashier/payments/grouped`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      patient_id: appointment?.patient_id ?? null,
+      visit_ids: visitIds,
+      amount: paymentData.amount,
+      method: paymentData.method,
+      note: paymentData.note || 'Grouped cashier payment'
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.detail || 'Grouped cashier payment failed.');
+  }
+
+  return payload;
 };
 
 const PAYMENT_ACTION_CAN_FIELD = {
@@ -578,9 +639,8 @@ const CashierPanel = () => {void
   };
 
   const openPaymentWidget = (appointment) => {
-    const visitId = resolveSingleCashierVisitId(appointment);
-    if (!visitId) {
-      const message = 'Cannot start payment: backend must provide exactly one visit_id for this payment row.';
+    if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
+      const message = 'Cannot start online payment: grouped cashier rows must use the backend grouped payment contract.';
       setPaymentError(message);
       notify.error(message);
       return;
@@ -594,21 +654,26 @@ const CashierPanel = () => {void
   // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
   const processPayment = async (appointment, paymentData) => {
     try {
+      const groupedPayment = isBackendGroupedCashierPayment(appointment);
       const visitId = resolveSingleCashierVisitId(appointment);
 
-      if (!visitId) {
+      if (!groupedPayment && !visitId) {
         throw new Error('Cannot process payment: backend must provide exactly one visit_id or a backend-owned allocation contract.');
       }
 
-      const result = await paymentsHook.createPayment({
-        visit_id: visitId,
-        amount: paymentData.amount,
-        method: paymentData.method,
-        note: paymentData.note || 'Оплата медицинских услуг'
-      });
+      if (groupedPayment) {
+        await createGroupedCashierPayment(appointment, paymentData);
+      } else {
+        const result = await paymentsHook.createPayment({
+          visit_id: visitId,
+          amount: paymentData.amount,
+          method: paymentData.method,
+          note: paymentData.note || 'Оплата медицинских услуг'
+        });
 
-      if (!result.success) {
-        throw new Error(`Не удалось оплатить визит #${visitId}: ${result.error}`);
+        if (!result.success) {
+          throw new Error(`Не удалось оплатить визит #${visitId}: ${result.error}`);
+        }
       }
 
       notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
@@ -1271,6 +1336,7 @@ const CashierPanel = () => {void
                             size="sm"
                             variant="outline"
                             onClick={() => openPaymentWidget(appointment)}
+                            disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
                             aria-label={`Start online payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
                                   💳 Онлайн
@@ -1280,6 +1346,7 @@ const CashierPanel = () => {void
                             onClick={() => {
                               paymentModal.openModal(appointment);
                             }}
+                            disabled={!canCreateCashierPayment(appointment)}
                             aria-label={`Take cash payment for ${getAppointmentPaymentActionContext(appointment)}`}>
 
                                   💵 Касса
@@ -1576,7 +1643,7 @@ const CashierPanel = () => {void
 
               {paymentWidget.selectedItem &&
               <PaymentWidget
-                visitId={resolveSingleCashierVisitId(paymentWidget.selectedItem)}
+                visitId={canCreateDirectCashierPayment(paymentWidget.selectedItem) ? resolveSingleCashierVisitId(paymentWidget.selectedItem) : null}
                 amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
                 currency="UZS"
                 description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
