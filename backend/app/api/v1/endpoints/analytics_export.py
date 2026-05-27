@@ -9,17 +9,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.db.session import get_db
-from app.services.advanced_analytics import (
-    AdvancedAnalyticsService,
-    get_advanced_analytics_service,
-)
+from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
-from app.services.analytics_export_service import (
-    AnalyticsExportService,
-    get_analytics_export_service,
-)
+from app.services.analytics_export_service import get_analytics_export_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -29,7 +23,7 @@ ANALYTICS_EXPORT_PUBLIC_ERROR = "Internal server error"
 
 @router.get("/formats")
 async def get_export_formats(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db), current_user=Depends(require_roles("Admin"))
 ):
     """Получить список поддерживаемых форматов экспорта"""
     try:
@@ -55,7 +49,7 @@ async def export_kpi_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles("Admin")),
 ):
     """Экспорт отчета KPI в указанном формате"""
     try:
@@ -105,7 +99,7 @@ async def export_comprehensive_report(
         True, description="Включить предиктивную аналитику"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles("Admin")),
 ):
     """Экспорт комплексного отчета в указанном формате"""
     try:
@@ -176,7 +170,7 @@ async def export_doctor_performance_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles("Admin")),
 ):
     """Экспорт отчета по эффективности врачей в указанном формате"""
     try:
@@ -224,7 +218,7 @@ async def export_revenue_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles("Admin")),
 ):
     """Экспорт отчета по доходам в указанном формате"""
     try:

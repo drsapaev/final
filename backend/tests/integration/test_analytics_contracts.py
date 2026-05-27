@@ -134,3 +134,42 @@ def test_predictive_auxiliary_routes_are_alive(
     assert accuracy.status_code == 200, accuracy.text
     assert scenarios.status_code == 200, scenarios.text
     assert insights.status_code == 200, insights.text
+
+
+def test_admin_can_read_analytics_export_formats(
+    client: TestClient,
+    admin_token: str,
+) -> None:
+    response = client.get(
+        "/api/v1/analytics/export/formats",
+        headers=_auth_headers(admin_token),
+    )
+
+    assert response.status_code == 200, response.text
+    payload: dict[str, Any] = response.json()
+    assert "formats" in payload
+    assert "count" in payload
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/analytics/export/formats",
+        "/api/v1/analytics/export/comprehensive/export/json",
+        "/api/v1/analytics/export/revenue/export/json",
+        "/api/v1/analytics/export/doctors/performance/export/json",
+        "/api/v1/analytics/export/kpi/export/json",
+    ],
+)
+def test_patient_cannot_read_analytics_export_surfaces(
+    client: TestClient,
+    patient_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(patient_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
