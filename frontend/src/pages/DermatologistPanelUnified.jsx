@@ -1062,7 +1062,7 @@ const DermatologistPanelUnified = () => {
           setCurrentAppointment((prev) => prev ? { ...prev, visit_id: normalizedStatusVisitId } : prev);
         }
 
-        const normalizedAppointmentStatus = statusData.appointment?.status || statusData.status || null;
+        const normalizedAppointmentStatus = statusData.appointment?.status || null;
         if (normalizedAppointmentStatus) {
           setCurrentAppointment((prev) => prev ? { ...prev, status: normalizedAppointmentStatus } : prev);
         }
