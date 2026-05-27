@@ -10,6 +10,8 @@ import PropTypes from 'prop-types';
 
 const API_BASE = '/api/v1';
 
+const getInvoiceId = (invoice) => invoice?.invoice_id ?? invoice?.id ?? null;
+
 const PaymentManager = ({
   isOpen,
   onClose,
@@ -109,7 +111,7 @@ const PaymentManager = ({
 
   // Инициация оплаты существующего счета
   const payExistingInvoice = (invoice) => {
-    setCreatedInvoiceId(invoice.id);
+    setCreatedInvoiceId(getInvoiceId(invoice));
     setPaymentAmount(invoice.amount);
 
     if (invoice.provider === 'click') {
@@ -250,13 +252,13 @@ const PaymentManager = ({
 
               <div className="invoices-list">
                   {invoices.map((invoice) =>
-                <div key={invoice.id} className="invoice-item">
+                <div key={getInvoiceId(invoice)} className="invoice-item">
                       <div className="invoice-info">
                         <div className="invoice-amount">
                           {invoice.amount.toLocaleString()} сум
                         </div>
                         <div className="invoice-details">
-                          <span className="invoice-id">№{invoice.id}</span>
+                          <span className="invoice-id">№{getInvoiceId(invoice)}</span>
                           <span className="invoice-provider">{invoice.provider}</span>
                           <span className="invoice-status">{invoice.status}</span>
                         </div>
