@@ -488,7 +488,7 @@ const MacOSCardiologistPanelUnified = () => {
         number: nextAppointmentId || prev?.number || patientIdFromUrl,
         source: 'appointments',
         status: matchingAppointment.status ?? prev?.status ?? null,
-        payment_status: matchingAppointment.payment_status ?? prev?.payment_status ?? null,
+        payment_status: matchingAppointment.payment_status ?? null,
         discount_mode: matchingAppointment.discount_mode || prev?.discount_mode,
         specialty: matchingAppointment.specialty || prev?.specialty || 'cardiology'
       };
