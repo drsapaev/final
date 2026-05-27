@@ -156,7 +156,7 @@ export const API_ENDPOINTS = {
   // Печать (новое)
   PRINT: {
     PRINTERS: '/print/printers',
-    TEMPLATES: '/print/templates',
+    TEMPLATES: '/print/templates/templates',
     TICKET: '/print/ticket',
     PRESCRIPTION: '/print/prescription',
     CERTIFICATE: '/print/certificate',

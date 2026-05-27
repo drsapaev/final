@@ -148,7 +148,7 @@ export const printService = {
    */
   async getTemplates(templateType, language = 'ru') {
     try {
-      const response = await api.get('/print/templates', {
+      const response = await api.get('/print/templates/templates', {
         params: { template_type: templateType, language }
       });
       
