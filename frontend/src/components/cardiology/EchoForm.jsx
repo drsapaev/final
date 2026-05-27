@@ -118,7 +118,35 @@ function setNestedValue(source, path, value) {
   return result;
 }
 
-const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
+async function loadExistingEmrDraft(visitId) {
+  try {
+    const response = await api.get(`/v2/emr/${visitId}`);
+    return response.data || null;
+  } catch (err) {
+    if (err?.response?.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+function buildEchoEmrPayload(existingEmr, echoData) {
+  const currentData = existingEmr?.data || {};
+  return {
+    data: {
+      ...currentData,
+      specialty: currentData.specialty || 'cardiology',
+      specialty_data: {
+        ...(currentData.specialty_data || {}),
+        echo: echoData
+      }
+    },
+    row_version: existingEmr?.row_version ?? 0,
+    is_draft: true
+  };
+}
+
+const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
   const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
 
   const [loading, setLoading] = useState(false);
@@ -162,17 +190,24 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
       setLoading(true);
       setError('');
 
-      const response = await api.post('/cardiology/echo-results', {
-        patient_id: patientId,
-        visit_id: visitId,
-        echo_data: echoData
-      });
+      if (!visitId) {
+        if (onSave) {
+          onSave(echoData);
+          setSuccess('Результаты ЭхоКГ сохранены в черновике приема');
+          return;
+        }
+        throw new Error('visit_id is required to save Echo results');
+      }
+
+      const existingEmr = await loadExistingEmrDraft(visitId);
+      const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData));
 
       if (response.status === 200) {
         setSuccess('Результаты ЭхоКГ сохранены успешно');
         if (onSave) {
-          onSave(response.data);
+          onSave(response.data?.data?.specialty_data?.echo || echoData);
         }
+        onDataUpdate?.(response.data);
       }
     } catch (err) {
       setError('Ошибка при сохранении результатов ЭхоКГ');
@@ -369,6 +404,7 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
 EchoForm.propTypes = {
   ...(EchoForm.propTypes || {}),
   initialData: PropTypes.any,
+  onDataUpdate: PropTypes.func,
   onSave: PropTypes.any,
   patientId: PropTypes.any,
   visitId: PropTypes.any,
