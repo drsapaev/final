@@ -36,6 +36,46 @@ import PropTypes from 'prop-types';
 
 const iconSize = 15;
 
+function clonePlainObject(value) {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function loadExistingEmrDraft(visitId) {
+  const response = await api.get(`/v2/emr/${visitId}`, {
+    silent: true,
+    validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+  });
+
+  return response.status === 404 ? null : response.data;
+}
+
+function buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan) {
+  const data = clonePlainObject(existingEmr?.data);
+  const specialtyData = clonePlainObject(data.specialty_data);
+
+  return {
+    data: {
+      ...data,
+      specialty: data.specialty || 'dentistry',
+      specialty_data: {
+        ...specialtyData,
+        treatment_plan: clonePlainObject(treatmentPlan),
+      },
+      treatment_plan: clonePlainObject(treatmentPlan),
+    },
+    row_version: existingEmr?.row_version ?? 0,
+    is_draft: true,
+  };
+}
+
 const styles = {
   panel: {
     display: 'block',
@@ -266,7 +306,15 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
 
   const savePlan = async () => {
     try {
-      await api.post(`/visits/${visitId}/treatment-plan`, treatmentPlan);
+      if (!visitId) {
+        throw new Error('Treatment plan save requires visitId');
+      }
+
+      const existingEmr = await loadExistingEmrDraft(visitId);
+      await api.post(
+        `/v2/emr/${visitId}`,
+        buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan)
+      );
       onUpdate && onUpdate(treatmentPlan);
     } catch (error) {
       logger.error('Ошибка сохранения плана:', error);
