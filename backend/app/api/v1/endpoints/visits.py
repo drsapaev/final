@@ -107,6 +107,24 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None
     raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _doctor_allowed_visit_doctor_ids(db: Session, current_user) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    allowed_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_ids.add(current_user.id)
+    return allowed_ids
+
+
 @router.get("/visits", response_model=List[VisitOut], summary="Список визитов")
 def list_visits(
     patient_id: Optional[int] = Query(default=None),
@@ -118,6 +136,12 @@ def list_visits(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
+    if getattr(current_user, "role", None) == "Doctor":
+        if doctor_id is None:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if doctor_id not in _doctor_allowed_visit_doctor_ids(db, current_user):
+            raise HTTPException(status_code=403, detail="Access denied")
+
     rows = VisitsApiService(db).list_visits(
         patient_id=patient_id,
         doctor_id=doctor_id,
@@ -158,6 +182,11 @@ def get_visit(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(404, "Visit not found")
+    _ensure_visit_doctor_access(db, visit, current_user)
+
     payload = VisitsApiService(db).get_visit(visit_id=visit_id)
     return VisitWithServices(
         visit=VisitOut(**payload["visit"]),
