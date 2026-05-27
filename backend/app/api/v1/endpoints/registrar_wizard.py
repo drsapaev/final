@@ -1321,6 +1321,15 @@ class AllFreeVisitResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
     approval_status: str
+    available_actions: List[str]
+    can_approve: bool
+    can_reject: bool
+
+
+def _all_free_available_actions(approval_status: str) -> List[str]:
+    if approval_status == "pending":
+        return ["approve", "reject"]
+    return []
 
 
 @router.get(
@@ -1347,6 +1356,7 @@ def get_all_free_requests(
 
         result = []
         for visit in visits:
+            available_actions = _all_free_available_actions(visit.approval_status)
             # Получаем услуги визита
             visit_services = (
                 db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
@@ -1435,6 +1445,9 @@ def get_all_free_requests(
                     notes=visit.notes,
                     created_at=visit.created_at,
                     approval_status=visit.approval_status,
+                    available_actions=available_actions,
+                    can_approve="approve" in available_actions,
+                    can_reject="reject" in available_actions,
                 )
             )
 
