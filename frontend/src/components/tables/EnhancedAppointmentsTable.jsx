@@ -1020,8 +1020,7 @@ const EnhancedAppointmentsTable = ({
             queueStatus = row.queue_numbers[0].status;
           }
         }
-        // Fallback: используем общий статус записи только если queue_numbers отсутствует
-        queueStatus = queueStatus || row.status || null;
+        queueStatus = queueStatus || null;
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
@@ -1081,7 +1080,7 @@ const EnhancedAppointmentsTable = ({
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
       if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
         const firstQueue = row.queue_numbers[0];
-        const queueStatus = firstQueue.status || row.status || null;
+        const queueStatus = firstQueue.status || null;
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
