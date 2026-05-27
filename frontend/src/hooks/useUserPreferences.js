@@ -71,7 +71,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
 
             // Загрузка с сервера
             const endpoint = userId
-                ? `/user-management/users/${userId}/preferences`
+                ? `/users/users/${userId}/preferences`
                 : '/users/me/preferences';
 
             const response = await api.get(endpoint);
@@ -122,7 +122,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
 
         try {
             const endpoint = userId
-                ? `/user-management/users/${userId}/preferences`
+                ? `/users/users/${userId}/preferences`
                 : '/users/me/preferences';
 
             await api.put(endpoint, newPrefs);
