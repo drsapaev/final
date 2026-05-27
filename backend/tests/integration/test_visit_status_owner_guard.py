@@ -7,7 +7,7 @@ from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 def _suffix() -> str:
@@ -87,3 +87,38 @@ def test_doctor_cannot_change_other_doctor_visit_status(client, db_session) -> N
     assert response.status_code == 403
     db_session.refresh(other_visit)
     assert other_visit.status == "open"
+
+
+def test_doctor_cannot_add_service_to_other_doctor_visit(client, db_session) -> None:
+    own_user, _own_doctor = _create_doctor_user(db_session, label="svc_own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="svc_other")
+    other_patient = _create_patient(db_session)
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add(other_visit)
+    db_session.commit()
+    db_session.refresh(other_visit)
+
+    response = client.post(
+        f"/api/v1/visits/visits/{other_visit.id}/services",
+        json={
+            "code": "CONSULT",
+            "name": "Consultation",
+            "price": 125000,
+            "qty": 1,
+        },
+        headers=_doctor_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    assert (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == other_visit.id)
+        .count()
+        == 0
+    )
