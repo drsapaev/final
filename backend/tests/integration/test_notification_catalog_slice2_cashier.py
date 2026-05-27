@@ -8,7 +8,7 @@ from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.user import User
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 
 
 def _create_patient_visit(db_session, *, suffix: str) -> tuple[Patient, Visit]:
@@ -61,6 +61,21 @@ def _payment_event_deliveries(db_session, *, recipient_id: int):
         .order_by(NotificationDelivery.id.asc())
         .all()
     )
+
+
+def _add_visit_service(db_session, visit: Visit, *, price: str, service_id: int) -> VisitService:
+    service = VisitService(
+        visit_id=visit.id,
+        service_id=service_id,
+        code=f"CASH-{service_id}",
+        name=f"Cashier Service {service_id}",
+        qty=1,
+        price=Decimal(price),
+    )
+    db_session.add(service)
+    db_session.commit()
+    db_session.refresh(service)
+    return service
 
 
 def test_cashier_create_payment_creates_canonical_payment_notification(
@@ -126,6 +141,110 @@ def test_cashier_create_payment_creates_canonical_payment_notification(
     assert event.payload_snapshot["metadata"]["change_type"] == "paid"
     assert event.payload_snapshot["metadata"]["payment_status"] == "paid"
     assert event.payload_snapshot["metadata"]["visit_id"] == visit.id
+
+
+def test_cashier_grouped_payment_allocates_by_backend_remaining_debt(
+    client,
+    db_session,
+    auth_headers,
+):
+    patient, first_visit = _create_patient_visit(db_session, suffix="0101")
+    second_visit = Visit(
+        patient_id=patient.id,
+        status="waiting",
+        discount_mode="none",
+        approval_status="none",
+        source="desk",
+    )
+    db_session.add(second_visit)
+    db_session.commit()
+    db_session.refresh(second_visit)
+
+    _add_visit_service(db_session, first_visit, price="100000", service_id=101)
+    _add_visit_service(db_session, second_visit, price="50000", service_id=102)
+    existing_payment = Payment(
+        visit_id=first_visit.id,
+        amount=Decimal("40000"),
+        method="cash",
+        status="paid",
+    )
+    db_session.add(existing_payment)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/cashier/payments/grouped",
+        json={
+            "patient_id": patient.id,
+            "visit_ids": [first_visit.id, second_visit.id],
+            "amount": 80000,
+            "method": "cash",
+            "note": "backend grouped allocation",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["patient_id"] == patient.id
+    assert payload["amount"] == "80000"
+    assert [item["visit_id"] for item in payload["allocations"]] == [
+        first_visit.id,
+        second_visit.id,
+    ]
+    assert [item["amount"] for item in payload["allocations"]] == ["60000.00", "20000.00"]
+    assert [item["remaining_after"] for item in payload["allocations"]] == ["0.00", "30000.00"]
+
+    payments = (
+        db_session.query(Payment)
+        .filter(Payment.visit_id.in_([first_visit.id, second_visit.id]))
+        .order_by(Payment.id.asc())
+        .all()
+    )
+    assert [(payment.visit_id, payment.amount, payment.status) for payment in payments] == [
+        (first_visit.id, Decimal("40000.00"), "paid"),
+        (first_visit.id, Decimal("60000.00"), "paid"),
+        (second_visit.id, Decimal("20000.00"), "paid"),
+    ]
+
+
+def test_cashier_grouped_payment_rejects_overpay_without_mutation(
+    client,
+    db_session,
+    auth_headers,
+):
+    patient, first_visit = _create_patient_visit(db_session, suffix="0102")
+    second_visit = Visit(
+        patient_id=patient.id,
+        status="waiting",
+        discount_mode="none",
+        approval_status="none",
+        source="desk",
+    )
+    db_session.add(second_visit)
+    db_session.commit()
+    db_session.refresh(second_visit)
+
+    _add_visit_service(db_session, first_visit, price="10000", service_id=201)
+    _add_visit_service(db_session, second_visit, price="15000", service_id=202)
+
+    response = client.post(
+        "/api/v1/cashier/payments/grouped",
+        json={
+            "patient_id": patient.id,
+            "visit_ids": [first_visit.id, second_visit.id],
+            "amount": 30000,
+            "method": "cash",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400, response.text
+    assert "exceeds backend-calculated remaining debt" in response.json()["detail"]
+    assert (
+        db_session.query(Payment)
+        .filter(Payment.visit_id.in_([first_visit.id, second_visit.id]))
+        .count()
+    ) == 0
 
 
 def test_cashier_cancel_payment_creates_cancelled_payment_notification(

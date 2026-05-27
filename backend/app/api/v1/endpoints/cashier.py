@@ -95,6 +95,11 @@ class PendingPaymentItem(BaseModel):
     created_at: datetime
     queue_number: Optional[str] = None
     department: Optional[str] = None
+    payment_contract: str = "single_visit"
+    payment_visit_id: Optional[int] = None
+    payment_visit_ids: List[int] = Field(default_factory=list)
+    can_create_direct_payment: bool = True
+    can_create_grouped_payment: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -156,6 +161,35 @@ class PaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CreateGroupedPaymentRequest(BaseModel):
+    """Backend-owned allocation request for grouped cashier payment rows."""
+    visit_ids: List[int] = Field(..., min_length=1, description="Visit ids from a cashier grouped pending-payment row")
+    patient_id: Optional[int] = Field(None, description="Expected patient id for all grouped visits")
+    amount: Decimal = Field(..., gt=0, description="Total payment amount to allocate")
+    method: str = Field(default="cash", description="Payment method (cash, card)")
+    note: Optional[str] = Field(None, description="Payment note")
+
+
+class GroupedPaymentAllocationItem(BaseModel):
+    """One backend-owned payment allocation leg."""
+    visit_id: int
+    payment_id: int
+    amount: Decimal
+    remaining_before: Decimal
+    remaining_after: Decimal
+
+
+class GroupedPaymentResponse(BaseModel):
+    """Response for backend-owned grouped cashier payment allocation."""
+    patient_id: int
+    amount: Decimal
+    method: str
+    status: str
+    created_at: datetime
+    payments: List[PaymentResponse]
+    allocations: List[GroupedPaymentAllocationItem]
+
+
 class CancelPaymentRequest(BaseModel):
     """Запрос на отмену платежа"""
     reason: Optional[str] = None
@@ -208,6 +242,45 @@ def _decimal_to_float(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _cashier_visit_total_amount(visit: Visit) -> Decimal:
+    total_cost = Decimal("0")
+    if hasattr(visit, "services") and visit.services:
+        for visit_service in visit.services:
+            price = (
+                Decimal(str(visit_service.price))
+                if hasattr(visit_service, "price") and visit_service.price
+                else Decimal("0")
+            )
+            quantity = (
+                Decimal(str(visit_service.qty))
+                if hasattr(visit_service, "qty") and visit_service.qty
+                else Decimal("1")
+            )
+            total_cost += price * quantity
+
+    if total_cost == Decimal("0"):
+        if hasattr(visit, "total_price") and visit.total_price:
+            total_cost = Decimal(str(visit.total_price))
+        elif hasattr(visit, "total_amount") and visit.total_amount:
+            total_cost = Decimal(str(visit.total_amount))
+
+    return total_cost
+
+
+def _cashier_paid_amounts_by_visit_id(db: Session, visit_ids: list[int]) -> dict[int, Decimal]:
+    if not visit_ids:
+        return {}
+
+    paid_amounts = {visit_id: Decimal("0") for visit_id in visit_ids}
+    payments = db.query(Payment).filter(
+        Payment.visit_id.in_(visit_ids),
+        Payment.status.in_(["paid", "completed"]),
+    ).all()
+    for payment in payments:
+        paid_amounts[payment.visit_id] = paid_amounts.get(payment.visit_id, Decimal("0")) + Decimal(str(payment.amount or 0))
+    return paid_amounts
 
 
 async def _emit_payment_notification(
@@ -503,6 +576,8 @@ async def get_pending_payments(
         # Формируем результат
         result = []
         for group in paginated_groups:
+            group_visit_ids = group["visit_ids"]
+            direct_payment_allowed = len(group_visit_ids) == 1
             result.append(PendingPaymentItem(
                 id=group["visit_ids"][0] if group["visit_ids"] else 0,  # Первый visit_id для совместимости
                 patient_id=group["patient_id"],
@@ -519,6 +594,11 @@ async def get_pending_payments(
                 created_at=group["created_at"],
                 queue_number=group["queue_number"],
                 department=group["department"],
+                payment_contract="single_visit" if direct_payment_allowed else "grouped_visits",
+                payment_visit_id=group_visit_ids[0] if direct_payment_allowed else None,
+                payment_visit_ids=group_visit_ids,
+                can_create_direct_payment=direct_payment_allowed,
+                can_create_grouped_payment=not direct_payment_allowed,
             ))
         
         return {
@@ -857,6 +937,204 @@ async def get_payments(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения истории платежей: {str(e)}"
+        )
+
+
+@router.post("/payments/grouped", response_model=GroupedPaymentResponse)
+async def create_grouped_payment(
+    payment_data: CreateGroupedPaymentRequest,
+    db: Session = Depends(deps.get_db),
+    current_user = Depends(deps.require_roles("Admin", "Cashier")),
+):
+    """
+    Create cashier payments for a grouped pending-payment row.
+
+    Allocation is backend-owned: visits must belong to one patient, amount is
+    allocated oldest visit first by remaining backend-calculated debt, and
+    overpay is rejected instead of being assigned to an arbitrary visit.
+    """
+    normalized_visit_ids = list(dict.fromkeys(payment_data.visit_ids))
+    if not normalized_visit_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="visit_ids is required",
+        )
+
+    visits = db.query(Visit).options(joinedload(Visit.services)).filter(
+        Visit.id.in_(normalized_visit_ids)
+    ).all()
+    visits_by_id = {visit.id: visit for visit in visits}
+    missing_visit_ids = [visit_id for visit_id in normalized_visit_ids if visit_id not in visits_by_id]
+    if missing_visit_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Visits not found: {missing_visit_ids}",
+        )
+
+    patient_ids = {visit.patient_id for visit in visits if visit.patient_id is not None}
+    if len(patient_ids) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grouped cashier payment requires visits from exactly one patient",
+        )
+
+    patient_id = next(iter(patient_ids))
+    if payment_data.patient_id is not None and payment_data.patient_id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grouped cashier payment patient_id does not match visit ownership",
+        )
+
+    paid_amounts = _cashier_paid_amounts_by_visit_id(db, normalized_visit_ids)
+    allocation_candidates = []
+    for visit in visits:
+        total_amount = _cashier_visit_total_amount(visit)
+        paid_amount = paid_amounts.get(visit.id, Decimal("0"))
+        remaining_amount = total_amount - paid_amount
+        if remaining_amount > 0:
+            allocation_candidates.append({
+                "visit": visit,
+                "remaining_amount": remaining_amount,
+            })
+
+    allocation_candidates.sort(
+        key=lambda item: (
+            item["visit"].created_at or datetime.min,
+            item["visit"].id,
+        )
+    )
+
+    total_remaining = sum(
+        (item["remaining_amount"] for item in allocation_candidates),
+        Decimal("0"),
+    )
+    if total_remaining <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grouped cashier payment has no remaining backend-calculated debt",
+        )
+    if payment_data.amount > total_remaining:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grouped cashier payment amount exceeds backend-calculated remaining debt",
+        )
+
+    remaining_to_allocate = payment_data.amount
+    created_at = datetime.utcnow()
+    created_payments: list[Payment] = []
+    allocation_rows: list[tuple[Payment, Visit, Decimal, Decimal, Decimal]] = []
+
+    try:
+        for candidate in allocation_candidates:
+            if remaining_to_allocate <= 0:
+                break
+
+            visit = candidate["visit"]
+            remaining_before = candidate["remaining_amount"]
+            allocation_amount = min(remaining_to_allocate, remaining_before)
+            if allocation_amount <= 0:
+                continue
+
+            payment = Payment(
+                visit_id=visit.id,
+                amount=allocation_amount,
+                method=payment_data.method,
+                status="paid",
+                note=payment_data.note,
+                created_at=created_at,
+                paid_at=created_at,
+            )
+            db.add(payment)
+            db.flush()
+
+            remaining_after = remaining_before - allocation_amount
+            created_payments.append(payment)
+            allocation_rows.append((
+                payment,
+                visit,
+                allocation_amount,
+                remaining_before,
+                remaining_after,
+            ))
+            remaining_to_allocate -= allocation_amount
+
+        if remaining_to_allocate != Decimal("0"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Grouped cashier payment could not allocate full amount",
+            )
+
+        db.commit()
+        for payment in created_payments:
+            db.refresh(payment)
+
+        for payment, visit, *_ in allocation_rows:
+            await _emit_payment_notification(
+                db=db,
+                payment=payment,
+                current_user=current_user,
+                change_type="paid",
+                patient_id=patient_id,
+                visit=visit,
+            )
+
+        try:
+            from app.ws.cashier_ws import broadcast_cashier_update
+            import asyncio
+
+            for payment in created_payments:
+                asyncio.create_task(broadcast_cashier_update("payment_created", {
+                    "payment_id": payment.id,
+                    "visit_id": payment.visit_id,
+                    "patient_id": patient_id,
+                    "amount": float(payment.amount),
+                    "method": payment.method,
+                    "status": payment.status,
+                }))
+        except Exception as ws_error:
+            logger.warning(f"WebSocket broadcast failed: {ws_error}")
+
+        return GroupedPaymentResponse(
+            patient_id=patient_id,
+            amount=payment_data.amount,
+            method=payment_data.method,
+            status="paid",
+            created_at=created_at,
+            payments=[
+                PaymentResponse(
+                    id=payment.id,
+                    visit_id=payment.visit_id,
+                    patient_id=patient_id,
+                    amount=payment.amount,
+                    method=payment.method,
+                    status=payment.status,
+                    created_at=payment.created_at,
+                    paid_at=payment.paid_at,
+                    note=payment.note,
+                )
+                for payment in created_payments
+            ],
+            allocations=[
+                GroupedPaymentAllocationItem(
+                    visit_id=visit.id,
+                    payment_id=payment.id,
+                    amount=allocation_amount,
+                    remaining_before=remaining_before,
+                    remaining_after=remaining_after,
+                )
+                for payment, visit, allocation_amount, remaining_before, remaining_after in allocation_rows
+            ],
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Grouped cashier payment allocation failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Grouped cashier payment allocation failed: {str(exc)}",
         )
 
 
