@@ -73,36 +73,24 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
     try:
         # Поиск пользователя по телефону или Telegram ID
         user = None
+        patient = None
 
         if credentials.phone:
-            user = crud_user.get_user_by_phone(db, phone=credentials.phone)
+            patient = crud_patient.get_patient_by_phone(db, phone=credentials.phone)
+            user = patient.user if patient and patient.user else None
         elif credentials.telegram_id:
-            user = crud_user.get_user_by_telegram_id(
-                db, telegram_id=credentials.telegram_id
+            raise HTTPException(
+                status_code=400, detail="Telegram login requires a verified link"
             )
 
-        # Если пользователь не найден, создаем нового
         if not user:
-            if not credentials.phone:
-                raise HTTPException(
-                    status_code=400, detail="Номер телефона обязателен для регистрации"
-                )
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-            # Создаем нового пациента
-            user_data = {
-                "phone": credentials.phone,
-                "telegram_id": credentials.telegram_id,
-                "role": "Patient",
-                "is_active": True,
-            }
+        if not credentials.password or not user.hashed_password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-            user = crud_user.create_user(db, user_data)
-
-        # Проверяем пароль (если указан)
-        if credentials.password and not crud_user.verify_password(
-            credentials.password, user.hashed_password
-        ):
-            raise HTTPException(status_code=401, detail="Неверный пароль")
+        if not crud_user.verify_password(credentials.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
         # Генерируем токен
         access_token = crud_user.create_access_token(data={"sub": user.username})
@@ -120,7 +108,7 @@ async def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(ge
             user={
                 "id": user.id,
                 "username": user.username,
-                "phone": user.phone,
+                "phone": patient.phone if patient else None,
                 "role": user.role,
                 "is_active": user.is_active,
             },
