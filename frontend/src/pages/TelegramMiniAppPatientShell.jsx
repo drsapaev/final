@@ -307,6 +307,12 @@ function getTelegramMiniAppEntryToken(search) {
   return token.trim();
 }
 
+function getTelegramMiniAppEntryTokenSection(search) {
+  const token = getTelegramMiniAppEntryToken(search);
+  const tokenSection = token.split('_')[1] || '';
+  return MINI_APP_SECTION_ALIASES[tokenSection.trim().toLowerCase()] || '';
+}
+
 function getTelegramMiniAppAuthPayload(search, section) {
   const initData = getTelegramMiniAppInitData();
   const selectedSection = section || getTelegramMiniAppSelectedSection(search);
@@ -319,9 +325,12 @@ function getTelegramMiniAppAuthPayload(search, section) {
 
   const entryToken = getTelegramMiniAppEntryToken(search);
   if (entryToken) {
+    const tokenSection = getTelegramMiniAppEntryTokenSection(search);
     return {
       entryToken,
-      section: selectedSection || undefined,
+      // Local HTTP fallback tokens are signed for the entry section. Keep auth
+      // pinned to that section while the Mini App UI switches panels.
+      section: tokenSection || selectedSection || undefined,
     };
   }
 
