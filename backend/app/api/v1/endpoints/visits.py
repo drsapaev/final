@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.clinic import Doctor
+from app.models.visit import Visit
 from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
@@ -77,7 +78,7 @@ def _vservices(db: Session) -> Table:
     return Table("visit_services", md, autoload_with=db.get_bind())
 
 
-def _ensure_visit_doctor_status_access(db: Session, visit, current_user) -> None:
+def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None:
     if getattr(current_user, "role", None) == "Admin" or getattr(
         current_user, "is_superuser", False
     ):
@@ -166,10 +167,18 @@ def get_visit(
 
 @router.post(
     "/visits/{visit_id}/services",
-    dependencies=[Depends(require_roles("Admin", "Registrar", "Doctor", "Cashier"))],
     summary="Добавить услугу к визиту",
 )
-def add_service(visit_id: int, item: VisitServiceIn, db: Session = Depends(get_db)):
+def add_service(
+    visit_id: int,
+    item: VisitServiceIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin", "Registrar", "Doctor", "Cashier")),
+):
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(404, "Visit not found")
+    _ensure_visit_doctor_access(db, visit, current_user)
     return VisitsApiService(db).add_service(visit_id=visit_id, item=item)
 
 
@@ -185,12 +194,10 @@ def set_status(
 ):
     if status_new not in {"open", "in_progress", "closed", "canceled"}:
         raise HTTPException(400, "Invalid status")
-    # Use ORM for reliability
-    from app.models.visit import Visit
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(404, "Visit not found")
-    _ensure_visit_doctor_status_access(db, visit, current_user)
+    _ensure_visit_doctor_access(db, visit, current_user)
 
     visit.status = status_new
     if status_new == "in_progress" and hasattr(visit, "started_at"):
