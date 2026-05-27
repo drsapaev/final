@@ -46,6 +46,8 @@ from app.schemas.file_system import (
 
 logger = logging.getLogger(__name__)
 
+FILE_READ_CHUNK_BYTES = 1024 * 1024
+
 
 class FileSystemService:
     """Сервис файловой системы"""
@@ -78,6 +80,29 @@ class FileSystemService:
 
         # Создаем директории если их нет
         self._ensure_directories()
+
+    def _read_upload_file_limited(
+        self, upload_file: UploadFile, max_bytes: int
+    ) -> tuple[bytes, int]:
+        chunks: list[bytes] = []
+        total_size = 0
+
+        while True:
+            chunk = upload_file.file.read(FILE_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+
+            total_size += len(chunk)
+            if total_size > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=(
+                        f"Файл слишком большой. Максимальный размер: {max_bytes} байт"
+                    ),
+                )
+            chunks.append(chunk)
+
+        return b"".join(chunks), total_size
 
     def _ensure_directories(self):
         """Создать необходимые директории"""
@@ -226,16 +251,9 @@ class FileSystemService:
     ) -> File:
         """Загрузить файл"""
         try:
-            # Читаем содержимое файла
-            file_content = upload_file.file.read()
-            file_size = len(file_content)
-
-            # Проверяем размер файла
-            if file_size > self.max_file_size:
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"Файл слишком большой. Максимальный размер: {self.max_file_size} байт",
-                )
+            file_content, file_size = self._read_upload_file_limited(
+                upload_file, self.max_file_size
+            )
 
             # Проверяем квоту пользователя
             quota_ok, quota_message = self._check_file_quota(db, user_id, file_size)
@@ -474,16 +492,9 @@ class FileSystemService:
                 detail="Нет прав для замены содержимого файла",
             )
 
-        # Читаем новое содержимое
-        new_content = new_file.file.read()
-        new_size = len(new_content)
-
-        # Проверяем размер
-        if new_size > self.max_file_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Файл слишком большой. Максимальный размер: {self.max_file_size} байт",
-            )
+        new_content, new_size = self._read_upload_file_limited(
+            new_file, self.max_file_size
+        )
 
         # Вычисляем хеш нового содержимого
         new_hash = self._generate_file_hash(new_content)
