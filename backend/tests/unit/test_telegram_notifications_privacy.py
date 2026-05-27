@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import BackgroundTasks
+from fastapi import HTTPException
 
 from app.api.v1.endpoints import telegram_notifications
 
@@ -458,6 +459,106 @@ async def test_send_lab_results_respects_notification_preferences(monkeypatch):
     assert "Sensitive Patient" not in str(response)
     assert "998877" not in str(response)
     get_bot_service.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_lab_results_rejects_result_for_different_patient(monkeypatch):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    telegram_user = SimpleNamespace(
+        chat_id=998877,
+        language_code="ru",
+        notifications_enabled=True,
+        lab_notifications=True,
+    )
+    lab_result = SimpleNamespace(
+        patient_id=999,
+        test_code="CBC",
+        created_at=datetime(2026, 5, 18, 9, 0, 0),
+        is_abnormal=False,
+    )
+    get_bot_service = AsyncMock()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        lambda _db, _phone: telegram_user,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_lab,
+        "get_lab_result",
+        lambda _db, _result_id: lab_result,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "get_telegram_bot_service",
+        get_bot_service,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await telegram_notifications.send_lab_results(
+            patient_id=123,
+            lab_result_ids=[456],
+            background_tasks=BackgroundTasks(),
+            db=object(),
+            current_user=SimpleNamespace(role="Lab"),
+        )
+
+    assert exc_info.value.status_code == 403
+    get_bot_service.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_doctor_send_lab_results_rejects_unowned_patient(monkeypatch):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    find_telegram_user = AsyncMock()
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "_doctor_allowed_patient_ids",
+        lambda _db, _current_user: {123},
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        find_telegram_user,
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await telegram_notifications.send_lab_results(
+            patient_id=999,
+            lab_result_ids=[456],
+            background_tasks=BackgroundTasks(),
+            db=object(),
+            current_user=SimpleNamespace(
+                id=1,
+                role="Doctor",
+                is_superuser=False,
+            ),
+        )
+
+    assert exc_info.value.status_code == 403
+    find_telegram_user.assert_not_called()
 
 
 @pytest.mark.asyncio

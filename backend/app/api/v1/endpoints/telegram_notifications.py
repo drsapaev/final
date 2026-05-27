@@ -19,7 +19,10 @@ from app.crud import (
     patient as crud_patient,
     telegram_config as crud_telegram,
 )
+from app.models.clinic import Doctor
+from app.models.lab import LabOrder
 from app.models.user import User
+from app.models.visit import Visit
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
 
@@ -91,6 +94,83 @@ def _safe_payment_template_data(payment_data: Dict[str, Any]) -> Dict[str, Any]:
         "transaction_id": PROTECTED_PAYMENT_REFERENCE,
         "receipt_link": _protected_payment_history_url(),
     }
+
+
+def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+    allowed_doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_doctor_ids.add(current_user.id)
+
+    rows = (
+        db.query(Visit.patient_id)
+        .filter(
+            Visit.doctor_id.in_(allowed_doctor_ids),
+            Visit.patient_id.isnot(None),
+        )
+        .all()
+    )
+    return {row[0] for row in rows if row[0] is not None}
+
+
+def _ensure_doctor_can_send_patient_lab_results(
+    db: Session,
+    patient_id: int,
+    current_user: User,
+) -> None:
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+    if patient_id not in _doctor_allowed_patient_ids(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+
+def _lab_result_patient_id(db: Session, result: Any) -> int | None:
+    direct_patient_id = getattr(result, "patient_id", None)
+    if direct_patient_id is not None:
+        return int(direct_patient_id)
+
+    order = getattr(result, "order", None)
+    order_patient_id = getattr(order, "patient_id", None)
+    if order_patient_id is not None:
+        return int(order_patient_id)
+
+    order_id = getattr(result, "order_id", None)
+    if order_id is None:
+        return None
+    return db.query(LabOrder.patient_id).filter(LabOrder.id == order_id).scalar()
+
+
+def _ensure_lab_results_belong_to_patient(
+    db: Session,
+    *,
+    patient_id: int,
+    lab_results: List[Any],
+) -> None:
+    for result in lab_results:
+        result_patient_id = _lab_result_patient_id(db, result)
+        if result_patient_id is not None and result_patient_id != patient_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
 
 
 @router.post("/send-appointment-reminder")
@@ -200,6 +280,8 @@ async def send_lab_results(
             )
 
         # Ищем Telegram пользователя
+        _ensure_doctor_can_send_patient_lab_results(db, patient_id, current_user)
+
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
         if not telegram_user:
             return {
@@ -224,6 +306,12 @@ async def send_lab_results(
             )
 
         # Получаем сервис бота
+        _ensure_lab_results_belong_to_patient(
+            db,
+            patient_id=patient_id,
+            lab_results=lab_results,
+        )
+
         bot_service = await get_telegram_bot_service()
         if not bot_service.active:
             await bot_service.initialize(db)
