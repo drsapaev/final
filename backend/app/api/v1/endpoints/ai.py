@@ -17,6 +17,9 @@ from ....services.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
 
+MAX_LEGACY_AI_UPLOAD_BYTES = 25 * 1024 * 1024
+AI_UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
+
 LEGACY_AI_ACCESS = require_any_ai_permission(
     AIPermission.ADMIN_AI,
     AIPermission.DIAGNOSE,
@@ -26,6 +29,28 @@ LEGACY_AI_ACCESS = require_any_ai_permission(
 )
 
 router = APIRouter(dependencies=[Depends(LEGACY_AI_ACCESS)])
+
+
+async def _read_ai_upload_bounded(upload: UploadFile) -> bytes:
+    total_size = 0
+    chunks: list[bytes] = []
+
+    while True:
+        chunk = await upload.read(AI_UPLOAD_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_LEGACY_AI_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=(
+                    "File too large "
+                    f"(maximum {MAX_LEGACY_AI_UPLOAD_BYTES // 1024 // 1024} MB)"
+                ),
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 def _raise_ai_internal_error(exc: Exception) -> NoReturn:
@@ -217,7 +242,7 @@ async def analyze_skin(
             raise HTTPException(status_code=400, detail="Файл должен быть изображением")
 
         # Читаем изображение
-        image_data = await image.read()
+        image_data = await _read_ai_upload_bounded(image)
 
         # Парсим метаданные если есть
         metadata_dict = None
@@ -363,7 +388,7 @@ async def analyze_xray_image(
     """Анализ рентгеновского снимка"""
     try:
         # Читаем изображение
-        image_data = await image.read()
+        image_data = await _read_ai_upload_bounded(image)
 
         # Парсим метаданные
         metadata_dict = None
@@ -397,7 +422,7 @@ async def analyze_ultrasound_image(
     """Анализ УЗИ изображения"""
     try:
         # Читаем изображение
-        image_data = await image.read()
+        image_data = await _read_ai_upload_bounded(image)
 
         # Парсим метаданные
         metadata_dict = None
@@ -431,7 +456,7 @@ async def analyze_dermatoscopy_image(
     """Анализ дерматоскопического изображения"""
     try:
         # Читаем изображение
-        image_data = await image.read()
+        image_data = await _read_ai_upload_bounded(image)
 
         # Парсим метаданные
         metadata_dict = None
@@ -466,7 +491,7 @@ async def analyze_medical_image_generic(
     """Универсальный анализ медицинского изображения"""
     try:
         # Читаем изображение
-        image_data = await image.read()
+        image_data = await _read_ai_upload_bounded(image)
 
         # Парсим метаданные
         metadata_dict = None
@@ -893,7 +918,7 @@ async def transcribe_audio(
             raise HTTPException(status_code=400, detail="Файл должен быть аудио")
 
         # Читаем аудио данные
-        audio_data = await audio_file.read()
+        audio_data = await _read_ai_upload_bounded(audio_file)
 
         # Ограничиваем размер файла (например, 25 МБ)
         if len(audio_data) > 25 * 1024 * 1024:
