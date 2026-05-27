@@ -137,6 +137,19 @@ def _ensure_visit_doctor_access(visit: Visit, current_user: User) -> None:
     )
 
 
+def _visit_filter_doctor_id(db: Session, current_user: User) -> int:
+    doctor = (
+        db.query(Doctor)
+        .filter(and_(Doctor.user_id == current_user.id, Doctor.active == True))
+        .first()
+    )
+    if doctor:
+        return doctor.id
+    if current_user.role == "Admin":
+        return current_user.id
+    return -1
+
+
 class ScheduleNextVisitService(BaseModel):
     service_id: int
     quantity: int = 1
@@ -1448,7 +1461,10 @@ def get_today_visits(
 ):
     """Получить сегодняшние визиты врача"""
     try:
-        visits = crud_visit.get_today_visits_by_doctor(db=db, doctor_id=current_user.id)
+        visits = crud_visit.get_today_visits_by_doctor(
+            db=db,
+            doctor_id=_visit_filter_doctor_id(db, current_user),
+        )
 
         result = []
         for visit in visits:
@@ -1730,7 +1746,7 @@ def get_visit_statistics(
 
         stats = crud_visit.get_visit_statistics(
             db=db,
-            doctor_id=current_user.id,
+            doctor_id=_visit_filter_doctor_id(db, current_user),
             date_from=date_from_obj,
             date_to=date_to_obj,
         )

@@ -304,6 +304,78 @@ class TestDoctorVisitFlow:
             == 0
         )
 
+    def test_today_visits_uses_doctor_id_not_user_id_collision(
+        self,
+        client: TestClient,
+        db_session,
+    ):
+        attacker_user = User(
+            id=9501,
+            username="today_visit_attacker",
+            email="today-visit-attacker@test.com",
+            hashed_password=get_password_hash("doctor123"),
+            role="Doctor",
+            is_active=True,
+        )
+        victim_user = User(
+            id=9503,
+            username="today_visit_victim",
+            email="today-visit-victim@test.com",
+            hashed_password=get_password_hash("doctor123"),
+            role="Doctor",
+            is_active=True,
+        )
+        attacker_doctor = Doctor(
+            id=9502,
+            user_id=attacker_user.id,
+            specialty="therapy",
+            active=True,
+        )
+        victim_doctor = Doctor(
+            id=attacker_user.id,
+            user_id=victim_user.id,
+            specialty="therapy",
+            active=True,
+        )
+        patient = Patient(
+            first_name="Private",
+            last_name="Visit",
+            phone="+998909501000",
+            birth_date=date(1990, 1, 1),
+        )
+        db_session.add_all(
+            [attacker_user, victim_user, attacker_doctor, victim_doctor, patient]
+        )
+        db_session.commit()
+        db_session.refresh(patient)
+
+        victim_visit = Visit(
+            patient_id=patient.id,
+            doctor_id=victim_doctor.id,
+            visit_date=date.today(),
+            visit_time="12:00",
+            status="open",
+            department="therapy",
+        )
+        db_session.add(victim_visit)
+        db_session.commit()
+        db_session.refresh(victim_visit)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": attacker_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.get("/api/v1/doctor/visits/today", headers=headers)
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["total_count"] == 0
+        assert all(item["id"] != victim_visit.id for item in payload["visits"])
+
     def test_doctor_can_start_visit(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue, db_session
     ):
