@@ -225,6 +225,85 @@ class TestDoctorVisitFlow:
         assert db_session.get(VisitService, first_service.id) is not None
         assert db_session.get(VisitService, other_service.id) is not None
 
+    def test_add_visit_service_rejects_user_id_doctor_id_collision_bypass(
+        self,
+        client: TestClient,
+        db_session,
+        test_service,
+    ):
+        attacker_user = User(
+            id=9401,
+            username="visit_service_attacker",
+            email="visit-service-attacker@test.com",
+            hashed_password=get_password_hash("doctor123"),
+            role="Doctor",
+            is_active=True,
+        )
+        victim_user = User(
+            id=9403,
+            username="visit_service_victim",
+            email="visit-service-victim@test.com",
+            hashed_password=get_password_hash("doctor123"),
+            role="Doctor",
+            is_active=True,
+        )
+        attacker_doctor = Doctor(
+            id=9402,
+            user_id=attacker_user.id,
+            specialty="therapy",
+            active=True,
+        )
+        victim_doctor = Doctor(
+            id=attacker_user.id,
+            user_id=victim_user.id,
+            specialty="therapy",
+            active=True,
+        )
+        patient = Patient(
+            first_name="Visit",
+            last_name="Owner",
+            phone="+998909401000",
+            birth_date=date(1990, 1, 1),
+        )
+        db_session.add_all(
+            [attacker_user, victim_user, attacker_doctor, victim_doctor, patient]
+        )
+        db_session.commit()
+        db_session.refresh(patient)
+
+        victim_visit = Visit(
+            patient_id=patient.id,
+            doctor_id=victim_doctor.id,
+            visit_date=date.today(),
+            visit_time="11:00",
+            status="open",
+            department="therapy",
+        )
+        db_session.add(victim_visit)
+        db_session.commit()
+        db_session.refresh(victim_visit)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": attacker_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.put(
+            f"/api/v1/doctor/visits/{victim_visit.id}/add-service",
+            params={"service_id": test_service.id},
+            headers=headers,
+        )
+
+        assert response.status_code == 403, response.text
+        assert (
+            db_session.query(VisitService)
+            .filter(VisitService.visit_id == victim_visit.id)
+            .count()
+            == 0
+        )
+
     def test_doctor_can_start_visit(
         self, client: TestClient, doctor_auth_headers, doctor_with_queue, db_session
     ):
