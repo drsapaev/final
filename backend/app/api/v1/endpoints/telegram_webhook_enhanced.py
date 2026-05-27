@@ -2,7 +2,9 @@
 Расширенный webhook endpoint для Telegram бота
 """
 
+import json
 import logging
+from json import JSONDecodeError
 from typing import Any, Dict, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -18,6 +20,37 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
 TELEGRAM_ENHANCED_PUBLIC_ERROR = "Internal server error"
+MAX_TELEGRAM_ENHANCED_WEBHOOK_BODY_BYTES = 256 * 1024
+
+
+async def _read_telegram_enhanced_webhook_json(request: Request) -> Dict[str, Any]:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    async for chunk in request.stream():
+        total_size += len(chunk)
+        if total_size > MAX_TELEGRAM_ENHANCED_WEBHOOK_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Telegram webhook payload is too large",
+            )
+        chunks.append(chunk)
+
+    try:
+        update_data = json.loads(b"".join(chunks).decode("utf-8") or "{}")
+    except (JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Telegram webhook JSON",
+        ) from exc
+
+    if not isinstance(update_data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Telegram webhook JSON must be an object",
+        )
+
+    return update_data
 
 
 def _validate_webhook_secret(request: Request, db: Session) -> None:
@@ -69,9 +102,10 @@ def _telegram_enhanced_test_failure(exc: Exception) -> Dict[str, Any]:
 async def telegram_webhook_enhanced(request: Request, db: Session = Depends(get_db)):
     """Обработка webhook от Telegram для расширенного бота"""
     try:
-        # Получаем данные от Telegram
-        update_data = await request.json()
         _validate_webhook_secret(request, db)
+
+        # Получаем данные от Telegram
+        update_data = await _read_telegram_enhanced_webhook_json(request)
 
         # Получаем экземпляр расширенного бота
         bot = get_enhanced_telegram_bot()
