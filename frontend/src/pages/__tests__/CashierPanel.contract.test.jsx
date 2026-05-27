@@ -101,4 +101,18 @@ describe('CashierPanel payment action contract', () => {
     expect(paymentWidgetBlock).toContain('canCreateDirectCashierPayment(paymentWidget.selectedItem)');
     expect(paymentWidgetBlock).not.toContain('can_create_grouped_payment');
   });
+
+  it('does not infer direct cashier payment availability from visit ids', () => {
+    const source = readCashierPanelSource();
+    const helperBlock = extractSourceBlock(
+      source,
+      'const canCreateDirectCashierPayment = (appointment) => {',
+      'const canCreateCashierPayment = (appointment) =>',
+    );
+
+    expect(helperBlock).toContain('appointment?.can_create_direct_payment === true');
+    expect(helperBlock).not.toContain('resolveSingleCashierVisitId');
+    expect(helperBlock).not.toContain('visit_id');
+    expect(helperBlock).not.toContain('visit_ids');
+  });
 });

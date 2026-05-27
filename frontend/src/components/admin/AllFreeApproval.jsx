@@ -21,6 +21,31 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const ALL_FREE_ACTION_CAN_FIELD = {
+  approve: 'can_approve',
+  reject: 'can_reject'
+};
+
+const hasBackendAllFreeAction = (request, action) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(request?.available_actions)) {
+    return request.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = ALL_FREE_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(request || {}, canField)) {
+    return Boolean(request[canField]);
+  }
+
+  return false;
+};
 /**
  * Компонент для одобрения/отклонения заявок All Free в админке
  */
@@ -478,8 +503,9 @@ const AllFreeApproval = () => {void
             }
 
                 {/* Действия */}
-                {request.approval_status === 'pending' &&
+                {(hasBackendAllFreeAction(request, 'approve') || hasBackendAllFreeAction(request, 'reject')) &&
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {hasBackendAllFreeAction(request, 'approve') &&
                     <Button
                 onClick={() => handleApproval(request.id, 'approve')}
                 disabled={isProcessing}
@@ -488,7 +514,9 @@ const AllFreeApproval = () => {void
                       <CheckCircle size={16} />
                       Одобрить
                     </Button>
-                    
+              }
+
+                    {hasBackendAllFreeAction(request, 'reject') &&
                     <Button
                 onClick={() => {
                   setSelectedRequest(request);
@@ -501,6 +529,7 @@ const AllFreeApproval = () => {void
                       <XCircle size={16} />
                       Отклонить
                     </Button>
+              }
                   </div>
             }
               </Card>

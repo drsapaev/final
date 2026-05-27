@@ -300,7 +300,7 @@ async def get_users(
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None, min_length=1, max_length=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список пользователей"""
     try:

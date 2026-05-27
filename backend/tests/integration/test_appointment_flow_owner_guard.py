@@ -78,6 +78,43 @@ def _doctor_headers(client, user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
+def _create_patient_user(db_session, *, label: str) -> tuple[User, Patient]:
+    suffix = _suffix()
+    user = User(
+        username=f"appt_patient_{label}_{suffix}",
+        email=f"appt-patient-{label}-{suffix}@test.local",
+        full_name=f"Appointment Patient {label}",
+        hashed_password=get_password_hash("patient123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    patient = Patient(
+        user_id=user.id,
+        first_name=f"Patient {label}",
+        last_name="LegacyAppointmentGuard",
+        phone=f"+99891{suffix[:7]}",
+        birth_date=date(1990, 1, 1),
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+    return user, patient
+
+
+def _patient_headers(client, user: User) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": user.username, "password": "patient123"},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
 def test_doctor_cannot_read_other_doctor_appointment_flow_status(
     client,
     db_session,
@@ -107,3 +144,176 @@ def test_doctor_cannot_read_other_doctor_appointment_flow_status(
         .first()
     )
     assert leaked_visit is None
+
+
+def test_patient_cannot_read_other_patient_legacy_appointment(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="own_read")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_read")
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="11:00",
+        status="scheduled",
+    )
+    db_session.add(other_appointment)
+    db_session.commit()
+    db_session.refresh(other_appointment)
+
+    response = client.get(
+        f"/api/v1/appointments/{other_appointment.id}",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+
+
+def test_patient_can_read_own_legacy_appointment(
+    client,
+    db_session,
+) -> None:
+    own_user, own_patient = _create_patient_user(db_session, label="own_allow")
+    own_appointment = Appointment(
+        patient_id=own_patient.id,
+        appointment_date=date.today(),
+        appointment_time="10:30",
+        status="scheduled",
+    )
+    db_session.add(own_appointment)
+    db_session.commit()
+    db_session.refresh(own_appointment)
+
+    response = client.get(
+        f"/api/v1/appointments/{own_appointment.id}",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == own_appointment.id
+
+
+def test_patient_legacy_appointment_list_is_limited_to_own_records(
+    client,
+    db_session,
+) -> None:
+    own_user, own_patient = _create_patient_user(db_session, label="own_list")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_list")
+    own_appointment = Appointment(
+        patient_id=own_patient.id,
+        appointment_date=date.today(),
+        appointment_time="09:00",
+        status="scheduled",
+    )
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="09:30",
+        status="scheduled",
+    )
+    db_session.add_all([own_appointment, other_appointment])
+    db_session.commit()
+    db_session.refresh(own_appointment)
+    db_session.refresh(other_appointment)
+
+    response = client.get(
+        "/api/v1/appointments/",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 200
+    appointment_ids = {item["id"] for item in response.json()}
+    assert own_appointment.id in appointment_ids
+    assert other_appointment.id not in appointment_ids
+
+
+def test_patient_cannot_create_legacy_appointment_for_another_patient(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="own_create")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_create")
+    before_count = db_session.query(Appointment).count()
+
+    response = client.post(
+        "/api/v1/appointments/",
+        json={
+            "patient_id": other_patient.id,
+            "appointment_date": date.today().isoformat(),
+            "appointment_time": "14:00",
+            "status": "scheduled",
+        },
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    assert db_session.query(Appointment).count() == before_count
+
+
+def test_patient_cannot_read_legacy_pending_payments(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="pending")
+
+    response = client.get(
+        "/api/v1/appointments/pending-payments",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+
+
+def test_patient_cannot_update_other_patient_legacy_appointment(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="own_update")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_update")
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="12:00",
+        status="scheduled",
+        notes="original",
+    )
+    db_session.add(other_appointment)
+    db_session.commit()
+    db_session.refresh(other_appointment)
+
+    response = client.put(
+        f"/api/v1/appointments/{other_appointment.id}",
+        json={"notes": "tampered"},
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    db_session.refresh(other_appointment)
+    assert other_appointment.notes == "original"
+
+
+def test_patient_cannot_delete_other_patient_legacy_appointment(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="own_delete")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_delete")
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="13:00",
+        status="scheduled",
+    )
+    db_session.add(other_appointment)
+    db_session.commit()
+    db_session.refresh(other_appointment)
+    appointment_id = other_appointment.id
+
+    response = client.delete(
+        f"/api/v1/appointments/{appointment_id}",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    assert db_session.get(Appointment, appointment_id) is not None

@@ -111,12 +111,15 @@ def _template_summary_out(template) -> LabReportTemplateSummaryOut:
     )
 
 
-def _version_out(version) -> LabReportTemplateVersionOut:
+def _version_out(service: LabReportingService, version) -> LabReportTemplateVersionOut:
+    available_actions = service.template_version_available_actions(version)
     return LabReportTemplateVersionOut(
         id=version.id,
         template_id=version.template_id,
         version_no=version.version_no,
         status=version.status,
+        available_actions=available_actions,
+        **service.template_version_action_flags(version),
         layout_preset=version.layout_preset,
         page_settings=version.page_settings or {},
         branding_overrides=version.branding_overrides or {},
@@ -140,11 +143,14 @@ def _version_out(version) -> LabReportTemplateVersionOut:
     )
 
 
-def _template_out(template) -> LabReportTemplateOut:
+def _template_out(service: LabReportingService, template) -> LabReportTemplateOut:
     summary = _template_summary_out(template)
     return LabReportTemplateOut(
         **summary.model_dump(),
-        versions=[_version_out(version) for version in sorted(template.versions, key=lambda item: item.version_no)],
+        versions=[
+            _version_out(service, version)
+            for version in sorted(template.versions, key=lambda item: item.version_no)
+        ],
     )
 
 
@@ -169,7 +175,7 @@ def _instance_out(service: LabReportingService, instance) -> LabReportInstanceOu
         finalized_at=instance.finalized_at,
         printed_at=instance.printed_at,
         template=_template_summary_out(instance.template),
-        template_version=_version_out(instance.template_version),
+        template_version=_version_out(service, instance.template_version),
         sections=[
             LabReportRenderedSectionOut(
                 id=section["id"],
@@ -312,7 +318,7 @@ def create_lab_template(
     service = LabReportingService(db)
     try:
         template = service.create_template(payload.model_dump())
-        return _template_out(template)
+        return _template_out(service, template)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -325,7 +331,7 @@ def get_lab_template(
 ):
     service = LabReportingService(db)
     try:
-        return _template_out(service.get_template(template_id))
+        return _template_out(service, service.get_template(template_id))
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -340,7 +346,7 @@ def create_lab_template_version(
     service = LabReportingService(db)
     try:
         version = service.create_template_version(template_id, payload.source_version_id)
-        return _version_out(version)
+        return _version_out(service, version)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -356,7 +362,7 @@ def get_lab_template_version(
         version = service.repository.get_template_version(version_id)
         if not version:
             raise LabReportingDomainError(404, "Template version not found")
-        return _version_out(version)
+        return _version_out(service, version)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -371,7 +377,7 @@ def update_lab_template_version(
     service = LabReportingService(db)
     try:
         version = service.update_template_version(version_id, payload.model_dump())
-        return _version_out(version)
+        return _version_out(service, version)
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -384,7 +390,7 @@ def publish_lab_template_version(
 ):
     service = LabReportingService(db)
     try:
-        return _version_out(service.publish_template_version(version_id))
+        return _version_out(service, service.publish_template_version(version_id))
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -397,7 +403,7 @@ def archive_lab_template_version(
 ):
     service = LabReportingService(db)
     try:
-        return _version_out(service.archive_template_version(version_id))
+        return _version_out(service, service.archive_template_version(version_id))
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
@@ -410,7 +416,7 @@ def clone_lab_template(
 ):
     service = LabReportingService(db)
     try:
-        return _template_out(service.clone_template(template_id))
+        return _template_out(service, service.clone_template(template_id))
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)
 
