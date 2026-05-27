@@ -43,6 +43,33 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -> None:
+    if current_user.role == "Admin" or current_user.is_superuser:
+        return
+    if current_user.role != "Doctor":
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if visit.doctor_id == doctor.id:
+        return
+
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+    # Legacy writers sometimes stored User.id in Visit.doctor_id. Keep that
+    # compatibility only when the value is not another real Doctor row.
+    if not assigned_doctor and visit.doctor_id == current_user.id:
+        return
+    if assigned_doctor and assigned_doctor.user_id == current_user.id:
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
 # ===================== СХЕМЫ ДЛЯ КОРЗИНЫ =====================
 
 
@@ -3029,6 +3056,8 @@ def complete_visit(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
+
+        _ensure_visit_doctor_access(db, visit, current_user)
 
         visit.status = "completed"
         db.commit()

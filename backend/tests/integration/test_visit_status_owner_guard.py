@@ -122,3 +122,30 @@ def test_doctor_cannot_add_service_to_other_doctor_visit(client, db_session) -> 
         .count()
         == 0
     )
+
+
+def test_doctor_cannot_complete_other_doctor_visit_from_registrar_endpoint(
+    client, db_session
+) -> None:
+    own_user, _own_doctor = _create_doctor_user(db_session, label="complete_own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="complete_other")
+    other_patient = _create_patient(db_session)
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add(other_visit)
+    db_session.commit()
+    db_session.refresh(other_visit)
+
+    response = client.post(
+        f"/api/v1/registrar/visits/{other_visit.id}/complete",
+        headers=_doctor_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    db_session.refresh(other_visit)
+    assert other_visit.status == "open"
