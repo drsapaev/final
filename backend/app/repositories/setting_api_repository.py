@@ -17,3 +17,19 @@ class SettingApiRepository:
     def list_by_category(self, *, category: str) -> list[Setting]:
         stmt = select(Setting).where(Setting.category == category)
         return self.db.execute(stmt).scalars().all()
+
+    def upsert(self, *, category: str, key: str, value: str) -> Setting:
+        stmt = select(Setting).where(
+            Setting.category == category,
+            Setting.key == key,
+        )
+        row = self.db.execute(stmt).scalar_one_or_none()
+        if row is None:
+            row = Setting(category=category, key=key, value=value)
+            self.db.add(row)
+        else:
+            row.value = value
+
+        self.db.commit()
+        self.db.refresh(row)
+        return row

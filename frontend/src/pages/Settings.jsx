@@ -149,12 +149,13 @@ export default function Settings() {void
     try {
       // Ожидаем форму {items:[{key,value}]} или массив объектов
       const res = await api.get('/settings', { params: { category } });
+      const data = res?.data ?? res;
       let arr = [];
-      if (Array.isArray(res?.items)) arr = res.items;else
-      if (Array.isArray(res)) arr = res;else
-      if (res && typeof res === 'object') {
+      if (Array.isArray(data?.items)) arr = data.items;else
+      if (Array.isArray(data)) arr = data;else
+      if (data && typeof data === 'object') {
         // возможный словарь
-        arr = Object.entries(res).map(([k, v]) => ({ key: k, value: v }));
+        arr = Object.entries(data).map(([k, v]) => ({ key: k, value: v }));
       }
       setItems(arr.map((x) => ({ key: x.key ?? x.name ?? '', value: x.value ?? '' })));
     } catch (e) {
@@ -167,7 +168,7 @@ export default function Settings() {void
 
   async function saveKV(category, key, value) {
     try {
-      await api.put('/settings', { body: { category, key, value } });
+      await api.put('/settings', { category, key, value });
       await loadCat(category);
     } catch (e) {
       alert(e?.data?.detail || e?.message || 'Ошибка сохранения');

@@ -40,3 +40,16 @@ class SettingApiService:
                 status_code=500,
                 detail="Internal server error",
             ) from exc
+
+    def upsert_setting(self, *, category: str, key: str, value: str):
+        try:
+            return self.repository.upsert(category=category, key=key, value=value)
+        except Exception as exc:
+            logger.warning(
+                "Setting upsert failed error_type=%s",
+                type(exc).__name__,
+            )
+            raise SettingApiDomainError(
+                status_code=500,
+                detail="Internal server error",
+            ) from exc
