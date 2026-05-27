@@ -11,6 +11,7 @@ from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.clinic import Doctor
 from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
@@ -74,6 +75,35 @@ def _visits(db: Session) -> Table:
 def _vservices(db: Session) -> Table:
     md = MetaData()
     return Table("visit_services", md, autoload_with=db.get_bind())
+
+
+def _ensure_visit_doctor_status_access(db: Session, visit, current_user) -> None:
+    if getattr(current_user, "role", None) == "Admin" or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+    if getattr(current_user, "role", None) != "Doctor":
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if visit.doctor_id == doctor.id:
+        return
+
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor and visit.doctor_id == current_user.id:
+        return
+    if assigned_doctor and assigned_doctor.user_id == current_user.id:
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 @router.get("/visits", response_model=List[VisitOut], summary="Список визитов")
@@ -145,10 +175,14 @@ def add_service(visit_id: int, item: VisitServiceIn, db: Session = Depends(get_d
 
 @router.post(
     "/visits/{visit_id}/status",
-    dependencies=[Depends(require_roles("Admin", "Doctor", "Registrar"))],
     summary="Смена статуса визита",
 )
-def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
+def set_status(
+    visit_id: int,
+    status_new: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin", "Doctor", "Registrar")),
+):
     if status_new not in {"open", "in_progress", "closed", "canceled"}:
         raise HTTPException(400, "Invalid status")
     # Use ORM for reliability
@@ -156,6 +190,7 @@ def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(404, "Visit not found")
+    _ensure_visit_doctor_status_access(db, visit, current_user)
 
     visit.status = status_new
     if status_new == "in_progress" and hasattr(visit, "started_at"):
