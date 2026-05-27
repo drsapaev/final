@@ -194,6 +194,77 @@ def test_patient_can_read_own_legacy_appointment(
     assert response.json()["id"] == own_appointment.id
 
 
+def test_patient_legacy_appointment_list_is_limited_to_own_records(
+    client,
+    db_session,
+) -> None:
+    own_user, own_patient = _create_patient_user(db_session, label="own_list")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_list")
+    own_appointment = Appointment(
+        patient_id=own_patient.id,
+        appointment_date=date.today(),
+        appointment_time="09:00",
+        status="scheduled",
+    )
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="09:30",
+        status="scheduled",
+    )
+    db_session.add_all([own_appointment, other_appointment])
+    db_session.commit()
+    db_session.refresh(own_appointment)
+    db_session.refresh(other_appointment)
+
+    response = client.get(
+        "/api/v1/appointments/",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 200
+    appointment_ids = {item["id"] for item in response.json()}
+    assert own_appointment.id in appointment_ids
+    assert other_appointment.id not in appointment_ids
+
+
+def test_patient_cannot_create_legacy_appointment_for_another_patient(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="own_create")
+    _other_user, other_patient = _create_patient_user(db_session, label="other_create")
+    before_count = db_session.query(Appointment).count()
+
+    response = client.post(
+        "/api/v1/appointments/",
+        json={
+            "patient_id": other_patient.id,
+            "appointment_date": date.today().isoformat(),
+            "appointment_time": "14:00",
+            "status": "scheduled",
+        },
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    assert db_session.query(Appointment).count() == before_count
+
+
+def test_patient_cannot_read_legacy_pending_payments(
+    client,
+    db_session,
+) -> None:
+    own_user, _own_patient = _create_patient_user(db_session, label="pending")
+
+    response = client.get(
+        "/api/v1/appointments/pending-payments",
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+
+
 def test_patient_cannot_update_other_patient_legacy_appointment(
     client,
     db_session,
