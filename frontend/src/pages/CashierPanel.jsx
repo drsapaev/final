@@ -278,11 +278,7 @@ const isBackendGroupedCashierPayment = (appointment) =>
   appointment?.can_create_grouped_payment === true;
 
 const canCreateDirectCashierPayment = (appointment) => {
-  if (Object.prototype.hasOwnProperty.call(appointment || {}, 'can_create_direct_payment')) {
-    return appointment.can_create_direct_payment === true;
-  }
-
-  return resolveSingleCashierVisitId(appointment) !== null;
+  return appointment?.can_create_direct_payment === true;
 };
 
 const canCreateCashierPayment = (appointment) =>
