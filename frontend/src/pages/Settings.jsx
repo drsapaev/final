@@ -185,7 +185,7 @@ export default function Settings() {void
 
   const licenseOk = !!status?.ok;
   const badge = useMemo(() => {
-    const st = status?.status || (licenseOk ? 'active' : 'not_active');
+    const st = status?.status || status?.reason || 'unknown';
     return (
       <span style={{
         padding: '2px 8px', borderRadius: 999,
