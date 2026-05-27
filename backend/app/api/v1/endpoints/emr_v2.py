@@ -179,7 +179,8 @@ async def get_doctor_history(
     Doctor can only access their own history.
     """
     # Security: doctor can only access their own history
-    if current_user.id != doctor_id and not current_user.has_role("Admin"):
+    is_admin = current_user.role == "Admin" or current_user.is_superuser
+    if current_user.id != doctor_id and not is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
     
     history_service = EMRDoctorHistoryService(db)
