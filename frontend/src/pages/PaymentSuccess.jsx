@@ -116,8 +116,8 @@ const PaymentSuccess = () => {
 
   const generateReceipt = useCallback(async () => {
     try {
-      const response = await apiClient.post(`/payments/${paymentId}/receipt`, {
-        format: 'pdf'
+      const response = await apiClient.get(`/payments/${paymentId}/receipt`, {
+        params: { format_type: 'pdf' }
       });
 
       if (response.data?.receipt_url) {
