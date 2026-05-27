@@ -81,7 +81,9 @@ class TestFileReader {
 }
 
 function renderUploader(props = {}) {
-  return render(<PhotoUploader visitId="visit-42" onDataUpdate={vi.fn()} {...props} />);
+  return render(
+    <PhotoUploader patientId="patient-7" visitId="visit-42" onDataUpdate={vi.fn()} {...props} />
+  );
 }
 
 function getBeforeUploadInput(container) {
@@ -123,16 +125,13 @@ describe('PhotoUploader HEIC upload boundary', () => {
     expect(convertHEICToJPEGMock).not.toHaveBeenCalled();
 
     const [url, formData, config] = apiPostMock.mock.calls[0];
-    expect(url).toBe('/visits/visit-42/files');
+    expect(url).toBe('/files/upload');
     expect(formData.get('file')).toBe(jpgFile);
-    expect(formData.get('kind')).toBe('photo_before');
+    expect(formData.get('file_type')).toBe('image');
+    expect(formData.get('title')).toBe('lesion.jpg');
+    expect(formData.get('tags')).toBe('dermatology,photo,before');
+    expect(formData.get('patient_id')).toBe('patient-7');
     expect(formData.get('visit_id')).toBe('visit-42');
-    expect(JSON.parse(formData.get('metadata'))).toEqual({
-      zone: '',
-      angle: 'front',
-      lighting: 'natural',
-      flash: false,
-    });
     expect(config.headers).toEqual({ 'Content-Type': 'multipart/form-data' });
     expect(onDataUpdate).toHaveBeenCalledTimes(1);
   });
@@ -157,6 +156,7 @@ describe('PhotoUploader HEIC upload boundary', () => {
 
     const [, formData] = apiPostMock.mock.calls[0];
     expect(formData.get('file')).toBe(convertedFile);
-    expect(formData.get('kind')).toBe('photo_before');
+    expect(formData.get('file_type')).toBe('image');
+    expect(formData.get('tags')).toBe('dermatology,photo,before');
   });
 });
