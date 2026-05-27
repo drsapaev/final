@@ -256,7 +256,7 @@ const PaymentWidget = ({
     if (!paymentData?.payment_id) return;
 
     try {
-      const response = await apiClient.get(`/payments/${paymentData.payment_id}/status`);
+      const response = await apiClient.get(`/payments/${paymentData.payment_id}`);
 
       if (response.data?.status) {
         const nextStatus = normalizePaymentStatus(response.data.status);
