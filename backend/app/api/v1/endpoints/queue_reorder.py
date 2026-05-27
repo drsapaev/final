@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.services.queue_reorder_api_service import (
@@ -20,6 +20,21 @@ from app.services.queue_reorder_api_service import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+QUEUE_STATUS_ROLES = (
+    "Admin",
+    "Registrar",
+    "Doctor",
+    "Lab",
+    "Laboratory",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+)
 
 
 class QueueReorderRequest(BaseModel):
@@ -148,7 +163,7 @@ async def get_queue_status_by_specialist(
     specialist_id: int,
     day: date,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*QUEUE_STATUS_ROLES)),
 ):
     """
     Получение текущего состояния очереди по специалисту и дню
@@ -175,7 +190,7 @@ async def get_queue_status_by_specialist(
 async def get_queue_status(
     queue_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*QUEUE_STATUS_ROLES)),
 ):
     """
     Получение текущего состояния очереди по ID
