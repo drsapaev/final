@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.models.cardio_blood_test import CardioBloodTest
+from app.models.clinic import Doctor
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 CARDIO_ROLES = ("Admin", "Doctor", "cardio", "cardiology", "cardiologist", "Cardiologist")
 CARDIO_PUBLIC_ERROR = "Internal server error"
+CARDIO_ADMIN_ROLES = {"Admin"}
 
 
 def _raise_cardio_internal_error(operation: str, exc: Exception) -> NoReturn:
@@ -27,6 +29,57 @@ def _raise_cardio_internal_error(operation: str, exc: Exception) -> NoReturn:
         type(exc).__name__,
     )
     raise HTTPException(status_code=500, detail=CARDIO_PUBLIC_ERROR) from exc
+
+
+def _is_admin_user(user: User) -> bool:
+    return getattr(user, "role", None) in CARDIO_ADMIN_ROLES or bool(
+        getattr(user, "is_superuser", False)
+    )
+
+
+def _doctor_allowed_doctor_ids(db: Session, user: User) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    allowed_doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_doctor_ids.add(user.id)
+    return allowed_doctor_ids
+
+
+def _doctor_allowed_patient_ids(db: Session, user: User) -> set[int]:
+    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, user)
+    rows = (
+        db.query(Visit.patient_id)
+        .filter(
+            Visit.doctor_id.in_(allowed_doctor_ids),
+            Visit.patient_id.isnot(None),
+        )
+        .all()
+    )
+    return {row[0] for row in rows if row[0] is not None}
+
+
+def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) -> None:
+    if _is_admin_user(user):
+        return
+    if patient_id not in _doctor_allowed_patient_ids(db, user):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_doctor_can_access_visit(db: Session, visit: Visit, user: User) -> None:
+    if _is_admin_user(user):
+        return
+    if visit.doctor_id not in _doctor_allowed_doctor_ids(db, user):
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
 @router.get("/ecg", summary="ЭКГ исследования")
@@ -76,6 +129,15 @@ async def get_blood_tests(
     """
     try:
         query = db.query(CardioBloodTest)
+        if not _is_admin_user(user):
+            if patient_id is not None:
+                _ensure_doctor_can_access_patient(db, patient_id, user)
+            else:
+                allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
+                if not allowed_patient_ids:
+                    return []
+                query = query.filter(CardioBloodTest.patient_id.in_(allowed_patient_ids))
+
         if patient_id is not None:
             query = query.filter(CardioBloodTest.patient_id == patient_id)
 
@@ -127,6 +189,11 @@ async def create_blood_test(
                     status_code=400,
                     detail="Визит не принадлежит выбранному пациенту",
                 )
+
+        if blood_test_data.visit_id is None:
+            _ensure_doctor_can_access_patient(db, blood_test_data.patient_id, user)
+        else:
+            _ensure_doctor_can_access_visit(db, visit, user)
 
         blood_test = CardioBloodTest(
             patient_id=blood_test_data.patient_id,
