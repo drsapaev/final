@@ -290,7 +290,7 @@ function normalizeNotification(input, source = 'api') {
       input.department_key || input.departmentKey || input.department
     ),
     channel: input.channel || 'in_app_inbox',
-    status: input.status || input.delivery_status || input.deliveryStatus || null,
+    status: input.delivery_status || input.deliveryStatus || input.status || null,
     deliveryStatus:
       input.delivery_status || input.deliveryStatus || input.status || null,
     isRead: Boolean(
