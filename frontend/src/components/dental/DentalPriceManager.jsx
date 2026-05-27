@@ -13,10 +13,9 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
-import { getApiBaseUrl } from '../../api/runtime';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-const API_BASE = getApiBaseUrl();
 
 /**
  * Компонент для указания цены стоматологом после лечения
@@ -52,11 +51,10 @@ const DentalPriceManager = ({
   const loadPriceOverrides = useCallback(async () => {
     setLoadingOverrides(true);
     try {
-      const response = await fetch(`${API_BASE}/dental/price-overrides?visit_id=${visitId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPriceOverrides(data);
-      }
+      const response = await api.get('/dental/price-overrides', {
+        params: { visit_id: visitId }
+      });
+      setPriceOverrides(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
     } finally {
@@ -86,21 +84,17 @@ const DentalPriceManager = ({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/dental/price-override`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visit_id: visitId,
-          service_id: serviceId,
-          new_price: priceNum,
-          reason: reason,
-          details: details || null,
-          treatment_completed: true
-        })
+      const response = await api.post('/dental/price-override', {
+        visit_id: visitId,
+        service_id: serviceId,
+        new_price: priceNum,
+        reason: reason,
+        details: details || null,
+        treatment_completed: true
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status >= 200 && response.status < 300) {
+        const result = response.data;
         toast.success('Цена отправлена в регистратуру для подтверждения');
 
         // Обновляем список изменений
@@ -113,13 +107,10 @@ const DentalPriceManager = ({
 
         // Уведомляем родительский компонент
         onPriceSet?.(result);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка указания цены');
       }
     } catch (error) {
       logger.error('Error setting price:', error);
-      toast.error('Ошибка указания цены');
+      toast.error(error?.response?.data?.detail || 'Ошибка указания цены');
     } finally {
       setIsLoading(false);
     }
