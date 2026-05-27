@@ -5,11 +5,14 @@ Webhook endpoint для обработки входящих сообщений �
 import hashlib
 import html
 import hmac
+import ipaddress
 import logging
 import secrets
+import socket
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, NoReturn
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -1087,8 +1090,61 @@ def _append_patient_mini_app_entry_token(entry_url: str, token: str) -> str:
     return f"{entry_url}{separator}entryToken={token}"
 
 
+def _detect_local_lan_ip() -> str | None:
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.settimeout(0)
+        try:
+            probe.connect(("8.8.8.8", 80))
+            local_ip = probe.getsockname()[0]
+        finally:
+            probe.close()
+    except OSError:
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return None
+
+    try:
+        parsed_ip = ipaddress.ip_address(local_ip)
+    except ValueError:
+        return None
+    if parsed_ip.is_loopback or parsed_ip.is_unspecified:
+        return None
+    return local_ip
+
+
+def _is_local_frontend_host(hostname: str | None) -> bool:
+    host = str(hostname or "").strip().lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def _telegram_patient_frontend_url() -> str | None:
+    configured_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    if not configured_url:
+        local_ip = _detect_local_lan_ip()
+        return f"http://{local_ip}:5173" if local_ip else None
+
+    parsed = urlsplit(configured_url)
+    if parsed.scheme != "http" or not _is_local_frontend_host(parsed.hostname):
+        return configured_url
+
+    local_ip = _detect_local_lan_ip()
+    if not local_ip:
+        return configured_url
+
+    port = parsed.port or 5173
+    netloc = f"{local_ip}:{port}"
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+
 def _patient_entry_url(section: str | None = None) -> str | None:
-    frontend_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
+    frontend_url = _telegram_patient_frontend_url()
     if not frontend_url:
         return None
 
