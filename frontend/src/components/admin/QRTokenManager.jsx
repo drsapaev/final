@@ -89,7 +89,7 @@ const QRTokenManager = () => {
   const loadTokens = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/admin/qr-tokens/active', {
+      const response = await fetch('/api/v1/queue/admin/qr-tokens/active', {
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
         }
@@ -111,7 +111,7 @@ const QRTokenManager = () => {
   const createToken = async () => {
     try {
       setError(null);
-      const response = await fetch('/api/v1/admin/qr-tokens/generate', {
+      const response = await fetch('/api/v1/queue/admin/qr-tokens/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +146,7 @@ const QRTokenManager = () => {
     }
 
     try {
-      const response = await fetch(`/api/v1/admin/qr-tokens/${token}`, {
+      const response = await fetch(`/api/v1/queue/admin/qr-tokens/${token}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${tokenManager.getAccessToken()}`
