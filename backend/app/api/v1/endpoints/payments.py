@@ -30,8 +30,25 @@ from app.services.payment_test_init_service import (
     PaymentTestInitService,
 )
 from app.services.payment_provider_manager_factory import get_payment_manager
+from app.models.payment import Payment
+from app.models.visit import Visit
 
 router = APIRouter()
+
+
+def _ensure_patient_payment_access(db: Session, payment_id: int, current_user) -> None:
+    if getattr(current_user, "role", None) != "Patient":
+        return
+    if not getattr(current_user, "patient", None):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Платеж не найден")
+
+    visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+    if not visit or visit.patient_id != current_user.patient.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
 # ===================== МОДЕЛИ ДЛЯ МОДУЛЯ ОПЛАТЫ =====================
 
@@ -232,6 +249,7 @@ def get_payment_status(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
+    _ensure_patient_payment_access(db, payment_id, current_user)
     service = PaymentReadService(db, get_payment_manager())
     try:
         return PaymentStatusResponse(**service.get_payment_status(payment_id=payment_id))
@@ -296,6 +314,7 @@ def generate_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Генерация квитанции об оплате"""
+    _ensure_patient_payment_access(db, payment_id, current_user)
     service = PaymentReadService(db)
     try:
         return service.generate_receipt(payment_id=payment_id, format_type=format_type)
@@ -315,6 +334,7 @@ def download_receipt(
     current_user=Depends(deps.get_current_user),
 ):
     """Скачивание квитанции"""
+    _ensure_patient_payment_access(db, payment_id, current_user)
     service = PaymentReadService(db)
     try:
         pdf_bytes = service.build_receipt_pdf(payment_id=payment_id)
