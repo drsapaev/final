@@ -41,7 +41,7 @@ export const authService = {
    */
   async logout() {
     try {
-      await api.post('/auth/logout');
+      await api.post('/authentication/logout');
     } catch (error) {
       logger.warn('Ошибка выхода:', error);
     } finally {
@@ -59,7 +59,7 @@ export const authService = {
       const refreshToken = tokenManager.getRefreshToken();
       if (!refreshToken) return false;
 
-      const response = await api.post('/auth/refresh', {
+      const response = await api.post('/authentication/refresh', {
         refresh_token: refreshToken
       });
 
