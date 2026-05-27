@@ -59,4 +59,46 @@ describe('CashierPanel payment action contract', () => {
     expect(receiptBlock).toContain('status: paymentRow?.status ?? null');
     expect(receiptBlock).not.toContain("status: paymentRow?.status || 'paid'");
   });
+
+  it('delegates grouped cashier payment allocation to the backend contract', () => {
+    const source = readCashierPanelSource();
+    const groupedContractBlock = extractSourceBlock(
+      source,
+      'const createGroupedCashierPayment = async (appointment, paymentData) => {',
+      'const PAYMENT_ACTION_CAN_FIELD = {',
+    );
+    const processPaymentBlock = extractSourceBlock(
+      source,
+      'const processPayment = async (appointment, paymentData) => {',
+      'const confirmPayment = async (paymentId) => {',
+    );
+
+    expect(groupedContractBlock).toContain('/api/v1/cashier/payments/grouped');
+    expect(groupedContractBlock).toContain('appointment?.can_create_grouped_payment !== true');
+    expect(groupedContractBlock).toContain('visit_ids: visitIds');
+    expect(processPaymentBlock).toContain('const groupedPayment = isBackendGroupedCashierPayment(appointment);');
+    expect(processPaymentBlock).toContain('await createGroupedCashierPayment(appointment, paymentData);');
+    expect(processPaymentBlock).toContain('paymentsHook.createPayment');
+    expect(processPaymentBlock).not.toContain('remaining_amount -');
+    expect(processPaymentBlock).not.toContain('remainingAmount');
+    expect(processPaymentBlock).not.toContain('Math.min');
+  });
+
+  it('does not route grouped cashier rows through the single-visit online widget', () => {
+    const source = readCashierPanelSource();
+    const onlineActionBlock = extractSourceBlock(
+      source,
+      'onClick={() => openPaymentWidget(appointment)}',
+      'aria-label={`Take cash payment',
+    );
+    const paymentWidgetBlock = extractSourceBlock(
+      source,
+      '<PaymentWidget',
+      'amount={paymentWidget.selectedItem.remaining_amount',
+    );
+
+    expect(onlineActionBlock).toContain('disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}');
+    expect(paymentWidgetBlock).toContain('canCreateDirectCashierPayment(paymentWidget.selectedItem)');
+    expect(paymentWidgetBlock).not.toContain('can_create_grouped_payment');
+  });
 });
