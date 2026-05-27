@@ -39,7 +39,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
-const PhotoUploader = ({ visitId, onDataUpdate }) => {
+const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   const [photos, setPhotos] = useState({
     before: [],
     after: []
@@ -102,12 +102,22 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
 
           // Загружаем на сервер
           const formData = new FormData();
-          formData.append('file', processedFile);
-          formData.append('kind', fileType === 'before' ? 'photo_before' : 'photo_after');
-          formData.append('visit_id', visitId);
-          formData.append('metadata', JSON.stringify(metadata));
+          if (!patientId && !visitId) {
+            throw new Error('Photo upload requires patientId or visitId');
+          }
 
-          const response = await api.post(`/visits/${visitId}/files`, formData, {
+          formData.append('file', processedFile);
+          formData.append('file_type', 'image');
+          formData.append('title', processedFile.name);
+          formData.append('tags', `dermatology,photo,${fileType}`);
+          if (patientId) {
+            formData.append('patient_id', patientId);
+          }
+          if (visitId) {
+            formData.append('visit_id', visitId);
+          }
+
+          const response = await api.post('/files/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (progressEvent) => {
               const percentCompleted = Math.round(
@@ -119,7 +129,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
 
           const newPhoto = {
             id: response.data.id,
-            url: response.data.url,
+            url: response.data.url || (response.data.id ? `/api/v1/files/${response.data.id}/download` : preview),
             preview: preview,
             name: processedFile.name,
             size: processedFile.size,
@@ -643,6 +653,7 @@ const PhotoUploader = ({ visitId, onDataUpdate }) => {
 PhotoUploader.propTypes = {
   ...(PhotoUploader.propTypes || {}),
   onDataUpdate: PropTypes.any,
+  patientId: PropTypes.any,
   visitId: PropTypes.any,
 };
 
