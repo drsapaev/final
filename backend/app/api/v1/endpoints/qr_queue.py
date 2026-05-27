@@ -2978,14 +2978,32 @@ def cancel_service_in_entry(
             new_total,
         )
 
-        # Синхронизируем с другими queue_entries этого пациента
+        # Sync only within the same visit/session; patient_id alone is too broad.
         if entry.patient_id:
+            other_entry_filters = [
+                OnlineQueueEntry.patient_id == entry.patient_id,
+                OnlineQueueEntry.id != entry.id,
+            ]
+            if entry.visit_id:
+                other_entry_filters.append(OnlineQueueEntry.visit_id == entry.visit_id)
+            elif entry.session_id:
+                other_entry_filters.extend(
+                    [
+                        OnlineQueueEntry.visit_id.is_(None),
+                        OnlineQueueEntry.session_id == entry.session_id,
+                    ]
+                )
+            else:
+                other_entry_filters.extend(
+                    [
+                        OnlineQueueEntry.visit_id.is_(None),
+                        OnlineQueueEntry.queue_id == entry.queue_id,
+                    ]
+                )
+
             other_entries = (
                 db.query(OnlineQueueEntry)
-                .filter(
-                OnlineQueueEntry.patient_id == entry.patient_id,
-                    OnlineQueueEntry.id != entry.id,
-                )
+                .filter(*other_entry_filters)
                 .all()
             )
 
