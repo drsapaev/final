@@ -9,10 +9,52 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.models.clinic import Doctor
 from app.models.user import User
+from app.models.visit import Visit
 from app.services.emr_lab_integration import emr_lab_integration
 
 router = APIRouter()
+
+
+def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    allowed_doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_doctor_ids.add(current_user.id)
+
+    rows = (
+        db.query(Visit.patient_id)
+        .filter(
+            Visit.doctor_id.in_(allowed_doctor_ids),
+            Visit.patient_id.isnot(None),
+        )
+        .all()
+    )
+    return {row[0] for row in rows if row[0] is not None}
+
+
+def _ensure_doctor_can_read_patient_lab_data(
+    db: Session,
+    patient_id: int,
+    current_user: User,
+) -> None:
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+    if patient_id not in _doctor_allowed_patient_ids(db, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
 @router.get("/patients/{patient_id}/lab-results")
@@ -25,6 +67,7 @@ async def get_patient_lab_results(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить лабораторные результаты пациента"""
+    _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
         # Парсим даты
         parsed_date_from = None
@@ -98,6 +141,7 @@ async def get_abnormal_lab_results(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить аномальные лабораторные результаты пациента"""
+    _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
         date_from = datetime.utcnow() - timedelta(days=days)
 
@@ -135,6 +179,7 @@ async def get_lab_summary_for_emr(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить сводку лабораторных данных для EMR"""
+    _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
         summary = await emr_lab_integration.generate_lab_summary_for_emr(
             db=db, patient_id=patient_id, emr_id=emr_id
@@ -229,6 +274,7 @@ async def get_lab_results_trends(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить тренды лабораторных результатов пациента"""
+    _ensure_doctor_can_read_patient_lab_data(db, patient_id, current_user)
     try:
         date_from = datetime.utcnow() - timedelta(days=period_days)
 
