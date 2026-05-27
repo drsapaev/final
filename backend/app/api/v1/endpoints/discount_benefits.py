@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_db, require_roles
 from app.models.discount_benefits import BenefitType, DiscountType
 from app.models.user import User
 from app.services.discount_benefits_api_service import (
@@ -157,7 +157,7 @@ class RedeemPointsRequest(BaseModel):
 async def create_discount(
     discount_data: DiscountCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать скидку"""
     service = DiscountBenefitsService(db)
@@ -179,7 +179,7 @@ async def get_discounts(
     active_only: bool = Query(True),
     service_ids: Optional[List[int]] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список скидок"""
     discounts = DiscountBenefitsApiService(db).get_discounts(
@@ -215,7 +215,7 @@ async def update_discount(
     discount_id: int,
     discount_data: DiscountUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить скидку"""
     service = DiscountBenefitsApiService(db)
@@ -234,7 +234,7 @@ async def update_discount(
 async def delete_discount(
     discount_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Удалить скидку"""
     service = DiscountBenefitsApiService(db)
@@ -250,7 +250,7 @@ async def delete_discount(
 async def apply_discount(
     request: ApplyDiscountRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Применить скидку"""
     service = DiscountBenefitsService(db)
@@ -285,7 +285,7 @@ async def apply_discount(
 async def create_benefit(
     benefit_data: BenefitCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать льготу"""
     service = DiscountBenefitsService(db)
@@ -306,7 +306,7 @@ async def create_benefit(
 async def get_benefits(
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список льгот"""
     benefits = DiscountBenefitsApiService(db).list_benefits(active_only=active_only)
@@ -335,7 +335,7 @@ async def get_benefits(
 async def assign_benefit_to_patient(
     request: PatientBenefitCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Назначить льготу пациенту"""
     service = DiscountBenefitsService(db)
@@ -365,7 +365,7 @@ async def verify_patient_benefit(
     patient_benefit_id: int,
     notes: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Верифицировать льготу пациента"""
     service = DiscountBenefitsService(db)
@@ -386,7 +386,7 @@ async def get_patient_benefits(
     patient_id: int,
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить льготы пациента"""
     service = DiscountBenefitsService(db)
@@ -420,7 +420,7 @@ async def get_patient_benefits(
 async def apply_benefit(
     request: ApplyBenefitRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Применить льготу"""
     service = DiscountBenefitsService(db)
@@ -455,7 +455,7 @@ async def apply_benefit(
 async def create_loyalty_program(
     program_data: LoyaltyProgramCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать программу лояльности"""
     service = DiscountBenefitsService(db)
@@ -476,7 +476,7 @@ async def create_loyalty_program(
 async def get_loyalty_programs(
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить программы лояльности"""
     programs = DiscountBenefitsApiService(db).list_loyalty_programs(
@@ -505,7 +505,7 @@ async def enroll_patient_in_loyalty(
     patient_id: int,
     program_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Записать пациента в программу лояльности"""
     service = DiscountBenefitsService(db)
@@ -524,7 +524,7 @@ async def enroll_patient_in_loyalty(
 async def earn_loyalty_points(
     request: EarnPointsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Начислить баллы лояльности"""
     service = DiscountBenefitsService(db)
@@ -552,7 +552,7 @@ async def earn_loyalty_points(
 async def redeem_loyalty_points(
     request: RedeemPointsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Списать баллы лояльности"""
     service = DiscountBenefitsService(db)
@@ -581,7 +581,7 @@ async def get_loyalty_balance(
     patient_id: int,
     program_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить баланс баллов пациента"""
     service = DiscountBenefitsService(db)
@@ -597,7 +597,7 @@ async def get_loyalty_balance(
 async def calculate_total_discount(
     request: DiscountCalculationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Рассчитать общую скидку для пациента"""
     service = DiscountBenefitsService(db)
@@ -621,7 +621,7 @@ async def get_discount_analytics(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить аналитику по скидкам"""
     service = DiscountBenefitsService(db)
@@ -635,7 +635,7 @@ async def get_benefit_analytics(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить аналитику по льготам"""
     service = DiscountBenefitsService(db)
@@ -648,7 +648,7 @@ async def get_benefit_analytics(
 async def get_loyalty_analytics(
     program_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить аналитику по программе лояльности"""
     service = DiscountBenefitsService(db)
