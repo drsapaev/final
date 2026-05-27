@@ -27,6 +27,8 @@ from app.services.notifications import notification_sender_service
 
 CHAT_UPLOAD_DIR = Path("uploads/chat")
 CHAT_STORAGE_FILENAME_RE = re.compile(r"^\d{8}_\d{6}_.+$")
+MAX_CHAT_UPLOAD_BYTES = 10 * 1024 * 1024
+UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +59,29 @@ def _find_chat_upload_file(filename: str) -> Path:
             return resolved_path
 
     raise HTTPException(status_code=404, detail="Файл не найден")
+
+
+async def _read_upload_bounded(
+    upload: UploadFile,
+    *,
+    max_bytes: int,
+) -> bytes:
+    total_size = 0
+    chunks: list[bytes] = []
+
+    while True:
+        chunk = await upload.read(UPLOAD_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large (maximum {max_bytes // 1024 // 1024} MB)",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 class MessagesApiService:
@@ -414,11 +439,11 @@ class MessagesApiService:
         audio_file: UploadFile,
         current_user: User,
     ) -> MessageOut:
-        from app.utils.audio import get_audio_duration, validate_audio_file
+        from app.utils.audio import MAX_AUDIO_SIZE, get_audio_duration, validate_audio_file
         from app.ws.chat_ws import chat_manager
 
         recipient = self.validate_recipient(recipient_id=recipient_id, current_user=current_user)
-        content = await audio_file.read()
+        content = await _read_upload_bounded(audio_file, max_bytes=MAX_AUDIO_SIZE)
         format_name, mime_type = await validate_audio_file(content, audio_file.filename)
         duration = await get_audio_duration(content, format_name)
 
@@ -536,7 +561,7 @@ class MessagesApiService:
             current_user=current_user,
         )
 
-        content = await file.read()
+        content = await _read_upload_bounded(file, max_bytes=MAX_CHAT_UPLOAD_BYTES)
         original_filename = os.path.basename(file.filename or "file")
         safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
         upload_dir = "uploads/chat"
