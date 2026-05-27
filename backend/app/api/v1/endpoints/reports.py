@@ -4,9 +4,11 @@ API endpoints для системы отчетов
 
 import logging
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, NoReturn, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -244,6 +246,98 @@ async def generate_financial_report(
         )
 
 
+@router.post("/queue", response_model=ReportResponse)
+async def generate_queue_report(
+    request: QueueReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+):
+    """Generate a queue report."""
+    try:
+        reporting_service = get_reporting_service(db)
+
+        result = reporting_service.generate_queue_report(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            doctor_id=request.doctor_id,
+            format=request.format,
+        )
+
+        if "error" in result:
+            log_report_service_error("queue_report")
+            return ReportResponse(
+                success=False,
+                report_type="queue_report",
+                generated_at=datetime.now().isoformat(),
+                format=request.format,
+                error="Queue report generation failed",
+            )
+
+        return ReportResponse(
+            success=True,
+            report_type="queue_report",
+            generated_at=result.get("generated_at", datetime.now().isoformat()),
+            format=result.get("format", request.format),
+            data=result.get("data"),
+            filename=result.get("filename"),
+            filepath=result.get("filepath"),
+            size=result.get("size"),
+        )
+
+    except Exception as e:
+        raise_report_internal_error(
+            "queue-report", "Queue report generation failed", e
+        )
+
+
+@router.post("/doctor-performance", response_model=ReportResponse)
+async def generate_doctor_performance_report(
+    request: DoctorPerformanceReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+):
+    """Generate a doctor performance report."""
+    try:
+        reporting_service = get_reporting_service(db)
+
+        result = reporting_service.generate_doctor_performance_report(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            doctor_id=request.doctor_id,
+            format=request.format,
+        )
+
+        if "error" in result:
+            log_report_service_error("doctor_performance_report")
+            return ReportResponse(
+                success=False,
+                report_type="doctor_performance_report",
+                generated_at=datetime.now().isoformat(),
+                format=request.format,
+                error="Doctor performance report generation failed",
+            )
+
+        return ReportResponse(
+            success=True,
+            report_type="doctor_performance_report",
+            generated_at=result.get("generated_at", datetime.now().isoformat()),
+            format=result.get("format", request.format),
+            data=result.get("data"),
+            filename=result.get("filename"),
+            filepath=result.get("filepath"),
+            size=result.get("size"),
+        )
+
+    except Exception as e:
+        raise_report_internal_error(
+            "doctor-performance-report",
+            "Doctor performance report generation failed",
+            e,
+        )
+
+
 @router.get("/daily-summary")
 async def get_daily_summary(
     target_date: Optional[date] = Query(
@@ -357,4 +451,44 @@ async def list_report_files(
     except Exception as e:
         raise_report_internal_error(
             "report-files", "Ошибка получения списка файлов отчетов", e
+        )
+
+
+@router.get("/download/{filename}")
+async def download_report_file(
+    filename: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+):
+    """Download a generated report file."""
+    try:
+        reporting_service = get_reporting_service(db)
+        reports_dir = Path(reporting_service.reports_dir).resolve()
+        if not reports_dir.is_dir():
+            raise HTTPException(status_code=404, detail="Report file not found")
+
+        report_path = next(
+            (
+                candidate.resolve()
+                for candidate in reports_dir.iterdir()
+                if candidate.is_file() and candidate.name == filename
+            ),
+            None,
+        )
+
+        if report_path is None or report_path.parent != reports_dir:
+            raise HTTPException(status_code=404, detail="Report file not found")
+
+        return FileResponse(
+            path=str(report_path),
+            filename=report_path.name,
+            media_type="application/octet-stream",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise_report_internal_error(
+            "download-report", "Report file download failed", e
         )
