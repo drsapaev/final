@@ -1127,8 +1127,7 @@ def _is_local_frontend_host(hostname: str | None) -> bool:
 def _telegram_patient_frontend_url() -> str | None:
     configured_url = str(getattr(settings, "FRONTEND_URL", "") or "").strip()
     if not configured_url:
-        local_ip = _detect_local_lan_ip()
-        return f"http://{local_ip}:5173" if local_ip else None
+        return None
 
     parsed = urlsplit(configured_url)
     if parsed.scheme != "http" or not _is_local_frontend_host(parsed.hostname):
