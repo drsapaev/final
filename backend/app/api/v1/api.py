@@ -107,6 +107,7 @@ from app.api.v1.endpoints import (
     schedule,
     services,
     setup,
+    settings as settings_ep,
     simple_auth,
     sms_providers,
     specialized_panels,
@@ -419,6 +420,7 @@ api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(observability.router, tags=["observability"])
 api_router.include_router(activation_ep.router, tags=["activation"])
 api_router.include_router(setup.router, tags=["setup"])
+api_router.include_router(settings_ep.router, tags=["settings"])
 api_router.include_router(
     authentication.router, prefix="/authentication", tags=["authentication"]
 )
