@@ -256,7 +256,10 @@ const resolveCashierVisitIds = (appointment) => {
     : [];
 };
 
-const resolveSingleCashierVisitId = (appointment) => resolveCashierVisitIds(appointment)[0] ?? null;
+const resolveSingleCashierVisitId = (appointment) => {
+  const visitIds = resolveCashierVisitIds(appointment);
+  return visitIds.length === 1 ? visitIds[0] : null;
+};
 
 const PAYMENT_ACTION_CAN_FIELD = {
   cancel: 'can_cancel',
@@ -575,6 +578,13 @@ const CashierPanel = () => {void
   };
 
   const openPaymentWidget = (appointment) => {
+    const visitId = resolveSingleCashierVisitId(appointment);
+    if (!visitId) {
+      const message = 'Cannot start payment: backend must provide exactly one visit_id for this payment row.';
+      setPaymentError(message);
+      notify.error(message);
+      return;
+    }
     paymentWidget.openModal(appointment);
     setPaymentError(null);
     setPaymentSuccess(null);
@@ -584,78 +594,21 @@ const CashierPanel = () => {void
   // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
   const processPayment = async (appointment, paymentData) => {
     try {
-      // Получаем все visit_id пациента
-      const visitIds = resolveCashierVisitIds(appointment);
+      const visitId = resolveSingleCashierVisitId(appointment);
 
-      if (visitIds.length === 0) {
-        throw new Error('Невозможно обработать оплату: backend не вернул visit_id.');
+      if (!visitId) {
+        throw new Error('Cannot process payment: backend must provide exactly one visit_id or a backend-owned allocation contract.');
       }
 
-      // 1. Рассчитываем долг по каждому визиту на основе услуг
-      const visitDebts = {};
-      const services = appointment.services || [];
-
-      // Инициализируем долги нулями
-      visitIds.forEach((id) => visitDebts[id] = 0);
-
-      // Суммируем стоимость услуг для каждого визита
-      services.forEach((s) => {
-        if (s.visit_id) {
-          visitDebts[s.visit_id] = (visitDebts[s.visit_id] || 0) + (s.price || 0) * (s.quantity || 1);
-        }
+      const result = await paymentsHook.createPayment({
+        visit_id: visitId,
+        amount: paymentData.amount,
+        method: paymentData.method,
+        note: paymentData.note || 'Оплата медицинских услуг'
       });
 
-      // 2. Распределяем сумму оплаты
-      let remaining = parseFloat(paymentData.amount);
-      const paymentsToMake = [];
-
-      for (const visitId of visitIds) {
-        if (remaining <= 0) break;
-
-        const debt = visitDebts[visitId] || 0;
-        const payAmount = Math.min(remaining, debt);
-
-        if (payAmount > 0) {
-          paymentsToMake.push({ visitId, amount: payAmount });
-          remaining -= payAmount;
-        } else if (debt === 0 && remaining > 0 && visitIds.length === 1) {
-          // Если единственный визит и долг 0, но платим - зачисляем
-          paymentsToMake.push({ visitId, amount: remaining });
-          remaining = 0;
-        }
-      }
-
-      // Если осталась сумма (переплата), закидываем на первый визит
-      if (remaining > 0) {
-        if (paymentsToMake.length > 0) {
-          paymentsToMake[0].amount += remaining;
-        } else if (visitIds.length > 0) {
-          paymentsToMake.push({ visitId: visitIds[0], amount: remaining });
-        }
-      }
-
-      // 3. Выполняем платежи последовательно
-      for (const p of paymentsToMake) {
-        const result = await paymentsHook.createPayment({
-          visit_id: p.visitId,
-          amount: p.amount,
-          method: paymentData.method,
-          note: paymentData.note || 'Оплата медицинских услуг'
-        });
-
-        if (!result.success) {
-          throw new Error(`Не удалось оплатить визит #${p.visitId}: ${result.error}`);
-        }
-      }
-
-      // Fallback если ничего не добавилось в paymentsToMake но сумма есть
-      if (paymentsToMake.length === 0 && parseFloat(paymentData.amount) > 0 && visitIds.length > 0) {
-        await paymentsHook.createPayment({
-          visit_id: visitIds[0],
-          amount: paymentData.amount,
-          method: paymentData.method,
-          note: paymentData.note
-        });
+      if (!result.success) {
+        throw new Error(`Не удалось оплатить визит #${visitId}: ${result.error}`);
       }
 
       notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
