@@ -8,6 +8,7 @@ import pytest
 from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.lab import LabOrder, LabResult
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -105,6 +106,38 @@ def _create_lab_report_instance(
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def _create_legacy_lab_result(
+    db_session,
+    *,
+    patient_id: int,
+    visit_id: int,
+    test_code: str,
+    value: str,
+) -> LabResult:
+    order = LabOrder(
+        patient_id=patient_id,
+        visit_id=visit_id,
+        status="done",
+    )
+    db_session.add(order)
+    db_session.commit()
+    db_session.refresh(order)
+
+    result = LabResult(
+        order_id=order.id,
+        test_code=test_code,
+        test_name=test_code.title(),
+        value=value,
+        unit="g/L",
+        ref_range="120-160",
+        abnormal=False,
+    )
+    db_session.add(result)
+    db_session.commit()
+    db_session.refresh(result)
+    return result
 
 
 @pytest.mark.integration
@@ -353,6 +386,77 @@ def test_doctor_lab_report_reads_are_limited_to_own_visits(
         headers=doctor_headers,
     )
     assert other_pdf.status_code == 403
+
+
+@pytest.mark.integration
+def test_doctor_emr_lab_reads_are_limited_to_own_patients(
+    client,
+    db_session,
+) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="emr_own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="emr_other")
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    own_visit = _create_visit(
+        db_session,
+        patient_id=own_patient.id,
+        doctor_id=own_doctor.id,
+    )
+    other_visit = _create_visit(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+    )
+    own_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=own_patient.id,
+        visit_id=own_visit.id,
+        test_code="hemoglobin",
+        value="130",
+    )
+    _create_legacy_lab_result(
+        db_session,
+        patient_id=other_patient.id,
+        visit_id=other_visit.id,
+        test_code="hemoglobin",
+        value="80",
+    )
+    doctor_headers = _doctor_headers(client, own_user)
+
+    own_results = client.get(
+        f"/api/v1/emr/lab/patients/{own_patient.id}/lab-results",
+        headers=doctor_headers,
+    )
+    assert own_results.status_code == 200, own_results.text
+    own_payload = own_results.json()
+    assert own_payload["patient_id"] == own_patient.id
+    assert {item["id"] for item in own_payload["results"]} == {own_result.id}
+
+    other_results = client.get(
+        f"/api/v1/emr/lab/patients/{other_patient.id}/lab-results",
+        headers=doctor_headers,
+    )
+    assert other_results.status_code == 403
+
+    other_abnormal_results = client.get(
+        f"/api/v1/emr/lab/patients/{other_patient.id}/abnormal-lab-results",
+        headers=doctor_headers,
+    )
+    assert other_abnormal_results.status_code == 403
+
+    other_trends = client.get(
+        "/api/v1/emr/lab/lab-results/trends",
+        params={"patient_id": other_patient.id, "test_type": "hemoglobin"},
+        headers=doctor_headers,
+    )
+    assert other_trends.status_code == 403
+
+    other_summary = client.get(
+        "/api/v1/emr/lab/emr/123/lab-summary",
+        params={"patient_id": other_patient.id},
+        headers=doctor_headers,
+    )
+    assert other_summary.status_code == 403
 
 
 @pytest.mark.integration
