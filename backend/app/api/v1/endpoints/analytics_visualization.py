@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.services.advanced_analytics import (
     AdvancedAnalyticsService,
@@ -29,7 +29,7 @@ async def get_dashboard_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить визуализацию для дашборда"""
     try:
@@ -91,7 +91,7 @@ async def get_kpi_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить визуализацию KPI метрик"""
     try:
@@ -141,7 +141,7 @@ async def get_doctor_performance_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить визуализацию эффективности врачей"""
     try:
@@ -191,7 +191,7 @@ async def get_patient_analytics_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить визуализацию аналитики пациентов"""
     try:
@@ -238,7 +238,7 @@ async def get_revenue_analytics_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить визуализацию аналитики доходов"""
     try:
@@ -291,7 +291,7 @@ async def get_comprehensive_visualization(
         True, description="Включить предиктивную аналитику"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить полную визуализацию для комплексного отчета"""
     try:
@@ -355,7 +355,8 @@ async def get_comprehensive_visualization(
 
 @router.get("/chart-types")
 async def get_supported_chart_types(
-    db: Session = Depends(get_db), current_user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить список поддерживаемых типов графиков"""
     return {

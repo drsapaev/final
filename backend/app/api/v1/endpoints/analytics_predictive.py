@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
@@ -379,7 +379,7 @@ async def get_predictive_analytics(
     department: Optional[str] = Query(None, description="Отделение"),
     forecast_days: int = Query(30, description="Дни прогноза"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить предиктивную аналитику и прогнозы."""
     start, end = _parse_date_range(start_date, end_date)
@@ -428,7 +428,7 @@ async def get_prediction_accuracy(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить оценочную точность предыдущих прогнозов."""
     start, end = _parse_date_range(start_date, end_date)
@@ -462,7 +462,7 @@ async def get_scenario_analysis(
         "optimistic", description="Сценарий: optimistic, realistic, pessimistic"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить анализ сценариев развития."""
     start, end = _parse_date_range(start_date, end_date)
@@ -512,7 +512,7 @@ async def get_predictive_insights(
         "all", description="Тип инсайтов: all, revenue, patients, efficiency"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить инсайты и паттерны из предиктивной аналитики."""
     start, end = _parse_date_range(start_date, end_date)

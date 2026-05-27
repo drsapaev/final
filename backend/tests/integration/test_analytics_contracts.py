@@ -134,3 +134,27 @@ def test_predictive_auxiliary_routes_are_alive(
     assert accuracy.status_code == 200, accuracy.text
     assert scenarios.status_code == 200, scenarios.text
     assert insights.status_code == 200, insights.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/analytics/kpi-metrics",
+        "/api/v1/analytics/predictive",
+        "/api/v1/analytics/advanced/revenue/advanced",
+        "/api/v1/analytics/export/revenue/export/json",
+        "/api/v1/analytics/visualization/revenue",
+    ],
+)
+def test_patient_cannot_read_staff_analytics_extension_routes(
+    client: TestClient,
+    patient_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(patient_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
