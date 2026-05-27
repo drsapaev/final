@@ -82,7 +82,7 @@ const UserExportManager = () => {
   const loadExportFiles = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/user-management/users/export/files');
+      const response = await api.get('/users/users/export/files');
       setExportFiles(response.data.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов экспорта:', error);
@@ -111,7 +111,7 @@ const UserExportManager = () => {
         include_audit_logs: exportForm.include_audit_logs
       };
 
-      const response = await api.post('/user-management/users/export', exportData);
+      const response = await api.post('/users/users/export', exportData);
 
       if (response.data.success) {
         toast.success(response.data.message);
@@ -133,7 +133,7 @@ const UserExportManager = () => {
 
   const handleDownload = async (filename) => {
     try {
-      const response = await api.get(`/user-management/users/export/download/${filename}`, {
+      const response = await api.get(`/users/users/export/download/${filename}`, {
         responseType: 'blob'
       });
 
@@ -158,7 +158,7 @@ const UserExportManager = () => {
     if (!confirm(`Удалить файл ${filename}?`)) return;
 
     try {
-      await api.delete(`/user-management/users/export/files/${filename}`);
+      await api.delete(`/users/users/export/files/${filename}`);
       toast.success(`Файл ${filename} удален`);
       loadExportFiles();
     } catch (error) {
