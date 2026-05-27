@@ -187,7 +187,7 @@ def _model_to_dict(model: BaseModel) -> dict[str, Any]:
 def create_pricing_rule(
     rule_data: PricingRuleCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Создать правило ценообразования"""
     service = DynamicPricingApiService(db)
@@ -208,7 +208,7 @@ def get_pricing_rules(
     rule_type: PricingRuleType | None = None,
     is_active: bool | None = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить список правил ценообразования"""
     return DynamicPricingApiService(db).list_pricing_rules(
@@ -223,7 +223,7 @@ def get_pricing_rules(
 def get_pricing_rule(
     rule_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить правило ценообразования по ID"""
     try:
@@ -237,7 +237,7 @@ def update_pricing_rule(
     rule_id: int,
     rule_data: PricingRuleUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Обновить правило ценообразования"""
     service = DynamicPricingApiService(db)
@@ -257,7 +257,7 @@ def update_pricing_rule(
 def delete_pricing_rule(
     rule_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Удалить правило ценообразования"""
     service = DynamicPricingApiService(db)
@@ -274,7 +274,7 @@ def delete_pricing_rule(
 def calculate_price(
     request: PriceCalculationRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Рассчитать цену с учетом правил ценообразования"""
     service = DynamicPricingApiService(db)
@@ -292,7 +292,7 @@ def calculate_price(
 def create_service_package(
     package_data: ServicePackageCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Создать пакет услуг"""
     service = DynamicPricingApiService(db)
@@ -313,7 +313,7 @@ def get_service_packages(
     is_active: bool | None = None,
     patient_id: int | None = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить список пакетов услуг"""
     return DynamicPricingApiService(db).list_service_packages(
@@ -328,7 +328,7 @@ def get_service_packages(
 def get_service_package(
     package_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить пакет услуг по ID"""
     try:
@@ -342,7 +342,7 @@ def update_service_package(
     package_id: int,
     package_data: ServicePackageUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Обновить пакет услуг"""
     service = DynamicPricingApiService(db)
@@ -362,7 +362,7 @@ def update_service_package(
 def delete_service_package(
     package_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Удалить пакет услуг"""
     service = DynamicPricingApiService(db)
@@ -379,7 +379,7 @@ def delete_service_package(
 def purchase_package(
     request: PackagePurchaseRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Купить пакет услуг"""
     service = DynamicPricingApiService(db)
@@ -409,7 +409,7 @@ def purchase_package(
 @router.post("/update-dynamic-prices")
 def update_dynamic_prices(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Обновить динамические цены"""
     service = DynamicPricingApiService(db)
@@ -424,7 +424,7 @@ def get_pricing_analytics(
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить аналитику по ценообразованию"""
     service = DynamicPricingApiService(db)
@@ -440,7 +440,7 @@ def get_price_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """Получить историю изменения цен для услуги"""
     return DynamicPricingApiService(db).get_price_history(
