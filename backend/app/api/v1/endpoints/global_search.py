@@ -11,12 +11,28 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_db, require_roles
 from app.models.user import User
 from app.services.global_search_api_service import GlobalSearchApiService
 
 
 router = APIRouter(tags=["search"])
+
+GLOBAL_SEARCH_ROLES = (
+    "Admin",
+    "Registrar",
+    "Doctor",
+    "Cashier",
+    "Lab",
+    "Laboratory",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+)
 
 
 # ============== Response Schemas ==============
@@ -70,7 +86,7 @@ async def global_search(
     q: str = Query(..., min_length=2, max_length=100, description="Search query"),
     limit: int = Query(default=5, ge=1, le=20, description="Max results per domain"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*GLOBAL_SEARCH_ROLES)),
 ):
     """
     Global search across patients, visits, and lab results.
@@ -115,7 +131,7 @@ class LogClickRequest(BaseModel):
 async def log_search_click(
     request: LogClickRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*GLOBAL_SEARCH_ROLES)),
 ):
     """
     Log when user clicks on a search result.
