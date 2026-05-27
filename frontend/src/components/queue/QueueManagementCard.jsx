@@ -88,7 +88,7 @@ export const QueueActionButtons = ({
   } = styles;
 
   const entryId = entry?.queue_entry_id ?? null;
-  const status = entry.status || entry.queue_status || null;
+  const status = entry.queue_status || entry.status || null;
 
   if (!entryId) {
     logger.warn('[QueueActionButtons] Missing queue_entry_id, skipping queue action controls', {
