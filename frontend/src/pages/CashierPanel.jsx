@@ -234,13 +234,29 @@ const getPaymentActionContext = (paymentRow) => {
 };
 
 const getAppointmentPaymentActionContext = (appointment) => {
-  const appointmentId = appointment?.visit_id || appointment?.id || appointment?.patient_id || 'unknown';
+  const appointmentId = appointment?.visit_id || appointment?.patient_id || 'unknown';
   const patientName = appointment?.patient_name ||
     (appointment?.patient_last_name && appointment?.patient_first_name
       ? `${appointment.patient_last_name} ${appointment.patient_first_name}`
       : 'unknown patient');
   return `appointment ${appointmentId} for ${patientName}`;
 };
+
+const resolveCashierVisitIds = (appointment) => {
+  const groupedVisitIds = Array.isArray(appointment?.visit_ids)
+    ? appointment.visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
+    : [];
+
+  if (groupedVisitIds.length > 0) {
+    return [...new Set(groupedVisitIds)];
+  }
+
+  return appointment?.visit_id !== null && appointment?.visit_id !== undefined
+    ? [appointment.visit_id]
+    : [];
+};
+
+const resolveSingleCashierVisitId = (appointment) => resolveCashierVisitIds(appointment)[0] ?? null;
 
 const PAYMENT_ACTION_CAN_FIELD = {
   cancel: 'can_cancel',
@@ -569,9 +585,11 @@ const CashierPanel = () => {void
   const processPayment = async (appointment, paymentData) => {
     try {
       // Получаем все visit_id пациента
-      const visitIds = appointment.visit_ids && appointment.visit_ids.length > 0 ?
-      appointment.visit_ids :
-      [appointment.visit_id || appointment.id];
+      const visitIds = resolveCashierVisitIds(appointment);
+
+      if (visitIds.length === 0) {
+        throw new Error('Невозможно обработать оплату: backend не вернул visit_id.');
+      }
 
       // 1. Рассчитываем долг по каждому визиту на основе услуг
       const visitDebts = {};
@@ -1605,7 +1623,7 @@ const CashierPanel = () => {void
 
               {paymentWidget.selectedItem &&
               <PaymentWidget
-                visitId={paymentWidget.selectedItem.visit_id || paymentWidget.selectedItem.id}
+                visitId={resolveSingleCashierVisitId(paymentWidget.selectedItem)}
                 amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
                 currency="UZS"
                 description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
