@@ -95,3 +95,64 @@ def test_dynamic_pricing_rule_delete_cleans_linked_rows(
     db_session.delete(service)
     db_session.commit()
 
+
+@pytest.mark.integration
+def test_admin_can_list_dynamic_pricing_rules(client, admin_user, admin_password):
+    headers = _login_admin(client, admin_user, admin_password)
+
+    response = client.get("/api/v1/dynamic-pricing/pricing-rules", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.integration
+def test_patient_cannot_create_dynamic_pricing_rule(
+    client,
+    db_session,
+    patient_token,
+):
+    service = Service(
+        code="DP-RBAC-001",
+        service_code="DP-RBAC-001",
+        name="Dynamic Pricing RBAC Service",
+        price=Decimal("10000"),
+        currency="UZS",
+        active=True,
+    )
+    db_session.add(service)
+    db_session.commit()
+    db_session.refresh(service)
+    before_count = db_session.query(PricingRule).count()
+
+    response = client.post(
+        "/api/v1/dynamic-pricing/pricing-rules",
+        json={
+            "name": "Patient Dynamic Pricing Rule",
+            "description": "should be rejected",
+            "rule_type": "dynamic",
+            "discount_type": "percentage",
+            "discount_value": 99,
+            "min_quantity": 1,
+            "priority": 0,
+            "service_ids": [service.id],
+        },
+        headers={"Authorization": f"Bearer {patient_token}"},
+    )
+
+    assert response.status_code == 403
+    assert db_session.query(PricingRule).count() == before_count
+
+    db_session.delete(service)
+    db_session.commit()
+
+
+@pytest.mark.integration
+def test_patient_cannot_read_dynamic_pricing_analytics(client, patient_token):
+    response = client.get(
+        "/api/v1/dynamic-pricing/pricing-analytics",
+        headers={"Authorization": f"Bearer {patient_token}"},
+    )
+
+    assert response.status_code == 403
+
