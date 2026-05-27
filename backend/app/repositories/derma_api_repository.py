@@ -27,6 +27,9 @@ class DermaApiRepository:
     def get_doctor_by_user_id(self, user_id: int) -> Doctor | None:
         return self.db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
+    def get_doctor(self, doctor_id: int) -> Doctor | None:
+        return self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
+
     def create_price_override(
         self,
         *,
