@@ -65,7 +65,7 @@ export default function Settings() {void
   async function loadStatus() {
     try {
       const st = await api.get('/activation/status');
-      setStatus(st || null);
+      setStatus(st?.data ?? st ?? null);
     } catch {
       setStatus(null);
     }
@@ -75,7 +75,8 @@ export default function Settings() {void
     setBusyAct(true);
     setErrAct('');
     try {
-      const res = await api.post('/activation/activate', { body: { key } });
+      const response = await api.post('/activation/activate', { key });
+      const res = response?.data ?? response;
       if (!res?.ok) {
         setErrAct(res?.reason || 'Не удалось активировать');
       }
