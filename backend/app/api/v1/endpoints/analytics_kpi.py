@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
@@ -171,7 +171,7 @@ async def get_kpi_metrics(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить KPI метрики для аналитики."""
     start, end = _parse_date_range(start_date, end_date)
@@ -246,7 +246,7 @@ async def get_kpi_trends(
     department: Optional[str] = Query(None, description="Отделение"),
     metric: Optional[str] = Query(None, description="Конкретная метрика"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить тренды KPI метрик."""
     start, end = _parse_date_range(start_date, end_date)
@@ -275,7 +275,7 @@ async def get_kpi_comparison(
     department: Optional[str] = Query(None, description="Отделение"),
     comparison_period: str = Query("previous", description="Период сравнения"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить сравнение KPI с предыдущими периодами."""
     start, end = _parse_date_range(start_date, end_date)

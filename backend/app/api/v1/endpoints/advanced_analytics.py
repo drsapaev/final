@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.db.session import get_db
 from app.services.advanced_analytics import get_advanced_analytics_service
 from app.services.analytics import AnalyticsService
@@ -22,7 +22,7 @@ async def get_kpi_metrics(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить ключевые показатели эффективности (KPI)"""
     try:
@@ -47,7 +47,7 @@ async def get_doctor_performance(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить показатели эффективности врачей"""
     try:
@@ -70,7 +70,7 @@ async def get_advanced_patient_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить расширенную аналитику пациентов"""
     try:
@@ -94,7 +94,7 @@ async def get_advanced_revenue_analytics(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить расширенную аналитику доходов"""
     try:
@@ -118,7 +118,7 @@ async def get_predictive_analytics(
         30, ge=1, le=365, description="Количество дней для прогноза"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить предиктивную аналитику и прогнозы"""
     analytics_service = get_advanced_analytics_service()
@@ -134,7 +134,7 @@ async def get_advanced_comprehensive_report(
         True, description="Включить предиктивную аналитику"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
 ):
     """Получить расширенный комплексный отчет"""
     try:
