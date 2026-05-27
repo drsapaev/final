@@ -9,6 +9,17 @@ const readProvider = (fileName) =>
 
 describe('hosted payment provider ticket contract', () => {
   for (const fileName of ['PaymentClick.jsx', 'PaymentPayMe.jsx']) {
+    it(`${fileName} uses the authenticated api client for protected registrar invoice endpoints`, () => {
+      const source = readProvider(fileName);
+
+      expect(source).toContain("import { api } from '../../api/client'");
+      expect(source).toContain("api.post('/registrar/invoice/init-payment'");
+      expect(source).toContain("api.get(`/registrar/invoice/${invoiceId}/status`");
+      expect(source).not.toContain('fetch(`${API_BASE}/registrar/invoice/init-payment');
+      expect(source).not.toContain('fetch(`${API_BASE}/registrar/invoice/${invoiceId}/status');
+      expect(source).not.toContain('response.json()');
+    });
+
     it(`${fileName} prints only backend-provided tickets`, () => {
       const source = readProvider(fileName);
 
