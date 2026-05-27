@@ -16,6 +16,7 @@ from app.core.audit import extract_model_changes
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.core.config import settings
+from app.models.clinic import Doctor
 from app.models.enums import AppointmentStatus
 from app.models.user import User
 from app.schemas.appointment import Appointment
@@ -70,6 +71,18 @@ APPOINTMENT_FLOW_READ_ROLES = (
     "Laboratory",
 )
 
+APPOINTMENT_FLOW_DOCTOR_ROLES = {
+    "Doctor",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "Cardio",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+}
+
 
 class CanonicalVisitResponse(BaseModel):
     appointment_id: int
@@ -87,11 +100,46 @@ def _maybe_raise_legacy_write_freeze() -> None:
         )
 
 
+def _ensure_appointment_doctor_access(
+    db: Session,
+    appointment: Any,
+    current_user: User,
+) -> None:
+    if current_user.role == "Admin" or current_user.is_superuser:
+        return
+    if current_user.role not in APPOINTMENT_FLOW_DOCTOR_ROLES:
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if appointment.doctor_id == doctor.id:
+        return
+
+    assigned_doctor = (
+        db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
+    )
+    # Legacy visit-derived appointments can carry User.id in doctor_id; allow it
+    # only when it cannot resolve to another real Doctor row.
+    if not assigned_doctor and appointment.doctor_id == current_user.id:
+        return
+
+    if assigned_doctor and assigned_doctor.user_id == current_user.id:
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
 def _resolve_appointment_and_visit(
     db: Session,
     appointment_id: int,
     *,
     allow_visit_fallback: bool = True,
+    current_user: User | None = None,
 ) -> tuple[Any, int, AppointmentFlowApiService]:
     appointment_flow_api_service = AppointmentFlowApiService(db)
     appointment = crud_appointment.get(db, id=appointment_id)
@@ -107,6 +155,9 @@ def _resolve_appointment_and_visit(
 
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    if current_user is not None:
+        _ensure_appointment_doctor_access(db, appointment, current_user)
 
     try:
         visit_id = appointment_flow_api_service.resolve_canonical_visit(
@@ -143,6 +194,8 @@ def start_visit(
 
     # Проверяем, что запись оплачена или вызвана (called/calling)
     # Разрешаем начать прием если статус: paid, called, calling, waiting, queued
+    _ensure_appointment_doctor_access(db, appointment, current_user)
+
     status_str = str(appointment.status).lower()
     allowed_start_statuses = [
         AppointmentStatus.PAID,
@@ -213,6 +266,8 @@ def create_or_update_emr(
 
     # Get patient birth date for date validation
     appointment = crud_appointment.get(db, id=appointment_id)
+    if appointment:
+        _ensure_appointment_doctor_access(db, appointment, current_user)
     patient_birth_date = None
     if appointment and appointment.patient_id:
         from app.crud import patient as crud_patient
@@ -235,6 +290,7 @@ def create_or_update_emr(
         db,
         appointment_id,
         allow_visit_fallback=False,
+        current_user=current_user,
     )
 
     # Проверяем статус записи
@@ -342,6 +398,7 @@ def save_emr(
         db,
         appointment_id,
         allow_visit_fallback=False,
+        current_user=current_user,
     )
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
@@ -385,7 +442,11 @@ def get_emr(
     """
     Получить EMR по записи
     """
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        current_user=current_user,
+    )
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
     if not canonical_emr:
         return None
@@ -407,6 +468,7 @@ def create_or_update_prescription(
         db,
         appointment_id,
         allow_visit_fallback=False,
+        current_user=current_user,
     )
 
     # Проверяем, что есть сохраненная EMR
@@ -475,6 +537,7 @@ def save_prescription(
         db,
         appointment_id,
         allow_visit_fallback=False,
+        current_user=current_user,
     )
     prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
     if not prescription:
@@ -502,7 +565,11 @@ def get_prescription(
     """
     Получить рецепт по записи
     """
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        current_user=current_user,
+    )
     prescription = crud_emr.prescription.get_by_visit(db, visit_id=visit_id)
     if not prescription:
         prescription = crud_emr.prescription.get_by_appointment(
@@ -525,6 +592,7 @@ def complete_visit(
         db,
         appointment_id,
         allow_visit_fallback=False,
+        current_user=current_user,
     )
 
     # Проверяем, что прием активен
@@ -575,7 +643,11 @@ def get_appointment_status(
     """
     Получить полную информацию о статусе записи и связанных данных
     """
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        current_user=current_user,
+    )
 
     # Получаем связанные данные
     canonical_emr = emr_v2_service.get_by_visit(db, visit_id)
@@ -615,5 +687,9 @@ def resolve_canonical_visit(
     current_user: User = Depends(deps.require_roles(*APPOINTMENT_FLOW_READ_ROLES)),
 ) -> CanonicalVisitResponse:
     """Resolve appointment-based flows to the single canonical visit identifier."""
-    appointment, visit_id, _ = _resolve_appointment_and_visit(db, appointment_id)
+    appointment, visit_id, _ = _resolve_appointment_and_visit(
+        db,
+        appointment_id,
+        current_user=current_user,
+    )
     return CanonicalVisitResponse(appointment_id=appointment.id, visit_id=visit_id)
