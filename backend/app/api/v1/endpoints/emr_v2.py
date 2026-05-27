@@ -22,7 +22,9 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.audit import extract_model_changes, log_critical_change
+from app.models.clinic import Doctor
 from app.models.user import User
+from app.models.visit import Visit
 from app.schemas.emr_v2 import (
     EMRAmendRequest,
     EMRConflictError,
@@ -67,12 +69,47 @@ EMR_V2_ALLOWED_ROLES = (
     "Laboratory",
 )
 
+EMR_V2_DOCTOR_ROLES = {
+    "Doctor",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "Cardio",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+}
+
+
 def get_client_ip(request: Request) -> str | None:
     """Extract client IP from request"""
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else None
+
+
+def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> None:
+    """Prevent doctor-profile users from opening another doctor's visit EMR."""
+    if current_user.role == "Admin" or current_user.is_superuser:
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active == True)
+        .first()
+    )
+    if not doctor:
+        if current_user.role in EMR_V2_DOCTOR_ROLES:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+    if visit.doctor_id != doctor.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
 # =============================================================================
@@ -148,6 +185,8 @@ async def get_emr(
     Returns the latest version of the EMR for the specified visit.
     Creates an audit log entry for the view action.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     emr = emr_v2_service.get_by_visit(db, visit_id)
     if not emr:
         raise HTTPException(status_code=404, detail="EMR not found")
@@ -176,6 +215,8 @@ async def get_emr_history(
     
     Returns list of all revisions in descending order (newest first).
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     emr = emr_v2_service.get_by_visit(db, visit_id)
     if not emr:
         raise HTTPException(status_code=404, detail="EMR not found")
@@ -211,6 +252,8 @@ async def get_emr_version(
     
     Returns the complete data snapshot for the specified version.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     emr = emr_v2_service.get_by_visit(db, visit_id)
     if not emr:
         raise HTTPException(status_code=404, detail="EMR not found")
@@ -235,6 +278,8 @@ async def compare_versions(
     
     Returns list of field changes between the two versions.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     try:
         diff = emr_v2_service.get_diff(db, visit_id, v1, v2)
         return diff
@@ -283,6 +328,8 @@ async def save_emr(
     - If row_version mismatch and different user: returns 409 Conflict
     - If row_version mismatch but same user/session: allows (autosave)
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     try:
         existing_emr = emr_v2_service.get_by_visit(db, visit_id)
         old_data = None
@@ -342,6 +389,8 @@ async def sign_emr(
     Changes status to 'signed' and records signing timestamp.
     After signing, EMR can only be modified via the amend endpoint.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     try:
         emr = emr_v2_service.sign(
             db,
@@ -410,6 +459,8 @@ async def amend_emr(
     Creates a new version with amendment, requires a reason (min 10 chars).
     Only available for EMRs with status 'signed'.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     try:
         emr = emr_v2_service.amend(
             db,
@@ -450,6 +501,8 @@ async def restore_emr(
     Creates a new version with data from the target version.
     The restore is recorded in the revision history.
     """
+    ensure_emr_visit_access(db, visit_id, current_user)
+
     try:
         emr = emr_v2_service.restore(
             db,

@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from app.api.v1.endpoints import emr_v2
+from app.core.security import get_password_hash
+from app.models.clinic import Doctor
+from app.models.emr_v2 import EMRRecord
+from app.models.patient import Patient
+from app.models.user import User
+from app.models.visit import Visit
 
 
 @pytest.mark.unit
@@ -36,3 +44,83 @@ def test_doctor_history_route_is_not_shadowed_by_visit_id(
     payload = response.json()
     assert payload["field_name"] == "complaints"
     assert payload["entries"][0]["content"] == "Chest pain"
+
+
+@pytest.mark.unit
+def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
+    attacker_user = User(
+        id=9601,
+        username="emr_v2_attacker",
+        email="emr-v2-attacker@test.com",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+    )
+    victim_user = User(
+        id=9603,
+        username="emr_v2_victim",
+        email="emr-v2-victim@test.com",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+    )
+    attacker_doctor = Doctor(
+        id=9602,
+        user_id=attacker_user.id,
+        specialty="therapy",
+        active=True,
+    )
+    victim_doctor = Doctor(
+        id=9604,
+        user_id=victim_user.id,
+        specialty="therapy",
+        active=True,
+    )
+    patient = Patient(
+        first_name="EMR",
+        last_name="Owner",
+        phone="+998909601000",
+        birth_date=date(1990, 1, 1),
+    )
+    db_session.add_all(
+        [attacker_user, victim_user, attacker_doctor, victim_doctor, patient]
+    )
+    db_session.commit()
+    db_session.refresh(patient)
+
+    victim_visit = Visit(
+        patient_id=patient.id,
+        doctor_id=victim_doctor.id,
+        visit_date=date.today(),
+        visit_time="13:00",
+        status="open",
+        department="therapy",
+    )
+    db_session.add(victim_visit)
+    db_session.commit()
+    db_session.refresh(victim_visit)
+
+    login_response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": attacker_user.username, "password": "doctor123"},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+    response = client.post(
+        f"/api/v1/v2/emr/{victim_visit.id}",
+        headers=headers,
+        json={
+            "data": {"complaints": "tampered"},
+            "row_version": 0,
+            "is_draft": True,
+        },
+    )
+
+    assert response.status_code == 403, response.text
+    assert (
+        db_session.query(EMRRecord)
+        .filter(EMRRecord.visit_id == victim_visit.id)
+        .count()
+        == 0
+    )
