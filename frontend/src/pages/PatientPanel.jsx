@@ -733,7 +733,7 @@ const PatientFormsPreview = ({ status, preview, error, initData }) => {
             ...(submission.answers || currentForm.answers),
           },
           status: 'saved',
-          savedStatus: submission.status || nextStatus,
+          savedStatus: submission.status || '',
           error: '',
           message: submission.status === 'draft' ? 'Draft saved.' : 'Form submitted.',
           submittedAt: submission.submitted_at || '',
