@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { labReportingApi } from '../api/labReporting';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
@@ -45,9 +46,6 @@ export default function PatientPickupView() {
     return 'Выдача результатов';
   };
 
-  const canPrint = ['registrar', 'receptionist', 'admin'].includes(userRole);
-  const canDownloadPDF = ['registrar', 'receptionist', 'cashier', 'admin'].includes(userRole);
-
   const [patient, setPatient] = useState(null);
   const [labResults, setLabResults] = useState([]);
   const [visits, setVisits] = useState([]);
@@ -68,8 +66,8 @@ export default function PatientPickupView() {
 
       // Load lab results
       try {
-        const labRes = await api.get('/lab', { params: { patient_id: patientId } });
-        setLabResults(labRes.data || []);
+        const labReportInstances = await labReportingApi.listInstances({ patient_id: patientId, limit: 100 });
+        setLabResults(labReportInstances || []);
       } catch {
         setLabResults([]);
       }
@@ -111,8 +109,25 @@ export default function PatientPickupView() {
       ordered: { icon: '⚪', label: 'Заказан', bg: '#f1f5f9', color: '#475569' },
       canceled: { icon: '🔴', label: 'Отменён', bg: '#fee2e2', color: '#991b1b' }
     };
+    const normalizedStatus = String(status || '').toUpperCase();
+    if (['FINALIZED', 'PRINTED'].includes(normalizedStatus)) return config.done;
+    if (['IN_PROGRESS', 'READY'].includes(normalizedStatus)) return config.in_progress;
+    if (normalizedStatus === 'DRAFT') return config.ordered;
     return config[status] || config.ordered;
   };
+
+  const hasLabReportAction = (labResult, action) => {
+    const actions = Array.isArray(labResult?.available_actions) ? labResult.available_actions : [];
+    if (actions.includes(action)) return true;
+    if (action === 'print') return labResult?.can_print === true;
+    return false;
+  };
+
+  const getLabDisplayName = (labResult) =>
+    labResult?.template?.name || labResult?.service_name || labResult?.name || labResult?.test_name || `Lab #${labResult?.id}`;
+
+  const getLabDisplayCode = (labResult) =>
+    labResult?.template?.code || labResult?.service_code || labResult?.test_code || '-';
 
   // Get status badge for visits
   const getVisitStatusBadge = (status) => {
@@ -143,7 +158,7 @@ export default function PatientPickupView() {
     const labHtml = labResults.length
       ? labResults.map((result) => `
         <tr>
-          <td>${result.name || result.test_name || '—'}</td>
+          <td>${getLabDisplayName(result)}</td>
           <td>${result.value || '—'}</td>
           <td>${getStatusBadge(result.status).label}</td>
         </tr>
@@ -211,8 +226,8 @@ export default function PatientPickupView() {
   // Handle download PDF
   const handleDownloadPDF = async (labResult) => {
     try {
-      const response = await api.get(`/lab/${labResult.id}/pdf`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = await labReportingApi.downloadPdf(labResult.id);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `lab_result_${labResult.id}.pdf`;
@@ -475,14 +490,15 @@ export default function PatientPickupView() {
         <div style={styles.labList}>
                             {labResults.map((lab) => {
             const status = getStatusBadge(lab.status);
+            const canPrintLabReport = hasLabReportAction(lab, 'print');
             return (
               <div key={lab.id} style={styles.labItem}>
                                         <div style={styles.labInfo}>
                                             <div style={styles.labName}>
-                                                {lab.service_name || `Анализ #${lab.id}`}
+                                                {getLabDisplayName(lab)}
                                             </div>
                                             <div style={styles.labDate}>
-                                                Код: {lab.service_code || '—'} • Заказ #{lab.id}
+                                                Код: {getLabDisplayCode(lab)} • Заказ #{lab.id}
                                             </div>
                                         </div>
 
@@ -497,30 +513,26 @@ export default function PatientPickupView() {
                                             {status.icon} {status.label}
                                         </div>
 
-                                        {lab.status === 'done' && (canPrint || canDownloadPDF) &&
+                                        {canPrintLabReport &&
                 <div style={styles.actions}>
-                                                {canPrint &&
                   <button
                     type="button"
                     style={styles.actionButton}
                     onClick={() => handlePrint(lab)}
-                    aria-label={`Печать анализа ${lab.service_name || `#${lab.id}`}`}
+                    aria-label={`Печать анализа ${getLabDisplayName(lab)}`}
                     title="Печать">
                     
                                                         🖨️ Печать
                                                     </button>
-                  }
-                                                {canDownloadPDF &&
                   <button
                     type="button"
                     style={styles.actionButton}
                     onClick={() => handleDownloadPDF(lab)}
-                    aria-label={`Скачать PDF анализа ${lab.service_name || `#${lab.id}`}`}
+                    aria-label={`Скачать PDF анализа ${getLabDisplayName(lab)}`}
                     title="Скачать PDF">
                     
                                                         📄 PDF
                                                     </button>
-                  }
                                             </div>
                 }
                                     </div>);
