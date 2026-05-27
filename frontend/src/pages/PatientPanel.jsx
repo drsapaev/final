@@ -520,7 +520,9 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
                       <div className="text-gray-900">{appointment.date || 'Date pending'}</div>
                       <div className="text-gray-500">{appointment.time || 'Time pending'} · {appointment.department || 'Department pending'}</div>
                     </div>
-                    <Badge variant="info">{appointment.status || 'scheduled'}</Badge>
+                    <Badge variant={appointment.status ? 'info' : 'secondary'}>
+                      {appointment.status || 'status unavailable'}
+                    </Badge>
                   </div>
                 )) : (
                   <div className="text-sm text-gray-500">No appointment requests yet.</div>
@@ -534,7 +536,7 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
                 {visits.length > 0 ? visits.map((visit) => (
                   <div key={visit.id} className="flex items-center justify-between gap-3 text-sm">
                     <div className="text-gray-900">Visit #{visit.id}</div>
-                    <div className="text-gray-500">{visit.date || 'Date pending'} · {visit.status || 'open'}</div>
+                    <div className="text-gray-500">{visit.date || 'Date pending'} · {visit.status || 'status unavailable'}</div>
                   </div>
                 )) : (
                   <div className="text-sm text-gray-500">No recent visits yet.</div>
