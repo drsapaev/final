@@ -11,15 +11,13 @@ import {
 'lucide-react';
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
-import { getApiBaseUrl } from '../../api/runtime';
+import { api } from '../../api/client';
 import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';
 import './PaymentPayMe.css';
 import PropTypes from 'prop-types';
-
-const API_BASE = getApiBaseUrl();
 
 const PaymentPayMe = ({
   isOpen,
@@ -88,23 +86,14 @@ const PaymentPayMe = ({
 
     await executeAction(
       async () => {
-        const response = await fetch(`${API_BASE}/registrar/invoice/init-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            invoice_id: invoiceId,
-            provider: 'payme',
-            return_url: `${window.location.origin}/payment/success`,
-            cancel_url: `${window.location.origin}/payment/cancel`
-          })
+        const response = await api.post('/registrar/invoice/init-payment', {
+          invoice_id: invoiceId,
+          provider: 'payme',
+          return_url: `${window.location.origin}/payment/success`,
+          cancel_url: `${window.location.origin}/payment/cancel`
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Ошибка инициации платежа');
-        }
-
-        const data = await response.json();
+        const data = response.data;
 
         if (data.success) {
           setPaymentUrl(data.payment_url);
@@ -165,10 +154,10 @@ const PaymentPayMe = ({
   };
 
   const checkPaymentStatus = async () => {
-    const response = await fetch(`${API_BASE}/registrar/invoice/${invoiceId}/status`);
+    const response = await api.get(`/registrar/invoice/${invoiceId}/status`);
 
-    if (response.ok) {
-      const data = await response.json();
+    if (response.status >= 200 && response.status < 300) {
+      const data = response.data;
 
       if (data.status === 'paid') {
         clearPolling();
