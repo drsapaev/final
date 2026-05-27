@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { getVisit } from '../api/visits';
 import { AppEmpty, AppError, Button } from '../components/ui/macos';
 
 // Modern Search Page with Full Functionality
@@ -42,9 +43,9 @@ export default function Search() {
 
         // Try to get visit by ID directly
         try {
-          const visitRes = await api.get(`/visits/${visitId}`);
-          if (visitRes.data && visitRes.data.visit) {
-            visitsData = [visitRes.data.visit];
+          const visitRes = await getVisit(visitId);
+          if (visitRes?.visit) {
+            visitsData = [visitRes.visit];
           }
         } catch {
           // Visit not found by ID, try by patient_id
@@ -52,7 +53,7 @@ export default function Search() {
 
         // Also get visits for patient with this ID
         try {
-          const patientVisitsRes = await api.get(`/visits?patient_id=${visitId}&limit=20`);
+          const patientVisitsRes = await api.get(`/visits/visits?patient_id=${visitId}&limit=20`);
           if (Array.isArray(patientVisitsRes.data)) {
             // Merge without duplicates
             const existingIds = new Set(visitsData.map(v => v.id));
@@ -72,7 +73,7 @@ export default function Search() {
         const patientIds = patientsData.slice(0, 5).map(p => p.id);
         for (const patientId of patientIds) {
           try {
-            const pvRes = await api.get(`/visits?patient_id=${patientId}&limit=5`);
+            const pvRes = await api.get(`/visits/visits?patient_id=${patientId}&limit=5`);
             if (Array.isArray(pvRes.data)) {
               const existingIds = new Set(visitsData.map(v => v.id));
               pvRes.data.forEach(v => {
