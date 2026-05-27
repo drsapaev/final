@@ -114,6 +114,10 @@ class LabReportTemplateVersionOut(BaseModel):
     template_id: int
     version_no: int
     status: str
+    available_actions: list[str] = Field(default_factory=list)
+    can_update: bool = False
+    can_publish: bool = False
+    can_create_draft: bool = False
     layout_preset: str
     page_settings: dict[str, Any]
     branding_overrides: dict[str, Any]

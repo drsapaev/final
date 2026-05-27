@@ -93,6 +93,32 @@ function formatVersionStatus(status) {
   return versionStatusLabels[status] || status;
 }
 
+const TEMPLATE_VERSION_ACTION_CAN_FIELD = {
+  update: 'can_update',
+  publish: 'can_publish',
+  create_draft: 'can_create_draft'
+};
+
+function hasTemplateVersionAction(version, action) {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(version?.available_actions)) {
+    return version.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const flagName = TEMPLATE_VERSION_ACTION_CAN_FIELD[normalizedAction];
+  if (flagName && Object.prototype.hasOwnProperty.call(version || {}, flagName)) {
+    return Boolean(version[flagName]);
+  }
+
+  return false;
+}
+
 function parseJsonInput(value) {
   if (!value?.trim()) {
     return null;
@@ -266,8 +292,11 @@ export default function LabTemplateWorkbench({
     if (!selectedTemplate) {
       throw new Error('Сначала выберите шаблон');
     }
-    if (activeVersion?.status === 'DRAFT') {
+    if (hasTemplateVersionAction(activeVersion, 'update')) {
       return activeVersion.id;
+    }
+    if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
+      throw new Error('Сервер не разрешил создать черновик для этой версии шаблона');
     }
     const version = await labReportingApi.createTemplateVersion(selectedTemplate.id, activeVersion?.id || null);
     await onTemplatesChanged(selectedTemplate.id);

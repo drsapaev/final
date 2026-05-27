@@ -318,6 +318,23 @@ class LabReportingService:
         logger.info("[LAB] create_template_version created version_id=%s", draft.id)
         return self.repository.get_template_version(draft.id)
 
+    def template_version_available_actions(
+        self, version: LabReportTemplateVersion,
+    ) -> list[str]:
+        if version.status == "DRAFT":
+            return ["update", "publish"]
+        return ["create_draft"]
+
+    def template_version_action_flags(
+        self, version: LabReportTemplateVersion,
+    ) -> dict[str, bool]:
+        available_actions = set(self.template_version_available_actions(version))
+        return {
+            "can_update": "update" in available_actions,
+            "can_publish": "publish" in available_actions,
+            "can_create_draft": "create_draft" in available_actions,
+        }
+
     def update_template_version(
         self, version_id: int, payload: dict[str, Any]
     ) -> LabReportTemplateVersion:

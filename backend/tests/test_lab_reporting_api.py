@@ -176,6 +176,65 @@ def _create_emr(
 
 
 @pytest.mark.integration
+def test_lab_template_version_actions_are_backend_owned(client, auth_headers):
+    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    assert templates_response.status_code == 200
+    cbc_template = next(
+        template for template in templates_response.json() if template["code"] == "cbc_oak"
+    )
+
+    detail_response = client.get(
+        f"/api/v1/lab/templates/{cbc_template['id']}", headers=auth_headers
+    )
+    assert detail_response.status_code == 200
+    template_detail = detail_response.json()
+    source_version_id = (
+        template_detail["draft_version_id"]
+        or template_detail["published_version_id"]
+        or template_detail["latest_version_id"]
+    )
+    source = next(
+        version
+        for version in template_detail["versions"]
+        if version["id"] == source_version_id
+    )
+
+    if source["status"] == "DRAFT":
+        assert set(source["available_actions"]) == {"update", "publish"}
+        assert source["can_update"] is True
+        assert source["can_publish"] is True
+        assert source["can_create_draft"] is False
+
+        publish_response = client.post(
+            f"/api/v1/lab/template-versions/{source['id']}/publish",
+            headers=auth_headers,
+        )
+        assert publish_response.status_code == 200
+        published = publish_response.json()
+    else:
+        published = source
+
+    assert published["status"] == "PUBLISHED"
+    assert published["available_actions"] == ["create_draft"]
+    assert published["can_update"] is False
+    assert published["can_publish"] is False
+    assert published["can_create_draft"] is True
+
+    new_draft_response = client.post(
+        f"/api/v1/lab/templates/{cbc_template['id']}/versions",
+        headers=auth_headers,
+        json={"source_version_id": published["id"]},
+    )
+    assert new_draft_response.status_code == 200
+    new_draft = new_draft_response.json()
+    assert new_draft["status"] == "DRAFT"
+    assert set(new_draft["available_actions"]) == {"update", "publish"}
+    assert new_draft["can_update"] is True
+    assert new_draft["can_publish"] is True
+    assert new_draft["can_create_draft"] is False
+
+
+@pytest.mark.integration
 def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, test_visit):
     test_patient.sex = "M"
     test_patient.birth_date = date(1990, 1, 1)
