@@ -334,7 +334,7 @@ async function login(username, password) {
     remember_me: false
   };
 
-  const resp = await api.post('/auth/login', credentials);
+  const resp = await api.post('/authentication/login', credentials);
 
   return resp.data;
 }

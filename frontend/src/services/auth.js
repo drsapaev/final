@@ -12,7 +12,7 @@ export const authService = {
    */
   async login(credentials) {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const response = await api.post('/authentication/login', credentials);
       
       if (response.data.access_token) {
         // Сохраняем токен через tokenManager
