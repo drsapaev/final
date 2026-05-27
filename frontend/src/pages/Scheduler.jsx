@@ -87,7 +87,7 @@ export default function Scheduler() {
                       {s.time || s.slot || s.start_time ? s.time || s.slot || s.start_time : '—'}
                       {s.end_time ? ` — ${s.end_time}` : ''}
                     </td>
-                    <td>{s.status || (s.available ? 'available' : '—')}</td>
+                    <td>{s.status || '—'}</td>
                   </tr>
                 )}
                 {filtered.length === 0 &&
