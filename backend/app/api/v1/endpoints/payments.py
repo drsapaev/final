@@ -425,7 +425,7 @@ def download_receipt(
 async def create_payment_invoice(
     request: PaymentInvoiceCreateRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_user),
+    current_user: Any = Depends(deps.require_roles("Admin", "Registrar", "Cashier")),
 ):
     """Создание счета для оплаты из модуля оплаты"""
     service = PaymentInvoiceService(db)
@@ -451,7 +451,8 @@ async def create_payment_invoice(
 
 @router.get("/invoices/pending", response_model=List[PaymentInvoiceResponse])
 async def get_pending_invoices(
-    db: Session = Depends(get_db), current_user: Any = Depends(deps.get_current_user)
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.require_roles("Admin", "Registrar", "Cashier")),
 ):
     """Получение списка неоплаченных счетов"""
     service = PaymentInvoiceService(db)
