@@ -39,7 +39,7 @@ const getStatusText = (status) => {
     case 'busy': return 'Занят';
     case 'offline': return 'Не в сети';
     case 'error': return 'Ошибка';
-    default: return status;
+    default: return status || 'Статус неизвестен';
   }
 };
 
@@ -67,7 +67,7 @@ const normalizeLocalPrinter = (printer) => ({
     ]
       .filter(Boolean)
       .join(' • ') || 'Локальный системный принтер',
-  status: printer.status || 'offline',
+  status: printer.status || null,
   location: printer.device_path || printer.location || 'Локальный компьютер',
   capabilities: {
     printer_type: printer.printer_type || 'unknown',

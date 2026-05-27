@@ -94,7 +94,7 @@ const PrintDialog = ({
       const normalizedPrinters = backendPrinters.map((printer) => ({
         id: printer.name || String(printer.id),
         name: printer.display_name || printer.name || 'Принтер',
-        status: printer.status || 'offline',
+        status: printer.status || null,
         type: printer.printer_type || 'unknown',
         isDefault: Boolean(printer.is_default),
       }));
@@ -516,7 +516,11 @@ const PrintDialog = ({
                           fontSize: '12px',
                           fontWeight: '500',
                           color:
-                            printer.status === 'online' ? '#10b981' : '#ef4444',
+                            printer.status === 'online'
+                              ? '#10b981'
+                              : printer.status
+                                ? '#ef4444'
+                                : '#64748b',
                         }}
                       >
                         {printer.status === 'online' ? (
@@ -524,10 +528,15 @@ const PrintDialog = ({
                             <Wifi size={14} />
                             Онлайн
                           </>
-                        ) : (
+                        ) : printer.status ? (
                           <>
                             <WifiOff size={14} />
                             Офлайн
+                          </>
+                        ) : (
+                          <>
+                            <WifiOff size={14} />
+                            Статус неизвестен
                           </>
                         )}
                       </div>
