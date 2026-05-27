@@ -565,7 +565,9 @@ const PatientCabinetSummary = ({ mode = 'cabinet' }) => {
                       <div className="text-gray-900">{report.name || 'Lab report'}</div>
                       <div className="text-gray-500">{report.ready_at || 'Ready date pending'}</div>
                     </div>
-                    <Badge variant="success">{report.status || 'ready'}</Badge>
+                    <Badge variant={report.status ? 'success' : 'secondary'}>
+                      {report.status || 'status unavailable'}
+                    </Badge>
                   </div>
                 )) : (
                   <div className="text-sm text-gray-500">No ready reports yet.</div>
