@@ -1140,7 +1140,16 @@ class PriceOverrideListResponse(BaseModel):
     reason: str
     details: Optional[str]
     status: str
+    available_actions: List[str]
+    can_approve: bool
+    can_reject: bool
     created_at: datetime
+
+
+def _price_override_available_actions(override_status: str) -> List[str]:
+    if override_status == "pending":
+        return ["approve", "reject"]
+    return []
 
 
 @router.get(
@@ -1169,6 +1178,7 @@ def get_pending_price_overrides(
 
         result = []
         for override in overrides:
+            available_actions = _price_override_available_actions(override.status)
             # Получаем данные визита и пациента
             visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
             patient_name = None
@@ -1191,6 +1201,9 @@ def get_pending_price_overrides(
                     reason=override.reason,
                     details=override.details,
                     status=override.status,
+                    available_actions=available_actions,
+                    can_approve="approve" in available_actions,
+                    can_reject="reject" in available_actions,
                     created_at=override.created_at,
                 )
             )

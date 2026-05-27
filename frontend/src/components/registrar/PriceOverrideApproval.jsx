@@ -18,6 +18,31 @@ import { getApiBaseUrl } from '../../api/runtime';
 import logger from '../../utils/logger';
 const API_BASE = getApiBaseUrl();
 
+const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
+  approve: 'can_approve',
+  reject: 'can_reject'
+};
+
+const hasBackendPriceOverrideAction = (override, action) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(override?.available_actions)) {
+    return override.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = PRICE_OVERRIDE_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(override || {}, canField)) {
+    return Boolean(override[canField]);
+  }
+
+  return false;
+};
+
 /**
  * Компонент для одобрения/отклонения изменений цен врачами
  */
@@ -280,8 +305,9 @@ const PriceOverrideApproval = () => {void
               </div>
 
               {/* Действия */}
-              {override.status === 'pending' &&
+              {(hasBackendPriceOverrideAction(override, 'approve') || hasBackendPriceOverrideAction(override, 'reject')) &&
           <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {hasBackendPriceOverrideAction(override, 'approve') &&
                   <button
               onClick={() => handleApproval(override.id, 'approve')}
               disabled={isProcessing}
@@ -290,7 +316,9 @@ const PriceOverrideApproval = () => {void
                     <CheckCircle size={16} />
                     Одобрить
                   </button>
-                  
+            }
+
+                  {hasBackendPriceOverrideAction(override, 'reject') &&
                   <button
               onClick={() => {
                 setSelectedOverride(override);
@@ -302,6 +330,7 @@ const PriceOverrideApproval = () => {void
                     <XCircle size={16} />
                     Отклонить
                   </button>
+            }
                 </div>
           }
             </div>
