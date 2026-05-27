@@ -30,6 +30,7 @@ from app.services.payment_test_init_service import (
     PaymentTestInitService,
 )
 from app.services.payment_provider_manager_factory import get_payment_manager
+from app.models.clinic import Doctor
 from app.models.payment import Payment
 from app.models.visit import Visit
 
@@ -51,6 +52,63 @@ def _ensure_patient_payment_access(db: Session, payment_id: int, current_user) -
         raise HTTPException(status_code=403, detail="Access denied")
 
 # ===================== МОДЕЛИ ДЛЯ МОДУЛЯ ОПЛАТЫ =====================
+
+
+def _ensure_doctor_visit_payment_access(
+    db: Session, visit: Visit | None, current_user
+) -> None:
+    if not visit:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if visit.doctor_id == doctor.id:
+        return
+
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+    # Legacy writers sometimes stored User.id in visits.doctor_id. Preserve that
+    # compatibility only when the value does not point to another Doctor row.
+    if not assigned_doctor and visit.doctor_id == current_user.id:
+        return
+    if assigned_doctor and assigned_doctor.user_id == current_user.id:
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_visit_payment_access(db: Session, visit_id: int, current_user) -> Visit:
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+
+    role = getattr(current_user, "role", None)
+    if role == "Patient":
+        if not getattr(current_user, "patient", None):
+            raise HTTPException(status_code=403, detail="Access denied")
+        if visit.patient_id != current_user.patient.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif role == "Doctor":
+        _ensure_doctor_visit_payment_access(db, visit, current_user)
+
+    return visit
+
+
+def _ensure_payment_read_access(db: Session, payment_id: int, current_user) -> None:
+    if getattr(current_user, "role", None) not in {"Patient", "Doctor"}:
+        return
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    if not payment.visit_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_visit_payment_access(db, payment.visit_id, current_user)
 
 
 class PaymentInvoiceCreateRequest(BaseModel):
@@ -230,6 +288,10 @@ def list_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение списка платежей с фильтрацией (использует SSOT)"""
+    if getattr(current_user, "role", None) == "Doctor":
+        if visit_id is None:
+            raise HTTPException(status_code=403, detail="Access denied")
+        _ensure_visit_payment_access(db, visit_id, current_user)
     service = PaymentReadService(db)
     return PaymentListResponse(
         **service.list_payments(
@@ -249,7 +311,7 @@ def get_payment_status(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
-    _ensure_patient_payment_access(db, payment_id, current_user)
+    _ensure_payment_read_access(db, payment_id, current_user)
     service = PaymentReadService(db, get_payment_manager())
     try:
         return PaymentStatusResponse(**service.get_payment_status(payment_id=payment_id))
@@ -264,6 +326,7 @@ def get_visit_payments(
     current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение всех платежей по визиту"""
+    _ensure_visit_payment_access(db, visit_id, current_user)
     service = PaymentReadService(db)
     return PaymentListResponse(**service.get_visit_payments(visit_id=visit_id))
 
@@ -311,10 +374,10 @@ def generate_receipt(
     payment_id: int,
     format_type: str = "pdf",
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ):
     """Генерация квитанции об оплате"""
-    _ensure_patient_payment_access(db, payment_id, current_user)
+    _ensure_payment_read_access(db, payment_id, current_user)
     service = PaymentReadService(db)
     try:
         return service.generate_receipt(payment_id=payment_id, format_type=format_type)
@@ -331,10 +394,10 @@ def generate_receipt(
 def download_receipt(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ):
     """Скачивание квитанции"""
-    _ensure_patient_payment_access(db, payment_id, current_user)
+    _ensure_payment_read_access(db, payment_id, current_user)
     service = PaymentReadService(db)
     try:
         pdf_bytes = service.build_receipt_pdf(payment_id=payment_id)
