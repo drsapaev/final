@@ -124,3 +124,107 @@ def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
         .count()
         == 0
     )
+
+
+@pytest.mark.unit
+def test_patient_emr_history_filters_other_doctors_summaries(client, db_session):
+    attacker_user = User(
+        id=9701,
+        username="emr_history_attacker",
+        email="emr-history-attacker@test.com",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+    )
+    victim_user = User(
+        id=9703,
+        username="emr_history_victim",
+        email="emr-history-victim@test.com",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+    )
+    attacker_doctor = Doctor(
+        id=9702,
+        user_id=attacker_user.id,
+        specialty="therapy",
+        active=True,
+    )
+    victim_doctor = Doctor(
+        id=9704,
+        user_id=victim_user.id,
+        specialty="therapy",
+        active=True,
+    )
+    patient = Patient(
+        first_name="Shared",
+        last_name="Patient",
+        phone="+998909701000",
+        birth_date=date(1990, 1, 1),
+    )
+    db_session.add_all(
+        [attacker_user, victim_user, attacker_doctor, victim_doctor, patient]
+    )
+    db_session.commit()
+    db_session.refresh(patient)
+
+    attacker_visit = Visit(
+        patient_id=patient.id,
+        doctor_id=attacker_doctor.id,
+        visit_date=date.today(),
+        visit_time="14:00",
+        status="open",
+        department="therapy",
+    )
+    victim_visit = Visit(
+        patient_id=patient.id,
+        doctor_id=victim_doctor.id,
+        visit_date=date.today(),
+        visit_time="15:00",
+        status="open",
+        department="therapy",
+    )
+    db_session.add_all([attacker_visit, victim_visit])
+    db_session.commit()
+    db_session.refresh(attacker_visit)
+    db_session.refresh(victim_visit)
+
+    attacker_emr = EMRRecord(
+        patient_id=patient.id,
+        visit_id=attacker_visit.id,
+        version=1,
+        data={"complaints": "own"},
+        status="draft",
+        created_by=attacker_user.id,
+        row_version=1,
+    )
+    victim_emr = EMRRecord(
+        patient_id=patient.id,
+        visit_id=victim_visit.id,
+        version=1,
+        data={"complaints": "private"},
+        status="draft",
+        created_by=victim_user.id,
+        row_version=1,
+    )
+    db_session.add_all([attacker_emr, victim_emr])
+    db_session.commit()
+    db_session.refresh(attacker_emr)
+    db_session.refresh(victim_emr)
+
+    login_response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": attacker_user.username, "password": "doctor123"},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+    response = client.get(
+        f"/api/v1/v2/emr/patient/{patient.id}",
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+    visit_ids = {item["visit_id"] for item in response.json()}
+    assert attacker_visit.id in visit_ids
+    assert victim_visit.id not in visit_ids

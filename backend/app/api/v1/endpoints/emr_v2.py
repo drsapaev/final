@@ -90,16 +90,20 @@ def get_client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def get_current_active_doctor(db: Session, current_user: User) -> Doctor | None:
+    return (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active == True)
+        .first()
+    )
+
+
 def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> None:
     """Prevent doctor-profile users from opening another doctor's visit EMR."""
     if current_user.role == "Admin" or current_user.is_superuser:
         return
 
-    doctor = (
-        db.query(Doctor)
-        .filter(Doctor.user_id == current_user.id, Doctor.active == True)
-        .first()
-    )
+    doctor = get_current_active_doctor(db, current_user)
     if not doctor:
         if current_user.role in EMR_V2_DOCTOR_ROLES:
             raise HTTPException(status_code=403, detail="Access denied")
@@ -110,6 +114,33 @@ def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> N
         raise HTTPException(status_code=404, detail="Visit not found")
     if visit.doctor_id != doctor.id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+
+def filter_patient_emrs_for_access(
+    db: Session,
+    emrs: list,
+    current_user: User,
+) -> list:
+    if current_user.role == "Admin" or current_user.is_superuser:
+        return emrs
+
+    doctor = get_current_active_doctor(db, current_user)
+    if not doctor:
+        if current_user.role in EMR_V2_DOCTOR_ROLES:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return emrs
+
+    visit_ids = [emr.visit_id for emr in emrs]
+    if not visit_ids:
+        return emrs
+
+    allowed_visit_ids = {
+        row[0]
+        for row in db.query(Visit.id)
+        .filter(Visit.id.in_(visit_ids), Visit.doctor_id == doctor.id)
+        .all()
+    }
+    return [emr for emr in emrs if emr.visit_id in allowed_visit_ids]
 
 
 # =============================================================================
@@ -302,7 +333,7 @@ async def get_patient_emrs(
     Returns list of EMR summaries in descending order by creation date.
     """
     emrs = emr_v2_service.get_by_patient(db, patient_id, limit=limit)
-    return emrs
+    return filter_patient_emrs_for_access(db, emrs, current_user)
 
 
 # =============================================================================
