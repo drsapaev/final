@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 # from app.models.patient import Patient  # Временно отключено
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.services.queue_api_service import QueueApiService
@@ -34,6 +34,21 @@ router = APIRouter()
 
 # Timezone для Узбекистана (UTC+5)
 TASHKENT_OFFSET = 5
+
+QUEUE_STATUS_ROLES = (
+    "Admin",
+    "Registrar",
+    "Doctor",
+    "Lab",
+    "Laboratory",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+)
 
 
 # Pydantic схемы
@@ -357,7 +372,7 @@ def open_queue(
 def get_today_queue(
     specialist_id: int = Query(..., description="ID специалиста"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*QUEUE_STATUS_ROLES)),
 ):
     """
     Получение текущей очереди на сегодня
