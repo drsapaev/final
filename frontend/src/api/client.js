@@ -90,7 +90,7 @@ async function refreshTokenIfNeeded() {
   refreshPromise = (async () => {
     try {
       logger.log('🔄 Token expiring soon, refreshing...');
-      const response = await axios.post(buildApiUrl('/auth/refresh'), {
+      const response = await axios.post(buildApiUrl('/authentication/refresh'), {
         refresh_token: refreshToken
       });
 

@@ -79,7 +79,7 @@ describe('shouldClearAuthOnUnauthorized', () => {
   it('does not clear auth for auth endpoints or when no token exists', () => {
     expect(
       shouldClearAuthOnUnauthorized({
-        config: { url: '/auth/refresh' },
+        config: { url: '/authentication/refresh' },
         response: { status: 401 },
       }, true)
     ).toBe(false);
