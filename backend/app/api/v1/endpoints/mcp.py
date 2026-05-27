@@ -10,7 +10,7 @@ from typing import Any, NoReturn
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from ....api.deps import get_current_user
+from ....api.deps import get_current_user, require_roles
 from ....models.user import User
 from ....services.mcp import get_mcp_manager
 
@@ -41,7 +41,7 @@ def raise_mcp_internal_error(action: str, exc: Exception) -> NoReturn:
 
 @router.get("/status")
 async def get_mcp_status(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
     """Получить статус MCP системы"""
     try:
@@ -57,7 +57,7 @@ async def get_mcp_status(
 
 @router.get("/health")
 async def mcp_health_check(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
     """Проверка здоровья MCP серверов"""
     try:
@@ -73,7 +73,7 @@ async def mcp_health_check(
 
 @router.get("/metrics")
 async def get_mcp_metrics(
-    server: str | None = None, current_user: User = Depends(get_current_user)
+    server: str | None = None, current_user: User = Depends(require_roles("Admin"))
 ) -> dict[str, Any]:
     """Получить метрики MCP"""
     try:
@@ -87,7 +87,7 @@ async def get_mcp_metrics(
 
 @router.get("/circuit-breaker")
 async def get_circuit_breaker_status(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("Admin")),
 ) -> dict[str, Any]:
     """Получить статус circuit breaker для всех серверов"""
     try:
@@ -646,7 +646,7 @@ async def mcp_batch_process(
 
 @router.get("/capabilities")
 async def mcp_get_capabilities(
-    server: str | None = None, current_user: User = Depends(get_current_user)
+    server: str | None = None, current_user: User = Depends(require_roles("Admin"))
 ) -> dict[str, Any]:
     """Получить возможности MCP серверов"""
     try:
