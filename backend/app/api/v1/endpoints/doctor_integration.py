@@ -123,6 +123,20 @@ def _doctor_queue_action_flags(entry: OnlineQueueEntry) -> dict[str, bool]:
     }
 
 
+def _ensure_visit_doctor_access(visit: Visit, current_user: User) -> None:
+    if current_user.role == "Admin":
+        return
+
+    doctor = visit.doctor
+    if doctor and doctor.user_id == current_user.id:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No access to this visit",
+    )
+
+
 class ScheduleNextVisitService(BaseModel):
     service_id: int
     quantity: int = 1
@@ -1517,11 +1531,7 @@ def get_visit_details(
             )
 
         # Проверяем права доступа
-        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этому визиту",
-            )
+        _ensure_visit_doctor_access(visit, current_user)
 
         # Получаем услуги визита
         visit_services = crud_visit.get_visit_services(db=db, visit_id=visit.id)
@@ -1600,11 +1610,7 @@ def add_service_to_visit(
             )
 
         # Проверяем права доступа
-        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этому визиту",
-            )
+        _ensure_visit_doctor_access(visit, current_user)
 
         # Проверяем, что услуга существует
         service = db.query(Service).filter(Service.id == service_id).first()
@@ -1664,11 +1670,7 @@ def remove_service_from_visit(
             )
 
         # Проверяем права доступа
-        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этому визиту",
-            )
+        _ensure_visit_doctor_access(visit, current_user)
 
         # Удаляем услугу
         visit_service = (
