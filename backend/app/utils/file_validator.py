@@ -104,6 +104,8 @@ SIZE_LIMITS = {
     FileCategory.OTHER: 10 * 1024 * 1024,  # 10MB
 }
 
+READ_CHUNK_BYTES = 1024 * 1024
+
 
 # Allowed extensions by category
 ALLOWED_EXTENSIONS = {
@@ -251,9 +253,25 @@ async def validate_upload_file(
         Tuple of (is_valid, error_message, file_info)
     """
     try:
-        # Read file content
-        content = await upload_file.read()
-        file_size = len(content)
+        chunks: list[bytes] = []
+        file_size = 0
+        read_limit = max_size or max(SIZE_LIMITS.values())
+
+        while True:
+            chunk = await upload_file.read(READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            file_size += len(chunk)
+            if file_size > read_limit:
+                await upload_file.seek(0)
+                return (
+                    False,
+                    f"File size {file_size} bytes exceeds limit {read_limit} bytes",
+                    None,
+                )
+            chunks.append(chunk)
+
+        content = b"".join(chunks)
 
         # Reset file pointer for later use
         await upload_file.seek(0)
