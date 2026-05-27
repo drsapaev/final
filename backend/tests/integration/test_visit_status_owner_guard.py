@@ -89,6 +89,75 @@ def test_doctor_cannot_change_other_doctor_visit_status(client, db_session) -> N
     assert other_visit.status == "open"
 
 
+def test_doctor_cannot_read_other_doctor_visit_detail(client, db_session) -> None:
+    own_user, _own_doctor = _create_doctor_user(db_session, label="read_own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="read_other")
+    other_patient = _create_patient(db_session)
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add(other_visit)
+    db_session.commit()
+    db_session.refresh(other_visit)
+
+    response = client.get(
+        f"/api/v1/visits/visits/{other_visit.id}",
+        headers=_doctor_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+
+
+def test_doctor_visit_list_is_limited_to_own_doctor_id(client, db_session) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="list_own")
+    _other_user, other_doctor = _create_doctor_user(db_session, label="list_other")
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    own_visit = Visit(
+        patient_id=own_patient.id,
+        doctor_id=own_doctor.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add_all([own_visit, other_visit])
+    db_session.commit()
+    db_session.refresh(own_visit)
+    db_session.refresh(other_visit)
+    headers = _doctor_headers(client, own_user)
+
+    own_response = client.get(
+        "/api/v1/visits/visits",
+        params={"doctor_id": own_doctor.id},
+        headers=headers,
+    )
+    assert own_response.status_code == 200, own_response.text
+    own_ids = {row["id"] for row in own_response.json()}
+    assert own_visit.id in own_ids
+    assert other_visit.id not in own_ids
+
+    other_response = client.get(
+        "/api/v1/visits/visits",
+        params={"doctor_id": other_doctor.id},
+        headers=headers,
+    )
+    assert other_response.status_code == 403
+
+    unscoped_response = client.get("/api/v1/visits/visits", headers=headers)
+    assert unscoped_response.status_code == 403
+
+
 def test_doctor_cannot_add_service_to_other_doctor_visit(client, db_session) -> None:
     own_user, _own_doctor = _create_doctor_user(db_session, label="svc_own")
     _other_user, other_doctor = _create_doctor_user(db_session, label="svc_other")

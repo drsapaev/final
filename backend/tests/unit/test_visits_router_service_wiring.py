@@ -75,7 +75,7 @@ def test_list_visits_endpoint_delegates_to_service(
 
 
 def test_get_visit_endpoint_delegates_to_service(
-    client, monkeypatch, auth_headers
+    client, monkeypatch, auth_headers, test_visit
 ) -> None:
     captured = {}
 
@@ -110,16 +110,19 @@ def test_get_visit_endpoint_delegates_to_service(
 
     monkeypatch.setattr(VisitsApiService, "get_visit", fake_get_visit)
 
-    response = client.get("/api/v1/visits/visits/42", headers=auth_headers)
+    response = client.get(
+        f"/api/v1/visits/visits/{test_visit.id}",
+        headers=auth_headers,
+    )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["visit"]["id"] == 42
+    assert payload["visit"]["id"] == test_visit.id
     assert payload["visit"]["notes"] == "visit card"
     assert payload["visit"]["patient_name"] == "Karimov Aziz"
     assert payload["visit"]["doctor_name"] == "Demo Cardiologist"
     assert payload["services"][0]["name"] == "Consultation"
-    assert captured["visit_id"] == 42
+    assert captured["visit_id"] == test_visit.id
 
 
 def test_list_visits_endpoint_requires_auth(client, monkeypatch) -> None:
