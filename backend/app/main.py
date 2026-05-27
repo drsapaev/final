@@ -1,9 +1,12 @@
 # --- BEGIN app/main.py ---
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
+import socket
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,10 +30,72 @@ API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
 # Use settings for CORS configuration
 CORS_DISABLE = settings.CORS_DISABLE
 CORS_ALLOW_ALL = settings.CORS_ALLOW_ALL
-CORS_ORIGINS = settings.BACKEND_CORS_ORIGINS
 ENV = os.getenv("ENV", "dev").lower()
 IS_PROD = ENV in ("prod", "production")
 TESTING = os.getenv("TESTING", "0").lower() in ("1", "true", "yes")
+
+
+def _detect_local_lan_ip() -> str | None:
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.settimeout(0)
+        try:
+            probe.connect(("8.8.8.8", 80))
+            local_ip = probe.getsockname()[0]
+        finally:
+            probe.close()
+    except OSError:
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return None
+
+    try:
+        parsed_ip = ipaddress.ip_address(local_ip)
+    except ValueError:
+        return None
+    if parsed_ip.is_loopback or parsed_ip.is_unspecified:
+        return None
+    return local_ip
+
+
+def _is_local_cors_host(hostname: str | None) -> bool:
+    host = str(hostname or "").strip().lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def _with_dev_lan_cors_origins(origins: list[str]) -> list[str]:
+    if IS_PROD:
+        return origins
+
+    local_ip = _detect_local_lan_ip()
+    if not local_ip:
+        return origins
+
+    updated_origins = list(dict.fromkeys(origins))
+    ports: set[int] = set()
+    for origin in origins:
+        parsed = urlsplit(str(origin or "").strip())
+        if parsed.scheme != "http" or not _is_local_cors_host(parsed.hostname):
+            continue
+        try:
+            ports.add(parsed.port or 80)
+        except ValueError:
+            continue
+
+    for port in ports or {5173}:
+        local_origin = urlunsplit(("http", f"{local_ip}:{port}", "", "", ""))
+        if local_origin not in updated_origins:
+            updated_origins.append(local_origin)
+    return updated_origins
+
+
+CORS_ORIGINS = _with_dev_lan_cors_origins(settings.BACKEND_CORS_ORIGINS)
 
 # Fail fast on insecure CORS in production
 if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
