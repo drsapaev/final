@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.security import require_roles
 from app.models.billing import InvoiceStatus, InvoiceType, PaymentMethod, RecurrenceType
 from app.models.user import User
 from app.services.billing_api_service import BillingApiDomainError, BillingApiService
@@ -20,6 +21,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 BILLING_PUBLIC_ERROR = "Internal server error"
+BILLING_VIEW_ROLES = ("Admin", "Registrar", "Cashier")
+BILLING_WRITE_ROLES = ("Admin", "Cashier")
+BILLING_ADMIN_ROLES = ("Admin",)
 
 
 def _billing_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -181,7 +185,7 @@ class PaymentResponse(BaseModel):
 def create_invoice(
     invoice_data: InvoiceCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Создать счет"""
     service = BillingService(db)
@@ -241,7 +245,7 @@ def get_invoices(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
     """Получить список счетов"""
     return BillingApiService(db).list_invoices(
@@ -259,7 +263,7 @@ def get_invoices(
 def get_invoice(
     invoice_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
     """Получить счет по ID"""
     try:
@@ -273,7 +277,7 @@ def update_invoice(
     invoice_id: int,
     invoice_data: InvoiceUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Обновить счет"""
     try:
@@ -289,7 +293,7 @@ def update_invoice(
 def delete_invoice(
     invoice_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Удалить счет"""
     try:
@@ -304,7 +308,7 @@ def get_invoice_html(
     invoice_id: int,
     template_id: Optional[int] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
     """Получить HTML счета"""
     service = BillingService(db)
@@ -323,7 +327,7 @@ def send_invoice(
     invoice_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Отправить счет пациенту"""
     service = BillingService(db)
@@ -338,7 +342,7 @@ def send_invoice(
 def record_payment(
     payment_data: PaymentCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Записать платеж"""
     service = BillingService(db)
@@ -366,7 +370,7 @@ def get_payments(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
     """Получить список платежей"""
     payments = BillingApiService(db).list_payments(
@@ -382,7 +386,7 @@ def get_payments(
 def auto_generate_invoice_for_visit(
     visit_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Автоматически создать счет для визита"""
     service = BillingService(db)
@@ -402,7 +406,7 @@ def auto_generate_invoice_for_visit(
 def auto_generate_invoice_for_appointment(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Автоматически создать счет для записи"""
     service = BillingService(db)
@@ -422,7 +426,7 @@ def auto_generate_invoice_for_appointment(
 def process_recurring_invoices(
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_ADMIN_ROLES)),
 ):
     """Обработать периодические счета"""
     service = BillingService(db)
@@ -437,7 +441,7 @@ def process_recurring_invoices(
 def send_payment_reminders(
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_WRITE_ROLES)),
 ):
     """Отправить напоминания об оплате"""
     service = BillingService(db)
@@ -451,7 +455,7 @@ def send_payment_reminders(
 @router.get("/settings")
 def get_billing_settings(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_ADMIN_ROLES)),
 ):
     """Получить настройки биллинга"""
     service = BillingService(db)
@@ -484,7 +488,7 @@ def get_billing_settings(
 def update_billing_settings(
     settings_data: BillingSettingsUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_ADMIN_ROLES)),
 ):
     """Обновить настройки биллинга"""
     service = BillingService(db)
@@ -502,7 +506,7 @@ def get_billing_analytics(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(require_roles(*BILLING_VIEW_ROLES)),
 ):
     """Получить аналитику по счетам"""
     return BillingApiService(db).get_billing_analytics(
