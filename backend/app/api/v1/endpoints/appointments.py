@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud.appointment import appointment as appointment_crud
 from app.models import appointment as appointment_models
+from app.models.clinic import Doctor
+from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
@@ -22,6 +24,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 APPOINTMENTS_PUBLIC_ERROR = "Internal server error"
+APPOINTMENT_BROAD_ACCESS_ROLES = {"Admin", "Registrar"}
+APPOINTMENT_DOCTOR_ROLES = {
+    "Doctor",
+    "cardio",
+    "cardiology",
+    "Cardiologist",
+    "Cardio",
+    "derma",
+    "Dermatologist",
+    "dentist",
+    "Dentist",
+}
+APPOINTMENT_PATIENT_ROLES = {"Patient"}
 
 
 def _appointments_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -34,6 +49,60 @@ def _appointments_http_error(exc: Exception, operation: str) -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=APPOINTMENTS_PUBLIC_ERROR,
     )
+
+
+def _ensure_appointment_record_access(
+    db: Session,
+    appointment: Any,
+    current_user: User,
+) -> None:
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    if role in APPOINTMENT_DOCTOR_ROLES:
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+            .first()
+        )
+        if not doctor:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if appointment.doctor_id == doctor.id:
+            return
+
+        assigned_doctor = (
+            db.query(Doctor).filter(Doctor.id == appointment.doctor_id).first()
+        )
+        # Some legacy appointment writers stored User.id in doctor_id. Allow it
+        # only when that value does not resolve to another real Doctor row.
+        if not assigned_doctor and appointment.doctor_id == current_user.id:
+            return
+        if assigned_doctor and assigned_doctor.user_id == current_user.id:
+            return
+
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if role in APPOINTMENT_PATIENT_ROLES:
+        patient_id = getattr(appointment, "patient_id", None)
+        if patient_id is None:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        current_patient = getattr(current_user, "patient", None)
+        if getattr(current_patient, "id", None) == patient_id:
+            return
+
+        patient = (
+            db.query(Patient)
+            .filter(Patient.id == patient_id, Patient.user_id == current_user.id)
+            .first()
+        )
+        if patient:
+            return
+
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 # Схема для ответа pending-payments
@@ -472,9 +541,10 @@ def get_appointment(
     """
     Получить запись на прием по ID
     """
-    appointment = appointment_crud.get_appointment(db, id=appointment_id)
+    appointment = appointment_crud.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
+    _ensure_appointment_record_access(db, appointment, current_user)
     return appointment
 
 
@@ -489,11 +559,13 @@ def update_appointment(
     """
     Обновить запись на прием
     """
-    appointment = appointment_crud.get_appointment(db, id=appointment_id)
+    appointment = appointment_crud.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
     # Проверяем, не занято ли новое время у врача
+    _ensure_appointment_record_access(db, appointment, current_user)
+
     if (
         appointment_in.appointment_date
         or appointment_in.appointment_time
@@ -514,7 +586,7 @@ def update_appointment(
                 status_code=400, detail="Это время уже занято у выбранного врача"
             )
 
-    appointment = appointment_crud.update_appointment(
+    appointment = appointment_crud.update(
         db=db, db_obj=appointment, obj_in=appointment_in
     )
     return appointment
@@ -530,11 +602,13 @@ def delete_appointment(
     """
     Отменить запись на прием
     """
-    appointment = appointment_crud.get_appointment(db, id=appointment_id)
+    appointment = appointment_crud.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
-    appointment_crud.delete_appointment(db=db, id=appointment_id)
+    _ensure_appointment_record_access(db, appointment, current_user)
+
+    appointment_crud.remove(db=db, id=appointment_id)
     return {"message": "Запись успешно отменена"}
 
 
