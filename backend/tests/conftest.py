@@ -2,6 +2,8 @@
 Конфигурация pytest для тестов системы клиники
 """
 
+import asyncio
+import inspect
 import os
 import secrets
 import tempfile
@@ -419,9 +421,24 @@ def registrar_auth_headers(client, registrar_user):
 
 
 # Маркеры для pytest
+def pytest_pyfunc_call(pyfuncitem):
+    if "asyncio" not in pyfuncitem.keywords:
+        return None
+    test_function = pyfuncitem.obj
+    if not inspect.iscoroutinefunction(test_function):
+        return None
+    fixture_args = {
+        arg: pyfuncitem.funcargs[arg]
+        for arg in pyfuncitem._fixtureinfo.argnames
+    }
+    asyncio.run(test_function(**fixture_args))
+    return True
+
+
 def pytest_configure(config):
     """Конфигурация pytest"""
     os.environ.setdefault("DISABLE_2FA_REQUIREMENT", "true")  # Disable 2FA for most tests
+    config.addinivalue_line("markers", "asyncio: asynchronous tests")
     config.addinivalue_line("markers", "unit: Юнит тесты")
     config.addinivalue_line("markers", "integration: Интеграционные тесты")
     config.addinivalue_line("markers", "e2e: Сквозные E2E тесты")

@@ -155,6 +155,7 @@ from .service import Service, ServiceCatalog
 from .service_audit import ServiceAuditLog
 from .setting import Setting
 from .telegram_config import (
+    PatientOnboardingRequest,
     TelegramConfig,
     TelegramMessage,
     TelegramPatientFormSubmission,
@@ -286,6 +287,7 @@ __all__ = [
     "TelegramUser",
     "TelegramMessage",
     "TelegramPatientFormSubmission",
+    "PatientOnboardingRequest",
     "DoctorPriceOverride",
     "DoctorPhraseHistory",
     "DoctorTreatmentTemplate",

@@ -73,6 +73,18 @@ ALLOWED_EVENTS = {
     'autosave.trigger',
     'autosave.success',
     'autosave.fail',
+
+    # Telegram patient onboarding
+    'patient_onboarding_started',
+    'patient_onboarding_opened',
+    'patient_onboarding_submitted',
+    'patient_onboarding_pending_review',
+    'patient_onboarding_needs_more_info',
+    'registrar_onboarding_reviewed',
+    'patient_onboarding_linked_existing',
+    'patient_onboarding_created_patient',
+    'patient_onboarding_rejected',
+    'patient_onboarding_expired',
 }
 
 
@@ -122,7 +134,24 @@ def validate_event(event: TelemetryEvent) -> bool:
                 logger.debug(f"[Telemetry] Rejected: meta value too long")
                 return False
             # Block suspicious keys
-            if key.lower() in ('content', 'text', 'diagnosis', 'treatment', 'body'):
+            if key.lower() in (
+                'content',
+                'text',
+                'diagnosis',
+                'treatment',
+                'body',
+                'entrytoken',
+                'entry_token',
+                'raw_token',
+                'payment_id',
+                'invoice_id',
+                'payment_payload',
+                'provider_payload',
+                'emr',
+                'lab_details',
+                'full_phone',
+                'full_name',
+            ):
                 logger.debug(f"[Telemetry] Rejected: suspicious key {key}")
                 return False
     

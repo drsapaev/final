@@ -46,6 +46,32 @@ const MINI_APP_I18N = {
     appointmentCreating: 'Заявка отправляется...',
     appointmentRequestCreated: 'Заявка на запись создана. Номер записи: #{appointmentId}. Регистратура подтвердит детали.',
     appointmentRequestCreatedNoId: 'Заявка на запись создана. Регистратура подтвердит детали.',
+    onboardingKicker: 'REQUEST REVIEW',
+    onboardingTitle: 'Заявка на запись',
+    onboardingIntro: 'Если карты пациента ещё нет или Telegram не привязан, отправьте безопасную заявку. Регистратура проверит данные и вручную свяжет её с картой пациента.',
+    onboardingPrivacy: 'Не отправляйте диагнозы, результаты анализов и медицинские документы. Здесь нужны только контакт и желаемые детали записи.',
+    onboardingBlockedTitle: 'Нужна проверка регистратуры',
+    onboardingBlockedText: 'Этот раздел откроется после того, как регистратура свяжет Telegram с картой пациента. Сейчас можно оставить заявку на запись.',
+    onboardingOpenAppointments: 'Перейти к заявке',
+    contactName: 'Имя',
+    contactPhone: 'Телефон',
+    desiredService: 'Услуга или направление',
+    desiredBranch: 'Филиал',
+    onboardingSubmit: 'Отправить заявку',
+    onboardingSubmitting: 'Заявка отправляется...',
+    onboardingSubmitted: 'Заявка отправлена. Регистратура проверит её и свяжет Telegram с картой пациента.',
+    onboardingRequestFailed: 'Заявка не отправлена. Проверьте ссылку из Telegram и попробуйте ещё раз.',
+    onboardingStatusTitle: 'Статус заявки',
+    onboardingStatus: {
+      not_found: 'Заявка ещё не отправлена.',
+      pending_review: 'Заявка ожидает проверки регистратурой.',
+      needs_more_info: 'Регистратуре нужны дополнительные сведения. Обновите заявку или свяжитесь с клиникой.',
+      linked_existing: 'Заявка связана с существующей картой пациента. Откройте защищённый кабинет из Telegram.',
+      created_patient: 'Карта пациента создана сотрудником. Откройте защищённый кабинет из Telegram.',
+      rejected: 'Заявка отклонена. Свяжитесь с регистратурой для уточнения.',
+      cancelled: 'Заявка отменена.',
+      expired: 'Срок заявки истёк. Отправьте новую заявку или свяжитесь с регистратурой.',
+    },
     date: 'Дата',
     time: 'Время',
     department: 'Отделение',
@@ -110,6 +136,8 @@ const MINI_APP_I18N = {
     capabilityStatus: {
       manifest_only: 'Статус из manifest',
       preview_enabled: 'Доступен предпросмотр',
+      request_review_enabled: 'Заявка через регистратуру',
+      staff_approval_required: 'Нужна проверка регистратуры',
       summary_enabled: 'Доступна сводка',
       ready_pdf_list_enabled: 'Доступны готовые PDF',
     },
@@ -175,6 +203,32 @@ const MINI_APP_I18N = {
     appointmentCreating: 'So\'rov yuborilmoqda...',
     appointmentRequestCreated: 'Yozilish so\'rovi yaratildi. Yozuv raqami: #{appointmentId}. Registratura ma\'lumotlarni tasdiqlaydi.',
     appointmentRequestCreatedNoId: 'Yozilish so\'rovi yaratildi. Registratura ma\'lumotlarni tasdiqlaydi.',
+    onboardingKicker: 'REQUEST REVIEW',
+    onboardingTitle: 'Qabul uchun so\'rov',
+    onboardingIntro: 'Agar bemor kartasi hali yo\'q yoki Telegram bog\'lanmagan bo\'lsa, xavfsiz so\'rov yuboring. Registratura ma\'lumotlarni tekshiradi va uni bemor kartasiga qo\'lda bog\'laydi.',
+    onboardingPrivacy: 'Diagnoz, tahlil natijalari va tibbiy hujjatlarni yubormang. Bu yerda faqat aloqa va qabul uchun kerakli tafsilotlar so\'raladi.',
+    onboardingBlockedTitle: 'Registratura tekshiruvi kerak',
+    onboardingBlockedText: 'Bu bo\'lim Telegram bemor kartasiga bog\'langandan keyin ochiladi. Hozir qabul uchun so\'rov qoldirishingiz mumkin.',
+    onboardingOpenAppointments: 'So\'rovga o\'tish',
+    contactName: 'Ism',
+    contactPhone: 'Telefon',
+    desiredService: 'Xizmat yoki yo\'nalish',
+    desiredBranch: 'Filial',
+    onboardingSubmit: 'So\'rov yuborish',
+    onboardingSubmitting: 'So\'rov yuborilmoqda...',
+    onboardingSubmitted: 'So\'rov yuborildi. Registratura uni tekshiradi va Telegramni bemor kartasiga bog\'laydi.',
+    onboardingRequestFailed: 'So\'rov yuborilmadi. Telegram havolasini tekshiring va qayta urinib ko\'ring.',
+    onboardingStatusTitle: 'So\'rov holati',
+    onboardingStatus: {
+      not_found: 'So\'rov hali yuborilmagan.',
+      pending_review: 'So\'rov registratura tekshiruvini kutmoqda.',
+      needs_more_info: 'Registraturaga qo\'shimcha ma\'lumot kerak. So\'rovni yangilang yoki klinika bilan bog\'laning.',
+      linked_existing: 'So\'rov mavjud bemor kartasiga bog\'landi. Himoyalangan kabinetni Telegramdan oching.',
+      created_patient: 'Bemor kartasi xodim tomonidan yaratildi. Himoyalangan kabinetni Telegramdan oching.',
+      rejected: 'So\'rov rad etildi. Aniqlashtirish uchun registraturaga murojaat qiling.',
+      cancelled: 'So\'rov bekor qilindi.',
+      expired: 'So\'rov muddati tugadi. Yangi so\'rov yuboring yoki registraturaga murojaat qiling.',
+    },
     date: 'Sana',
     time: 'Vaqt',
     department: 'Bo\'lim',
@@ -239,6 +293,8 @@ const MINI_APP_I18N = {
     capabilityStatus: {
       manifest_only: 'Manifest holati',
       preview_enabled: 'Oldindan ko\'rish mavjud',
+      request_review_enabled: 'Registratura orqali so\'rov',
+      staff_approval_required: 'Registratura tekshiruvi kerak',
       summary_enabled: 'Qisqa maʼlumot mavjud',
       ready_pdf_list_enabled: 'Tayyor PDFlar mavjud',
     },
@@ -284,6 +340,18 @@ const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set(['entry_token_invalid', 'en
 const MINI_APP_HANDLED_ERROR_REQUEST_CONFIG = {
   silent: true,
   expectedErrorStatuses: [400, 403, 503],
+};
+const MINI_APP_TELEMETRY_REQUEST_CONFIG = {
+  silent: true,
+  expectedErrorStatuses: [400, 404, 422, 503],
+};
+const MINI_APP_ONBOARDING_STATUS_EVENTS = {
+  pending_review: 'patient_onboarding_pending_review',
+  needs_more_info: 'patient_onboarding_needs_more_info',
+  linked_existing: 'patient_onboarding_linked_existing',
+  created_patient: 'patient_onboarding_created_patient',
+  rejected: 'patient_onboarding_rejected',
+  expired: 'patient_onboarding_expired',
 };
 const MINI_APP_ERROR_ALERT_PROPS = {
   role: 'alert',
@@ -412,6 +480,10 @@ function getDefaultMiniAppAppointmentDate() {
 
 function createMiniAppAppointmentPreviewForm() {
   return {
+    contactName: '',
+    contactPhone: '',
+    desiredService: '',
+    desiredBranch: '',
     appointmentDate: getDefaultMiniAppAppointmentDate(),
     appointmentTime: '09:30',
     department: '',
@@ -427,6 +499,64 @@ function buildMiniAppAppointmentRequestBody(authPayload, form) {
     department: form.department.trim() || undefined,
     notes: form.notes.trim() || undefined,
   };
+}
+
+function buildMiniAppOnboardingRequestBody(authPayload, form, languageCode) {
+  return {
+    ...authPayload,
+    languageCode,
+    contactName: form.contactName.trim() || undefined,
+    contactPhone: form.contactPhone.trim() || undefined,
+    desiredService: form.desiredService.trim() || form.department.trim() || undefined,
+    desiredBranch: form.desiredBranch.trim() || undefined,
+    desiredDate: form.appointmentDate || undefined,
+    desiredTime: form.appointmentTime || undefined,
+    note: form.notes.trim() || undefined,
+  };
+}
+
+function getMiniAppTelemetryReasonCode(reasonCode) {
+  const value = String(reasonCode || '').trim().toLowerCase();
+  if (!/^[a-z0-9_:-]{1,64}$/.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function emitMiniAppOnboardingTelemetry(event, meta = {}) {
+  const section = MINI_APP_SECTION_ALIASES[String(meta.section || '').trim().toLowerCase()]
+    || 'appointments';
+  const payloadMeta = {
+    role: 'patient',
+    scope: 'onboarding',
+    section,
+    language: normalizeMiniAppLanguage(meta.language),
+    success: meta.success !== false,
+    reason_code: getMiniAppTelemetryReasonCode(meta.reason_code),
+    timestamp: new Date().toISOString(),
+  };
+
+  api.post('/telemetry', {
+    events: [
+      {
+        event,
+        entity: 'telegram_mini_app',
+        timestamp: Date.now(),
+        meta: payloadMeta,
+      },
+    ],
+  }, MINI_APP_TELEMETRY_REQUEST_CONFIG).catch(() => {});
+}
+
+function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {
+  const event = MINI_APP_ONBOARDING_STATUS_EVENTS[status];
+  if (!event) {
+    return;
+  }
+  emitMiniAppOnboardingTelemetry(event, {
+    ...meta,
+    reason_code: status,
+  });
 }
 
 function getMiniAppApiErrorReason(error, fallback) {
@@ -467,6 +597,7 @@ function isMiniAppCapabilityEnabled(capability) {
   return Boolean(
     capability?.create_enabled ||
     capability?.preview_enabled ||
+    capability?.onboarding_request_enabled ||
     capability?.read_enabled ||
     capability?.view_enabled ||
     capability?.capture_enabled ||
@@ -531,6 +662,11 @@ function TelegramMiniAppPatientShell() {
     error: null,
   });
   const [appointmentCreate, setAppointmentCreate] = useState({
+    status: 'idle',
+    payload: null,
+    error: null,
+  });
+  const [onboardingSubmit, setOnboardingSubmit] = useState({
     status: 'idle',
     payload: null,
     error: null,
@@ -606,6 +742,11 @@ function TelegramMiniAppPatientShell() {
       payload: null,
       error: null,
     });
+    setOnboardingSubmit({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
     setReportDownload({
       status: 'idle',
       reportId: null,
@@ -626,11 +767,43 @@ function TelegramMiniAppPatientShell() {
     api.post('/telegram/mini-app/patient/manifest', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
       .then((response) => {
         if (!isMounted) return;
+        const manifest = response.data;
+        const isOnboardingManifest = manifest?.scope?.type === 'onboarding';
         setState({
           status: 'ready',
-          manifest: response.data,
+          manifest,
           error: null,
         });
+        if (isOnboardingManifest) {
+          const telemetryMeta = {
+            section: selectedSection || 'appointments',
+            language: manifest?.language?.code || effectLanguageCode,
+            success: true,
+          };
+          const onboardingStatus = manifest?.onboarding?.request?.status || 'not_found';
+          emitMiniAppOnboardingTelemetry('patient_onboarding_opened', telemetryMeta);
+          if (onboardingStatus === 'not_found') {
+            emitMiniAppOnboardingTelemetry('patient_onboarding_started', telemetryMeta);
+          } else {
+            emitMiniAppOnboardingStatusTelemetry(onboardingStatus, telemetryMeta);
+          }
+          setCabinetSummary({
+            status: 'idle',
+            payload: null,
+            error: null,
+          });
+          setFormsPreview({
+            status: 'idle',
+            payload: null,
+            error: null,
+          });
+          setResultsSummary({
+            status: 'idle',
+            payload: null,
+            error: null,
+          });
+          return null;
+        }
         if (usesCabinetSummary) {
           return api.post('/telegram/mini-app/cabinet/summary', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
             .then((summaryResponse) => {
@@ -719,6 +892,13 @@ function TelegramMiniAppPatientShell() {
     canPreviewAppointments &&
     selectedCapability?.create_enabled
   );
+  const isOnboardingScope = state.manifest?.scope?.type === 'onboarding';
+  const onboardingCapability = capabilities.appointments || {};
+  const canSubmitOnboardingRequest = Boolean(
+    isOnboardingScope &&
+    (selectedSection === 'appointments' || !selectedSection) &&
+    onboardingCapability.onboarding_request_enabled
+  );
 
   const handleMiniAppCapabilitySelect = (section) => {
     if (!section || section === selectedSection) {
@@ -743,6 +923,11 @@ function TelegramMiniAppPatientShell() {
       error: null,
     });
     setAppointmentCreate({
+      status: 'idle',
+      payload: null,
+      error: null,
+    });
+    setOnboardingSubmit({
       status: 'idle',
       payload: null,
       error: null,
@@ -833,6 +1018,65 @@ function TelegramMiniAppPatientShell() {
           status: 'error',
           payload: null,
           error: t('appointmentCreateFailed', { reason }),
+        });
+      });
+  };
+
+  const handleOnboardingRequestSubmit = (event) => {
+    event.preventDefault();
+
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
+    if (!authPayload || !appointmentPreviewForm.appointmentDate) {
+      setOnboardingSubmit({
+        status: 'error',
+        payload: null,
+        error: t('appointmentDateRequired'),
+      });
+      return;
+    }
+
+    const requestBody = buildMiniAppOnboardingRequestBody(
+      authPayload,
+      appointmentPreviewForm,
+      languageCode
+    );
+
+    setOnboardingSubmit({
+      status: 'loading',
+      payload: null,
+      error: null,
+    });
+
+    api.post('/telegram/mini-app/onboarding/requests', requestBody, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+      .then((response) => {
+        setOnboardingSubmit({
+          status: 'ready',
+          payload: response.data,
+          error: null,
+        });
+        emitMiniAppOnboardingTelemetry('patient_onboarding_submitted', {
+          section: 'appointments',
+          language: languageCode,
+          success: true,
+        });
+        emitMiniAppOnboardingStatusTelemetry(response.data?.request?.status, {
+          section: 'appointments',
+          language: languageCode,
+          success: true,
+        });
+      })
+      .catch((error) => {
+        const reason = getMiniAppApiErrorReason(error, 'onboarding_submit_failed');
+        emitMiniAppOnboardingTelemetry('patient_onboarding_submitted', {
+          section: 'appointments',
+          language: languageCode,
+          success: false,
+          reason_code: reason,
+        });
+        setOnboardingSubmit({
+          status: 'error',
+          payload: null,
+          error: t('onboardingRequestFailed'),
         });
       });
   };
@@ -966,6 +1210,11 @@ function TelegramMiniAppPatientShell() {
   const patientQueueEntries = cabinetSummary.payload?.queue || [];
   const currentQueueEntry = patientQueueEntries[0] || null;
   const paymentsDebtValue = Number(String(paymentsSummary.debt || '0').replace(/\s/g, ''));
+  const onboardingRequest = onboardingSubmit.payload?.request
+    || state.manifest?.onboarding?.request
+    || null;
+  const onboardingStatus = onboardingRequest?.status || 'not_found';
+  const onboardingStatusMessage = t(`onboardingStatus.${onboardingStatus}`);
   const statusBadge = getMiniAppStatusBadge(state.status, languageCode);
 
   return (
@@ -1026,6 +1275,139 @@ function TelegramMiniAppPatientShell() {
                       {localizeMiniAppCapabilityStatus(languageCode, selectedCapability?.status)}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isOnboardingScope && selectedSection && selectedSection !== 'appointments' && (
+              <Card padding="small" shadow="none" style={miniAppOnboardingBlockedStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>{t('onboardingKicker')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('onboardingBlockedTitle')}</h2>
+                    </div>
+                    <Badge variant="warning" size="small">{t('statusOnly')}</Badge>
+                  </div>
+                  <Alert severity="info" style={miniAppNoticeStyle}>
+                    {t('onboardingBlockedText')}
+                  </Alert>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="small"
+                    onClick={() => handleMiniAppCapabilitySelect('appointments')}
+                  >
+                    {t('onboardingOpenAppointments')}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {canSubmitOnboardingRequest && (
+              <Card padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
+                <CardContent style={miniAppAppointmentPreviewContentStyle}>
+                  <div style={miniAppAppointmentPreviewHeaderStyle}>
+                    <div>
+                      <p style={miniAppKickerStyle}>{t('onboardingKicker')}</p>
+                      <h2 style={miniAppSelectedSectionTitleStyle}>{t('onboardingTitle')}</h2>
+                      <p style={miniAppCapabilityTextStyle}>{t('onboardingIntro')}</p>
+                    </div>
+                    <Badge variant="secondary" size="small">{t('appointmentRequest')}</Badge>
+                  </div>
+
+                  <Alert severity="info" style={miniAppNoticeStyle}>
+                    <span style={miniAppQueueEmptyContentStyle}>
+                      <strong>{t('onboardingStatusTitle')}</strong>
+                      <span>{onboardingStatusMessage}</span>
+                      {onboardingRequest?.reviewMessage && (
+                        <span>{onboardingRequest.reviewMessage}</span>
+                      )}
+                    </span>
+                  </Alert>
+
+                  <form style={miniAppAppointmentFormStyle} onSubmit={handleOnboardingRequestSubmit}>
+                    <div style={miniAppAppointmentFormGridStyle}>
+                      <Input
+                        label={t('contactName')}
+                        value={appointmentPreviewForm.contactName}
+                        onChange={handleAppointmentPreviewFieldChange('contactName')}
+                        maxLength={256}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        label={t('contactPhone')}
+                        value={appointmentPreviewForm.contactPhone}
+                        onChange={handleAppointmentPreviewFieldChange('contactPhone')}
+                        maxLength={32}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        label={t('desiredService')}
+                        value={appointmentPreviewForm.desiredService}
+                        onChange={handleAppointmentPreviewFieldChange('desiredService')}
+                        maxLength={128}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        label={t('desiredBranch')}
+                        value={appointmentPreviewForm.desiredBranch}
+                        onChange={handleAppointmentPreviewFieldChange('desiredBranch')}
+                        maxLength={128}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        type="date"
+                        label={t('date')}
+                        value={appointmentPreviewForm.appointmentDate}
+                        onChange={handleAppointmentPreviewFieldChange('appointmentDate')}
+                        required
+                        style={miniAppAppointmentInputStyle}
+                      />
+                      <Input
+                        type="time"
+                        label={t('time')}
+                        value={appointmentPreviewForm.appointmentTime}
+                        onChange={handleAppointmentPreviewFieldChange('appointmentTime')}
+                        style={miniAppAppointmentInputStyle}
+                      />
+                    </div>
+                    <Textarea
+                      label={t('registrarNote')}
+                      value={appointmentPreviewForm.notes}
+                      onChange={handleAppointmentPreviewFieldChange('notes')}
+                      placeholder={t('noMedicalData')}
+                      maxLength={1000}
+                      minRows={2}
+                    />
+                    <Alert severity="warning" style={miniAppNoticeStyle}>
+                      {t('onboardingPrivacy')}
+                    </Alert>
+
+                    {onboardingSubmit.status === 'error' && (
+                      <Alert severity="error" style={miniAppNoticeStyle}>
+                        {onboardingSubmit.error}
+                      </Alert>
+                    )}
+
+                    {onboardingSubmit.status === 'ready' && (
+                      <Alert severity="success" style={miniAppNoticeStyle}>
+                        {t('onboardingSubmitted')}
+                      </Alert>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="small"
+                      loading={onboardingSubmit.status === 'loading'}
+                      disabled={onboardingSubmit.status === 'loading'}
+                    >
+                      {onboardingSubmit.status === 'loading'
+                        ? t('onboardingSubmitting')
+                        : t('onboardingSubmit')}
+                    </Button>
+                  </form>
                 </CardContent>
               </Card>
             )}
@@ -1742,6 +2124,11 @@ const miniAppSelectedSectionStatusStyle = {
 const miniAppAppointmentPreviewStyle = {
   marginBottom: '12px',
   borderColor: 'rgba(52, 199, 89, 0.26)',
+};
+
+const miniAppOnboardingBlockedStyle = {
+  marginBottom: '12px',
+  borderColor: 'rgba(255, 149, 0, 0.28)',
 };
 
 const miniAppAppointmentPreviewContentStyle = {

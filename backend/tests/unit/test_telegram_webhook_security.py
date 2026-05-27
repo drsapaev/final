@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 
@@ -1113,6 +1113,52 @@ class TestTelegramWebhookSecurity:
         assert log.status == "sent"
 
     @pytest.mark.asyncio
+    async def test_unknown_start_creates_only_telegram_user_not_patient(
+        self, db_session
+    ):
+        initial_patients = db_session.query(Patient).count()
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": 119,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": 7018},
+                "from": {"id": 7018, "username": "first_start"},
+                "text": "/start",
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        telegram_user = (
+            db_session.query(TelegramUser)
+            .filter(TelegramUser.chat_id == 7018)
+            .one()
+        )
+        assert telegram_user.patient_id is None
+        assert telegram_user.notifications_enabled is False
+        assert db_session.query(Patient).count() == initial_patients
+        fake_service._send_message.assert_awaited_once_with(
+            7018,
+            telegram_webhook._localized_text("language_prompt", "ru"),
+            telegram_webhook.TELEGRAM_LANGUAGE_MENU,
+        )
+        reply_text = fake_service._send_message.await_args.args[1]
+        assert "entryToken" not in reply_text
+        assert "patient_id" not in reply_text
+        assert "payment_id" not in reply_text
+        assert "diagnosis" not in reply_text
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == 7018)
+            .one()
+        )
+        assert log.template_key == "telegram_patient_language_prompt"
+
+    @pytest.mark.asyncio
     async def test_plain_uzbek_button_switches_next_visible_menu(self, db_session):
         fake_service = FakeTelegramBotService(active=True)
         language_update = {
@@ -1797,7 +1843,7 @@ class TestTelegramWebhookSecurity:
         assert log.template_key == template_key
 
     @pytest.mark.asyncio
-    async def test_book_command_without_link_or_frontend_falls_back_to_main_menu(
+    async def test_book_command_without_link_uses_request_review_onboarding_cta(
         self, db_session
     ):
         telegram_user = TelegramUser(
@@ -1829,17 +1875,134 @@ class TestTelegramWebhookSecurity:
         )
 
         assert handled is True
-        fake_service._send_message.assert_awaited_once_with(
-            7030,
-            telegram_webhook._localized_text("book", "uz-Latn"),
-            telegram_webhook._localized_main_menu("uz-Latn"),
+        fake_service._send_message.assert_awaited_once()
+        chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert chat_id == 7030
+        assert message == telegram_webhook._localized_text("book", "uz-Latn")
+        button = reply_markup["inline_keyboard"][0][0]
+        assert button["text"] == telegram_webhook._localized_text(
+            "onboarding_entry_button",
+            "uz-Latn",
         )
+        entry_url = button.get("url") or button.get("web_app", {}).get("url")
+        assert entry_url
+        assert "entryToken=pmo_" in entry_url
+        assert "pma_" not in entry_url
+        entry_token = parse_qs(urlsplit(entry_url).query)["entryToken"][0]
+        parsed_onboarding = telegram_webhook._parse_patient_onboarding_entry_token(
+            entry_token,
+            expected_section="appointments",
+        )
+        assert parsed_onboarding["chat_id"] == 7030
+        assert telegram_webhook._parse_patient_mini_app_entry_token(
+            entry_token,
+            expected_section="appointments",
+        ) is None
+        db_session.refresh(telegram_user)
+        assert telegram_user.patient_id is None
         log = (
             db_session.query(TelegramMessage)
             .filter(TelegramMessage.chat_id == 7030)
             .one()
         )
         assert log.template_key == "telegram_patient_book"
+
+    @pytest.mark.parametrize(
+        "command,template_key,chat_id,update_id",
+        [
+            ("/queue", "telegram_patient_queue", 7031, 1281),
+            ("/payments", "telegram_patient_payments", 7032, 1282),
+            (
+                "/documents",
+                "telegram_patient_documents_placeholder",
+                7033,
+                1283,
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_unlinked_protected_commands_use_request_review_onboarding_cta(
+        self,
+        db_session,
+        monkeypatch,
+        command,
+        template_key,
+        chat_id,
+        update_id,
+    ):
+        telegram_user = TelegramUser(
+            chat_id=chat_id,
+            username=f"unlinked_{chat_id}",
+            first_name="NoLink",
+            language_code="uz-Latn",
+            notifications_enabled=True,
+            appointment_reminders=True,
+            lab_notifications=True,
+            active=True,
+            blocked=False,
+        )
+        db_session.add(telegram_user)
+        db_session.commit()
+        monkeypatch.setattr(
+            telegram_webhook.settings,
+            "FRONTEND_URL",
+            "http://localhost:5173",
+            raising=False,
+        )
+        fake_service = FakeTelegramBotService(active=True)
+        update = {
+            "update_id": update_id,
+            "message": {
+                "message_id": 1,
+                "chat": {"id": chat_id},
+                "from": {"id": 111},
+                "text": command,
+            },
+        }
+
+        handled = await telegram_webhook._handle_clinic_bot_update(
+            update, db_session, fake_service
+        )
+
+        assert handled is True
+        fake_service._send_message.assert_awaited_once()
+        reply_chat_id, message, reply_markup = fake_service._send_message.await_args.args
+        assert reply_chat_id == chat_id
+        assert message == telegram_webhook._localized_text(
+            "unlinked_protected_action",
+            "uz-Latn",
+        )
+        assert "payment_id" not in message
+        assert "patient_id" not in message
+        assert "diagnosis" not in message
+        assert "Traceback" not in message
+        button = reply_markup["inline_keyboard"][0][0]
+        assert button["text"] == telegram_webhook._localized_text(
+            "onboarding_entry_button",
+            "uz-Latn",
+        )
+        entry_url = button.get("url") or button.get("web_app", {}).get("url")
+        assert entry_url
+        assert "entryToken=pmo_" in entry_url
+        assert "pma_" not in entry_url
+        entry_token = parse_qs(urlsplit(entry_url).query)["entryToken"][0]
+        parsed_onboarding = telegram_webhook._parse_patient_onboarding_entry_token(
+            entry_token,
+            expected_section="appointments",
+        )
+        assert parsed_onboarding["chat_id"] == chat_id
+        assert telegram_webhook._parse_patient_mini_app_entry_token(
+            entry_token,
+            expected_section="appointments",
+        ) is None
+        db_session.refresh(telegram_user)
+        assert telegram_user.patient_id is None
+        log = (
+            db_session.query(TelegramMessage)
+            .filter(TelegramMessage.chat_id == chat_id)
+            .one()
+        )
+        assert log.template_key == template_key
 
     @pytest.mark.asyncio
     async def test_staff_start_token_links_user_and_writes_audit(

@@ -35,6 +35,13 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
         ("/api/v1/registrar/records/actions", "post"),
         ("/api/v1/payments/init", "post"),
         ("/api/v1/payments/{payment_id}", "get"),
+        ("/api/v1/telegram/mini-app/onboarding/requests", "post"),
+        ("/api/v1/telegram/mini-app/onboarding/status", "post"),
+        ("/api/v1/telegram/onboarding/requests", "get"),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/link-existing", "post"),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/create-patient", "post"),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/request-more-info", "post"),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/reject", "post"),
         ("/api/v1/health", "get"),
     ],
 )
@@ -73,6 +80,42 @@ def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) ->
         "message",
     ):
         assert field_name in properties
+
+
+def test_openapi_telegram_onboarding_contract_has_stable_operation_ids(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    expected_operations = {
+        ("/api/v1/telegram/mini-app/onboarding/requests", "post"): (
+            "telegram_mini_app_submit_patient_onboarding_request"
+        ),
+        ("/api/v1/telegram/mini-app/onboarding/status", "post"): (
+            "telegram_mini_app_read_patient_onboarding_status"
+        ),
+        ("/api/v1/telegram/onboarding/requests", "get"): (
+            "telegram_registrar_list_patient_onboarding_requests"
+        ),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/link-existing", "post"): (
+            "telegram_registrar_link_existing_patient_onboarding_request"
+        ),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/create-patient", "post"): (
+            "telegram_registrar_create_patient_from_onboarding_request"
+        ),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/request-more-info", "post"): (
+            "telegram_registrar_request_more_info_onboarding_request"
+        ),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/reject", "post"): (
+            "telegram_registrar_reject_patient_onboarding_request"
+        ),
+    }
+
+    for (path, method), operation_id in expected_operations.items():
+        operation = schema["paths"][path][method]
+        assert operation["operationId"] == operation_id
+        assert "responses" in operation
+        assert "payment_id" not in str(operation)
+        assert "diagnosis" not in str(operation).lower()
 
 
 def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
