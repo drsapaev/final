@@ -44,7 +44,6 @@ export function shouldClearAuthOnUnauthorized(error, hasToken = tokenManager.has
   const requestUrl = String(error?.config?.url || '');
   if (
     requestUrl.includes('/auth/login') ||
-    requestUrl.includes('/auth/refresh') ||
     requestUrl.includes('/auth/csrf-token') ||
     requestUrl.includes('/authentication/login') ||
     requestUrl.includes('/authentication/refresh')
