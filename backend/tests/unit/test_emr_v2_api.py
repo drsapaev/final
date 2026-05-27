@@ -34,9 +34,10 @@ def test_doctor_history_route_is_not_shadowed_by_visit_id(
         "get_history_entries",
         fake_get_history_entries,
     )
+    other_doctor_id = admin_user.id + 1000
 
     response = client.get(
-        f"/api/v1/v2/emr/doctor-history?doctor_id={admin_user.id}&field_name=complaints&specialty=cardiology",
+        f"/api/v1/v2/emr/doctor-history?doctor_id={other_doctor_id}&field_name=complaints&specialty=cardiology",
         headers=auth_headers,
     )
 
