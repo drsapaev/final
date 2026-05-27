@@ -12,10 +12,9 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
-import { getApiBaseUrl } from '../../api/runtime';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-const API_BASE = getApiBaseUrl();
 
 /**
  * Компонент для управления изменениями цен дерматологом
@@ -48,11 +47,10 @@ const PriceOverrideManager = ({
   const loadPriceOverrides = useCallback(async () => {
     setLoadingOverrides(true);
     try {
-      const response = await fetch(`${API_BASE}/derma/price-overrides?visit_id=${visitId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPriceOverrides(data);
-      }
+      const response = await api.get('/derma/price-overrides', {
+        params: { visit_id: visitId }
+      });
+      setPriceOverrides(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
     } finally {
@@ -82,20 +80,16 @@ const PriceOverrideManager = ({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/derma/price-override`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visit_id: visitId,
-          service_id: serviceId,
-          new_price: priceNum,
-          reason: reason,
-          details: details || null
-        })
+      const response = await api.post('/derma/price-override', {
+        visit_id: visitId,
+        service_id: serviceId,
+        new_price: priceNum,
+        reason: reason,
+        details: details || null
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status >= 200 && response.status < 300) {
+        const result = response.data;
         toast.success('Изменение цены отправлено на одобрение');
 
         // Обновляем список изменений
@@ -108,13 +102,10 @@ const PriceOverrideManager = ({
 
         // Уведомляем родительский компонент
         onPriceOverrideCreated?.(result);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка создания изменения цены');
       }
     } catch (error) {
       logger.error('Error creating price override:', error);
-      toast.error('Ошибка создания изменения цены');
+      toast.error(error?.response?.data?.detail || 'Ошибка создания изменения цены');
     } finally {
       setIsLoading(false);
     }
