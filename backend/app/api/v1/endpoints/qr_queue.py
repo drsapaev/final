@@ -1429,22 +1429,39 @@ def full_update_online_entry(
         # ⭐ FIX: Если aggregated_ids не предоставлен или пустой, используем старую логику
         # Но ТОЛЬКО если мы ещё не нашли услуги через aggregated_ids
         if len(existing_service_ids) == 0:
-            if entry.patient_id and queue:
-                # ⭐ Запрашиваем ВСЕ записи этого пациента за этот день
+            if entry.patient_id:
+                # Limit fallback service detection to the same service session.
+                all_patient_entry_filters = [
+                    OnlineQueueEntry.patient_id == entry.patient_id,
+                ]
+                if entry.visit_id:
+                    all_patient_entry_filters.append(
+                        OnlineQueueEntry.visit_id == entry.visit_id
+                    )
+                elif entry.session_id:
+                    all_patient_entry_filters.extend(
+                        [
+                            OnlineQueueEntry.visit_id.is_(None),
+                            OnlineQueueEntry.session_id == entry.session_id,
+                        ]
+                    )
+                else:
+                    all_patient_entry_filters.extend(
+                        [
+                            OnlineQueueEntry.visit_id.is_(None),
+                            OnlineQueueEntry.queue_id == entry.queue_id,
+                        ]
+                    )
+
                 all_patient_entries = (
                     db.query(OnlineQueueEntry)
-                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-                    .filter(
-                        OnlineQueueEntry.patient_id == entry.patient_id,
-                        DailyQueue.day == queue.day
-                    )
+                    .filter(*all_patient_entry_filters)
                     .all()
                 )
-                
+
                 logger.info(
-                    "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента за %s",
+                    "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента в текущей сессии",
                     len(all_patient_entries),
-                    queue.day,
                 )
                 
                 for patient_entry in all_patient_entries:
