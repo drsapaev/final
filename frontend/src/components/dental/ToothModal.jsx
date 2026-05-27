@@ -3,7 +3,7 @@
  * Модальное окно для работы с зубом
  * Согласно MASTER_TODO_LIST строка 285
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -30,6 +30,49 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 
 const iconSize = 15;
+
+function clonePlainObject(value) {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function loadExistingEmrDraft(visitId) {
+  const response = await api.get(`/v2/emr/${visitId}`, {
+    silent: true,
+    validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
+  });
+
+  return response.status === 404 ? null : response.data;
+}
+
+function buildToothEmrPayload(existingEmr, toothNumber, toothData) {
+  const data = clonePlainObject(existingEmr?.data);
+  const specialtyData = clonePlainObject(data.specialty_data);
+  const toothStatus = clonePlainObject(specialtyData.tooth_status);
+
+  toothStatus[toothNumber] = clonePlainObject(toothData);
+
+  return {
+    data: {
+      ...data,
+      specialty: data.specialty || 'dentistry',
+      specialty_data: {
+        ...specialtyData,
+        tooth_status: toothStatus,
+      },
+      tooth_status: toothStatus,
+    },
+    row_version: existingEmr?.row_version ?? 0,
+    is_draft: true,
+  };
+}
 
 const styles = {
   header: {
@@ -199,14 +242,13 @@ const MATERIALS = {
   GOLD: { id: 'gold', name: 'Золото', price: 500000 },
 };
 
-const ToothModal = ({ 
-  open, 
-  onClose, 
-  toothNumber, 
-  toothData = {}, 
+const ToothModal = ({
+  open,
+  onClose,
+  toothNumber,
+  toothData = {},
   onSave,
-  patientId,
-  visitId 
+  visitId
 }) => {
   const [formData, setFormData] = useState({
     status: '',
@@ -221,19 +263,6 @@ const ToothModal = ({
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Загрузка истории процедур
-  const loadToothHistory = useCallback(async () => {
-    if (!toothNumber || !patientId) return;
-    
-    try {
-      const response = await api.get(`/patients/${patientId}/teeth/${toothNumber}/history`);
-      setHistory(response.data || []);
-    } catch (error) {
-      logger.error('Ошибка загрузки истории зуба:', error);
-      setHistory([]);
-    }
-  }, [patientId, toothNumber]);
-
   useEffect(() => {
     if (open && toothData) {
       setFormData({
@@ -246,10 +275,9 @@ const ToothModal = ({
         requiresFollowUp: toothData.requiresFollowUp || false,
       });
 
-      // Загружаем историю зуба
-      loadToothHistory();
+      setHistory([]);
     }
-  }, [loadToothHistory, open, toothData]);
+  }, [open, toothData]);
 
   // Добавление процедуры
   const addProcedure = (procedureId) => {
@@ -307,9 +335,12 @@ const ToothModal = ({
         updatedAt: new Date().toISOString(),
       };
       
-      // Сохраняем на сервере
       if (visitId) {
-        await api.post(`/visits/${visitId}/teeth/${toothNumber}`, dataToSave);
+        const existingEmr = await loadExistingEmrDraft(visitId);
+        await api.post(
+          `/v2/emr/${visitId}`,
+          buildToothEmrPayload(existingEmr, toothNumber, dataToSave)
+        );
       }
       
       onSave && onSave(toothNumber, dataToSave);
