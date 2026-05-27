@@ -18,6 +18,32 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+MAX_MCP_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024
+MCP_IMAGE_READ_CHUNK_BYTES = 1024 * 1024
+
+
+async def _read_mcp_image_bounded(image: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    while True:
+        chunk = await image.read(MCP_IMAGE_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > MAX_MCP_IMAGE_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "Image upload is too large "
+                    f"(maximum {MAX_MCP_IMAGE_UPLOAD_BYTES // 1024 // 1024} MB)"
+                ),
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
 
 def log_mcp_service_unavailable(action: str, exc: Exception) -> None:
     logger.warning(
@@ -518,7 +544,7 @@ async def mcp_analyze_image(
             raise HTTPException(status_code=400, detail="Файл должен быть изображением")
 
         # Читаем и кодируем изображение в base64
-        image_data = await image.read()
+        image_data = await _read_mcp_image_bounded(image)
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
         mcp_manager = await get_mcp_manager()
@@ -558,7 +584,7 @@ async def mcp_analyze_skin_lesion(
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         # Читаем и кодируем изображение
-        image_data = await image.read()
+        image_data = await _read_mcp_image_bounded(image)
         image_base64 = base64.b64encode(image_data).decode('utf-8')
 
         # Парсим JSON данные
