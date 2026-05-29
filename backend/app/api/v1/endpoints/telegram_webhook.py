@@ -56,15 +56,18 @@ from app.models.visit import Visit
 from app.models.webhook import WebhookCall, WebhookCallStatus, WebhookEvent
 from app.schemas import appointment as appointment_schemas
 from app.schemas.patient_onboarding import (
+    OnboardingAnalyticsSummaryResponse,
+    OnboardingPatientSearchRequest,
+    OnboardingSearchResponse,
     PatientOnboardingAuthRequest,
     PatientOnboardingStatusResponse,
     PatientOnboardingSubmitRequest,
     PatientOnboardingSubmitResponse,
-    RegistrarCreatePatientFromOnboardingRequest,
-    RegistrarLinkExistingPatientRequest,
     RegistrarOnboardingActionResponse,
     RegistrarOnboardingListResponse,
-    RegistrarReviewMessageRequest,
+    RegistrarOnboardingReviewDecisionRequest,
+    RegistrarPatientCreateDecisionRequest,
+    RegistrarPatientLinkDecisionRequest,
 )
 from app.services.lab_report_pdf_service import lab_report_pdf_service
 from app.services.lab_reporting_service import LabReportingService
@@ -5224,6 +5227,67 @@ def list_registrar_patient_onboarding_requests(
     )
 
 
+@router.get(
+    "/onboarding/analytics/summary",
+    response_model=OnboardingAnalyticsSummaryResponse,
+    operation_id="telegram_registrar_patient_onboarding_analytics_summary",
+)
+def get_registrar_patient_onboarding_analytics_summary(
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Return safe onboarding funnel metrics for the registrar/admin dashboard."""
+
+    del current_user
+    return PatientOnboardingService(db).analytics_summary()
+
+
+@router.get(
+    "/onboarding/requests/export",
+    operation_id="telegram_registrar_export_patient_onboarding_requests_csv",
+)
+def export_registrar_patient_onboarding_requests_csv(
+    status_filter: str = "",
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Export masked onboarding requests for operational review."""
+
+    del current_user
+    csv_text = PatientOnboardingService(db).export_requests_csv(
+        status_filter=status_filter
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                'attachment; filename="telegram_onboarding_requests.csv"'
+            )
+        },
+    )
+
+
+@router.post(
+    "/onboarding/requests/{request_id}/search-patients",
+    response_model=OnboardingSearchResponse,
+    operation_id="telegram_registrar_search_patient_onboarding_candidates",
+)
+def search_patient_candidates_for_onboarding_request(
+    request_id: int,
+    request_body: OnboardingPatientSearchRequest,
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    db: Session = Depends(get_db),
+):
+    """Search safe duplicate candidates before linking or creating a patient."""
+
+    return PatientOnboardingService(db).search_candidates_for_request(
+        request_id=request_id,
+        actor=current_user,
+        search_payload=request_body,
+    )
+
+
 @router.post(
     "/onboarding/requests/{request_id}/link-existing",
     response_model=RegistrarOnboardingActionResponse,
@@ -5231,7 +5295,7 @@ def list_registrar_patient_onboarding_requests(
 )
 def link_existing_patient_onboarding_request(
     request_id: int,
-    request_body: RegistrarLinkExistingPatientRequest,
+    request_body: RegistrarPatientLinkDecisionRequest,
     current_user: User = Depends(require_roles("Admin", "Registrar")),
     db: Session = Depends(get_db),
 ):
@@ -5239,9 +5303,8 @@ def link_existing_patient_onboarding_request(
 
     return PatientOnboardingService(db).link_existing_patient(
         request_id=request_id,
-        patient_id=request_body.patient_id,
+        payload=request_body,
         actor=current_user,
-        review_message=request_body.review_message,
     )
 
 
@@ -5253,7 +5316,7 @@ def link_existing_patient_onboarding_request(
 def create_patient_from_onboarding_request(
     request: Request,
     request_id: int,
-    request_body: RegistrarCreatePatientFromOnboardingRequest,
+    request_body: RegistrarPatientCreateDecisionRequest,
     current_user: User = Depends(require_roles("Admin", "Registrar")),
     db: Session = Depends(get_db),
 ):
@@ -5274,7 +5337,7 @@ def create_patient_from_onboarding_request(
 )
 def request_more_info_for_onboarding_request(
     request_id: int,
-    request_body: RegistrarReviewMessageRequest,
+    request_body: RegistrarOnboardingReviewDecisionRequest,
     current_user: User = Depends(require_roles("Admin", "Registrar")),
     db: Session = Depends(get_db),
 ):
@@ -5283,7 +5346,8 @@ def request_more_info_for_onboarding_request(
     return PatientOnboardingService(db).request_more_info(
         request_id=request_id,
         actor=current_user,
-        review_message=request_body.review_message,
+        reason_code=request_body.reason_code,
+        safe_note=request_body.safe_note,
     )
 
 
@@ -5294,7 +5358,7 @@ def request_more_info_for_onboarding_request(
 )
 def reject_patient_onboarding_request(
     request_id: int,
-    request_body: RegistrarReviewMessageRequest,
+    request_body: RegistrarOnboardingReviewDecisionRequest,
     current_user: User = Depends(require_roles("Admin", "Registrar")),
     db: Session = Depends(get_db),
 ):
@@ -5303,7 +5367,8 @@ def reject_patient_onboarding_request(
     return PatientOnboardingService(db).reject(
         request_id=request_id,
         actor=current_user,
-        review_message=request_body.review_message,
+        reason_code=request_body.reason_code,
+        safe_note=request_body.safe_note,
     )
 
 

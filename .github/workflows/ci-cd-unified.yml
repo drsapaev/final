@@ -45,6 +45,7 @@ jobs:
       parity_required: ${{ steps.scope.outputs.parity_required }}
       docs_required: ${{ steps.scope.outputs.docs_required }}
       frontend_e2e_required: ${{ steps.scope.outputs.frontend_e2e_required }}
+      telegram_release_gate_required: ${{ steps.scope.outputs.telegram_release_gate_required }}
       workflow_changed: ${{ steps.scope.outputs.workflow_changed }}
       skills_changed: ${{ steps.scope.outputs.skills_changed }}
       deps_changed: ${{ steps.scope.outputs.deps_changed }}
@@ -96,6 +97,23 @@ jobs:
             - 'frontend/src/components/payment/**'
             - 'frontend/src/components/emr/**'
             - 'frontend/src/components/lab/**'
+          telegram_release_gate:
+            - 'backend/app/api/v1/endpoints/telegram_webhook.py'
+            - 'backend/app/api/v1/endpoints/telemetry.py'
+            - 'backend/app/schemas/patient_onboarding.py'
+            - 'backend/app/services/patient_onboarding_service.py'
+            - 'backend/tests/test_openapi_contract.py'
+            - 'backend/tests/unit/test_patient_onboarding_request_policy.py'
+            - 'backend/tests/unit/test_telemetry_onboarding_privacy.py'
+            - 'frontend/src/components/TelegramManager.jsx'
+            - 'frontend/src/pages/TelegramMiniAppPatientShell.jsx'
+            - 'frontend/src/__tests__/telegramManagerOnboardingRequests.test.js'
+            - 'frontend/src/__tests__/telegramMiniAppOnboardingGuardrails.test.js'
+            - 'frontend/e2e/telegram-miniapp-release-gate.spec.js'
+            - 'scripts/telegram_miniapp_release_gate_score.ps1'
+            - 'scripts/run_backend_pytest.ps1'
+            - 'scripts/run_python.ps1'
+            - 'docs/release_gates/**'
           api_docs:
             - 'backend/app/main.py'
             - 'backend/app/api/**'
@@ -151,6 +169,7 @@ jobs:
         PR_FRONTEND: ${{ steps.changes.outputs.frontend }}
         PR_FRONTEND_CONTRACT: ${{ steps.changes.outputs.frontend_contract }}
         PR_FRONTEND_E2E: ${{ steps.changes.outputs.frontend_e2e }}
+        PR_TELEGRAM_RELEASE_GATE: ${{ steps.changes.outputs.telegram_release_gate }}
         PR_API_DOCS: ${{ steps.changes.outputs.api_docs }}
         PR_OPS: ${{ steps.changes.outputs.ops }}
         PR_PARITY_TOOLS: ${{ steps.changes.outputs.parity_tools }}
@@ -172,6 +191,7 @@ jobs:
           DEPS_CHANGED="${PR_DEPS:-false}"
           FRONTEND_CONTRACT="${PR_FRONTEND_CONTRACT:-false}"
           FRONTEND_E2E="${PR_FRONTEND_E2E:-false}"
+          TELEGRAM_RELEASE_GATE_REQUIRED="${PR_TELEGRAM_RELEASE_GATE:-false}"
           API_DOCS_CHANGED="${PR_API_DOCS:-false}"
           OPS_CHANGED="${PR_OPS:-false}"
           PARITY_TOOLS_CHANGED="${PR_PARITY_TOOLS:-false}"
@@ -188,6 +208,7 @@ jobs:
           DEPS_CHANGED="true"
           FRONTEND_CONTRACT="true"
           FRONTEND_E2E="true"
+          TELEGRAM_RELEASE_GATE_REQUIRED="true"
           API_DOCS_CHANGED="true"
           OPS_CHANGED="true"
           PARITY_TOOLS_CHANGED="true"
@@ -241,6 +262,7 @@ jobs:
         echo "parity_required=${PARITY_REQUIRED}" >> "$GITHUB_OUTPUT"
         echo "docs_required=${DOCS_REQUIRED}" >> "$GITHUB_OUTPUT"
         echo "frontend_e2e_required=${FRONTEND_E2E}" >> "$GITHUB_OUTPUT"
+        echo "telegram_release_gate_required=${TELEGRAM_RELEASE_GATE_REQUIRED}" >> "$GITHUB_OUTPUT"
         echo "workflow_changed=${WORKFLOW_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "skills_changed=${SKILLS_CHANGED}" >> "$GITHUB_OUTPUT"
         echo "deps_changed=${DEPS_CHANGED}" >> "$GITHUB_OUTPUT"
@@ -256,6 +278,7 @@ jobs:
         echo "parity_required=${PARITY_REQUIRED}"
         echo "docs_required=${DOCS_REQUIRED}"
         echo "frontend_e2e_required=${FRONTEND_E2E}"
+        echo "telegram_release_gate_required=${TELEGRAM_RELEASE_GATE_REQUIRED}"
         echo "root_deps_changed=${ROOT_DEPS_CHANGED}"
         echo "frontend_deps_changed=${FRONTEND_DEPS_CHANGED}"
         echo "backend_deps_changed=${BACKEND_DEPS_CHANGED}"
@@ -1931,6 +1954,97 @@ jobs:
         path: backend/openapi.json
         retention-days: 14
 
+  telegram-miniapp-release-gate:
+    name: Telegram Mini App Release Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [ci-scope]
+    if: |
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
+        (
+          github.event_name == 'pull_request' &&
+          (
+            needs.ci-scope.outputs.telegram_release_gate_required == 'true' ||
+            needs.ci-scope.outputs.workflow_changed == 'true'
+          )
+        )
+      ) &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic_ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
+      DATABASE_URL_TEST: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
+      CORS_DISABLE: '1'
+      WS_DEV_ALLOW: '1'
+      PYTHONIOENCODING: 'utf-8'
+      PYTHONUTF8: '1'
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: рџђЌ Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: рџ“¦ Install backend dependencies
+      run: |
+        cd backend
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx
+
+    - name: рџ“¦ Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: рџ“¦ Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: рџ§Є Telegram Mini App browser QA artifacts
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+        npx playwright test e2e/telegram-miniapp-release-gate.spec.js --project=chromium --workers=1 --reporter=line
+
+    - name: рџ§® Telegram Mini App release score
+      shell: pwsh
+      run: ./scripts/telegram_miniapp_release_gate_score.ps1
+
+    - name: рџ“¤ Upload Telegram Mini App release-gate artifacts
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: telegram-miniapp-release-gate
+        path: |
+          docs/release_gates/telegram_mini_app_release_gate_score.json
+          output/playwright/telegram-miniapp-release-gate/
+        retention-days: 14
+        if-no-files-found: warn
+
   pr-required-gate:
     name: PR Required Gate
     runs-on: ubuntu-latest
@@ -1946,6 +2060,7 @@ jobs:
       - architecture-boundary
       - frontend-backend-parity
       - docs
+      - telegram-miniapp-release-gate
     if: always() && github.event_name == 'pull_request'
 
     steps:
@@ -1962,6 +2077,7 @@ jobs:
         ARCHITECTURE_RESULT: ${{ needs.architecture-boundary.result }}
         PARITY_RESULT: ${{ needs.frontend-backend-parity.result }}
         DOCS_RESULT: ${{ needs.docs.result }}
+        TELEGRAM_RELEASE_GATE_RESULT: ${{ needs.telegram-miniapp-release-gate.result }}
         BACKEND_REQUIRED: ${{ needs.ci-scope.outputs.backend_required }}
         FRONTEND_REQUIRED: ${{ needs.ci-scope.outputs.frontend_required }}
         FRONTEND_E2E_REQUIRED: ${{ needs.ci-scope.outputs.frontend_e2e_required }}
@@ -1969,6 +2085,7 @@ jobs:
         ARCHITECTURE_REQUIRED: ${{ needs.ci-scope.outputs.architecture_required }}
         PARITY_REQUIRED: ${{ needs.ci-scope.outputs.parity_required }}
         DOCS_REQUIRED: ${{ needs.ci-scope.outputs.docs_required }}
+        TELEGRAM_RELEASE_GATE_REQUIRED: ${{ needs.ci-scope.outputs.telegram_release_gate_required }}
         WORKFLOW_CHANGED: ${{ needs.ci-scope.outputs.workflow_changed }}
       run: |
         set -euo pipefail
@@ -1976,10 +2093,12 @@ jobs:
         CODE_QUALITY_REQUIRED="$BACKEND_REQUIRED"
         BACKEND_TESTS_REQUIRED="$BACKEND_REQUIRED"
         FRONTEND_CHECKS_REQUIRED="$FRONTEND_REQUIRED"
+        TELEGRAM_GATE_REQUIRED="$TELEGRAM_RELEASE_GATE_REQUIRED"
         if [ "$WORKFLOW_CHANGED" = "true" ]; then
           CODE_QUALITY_REQUIRED="true"
           BACKEND_TESTS_REQUIRED="true"
           FRONTEND_CHECKS_REQUIRED="true"
+          TELEGRAM_GATE_REQUIRED="true"
         fi
 
         echo "## PR Required Gate" >> "$GITHUB_STEP_SUMMARY"
@@ -2019,6 +2138,7 @@ jobs:
         check_result "architecture" "$ARCHITECTURE_REQUIRED" "$ARCHITECTURE_RESULT"
         check_result "parity" "$PARITY_REQUIRED" "$PARITY_RESULT"
         check_result "docs" "$DOCS_REQUIRED" "$DOCS_RESULT"
+        check_result "telegram-miniapp-release-gate" "$TELEGRAM_GATE_REQUIRED" "$TELEGRAM_RELEASE_GATE_RESULT"
 
         if [ "$fail" -ne 0 ]; then
           exit 1

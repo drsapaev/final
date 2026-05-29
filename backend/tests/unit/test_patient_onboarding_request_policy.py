@@ -100,6 +100,32 @@ def _create_onboarding_request(
     return request_row
 
 
+def _search_candidate_id(
+    client,
+    *,
+    request_id: int,
+    headers: dict[str, str],
+    phone: str | None = None,
+    name: str | None = None,
+) -> str:
+    payload_body = {
+        **({"phone": phone} if phone else {}),
+        **({"name": name} if name else {}),
+    }
+    for candidate_search_body in (payload_body, {}):
+        response = client.post(
+            f"/api/v1/telegram/onboarding/requests/{request_id}/search-patients",
+            headers=headers,
+            json=candidate_search_body,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert "entryToken" not in str(payload)
+        if payload["candidates"]:
+            return payload["candidates"][0]["candidateId"]
+    raise AssertionError(f"Expected duplicate candidates, got payload={payload!r}")
+
+
 @pytest.mark.unit
 def test_unknown_mini_app_user_gets_onboarding_manifest_and_no_patient_row(
     client,
@@ -220,40 +246,66 @@ def test_registrar_links_existing_patient_and_writes_audit(
     client,
     db_session,
     registrar_auth_headers,
-    test_patient,
     registrar_user,
 ):
+    patient_response = client.post(
+        "/api/v1/patients/",
+        headers=registrar_auth_headers,
+        json={
+            "last_name": "Linked",
+            "first_name": "Patient",
+            "middle_name": "Test",
+            "phone": "+998901234567",
+            "birth_date": "1990-01-01",
+        },
+    )
+    assert patient_response.status_code == 200
+    linked_patient = patient_response.json()
+
     telegram_user = _create_unlinked_telegram_user(db_session, chat_id=9104)
     request_row = PatientOnboardingRequest(
         telegram_user_id=telegram_user.id,
         telegram_chat_id=telegram_user.chat_id,
         status="pending_review",
         language_code="ru",
-        contact_phone="+998901112244",
+        contact_phone=linked_patient["phone"],
+        contact_name=f'{linked_patient["last_name"]} {linked_patient["first_name"]}',
     )
     db_session.add(request_row)
     db_session.commit()
     db_session.refresh(request_row)
+    candidate_id = _search_candidate_id(
+        client,
+        request_id=request_row.id,
+        headers=registrar_auth_headers,
+        phone=linked_patient["phone"],
+        name=f'{linked_patient["last_name"]} {linked_patient["first_name"]}',
+    )
 
     response = client.post(
         f"/api/v1/telegram/onboarding/requests/{request_row.id}/link-existing",
         headers=registrar_auth_headers,
-        json={"patientId": test_patient.id, "reviewMessage": "Linked by registrar"},
+        json={
+            "candidateId": candidate_id,
+            "safeNote": "Linked by registrar",
+            "reasonCode": "duplicate_suspected",
+        },
     )
 
     assert response.status_code == 200
     db_session.refresh(request_row)
     db_session.refresh(telegram_user)
     assert request_row.status == "linked_existing"
-    assert request_row.resolved_patient_id == test_patient.id
-    assert telegram_user.patient_id == test_patient.id
+    assert request_row.resolved_patient_id == linked_patient["id"]
+    assert telegram_user.patient_id == linked_patient["id"]
     audit_log = (
         db_session.query(AuditLog)
         .filter(AuditLog.action == "patient_onboarding_linked_existing")
         .one()
     )
     assert audit_log.actor_user_id == registrar_user.id
-    assert audit_log.payload["resolved_patient_id"] == test_patient.id
+    assert "resolved_patient_ref" in audit_log.payload
+    assert "resolved_patient_id" not in audit_log.payload
     assert "entryToken" not in str(audit_log.payload)
 
 
@@ -296,7 +348,7 @@ def test_registrar_onboarding_actions_require_staff_role(client, db_session):
     list_response = client.get("/api/v1/telegram/onboarding/requests")
     action_response = client.post(
         f"/api/v1/telegram/onboarding/requests/{request_row.id}/request-more-info",
-        json={"reviewMessage": "Please add contact details."},
+        json={"reasonCode": "other", "safeNote": "Please add contact details."},
     )
 
     assert list_response.status_code in {401, 403}
@@ -337,7 +389,7 @@ def test_review_statuses_are_visible_through_own_status_endpoint(
     review_response = client.post(
         f"/api/v1/telegram/onboarding/requests/{request_row.id}/{action}",
         headers=registrar_auth_headers,
-        json={"reviewMessage": review_message},
+        json={"reasonCode": "other", "safeNote": review_message},
     )
 
     assert review_response.status_code == 200
@@ -424,6 +476,15 @@ def test_registrar_creates_patient_only_by_staff_action_and_writes_audit(
     db_session.commit()
     db_session.refresh(request_row)
     initial_patients = db_session.query(Patient).count()
+    duplicate_review_response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/search-patients",
+        headers=registrar_auth_headers,
+        json={
+            "phone": request_row.contact_phone,
+            "name": request_row.contact_name,
+        },
+    )
+    assert duplicate_review_response.status_code == 200
 
     response = client.post(
         f"/api/v1/telegram/onboarding/requests/{request_row.id}/create-patient",
@@ -434,7 +495,8 @@ def test_registrar_creates_patient_only_by_staff_action_and_writes_audit(
                 "first_name": "Patient",
                 "phone": "+998901112255",
             },
-            "reviewMessage": "Created by registrar",
+            "reasonCode": "other",
+            "safeNote": "Created by registrar",
         },
     )
 
@@ -450,5 +512,106 @@ def test_registrar_creates_patient_only_by_staff_action_and_writes_audit(
         .one()
     )
     assert audit_log.actor_user_id == registrar_user.id
-    assert audit_log.payload["resolved_patient_id"] == request_row.resolved_patient_id
+    assert "resolved_patient_ref" in audit_log.payload
+    assert "resolved_patient_id" not in audit_log.payload
     assert "entryToken" not in str(audit_log.payload)
+
+
+@pytest.mark.unit
+def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
+    client,
+    db_session,
+    registrar_auth_headers,
+):
+    now = datetime.now(timezone.utc)
+    pending_request = _create_onboarding_request(db_session, chat_id=9201, status="pending_review")
+    needs_info_request = _create_onboarding_request(
+        db_session,
+        chat_id=9202,
+        status="needs_more_info",
+        review_message="Please confirm contact details.",
+    )
+    linked_request = _create_onboarding_request(db_session, chat_id=9203, status="linked_existing")
+    rejected_request = _create_onboarding_request(
+        db_session,
+        chat_id=9204,
+        status="rejected",
+        review_message="Please contact the clinic.",
+    )
+
+    pending_request.created_at = now - timedelta(hours=5)
+    needs_info_request.created_at = now - timedelta(hours=3)
+    needs_info_request.reviewed_at = now - timedelta(hours=1)
+    linked_request.created_at = now - timedelta(hours=2)
+    linked_request.reviewed_at = now - timedelta(minutes=30)
+    rejected_request.created_at = now - timedelta(hours=1)
+    rejected_request.reviewed_at = now - timedelta(minutes=10)
+    db_session.add_all(
+        [
+            AuditLog(
+                action="patient_onboarding_started",
+                entity_type="telegram_onboarding_telemetry",
+                payload={"role": "patient", "scope": "onboarding", "section": "appointments"},
+            ),
+            AuditLog(
+                action="patient_onboarding_opened",
+                entity_type="telegram_onboarding_telemetry",
+                payload={"role": "patient", "scope": "onboarding", "section": "appointments"},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/telegram/onboarding/analytics/summary",
+        headers=registrar_auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["funnel"]["started"] == 1
+    assert payload["funnel"]["opened"] == 1
+    assert payload["funnel"]["submitted"] >= 4
+    assert payload["dashboard"]["pendingRequests"] >= 1
+    assert payload["dashboard"]["overdueRequests"] >= 1
+    assert payload["dashboard"]["todaySubmitted"] >= 1
+    assert payload["dashboard"]["averageReviewTimeMinutes"] > 0
+    assert payload["dashboard"]["conversionRate"] >= 0
+    payload_text = str(payload)
+    assert "entryToken" not in payload_text
+    assert "pma_" not in payload_text
+    assert pending_request.contact_phone not in payload_text
+    assert "diagnosis" not in payload_text
+
+
+@pytest.mark.unit
+def test_onboarding_csv_export_masks_sensitive_fields(
+    client,
+    db_session,
+    registrar_auth_headers,
+):
+    request_row = _create_onboarding_request(db_session, chat_id=9205, status="needs_more_info")
+    request_row.contact_phone = "+998901234567"
+    request_row.contact_name = "Sensitive Patient"
+    request_row.desired_service = "Cardiology"
+    request_row.desired_branch = "Main"
+    request_row.reviewed_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/telegram/onboarding/requests/export",
+        headers=registrar_auth_headers,
+        params={"status_filter": "needs_more_info"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    body = response.text
+    assert "request_id,status,created_at,reviewed_at" in body
+    assert "Cardiology" in body
+    assert "Main" in body
+    assert "Sensitive Patient" not in body
+    assert "+998901234567" not in body
+    assert "entryToken" not in body
+    assert "payment_id" not in body
+    assert "diagnosis" not in body

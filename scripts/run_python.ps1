@@ -73,33 +73,48 @@ if (-not $PythonArgs -or $PythonArgs.Count -eq 0) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Resolve-Path (Join-Path $scriptDir "..")
+$repoRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
 $candidates = [System.Collections.Generic.List[object]]::new()
+$isWindowsPlatform = $env:OS -eq 'Windows_NT'
 
 Add-FileCandidate $candidates "REPO_PYTHON" $env:REPO_PYTHON
 Add-FileCandidate $candidates "AGENT_GATE_PYTHON" $env:AGENT_GATE_PYTHON
-Add-FileCandidate $candidates "repo .venv" (Join-Path $repoRoot ".venv\Scripts\python.exe")
-Add-FileCandidate $candidates "backend .venv" (Join-Path $repoRoot "backend\.venv\Scripts\python.exe")
-Add-CommandCandidate $candidates "py -3.11 launcher" "py.exe" @("-3.11")
-Add-CommandCandidate $candidates "py -3 launcher" "py.exe" @("-3")
-Add-CommandCandidate $candidates "PATH python.exe" "python.exe"
 
-$programFilesRoots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
-foreach ($root in $programFilesRoots) {
-    $postgresRoot = Join-Path $root "PostgreSQL"
-    if (-not (Test-Path -LiteralPath $postgresRoot)) {
-        continue
-    }
-
-    Get-ChildItem -LiteralPath $postgresRoot -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending |
-        ForEach-Object {
-            Add-FileCandidate $candidates "pgAdmin bundled Python" (Join-Path $_.FullName "pgAdmin 4\python\python.exe")
-        }
+if ($isWindowsPlatform) {
+    Add-FileCandidate $candidates "repo .venv" (Join-Path $repoRoot ".venv\Scripts\python.exe")
+    Add-FileCandidate $candidates "backend .venv" (Join-Path $repoRoot "backend\.venv\Scripts\python.exe")
+    Add-CommandCandidate $candidates "py -3.11 launcher" "py.exe" @("-3.11")
+    Add-CommandCandidate $candidates "py -3 launcher" "py.exe" @("-3")
+    Add-CommandCandidate $candidates "PATH python.exe" "python.exe"
+    Add-CommandCandidate $candidates "PATH python" "python"
+}
+else {
+    Add-FileCandidate $candidates "repo .venv" (Join-Path $repoRoot ".venv/bin/python3")
+    Add-FileCandidate $candidates "repo .venv fallback" (Join-Path $repoRoot ".venv/bin/python")
+    Add-FileCandidate $candidates "backend .venv" (Join-Path $repoRoot "backend/.venv/bin/python3")
+    Add-FileCandidate $candidates "backend .venv fallback" (Join-Path $repoRoot "backend/.venv/bin/python")
+    Add-CommandCandidate $candidates "PATH python3" "python3"
+    Add-CommandCandidate $candidates "PATH python" "python"
 }
 
-foreach ($path in @("C:\Python311\python.exe", "C:\Program Files\Python311\python.exe")) {
-    Add-FileCandidate $candidates "common Python 3.11 path" $path
+if ($isWindowsPlatform) {
+    $programFilesRoots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }
+    foreach ($root in $programFilesRoots) {
+        $postgresRoot = Join-Path $root "PostgreSQL"
+        if (-not (Test-Path -LiteralPath $postgresRoot)) {
+            continue
+        }
+
+        Get-ChildItem -LiteralPath $postgresRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object {
+                Add-FileCandidate $candidates "pgAdmin bundled Python" (Join-Path $_.FullName "pgAdmin 4\python\python.exe")
+            }
+    }
+
+    foreach ($path in @("C:\Python311\python.exe", "C:\Program Files\Python311\python.exe")) {
+        Add-FileCandidate $candidates "common Python 3.11 path" $path
+    }
 }
 
 $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -128,6 +143,6 @@ No working Python 3.11+ interpreter was found$(if ($RequireModule.Count -gt 0) {
 Tried:
 $($attempted -join [Environment]::NewLine)
 
-Set REPO_PYTHON to a valid python.exe, set AGENT_GATE_PYTHON for gate-only runs,
-or recreate .venv/backend\.venv with Python 3.11+ and the required packages.
+Set REPO_PYTHON to a valid Python executable, set AGENT_GATE_PYTHON for gate-only runs,
+or recreate the repo/backend virtual environment with Python 3.11+ and the required packages.
 "@
