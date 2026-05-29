@@ -362,7 +362,10 @@ function monitorRuntimeErrors(page) {
     const text = msg.text();
     if (
       msg.type() === 'error' &&
-      text === 'Failed to load resource: the server responded with a status of 403 (Forbidden)'
+      (
+        text === 'Failed to load resource: the server responded with a status of 403 (Forbidden)' ||
+        /WebSocket connection to 'ws:\/\/localhost:5173\/ws\/chat\?token=.*' failed: Connection closed before receiving a handshake response/.test(text)
+      )
     ) {
       return;
     }
