@@ -103,11 +103,28 @@ C:\final\scripts\telegram_miniapp_release_gate_score.ps1
 
 Result: `100/100`, `Privacy Gate: Pass`, `P0: 0`, `P1: 0`, `P2: 0`
 
+### Remote CI release-gate proof
+
+GitHub Actions workflow:
+
+- Workflow run: [26630843351](https://github.com/drsapaev/final/actions/runs/26630843351)
+- Release-gate job: [78480178828](https://github.com/drsapaev/final/actions/runs/26630843351/job/78480178828)
+- Branch: `codex/telegram-release-gate-ci-proof`
+- Artifact name: `telegram-miniapp-release-gate`
+
+Result:
+
+- `Telegram Mini App Release Gate`: `success`
+- `Disposable DB alembic upgrade head`: `passed`
+- `Privacy Gate`: `Pass`
+- `Final score`: `100/100`
+
 ## Evidence Paths
 
 - Release gate rule: [telegram_mini_app_operational_ux.md](/C:/final/docs/release_gates/telegram_mini_app_operational_ux.md)
 - Release gate JSON report: [telegram_mini_app_release_gate_score.json](/C:/final/docs/release_gates/telegram_mini_app_release_gate_score.json)
 - Browser QA artifact folder: [telegram-miniapp-release-gate](/C:/final/output/playwright/telegram-miniapp-release-gate)
+- Downloaded CI artifact mirror: [telegram-miniapp-release-gate-success](/C:/final/output/ci/telegram-miniapp-release-gate-success)
 - Mini App onboarding 375: [miniapp-onboarding-new-375.png](/C:/final/output/playwright/telegram-miniapp-release-gate/miniapp-onboarding-new-375.png)
 - Mini App linked cabinet 1920: [miniapp-linked-cabinet-1920.png](/C:/final/output/playwright/telegram-miniapp-release-gate/miniapp-linked-cabinet-1920.png)
 - Mini App expired token 768: [miniapp-expired-token-768.png](/C:/final/output/playwright/telegram-miniapp-release-gate/miniapp-expired-token-768.png)
@@ -137,6 +154,7 @@ Validated onboarding and staff-review routes:
 
 - Active onboarding revision: `0029_tg_patient_onboarding`
 - Alembic chain check: `heads` and `history` passed
+- Disposable Postgres upgrade-to-head passed in remote CI via `DATABASE_URL_TEST`
 - Existing migrations were preserved; no historical revision was edited
 
 ## Browser QA Matrix
@@ -191,5 +209,5 @@ Whitelisted onboarding events validated:
 ## Known Limitations
 
 - No release-blocking limitations remain in the certified onboarding scope.
-- Disposable DB upgrade remains conditional on `DATABASE_URL_TEST`; it was not available in this local workspace during this evidence run.
-- CI now wires `DATABASE_URL_TEST` through the `telegram-miniapp-release-gate` job in [ci-cd-unified.yml](/C:/final/.github/workflows/ci-cd-unified.yml), so the disposable Postgres Alembic proof can run remotely even when a local disposable DB is unavailable.
+- Local disposable DB upgrade remains conditional on `DATABASE_URL_TEST`; it was not available in this local workspace during the original local evidence run.
+- CI now wires `DATABASE_URL_TEST` through the `telegram-miniapp-release-gate` job in [ci-cd-unified.yml](/C:/final/.github/workflows/ci-cd-unified.yml), and the remote proof run above completed successfully.
