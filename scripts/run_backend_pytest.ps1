@@ -7,8 +7,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Resolve-Path (Join-Path $scriptDir "..")
-$pythonLauncher = Join-Path $repoRoot "scripts\run_python.ps1"
+$repoRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
+$pythonLauncher = Join-Path (Join-Path $repoRoot "scripts") "run_python.ps1"
 $backendRoot = Join-Path $repoRoot "backend"
 
 if (-not (Test-Path -LiteralPath $pythonLauncher)) {

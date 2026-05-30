@@ -38,6 +38,9 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
         ("/api/v1/telegram/mini-app/onboarding/requests", "post"),
         ("/api/v1/telegram/mini-app/onboarding/status", "post"),
         ("/api/v1/telegram/onboarding/requests", "get"),
+        ("/api/v1/telegram/onboarding/analytics/summary", "get"),
+        ("/api/v1/telegram/onboarding/requests/export", "get"),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/search-patients", "post"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/link-existing", "post"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/create-patient", "post"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/request-more-info", "post"),
@@ -95,6 +98,15 @@ def test_openapi_telegram_onboarding_contract_has_stable_operation_ids(
         ),
         ("/api/v1/telegram/onboarding/requests", "get"): (
             "telegram_registrar_list_patient_onboarding_requests"
+        ),
+        ("/api/v1/telegram/onboarding/analytics/summary", "get"): (
+            "telegram_registrar_patient_onboarding_analytics_summary"
+        ),
+        ("/api/v1/telegram/onboarding/requests/export", "get"): (
+            "telegram_registrar_export_patient_onboarding_requests_csv"
+        ),
+        ("/api/v1/telegram/onboarding/requests/{request_id}/search-patients", "post"): (
+            "telegram_registrar_search_patient_onboarding_candidates"
         ),
         ("/api/v1/telegram/onboarding/requests/{request_id}/link-existing", "post"): (
             "telegram_registrar_link_existing_patient_onboarding_request"

@@ -50,13 +50,45 @@ describe('Telegram Mini App onboarding guardrails', () => {
     const onboardingBlockedPanel = sourceBetween(
       appSource,
       "{isOnboardingScope && selectedSection && selectedSection !== 'appointments' && (",
-      "{canSubmitOnboardingRequest && ("
+      "{isOnboardingScope && (selectedSection === 'appointments' || !selectedSection) && ("
     );
 
     expect(onboardingBlockedPanel).toContain("t('onboardingBlockedText')");
     expect(onboardingBlockedPanel).toContain("handleMiniAppCapabilitySelect('appointments')");
+    expect(onboardingBlockedPanel).toContain("handleMiniAppSupportClick");
     expect(onboardingBlockedPanel).not.toContain('api.post(');
     expect(onboardingBlockedPanel).not.toMatch(/403|Request failed|entryToken|patientId/);
+  });
+
+  it('adds safe retry and support actions for unavailable and token-error states', () => {
+    const statusAlerts = sourceBetween(
+      appSource,
+      "{state.status === 'unavailable' && (",
+      "{state.status === 'ready' && ("
+    );
+
+    expect(statusAlerts).toContain("handleMiniAppRetry");
+    expect(statusAlerts).toContain("handleMiniAppSupportClick");
+    expect(statusAlerts).toContain("t('onboardingRetry')");
+    expect(statusAlerts).not.toMatch(/AxiosError|Traceback|entryToken=pma_|entryToken=pmo_/);
+  });
+
+  it('keeps approved onboarding states out of the editable request form until the patient reopens Telegram', () => {
+    const onboardingGate = sourceBetween(
+      appSource,
+      'const canSubmitOnboardingRequest = Boolean(',
+      'const handleMiniAppCapabilitySelect = (section) => {'
+    );
+    const onboardingSummary = sourceBetween(
+      appSource,
+      '{shouldShowMiniAppOnboardingSummary(onboardingStatus) && (',
+      '{canSubmitOnboardingRequest && ('
+    );
+
+    expect(onboardingGate).toContain('canEditOnboardingRequest');
+    expect(onboardingSummary).toContain("['linked_existing', 'created_patient'].includes(onboardingStatus)");
+    expect(onboardingSummary).toContain('handleMiniAppReturnToTelegram');
+    expect(onboardingSummary).toContain("t('onboardingSupport')");
   });
 
   it('emits onboarding telemetry with a safe minimal payload', () => {

@@ -63,6 +63,59 @@ import {
 'lucide-react';
 import { api } from '../api/client.js';
 
+const ONBOARDING_STATUS_FILTER_OPTIONS = [
+{ value: 'all', label: 'All statuses' },
+{ value: 'pending_review', label: 'Pending review' },
+{ value: 'needs_more_info', label: 'Needs more info' },
+{ value: 'linked_existing', label: 'Linked existing' },
+{ value: 'created_patient', label: 'Created patient' },
+{ value: 'rejected', label: 'Rejected' },
+{ value: 'expired', label: 'Expired' },
+{ value: 'cancelled', label: 'Cancelled' }];
+
+const ONBOARDING_SORT_OPTIONS = [
+{ value: 'newest', label: 'Newest first' },
+{ value: 'oldest', label: 'Oldest first' },
+{ value: 'highest_confidence', label: 'Highest confidence' },
+{ value: 'sla_overdue', label: 'SLA overdue' }];
+
+const ONBOARDING_NEEDS_MORE_INFO_REASONS = [
+{ value: 'wrong_contact', label: 'Wrong contact' },
+{ value: 'patient_unreachable', label: 'Patient unreachable' },
+{ value: 'duplicate_suspected', label: 'Duplicate suspected' },
+{ value: 'other', label: 'Other' }];
+
+const ONBOARDING_REJECT_REASONS = [
+{ value: 'wrong_contact', label: 'Wrong contact' },
+{ value: 'patient_unreachable', label: 'Patient unreachable' },
+{ value: 'duplicate_suspected', label: 'Duplicate suspected' },
+{ value: 'invalid_identity', label: 'Invalid identity' },
+{ value: 'not_clinic_patient', label: 'Not a clinic patient' },
+{ value: 'other', label: 'Other' }];
+
+const ONBOARDING_OVERRIDE_REASONS = [
+{ value: 'duplicate_suspected', label: 'Duplicate reviewed' },
+{ value: 'other', label: 'Other' }];
+
+const ONBOARDING_STATUS_LABELS = {
+  pending_review: 'Pending review',
+  needs_more_info: 'Needs more info',
+  linked_existing: 'Linked existing',
+  created_patient: 'Created patient',
+  rejected: 'Rejected',
+  expired: 'Expired',
+  cancelled: 'Cancelled'
+};
+
+const ONBOARDING_REASON_LABELS = {
+  wrong_contact: 'Wrong contact',
+  patient_unreachable: 'Patient unreachable',
+  duplicate_suspected: 'Duplicate suspected',
+  invalid_identity: 'Invalid identity',
+  not_clinic_patient: 'Not a clinic patient',
+  other: 'Other'
+};
+
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
   const [templates, setTemplates] = useState([]);
@@ -70,6 +123,16 @@ const TelegramManager = () => {
   const [onboardingTotal, setOnboardingTotal] = useState(0);
   const [onboardingReviewForms, setOnboardingReviewForms] = useState({});
   const [onboardingActionId, setOnboardingActionId] = useState('');
+  const [onboardingAnalytics, setOnboardingAnalytics] = useState(null);
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('all');
+  const [onboardingSort, setOnboardingSort] = useState('newest');
+  const [onboardingDialog, setOnboardingDialog] = useState({
+    open: false,
+    action: '',
+    requestId: null,
+    candidateId: ''
+  });
+  const [exportingOnboardingCsv, setExportingOnboardingCsv] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -87,23 +150,75 @@ const TelegramManager = () => {
     loadTelegramData();
   }, []);
 
+  useEffect(() => {
+    loadOnboardingRequests();
+  }, [onboardingStatusFilter, onboardingSort]);
+
+  const getOnboardingSearchPayload = (request, form = {}) => {
+    const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
+    const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
+    const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', '');
+    const desiredDate = getOnboardingValue(request, 'desiredDate', 'desired_date', '');
+    const desiredDoctorId = getOnboardingValue(request, 'desiredDoctorId', 'desired_doctor_id', '');
+    const contactNameParts = splitOnboardingContactName(contactName);
+    const draftName = [
+    form.lastName || contactNameParts.lastName,
+    form.firstName || contactNameParts.firstName].
+    filter(Boolean).join(' ').trim();
+
+    return {
+      ...(form.phone || contactPhone ? { phone: (form.phone || contactPhone).trim() } : {}),
+      ...(draftName ? { name: draftName } : {}),
+      ...(desiredBranch ? { branch: desiredBranch } : {}),
+      ...(desiredDoctorId ? { doctorId: Number(desiredDoctorId) } : {}),
+      ...(desiredDate ? { preferredDateFrom: desiredDate, preferredDateTo: desiredDate } : {})
+    };
+  };
+
+  const hydrateOnboardingRequests = async (items) => {
+    const hydrated = await Promise.all((items || []).map(async (request) => {
+      if (!['pending_review', 'needs_more_info'].includes(request.status)) {
+        return {
+          ...request,
+          duplicateCandidates: request.duplicateCandidates || [],
+          duplicateSearch: request.duplicateSearch || null
+        };
+      }
+
+      try {
+        const response = await api.post(
+          `/telegram/onboarding/requests/${request.id}/search-patients`,
+          getOnboardingSearchPayload(request, onboardingReviewForms[request.id] || {})
+        );
+        return {
+          ...request,
+          duplicateCandidates: Array.isArray(response?.data?.candidates) ? response.data.candidates : [],
+          duplicateSearch: response?.data || null
+        };
+      } catch (_error) {
+        return {
+          ...request,
+          duplicateCandidates: request.duplicateCandidates || [],
+          duplicateSearch: request.duplicateSearch || null
+        };
+      }
+    }));
+
+    return hydrated;
+  };
+
   const loadTelegramData = async () => {
     try {
       setLoading(true);
-      const [statusRes, integrationRes, templatesRes, onboardingRes] = await Promise.all([
+      const [statusRes, integrationRes, templatesRes] = await Promise.all([
         api.get('/telegram/bot-status'),
         api.get('/admin/telegram/integration-status').catch(() => ({ data: null })),
-        api.get('/admin/telegram/templates'),
-        api.get('/telegram/onboarding/requests', {
-          params: { status_filter: 'pending_review', limit: 20 }
-        }).catch(() => ({ data: { items: [], total: 0 } }))
+        api.get('/admin/telegram/templates')
       ]);
 
       const statusData = statusRes?.data || {};
       const integrationData = integrationRes?.data || {};
       const templatesData = templatesRes?.data || {};
-      const onboardingData = onboardingRes?.data || {};
-
       setBotStatus({
         bot_active: Boolean(integrationData.active ?? statusData.active ?? statusData.configured),
         webhook_configured: Boolean(integrationData.webhook_set || statusData.webhook_configured || statusData.webhook_set),
@@ -136,8 +251,8 @@ const TelegramManager = () => {
       }));
 
       setTemplates(normalizedTemplates);
-      setOnboardingRequests(Array.isArray(onboardingData.items) ? onboardingData.items : []);
-      setOnboardingTotal(Number(onboardingData.total ?? 0));
+      await loadOnboardingRequests();
+      await loadOnboardingAnalytics();
     } catch (e) {
       setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных Telegram');
     } finally {
@@ -147,14 +262,51 @@ const TelegramManager = () => {
 
   const loadOnboardingRequests = async () => {
     try {
+      const statusFilterValue = onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter;
       const response = await api.get('/telegram/onboarding/requests', {
-        params: { status_filter: 'pending_review', limit: 20 }
+        params: { status_filter: statusFilterValue, limit: 40 }
       });
       const data = response?.data || {};
-      setOnboardingRequests(Array.isArray(data.items) ? data.items : []);
-      setOnboardingTotal(Number(data.total ?? 0));
+      const items = Array.isArray(data.items) ? data.items : [];
+      const hydratedItems = await hydrateOnboardingRequests(items);
+      setOnboardingRequests(hydratedItems);
+      setOnboardingTotal(Number(data.total ?? hydratedItems.length ?? 0));
     } catch (_err) {
       setError('Could not load REQUEST_REVIEW patient requests.');
+    }
+  };
+
+  const loadOnboardingAnalytics = async () => {
+    try {
+      const response = await api.get('/telegram/onboarding/analytics/summary');
+      setOnboardingAnalytics(response?.data || null);
+    } catch (_err) {
+      setOnboardingAnalytics(null);
+    }
+  };
+
+  const handleExportOnboardingCsv = async () => {
+    try {
+      setExportingOnboardingCsv(true);
+      const statusFilterValue = onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter;
+      const response = await api.get('/telegram/onboarding/requests/export', {
+        params: { status_filter: statusFilterValue },
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'telegram_onboarding_requests.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Masked onboarding CSV exported.');
+    } catch (_err) {
+      setError('Could not export onboarding CSV.');
+    } finally {
+      setExportingOnboardingCsv(false);
     }
   };
 
@@ -168,21 +320,69 @@ const TelegramManager = () => {
     }));
   };
 
-  const handleOnboardingReviewAction = async (requestId, action) => {
+  const closeOnboardingDialog = () => {
+    setOnboardingDialog({
+      open: false,
+      action: '',
+      requestId: null,
+      candidateId: ''
+    });
+  };
+
+  const openOnboardingActionDialog = (requestId, action, candidateId = '') => {
+    setOnboardingDialog({
+      open: true,
+      action,
+      requestId,
+      candidateId
+    });
+  };
+
+  const refreshOnboardingCandidates = async (requestId) => {
+    const request = onboardingRequests.find((item) => item.id === requestId);
+    if (!request) {
+      return;
+    }
+
+    try {
+      setOnboardingActionId(`search:${requestId}`);
+      const response = await api.post(
+        `/telegram/onboarding/requests/${requestId}/search-patients`,
+        getOnboardingSearchPayload(request, onboardingReviewForms[requestId] || {})
+      );
+      setOnboardingRequests((current) => current.map((item) => item.id === requestId ? {
+        ...item,
+        duplicateCandidates: Array.isArray(response?.data?.candidates) ? response.data.candidates : [],
+        duplicateSearch: response?.data || null
+      } : item));
+    } catch (_err) {
+      setError('Could not refresh duplicate candidates.');
+    } finally {
+      setOnboardingActionId('');
+    }
+  };
+
+  const handleOnboardingReviewAction = async (requestId, action, options = {}) => {
     const request = onboardingRequests.find((item) => item.id === requestId) || {};
     const form = onboardingReviewForms[requestId] || {};
-    const reviewMessage = (form.reviewMessage || '').trim();
+    const safeNote = (form.safeNote || '').trim();
+    const reasonCode = form.reasonCode || undefined;
     const actionKey = `${action}:${requestId}`;
     let endpoint = `/telegram/onboarding/requests/${requestId}/${action}`;
-    let payload = { reviewMessage: reviewMessage || undefined };
+    let payload = { reasonCode, safeNote: safeNote || undefined };
 
     if (action === 'link-existing') {
-      const patientId = Number(form.patientId);
-      if (!Number.isInteger(patientId) || patientId <= 0) {
-        setError('Enter an existing patient ID before linking.');
+      const candidateId = options.candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
+      if (!candidateId) {
+        setError('Select a duplicate candidate before linking.');
         return;
       }
-      payload = { patientId, reviewMessage: reviewMessage || undefined };
+      endpoint = `/telegram/onboarding/requests/${requestId}/link-existing`;
+      payload = {
+        candidateId,
+        ...(reasonCode ? { reasonCode } : {}),
+        ...(safeNote ? { safeNote } : {})
+      };
     } else if (action === 'create-patient') {
       const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
       const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
@@ -197,6 +397,15 @@ const TelegramManager = () => {
         return;
       }
 
+      const highConfidenceCandidateExists = Boolean(
+        request?.duplicateSearch?.highConfidenceCandidateExists ||
+        request?.duplicateReviewSnapshot?.highConfidenceCandidateExists
+      );
+      if (highConfidenceCandidateExists && !form.confirmCreateDespiteDuplicates) {
+        setError('High-confidence duplicate found. Confirm create despite duplicates or link the existing patient.');
+        return;
+      }
+
       endpoint = `/telegram/onboarding/requests/${requestId}/create-patient`;
       payload = {
         patient: {
@@ -205,8 +414,16 @@ const TelegramManager = () => {
           ...(middleName ? { middle_name: middleName } : {}),
           ...(phone ? { phone } : {})
         },
-        reviewMessage: reviewMessage || undefined
+        ...(form.selectedCandidateId ? { reviewCandidateId: form.selectedCandidateId } : {}),
+        ...(reasonCode ? { reasonCode } : {}),
+        ...(safeNote ? { safeNote } : {}),
+        confirmCreateDespiteDuplicates: Boolean(form.confirmCreateDespiteDuplicates)
       };
+    } else if (action === 'request-more-info' || action === 'reject') {
+      if (!reasonCode) {
+        setError('Choose a reason code before continuing.');
+        return;
+      }
     }
 
     try {
@@ -220,7 +437,9 @@ const TelegramManager = () => {
         delete next[requestId];
         return next;
       });
+      closeOnboardingDialog();
       await loadOnboardingRequests();
+      await loadOnboardingAnalytics();
     } catch (_err) {
       setError('Could not update REQUEST_REVIEW request. Check staff role and request status.');
     } finally {
@@ -650,11 +869,162 @@ const TelegramManager = () => {
     if (status === 'rejected' || status === 'expired') return 'danger';
     return 'default';
   };
+  const getOnboardingAgeBadge = (value) => {
+    if (!value) return { label: 'New', variant: 'primary' };
+    const ageMs = Date.now() - new Date(value).getTime();
+    if (Number.isNaN(ageMs) || ageMs < 0) return { label: 'New', variant: 'primary' };
+    const ageMinutes = ageMs / (1000 * 60);
+    if (ageMinutes >= 240) return { label: 'Overdue', variant: 'danger' };
+    if (ageMinutes >= 60) return { label: 'Waiting 1h', variant: 'warning' };
+    return { label: 'New', variant: 'primary' };
+  };
+  const getCandidateValue = (candidate, camelKey, snakeKey, fallback = '') =>
+  candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
+  const getCandidateTopScore = (request) => {
+    const duplicateCandidates = Array.isArray(request?.duplicateCandidates) ? request.duplicateCandidates : [];
+    const snapshotCandidates = Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
+    const candidates = duplicateCandidates.length ? duplicateCandidates : snapshotCandidates;
+    if (!candidates.length) return 0;
+    return Number(getCandidateValue(candidates[0], 'matchScore', 'match_score', 0)) || 0;
+  };
+  const getVisibleDuplicateCandidates = (request) => {
+    if (Array.isArray(request?.duplicateCandidates) && request.duplicateCandidates.length) {
+      return request.duplicateCandidates;
+    }
+    return Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
+  };
+  const getReasonOptionsForAction = (action) => {
+    if (action === 'request-more-info') return ONBOARDING_NEEDS_MORE_INFO_REASONS;
+    if (action === 'reject') return ONBOARDING_REJECT_REASONS;
+    if (action === 'create-patient') return ONBOARDING_OVERRIDE_REASONS;
+    return ONBOARDING_NEEDS_MORE_INFO_REASONS;
+  };
+  const getStatusLabel = (status) => ONBOARDING_STATUS_LABELS[status] || status || 'Unknown';
+  const getReasonLabel = (reasonCode) => ONBOARDING_REASON_LABELS[reasonCode] || reasonCode || 'Not specified';
+  const getRiskVariant = (riskLevel) => {
+    if (riskLevel === 'high') return 'danger';
+    if (riskLevel === 'medium') return 'warning';
+    return 'primary';
+  };
+  const getRiskLabel = (riskLevel) => {
+    if (riskLevel === 'high') return 'High risk';
+    if (riskLevel === 'medium') return 'Medium risk';
+    return 'Low risk';
+  };
+  const formatCandidateReasons = (candidate) => {
+    const reasons = [];
+    const matchReasons = getCandidateValue(candidate, 'matchReasons', 'match_reasons', {});
+    if (matchReasons?.phone_match || matchReasons?.phoneMatch) reasons.push('Phone match');
+    const similarity = Number(matchReasons?.name_similarity ?? matchReasons?.nameSimilarity ?? 0);
+    if (similarity > 0) reasons.push(`Name similarity ${Math.round(similarity * 100)}%`);
+    if (matchReasons?.dob_match || matchReasons?.dobMatch) reasons.push('DOB month/year match');
+    if (matchReasons?.recent_visit_match || matchReasons?.recentVisitMatch) reasons.push('Recent visit/contact match');
+    return reasons.length ? reasons.join(' · ') : 'Manual review only';
+  };
+  const getOnboardingActionTitle = (action) => {
+    if (action === 'link-existing') return 'Link existing patient';
+    if (action === 'create-patient') return 'Create new patient';
+    if (action === 'request-more-info') return 'Request more info';
+    if (action === 'reject') return 'Reject request';
+    return 'Review request';
+  };
+  const getOnboardingActionDescription = (action) => {
+    if (action === 'link-existing') {
+      return 'You are linking this Telegram user and onboarding request to an existing patient. This action will be audit logged.';
+    }
+    if (action === 'create-patient') {
+      return 'Use this only after duplicate review. Staff-created patients are linked and audit logged immediately.';
+    }
+    if (action === 'request-more-info') {
+      return 'Ask only for safe identity or contact details. Protected medical data stays blocked.';
+    }
+    if (action === 'reject') {
+      return 'Reject only when clinic staff cannot safely continue from this request.';
+    }
+    return '';
+  };
+  const getOnboardingActionButtonLabel = (action, busy) => {
+    if (busy && action === 'link-existing') return 'Linking...';
+    if (busy && action === 'create-patient') return 'Creating...';
+    if (busy && action === 'request-more-info') return 'Sending...';
+    if (busy && action === 'reject') return 'Rejecting...';
+    return getOnboardingActionTitle(action);
+  };
+  const getDialogCandidateId = (form, dialogState) =>
+  form?.selectedCandidateId ||
+  dialogState?.candidateId ||
+  '';
+  const isReviewableStatus = (status) => ['pending_review', 'needs_more_info'].includes(status);
+  const visibleOnboardingRequests = [...onboardingRequests].
+  filter((request) => onboardingStatusFilter === 'all' ? true : request.status === onboardingStatusFilter).
+  sort((left, right) => {
+    if (onboardingSort === 'oldest') {
+      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime() -
+      new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime();
+    }
+    if (onboardingSort === 'highest_confidence') {
+      return getCandidateTopScore(right) - getCandidateTopScore(left);
+    }
+    if (onboardingSort === 'sla_overdue') {
+      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime() -
+      new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime();
+    }
+    return new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime() -
+    new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime();
+  });
+  const onboardingSummaryCards = [
+  {
+    label: 'Pending requests',
+    value: onboardingAnalytics?.dashboard?.pendingRequests ??
+    onboardingRequests.filter((item) => item.status === 'pending_review').length
+  },
+  {
+    label: 'Overdue requests',
+    value: onboardingAnalytics?.dashboard?.overdueRequests ??
+    onboardingRequests.filter((item) => getOnboardingAgeBadge(getOnboardingValue(item, 'createdAt', 'created_at', '')).label === 'Overdue').length
+  },
+  {
+    label: "Today's submitted",
+    value: onboardingAnalytics?.dashboard?.todaySubmitted ?? 0
+  },
+  {
+    label: 'Linked / created today',
+    value: onboardingAnalytics?.dashboard?.linkedOrCreatedToday ?? 0
+  },
+  {
+    label: 'Avg review time',
+    value: `${onboardingAnalytics?.dashboard?.averageReviewTimeMinutes ?? 0} min`
+  },
+  {
+    label: 'Conversion rate',
+    value: `${onboardingAnalytics?.dashboard?.conversionRate ?? 0}%`
+  }];
   const iconActionStyle = {
     width: 32,
     minHeight: 32,
     padding: 0
   };
+  const dialogRequest = onboardingRequests.find((item) => item.id === onboardingDialog.requestId) || null;
+  const dialogForm = onboardingDialog.requestId ? onboardingReviewForms[onboardingDialog.requestId] || {} : {};
+  const dialogContactName = dialogRequest ?
+  getOnboardingValue(dialogRequest, 'contactName', 'contact_name', '') :
+  '';
+  const dialogContactPhone = dialogRequest ?
+  getOnboardingValue(dialogRequest, 'contactPhone', 'contact_phone', '') :
+  '';
+  const dialogNameParts = splitOnboardingContactName(dialogContactName);
+  const dialogDuplicateCandidates = dialogRequest ? getVisibleDuplicateCandidates(dialogRequest) : [];
+  const dialogSelectedCandidateId = getDialogCandidateId(dialogForm, onboardingDialog);
+  const dialogSelectedCandidate = dialogDuplicateCandidates.find(
+    (candidate) => getCandidateValue(candidate, 'candidateId', 'candidate_id', '') === dialogSelectedCandidateId
+  ) || null;
+  const dialogHighConfidenceDuplicateExists = Boolean(
+    dialogRequest?.duplicateSearch?.highConfidenceCandidateExists ||
+    dialogRequest?.duplicateReviewSnapshot?.highConfidenceCandidateExists
+  );
+  const dialogReasonOptions = getReasonOptionsForAction(onboardingDialog.action);
+  const dialogStatus = dialogRequest?.status || '';
+  const dialogReviewable = isReviewableStatus(dialogStatus);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -1271,186 +1641,411 @@ const TelegramManager = () => {
                 </Box>
                 <Box display="flex" gap={1} alignItems="center">
                   <Badge variant={onboardingTotal > 0 ? 'warning' : 'success'} size="small">
-                    {onboardingTotal} pending
+                    {onboardingTotal} requests
                   </Badge>
                   <Button
                     type="button"
                     variant="outlined"
                     size="small"
-                    onClick={loadOnboardingRequests}
-                    aria-label="Refresh REQUEST_REVIEW requests">
-                    <RefreshCw size={16} />
-                    Refresh
+                    disabled={exportingOnboardingCsv}
+                    onClick={handleExportOnboardingCsv}>
+                    <ReceiptText size={16} />
+                    {exportingOnboardingCsv ? 'Exporting...' : 'Export CSV'}
                   </Button>
                 </Box>
               </Box>
 
-              {!onboardingRequests.length ? (
+              <Box
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: 12,
+                  marginBottom: 16
+                }}>
+                {onboardingSummaryCards.map((card) =>
+                <Box
+                  key={card.label}
+                  style={{
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    padding: 12,
+                    background: 'var(--mac-bg-secondary)'
+                  }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {card.label}
+                    </Typography>
+                    <Typography variant="h6" style={{ marginTop: 6 }}>
+                      {card.value}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Box
+                display="flex"
+                gap={1.5}
+                alignItems="flex-end"
+                sx={{ flexWrap: 'wrap' }}
+                mb={2}>
+                <Select
+                  label="Status filter"
+                  value={onboardingStatusFilter}
+                  options={ONBOARDING_STATUS_FILTER_OPTIONS}
+                  onChange={(value) => setOnboardingStatusFilter(value)}
+                  style={{ minWidth: 220 }} />
+                <Select
+                  label="Sort"
+                  value={onboardingSort}
+                  options={ONBOARDING_SORT_OPTIONS}
+                  onChange={(value) => setOnboardingSort(value)}
+                  style={{ minWidth: 220 }} />
+                <Button
+                  type="button"
+                  variant="outlined"
+                  size="small"
+                  onClick={loadOnboardingRequests}
+                  aria-label="Refresh REQUEST_REVIEW requests"
+                  style={{ minHeight: 32 }}>
+                  <RefreshCw size={16} />
+                  Refresh
+                </Button>
+              </Box>
+
+              {!visibleOnboardingRequests.length ? (
                 <Alert severity="info">
                   No pending REQUEST_REVIEW requests. Unknown patients still get a safe appointment request CTA instead of confirmed booking.
                 </Alert>
               ) : (
-                <div style={{ width: '100%', overflowX: 'auto' }}>
-                  <Table style={{ minWidth: 1080 }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableHeaderCell>Request</TableHeaderCell>
-                        <TableHeaderCell>Contact</TableHeaderCell>
-                        <TableHeaderCell>Desired visit</TableHeaderCell>
-                        <TableHeaderCell>Review</TableHeaderCell>
-                        <TableHeaderCell align="right">Actions</TableHeaderCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {onboardingRequests.map((request) => {
-                        const requestId = request.id;
-                        const form = onboardingReviewForms[requestId] || {};
-                        const contactName = getOnboardingValue(request, 'contactName', 'contact_name', 'No name');
-                        const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', 'No phone');
-                        const contactNameParts = splitOnboardingContactName(contactName);
-                        const createLastName = (form.lastName || contactNameParts.lastName || '').trim();
-                        const createFirstName = (form.firstName || contactNameParts.firstName || '').trim();
-                        const canCreatePatient = Boolean(createLastName && createFirstName);
-                        const desiredService = getOnboardingValue(request, 'desiredService', 'desired_service', 'Service not selected');
-                        const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', 'Branch not selected');
-                        const desiredDate = getOnboardingValue(request, 'desiredDate', 'desired_date', '');
-                        const desiredTime = getOnboardingValue(request, 'desiredTime', 'desired_time', '');
-                        const desiredDoctorId = getOnboardingValue(request, 'desiredDoctorId', 'desired_doctor_id', '');
-                        const note = getOnboardingValue(request, 'note', 'note', '');
-                        const createdAt = getOnboardingValue(request, 'createdAt', 'created_at', '');
-                        const status = request.status || 'pending_review';
-                        const linkActionId = `link-existing:${requestId}`;
-                        const createPatientActionId = `create-patient:${requestId}`;
-                        const moreInfoActionId = `request-more-info:${requestId}`;
-                        const rejectActionId = `reject:${requestId}`;
-                        const actionBusy = onboardingActionId.endsWith(`:${requestId}`);
+                <Box display="flex" sx={{ flexDirection: 'column' }} gap={2}>
+                  {visibleOnboardingRequests.map((request) => {
+                    const requestId = request.id;
+                    const form = onboardingReviewForms[requestId] || {};
+                    const contactName = getOnboardingValue(request, 'contactName', 'contact_name', 'No name');
+                    const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', 'No phone');
+                    const desiredService = getOnboardingValue(request, 'desiredService', 'desired_service', 'Service not selected');
+                    const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', 'Branch not selected');
+                    const desiredDate = getOnboardingValue(request, 'desiredDate', 'desired_date', '');
+                    const desiredTime = getOnboardingValue(request, 'desiredTime', 'desired_time', '');
+                    const note = getOnboardingValue(request, 'note', 'note', '');
+                    const createdAt = getOnboardingValue(request, 'createdAt', 'created_at', '');
+                    const status = request.status || 'pending_review';
+                    const statusLabel = getStatusLabel(status);
+                    const ageBadge = getOnboardingAgeBadge(createdAt);
+                    const reviewable = isReviewableStatus(status);
+                    const duplicateCandidates = getVisibleDuplicateCandidates(request);
+                    const topScore = getCandidateTopScore(request);
+                    const highConfidenceCandidateExists = Boolean(
+                      request?.duplicateSearch?.highConfidenceCandidateExists ||
+                      request?.duplicateReviewSnapshot?.highConfidenceCandidateExists
+                    );
+                    const auditTrail = Array.isArray(request.auditTrail) ? request.auditTrail : [];
+                    const notificationPreview = request.notificationPreview || null;
+                    const actionBusy = onboardingActionId.endsWith(`:${requestId}`) || onboardingActionId === `search:${requestId}`;
 
-                        return (
-                          <TableRow key={requestId} hover>
-                            <TableCell>
-                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
-                                <Typography variant="body2" fontWeight={600}>
-                                  #{requestId}
-                                </Typography>
+                    return (
+                      <Box
+                        key={requestId}
+                        style={{
+                          border: '1px solid var(--mac-border)',
+                          borderRadius: 8,
+                          padding: 16,
+                          background: 'var(--mac-bg-secondary)'
+                        }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} sx={{ flexWrap: 'wrap' }} mb={2}>
+                          <Box>
+                            <Typography variant="body1" style={{ fontWeight: 600 }}>
+                              Request #{requestId}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Received {formatOnboardingCreatedAt(createdAt)}
+                            </Typography>
+                          </Box>
+                          <Box display="flex" gap={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                            <Badge variant={onboardingStatusVariant(status)} size="small">
+                              {statusLabel}
+                            </Badge>
+                            <Badge variant={ageBadge.variant} size="small">
+                              {ageBadge.label}
+                            </Badge>
+                            {topScore > 0 ? (
+                              <Badge variant={topScore >= 0.85 ? 'danger' : topScore >= 0.5 ? 'warning' : 'primary'} size="small">
+                                Match {Math.round(topScore * 100)}%
+                              </Badge>
+                            ) : null}
+                          </Box>
+                        </Box>
+
+                        <Box
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: 16
+                          }}>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">
+                              Onboarding details
+                            </Typography>
+                            <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.75} mt={1}>
+                              <Typography variant="body2">{contactName}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {contactPhone}
+                              </Typography>
+                              <Typography variant="body2">{desiredService}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {desiredBranch}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {formatOnboardingDate(desiredDate)} {desiredTime || 'Time not selected'}
+                              </Typography>
+                              {note ? (
                                 <Typography variant="caption" color="text.secondary">
-                                  {formatOnboardingCreatedAt(createdAt)}
+                                  Note: {note}
                                 </Typography>
-                                <Badge variant={onboardingStatusVariant(status)} size="small">
-                                  {status}
-                                </Badge>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">
+                                  No safe note submitted
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+
+                          <Box>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} sx={{ flexWrap: 'wrap' }} mb={1}>
+                              <Typography variant="caption" color="text.secondary">
+                                Duplicate review
+                              </Typography>
+                              {reviewable ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="small"
+                                  disabled={actionBusy}
+                                  onClick={() => refreshOnboardingCandidates(requestId)}
+                                  aria-label={`Refresh duplicate candidates for request ${requestId}`}>
+                                  <RefreshCw size={14} />
+                                  Refresh candidates
+                                </Button>
+                              ) : null}
+                            </Box>
+                            {highConfidenceCandidateExists ? (
+                              <Alert severity="warning" style={{ marginBottom: 12 }}>
+                                High-confidence duplicate found. Review visible evidence before creating a new patient.
+                              </Alert>
+                            ) : null}
+                            {duplicateCandidates.length ? (
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={1}>
+                                {duplicateCandidates.map((candidate) => {
+                                  const candidateId = getCandidateValue(candidate, 'candidateId', 'candidate_id', '');
+                                  const maskedName = getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient');
+                                  const maskedPhone = getCandidateValue(candidate, 'maskedPhone', 'masked_phone', 'No phone');
+                                  const dobYear = getCandidateValue(candidate, 'dobYear', 'dob_year', '');
+                                  const dobMonth = getCandidateValue(candidate, 'dobMonth', 'dob_month', '');
+                                  const recentVisitSummary = getCandidateValue(candidate, 'recentVisitSummary', 'recent_visit_summary', '');
+                                  const branch = getCandidateValue(candidate, 'branch', 'branch', '');
+                                  const riskLevel = getCandidateValue(candidate, 'riskLevel', 'risk_level', 'low');
+                                  const matchScore = Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0;
+                                  return (
+                                    <Box
+                                      key={candidateId}
+                                      style={{
+                                        border: '1px solid var(--mac-border)',
+                                        borderRadius: 8,
+                                        padding: 12,
+                                        background: 'var(--mac-bg-primary)'
+                                      }}>
+                                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} sx={{ flexWrap: 'wrap' }}>
+                                        <Box>
+                                          <Typography variant="body2" style={{ fontWeight: 600 }}>
+                                            {maskedName}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {maskedPhone}
+                                            {dobMonth && dobYear ? ` - DOB ${String(dobMonth).padStart(2, '0')}/${dobYear}` : ''}
+                                          </Typography>
+                                        </Box>
+                                        <Box display="flex" gap={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                          <Badge variant={getRiskVariant(riskLevel)} size="small">
+                                            {getRiskLabel(riskLevel)}
+                                          </Badge>
+                                          <Badge variant={matchScore >= 0.85 ? 'danger' : matchScore >= 0.5 ? 'warning' : 'primary'} size="small">
+                                            {Math.round(matchScore * 100)}%
+                                          </Badge>
+                                        </Box>
+                                      </Box>
+                                      <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 8 }}>
+                                        {formatCandidateReasons(candidate)}
+                                      </Typography>
+                                      {recentVisitSummary ? (
+                                        <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                                          {recentVisitSummary}
+                                        </Typography>
+                                      ) : null}
+                                      {branch ? (
+                                        <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                                          Branch: {branch}
+                                        </Typography>
+                                      ) : null}
+                                      {reviewable ? (
+                                        <Box mt={1.5}>
+                                          <Button
+                                            type="button"
+                                            variant="contained"
+                                            size="small"
+                                            onClick={() => {
+                                              updateOnboardingReviewForm(requestId, 'selectedCandidateId', candidateId);
+                                              openOnboardingActionDialog(requestId, 'link-existing', candidateId);
+                                            }}>
+                                            <UserCheck size={16} />
+                                            Link this patient
+                                          </Button>
+                                        </Box>
+                                      ) : null}
+                                    </Box>
+                                  );
+                                })}
                               </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
-                                <Typography variant="body2">{contactName}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {contactPhone}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.5}>
-                                <Typography variant="body2">{desiredService}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {desiredBranch}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {formatOnboardingDate(desiredDate)} {desiredTime}
-                                  {desiredDoctorId ? `, doctor #${desiredDoctorId}` : ''}
-                                </Typography>
-                                {note && (
+                            ) : (
+                              <Alert severity="info">
+                                No safe duplicate candidates yet. Staff may still create a patient only after duplicate review is completed.
+                              </Alert>
+                            )}
+                          </Box>
+
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">
+                              Staff action
+                            </Typography>
+                            <Box display="flex" sx={{ flexDirection: 'column' }} gap={1} mt={1}>
+                              {reviewable ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="contained"
+                                    size="small"
+                                    disabled={actionBusy || !duplicateCandidates.length}
+                                    onClick={() => openOnboardingActionDialog(requestId, 'link-existing', form.selectedCandidateId || '')}>
+                                    <UserCheck size={16} />
+                                    Link this patient
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={actionBusy}
+                                    onClick={() => openOnboardingActionDialog(requestId, 'create-patient')}>
+                                    <Plus size={16} />
+                                    Create new patient
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={actionBusy}
+                                    onClick={() => openOnboardingActionDialog(requestId, 'request-more-info')}>
+                                    <MessageSquare size={16} />
+                                    Request more info
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={actionBusy}
+                                    onClick={() => openOnboardingActionDialog(requestId, 'reject')}>
+                                    <Trash2 size={16} />
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : (
+                                <Alert severity="success">
+                                  Review complete. Protected actions stay closed until the linked patient cabinet is ready.
+                                </Alert>
+                              )}
+
+                              {notificationPreview ? (
+                                <Box
+                                  style={{
+                                    border: '1px dashed var(--mac-border)',
+                                    borderRadius: 8,
+                                    padding: 12,
+                                    marginTop: 8
+                                  }}>
                                   <Typography variant="caption" color="text.secondary">
-                                    Note: {note}
+                                    Patient-facing safe message
                                   </Typography>
+                                  <Typography variant="body2" style={{ marginTop: 6, fontWeight: 600 }}>
+                                    {notificationPreview.title}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                                    {notificationPreview.body}
+                                  </Typography>
+                                  <Badge variant="primary" size="small" style={{ marginTop: 8 }}>
+                                    {notificationPreview.ctaLabel}
+                                  </Badge>
+                                </Box>
+                              ) : null}
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        <Box
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                            gap: 12,
+                            marginTop: 16
+                          }}>
+                          <Box
+                            style={{
+                              border: '1px solid var(--mac-border)',
+                              borderRadius: 8,
+                              padding: 12,
+                              background: 'var(--mac-bg-primary)'
+                            }}>
+                            <Typography variant="caption" color="text.secondary">
+                              Audit trail
+                            </Typography>
+                            {auditTrail.length ? (
+                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={0.75} mt={1}>
+                                {auditTrail.map((item, index) =>
+                                <Box key={`${requestId}-${item.action}-${index}`}>
+                                    <Typography variant="body2">
+                                      {item.action}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {(item.reviewer || 'System review')} - {item.timestamp ? formatOnboardingCreatedAt(item.timestamp) : 'No timestamp'}
+                                      {item.reasonCode ? ` - ${getReasonLabel(item.reasonCode)}` : ''}
+                                    </Typography>
+                                  </Box>
                                 )}
                               </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box display="flex" sx={{ flexDirection: 'column' }} gap={1}>
-                                <Input
-                                  label="Existing patient ID"
-                                  value={form.patientId || ''}
-                                  onChange={(event) => updateOnboardingReviewForm(requestId, 'patientId', event.target.value)}
-                                  inputMode="numeric"
-                                  placeholder="12345"
-                                  style={{ width: 180 }} />
-                                <Box display="flex" gap={1} sx={{ flexWrap: 'wrap' }}>
-                                  <Input
-                                    label="Last name"
-                                    value={form.lastName ?? contactNameParts.lastName}
-                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'lastName', event.target.value)}
-                                    placeholder="Last"
-                                    style={{ width: 150 }} />
-                                  <Input
-                                    label="First name"
-                                    value={form.firstName ?? contactNameParts.firstName}
-                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'firstName', event.target.value)}
-                                    placeholder="First"
-                                    style={{ width: 150 }} />
-                                  <Input
-                                    label="Phone"
-                                    value={form.phone ?? contactPhone}
-                                    onChange={(event) => updateOnboardingReviewForm(requestId, 'phone', event.target.value)}
-                                    placeholder="+998..."
-                                    style={{ width: 180 }} />
-                                </Box>
-                                <Textarea
-                                  label="Patient-facing safe message"
-                                  value={form.reviewMessage || ''}
-                                  maxLength={512}
-                                  minRows={2}
-                                  maxRows={4}
-                                  onChange={(event) => updateOnboardingReviewForm(requestId, 'reviewMessage', event.target.value)}
-                                  placeholder="Ask for safe contact details or explain decision"
-                                  style={{ minWidth: 280 }} />
-                              </Box>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Box display="inline-flex" sx={{ flexDirection: 'column' }} gap={1} alignItems="stretch">
-                                <Button
-                                  type="button"
-                                  variant="contained"
-                                  size="small"
-                                  disabled={actionBusy || !form.patientId}
-                                  onClick={() => handleOnboardingReviewAction(requestId, 'link-existing')}>
-                                  <UserCheck size={16} />
-                                  {onboardingActionId === linkActionId ? 'Linking...' : 'Link existing'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outlined"
-                                  size="small"
-                                  disabled={actionBusy || !canCreatePatient}
-                                  onClick={() => handleOnboardingReviewAction(requestId, 'create-patient')}>
-                                  <Plus size={16} />
-                                  {onboardingActionId === createPatientActionId ? 'Creating...' : 'Create patient'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outlined"
-                                  size="small"
-                                  disabled={actionBusy}
-                                  onClick={() => handleOnboardingReviewAction(requestId, 'request-more-info')}>
-                                  <MessageSquare size={16} />
-                                  {onboardingActionId === moreInfoActionId ? 'Sending...' : 'Need info'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outlined"
-                                  size="small"
-                                  disabled={actionBusy}
-                                  onClick={() => handleOnboardingReviewAction(requestId, 'reject')}>
-                                  <Trash2 size={16} />
-                                  {onboardingActionId === rejectActionId ? 'Rejecting...' : 'Reject'}
-                                </Button>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 8 }}>
+                                No audit events yet.
+                              </Typography>
+                            )}
+                          </Box>
+
+                          <Box
+                            style={{
+                              border: '1px solid var(--mac-border)',
+                              borderRadius: 8,
+                              padding: 12,
+                              background: 'var(--mac-bg-primary)'
+                            }}>
+                            <Typography variant="caption" color="text.secondary">
+                              Safe next step
+                            </Typography>
+                            <Typography variant="body2" style={{ marginTop: 8 }}>
+                              {reviewable ?
+                              'Review duplicates, then link the patient or create a staff-approved patient profile.' :
+                              'This request already has a staff outcome. The patient sees only a safe next action in Telegram and Mini App.'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
               )}
             </CardContent>
           </Card>
@@ -1523,6 +2118,188 @@ const TelegramManager = () => {
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog open={onboardingDialog.open} onClose={closeOnboardingDialog} maxWidth="md" fullWidth>
+        <DialogTitle>{getOnboardingActionTitle(onboardingDialog.action)}</DialogTitle>
+        <DialogContent>
+          <Box display="flex" sx={{ flexDirection: 'column' }} gap={2}>
+            <Alert severity={onboardingDialog.action === 'reject' ? 'warning' : 'info'}>
+              {getOnboardingActionDescription(onboardingDialog.action)}
+            </Alert>
+
+            {dialogRequest ? (
+              <Box
+                style={{
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 8,
+                  padding: 12,
+                  background: 'var(--mac-bg-secondary)'
+                }}>
+                <Typography variant="body2" style={{ fontWeight: 600 }}>
+                  Request #{dialogRequest.id}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                  {dialogContactName || 'No name'} - {dialogContactPhone || 'No phone'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                  Status: {getStatusLabel(dialogStatus)}
+                </Typography>
+              </Box>
+            ) : null}
+
+            {onboardingDialog.action === 'link-existing' ? (
+              <>
+                {dialogDuplicateCandidates.length ? (
+                  <Select
+                    label="Duplicate candidate"
+                    value={dialogSelectedCandidateId}
+                    options={dialogDuplicateCandidates.map((candidate) => ({
+                      value: getCandidateValue(candidate, 'candidateId', 'candidate_id', ''),
+                      label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
+                    }))}
+                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
+                    style={{ width: '100%' }} />
+                ) : (
+                  <Alert severity="warning">
+                    No duplicate candidate is selected yet. Refresh candidates from the request card first.
+                  </Alert>
+                )}
+
+                {dialogSelectedCandidate ? (
+                  <Box
+                    style={{
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      padding: 12,
+                      background: 'var(--mac-bg-primary)'
+                    }}>
+                    <Typography variant="body2" style={{ fontWeight: 600 }}>
+                      {getCandidateValue(dialogSelectedCandidate, 'maskedName', 'masked_name', 'Masked patient')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                      {getCandidateValue(dialogSelectedCandidate, 'maskedPhone', 'masked_phone', 'No phone')}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" style={{ display: 'block', marginTop: 4 }}>
+                      {formatCandidateReasons(dialogSelectedCandidate)}
+                    </Typography>
+                  </Box>
+                ) : null}
+              </>
+            ) : null}
+
+            {onboardingDialog.action === 'create-patient' ? (
+              <Box display="flex" sx={{ flexDirection: 'column' }} gap={1.5}>
+                {dialogHighConfidenceDuplicateExists ? (
+                  <Alert severity="warning">
+                    High-confidence duplicate detected. Review duplicates and confirm override before creating a new patient.
+                  </Alert>
+                ) : null}
+                {dialogDuplicateCandidates.length ? (
+                  <Select
+                    label="Reviewed duplicate candidate"
+                    value={dialogSelectedCandidateId}
+                    options={[
+                      { value: '', label: 'No candidate selected' },
+                      ...dialogDuplicateCandidates.map((candidate) => ({
+                        value: getCandidateValue(candidate, 'candidateId', 'candidate_id', ''),
+                        label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
+                      }))
+                    ]}
+                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
+                    style={{ width: '100%' }} />
+                ) : null}
+                <Box
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: 12
+                  }}>
+                  <Input
+                    label="Last name"
+                    value={dialogForm.lastName ?? dialogNameParts.lastName}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'lastName', event.target.value)}
+                    placeholder="Last name"
+                    required />
+                  <Input
+                    label="First name"
+                    value={dialogForm.firstName ?? dialogNameParts.firstName}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'firstName', event.target.value)}
+                    placeholder="First name"
+                    required />
+                  <Input
+                    label="Middle name"
+                    value={dialogForm.middleName ?? dialogNameParts.middleName}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'middleName', event.target.value)}
+                    placeholder="Middle name" />
+                  <Input
+                    label="Phone"
+                    value={dialogForm.phone ?? dialogContactPhone}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'phone', event.target.value)}
+                    placeholder="+998..." />
+                </Box>
+                {dialogHighConfidenceDuplicateExists ? (
+                  <>
+                    <Select
+                      label="Override reason"
+                      value={dialogForm.reasonCode || ''}
+                      options={dialogReasonOptions}
+                      onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
+                      style={{ width: '100%' }} />
+                    <Switch
+                      checked={Boolean(dialogForm.confirmCreateDespiteDuplicates)}
+                      onChange={(checked) => updateOnboardingReviewForm(onboardingDialog.requestId, 'confirmCreateDespiteDuplicates', checked)}
+                      label="I reviewed duplicates and still want to create a new patient" />
+                  </>
+                ) : null}
+              </Box>
+            ) : null}
+
+            {['request-more-info', 'reject'].includes(onboardingDialog.action) ? (
+              <Select
+                label="Reason code"
+                value={dialogForm.reasonCode || ''}
+                options={dialogReasonOptions}
+                onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
+                style={{ width: '100%' }} />
+            ) : null}
+
+            {['create-patient', 'request-more-info', 'reject', 'link-existing'].includes(onboardingDialog.action) ? (
+              <Textarea
+                label="Safe staff note"
+                value={dialogForm.safeNote || ''}
+                maxLength={512}
+                minRows={3}
+                maxRows={5}
+                onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'safeNote', event.target.value)}
+                placeholder="Use safe operational wording only. Do not include diagnosis, lab details, raw IDs, or tokens."
+                style={{ width: '100%' }} />
+            ) : null}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeOnboardingDialog}>Cancel</Button>
+          <Button
+            variant={onboardingDialog.action === 'reject' ? 'outlined' : 'contained'}
+            disabled={
+              !dialogReviewable ||
+              (onboardingDialog.action === 'link-existing' && !dialogSelectedCandidateId) ||
+              (onboardingDialog.action === 'create-patient' &&
+                dialogHighConfidenceDuplicateExists &&
+                (!dialogForm.confirmCreateDespiteDuplicates || !dialogForm.reasonCode)) ||
+              (['request-more-info', 'reject'].includes(onboardingDialog.action) && !dialogForm.reasonCode)
+            }
+            onClick={() => handleOnboardingReviewAction(
+              onboardingDialog.requestId,
+              onboardingDialog.action,
+              { candidateId: dialogSelectedCandidateId }
+            )}>
+            {getOnboardingActionButtonLabel(
+              onboardingDialog.action,
+              onboardingActionId === `${onboardingDialog.action}:${onboardingDialog.requestId}`
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={showTemplateDialog} onClose={() => setShowTemplateDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>Создать шаблон сообщения</DialogTitle>

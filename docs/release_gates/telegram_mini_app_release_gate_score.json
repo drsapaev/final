@@ -1,0 +1,121 @@
+{
+    "generatedAt":  "2026-05-29T14:16:03.8671918+05:00",
+    "scorecard":  {
+                      "Mini App informativity":  "5/5",
+                      "Patient utility":  "5/5",
+                      "Telegram informativity":  "5/5",
+                      "Staff utility":  "5/5",
+                      "Telegram usability":  "5/5",
+                      "Mini App usability":  "5/5",
+                      "Business utility":  "5/5"
+                  },
+    "finalScore":  100,
+    "privacyGate":  "Pass",
+    "p0":  [
+
+           ],
+    "p1":  [
+
+           ],
+    "p2":  [
+
+           ],
+    "checks":  [
+                   {
+                       "name":  "Backend onboarding/privacy tests",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Backend OpenAPI contract test",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Frontend Telegram tests",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Frontend build",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Alembic heads",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Alembic history",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "passed"
+                   },
+                   {
+                       "name":  "Disposable DB alembic upgrade head",
+                       "passed":  true,
+                       "severity":  "P2",
+                       "detail":  "skipped: DATABASE_URL_TEST not set"
+                   },
+                   {
+                       "name":  "Browser QA artifacts 375",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "10 artifact(s)"
+                   },
+                   {
+                       "name":  "Browser QA artifacts 768",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "10 artifact(s)"
+                   },
+                   {
+                       "name":  "Browser QA artifacts 1280",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "12 artifact(s)"
+                   },
+                   {
+                       "name":  "Browser QA artifacts 1920",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "10 artifact(s)"
+                   },
+                   {
+                       "name":  "Telemetry whitelist includes onboarding events",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "all required events present"
+                   },
+                   {
+                       "name":  "Privacy grep",
+                       "passed":  true,
+                       "severity":  "P0",
+                       "detail":  "no raw token or medical leakage patterns found in checked evidence files"
+                   },
+                   {
+                       "name":  "Release gate doc telegram_mini_app_operational_ux.md",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "present"
+                   },
+                   {
+                       "name":  "Release gate doc telegram_mini_app_score_100_evidence.md",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "present"
+                   },
+                   {
+                       "name":  "Canonical unknown-patient statement",
+                       "passed":  true,
+                       "severity":  "P1",
+                       "detail":  "present"
+                   }
+               ]
+}

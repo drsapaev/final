@@ -26,7 +26,9 @@ describe('Telegram manager onboarding request review', () => {
     );
 
     expect(loader).toContain('/telegram/onboarding/requests');
-    expect(loader).toContain("status_filter: 'pending_review'");
+    expect(loader).toContain('/telegram/onboarding/analytics/summary');
+    expect(loader).toContain("onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter");
+    expect(loader).toContain('/search-patients');
     expect(loader).not.toContain('/telegram/mini-app/onboarding');
     expect(loader).not.toContain('/telegram/mini-app/appointments');
     expect(loader).not.toMatch(/entryToken|payment|invoice|diagnosis|lab|emr/i);
@@ -35,19 +37,23 @@ describe('Telegram manager onboarding request review', () => {
   it('limits review actions to staff review endpoints', () => {
     const actionHandler = sourceBetween(
       managerSource,
-      'const handleOnboardingReviewAction = async (requestId, action) => {',
+      'const handleOnboardingReviewAction = async (requestId, action, options = {}) => {',
       'const handleCreateTemplate = async () => {'
     );
 
     expect(actionHandler).toContain('/telegram/onboarding/requests/');
     expect(actionHandler).toContain("action === 'link-existing'");
     expect(actionHandler).toContain("action === 'create-patient'");
+    expect(actionHandler).toContain('candidateId');
     expect(actionHandler).toContain('/create-patient');
+    expect(actionHandler).toContain('confirmCreateDespiteDuplicates');
+    expect(actionHandler).toContain('reviewCandidateId');
     expect(actionHandler).toContain('patient: {');
     expect(managerSource).toContain("'request-more-info'");
     expect(managerSource).toContain("'reject'");
     expect(actionHandler).not.toContain('/telegram/mini-app/appointments');
-    expect(actionHandler).not.toMatch(/entryToken|raw|payment|invoice|diagnosis|lab|emr/i);
+    expect(actionHandler).not.toContain('patientId');
+    expect(actionHandler).not.toMatch(/entryToken|payment|invoice|diagnosis|lab|emr/i);
   });
 
   it('renders a safe staff inbox instead of exposing Telegram token details', () => {
@@ -58,11 +64,16 @@ describe('Telegram manager onboarding request review', () => {
     );
 
     expect(reviewPanel).toContain('Unknown Telegram users can submit only an onboarding request');
-    expect(reviewPanel).toContain('Existing patient ID');
-    expect(reviewPanel).toContain('Last name');
-    expect(reviewPanel).toContain('First name');
-    expect(reviewPanel).toContain('Create patient');
+    expect(reviewPanel).toContain('Status filter');
+    expect(reviewPanel).toContain('Refresh candidates');
+    expect(reviewPanel).toContain('Export CSV');
+    expect(reviewPanel).toContain('Conversion rate');
+    expect(reviewPanel).toContain('Link this patient');
+    expect(reviewPanel).toContain('Create new patient');
+    expect(reviewPanel).toContain('Audit trail');
     expect(reviewPanel).toContain('Patient-facing safe message');
+    expect(reviewPanel).not.toContain('Existing patient ID');
+    expect(reviewPanel).not.toContain('doctor #');
     expect(reviewPanel).not.toMatch(/entryToken|telegramUserId|telegramChatId|raw API|stack trace/i);
   });
 });
