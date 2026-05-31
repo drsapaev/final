@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy.orm import Session
 
-from app.models.online_queue import OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
     PatientDeposit,
@@ -18,12 +20,22 @@ class ForceMajeureApiRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_pending_entries_by_ids(self, entry_ids: list[int]) -> list[OnlineQueueEntry]:
+    def list_pending_entries_by_ids(
+        self,
+        entry_ids: list[int],
+        *,
+        specialist_id: int,
+        target_date: date | None,
+    ) -> list[OnlineQueueEntry]:
+        queue_day = target_date or date.today()
         return (
             self.db.query(OnlineQueueEntry)
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
             .filter(
                 OnlineQueueEntry.id.in_(entry_ids),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
+                DailyQueue.specialist_id == specialist_id,
+                DailyQueue.day == queue_day,
             )
             .all()
         )

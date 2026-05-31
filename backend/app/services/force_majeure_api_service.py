@@ -39,7 +39,11 @@ class ForceMajeureApiService:
     def transfer_queue_to_tomorrow(self, *, request, current_user_id: int) -> dict[str, Any]:
         service = get_force_majeure_service(self.repository.db)
         if request.entry_ids:
-            entries = self.repository.list_pending_entries_by_ids(request.entry_ids)
+            entries = self.repository.list_pending_entries_by_ids(
+                request.entry_ids,
+                specialist_id=request.specialist_id,
+                target_date=request.target_date,
+            )
         else:
             entries = service.get_pending_entries(
                 specialist_id=request.specialist_id,
@@ -68,7 +72,11 @@ class ForceMajeureApiService:
             ) from exc
 
         if request.entry_ids:
-            entries = self.repository.list_pending_entries_by_ids(request.entry_ids)
+            entries = self.repository.list_pending_entries_by_ids(
+                request.entry_ids,
+                specialist_id=request.specialist_id,
+                target_date=request.target_date,
+            )
         else:
             entries = service.get_pending_entries(
                 specialist_id=request.specialist_id,
