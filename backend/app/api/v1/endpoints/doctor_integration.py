@@ -21,6 +21,7 @@ from app.crud import (
     online_queue as crud_queue,
     visit as crud_visit,
 )
+from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
@@ -56,6 +57,14 @@ DOCTOR_QUEUE_ALLOWED_TAGS: dict[str, list[str]] = {
     "lab": ["lab", "laboratory"],
     "laboratory": ["lab", "laboratory"],
     "general": ["general"],
+}
+
+DOCTOR_SCHEDULE_NEXT_ROLES = {
+    "doctor",
+    "cardio",
+    "cardiology",
+    "derma",
+    "dentist",
 }
 
 
@@ -148,6 +157,60 @@ def _visit_filter_doctor_id(db: Session, current_user: User) -> int:
     if current_user.role == "Admin":
         return current_user.id
     return -1
+
+
+def _doctor_schedule_patient_context_exists(
+    db: Session,
+    *,
+    patient_id: int,
+    doctor: Doctor,
+    current_user: User,
+) -> bool:
+    doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Preserve that
+    # compatibility only when current_user.id does not point to another Doctor row.
+    if not assigned_doctor:
+        doctor_ids.add(current_user.id)
+
+    visit_exists = (
+        db.query(Visit.id)
+        .filter(Visit.patient_id == patient_id, Visit.doctor_id.in_(doctor_ids))
+        .first()
+        is not None
+    )
+    if visit_exists:
+        return True
+
+    return (
+        db.query(Appointment.id)
+        .filter(
+            Appointment.patient_id == patient_id,
+            Appointment.doctor_id.in_(doctor_ids),
+        )
+        .first()
+        is not None
+    )
+
+
+def _ensure_schedule_next_patient_access(
+    db: Session,
+    *,
+    patient_id: int,
+    doctor: Doctor | None,
+    current_user: User,
+) -> None:
+    if current_user.role == "Admin":
+        return
+    if (current_user.role or "").strip().lower() not in DOCTOR_SCHEDULE_NEXT_ROLES:
+        return
+    if not doctor or not _doctor_schedule_patient_context_exists(
+        db,
+        patient_id=patient_id,
+        doctor=doctor,
+        current_user=current_user,
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
 class ScheduleNextVisitService(BaseModel):
@@ -1291,6 +1354,13 @@ async def schedule_next_visit(
             )
 
         # Проверяем существование услуг
+        _ensure_schedule_next_patient_access(
+            db,
+            patient_id=request.patient_id,
+            doctor=doctor,
+            current_user=current_user,
+        )
+
         service_ids = [s.service_id for s in request.services]
         services = db.query(Service).filter(Service.id.in_(service_ids)).all()
 
