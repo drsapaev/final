@@ -5,6 +5,25 @@ from fastapi.testclient import TestClient
 from app.api.v1.endpoints import print_templates
 
 
+def test_print_template_types_route_dispatches_before_template_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get(
+        "/api/v1/print/templates/templates/types",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["template_types"][0]["code"] == "ticket"
+    assert {template_type["code"] for template_type in payload["template_types"]} >= {
+        "ticket",
+        "prescription",
+        "payment_receipt",
+    }
+
+
 def test_print_template_upload_rejects_oversized_payload_before_write(
     client: TestClient,
     auth_headers: dict[str, str],
