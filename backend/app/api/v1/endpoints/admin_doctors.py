@@ -173,6 +173,14 @@ def get_available_doctor_users(
     ]
 
 
+@router.get("/doctors/stats")
+def get_doctors_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    return _get_doctors_stats_payload(db)
+
+
 @router.get("/doctors/{doctor_id}", response_model=DoctorOut)
 def get_doctor(
     doctor_id: int,
@@ -348,11 +356,7 @@ def get_specialties(
         raise _admin_doctors_http_error(exc, "get_specialties") from exc
 
 
-@router.get("/doctors/stats")
-def get_doctors_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
-):
+def _get_doctors_stats_payload(db: Session):
     """Получить статистику по врачам."""
     try:
         return AdminDoctorsStatsService(db).get_doctors_stats()
