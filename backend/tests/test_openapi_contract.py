@@ -1,11 +1,16 @@
 """OpenAPI contract checks for critical clinic API flows."""
 
+import ast
 import warnings
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+HTTP_ROUTE_METHODS = {"get", "post", "put", "patch", "delete"}
+ENDPOINTS_DIR = Path(__file__).resolve().parents[1] / "app" / "api" / "v1" / "endpoints"
 
 
 def _get_openapi_schema(client: TestClient) -> dict:
@@ -143,4 +148,91 @@ def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
     ]
     assert not duplicate_messages, "Duplicate OpenAPI operation IDs found:\n" + "\n".join(
         duplicate_messages
+    )
+
+
+def _decorator_route(decorator: ast.expr) -> tuple[str, str] | None:
+    if not isinstance(decorator, ast.Call):
+        return None
+    if not isinstance(decorator.func, ast.Attribute):
+        return None
+    if decorator.func.attr not in HTTP_ROUTE_METHODS:
+        return None
+
+    if decorator.args:
+        first_arg = decorator.args[0]
+        if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+            return decorator.func.attr.upper(), first_arg.value
+
+    for keyword in decorator.keywords:
+        if keyword.arg != "path":
+            continue
+        if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+            return decorator.func.attr.upper(), keyword.value.value
+
+    return None
+
+
+def _route_parts(route: str) -> list[str]:
+    stripped = route.strip("/")
+    return stripped.split("/") if stripped else []
+
+
+def _is_shadowed_static_route(previous_route: str, current_route: str) -> bool:
+    previous_parts = _route_parts(previous_route)
+    current_parts = _route_parts(current_route)
+    if len(previous_parts) != len(current_parts):
+        return False
+
+    saw_previous_param = False
+    for previous_part, current_part in zip(previous_parts, current_parts):
+        if previous_part == current_part:
+            continue
+        if (
+            previous_part.startswith("{")
+            and previous_part.endswith("}")
+            and not current_part.startswith("{")
+        ):
+            saw_previous_param = True
+            continue
+        return False
+
+    return saw_previous_param
+
+
+def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes() -> None:
+    """A later static route can be swallowed by an earlier same-shape path parameter."""
+
+    shadow_messages: list[str] = []
+
+    for endpoint_file in sorted(ENDPOINTS_DIR.glob("*.py")):
+        tree = ast.parse(
+            endpoint_file.read_text(encoding="utf-8"),
+            filename=str(endpoint_file),
+        )
+        routes: list[tuple[int, str, str]] = []
+
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                route = _decorator_route(decorator)
+                if route is not None:
+                    method, route_path = route
+                    routes.append((decorator.lineno, method, route_path))
+
+        routes.sort()
+        for index, (line_number, method, route_path) in enumerate(routes):
+            for previous_line, previous_method, previous_route_path in routes[:index]:
+                if method != previous_method:
+                    continue
+                if not _is_shadowed_static_route(previous_route_path, route_path):
+                    continue
+                shadow_messages.append(
+                    f"{endpoint_file}:{line_number}: {method} {route_path} "
+                    f"is shadowed by {previous_route_path} at {previous_line}"
+                )
+
+    assert not shadow_messages, "Static routes declared after parameter routes:\n" + "\n".join(
+        shadow_messages
     )
