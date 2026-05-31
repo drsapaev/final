@@ -443,30 +443,28 @@ async def mark_notification_read(
 ):
     """Отметить уведомление как прочитанное"""
     try:
-        notification = crud_notification.get(db, id=notification_id)
+        notification = crud_notification.get_notification(
+            db, notification_id=notification_id
+        )
         if not notification:
-             raise HTTPException(status_code=404, detail="Уведомление не найдено")
-        
-        # Check ownership logic if needed, usually notification has user_id or recipient_id
-        # Assuming CRUD handles update safely or we check here
-        # crud_notification.update(db, db_obj=notification, obj_in={"is_read": True}) 
-        # But we need to know the field name, usually 'is_read' or 'read'
-        
-        # In MobileNotificationService it was: notification.read = True
-        # Let's assume 'read' or 'is_read'. Checking NotificationHistory model logic previously...
-        # NotificationHistory usually has 'status', but for 'read/unread' it might need a field.
-        # If NotificationHistory doesn't have read status, maybe we need to add it or it uses 'status'.
-        # MobileNotificationService used 'read' field.
-        
-        if hasattr(notification, 'read'):
-             success = MobileApiService(db).mark_notification_as_read(
-                 notification=notification
-             )
-        else:
-             # If no read field, maybe status='read'?
-             # crud_notification.update_status(db, notification_id, status='read')
-             success = True # Mocking success if field missing to avoid 500
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
 
+        recipient_type = (notification.recipient_type or "").lower()
+        recipient_id = notification.recipient_id
+        owns_notification = recipient_type == "user" and recipient_id == current_user.id
+        if not owns_notification and recipient_type == "patient":
+            patient = get_patient_by_user_id(db, user_id=current_user.id)
+            owns_notification = bool(patient and recipient_id == patient.id)
+
+        if not owns_notification:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+
+        if hasattr(notification, 'read'):
+            success = MobileApiService(db).mark_notification_as_read(
+                notification=notification
+            )
+        else:
+            success = True
 
         if not success:
             raise HTTPException(status_code=404, detail="Уведомление не найдено")
