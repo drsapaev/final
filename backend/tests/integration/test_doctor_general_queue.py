@@ -220,6 +220,96 @@ class TestDoctorGeneralQueue:
         assert waiting_entry.status == "waiting"
         assert called_entry.status == "called"
 
+    def test_start_visit_does_not_reuse_another_doctors_open_visit(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        other_doctor = Doctor(
+            user_id=None,
+            specialty="dermatology",
+            active=True,
+            cabinet="202",
+        )
+        db_session.add_all([doctor, other_doctor])
+        db_session.commit()
+        db_session.refresh(doctor)
+        db_session.refresh(other_doctor)
+
+        unrelated_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=other_doctor.id,
+            visit_date=date.today(),
+            visit_time="08:00",
+            status="open",
+            notes="do not touch",
+            discount_mode="none",
+            source="desk",
+        )
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add_all([unrelated_visit, queue])
+        db_session.commit()
+        db_session.refresh(unrelated_visit)
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="called",
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/start-visit",
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        db_session.refresh(entry)
+        db_session.refresh(unrelated_visit)
+        created_visit = (
+            db_session.query(Visit)
+            .filter(
+                Visit.patient_id == test_patient.id,
+                Visit.visit_date == date.today(),
+                Visit.doctor_id == doctor.id,
+            )
+            .one()
+        )
+
+        assert entry.status == "in_progress"
+        assert created_visit.id != unrelated_visit.id
+        assert created_visit.notes is not None
+        assert unrelated_visit.status == "open"
+        assert unrelated_visit.visit_time == "08:00"
+        assert unrelated_visit.notes == "do not touch"
+
     def test_general_queue_returns_empty_payload_without_configuration(
         self,
         client,
