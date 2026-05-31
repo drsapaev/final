@@ -2623,6 +2623,7 @@ REGISTRAR_COMMAND_ROLE_BY_ACTION = {
 }
 
 REGISTRAR_SUPPORTED_RECORD_KINDS = {"visit", "online_queue", "appointment"}
+REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar", "receptionist"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -2647,8 +2648,24 @@ def _normalize_registrar_record_kind(record_kind: str | None) -> str:
     return str(record_kind or "").strip().lower()
 
 
-def _ensure_registrar_command_role(user: User | None, action: str) -> None:
-    allowed_roles = REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
+def _registrar_command_allowed_roles(
+    action: str,
+    record_kind: str | None = None,
+) -> set[str] | None:
+    if (
+        record_kind == "appointment"
+        and action in {"start_visit", "complete"}
+    ):
+        return REGISTRAR_APPOINTMENT_WORKFLOW_ROLES
+    return REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
+
+
+def _ensure_registrar_command_role(
+    user: User | None,
+    action: str,
+    record_kind: str | None = None,
+) -> None:
+    allowed_roles = _registrar_command_allowed_roles(action, record_kind)
     if not allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -3326,7 +3343,6 @@ def run_registrar_record_action(
     """Run registrar-owned record commands through a single backend contract."""
 
     action = _normalize_registrar_action(request.action)
-    _ensure_registrar_command_role(current_user, action)
 
     records: list[RegistrarRecordRef] = []
     if request.records:
@@ -3355,6 +3371,13 @@ def run_registrar_record_action(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No registrar records provided",
+        )
+
+    for record in unique_records:
+        _ensure_registrar_command_role(
+            current_user,
+            action,
+            record.record_kind,
         )
 
     results = [
