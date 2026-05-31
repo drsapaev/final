@@ -984,6 +984,7 @@ class QueueBusinessService:
             source=source,
             status=status,
             queue_time=queue_dt,
+            updated_at=queue_dt,
             total_amount=total_amount or 0,
             session_id=session_id,  # ⭐ NEW: Session grouping
         )
@@ -1074,8 +1075,10 @@ class QueueBusinessService:
 
         original_queue_time = entry.queue_time
         previous_status = entry.status
+        changed_at = self.get_local_timestamp(db)
         entry.status = "called"
-        entry.called_at = self.get_local_timestamp(db)
+        entry.called_at = changed_at
+        entry.updated_at = changed_at
         if commit:
             db.commit()
             db.refresh(entry)
@@ -1112,6 +1115,7 @@ class QueueBusinessService:
         original_queue_time = entry.queue_time
         previous_status = entry.status
         entry.status = "no_show"
+        entry.updated_at = self.get_local_timestamp(db)
         if commit:
             db.commit()
             db.refresh(entry)
@@ -1167,6 +1171,7 @@ class QueueBusinessService:
         original_queue_time = entry.queue_time
         previous_status = entry.status
         entry.status = "cancelled"
+        entry.updated_at = self.get_local_timestamp(db)
         if commit:
             db.commit()
             db.refresh(entry)
@@ -1192,6 +1197,7 @@ class QueueBusinessService:
         original_queue_time = entry.queue_time
         previous_status = entry.status
         entry.status = "rescheduled"
+        entry.updated_at = self.get_local_timestamp(db)
         if commit:
             db.commit()
             db.refresh(entry)

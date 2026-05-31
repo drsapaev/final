@@ -35,6 +35,62 @@ export const parseRegistrarTimestamp = (value) => {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+export const formatRegistrarDate = (value, locale = 'ru-RU') => {
+    const parsed = parseRegistrarTimestamp(value);
+    if (!parsed) return '';
+    return parsed.toLocaleDateString(locale, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: REGISTRAR_TIME_ZONE
+    });
+};
+
+export const formatRegistrarTime = (value, locale = 'ru-RU', options = {}) => {
+    const parsed = parseRegistrarTimestamp(value);
+    if (!parsed) return '';
+    return parsed.toLocaleTimeString(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(options.includeSeconds ? { second: '2-digit' } : {}),
+        timeZone: REGISTRAR_TIME_ZONE
+    });
+};
+
+export const formatRegistrarDateTime = (value, locale = 'ru-RU', options = {}) => {
+    const date = formatRegistrarDate(value, locale);
+    const time = formatRegistrarTime(value, locale, options);
+    return [date, time].filter(Boolean).join(' ');
+};
+
+const timestampsDiffer = (a, b) => {
+    const first = parseRegistrarTimestamp(a);
+    const second = parseRegistrarTimestamp(b);
+    if (!first || !second) return false;
+    return Math.abs(first.getTime() - second.getTime()) > 1000;
+};
+
+export const getRegistrarTimestampDisplay = (record = {}, locale = 'ru-RU') => {
+    const primaryValue = record.queue_time || record.created_at || null;
+    const changedValue = record.last_changed_at || record.updated_at || null;
+    const primaryKind = record.queue_time ? 'queue_time' : 'created_at';
+    const showChanged = Boolean(changedValue && primaryValue && timestampsDiffer(primaryValue, changedValue));
+
+    return {
+        timeZone: record.timezone || REGISTRAR_TIME_ZONE,
+        primaryKind,
+        primaryLabel: primaryKind === 'queue_time' ? 'Очередь' : 'Создано',
+        primaryValue,
+        primaryDate: formatRegistrarDate(primaryValue, locale),
+        primaryTime: formatRegistrarTime(primaryValue, locale, { includeSeconds: true }),
+        changedValue,
+        showChanged,
+        changedLabel: 'Изменено',
+        changedDate: showChanged ? formatRegistrarDate(changedValue, locale) : '',
+        changedTime: showChanged ? formatRegistrarTime(changedValue, locale, { includeSeconds: true }) : ''
+    };
+};
+
 /**
  * Converts a Date object to YYYY-MM-DD format string
  * @param {Date} date - The date to format (defaults to current date)
@@ -42,10 +98,14 @@ export const parseRegistrarTimestamp = (value) => {
  */
 export const getLocalDateString = (date = new Date()) => {
     const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: REGISTRAR_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(d);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
 };
 
 /**

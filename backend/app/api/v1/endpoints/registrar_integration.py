@@ -43,26 +43,21 @@ def _normalize_queue_status_for_registrar(raw_status: str | None) -> str:
 
 
 REGISTRAR_PAYMENT_ROLES = {"admin", "registrar", "cashier"}
-REGISTRAR_START_VISIT_ROLES = {
-    "admin",
-    "registrar",
+REGISTRAR_DOCTOR_ACTION_ROLES = {
     "doctor",
     "cardio",
     "cardiology",
+    "cardiologist",
     "derma",
+    "dermatologist",
     "dentist",
     "lab",
 }
+REGISTRAR_START_VISIT_ROLES = REGISTRAR_DOCTOR_ACTION_ROLES
 REGISTRAR_PRINT_TICKET_ROLES = {"admin", "registrar", "cashier", "doctor"}
-REGISTRAR_COMPLETE_ROLES = {"admin", "registrar", "doctor", "cashier", "receptionist"}
+REGISTRAR_COMPLETE_ROLES = REGISTRAR_DOCTOR_ACTION_ROLES
 REGISTRAR_CANCEL_ROLES = {"admin", "registrar", "cashier", "receptionist", "doctor"}
-REGISTRAR_DOCTOR_SECONDARY_ACTION_ROLES = {
-    "doctor",
-    "cardio",
-    "cardiology",
-    "derma",
-    "dentist",
-}
+REGISTRAR_DOCTOR_SECONDARY_ACTION_ROLES = REGISTRAR_DOCTOR_ACTION_ROLES
 REGISTRAR_START_STATUSES = {"waiting", "queued"}
 REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
 REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
@@ -1437,9 +1432,12 @@ def start_queue_visit(
                     db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
                 )
 
+            changed_at = datetime.now(timezone.utc)
             queue_entry.status = "in_progress"
+            queue_entry.updated_at = changed_at
             if linked_visit:
                 linked_visit.status = "in_progress"
+                linked_visit.updated_at = changed_at
 
             logger.info(
                 "start_queue_visit: started queue entry %d; linked_visit_id=%s; status=%s",
@@ -2695,7 +2693,7 @@ def get_today_queues(
                         # ✅ SSOT FIX: Для QR-визитов нужно получить данные из OnlineQueueEntry
                         # Frontend использует этот ID для вызова full-update endpoint
                         queue_entry_for_visit = db.execute(
-                            text("SELECT id, number, queue_time, total_amount FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                            text("SELECT id, number, queue_time, updated_at, total_amount FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
                             {"visit_id": visit.id}
                         ).first()
                         if queue_entry_for_visit:
@@ -2704,6 +2702,7 @@ def get_today_queues(
                             entry_wrapper["oqe_number"] = queue_entry_for_visit.number
                             entry_wrapper["oqe_total_amount"] = queue_entry_for_visit.total_amount or 0
                             entry_wrapper["oqe_queue_time"] = queue_entry_for_visit.queue_time
+                            entry_wrapper["oqe_updated_at"] = queue_entry_for_visit.updated_at
                         else:
                             record_id = visit.id
                         # Также сохраняем visit_id для обратной совместимости
@@ -2893,6 +2892,8 @@ def get_today_queues(
                 queue_entry_time = None  # По умолчанию нет queue_time
 
                 # Пробуем получить номер и queue_time из таблицы queue_entries через Table reflection
+                queue_entry_updated_at = None
+
                 if record_id:
                     try:
                         # Используем прямой SQL запрос через Table reflection (без импорта модели)
@@ -2908,6 +2909,7 @@ def get_today_queues(
                                 # ⭐ PHASE 1 FIX: Используем уже полученные данные из entry_wrapper
                                 queue_entry_number = entry_wrapper.get("oqe_number") or idx
                                 queue_entry_time = entry_wrapper.get("oqe_queue_time")
+                                queue_entry_updated_at = entry_wrapper.get("oqe_updated_at")
                             else:
                                 # ⭐ PHASE 1 FIX: Для OnlineQueueEntry номер и queue_time из entry_data
                                 queue_entry_number = (
@@ -2928,6 +2930,7 @@ def get_today_queues(
                                     and entry_data.queue_time
                                     else None
                                 )
+                                queue_entry_updated_at = getattr(entry_data, 'updated_at', None)
                             logger.debug(
                                 "get_today_queues: OnlineQueue номер: ID=%d, number=%d, queue_time=%s, patient=%s",
                                 record_id,
@@ -2939,13 +2942,14 @@ def get_today_queues(
                             # Ищем запись по visit_id
                             queue_entry_row = db.execute(
                                 text(
-                                    "SELECT number, queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
+                                    "SELECT number, queue_time, updated_at FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
                                 ),
                                 {"visit_id": record_id},
                             ).first()
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
                                 queue_entry_time = queue_entry_row.queue_time
+                                queue_entry_updated_at = queue_entry_row.updated_at
                         elif (
                             entry_type == "appointment"
                             and patient_id
@@ -2956,7 +2960,7 @@ def get_today_queues(
                             queue_entry_row = db.execute(
                                 text(
                                     """
-                                    SELECT qe.number, qe.queue_time
+                                    SELECT qe.number, qe.queue_time, qe.updated_at
                                     FROM queue_entries qe
                                     JOIN daily_queues dq ON qe.queue_id = dq.id
                                     WHERE qe.patient_id = :patient_id
@@ -2976,6 +2980,7 @@ def get_today_queues(
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
                                 queue_entry_time = queue_entry_row.queue_time
+                                queue_entry_updated_at = queue_entry_row.updated_at
                     except Exception as e:
                         # Логируем ошибку, но продолжаем работу с дефолтным номером
                         # Это не критично - порядковые номера работают как fallback
@@ -3050,6 +3055,15 @@ def get_today_queues(
                     entry_queue_time = entry_wrapper["queue_time"]
                 if not entry_queue_time:
                     entry_queue_time = entry_wrapper.get("created_at")
+                entry_updated_at = (
+                    queue_entry_updated_at
+                    or entry_wrapper.get("oqe_updated_at")
+                    or getattr(entry_data, "updated_at", None)
+                    or entry_wrapper.get("created_at")
+                )
+                entry_display_time_kind = (
+                    "queue_time" if queue_entry_time or entry_wrapper.get("queue_time") else "created_at"
+                )
 
                 entry_visit_id = (
                     entry_wrapper.get("visit_id")
@@ -3121,6 +3135,10 @@ def get_today_queues(
                             entry_wrapper.get("created_at")
                         ),
                         "queue_time": _serialize_registrar_datetime(entry_queue_time),
+                        "updated_at": _serialize_registrar_datetime(entry_updated_at),
+                        "last_changed_at": _serialize_registrar_datetime(entry_updated_at),
+                        "display_time_kind": entry_display_time_kind,
+                        "timezone": "Asia/Tashkent",
                         "called_at": None,
                         "visit_time": visit_time,
                         "discount_mode": discount_mode,
@@ -3149,6 +3167,7 @@ def get_today_queues(
                     else f"Специалист #{data['doctor_id']}"
                 ),
                 "specialty": specialty,
+                "timezone": "Asia/Tashkent",
                 "cabinet": doctor.cabinet if doctor else "N/A",
                 "integrity_warnings": list(dict.fromkeys(data.get("integrity_warnings", []))),
                 "has_integrity_warnings": bool(data.get("integrity_warnings")),
@@ -3172,6 +3191,7 @@ def get_today_queues(
             "queues": result,
             "total_queues": len(result),
             "date": today.isoformat(),
+            "timezone": "Asia/Tashkent",
         }
 
     except Exception as e:

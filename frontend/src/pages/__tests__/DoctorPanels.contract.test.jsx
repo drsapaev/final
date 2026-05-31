@@ -67,10 +67,10 @@ describe('Doctor panels SSOT contract', () => {
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'view_emr', 'can_view_emr')");
     expect(actionBlock).toContain("getBackendActionAvailability(row, 'schedule_next', 'can_schedule_next')");
     expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
-    expect(actionBlock).toContain('const canCall = backendCanCall === true');
+    expect(actionBlock).toContain('const canCall = isDoctorView && backendCanCall === true');
     expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
-    expect(actionBlock).toContain('const canComplete = backendCanComplete === true');
-    expect(actionBlock).toContain('const canViewEmr = backendCanViewEmr === true');
+    expect(actionBlock).toContain('const canComplete = isDoctorView && backendCanComplete === true');
+    expect(actionBlock).toContain('const canViewEmr = isDoctorView && backendCanViewEmr === true');
     expect(actionBlock).toContain('const canScheduleNext = isDoctorView && backendCanScheduleNext === true');
     expect(actionBlock).not.toContain('rowStatus');
     expect(actionBlock).not.toContain('rowPaymentStatus');

@@ -5,7 +5,7 @@ API endpoints для мастера регистрации с поддержко
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -2600,8 +2600,6 @@ def _sync_payment_invoices_for_paid_visit(
 REGISTRAR_COMMAND_ROLE_BY_ACTION = {
     "mark_paid": {"admin", "registrar", "cashier"},
     "start_visit": {
-        "admin",
-        "registrar",
         "doctor",
         "cardio",
         "cardiology",
@@ -2611,11 +2609,21 @@ REGISTRAR_COMMAND_ROLE_BY_ACTION = {
         "dentist",
         "lab",
     },
-    "complete": {"admin", "registrar", "doctor", "cashier", "receptionist"},
+    "complete": {
+        "doctor",
+        "cardio",
+        "cardiology",
+        "cardiologist",
+        "derma",
+        "dermatologist",
+        "dentist",
+        "lab",
+    },
     "cancel": {"admin", "registrar", "cashier", "receptionist", "doctor"},
 }
 
 REGISTRAR_SUPPORTED_RECORD_KINDS = {"visit", "online_queue", "appointment"}
+REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar", "receptionist"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -2640,8 +2648,24 @@ def _normalize_registrar_record_kind(record_kind: str | None) -> str:
     return str(record_kind or "").strip().lower()
 
 
-def _ensure_registrar_command_role(user: User | None, action: str) -> None:
-    allowed_roles = REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
+def _registrar_command_allowed_roles(
+    action: str,
+    record_kind: str | None = None,
+) -> set[str] | None:
+    if (
+        record_kind == "appointment"
+        and action in {"start_visit", "complete"}
+    ):
+        return REGISTRAR_APPOINTMENT_WORKFLOW_ROLES
+    return REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
+
+
+def _ensure_registrar_command_role(
+    user: User | None,
+    action: str,
+    record_kind: str | None = None,
+) -> None:
+    allowed_roles = _registrar_command_allowed_roles(action, record_kind)
     if not allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -2920,8 +2944,6 @@ def mark_visit_as_paid(
 
             # [OK] ИСПРАВЛЕНО: Используем прямой SQL для создания платежа, чтобы обойти конфликт моделей
             # (BillingPayment и Payment используют одну таблицу, что вызывает проблемы)
-            from datetime import datetime, timezone
-
             from sqlalchemy import text
 
             currency = total_info.get("currency", "UZS")
@@ -2973,7 +2995,9 @@ def mark_visit_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
+        changed_at = datetime.now(timezone.utc)
         visit.status = _preserve_operational_status_on_payment(visit.status)
+        visit.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
             db,
             visit_id=visit.id,
@@ -3077,6 +3101,7 @@ def mark_queue_entry_as_paid(
             )
             entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
+            entry.updated_at = datetime.now(timezone.utc)
             logger.info(
                 "[FIX:PAYMENT_STATUS] Queue entry marked paid without Visit: entry_id=%d, status=%s",
                 entry.id,
@@ -3110,7 +3135,6 @@ def mark_queue_entry_as_paid(
             )
             payment_amount = float(total_info["total"])
 
-            from datetime import datetime, timezone
             from sqlalchemy import text
 
             currency = total_info.get("currency", "UZS")
@@ -3161,9 +3185,12 @@ def mark_queue_entry_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
+        changed_at = datetime.now(timezone.utc)
         visit.status = _preserve_operational_status_on_payment(visit.status)
+        visit.updated_at = changed_at
         
         entry.status = _preserve_operational_status_on_payment(entry.status)
+        entry.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
             db,
             visit_id=visit.id,
@@ -3234,6 +3261,7 @@ def complete_visit(
         _ensure_visit_doctor_access(db, visit, current_user)
 
         visit.status = "completed"
+        visit.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(visit)
 
@@ -3265,6 +3293,7 @@ def start_visit(
             )
 
         visit.status = "in_progress"
+        visit.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(visit)
 
@@ -3314,7 +3343,6 @@ def run_registrar_record_action(
     """Run registrar-owned record commands through a single backend contract."""
 
     action = _normalize_registrar_action(request.action)
-    _ensure_registrar_command_role(current_user, action)
 
     records: list[RegistrarRecordRef] = []
     if request.records:
@@ -3343,6 +3371,13 @@ def run_registrar_record_action(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No registrar records provided",
+        )
+
+    for record in unique_records:
+        _ensure_registrar_command_role(
+            current_user,
+            action,
+            record.record_kind,
         )
 
     results = [

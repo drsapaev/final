@@ -18,6 +18,7 @@ import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
+import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } from '../utils/dateUtils';
 import notify from '../services/notify';
 import {
   Dialog,
@@ -104,14 +105,14 @@ const resolvePaymentMethodLabel = (method) => {
 
 const extractReceiptDateTime = (paymentRow) => {
   const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
-  const parsedDate = sourceTimestamp ? new Date(sourceTimestamp) : null;
+  const parsedDate = sourceTimestamp ? parseRegistrarTimestamp(sourceTimestamp) : null;
   const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
 
   return {
-    date: paymentRow?.date || (hasValidDate ? parsedDate.toLocaleDateString('ru-RU') : ''),
+    date: paymentRow?.date || (hasValidDate ? formatRegistrarDate(parsedDate) : ''),
     time: paymentRow?.time || (
       hasValidDate
-        ? parsedDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        ? formatRegistrarTime(parsedDate)
         : ''
     )
   };
@@ -941,9 +942,9 @@ const CashierPanel = () => {void
 
     paymentsList.forEach((payment) => {
       // Parse dates from backend
-      const dateObj = new Date(payment.created_at);
-      const dateKey = dateObj.toLocaleDateString('ru-RU');
-      const timeKey = dateObj.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const dateObj = parseRegistrarTimestamp(payment.created_at);
+      const dateKey = formatRegistrarDate(dateObj || payment.created_at);
+      const timeKey = formatRegistrarTime(dateObj || payment.created_at);
 
       const groupKey = `${payment.patient_id}_${dateKey}_${timeKey}`;
 
@@ -1285,22 +1286,13 @@ const CashierPanel = () => {void
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '500' }}>
                                   {appointment.created_at ?
-                            new Date(appointment.created_at).toLocaleDateString('ru-RU', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              timeZone: 'Asia/Tashkent'
-                            }) :
+                            formatRegistrarDate(appointment.created_at) :
                             appointment.appointment_date || '—'
                             }
                                 </span>
                                 <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
                                   {appointment.created_at ?
-                            new Date(appointment.created_at).toLocaleTimeString('ru-RU', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              timeZone: 'Asia/Tashkent'
-                            }) :
+                            formatRegistrarTime(appointment.created_at) :
                             appointment.appointment_time || '—'
                             }
                                 </span>

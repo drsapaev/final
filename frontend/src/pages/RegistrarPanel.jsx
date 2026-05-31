@@ -1424,7 +1424,8 @@ const RegistrarPanel = () => {
 
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
-      const dateParam = showCalendar && historyDate ? historyDate : getLocalDateString();
+      const urlDate = searchParams.get('date');
+      const dateParam = showCalendar && historyDate ? historyDate : urlDate || getLocalDateString();
       /* console.log('📅 Параметры для loadAppointments:', {
         source: callSource,
         showCalendar,
@@ -1515,6 +1516,10 @@ const RegistrarPanel = () => {
               record_type: fullEntry.record_type ?? fullEntry.type ?? entry.record_type ?? entry.type ?? null,
               created_at: fullEntry.created_at || null,
               queue_time: queueTime,
+              updated_at: fullEntry.updated_at || fullEntry.last_changed_at || null,
+              last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || null,
+              display_time_kind: fullEntry.display_time_kind || (fullEntry.queue_time ? 'queue_time' : 'created_at'),
+              timezone: fullEntry.timezone || data.timezone || 'Asia/Tashkent',
               discount_mode: fullEntry.discount_mode ?? null,
               approval_status: fullEntry.approval_status || null,
               available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
@@ -1532,7 +1537,10 @@ const RegistrarPanel = () => {
                 queue_name: queueName,
                 specialty: queueTag,
                 status: canonicalStatus,
-                queue_time: queueTime
+                queue_time: queueTime,
+                updated_at: fullEntry.updated_at || fullEntry.last_changed_at || null,
+                last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || null,
+                timezone: fullEntry.timezone || data.timezone || 'Asia/Tashkent'
               }],
               specialty: queueTag,
               queue_tag: queueTag,
@@ -1668,7 +1676,7 @@ const RegistrarPanel = () => {
       loadAppointmentsInFlightRef.current = false;
       if (!silent) setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab, demoAppointments, appointmentsCount]);
+  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, demoAppointments, appointmentsCount]);
 
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
