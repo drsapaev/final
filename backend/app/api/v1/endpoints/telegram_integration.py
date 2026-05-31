@@ -10,7 +10,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
+from app.models.appointment import Appointment
 from app.models.user import User
 from app.services.telegram_service import (
     get_telegram_service,
@@ -18,6 +20,46 @@ from app.services.telegram_service import (
 )
 
 router = APIRouter()
+
+
+def _appointment_id_from_payload(appointment_data: Dict[str, Any]) -> int | None:
+    for key in ("appointment_id", "id"):
+        value = appointment_data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid appointment_id",
+            )
+    return None
+
+
+def _ensure_appointment_reminder_belongs_to_phone(
+    db: Session,
+    *,
+    patient_phone: str,
+    appointment_data: Dict[str, Any],
+) -> None:
+    appointment_id = _appointment_id_from_payload(appointment_data)
+    if appointment_id is None:
+        return
+
+    appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found",
+        )
+
+    patient = crud_patient.find_patient(db, phone=patient_phone)
+    if not patient or appointment.patient_id != patient.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
 
 # ===================== УВЕДОМЛЕНИЯ =====================
 
@@ -96,6 +138,12 @@ async def send_appointment_reminder(
             }
 
         # Формируем данные для шаблона
+        _ensure_appointment_reminder_belongs_to_phone(
+            db,
+            patient_phone=patient_phone,
+            appointment_data=appointment_data,
+        )
+
         template_data = {
             "patient_name": appointment_data.get("patient_name", "Пациент"),
             "doctor_name": appointment_data.get("doctor_name", "Врач"),
