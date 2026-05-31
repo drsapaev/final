@@ -183,6 +183,13 @@ def create_print_template(
         )
 
 
+@router.get("/templates/types")
+def get_template_types(
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
+):
+    return _print_template_types_payload()
+
+
 @router.get("/templates/{template_id}", response_model=PrintTemplateOut)
 def get_print_template(
     template_id: int,
@@ -419,10 +426,7 @@ def get_default_template(
         )
 
 
-@router.get("/templates/types")
-def get_template_types(
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
-):
+def _print_template_types_payload():
     """
     Получить список доступных типов шаблонов
     """
