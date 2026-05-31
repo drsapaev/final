@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from app.api.v1.endpoints.telemetry import ALLOWED_EVENTS, TelemetryEvent, store_events, validate_event
@@ -68,7 +70,10 @@ def test_patient_onboarding_telemetry_rejects_sensitive_payload_keys(blocked_key
 
 @pytest.mark.unit
 @pytest.mark.anyio
-async def test_patient_onboarding_telemetry_events_are_persisted_safely(db_session):
+async def test_patient_onboarding_telemetry_events_do_not_write_anonymous_audit_logs(
+    caplog,
+    db_session,
+):
     event = TelemetryEvent(
         event="patient_onboarding_opened",
         entity="telegram_mini_app",
@@ -82,22 +87,47 @@ async def test_patient_onboarding_telemetry_events_are_persisted_safely(db_sessi
         },
     )
 
-    from app.api.v1.endpoints import telemetry as telemetry_module
+    with caplog.at_level(logging.INFO, logger="app.api.v1.endpoints.telemetry"):
+        await store_events([event])
 
-    telemetry_module.SessionLocal = lambda: db_session
-    await store_events([event])
-
-    audit_row = (
+    audit_rows = (
         db_session.query(AuditLog)
-        .filter(
-            AuditLog.entity_type == "telegram_onboarding_telemetry",
-            AuditLog.action == "patient_onboarding_opened",
-        )
-        .order_by(AuditLog.id.desc())
-        .first()
+        .filter(AuditLog.entity_type == "telegram_onboarding_telemetry")
+        .all()
     )
-    assert audit_row is not None
-    assert audit_row.payload["role"] == "patient"
-    assert audit_row.payload["scope"] == "onboarding"
-    assert "entryToken" not in str(audit_row.payload)
-    assert "full_phone" not in str(audit_row.payload)
+    assert audit_rows == []
+    assert "patient_onboarding_opened" in caplog.text
+    assert "entryToken" not in caplog.text
+    assert "full_phone" not in caplog.text
+
+
+@pytest.mark.unit
+def test_anonymous_telemetry_endpoint_cannot_populate_audit_log(client, db_session):
+    response = client.post(
+        "/api/v1/telemetry",
+        json={
+            "events": [
+                {
+                    "event": "patient_onboarding_opened",
+                    "entity": "telegram_mini_app",
+                    "meta": {
+                        "role": "patient",
+                        "scope": "onboarding",
+                        "section": "appointments",
+                        "language": "ru",
+                        "success": True,
+                        "reason_code": None,
+                    },
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"accepted": 1, "rejected": 0}
+    assert (
+        db_session.query(AuditLog)
+        .filter(AuditLog.entity_type == "telegram_onboarding_telemetry")
+        .count()
+        == 0
+    )

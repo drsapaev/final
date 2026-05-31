@@ -25,9 +25,6 @@ from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.crud import audit as crud_audit
-from app.db.session import SessionLocal
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
@@ -77,19 +74,6 @@ ALLOWED_EVENTS = {
     'autosave.fail',
 
     # Telegram patient onboarding
-    'patient_onboarding_started',
-    'patient_onboarding_opened',
-    'patient_onboarding_submitted',
-    'patient_onboarding_pending_review',
-    'patient_onboarding_needs_more_info',
-    'registrar_onboarding_reviewed',
-    'patient_onboarding_linked_existing',
-    'patient_onboarding_created_patient',
-    'patient_onboarding_rejected',
-    'patient_onboarding_expired',
-}
-
-ONBOARDING_TELEMETRY_EVENTS = {
     'patient_onboarding_started',
     'patient_onboarding_opened',
     'patient_onboarding_submitted',
@@ -188,38 +172,12 @@ async def store_events(events: List[TelemetryEvent]):
     - Mixpanel
     - etc.
     """
-    db = None
-    try:
-        db = SessionLocal()
-        for event in events:
-            logger.info(
-                f"[Telemetry] {event.event} | "
-                f"session={event.session_id} | "
-                f"meta={event.meta}"
-            )
-            if event.event in ONBOARDING_TELEMETRY_EVENTS:
-                crud_audit.log(
-                    db,
-                    action=event.event,
-                    entity_type="telegram_onboarding_telemetry",
-                    payload={
-                        "role": str((event.meta or {}).get("role") or "")[:32],
-                        "scope": str((event.meta or {}).get("scope") or "")[:32],
-                        "section": str((event.meta or {}).get("section") or "")[:32],
-                        "language": str((event.meta or {}).get("language") or "")[:16],
-                        "success": bool((event.meta or {}).get("success", True)),
-                        "reason_code": str((event.meta or {}).get("reason_code") or "")[:64] or None,
-                        "timestamp": str((event.meta or {}).get("timestamp") or event.timestamp or "")[:64] or None,
-                    },
-                )
-        db.commit()
-    except Exception as exc:
-        if db is not None:
-            db.rollback()
-        logger.warning("[Telemetry] Failed to persist events error_type=%s", type(exc).__name__)
-    finally:
-        if db is not None:
-            db.close()
+    for event in events:
+        logger.info(
+            f"[Telemetry] {event.event} | "
+            f"session={event.session_id} | "
+            f"meta={event.meta}"
+        )
 
 
 # =============================================================================
