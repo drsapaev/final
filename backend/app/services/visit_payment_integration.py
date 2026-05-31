@@ -18,6 +18,16 @@ logger = logging.getLogger(__name__)
 class VisitPaymentIntegrationService:
     """Сервис для интеграции визитов с платежами"""
 
+    IMMUTABLE_VISIT_PAYMENT_FIELDS = frozenset(
+        {
+            "id",
+            "patient_id",
+            "doctor_id",
+            "created_at",
+            "source",
+        }
+    )
+
     @staticmethod
     def _repo(db: Session) -> VisitPaymentIntegrationRepository:
         return VisitPaymentIntegrationRepository(db)
@@ -299,6 +309,20 @@ class VisitPaymentIntegrationService:
 
             # Добавляем дополнительные данные
             if additional_data:
+                forbidden_fields = (
+                    set(additional_data)
+                    & VisitPaymentIntegrationService.IMMUTABLE_VISIT_PAYMENT_FIELDS
+                )
+                if forbidden_fields:
+                    logger.warning(
+                        "Rejected visit payment ownership update visit_id=%s fields=%s",
+                        visit_id,
+                        sorted(forbidden_fields),
+                    )
+                    return (
+                        False,
+                        "Cannot change visit ownership through payment status update",
+                    )
                 update_data.update(additional_data)
 
             # Обновляем визит
