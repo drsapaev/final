@@ -702,23 +702,8 @@ def complete_patient_visit(
             # Обновляем статус визита
             visit.status = "completed"
 
-            # ✅ ИСПРАВЛЕНО: payment state должен приходить из Payment/discount_mode,
-            # а не из факта завершения приема.
-            from app.models.payment import Payment
-
-            payment = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit.id)
-                .order_by(Payment.created_at.desc())
-                .first()
-            )
-            if payment and (
-                payment.status
-                and payment.status.lower() == 'paid'
-                or payment.paid_at
-            ):
-                visit.discount_mode = "paid"
-
+            # Payment state remains in Payment; completion must not rewrite
+            # registration discount_mode.
             db.commit()
             db.refresh(visit)
 
@@ -820,13 +805,16 @@ def complete_patient_visit(
                     .order_by(Payment.created_at.desc())
                     .first()
                 )
-                if payment and (
-                    payment.status
-                    and payment.status.lower() == 'paid'
-                    or payment.paid_at
-                ):
-                    # Визит оплачен - устанавливаем discount_mode и payment_processed_at
-                    visit.discount_mode = "paid"
+                payment_is_paid = bool(
+                    payment
+                    and (
+                        (payment.status and payment.status.lower() == "paid")
+                        or payment.paid_at
+                    )
+                )
+                if payment_is_paid:
+                    # Paid payment may update explicit payment markers only;
+                    # registration discount_mode must be preserved.
                     if (
                         hasattr(visit, 'payment_processed_at')
                         and not visit.payment_processed_at
@@ -834,17 +822,6 @@ def complete_patient_visit(
                         visit.payment_processed_at = (
                             payment.paid_at or datetime.utcnow()
                         )
-                elif payment:
-                    # Если платеж уже существует, отражаем его в discount_mode.
-                    visit.discount_mode = "paid"
-                    if (
-                        hasattr(visit, 'payment_processed_at')
-                        and not visit.payment_processed_at
-                    ):
-                        visit.payment_processed_at = (
-                            payment.paid_at or datetime.utcnow()
-                        )
-
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
 
@@ -868,11 +845,11 @@ def complete_patient_visit(
                     appointment.status = "completed"
                     # Appointment has no discount_mode; use its explicit payment marker.
                     if (
-                        visit.discount_mode == "paid"
+                        payment_is_paid
                         and not appointment.payment_processed_at
                     ):
                         appointment.payment_processed_at = (
-                            visit.payment_processed_at or datetime.utcnow()
+                            payment.paid_at or datetime.utcnow()
                         )
 
                 if visit_data:
