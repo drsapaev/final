@@ -1272,6 +1272,7 @@ def full_update_online_entry(
         )
 
         # 2. Обновляем данные пациента в OnlineQueueEntry
+        original_entry_discount_mode = entry.discount_mode
         patient_data = request.patient_data
         if patient_data.get('patient_name'):
             entry.patient_name = patient_data['patient_name']
@@ -2298,13 +2299,6 @@ def full_update_online_entry(
                     "[full_update_online_entry] Обновление существующего Visit ID=%d",
                     visit.id,
                 )
-                visit.approval_status = (
-                    "pending"  # Сбрасываем статус на pending при обновлении
-                )
-                visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
-                visit.department = department  # Обновляем department
-                visit.doctor_id = doctor_id  # Обновляем doctor_id
-
                 # ⭐ ИСПРАВЛЕНИЕ #2: Проверяем есть ли оплаченный инвойс перед удалением услуг
                 from app.models.payment_invoice import (
                     PaymentInvoice,
@@ -2322,14 +2316,22 @@ def full_update_online_entry(
                 )
 
                 if has_paid_invoice:
-                    # ⚠️ Визит УЖЕ оплачен - НЕ удаляем существующие услуги!
-                    # Только добавляем новые услуги к уже существующим
+                    # ⚠️ Визит УЖЕ оплачен - НЕ меняем платежный режим/статус и НЕ удаляем существующие услуги.
+                    # Только добавляем новые услуги к уже существующим.
+                    entry.discount_mode = original_entry_discount_mode
                     logger.warning(
-                        "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ удаляем услуги, только добавляем новые",
+                        "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ меняем payment state и НЕ удаляем услуги, только добавляем новые",
                         visit.id,
                     )
                     deleted_count = 0
                 else:
+                    visit.approval_status = (
+                        "pending"  # Сбрасываем статус на pending при обновлении
+                    )
+                    visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
+                    visit.department = department  # Обновляем department
+                    visit.doctor_id = doctor_id  # Обновляем doctor_id
+
                     # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
                     deleted_count = (
                         db.query(VisitService)
@@ -2350,9 +2352,9 @@ def full_update_online_entry(
                         entry.id,
                         visit.id,
                     )
-                
+
                 # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
-                if entry.discount_mode != "all_free":
+                if not has_paid_invoice and entry.discount_mode != "all_free":
                     entry.discount_mode = "all_free"
                     logger.info(
                         "[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry %d с Visit %d",
