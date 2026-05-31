@@ -9,6 +9,8 @@ from typing import Any
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.models.appointment import Appointment
+from app.models.billing import Invoice
 from app.models.discount_benefits import (
     Benefit,
     BenefitApplication,
@@ -21,6 +23,7 @@ from app.models.discount_benefits import (
     PatientBenefit,
     PatientLoyalty,
 )
+from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,41 @@ class DiscountBenefitsService:
 
     def __init__(self, db: Session):
         self.db = db
+
+    def _validate_patient_context(
+        self,
+        *,
+        patient_id: int,
+        appointment_id: int | None = None,
+        visit_id: int | None = None,
+        invoice_id: int | None = None,
+    ) -> None:
+        if appointment_id is not None:
+            appointment = (
+                self.db.query(Appointment)
+                .filter(Appointment.id == appointment_id)
+                .first()
+            )
+            if not appointment:
+                raise ValueError(f"Appointment {appointment_id} not found")
+            if appointment.patient_id != patient_id:
+                raise ValueError(
+                    "Patient context does not match appointment ownership"
+                )
+
+        if visit_id is not None:
+            visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
+                raise ValueError(f"Visit {visit_id} not found")
+            if visit.patient_id != patient_id:
+                raise ValueError("Patient context does not match visit ownership")
+
+        if invoice_id is not None:
+            invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
+            if not invoice:
+                raise ValueError(f"Invoice {invoice_id} not found")
+            if invoice.patient_id != patient_id:
+                raise ValueError("Patient context does not match invoice ownership")
 
     # === СКИДКИ ===
 
@@ -266,6 +304,13 @@ class DiscountBenefitsService:
         if not patient_benefit:
             raise ValueError("Льгота пациента не найдена")
 
+        self._validate_patient_context(
+            patient_id=patient_benefit.patient_id,
+            appointment_id=appointment_id,
+            visit_id=visit_id,
+            invoice_id=invoice_id,
+        )
+
         benefit_amount = self.calculate_benefit_discount(patient_benefit, amount)
         final_amount = amount - benefit_amount
 
@@ -387,6 +432,13 @@ class DiscountBenefitsService:
         if not program or amount < program.min_purchase_for_points:
             return 0
 
+        self._validate_patient_context(
+            patient_id=patient_id,
+            appointment_id=appointment_id,
+            visit_id=visit_id,
+            invoice_id=invoice_id,
+        )
+
         # Получить или создать запись лояльности пациента
         patient_loyalty = (
             self.db.query(PatientLoyalty)
@@ -469,6 +521,13 @@ class DiscountBenefitsService:
 
         if points > patient_loyalty.current_balance:
             raise ValueError("Недостаточно баллов")
+
+        self._validate_patient_context(
+            patient_id=patient_id,
+            appointment_id=appointment_id,
+            visit_id=visit_id,
+            invoice_id=invoice_id,
+        )
 
         # Рассчитать сумму скидки
         discount_amount = points * program.ruble_per_point
