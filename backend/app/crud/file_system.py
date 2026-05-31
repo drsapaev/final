@@ -86,6 +86,8 @@ class CRUDFile:
             query = query.filter(File.file_type == file_type)
         if status:
             query = query.filter(File.status == status)
+        else:
+            query = query.filter(File.status != FileStatus.DELETED)
         if owner_id:
             query = query.filter(File.owner_id == owner_id)
         if patient_id:
@@ -107,7 +109,7 @@ class CRUDFile:
         self, db: Session, *, search_request: FileSearchRequest
     ) -> tuple[list[File], int, dict[str, Any]]:
         """Поиск файлов с фильтрацией"""
-        query = db.query(File)
+        query = db.query(File).filter(File.status != FileStatus.DELETED)
 
         # Текстовый поиск
         if search_request.query:
@@ -172,9 +174,11 @@ class CRUDFile:
         # Фасеты для фильтрации
         facets = {
             "file_types": db.query(File.file_type, func.count(File.id))
+            .filter(File.status != FileStatus.DELETED)
             .group_by(File.file_type)
             .all(),
             "permissions": db.query(File.permission, func.count(File.id))
+            .filter(File.status != FileStatus.DELETED)
             .group_by(File.permission)
             .all(),
             "size_ranges": self._get_size_ranges(db, query),

@@ -461,7 +461,7 @@ class FileSystemService:
     ) -> File | None:
         """Получить файл"""
         db_file = file.get(db, id=file_id)
-        if not db_file:
+        if not db_file or self._is_deleted_file(db_file):
             return None
 
         # Проверяем права доступа
@@ -473,6 +473,10 @@ class FileSystemService:
             file_access_log.create(db, file_id=file_id, user_id=user_id, action="view")
 
         return db_file
+
+    def _is_deleted_file(self, file_obj: File) -> bool:
+        """Soft-deleted files must be hidden from normal file access paths."""
+        return file_obj.status == FileStatusEnum.DELETED
 
     def _check_file_access(
         self, db: Session, file_obj: File, user_id: int | None
@@ -572,6 +576,11 @@ class FileSystemService:
             )
 
         # Проверяем права доступа
+        if self._is_deleted_file(db_file):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
+            )
+
         if db_file.owner_id != user_id and not self._is_admin(db, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -647,7 +656,7 @@ class FileSystemService:
     def delete_file(self, db: Session, file_id: int, user_id: int) -> bool:
         """Удалить файл"""
         db_file = file.get(db, id=file_id)
-        if not db_file:
+        if not db_file or self._is_deleted_file(db_file):
             return False
 
         # Проверяем права доступа
@@ -675,7 +684,7 @@ class FileSystemService:
         """Создать совместное использование файла"""
         # Проверяем права доступа
         db_file = file.get(db, id=file_id)
-        if not db_file or db_file.owner_id != user_id:
+        if not db_file or self._is_deleted_file(db_file) or db_file.owner_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для создания совместного использования",

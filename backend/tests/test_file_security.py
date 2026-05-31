@@ -13,7 +13,7 @@ from io import BytesIO
 from datetime import date
 
 from app.models.appointment import Appointment
-from app.models.file_system import File, FileVersion
+from app.models.file_system import File, FileStatus, FileVersion
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
@@ -404,4 +404,69 @@ class TestFileSecurity:
         assert version is not None
         assert version.file_hash is not None
         assert version.file_hash == original_hash
+
+    def test_soft_deleted_file_is_hidden_from_read_and_list_paths(
+        self, client: TestClient, db_session: Session, auth_headers: dict[str, str]
+    ):
+        file_obj = BytesIO(b"soft deleted clinical document")
+
+        upload_response = client.post(
+            "/api/v1/files/upload",
+            files={"file": ("soft-delete.txt", file_obj, "text/plain")},
+            data={
+                "file_type": "document",
+                "permission": "public",
+                "title": "soft-delete-contract-proof",
+            },
+            headers=auth_headers,
+        )
+        assert upload_response.status_code == 200
+        file_id = upload_response.json()["id"]
+
+        delete_response = client.delete(
+            f"/api/v1/files/{file_id}",
+            headers=auth_headers,
+        )
+        assert delete_response.status_code == 200
+
+        db_session.expire_all()
+        db_file = db_session.query(File).filter(File.id == file_id).one()
+        assert db_file.status == FileStatus.DELETED
+
+        assert (
+            client.get(f"/api/v1/files/{file_id}", headers=auth_headers).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                f"/api/v1/files/{file_id}/download", headers=auth_headers
+            ).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                f"/api/v1/files/{file_id}/preview", headers=auth_headers
+            ).status_code
+            == 404
+        )
+
+        list_response = client.get("/api/v1/files/", headers=auth_headers)
+        assert list_response.status_code == 200
+        listed_ids = {item["id"] for item in list_response.json()["files"]}
+        assert file_id not in listed_ids
+
+        search_response = client.post(
+            "/api/v1/files/search",
+            json={"query": "soft-delete-contract-proof"},
+            headers=auth_headers,
+        )
+        assert search_response.status_code == 200
+        assert search_response.json()["total"] == 0
+        assert search_response.json()["files"] == []
+
+        second_delete_response = client.delete(
+            f"/api/v1/files/{file_id}",
+            headers=auth_headers,
+        )
+        assert second_delete_response.status_code == 404
 
