@@ -337,33 +337,6 @@ async def get_users(
         )
 
 
-@router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_staff),
-):
-    """Получить пользователя по ID"""
-    try:
-        service = get_user_management_service()
-        profile_data = service.get_user_profile(db, user_id)
-
-        if not profile_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
-            )
-
-        return UserResponse(**profile_data)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения пользователя: {str(e)}",
-        )
-
-
 @router.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: int,
@@ -1092,3 +1065,30 @@ async def user_management_health_check():
         "supported_statuses": ["active", "inactive", "suspended", "pending", "locked"],
         "export_formats": ["csv", "excel", "json", "pdf"],
     }
+
+
+@router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    """Получить пользователя по ID"""
+    try:
+        service = get_user_management_service()
+        profile_data = service.get_user_profile(db, user_id)
+
+        if not profile_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
+            )
+
+        return UserResponse(**profile_data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения пользователя: {str(e)}",
+        )
