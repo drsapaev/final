@@ -310,6 +310,46 @@ def test_registrar_links_existing_patient_and_writes_audit(
 
 
 @pytest.mark.unit
+def test_onboarding_duplicate_search_keeps_exact_phone_match_beyond_page_limit(
+    client,
+    db_session,
+    registrar_auth_headers,
+):
+    target_phone = "+998901234321"
+    for index in range(45):
+        db_session.add(
+            Patient(
+                last_name=f"Alpha{index:02d}",
+                first_name="Filler",
+                phone=f"+99890000{index:04d}",
+            )
+        )
+    target = Patient(
+        last_name="Zulu",
+        first_name="Exact",
+        phone=target_phone,
+    )
+    db_session.add(target)
+    request_row = _create_onboarding_request(db_session, chat_id=9106)
+    request_row.contact_phone = target_phone
+    request_row.contact_name = "Unknown Caller"
+    db_session.commit()
+
+    response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/search-patients",
+        headers=registrar_auth_headers,
+        json={"phone": "901234321"},
+    )
+
+    assert response.status_code == 200
+    candidates = response.json()["candidates"]
+    assert candidates
+    assert candidates[0]["matchReasons"]["phone_match"] is True
+    assert candidates[0]["maskedPhone"].endswith("21")
+    assert len(candidates) <= 40
+
+
+@pytest.mark.unit
 def test_registrar_lists_pending_onboarding_requests_with_safe_payload(
     client,
     db_session,

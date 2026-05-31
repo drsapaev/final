@@ -75,6 +75,13 @@ def _normalize_phone(value: str | None) -> str:
     return re.sub(r"\D", "", str(value or ""))
 
 
+def _phone_matches(search_digits: str, candidate_phone: str | None) -> bool:
+    candidate_digits = _normalize_phone(candidate_phone)
+    if not search_digits or not candidate_digits:
+        return False
+    return search_digits == candidate_digits or candidate_digits.endswith(search_digits)
+
+
 def _mask_phone(value: str | None) -> str | None:
     digits = _normalize_phone(value)
     if not digits:
@@ -360,7 +367,7 @@ class PatientOnboardingService:
                 if value
             ) or None
 
-        phone_match = bool(search_phone and patient_phone and search_phone == patient_phone)
+        phone_match = _phone_matches(search_phone, patient_phone)
         dob_match = bool(
             search_input.birth_date is not None
             and patient.birth_date is not None
@@ -416,7 +423,20 @@ class PatientOnboardingService:
         birth_date = search_payload.birth_date
 
         query = self.db.query(Patient).filter(Patient.is_deleted.is_not(True))
+        exact_phone_rows: list[Patient] = []
         if phone:
+            phone_rows = (
+                self.db.query(Patient)
+                .filter(
+                    Patient.is_deleted.is_not(True),
+                    Patient.phone.is_not(None),
+                )
+                .order_by(Patient.last_name.asc(), Patient.first_name.asc())
+                .all()
+            )
+            exact_phone_rows = [
+                patient for patient in phone_rows if _phone_matches(phone, patient.phone)
+            ]
             query = query.filter(Patient.phone.is_not(None))
         name_parts = [
             part.strip().lower()
@@ -442,6 +462,14 @@ class PatientOnboardingService:
             .limit(MAX_SEARCH_CANDIDATES)
             .all()
         )
+        if exact_phone_rows:
+            seen_ids = {int(patient.id) for patient in exact_phone_rows}
+            candidate_rows = exact_phone_rows + [
+                patient
+                for patient in candidate_rows
+                if int(patient.id) not in seen_ids
+            ]
+            candidate_rows = candidate_rows[:MAX_SEARCH_CANDIDATES]
         candidates = [
             self._candidate_for_patient(
                 request_row,
