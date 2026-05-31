@@ -7,6 +7,7 @@ from app.core.security import get_password_hash
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.visit import Visit
 
 
 def _payment_event_deliveries(db_session, *, recipient_id: int):
@@ -247,3 +248,53 @@ def test_legacy_payme_webhook_duplicate_callback_does_not_create_duplicate_deliv
 
     deliveries = _payment_event_deliveries(db_session, recipient_id=patient_user.id)
     assert len(deliveries) == 1
+
+
+def test_legacy_click_webhook_skips_conflicting_patient_and_visit_owner(
+    client,
+    db_session,
+    monkeypatch,
+):
+    wrong_user, wrong_patient = _create_patient_user(
+        db_session, username="legacy_webhook_conflict_wrong_patient"
+    )
+    owner_user, owner_patient = _create_patient_user(
+        db_session, username="legacy_webhook_conflict_owner_patient"
+    )
+    visit = Visit(
+        patient_id=owner_patient.id,
+        visit_date=date.today(),
+        status="open",
+        source="desk",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(visit)
+
+    fake_webhook = SimpleNamespace(
+        id=951,
+        provider="click",
+        status="processed",
+        transaction_id="legacy-click-conflict-951",
+        patient_id=wrong_patient.id,
+        visit_id=visit.id,
+        raw_data={"patient_id": wrong_patient.id},
+    )
+
+    def _fake_process_click_webhook(self, data):
+        return True, "Webhook processed successfully", fake_webhook
+
+    monkeypatch.setattr(
+        "app.services.payment_webhook_api_service.PaymentWebhookApiRepository.process_click_webhook",
+        _fake_process_click_webhook,
+    )
+
+    response = client.post(
+        "/api/v1/webhooks/payment/click",
+        data={"merchant_trans_id": "legacy-click-conflict"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["webhook_id"] == 951
+    assert _payment_event_deliveries(db_session, recipient_id=wrong_user.id) == []
+    assert _payment_event_deliveries(db_session, recipient_id=owner_user.id) == []

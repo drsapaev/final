@@ -286,7 +286,7 @@ class PaymentWebhookApiService:
 
     def _resolve_legacy_webhook_recipient(self, webhook: Any) -> tuple[User | None, dict[str, int | None]]:
         db = self.repository.db
-        patient_id = self._safe_int(getattr(webhook, "patient_id", None))
+        claimed_patient_id = self._safe_int(getattr(webhook, "patient_id", None))
         visit_id = self._safe_int(getattr(webhook, "visit_id", None))
         payment_id = None
 
@@ -303,17 +303,44 @@ class PaymentWebhookApiService:
 
         if payment_id is not None:
             payment = db.query(Payment).filter(Payment.id == payment_id).first()
-            if payment and visit_id is None:
-                visit_id = self._safe_int(getattr(payment, "visit_id", None))
+            if payment:
+                payment_visit_id = self._safe_int(getattr(payment, "visit_id", None))
+                if (
+                    visit_id is not None
+                    and payment_visit_id is not None
+                    and visit_id != payment_visit_id
+                ):
+                    return None, {
+                        "patient_id": claimed_patient_id,
+                        "visit_id": visit_id,
+                        "payment_id": payment_id,
+                    }
+                if visit_id is None:
+                    visit_id = payment_visit_id
 
-        if visit_id is not None and patient_id is None:
+        canonical_patient_id = None
+        if visit_id is not None:
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
             if visit:
-                patient_id = self._safe_int(getattr(visit, "patient_id", None))
+                canonical_patient_id = self._safe_int(getattr(visit, "patient_id", None))
 
-        if patient_id is None:
+        if claimed_patient_id is None:
             raw_data = getattr(webhook, "raw_data", None)
-            patient_id = self._extract_patient_id_from_raw_data(raw_data)
+            claimed_patient_id = self._extract_patient_id_from_raw_data(raw_data)
+
+        if canonical_patient_id is not None:
+            if (
+                claimed_patient_id is not None
+                and claimed_patient_id != canonical_patient_id
+            ):
+                return None, {
+                    "patient_id": claimed_patient_id,
+                    "visit_id": visit_id,
+                    "payment_id": payment_id,
+                }
+            patient_id = canonical_patient_id
+        else:
+            patient_id = claimed_patient_id
 
         if patient_id is None:
             return None, {"patient_id": None, "visit_id": visit_id, "payment_id": payment_id}
