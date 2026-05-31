@@ -322,12 +322,13 @@ def test_e2e_clinic_flow(
         from app.services.queue_service import queue_service
         now = queue_service.get_local_timestamp(db_session)
         order_id = f"clinic_{payment_id}_{int(now.timestamp())}"
+    payme_amount = int(payment_obj.amount * 100)
 
     # Создаем PayMe webhook payload (JSON-RPC формат) для CheckPerformTransaction
     check_payload = {
         "method": "CheckPerformTransaction",
         "params": {
-            "amount": 100000,
+            "amount": payme_amount,
             "account": {
                 "order_id": order_id,
             },
@@ -353,7 +354,7 @@ def test_e2e_clinic_flow(
     create_payload = {
         "method": "CreateTransaction",
         "params": {
-            "amount": 100000,
+            "amount": payme_amount,
             "account": {
                 "order_id": order_id,
             },

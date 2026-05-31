@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,50 @@ class ProviderWebhookService:
     ):
         self.db = db
         self.repository = repository or ProviderWebhookRepository(db)
+
+    @staticmethod
+    def _decimal_amount(value: Any) -> Decimal | None:
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _amounts_match(cls, expected: Any, actual: Any) -> bool:
+        expected_amount = cls._decimal_amount(expected)
+        actual_amount = cls._decimal_amount(actual)
+        return (
+            expected_amount is not None
+            and actual_amount is not None
+            and expected_amount == actual_amount
+        )
+
+    def _result_amount_matches_payment(self, payment: Any, result: Any) -> bool:
+        provider_amount = (getattr(result, "provider_data", None) or {}).get("amount")
+        return self._amounts_match(getattr(payment, "amount", None), provider_amount)
+
+    def _payme_params_amount_matches_payment(
+        self,
+        payment: Any,
+        params: dict[str, Any],
+        transaction: Any | None = None,
+    ) -> bool:
+        raw_amount = params.get("amount")
+        if raw_amount is not None:
+            provider_amount = self._decimal_amount(raw_amount)
+            if provider_amount is None:
+                return False
+            provider_amount = provider_amount / Decimal("100")
+        else:
+            provider_amount = self._decimal_amount(
+                (getattr(transaction, "provider_data", None) or {}).get("amount")
+            )
+            if provider_amount is None:
+                return False
+        return self._amounts_match(
+            getattr(payment, "amount", None),
+            provider_amount,
+        )
 
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Click платежной системы."""
@@ -102,6 +147,21 @@ class ProviderWebhookService:
                             )
 
                     if payment:
+                        if not self._result_amount_matches_payment(payment, result):
+                            webhook.status = "failed"
+                            webhook.error_message = "provider_amount_mismatch"
+                            return {
+                                "click_trans_id": webhook_data.get("click_trans_id"),
+                                "merchant_trans_id": webhook_data.get(
+                                    "merchant_trans_id"
+                                ),
+                                "merchant_prepare_id": webhook.id,
+                                "error": -1,
+                                "error_note": "Payment amount mismatch",
+                                "payment_id": payment.id,
+                                "payment_status": None,
+                                "payment_provider": "click",
+                            }
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
                         payment.status = mapped_status
                         if payment.status == "paid":
@@ -235,6 +295,17 @@ class ProviderWebhookService:
                             params=params,
                         )
                         payment_id = getattr(existing_transaction, "payment_id", None)
+                if payment_status == "amount_mismatch":
+                    return {
+                        "error": {
+                            "code": -31001,
+                            "message": "Payment amount mismatch",
+                        },
+                        "id": request_id,
+                        "payment_id": payment_id,
+                        "payment_status": None,
+                        "payment_provider": "payme",
+                    }
                 if method == "CreateTransaction":
                     return {
                         "result": {
@@ -308,6 +379,19 @@ class ProviderWebhookService:
                             )
 
                     if payment:
+                        if not self._result_amount_matches_payment(payment, result):
+                            webhook.status = "failed"
+                            webhook.error_message = "provider_amount_mismatch"
+                            return {
+                                "error": {
+                                    "code": -31001,
+                                    "message": "Payment amount mismatch",
+                                },
+                                "id": request_id,
+                                "payment_id": payment.id,
+                                "payment_status": None,
+                                "payment_provider": "payme",
+                            }
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
                         payment.status = mapped_status
                         if payment.status == "paid":
@@ -434,6 +518,17 @@ class ProviderWebhookService:
             return None
 
         payment_status = self._map_provider_status_to_payment_status(provider_status)
+        payment_id = getattr(transaction, "payment_id", None)
+        if payment_id:
+            payment = self.repository.get_payment_by_id(payment_id)
+            if payment:
+                if not self._payme_params_amount_matches_payment(
+                    payment,
+                    params,
+                    transaction,
+                ):
+                    return "amount_mismatch"
+
         transaction.status = provider_status
         transaction.provider_data = {
             **(transaction.provider_data or {}),
@@ -442,7 +537,6 @@ class ProviderWebhookService:
             "params": params,
         }
 
-        payment_id = getattr(transaction, "payment_id", None)
         if payment_id:
             payment = self.repository.get_payment_by_id(payment_id)
             if payment:
@@ -488,6 +582,17 @@ class ProviderWebhookService:
                     )
 
                 if payment:
+                    if not self._result_amount_matches_payment(payment, result):
+                        webhook.status = "failed"
+                        webhook.error_message = "provider_amount_mismatch"
+                        self.db.commit()
+                        return {
+                            "status": "error",
+                            "message": "Payment amount mismatch",
+                            "payment_id": payment.id,
+                            "payment_status": None,
+                            "payment_provider": "kaspi",
+                        }
                     mapped_status = self._map_provider_status_to_payment_status(result.status)
                     payment.status = mapped_status
                     if payment.status == "paid":
