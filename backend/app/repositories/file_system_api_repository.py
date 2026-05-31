@@ -6,6 +6,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.file_system import FileStatus
+
 
 class FileSystemApiRepository:
     """Encapsulates DB primitives used by file_system endpoint wrappers."""
@@ -35,7 +37,7 @@ class FileSystemApiRepository:
         emr_record_id: int | None,
         folder_id: int | None,
     ) -> int:
-        query = self.db.query(file_model)
+        query = self.db.query(file_model).filter(file_model.status != FileStatus.DELETED)
 
         # owner_id=None означает "без фильтра по владельцу" (admin view)
         if owner_id is not None:
