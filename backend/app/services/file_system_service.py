@@ -26,6 +26,9 @@ from app.crud.file_system import (
     file_share,
     file_version,
 )
+from app.models.appointment import Appointment
+from app.models.emr import EMR
+from app.models.emr_v2 import EMRRecord
 from app.models.file_system import (
     File,
     FileShare,
@@ -34,6 +37,7 @@ from app.models.file_system import (
 from app.models.file_system import (
     FileStatus as FileStatusEnum,
 )
+from app.models.visit import Visit
 from app.schemas.file_system import (
     FileCreate,
     FileExportRequest,
@@ -242,6 +246,86 @@ class FileSystemService:
             db, user_id=user_id, additional_size=file_size, additional_files=1
         )
 
+    @staticmethod
+    def _coerce_optional_int(value: Any) -> int | None:
+        if value is None:
+            return None
+        return int(value)
+
+    def _validate_upload_context(
+        self, db: Session, file_data: FileUploadRequest
+    ) -> None:
+        context_patient_ids: dict[str, int] = {}
+
+        patient_id = self._coerce_optional_int(file_data.patient_id)
+        if patient_id is not None:
+            context_patient_ids["patient_id"] = patient_id
+
+        appointment_id = self._coerce_optional_int(file_data.appointment_id)
+        if appointment_id is not None:
+            appointment = db.get(Appointment, appointment_id)
+            if not appointment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Appointment not found",
+                )
+            context_patient_ids["appointment_id"] = int(appointment.patient_id)
+
+        visit_id = self._coerce_optional_int(file_data.visit_id)
+        if visit_id is not None:
+            visit = db.get(Visit, visit_id)
+            if not visit:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Visit not found",
+                )
+            context_patient_ids["visit_id"] = int(visit.patient_id)
+
+        emr_id = self._coerce_optional_int(file_data.emr_id)
+        if emr_id is not None:
+            emr = db.get(EMR, emr_id)
+            if not emr:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="EMR not found",
+                )
+            appointment = db.get(Appointment, emr.appointment_id)
+            if not appointment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="EMR appointment not found",
+                )
+            context_patient_ids["emr_id"] = int(appointment.patient_id)
+            if (
+                appointment_id is not None
+                and int(emr.appointment_id) != appointment_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="EMR does not belong to selected appointment",
+                )
+
+        emr_record_id = self._coerce_optional_int(file_data.emr_record_id)
+        if emr_record_id is not None:
+            emr_record = db.get(EMRRecord, emr_record_id)
+            if not emr_record:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="EMR record not found",
+                )
+            context_patient_ids["emr_record_id"] = int(emr_record.patient_id)
+            if visit_id is not None and int(emr_record.visit_id) != visit_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="EMR record does not belong to selected visit",
+                )
+
+        if len(set(context_patient_ids.values())) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="File context does not belong to a single patient",
+            )
+
     def upload_file(
         self,
         db: Session,
@@ -251,6 +335,8 @@ class FileSystemService:
     ) -> File:
         """Загрузить файл"""
         try:
+            self._validate_upload_context(db, file_data)
+
             file_content, file_size = self._read_upload_file_limited(
                 upload_file, self.max_file_size
             )

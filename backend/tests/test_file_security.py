@@ -10,9 +10,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from io import BytesIO
+from datetime import date
 
+from app.models.appointment import Appointment
 from app.models.file_system import File, FileVersion
+from app.models.patient import Patient
 from app.models.user import User
+from app.models.visit import Visit
 
 
 class TestFileSecurity:
@@ -176,6 +180,104 @@ class TestFileSecurity:
 
         # Patient не должен иметь доступ к загрузке
         assert response.status_code == 403
+
+    def test_file_upload_rejects_mismatched_patient_visit_context(
+        self,
+        client: TestClient,
+        db_session: Session,
+        auth_headers: dict[str, str],
+        test_patient,
+        test_doctor,
+    ):
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Patient",
+            phone="+998901112233",
+            birth_date=date(1985, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.commit()
+        db_session.refresh(other_patient)
+
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="11:00",
+            status="open",
+        )
+        db_session.add(other_visit)
+        db_session.commit()
+        db_session.refresh(other_visit)
+
+        file_obj = BytesIO(b"wrong patient visit context")
+        response = client.post(
+            "/api/v1/files/upload",
+            files={"file": ("context.txt", file_obj, "text/plain")},
+            data={
+                "file_type": "document",
+                "permission": "private",
+                "patient_id": str(test_patient.id),
+                "visit_id": str(other_visit.id),
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409
+        patient_files = db_session.query(File).filter(
+            File.patient_id == test_patient.id
+        )
+        visit_files = db_session.query(File).filter(File.visit_id == other_visit.id)
+        assert patient_files.count() == 0
+        assert visit_files.count() == 0
+
+    def test_file_upload_rejects_mismatched_patient_appointment_context(
+        self,
+        client: TestClient,
+        db_session: Session,
+        auth_headers: dict[str, str],
+        test_patient,
+        test_doctor,
+    ):
+        other_patient = Patient(
+            first_name="Appointment",
+            last_name="Other",
+            phone="+998901112244",
+            birth_date=date(1986, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.commit()
+        db_session.refresh(other_patient)
+
+        other_appointment = Appointment(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="12:00",
+            status="scheduled",
+        )
+        db_session.add(other_appointment)
+        db_session.commit()
+        db_session.refresh(other_appointment)
+
+        file_obj = BytesIO(b"wrong appointment context")
+        response = client.post(
+            "/api/v1/files/upload",
+            files={"file": ("appointment-context.txt", file_obj, "text/plain")},
+            data={
+                "file_type": "document",
+                "permission": "private",
+                "patient_id": str(test_patient.id),
+                "appointment_id": str(other_appointment.id),
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409
+        appointment_files = db_session.query(File).filter(
+            File.appointment_id == other_appointment.id
+        )
+        assert appointment_files.count() == 0
 
     def test_file_hash_consistency(
         self, client: TestClient, db_session: Session
