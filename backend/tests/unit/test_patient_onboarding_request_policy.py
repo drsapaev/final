@@ -350,6 +350,72 @@ def test_onboarding_duplicate_search_keeps_exact_phone_match_beyond_page_limit(
 
 
 @pytest.mark.unit
+def test_onboarding_duplicate_review_is_invalid_after_patient_resubmits_request(
+    client,
+    db_session,
+    registrar_auth_headers,
+):
+    _add_mini_app_telegram_config(db_session)
+    patient = Patient(
+        last_name="Old",
+        first_name="Candidate",
+        phone="+998901110001",
+    )
+    db_session.add(patient)
+    telegram_user = _create_unlinked_telegram_user(db_session, chat_id=9107)
+    request_row = PatientOnboardingRequest(
+        telegram_user_id=telegram_user.id,
+        telegram_chat_id=telegram_user.chat_id,
+        status="pending_review",
+        language_code="ru",
+        contact_phone=patient.phone,
+        contact_name="Old Candidate",
+    )
+    db_session.add(request_row)
+    db_session.commit()
+    db_session.refresh(request_row)
+    stale_candidate_id = _search_candidate_id(
+        client,
+        request_id=request_row.id,
+        headers=registrar_auth_headers,
+        phone=patient.phone,
+        name="Old Candidate",
+    )
+
+    review_response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/request-more-info",
+        headers=registrar_auth_headers,
+        json={"reasonCode": "other", "safeNote": "Please confirm contact details."},
+    )
+    assert review_response.status_code == 200
+    resubmit_response = client.post(
+        "/api/v1/telegram/mini-app/onboarding/requests",
+        json={
+            "initData": _signed_mini_app_init_data(telegram_user.chat_id),
+            "section": "appointments",
+            "contactPhone": "+998909990002",
+            "contactName": "Updated Patient",
+        },
+    )
+    assert resubmit_response.status_code == 200
+
+    link_response = client.post(
+        f"/api/v1/telegram/onboarding/requests/{request_row.id}/link-existing",
+        headers=registrar_auth_headers,
+        json={
+            "candidateId": stale_candidate_id,
+            "safeNote": "Stale link attempt",
+            "reasonCode": "duplicate_suspected",
+        },
+    )
+
+    assert link_response.status_code == 409
+    assert link_response.json()["detail"]["reason"] == "duplicate_review_required"
+    db_session.refresh(telegram_user)
+    assert telegram_user.patient_id is None
+
+
+@pytest.mark.unit
 def test_registrar_lists_pending_onboarding_requests_with_safe_payload(
     client,
     db_session,

@@ -550,10 +550,18 @@ class PatientOnboardingService:
 
     def _safe_duplicate_review_snapshot(
         self,
-        request_id: int,
+        row: PatientOnboardingRequest,
     ) -> dict[str, Any] | None:
-        log_row = self._latest_duplicate_review_log(request_id)
+        log_row = self._latest_duplicate_review_log(int(row.id))
         if log_row is None or not isinstance(log_row.payload, dict):
+            return None
+        reviewed_at = _as_aware_utc(log_row.created_at)
+        request_updated_at = _as_aware_utc(row.updated_at or row.created_at)
+        if (
+            reviewed_at is not None
+            and request_updated_at is not None
+            and reviewed_at < request_updated_at
+        ):
             return None
         payload = log_row.payload
         return {
@@ -635,7 +643,7 @@ class PatientOnboardingService:
         )
 
     def _registrar_request_payload(self, row: PatientOnboardingRequest) -> dict[str, Any]:
-        duplicate_snapshot = self._safe_duplicate_review_snapshot(int(row.id))
+        duplicate_snapshot = self._safe_duplicate_review_snapshot(row)
         return {
             **_request_payload(row),
             "telegramUserId": row.telegram_user_id,
@@ -979,9 +987,9 @@ class PatientOnboardingService:
 
     def _require_duplicate_review(
         self,
-        request_id: int,
+        row: PatientOnboardingRequest,
     ) -> dict[str, Any]:
-        snapshot = self._safe_duplicate_review_snapshot(request_id)
+        snapshot = self._safe_duplicate_review_snapshot(row)
         if snapshot is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1013,7 +1021,7 @@ class PatientOnboardingService:
         self._validate_audit_actor(actor)
         row = self._get_reviewable(request_id)
         safe_note = _safe_note(payload.safe_note)
-        snapshot = self._require_duplicate_review(request_id)
+        snapshot = self._require_duplicate_review(row)
         candidate_ids = {
             str(item.get("candidate_id"))
             for item in snapshot.get("topCandidates") or []
@@ -1087,7 +1095,7 @@ class PatientOnboardingService:
         self._validate_audit_actor(actor)
         row = self._get_reviewable(request_id)
         safe_note = _safe_note(payload.safe_note)
-        snapshot = self._require_duplicate_review(request_id)
+        snapshot = self._require_duplicate_review(row)
         top_candidates = snapshot.get("topCandidates") or []
         high_confidence_exists = bool(snapshot.get("highConfidenceCandidateExists"))
         if high_confidence_exists and not payload.confirm_create_despite_duplicates:
