@@ -128,6 +128,96 @@ def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("path_suffix", "payload"),
+    [
+        ("", {"data": {"complaints": "tampered"}, "row_version": 0, "is_draft": True}),
+        ("/sign", {"data": {"complaints": "tampered"}, "row_version": 0}),
+        (
+            "/amend",
+            {
+                "data": {"complaints": "tampered"},
+                "reason": "Unauthorized lab amendment",
+                "row_version": 0,
+            },
+        ),
+        ("/restore", {"target_version": 1, "reason": "Unauthorized lab restore"}),
+    ],
+)
+def test_lab_role_cannot_write_emr_v2_records(
+    client,
+    db_session,
+    path_suffix,
+    payload,
+):
+    label = path_suffix.replace("/", "_") or "_save"
+    lab_user = User(
+        username=f"emr_v2_lab_writer{label}",
+        email=f"emr-v2-lab-writer{label}@test.com",
+        hashed_password=get_password_hash("lab123"),
+        role="Lab",
+        is_active=True,
+    )
+    doctor_user = User(
+        username=f"emr_v2_doctor_owner{label}",
+        email=f"emr-v2-doctor-owner{label}@test.com",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+    )
+    doctor = Doctor(
+        user_id=doctor_user.id,
+        specialty="therapy",
+        active=True,
+    )
+    patient = Patient(
+        first_name="EMR",
+        last_name="WriteGuard",
+        phone=f"+99890965{abs(hash(label)) % 10000:04d}",
+        birth_date=date(1990, 1, 1),
+    )
+    db_session.add_all([lab_user, doctor_user])
+    db_session.flush()
+    doctor.user_id = doctor_user.id
+    db_session.add_all([doctor, patient])
+    db_session.commit()
+    db_session.refresh(patient)
+
+    visit = Visit(
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        visit_date=date.today(),
+        visit_time="16:00",
+        status="open",
+        department="therapy",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(visit)
+
+    login_response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": lab_user.username, "password": "lab123"},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+    response = client.post(
+        f"/api/v1/v2/emr/{visit.id}{path_suffix}",
+        headers=headers,
+        json=payload,
+    )
+
+    assert response.status_code == 403, response.text
+    assert (
+        db_session.query(EMRRecord)
+        .filter(EMRRecord.visit_id == visit.id)
+        .count()
+        == 0
+    )
+
+
+@pytest.mark.unit
 def test_patient_emr_history_filters_other_doctors_summaries(client, db_session):
     attacker_user = User(
         id=9701,

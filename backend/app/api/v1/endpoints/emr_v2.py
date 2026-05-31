@@ -81,6 +81,11 @@ EMR_V2_DOCTOR_ROLES = {
     "Dentist",
 }
 
+EMR_V2_WRITE_ROLES = (
+    "Admin",
+    *EMR_V2_DOCTOR_ROLES,
+)
+
 
 def get_client_ip(request: Request) -> str | None:
     """Extract client IP from request"""
@@ -348,7 +353,7 @@ async def save_emr(
     payload: EMRSaveRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Save EMR with versioning.
@@ -413,7 +418,7 @@ async def sign_emr(
     payload: EMRSignRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Sign and finalize EMR.
@@ -483,7 +488,7 @@ async def amend_emr(
     payload: EMRAmendRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Amend a signed EMR.
@@ -525,7 +530,7 @@ async def restore_emr(
     payload: EMRRestoreRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
 ):
     """
     Restore EMR to a specific version.
