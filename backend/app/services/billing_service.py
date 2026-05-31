@@ -86,6 +86,28 @@ class BillingService:
         """Создать счет"""
 
         # Получаем настройки биллинга
+        if visit_id is not None:
+            visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
+                raise ValueError(f"Visit {visit_id} not found")
+            if visit.patient_id != patient_id:
+                raise ValueError(
+                    "Invoice patient_id does not match visit ownership"
+                )
+
+        if appointment_id is not None:
+            appointment = (
+                self.db.query(Appointment)
+                .filter(Appointment.id == appointment_id)
+                .first()
+            )
+            if not appointment:
+                raise ValueError(f"Appointment {appointment_id} not found")
+            if appointment.patient_id != patient_id:
+                raise ValueError(
+                    "Invoice patient_id does not match appointment ownership"
+                )
+
         settings = self.get_billing_settings()
 
         # Генерируем номер счета
