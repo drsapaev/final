@@ -16,6 +16,7 @@ from app.models.refund_deposit import (
     RefundRequestStatus,
     RefundType,
 )
+from app.models.visit import Visit
 from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 from app.services.force_majeure_service import get_force_majeure_service
 
@@ -295,6 +296,20 @@ class ForceMajeureApiService:
             )
         if not deposit.is_active:
             raise ForceMajeureApiDomainError(400, "Депозит деактивирован")
+
+        if request.visit_id is not None:
+            visit = (
+                self.repository.db.query(Visit)
+                .filter(Visit.id == request.visit_id)
+                .first()
+            )
+            if not visit:
+                raise ForceMajeureApiDomainError(404, "Visit not found")
+            if visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(
+                    400,
+                    "Visit does not belong to deposit patient",
+                )
 
         deposit.balance -= amount
         self.repository.flush()

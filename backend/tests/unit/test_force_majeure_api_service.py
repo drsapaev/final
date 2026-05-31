@@ -256,3 +256,51 @@ class TestForceMajeureApiService:
                 current_user_id=1,
             )
         assert exc_info.value.status_code == 400
+
+    def test_use_deposit_for_payment_rejects_cross_patient_visit(self):
+        deposit = SimpleNamespace(
+            balance=Decimal("100"),
+            is_active=True,
+            patient=None,
+            id=1,
+            patient_id=2,
+            currency="UZS",
+            created_at=None,
+        )
+        state = {"flushed": False}
+
+        class Query:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return SimpleNamespace(id=9, patient_id=99)
+
+        class Db:
+            def query(self, model):
+                return Query()
+
+        class Repository:
+            db = Db()
+
+            def get_patient_deposit(self, *, patient_id):
+                return deposit
+
+            def flush(self):
+                state["flushed"] = True
+
+        service = ForceMajeureApiService(db=None, repository=Repository())
+        with pytest.raises(ForceMajeureApiDomainError) as exc_info:
+            service.use_deposit_for_payment(
+                request=SimpleNamespace(
+                    patient_id=2,
+                    amount=40,
+                    visit_id=9,
+                    description=None,
+                ),
+                current_user_id=1,
+            )
+
+        assert exc_info.value.status_code == 400
+        assert deposit.balance == Decimal("100")
+        assert state["flushed"] is False
