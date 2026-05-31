@@ -4,10 +4,12 @@ E2E тесты для полного сценария работы с визит
 """
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
 from app.services.morning_assignment import MorningAssignmentService
@@ -18,6 +20,89 @@ from app.services.morning_assignment import MorningAssignmentService
 @pytest.mark.queue
 class TestE2EVisitFlow:
     """E2E тесты для полного сценария работы с визитами"""
+
+    def test_doctor_cannot_schedule_next_visit_for_unassigned_patient(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_doctor,
+        test_service,
+    ):
+        suffix = uuid4().hex[:10]
+        foreign_patient = Patient(
+            first_name="Foreign",
+            last_name="ScheduleNext",
+            phone=f"+99890{suffix[:7]}",
+            birth_date=date(1990, 1, 1),
+        )
+        db_session.add(foreign_patient)
+        db_session.commit()
+        db_session.refresh(foreign_patient)
+
+        response = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json={
+                "patient_id": foreign_patient.id,
+                "service_ids": [test_service.id],
+                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_time": "10:00",
+                "discount_mode": "none",
+                "all_free": False,
+                "confirmation_channel": "phone",
+            },
+            headers=cardio_auth_headers,
+        )
+
+        assert response.status_code == 403
+        assert (
+            db_session.query(Visit)
+            .filter(Visit.patient_id == foreign_patient.id)
+            .count()
+            == 0
+        )
+
+    def test_doctor_can_schedule_next_visit_for_assigned_patient(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_patient,
+        test_doctor,
+        test_service,
+    ):
+        existing_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="09:00",
+            status="open",
+            discount_mode="none",
+            source="desk",
+        )
+        db_session.add(existing_visit)
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json={
+                "patient_id": test_patient.id,
+                "service_ids": [test_service.id],
+                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_time": "10:00",
+                "discount_mode": "none",
+                "all_free": False,
+                "confirmation_channel": "phone",
+            },
+            headers=cardio_auth_headers,
+        )
+
+        assert response.status_code == 200
+        scheduled_visit_id = response.json()["visit_id"]
+        scheduled_visit = db_session.get(Visit, scheduled_visit_id)
+        assert scheduled_visit is not None
+        assert scheduled_visit.patient_id == test_patient.id
+        assert scheduled_visit.doctor_id == test_doctor.id
 
     def test_complete_visit_flow_today(self, client, db_session, auth_headers, test_patient, test_service):
         """
