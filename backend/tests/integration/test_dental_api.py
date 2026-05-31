@@ -40,7 +40,9 @@ def dentist_auth_headers(client, dentist_user):
 
 @pytest.mark.integration
 class TestDentalApi:
-    def test_dentist_role_can_create_examination(self, client, dentist_auth_headers):
+    def test_dentist_create_examination_does_not_report_false_success(
+        self, client, dentist_auth_headers
+    ):
         response = client.post(
             "/api/v1/dental/examinations",
             json={
@@ -51,8 +53,40 @@ class TestDentalApi:
             headers=dentist_auth_headers,
         )
 
-        assert response.status_code == 200
-        assert response.json()["message"] == "Стоматологический осмотр создан"
+        assert response.status_code == 501
+        assert "persistence is not implemented" in response.json()["detail"]
+
+    def test_dentist_create_treatment_does_not_report_false_success(
+        self, client, dentist_auth_headers
+    ):
+        response = client.post(
+            "/api/v1/dental/treatments",
+            json={
+                "patient_id": 451,
+                "treatment_date": "2026-03-22",
+                "treatment_type": "filling",
+            },
+            headers=dentist_auth_headers,
+        )
+
+        assert response.status_code == 501
+        assert "persistence is not implemented" in response.json()["detail"]
+
+    def test_dentist_create_prosthetic_does_not_report_false_success(
+        self, client, dentist_auth_headers
+    ):
+        response = client.post(
+            "/api/v1/dental/prosthetics",
+            json={
+                "patient_id": 451,
+                "prosthetic_date": "2026-03-22",
+                "prosthetic_type": "crown",
+            },
+            headers=dentist_auth_headers,
+        )
+
+        assert response.status_code == 501
+        assert "persistence is not implemented" in response.json()["detail"]
 
     def test_dentist_role_can_list_examinations(self, client, dentist_auth_headers):
         response = client.get(
