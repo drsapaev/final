@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dental", tags=["dental"])
 
 DENTAL_CLINICIAN_ROLES = ("Admin", "Doctor", "dentist")
+DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL = (
+    "Dental examination/treatment persistence is not implemented on this endpoint. "
+    "Use the canonical visit protocol or odontogram workflow until a durable dental "
+    "record contract is added."
+)
 
 
 class DentalPriceOverrideRequest(BaseModel):
@@ -67,12 +72,10 @@ async def create_dental_examination(
     """
     Создать новый стоматологический осмотр
     """
-    try:
-        return {"message": "Стоматологический осмотр создан", "id": 1}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка создания осмотра: {str(e)}"
-        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL,
+    )
 
 
 @router.get("/treatments", summary="Планы лечения")
@@ -102,12 +105,10 @@ async def create_treatment_plan(
     """
     Создать новый план лечения
     """
-    try:
-        return {"message": "План лечения создан", "id": 1}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка создания плана лечения: {str(e)}"
-        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL,
+    )
 
 
 @router.get("/prosthetics", summary="Протезирование")
@@ -137,12 +138,10 @@ async def create_prosthetic(
     """
     Создать новый протез
     """
-    try:
-        return {"message": "Протез создан", "id": 1}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка создания протеза: {str(e)}"
-        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL,
+    )
 
 
 @router.get("/xray", summary="Рентгеновские снимки")
