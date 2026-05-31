@@ -116,9 +116,13 @@ class VisitPaymentApiService:
         doctor_id: int | None,
         notes: str | None,
     ) -> dict[str, Any]:
+        if patient_id is not None or doctor_id is not None:
+            raise VisitPaymentApiDomainError(
+                status_code=400,
+                detail="Cannot change visit ownership through payment status update",
+            )
+
         visit_data = {
-            "patient_id": patient_id,
-            "doctor_id": doctor_id,
             "notes": notes or "Визит создан вручную",
             "payment_status": "paid",
         }

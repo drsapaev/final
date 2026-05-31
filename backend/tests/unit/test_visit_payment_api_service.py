@@ -66,10 +66,49 @@ class TestVisitPaymentApiService:
             with pytest.raises(VisitPaymentApiDomainError) as exc_info:
                 service.create_visit_from_payment(
                     visit_id=77,
-                    patient_id=10,
-                    doctor_id=20,
+                    patient_id=None,
+                    doctor_id=None,
                     notes=None,
                 )
 
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail == "update failed"
+
+    def test_create_visit_from_payment_rejects_ownership_fields(self, db_session):
+        service = VisitPaymentApiService(db_session)
+        with patch(
+            "app.services.visit_payment_api_service.VisitPaymentIntegrationService.update_visit_payment_status"
+        ) as update_status:
+            with pytest.raises(VisitPaymentApiDomainError) as exc_info:
+                service.create_visit_from_payment(
+                    visit_id=77,
+                    patient_id=10,
+                    doctor_id=None,
+                    notes=None,
+                )
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == (
+            "Cannot change visit ownership through payment status update"
+        )
+        update_status.assert_not_called()
+
+    def test_create_visit_from_payment_passes_payment_fields_only(self, db_session):
+        service = VisitPaymentApiService(db_session)
+        with patch(
+            "app.services.visit_payment_api_service.VisitPaymentIntegrationService.update_visit_payment_status",
+            return_value=(True, "updated"),
+        ) as update_status:
+            result = service.create_visit_from_payment(
+                visit_id=77,
+                patient_id=None,
+                doctor_id=None,
+                notes="Paid from cashier",
+            )
+
+        assert result["success"] is True
+        _, kwargs = update_status.call_args
+        assert kwargs["additional_data"] == {
+            "notes": "Paid from cashier",
+            "payment_status": "paid",
+        }

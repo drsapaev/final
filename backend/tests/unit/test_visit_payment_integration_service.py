@@ -31,6 +31,26 @@ class TestVisitPaymentIntegrationService:
         assert success is False
         assert message == "Визит 10 не найден"
 
+    def test_update_visit_payment_status_rejects_ownership_fields(self, db_session):
+        repo = SimpleNamespace(
+            get_visit=lambda _visit_id: _FakeRow({"id": 10, "patient_id": 1}),
+            update_visit=Mock(),
+        )
+        with patch(
+            "app.services.visit_payment_integration.VisitPaymentIntegrationRepository",
+            return_value=repo,
+        ):
+            success, message = VisitPaymentIntegrationService.update_visit_payment_status(
+                db_session,
+                visit_id=10,
+                payment_status="paid",
+                additional_data={"patient_id": 99, "notes": "bad owner update"},
+            )
+
+        assert success is False
+        assert message == "Cannot change visit ownership through payment status update"
+        repo.update_visit.assert_not_called()
+
     def test_get_visit_payment_info_success(self, db_session):
         row = _FakeRow(
             {
