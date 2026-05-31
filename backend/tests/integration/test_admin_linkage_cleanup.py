@@ -1,10 +1,40 @@
 from datetime import date
 
+from app.api.v1.endpoints import admin_doctors
 from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue
 from app.models.user import User
+
+
+def test_admin_doctors_stats_route_dispatches_before_doctor_id(
+    client,
+    auth_headers,
+    monkeypatch,
+):
+    class FakeAdminDoctorsStatsService:
+        def __init__(self, db):
+            self.db = db
+
+        def get_doctors_stats(self):
+            return {
+                "total": 2,
+                "active": 1,
+                "inactive": 1,
+                "by_specialty": {"cardiology": 1},
+            }
+
+    monkeypatch.setattr(
+        admin_doctors,
+        "AdminDoctorsStatsService",
+        FakeAdminDoctorsStatsService,
+    )
+
+    response = client.get("/api/v1/admin/doctors/stats", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json()["by_specialty"] == {"cardiology": 1}
 
 
 def test_available_doctor_users_excludes_already_linked_accounts(
