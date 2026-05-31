@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from app.models.enums import PaymentStatus
 from app.repositories.payment_create_repository import PaymentCreateRepository
 from app.services.billing_service import BillingService
+from app.services.canonical_visit_service import (
+    CanonicalVisitResolutionError,
+    CanonicalVisitService,
+)
 
 
 @dataclass
@@ -62,16 +65,18 @@ class PaymentCreateService:
         if not appointment_id:
             return None
 
-        appointment = self.repository.get_appointment(appointment_id)
-        if not appointment:
+        try:
+            return CanonicalVisitService(self.repository.db).resolve_canonical_visit(
+                appointment_id,
+                create_if_missing=False,
+            )
+        except CanonicalVisitResolutionError as exc:
+            if exc.status_code == 409:
+                raise PaymentCreateDomainError(
+                    status_code=exc.status_code,
+                    detail=exc.detail,
+                ) from exc
             return None
-
-        appointment_date = appointment.appointment_date or date.today()
-        visit = self.repository.get_visit_by_patient_and_date(
-            patient_id=appointment.patient_id,
-            visit_date=appointment_date,
-        )
-        return visit.id if visit else None
 
     def _sync_visit_paid_state(self, *, visit_id: int) -> None:
         visit = self.repository.get_visit(visit_id)
