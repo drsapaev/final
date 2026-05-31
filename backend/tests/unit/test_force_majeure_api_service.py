@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
@@ -13,6 +16,115 @@ from app.services.force_majeure_api_service import (
 
 @pytest.mark.unit
 class TestForceMajeureApiService:
+    def test_transfer_entry_ids_are_scoped_to_requested_specialist_and_date(
+        self, monkeypatch
+    ):
+        captured = {}
+        selected_entries = [SimpleNamespace(id=11)]
+
+        class Repository:
+            db = object()
+
+            def list_pending_entries_by_ids(
+                self, entry_ids, *, specialist_id, target_date
+            ):
+                captured["entry_ids"] = entry_ids
+                captured["specialist_id"] = specialist_id
+                captured["target_date"] = target_date
+                return selected_entries
+
+        force_service = SimpleNamespace(
+            transfer_entries_to_tomorrow=lambda **kwargs: {
+                "success": True,
+                "transferred_ids": [entry.id for entry in kwargs["entries"]],
+            }
+        )
+        monkeypatch.setattr(
+            "app.services.force_majeure_api_service.get_force_majeure_service",
+            lambda db: force_service,
+        )
+
+        target_date = date.today()
+        service = ForceMajeureApiService(db=None, repository=Repository())
+        result = service.transfer_queue_to_tomorrow(
+            request=SimpleNamespace(
+                entry_ids=[11, 12],
+                specialist_id=77,
+                target_date=target_date,
+                reason="doctor emergency",
+                send_notifications=False,
+            ),
+            current_user_id=10,
+        )
+
+        assert result["success"] is True
+        assert captured == {
+            "entry_ids": [11, 12],
+            "specialist_id": 77,
+            "target_date": target_date,
+        }
+
+    def test_repository_filters_explicit_entry_ids_by_specialist_and_date(
+        self, db_session, test_doctor, test_patient
+    ):
+        today = date.today()
+        other_day = today + timedelta(days=1)
+        requested_queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        other_specialist_queue = DailyQueue(
+            day=today,
+            specialist_id=test_doctor.id + 1000,
+            queue_tag="dermatology_common",
+            active=True,
+        )
+        other_day_queue = DailyQueue(
+            day=other_day,
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add_all([requested_queue, other_specialist_queue, other_day_queue])
+        db_session.flush()
+
+        scoped_entry = OnlineQueueEntry(
+            queue_id=requested_queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name="Scoped Patient",
+            status="waiting",
+            source="desk",
+        )
+        other_specialist_entry = OnlineQueueEntry(
+            queue_id=other_specialist_queue.id,
+            number=2,
+            patient_id=test_patient.id,
+            patient_name="Other Specialist",
+            status="waiting",
+            source="desk",
+        )
+        other_day_entry = OnlineQueueEntry(
+            queue_id=other_day_queue.id,
+            number=3,
+            patient_id=test_patient.id,
+            patient_name="Other Day",
+            status="waiting",
+            source="desk",
+        )
+        db_session.add_all([scoped_entry, other_specialist_entry, other_day_entry])
+        db_session.flush()
+
+        entries = ForceMajeureApiRepository(db_session).list_pending_entries_by_ids(
+            [scoped_entry.id, other_specialist_entry.id, other_day_entry.id],
+            specialist_id=test_doctor.id,
+            target_date=today,
+        )
+
+        assert [entry.id for entry in entries] == [scoped_entry.id]
+
     def test_cancel_queue_with_refund_rejects_invalid_type(self, monkeypatch):
         monkeypatch.setattr(
             "app.services.force_majeure_api_service.get_force_majeure_service",
