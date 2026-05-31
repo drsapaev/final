@@ -40,6 +40,7 @@ class TestPaymentCreateService:
             patient_id=test_patient.id,
             appointment_date=test_visit.visit_date or date.today(),
             doctor_id=test_visit.doctor_id,
+            appointment_time=test_visit.visit_time,
         )
         db_session.add(appointment)
         db_session.commit()
@@ -109,7 +110,7 @@ class TestPaymentCreateService:
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
             visit_date=visit_date,
-            visit_time="09:00",
+            visit_time="10:00",
             status="open",
             discount_mode="none",
             source="desk",
