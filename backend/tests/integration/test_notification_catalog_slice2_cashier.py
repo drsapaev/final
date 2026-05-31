@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.core.security import get_password_hash
+from app.models.appointment import Appointment
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.payment import Payment
@@ -141,6 +142,58 @@ def test_cashier_create_payment_creates_canonical_payment_notification(
     assert event.payload_snapshot["metadata"]["change_type"] == "paid"
     assert event.payload_snapshot["metadata"]["payment_status"] == "paid"
     assert event.payload_snapshot["metadata"]["visit_id"] == visit.id
+
+
+def test_cashier_create_payment_rejects_mismatched_visit_and_appointment(
+    client,
+    db_session,
+    auth_headers,
+):
+    patient, appointment_visit = _create_patient_visit(db_session, suffix="0102")
+    other_patient, other_visit = _create_patient_visit(db_session, suffix="0103")
+    appointment_visit.visit_date = date.today()
+    other_visit.visit_date = date.today()
+    db_session.add_all([appointment_visit, other_visit])
+    db_session.commit()
+
+    appointment = Appointment(
+        patient_id=patient.id,
+        appointment_date=appointment_visit.visit_date,
+        appointment_time=None,
+        doctor_id=None,
+        status="scheduled",
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    db_session.refresh(appointment)
+    db_session.refresh(other_visit)
+    original_status = other_visit.status
+
+    response = client.post(
+        "/api/v1/cashier/payments",
+        json={
+            "visit_id": other_visit.id,
+            "appointment_id": appointment.id,
+            "amount": 45000,
+            "method": "cash",
+            "note": "mixed-id cashier payment",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    db_session.refresh(other_visit)
+    assert other_visit.status == original_status
+    assert (
+        db_session.query(Payment)
+        .filter(Payment.visit_id == other_visit.id)
+        .count()
+        == 0
+    )
+    assert _payment_event_deliveries(
+        db_session,
+        recipient_id=other_patient.user_id,
+    ) == []
 
 
 def test_cashier_grouped_payment_allocates_by_backend_remaining_debt(

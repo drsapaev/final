@@ -19,6 +19,10 @@ from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.patient import Patient
 from app.models.user import User
+from app.services.canonical_visit_service import (
+    CanonicalVisitResolutionError,
+    CanonicalVisitService,
+)
 from app.services.payment_read_service import PaymentReadService
 from app.services.notifications import notification_sender_service
 
@@ -1153,8 +1157,30 @@ async def create_payment(
         visit = None
         
         if payment_data.visit_id:
+            def _ensure_appointment_matches_visit() -> None:
+                if not payment_data.appointment_id:
+                    return
+                if not visit:
+                    return
+                try:
+                    resolved_visit_id = CanonicalVisitService(db).resolve_canonical_visit(
+                        payment_data.appointment_id,
+                        create_if_missing=False,
+                    )
+                except CanonicalVisitResolutionError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="appointment_id does not match visit_id",
+                    ) from exc
+                if resolved_visit_id != visit.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="appointment_id does not match visit_id",
+                    )
+
             # ✅ FIX: Use lazy load to ensure consistency with get_pending_payments
             visit = db.query(Visit).filter(Visit.id == payment_data.visit_id).first()
+            _ensure_appointment_matches_visit()
             if not visit:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
