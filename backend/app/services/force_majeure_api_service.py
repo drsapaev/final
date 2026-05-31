@@ -296,6 +296,16 @@ class ForceMajeureApiService:
         if not deposit.is_active:
             raise ForceMajeureApiDomainError(400, "Депозит деактивирован")
 
+        if request.visit_id is not None:
+            visit = self.repository.get_visit(request.visit_id)
+            if not visit:
+                raise ForceMajeureApiDomainError(404, "Visit not found")
+            if visit.patient_id != request.patient_id:
+                raise ForceMajeureApiDomainError(
+                    400,
+                    "Visit does not belong to deposit patient",
+                )
+
         deposit.balance -= amount
         self.repository.flush()
 
