@@ -1,5 +1,7 @@
 import pytest
 
+from app.api.v1.endpoints import clinic_management
+
 
 def _login_admin(client, admin_user, admin_password):
     response = client.post(
@@ -28,6 +30,48 @@ def test_clinic_management_stats_and_health_are_admin_accessible(
     assert health_response.status_code == 200, health_response.text
     health = health_response.json()
     assert "status" in health
+
+
+@pytest.mark.integration
+def test_clinic_license_expiring_route_dispatches_before_license_id(
+    client,
+    admin_user,
+    admin_password,
+    monkeypatch,
+):
+    def _fake_expiring_licenses(*, db, days_ahead):
+        return [
+            {
+                "id": 7,
+                "name": "Expiring License",
+                "license_type": "software",
+                "license_key": "license-key",
+                "status": "active",
+                "issued_by": None,
+                "issued_date": None,
+                "expires_date": None,
+                "renewal_date": None,
+                "cost": None,
+                "features": None,
+                "restrictions": None,
+                "notes": None,
+                "created_at": None,
+                "updated_at": None,
+                "activations_count": 0,
+            }
+        ]
+
+    monkeypatch.setattr(
+        clinic_management.license_management,
+        "get_expiring_licenses",
+        _fake_expiring_licenses,
+    )
+    headers = _login_admin(client, admin_user, admin_password)
+
+    response = client.get("/api/v1/clinic/licenses/expiring", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()[0]["name"] == "Expiring License"
 
 
 @pytest.mark.integration

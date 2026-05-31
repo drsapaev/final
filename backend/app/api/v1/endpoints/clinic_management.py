@@ -359,6 +359,16 @@ def get_licenses(
     )
 
 
+@router.get("/licenses/expiring", response_model=List[LicenseOut])
+def get_expiring_licenses(
+    *,
+    db: Session = Depends(get_db),
+    days_ahead: int = Query(30, ge=1, le=365),
+    current_user: User = Depends(require_admin),
+):
+    return _get_expiring_licenses_payload(db=db, days_ahead=days_ahead)
+
+
 @router.get("/licenses/{license_id}", response_model=LicenseOut)
 def get_license(
     *,
@@ -409,8 +419,7 @@ def delete_license(
         )
 
 
-@router.get("/licenses/expiring", response_model=List[LicenseOut])
-def get_expiring_licenses(
+def _get_expiring_licenses_payload(
     *,
     db: Session = Depends(get_db),
     days_ahead: int = Query(
