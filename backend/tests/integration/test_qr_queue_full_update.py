@@ -176,3 +176,85 @@ def test_full_update_without_visit_id_ignores_unrelated_same_day_patient_entries
     current_services = json.loads(current_entry.services)
     assert [service["service_id"] for service in current_services] == [test_service.id]
     assert unrelated_entry.queue_id == unrelated_queue.id
+
+
+@pytest.mark.integration
+def test_full_update_without_visit_id_matches_same_session_phone_digits(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_service,
+):
+    existing_queue_time = datetime(2026, 5, 31, 9, 0, tzinfo=timezone.utc)
+    existing_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=20,
+        patient_id=None,
+        patient_name="Phone Format Patient",
+        phone="+998 90 123-45-67",
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        queue_time=existing_queue_time,
+        services=json.dumps(
+            [
+                {
+                    "service_id": test_service.id,
+                    "name": test_service.name,
+                    "code": test_service.code,
+                    "quantity": 1,
+                    "price": int(test_service.price or 0),
+                    "queue_time": existing_queue_time.isoformat(),
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    current_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=21,
+        patient_id=None,
+        patient_name="Phone Format Patient",
+        phone="+998901234567",
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=timezone.utc),
+        services=json.dumps([], ensure_ascii=False),
+    )
+    db_session.add_all([existing_entry, current_entry])
+    db_session.commit()
+    db_session.refresh(existing_entry)
+    db_session.refresh(current_entry)
+
+    before_count = db_session.query(OnlineQueueEntry).count()
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{current_entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": "Phone Format Patient",
+                "phone": "901234567",
+                "birth_year": 1990,
+                "address": "Phone Street",
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": False,
+            "aggregated_ids": [existing_entry.id, current_entry.id],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert db_session.query(OnlineQueueEntry).count() == before_count
+
+    db_session.refresh(current_entry)
+    current_services = json.loads(current_entry.services)
+    assert [service["service_id"] for service in current_services] == [test_service.id]
+    assert current_services[0]["queue_time"] == existing_queue_time.isoformat()
