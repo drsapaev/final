@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit, VisitService
 
 
@@ -258,3 +260,96 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
     current_services = json.loads(current_entry.services)
     assert [service["service_id"] for service in current_services] == [test_service.id]
     assert current_services[0]["queue_time"] == existing_queue_time.isoformat()
+
+
+@pytest.mark.integration
+def test_full_update_all_free_preserves_paid_visit_payment_state(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_doctor,
+    test_service,
+):
+    paid_visit = Visit(
+        patient_id=test_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="10:30",
+        status="open",
+        discount_mode="none",
+        approval_status="approved",
+        department="cardiology",
+    )
+    db_session.add(paid_visit)
+    db_session.flush()
+    db_session.add(
+        VisitService(
+            visit_id=paid_visit.id,
+            service_id=test_service.id,
+            code=test_service.code,
+            name=test_service.name,
+            qty=1,
+            price=test_service.price,
+            currency="UZS",
+        )
+    )
+    paid_invoice = PaymentInvoice(
+        patient_id=test_patient.id,
+        total_amount=Decimal("100000.00"),
+        currency="UZS",
+        status="paid",
+        payment_method="cash",
+    )
+    db_session.add(paid_invoice)
+    db_session.flush()
+    db_session.add(
+        PaymentInvoiceVisit(
+            invoice_id=paid_invoice.id,
+            visit_id=paid_visit.id,
+            visit_amount=Decimal("100000.00"),
+        )
+    )
+    entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=31,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=paid_visit.id,
+        source="online",
+        status="waiting",
+        discount_mode="none",
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    db_session.refresh(paid_visit)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+                "address": test_patient.address,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": True,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    db_session.refresh(entry)
+    db_session.refresh(paid_visit)
+    assert paid_visit.discount_mode == "none"
+    assert paid_visit.approval_status == "approved"
+    assert paid_visit.department == "cardiology"
+    assert paid_visit.doctor_id == test_doctor.id
+    assert entry.discount_mode == "none"
