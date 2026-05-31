@@ -1,5 +1,6 @@
 import { Badge, Icon } from '../ui/macos';
 import PropTypes from 'prop-types';
+import { formatRegistrarTime } from '../../utils/dateUtils';
 
 /**
  * QueueTable Component
@@ -119,10 +120,7 @@ const QueueTable = ({
     const formatTime = (timestamp) => {
         if (!timestamp) return '—';
         try {
-            return new Date(timestamp).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            return formatRegistrarTime(timestamp) || 'вЂ”';
         } catch {
             return '—';
         }

@@ -25,6 +25,10 @@ import {
   MacOSEmptyState,
   MacOSAlert } from
 '../ui/macos';
+import {
+  formatRegistrarTime,
+  getRegistrarTimestampDisplay,
+} from '../../utils/dateUtils';
 
 const QUEUE_ACTION_ALIASES = {
   call: ['call'],
@@ -535,6 +539,7 @@ const DoctorQueuePanel = ({
             const canCall = hasBackendQueueAction(entry, 'call', 'can_call');
             const canStartVisit = hasBackendQueueAction(entry, 'start_visit', 'can_start_visit');
             const canComplete = hasBackendQueueAction(entry, 'complete', 'can_complete');
+            const timeDisplay = getRegistrarTimestampDisplay(entry);
 
             return (
               <div
@@ -621,10 +626,8 @@ const DoctorQueuePanel = ({
                           fontSize: 'var(--mac-font-size-xs)',
                           color: 'var(--mac-text-tertiary)'
                         }}>
-                            {new Date(entry.created_at).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                            {timeDisplay.primaryLabel}: {timeDisplay.primaryTime || '—'}
+                            {timeDisplay.showChanged ? ` · ${timeDisplay.changedLabel}: ${timeDisplay.changedTime}` : ''}
                           </span>
                         </div>
                       </div>
@@ -647,10 +650,7 @@ const DoctorQueuePanel = ({
                         color: 'var(--mac-text-tertiary)',
                         marginTop: '4px'
                       }}>
-                            Вызван: {new Date(entry.called_at).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                            Вызван: {formatRegistrarTime(entry.called_at) || '—'}
                           </div>
                       }
                       </div>

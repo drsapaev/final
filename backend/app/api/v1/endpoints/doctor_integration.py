@@ -5,7 +5,7 @@ API endpoints для интеграции панелей врачей с сис�
 
 import logging
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -427,7 +427,12 @@ def get_doctor_queue_today(
                     "phone": entry.phone,
                     "source": entry.source,
                     "status": entry.status,
-                    "created_at": entry.created_at.isoformat(),
+                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                    "queue_time": entry.queue_time.isoformat() if entry.queue_time else None,
+                    "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
+                    "last_changed_at": entry.updated_at.isoformat() if entry.updated_at else None,
+                    "display_time_kind": "queue_time" if entry.queue_time else "created_at",
+                    "timezone": "Asia/Tashkent",
                     "called_at": (
                         entry.called_at.isoformat() if entry.called_at else None
                     ),
@@ -545,8 +550,10 @@ def call_patient(
                 detail=f"Р’С‹Р·РІР°С‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ waiting, С‚РµРєСѓС‰РёР№: {queue_entry.status}",
             )
 
+        changed_at = datetime.now(timezone.utc)
         queue_entry.status = "called"
-        queue_entry.called_at = datetime.utcnow()
+        queue_entry.called_at = changed_at
+        queue_entry.updated_at = changed_at
 
         db.commit()
         db.refresh(queue_entry)
@@ -583,6 +590,7 @@ def call_patient(
                 "number": queue_entry.number,
                 "status": queue_entry.status,
                 "called_at": queue_entry.called_at.isoformat(),
+                "updated_at": queue_entry.updated_at.isoformat() if queue_entry.updated_at else None,
             },
         }
 
@@ -657,7 +665,9 @@ def start_patient_visit(
                 ),
             )
 
+        changed_at = datetime.now(timezone.utc)
         queue_entry.status = "in_progress"
+        queue_entry.updated_at = changed_at
 
         # Создаем или обновляем визит в таблице visits
         visit = crud_visit.find_or_create_today_visit(
@@ -670,6 +680,8 @@ def start_patient_visit(
         # Обновляем время начала приема
         visit.visit_time = datetime.now().strftime("%H:%M")
         visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
+
+        visit.updated_at = changed_at
 
         db.commit()
 
@@ -764,6 +776,7 @@ def complete_patient_visit(
         if visit:
             # Обновляем статус визита
             visit.status = "completed"
+            visit.updated_at = datetime.now(timezone.utc)
 
             # Payment state remains in Payment; completion must not rewrite
             # registration discount_mode.
@@ -838,7 +851,9 @@ def complete_patient_visit(
                     ),
                 )
 
+            changed_at = datetime.now(timezone.utc)
             queue_entry.status = "served"
+            queue_entry.updated_at = changed_at
             db.commit()
             db.refresh(queue_entry)
 
@@ -857,6 +872,7 @@ def complete_patient_visit(
                 )
                 # ✅ Обновляем статус визита на completed
                 visit.status = "completed"
+                visit.updated_at = changed_at
 
                 # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT
                 # Если визит был оплачен (есть записи в Payment или статус указывает на оплату)

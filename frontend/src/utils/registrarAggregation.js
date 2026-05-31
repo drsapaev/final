@@ -1,3 +1,5 @@
+import { parseRegistrarTimestamp } from './dateUtils';
+
 export const normalizeRegistrationMode = (value) => {
   const normalized = String(value || 'none').toLowerCase();
   return ['none', 'repeat', 'benefit', 'all_free'].includes(normalized) ? normalized : 'none';
@@ -13,8 +15,8 @@ export const getRecordAmount = (appointment) => {
 export const getRegistrarPresentationSortTime = (record) => {
   const value = record?.queue_time || record?.created_at || null;
   if (!value) return 0;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  const date = parseRegistrarTimestamp(value);
+  return !date || Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
 export const compareRegistrarPresentationOrder = (a, b) => {
@@ -91,8 +93,8 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
 
   const toTime = (value) => {
     if (!value) return null;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date.getTime();
+    const date = parseRegistrarTimestamp(value);
+    return !date || Number.isNaN(date.getTime()) ? null : date.getTime();
   };
 
   const pickEarlierTimestamp = (currentValue, nextValue) => {
@@ -106,6 +108,19 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     if (nextTime === null) return currentValue;
 
     return nextTime < currentTime ? nextValue : currentValue;
+  };
+
+  const pickLaterTimestamp = (currentValue, nextValue) => {
+    if (!currentValue) return nextValue || currentValue;
+    if (!nextValue) return currentValue;
+
+    const currentTime = toTime(currentValue);
+    const nextTime = toTime(nextValue);
+
+    if (currentTime === null) return nextValue;
+    if (nextTime === null) return currentValue;
+
+    return nextTime > currentTime ? nextValue : currentValue;
   };
 
   appointments.forEach((appointment, index) => {
@@ -146,6 +161,10 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         appointment_date: appointment.appointment_date,
         created_at: appointment.created_at,
         queue_time: appointment.queue_time,
+        updated_at: appointment.updated_at || appointment.last_changed_at || appointment.created_at,
+        last_changed_at: appointment.last_changed_at || appointment.updated_at || appointment.created_at,
+        display_time_kind: appointment.display_time_kind || (appointment.queue_time ? 'queue_time' : 'created_at'),
+        timezone: appointment.timezone || 'Asia/Tashkent',
         services: [],
         service_details: Array.isArray(appointment.service_details) ? [...appointment.service_details] : [],
         departments: new Set(),
@@ -209,6 +228,14 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
       patientGroups[patientKey].queue_time = pickEarlierTimestamp(
         patientGroups[patientKey].queue_time,
         appointment.queue_time,
+      );
+      patientGroups[patientKey].updated_at = pickLaterTimestamp(
+        patientGroups[patientKey].updated_at,
+        appointment.updated_at || appointment.last_changed_at,
+      );
+      patientGroups[patientKey].last_changed_at = pickLaterTimestamp(
+        patientGroups[patientKey].last_changed_at,
+        appointment.last_changed_at || appointment.updated_at,
       );
 
       if (Array.isArray(appointment.queue_numbers)) {

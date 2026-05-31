@@ -21,6 +21,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
 import PropTypes from 'prop-types';
+import { formatRegistrarTime } from '../utils/dateUtils';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
@@ -492,10 +493,7 @@ export default function DisplayBoardUnified({
   // Форматирование времени (новое)
   const formatTime = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatRegistrarTime(dateString);
   };
 
   // Темы оформления (новое)
@@ -962,7 +960,7 @@ export default function DisplayBoardUnified({
 
         <div style={statCardStyle}>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
-            {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+            {formatRegistrarTime(new Date().toISOString())}
           </div>
           <div style={{ color: currentTheme.textSecondary }}>Текущее время</div>
         </div>

@@ -191,13 +191,12 @@ class TestRegistrarAllAppointments:
         assert found_entry["queue_status"] == "waiting"
         assert found_entry["queue_position"] == entry.number
         assert found_entry["can_mark_paid"] is True
-        assert found_entry["can_start_visit"] is True
+        assert found_entry["can_start_visit"] is False
         assert found_entry["can_cancel"] is True
         assert found_entry["can_print_ticket"] is True
         assert found_entry["can_complete"] is False
         assert set(found_entry["available_actions"]) == {
             "mark_paid",
-            "start_visit",
             "print_ticket",
             "cancel",
         }
@@ -205,6 +204,11 @@ class TestRegistrarAllAppointments:
         assert found_entry["can_schedule_next"] is False
         assert found_entry["queue_time"] == _serialize_registrar_datetime(entry.queue_time)
         assert found_entry["created_at"] == _serialize_registrar_datetime(entry.created_at)
+        expected_changed_at = _serialize_registrar_datetime(entry.updated_at or entry.created_at)
+        assert found_entry["updated_at"] == expected_changed_at
+        assert found_entry["last_changed_at"] == expected_changed_at
+        assert found_entry["display_time_kind"] == "queue_time"
+        assert found_entry["timezone"] == "Asia/Tashkent"
         assert found_entry["patient_name"] == test_patient.short_name()
         assert found_entry["phone"] == test_patient.phone
         assert found_entry["patient_birth_year"] == 1985

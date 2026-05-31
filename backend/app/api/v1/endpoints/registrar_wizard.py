@@ -5,7 +5,7 @@ API endpoints для мастера регистрации с поддержко
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -2600,8 +2600,6 @@ def _sync_payment_invoices_for_paid_visit(
 REGISTRAR_COMMAND_ROLE_BY_ACTION = {
     "mark_paid": {"admin", "registrar", "cashier"},
     "start_visit": {
-        "admin",
-        "registrar",
         "doctor",
         "cardio",
         "cardiology",
@@ -2611,7 +2609,16 @@ REGISTRAR_COMMAND_ROLE_BY_ACTION = {
         "dentist",
         "lab",
     },
-    "complete": {"admin", "registrar", "doctor", "cashier", "receptionist"},
+    "complete": {
+        "doctor",
+        "cardio",
+        "cardiology",
+        "cardiologist",
+        "derma",
+        "dermatologist",
+        "dentist",
+        "lab",
+    },
     "cancel": {"admin", "registrar", "cashier", "receptionist", "doctor"},
 }
 
@@ -2973,7 +2980,9 @@ def mark_visit_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
+        changed_at = datetime.now(timezone.utc)
         visit.status = _preserve_operational_status_on_payment(visit.status)
+        visit.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
             db,
             visit_id=visit.id,
@@ -3077,6 +3086,7 @@ def mark_queue_entry_as_paid(
             )
             entry.status = _preserve_operational_status_on_payment(entry.status)
             entry.discount_mode = "paid"
+            entry.updated_at = datetime.now(timezone.utc)
             logger.info(
                 "[FIX:PAYMENT_STATUS] Queue entry marked paid without Visit: entry_id=%d, status=%s",
                 entry.id,
@@ -3161,9 +3171,12 @@ def mark_queue_entry_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
+        changed_at = datetime.now(timezone.utc)
         visit.status = _preserve_operational_status_on_payment(visit.status)
+        visit.updated_at = changed_at
         
         entry.status = _preserve_operational_status_on_payment(entry.status)
+        entry.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
             db,
             visit_id=visit.id,
@@ -3234,6 +3247,7 @@ def complete_visit(
         _ensure_visit_doctor_access(db, visit, current_user)
 
         visit.status = "completed"
+        visit.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(visit)
 
@@ -3265,6 +3279,7 @@ def start_visit(
             )
 
         visit.status = "in_progress"
+        visit.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(visit)
 

@@ -36,7 +36,9 @@ import { QueueActionButtons } from '../queue/QueueManagementCard';
 import logger from '../../utils/logger';
 import {
   parseRegistrarTimestamp,
-  REGISTRAR_TIME_ZONE,
+  getRegistrarTimestampDisplay,
+  formatRegistrarDate,
+  formatRegistrarTime,
 } from '../../utils/dateUtils';
 
 // ⭐ SSOT: Centralized service code resolver
@@ -970,8 +972,8 @@ const EnhancedAppointmentsTable = ({
         if (row.payment_type) return t[row.payment_type] || row.payment_type;
         return paymentStatus === 'paid' ? t.unknownPayment : t.pendingPayment;
       })(),
-      row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : row.appointment_date || '',
-      row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : row.appointment_time || '',
+      row.created_at ? formatRegistrarDate(row.created_at) : row.appointment_date || '',
+      row.created_at ? formatRegistrarTime(row.created_at, 'ru-RU', { includeSeconds: true }) : row.appointment_time || '',
       t[row.status] || row.status || '',
       (() => {
         if (row.cost_display === 'free') return t.paymentFree;
@@ -1578,10 +1580,10 @@ const EnhancedAppointmentsTable = ({
               const backendCanViewEmr = getBackendActionAvailability(row, 'view_emr', 'can_view_emr');
               const backendCanScheduleNext = getBackendActionAvailability(row, 'schedule_next', 'can_schedule_next');
               const canPay = !isDoctorView && backendCanPay === true;
-              const canCall = backendCanCall === true;
+              const canCall = isDoctorView && backendCanCall === true;
               const canPrint = backendCanPrint === true;
-              const canComplete = backendCanComplete === true;
-              const canViewEmr = backendCanViewEmr === true;
+              const canComplete = isDoctorView && backendCanComplete === true;
+              const canViewEmr = isDoctorView && backendCanViewEmr === true;
               const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
 
               return (
@@ -1881,17 +1883,22 @@ const EnhancedAppointmentsTable = ({
                         {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
                         {(() => {
                         // ⭐ SSOT: Use row.queue_time directly - no aggregation
-                        const displayDate = row.queue_time ? safeParseDate(row.queue_time) :
-                        row.created_at ? safeParseDate(row.created_at) : null;
+                        const timeDisplay = getRegistrarTimestampDisplay(row);
 
-                        if (displayDate) {
+                        if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
                           return (
-                            <div>
+                            <div title={`Часовой пояс: ${timeDisplay.timeZone}`}>
+                                <div style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: 'var(--mac-text-secondary)',
+                                marginBottom: '2px'
+                              }}>
+                                  {timeDisplay.primaryLabel}
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                                   <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
-                                  {displayDate.toLocaleDateString('ru-RU', {
-                                  timeZone: REGISTRAR_TIME_ZONE
-                                })}
+                                  {timeDisplay.primaryDate}
                                 </div>
                                 <div style={{
                                 display: 'flex',
@@ -1903,13 +1910,18 @@ const EnhancedAppointmentsTable = ({
                                 color: 'var(--mac-text-secondary)'
                               }}>
                                   <Clock size={10} />
-                                  {displayDate.toLocaleTimeString('ru-RU', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  timeZone: REGISTRAR_TIME_ZONE
-                                })}
+                                  {timeDisplay.primaryTime}
                                 </div>
+                                {timeDisplay.showChanged &&
+                              <div style={{
+                                marginTop: '4px',
+                                fontSize: '11px',
+                                color: 'var(--mac-text-tertiary)',
+                                lineHeight: 1.35
+                              }}>
+                                    {timeDisplay.changedLabel}: {timeDisplay.changedDate} {timeDisplay.changedTime}
+                                  </div>
+                              }
                               </div>);
 
                         }

@@ -246,6 +246,8 @@ class RegistrarEditDeltaService:
         unit_price = Decimal("0") if all_free else Decimal(str(service.price or 0))
         delta_amount = unit_price * Decimal(delta_qty)
 
+        changed_at = queue_service.get_local_timestamp(self.db)
+
         if delta_qty > 0:
             if existing_payload:
                 existing_payload["quantity"] = requested_qty
@@ -261,6 +263,7 @@ class RegistrarEditDeltaService:
             entry.services = services
             entry.service_codes = self._merged_service_codes(entry.service_codes, service)
             entry.total_amount = int(Decimal(str(entry.total_amount or 0)) + delta_amount)
+            entry.updated_at = changed_at
 
         visit = self._ensure_entry_visit(
             entry=entry,
@@ -274,6 +277,7 @@ class RegistrarEditDeltaService:
         )
 
         if visit and delta_qty > 0:
+            visit.updated_at = changed_at
             self._append_visit_service(
                 visit=visit,
                 service=service,
@@ -348,6 +352,7 @@ class RegistrarEditDeltaService:
             auto_number=True,
             commit=False,
         )
+        entry.updated_at = queue_service.get_local_timestamp(self.db)
         return self._delta_result(
             entry=entry,
             service=service,
@@ -382,6 +387,7 @@ class RegistrarEditDeltaService:
             current_user=current_user,
         )
         entry.visit_id = visit.id
+        entry.updated_at = queue_service.get_local_timestamp(self.db)
         return visit
 
     def _create_visit(
@@ -432,7 +438,9 @@ class RegistrarEditDeltaService:
             existing.code = code
             existing.name = service.name
             existing.currency = service.currency or "UZS"
+            visit.updated_at = queue_service.get_local_timestamp(self.db)
             return
+        visit.updated_at = queue_service.get_local_timestamp(self.db)
         self.db.add(
             VisitService(
                 visit_id=visit.id,

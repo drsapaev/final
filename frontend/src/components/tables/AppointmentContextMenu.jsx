@@ -15,7 +15,7 @@ import {
 'lucide-react';
 
 const ACTION_ALIASES = {
-  in_cabinet: ['in_cabinet', 'in-cabinet', 'start_visit', 'start-visit', 'call'],
+  in_cabinet: ['in_cabinet', 'in-cabinet'],
   call: ['call', 'start_visit', 'start-visit'],
   complete: ['complete', 'complete_visit', 'complete-visit'],
   payment: ['payment', 'mark_paid', 'mark-paid'],

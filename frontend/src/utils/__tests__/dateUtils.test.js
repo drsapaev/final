@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseRegistrarTimestamp, REGISTRAR_TIME_ZONE } from '../dateUtils';
+import {
+  formatRegistrarDate,
+  formatRegistrarTime,
+  getRegistrarTimestampDisplay,
+  parseRegistrarTimestamp,
+  REGISTRAR_TIME_ZONE,
+} from '../dateUtils';
 
 describe('parseRegistrarTimestamp', () => {
   it('keeps timezone-aware timestamps stable', () => {
@@ -19,6 +25,23 @@ describe('parseRegistrarTimestamp', () => {
 
   it('exposes the clinic timezone constant used for rendering', () => {
     expect(REGISTRAR_TIME_ZONE).toBe('Asia/Tashkent');
+  });
+
+  it('formats UTC timestamps in clinic local time', () => {
+    expect(formatRegistrarDate('2026-05-31T19:00:00Z')).toBe('01.06.2026');
+    expect(formatRegistrarTime('2026-05-31T19:00:00Z')).toBe('00:00');
+  });
+
+  it('reports changed timestamps separately from queue time', () => {
+    const display = getRegistrarTimestampDisplay({
+      queue_time: '2026-05-31T09:15:00+05:00',
+      updated_at: '2026-05-31T09:45:00+05:00',
+    });
+
+    expect(display.primaryLabel).toBe('Очередь');
+    expect(display.primaryTime).toBe('09:15:00');
+    expect(display.showChanged).toBe(true);
+    expect(display.changedTime).toBe('09:45:00');
   });
 });
 

@@ -17,6 +17,7 @@ import {
   startQueueJoinSession,
   completeQueueJoinSession,
 } from '../api/queue';
+import { formatRegistrarTime } from '../utils/dateUtils';
 
 const formatSpecialistLabel = (specialist) => {
   const doctorName =
@@ -874,7 +875,7 @@ const QueueJoin = () => {
                             {entry.specialist_name || entry.department || `Мутахассис ${idx + 1}`}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '4px' }}>
-                            Вақт: {entry.queue_time ? new Date(entry.queue_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            Вақт: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'uz-UZ') : '—'}
                           </div>
                         </div>
                       </div>

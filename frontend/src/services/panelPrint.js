@@ -8,6 +8,12 @@ import {
   TICKET_PRINT_SETTINGS_DEFAULTS,
 } from '../api/ticketPrintSettings';
 import logger from '../utils/logger';
+import {
+  formatRegistrarDate,
+  formatRegistrarDateTime,
+  formatRegistrarTime,
+  parseRegistrarTimestamp,
+} from '../utils/dateUtils';
 import { finalizePrintableWindow, openPrintableWindow } from '../utils/printWindow';
 
 function normalizePrintableDateString(value) {
@@ -33,8 +39,8 @@ function tryParsePrintableDate(value) {
   }
 
   for (const candidate of candidates) {
-    const parsed = new Date(candidate);
-    if (!Number.isNaN(parsed.getTime())) {
+    const parsed = parseRegistrarTimestamp(candidate);
+    if (parsed && !Number.isNaN(parsed.getTime())) {
       return parsed;
     }
   }
@@ -43,22 +49,15 @@ function tryParsePrintableDate(value) {
 }
 
 function formatPrintableDate(date) {
-  return date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return formatRegistrarDate(date);
 }
 
 function formatPrintableTime(date) {
-  return date.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return formatRegistrarTime(date);
 }
 
 function formatPrintableDateTime(date) {
-  return `${formatPrintableDate(date)} ${formatPrintableTime(date)}`;
+  return formatRegistrarDateTime(date);
 }
 
 function normalizeDateOnly(value) {
@@ -668,7 +667,7 @@ function renderPanelTicketMarkup(payload, settings, branding, issuedAt) {
 }
 
 function renderPanelTicketHtml(payloads, settings, branding) {
-  const issuedAt = new Date().toLocaleString('ru-RU');
+  const issuedAt = formatRegistrarDateTime(new Date().toISOString());
   const safePayloads = Array.isArray(payloads) && payloads.length > 0 ? payloads : [];
   const documentTitle = safePayloads.length > 1
     ? `Талоны (${safePayloads.length})`
@@ -957,7 +956,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
   const patient = receiptPayload?.patient || {};
   const services = Array.isArray(receiptPayload?.services) ? receiptPayload.services : [];
   const currency = services[0]?.currency || 'UZS';
-  const issuedAt = new Date().toLocaleString('ru-RU');
+  const issuedAt = formatRegistrarDateTime(new Date().toISOString());
 
   const serviceRows = services.length > 0
     ? services.map((service) => `
