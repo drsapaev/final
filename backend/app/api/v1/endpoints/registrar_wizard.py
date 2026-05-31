@@ -2927,8 +2927,6 @@ def mark_visit_as_paid(
 
             # [OK] ИСПРАВЛЕНО: Используем прямой SQL для создания платежа, чтобы обойти конфликт моделей
             # (BillingPayment и Payment используют одну таблицу, что вызывает проблемы)
-            from datetime import datetime, timezone
-
             from sqlalchemy import text
 
             currency = total_info.get("currency", "UZS")
@@ -3120,7 +3118,6 @@ def mark_queue_entry_as_paid(
             )
             payment_amount = float(total_info["total"])
 
-            from datetime import datetime, timezone
             from sqlalchemy import text
 
             currency = total_info.get("currency", "UZS")
