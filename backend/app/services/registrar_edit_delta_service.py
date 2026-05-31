@@ -370,7 +370,15 @@ class RegistrarEditDeltaService:
         create_only_if_needed: bool,
     ) -> Visit | None:
         if entry.visit_id:
-            return self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+            visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+            if visit:
+                if visit.patient_id != patient.id:
+                    raise ValueError(
+                        "Queue entry visit does not belong to the requested patient"
+                    )
+                return visit
+            if not create_only_if_needed:
+                return None
         if not create_only_if_needed:
             return None
         visit = self._create_visit(

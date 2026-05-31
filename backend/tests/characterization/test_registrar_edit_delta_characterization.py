@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
@@ -435,6 +436,84 @@ def test_edit_delta_pending_invoice_receives_delta(
     assert payload["invoice_id"] == invoice.id
     db_session.refresh(invoice)
     assert invoice.total_amount == Decimal("40000.00")
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_edit_delta_rejects_queue_entry_linked_to_other_patient_visit(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_doctor,
+):
+    original_service = _create_service(
+        db_session,
+        code="OWNER-OLD-01",
+        name="Owner Old Lab",
+        queue_tag="laboratory_general",
+    )
+    added_service = _create_service(
+        db_session,
+        code="OWNER-NEW-01",
+        name="Owner New Lab",
+        queue_tag="laboratory_general",
+        price=Decimal("30000"),
+    )
+    other_patient = Patient(
+        last_name="Other",
+        first_name="Patient",
+        phone="+998900000999",
+    )
+    db_session.add(other_patient)
+    db_session.commit()
+    db_session.refresh(other_patient)
+    other_visit = _create_visit(
+        db_session,
+        patient=other_patient,
+        doctor_id=test_doctor.id,
+        department="laboratory_general",
+    )
+    queue = _create_queue(
+        db_session,
+        specialist_id=test_doctor.id,
+        queue_tag="laboratory_general",
+    )
+    entry = _create_entry(
+        db_session,
+        queue=queue,
+        patient=test_patient,
+        service=original_service,
+        visit_id=other_visit.id,
+    )
+
+    response = _post_edit_delta(
+        client,
+        registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": added_service.id, "quantity": 1}],
+        entry_ids=[entry.id],
+    )
+
+    assert response.status_code == 400, response.text
+    assert "does not belong" in response.json()["detail"]
+    assert (
+        db_session.query(VisitService)
+        .filter(
+            VisitService.visit_id == other_visit.id,
+            VisitService.service_id == added_service.id,
+        )
+        .count()
+        == 0
+    )
+    assert (
+        db_session.query(PaymentInvoiceVisit)
+        .filter(PaymentInvoiceVisit.visit_id == other_visit.id)
+        .count()
+        == 0
+    )
+    db_session.refresh(entry)
+    assert {svc["service_id"] for svc in entry.services} == {original_service.id}
 
 
 @pytest.mark.integration
