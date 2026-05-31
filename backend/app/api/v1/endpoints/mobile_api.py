@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -22,6 +23,7 @@ from app.crud import (
 )
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
+from app.models.notification import NotificationHistory
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
     BookAppointmentRequest,
@@ -58,6 +60,38 @@ def compress_json_response(data: dict) -> Response:
         )
     else:
         return JSONResponse(content=data)
+
+
+def _get_mobile_notification_rows(
+    db: Session,
+    *,
+    user_id: int,
+    patient_id: int | None,
+    limit: int,
+    offset: int,
+) -> list[NotificationHistory]:
+    ownership_filters = [
+        and_(
+            NotificationHistory.recipient_type == "user",
+            NotificationHistory.recipient_id == user_id,
+        )
+    ]
+    if patient_id is not None:
+        ownership_filters.append(
+            and_(
+                NotificationHistory.recipient_type == "patient",
+                NotificationHistory.recipient_id == patient_id,
+            )
+        )
+
+    return (
+        db.query(NotificationHistory)
+        .filter(or_(*ownership_filters))
+        .order_by(NotificationHistory.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.post("/mobile/auth/login", response_model=MobileLoginResponse)
@@ -412,8 +446,13 @@ async def get_mobile_notifications(
 ):
     """История уведомлений для мобильного приложения"""
     try:
-        notifications = crud_notification.get_user_notifications(
-            db, user_id=current_user.id, limit=limit
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
+        notifications = _get_mobile_notification_rows(
+            db,
+            user_id=current_user.id,
+            patient_id=patient.id if patient else None,
+            limit=limit,
+            offset=offset,
         )
 
         return [
@@ -422,9 +461,9 @@ async def get_mobile_notifications(
                 "title": notif.subject, # Subject as title
                 "message": notif.content,
                 "type": notif.notification_type,
-                "data": notif.metadata,
+                "data": notif.notification_metadata or {},
                 "sent_at": notif.created_at,
-                "read": notif.is_read if hasattr(notif, 'is_read') else False, # Assuming is_read field exists or logic needed
+                "read": False,
             }
             for notif in notifications
         ]

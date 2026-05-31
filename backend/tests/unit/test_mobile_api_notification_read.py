@@ -9,6 +9,67 @@ from app.api.v1.endpoints import mobile_api
 
 
 @pytest.mark.asyncio
+async def test_mobile_notifications_list_uses_owned_rows_and_model_fields(
+    monkeypatch,
+):
+    notification = SimpleNamespace(
+        id=10,
+        subject="Visit reminder",
+        content="Tomorrow at 10:00",
+        notification_type="appointment",
+        notification_metadata={"appointment_id": 42},
+        created_at="2026-05-31T10:00:00",
+    )
+    calls = {}
+
+    def fail_stale_crud(*_args, **_kwargs):
+        raise AssertionError("stale user_id NotificationHistory helper used")
+
+    def fake_rows(_db, *, user_id, patient_id, limit, offset):
+        calls.update(
+            {
+                "user_id": user_id,
+                "patient_id": patient_id,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        return [notification]
+
+    monkeypatch.setattr(
+        mobile_api.crud_notification,
+        "get_user_notifications",
+        fail_stale_crud,
+    )
+    monkeypatch.setattr(
+        mobile_api,
+        "get_patient_by_user_id",
+        lambda _db, user_id: SimpleNamespace(id=9, user_id=user_id),
+    )
+    monkeypatch.setattr(mobile_api, "_get_mobile_notification_rows", fake_rows)
+
+    response = await mobile_api.get_mobile_notifications(
+        current_user=SimpleNamespace(id=55),
+        db=object(),
+        limit=7,
+        offset=2,
+    )
+
+    assert calls == {"user_id": 55, "patient_id": 9, "limit": 7, "offset": 2}
+    assert response == [
+        {
+            "id": 10,
+            "title": "Visit reminder",
+            "message": "Tomorrow at 10:00",
+            "type": "appointment",
+            "data": {"appointment_id": 42},
+            "sent_at": "2026-05-31T10:00:00",
+            "read": False,
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_mobile_notification_read_accepts_owned_user_notification(monkeypatch):
     notification = SimpleNamespace(
         id=10,
