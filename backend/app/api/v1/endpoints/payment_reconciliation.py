@@ -19,6 +19,29 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.post("/reconcile/all")
+async def reconcile_all_providers(
+    start_date: date = Query(..., description="Start date for reconciliation"),
+    end_date: date = Query(..., description="End date for reconciliation"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin")),
+) -> dict:
+    """
+    Reconcile all payment providers
+
+    ✅ SECURITY: Requires Admin role
+    """
+    service = PaymentReconciliationApiService(db)
+    try:
+        return service.reconcile_all_providers(
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except PaymentReconciliationApiDomainError as exc:
+        logger.error("Error in reconcile_all_providers: %s", exc.detail)
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
 @router.post("/reconcile/{provider}")
 async def reconcile_provider(
     provider: str,
@@ -41,29 +64,6 @@ async def reconcile_provider(
         )
     except PaymentReconciliationApiDomainError as exc:
         logger.error("Error in reconcile_provider: %s", exc.detail)
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
-
-@router.post("/reconcile/all")
-async def reconcile_all_providers(
-    start_date: date = Query(..., description="Start date for reconciliation"),
-    end_date: date = Query(..., description="End date for reconciliation"),
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin")),
-) -> dict:
-    """
-    Reconcile all payment providers
-
-    ✅ SECURITY: Requires Admin role
-    """
-    service = PaymentReconciliationApiService(db)
-    try:
-        return service.reconcile_all_providers(
-            start_date=start_date,
-            end_date=end_date,
-        )
-    except PaymentReconciliationApiDomainError as exc:
-        logger.error("Error in reconcile_all_providers: %s", exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
