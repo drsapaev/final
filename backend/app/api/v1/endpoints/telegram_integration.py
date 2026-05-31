@@ -13,6 +13,7 @@ from app.api.deps import get_db, require_roles
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
 from app.models.appointment import Appointment
+from app.models.lab import LabOrder, LabResult
 from app.models.user import User
 from app.services.telegram_service import (
     get_telegram_service,
@@ -60,6 +61,47 @@ def _ensure_appointment_reminder_belongs_to_phone(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
+
+def _lab_result_id_from_payload(lab_data: Dict[str, Any]) -> int | None:
+    for key in ("lab_results_id", "lab_result_id", "id"):
+        value = lab_data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid lab_results_id",
+            )
+    return None
+
+
+def _ensure_lab_notification_belongs_to_phone(
+    db: Session,
+    *,
+    patient_phone: str,
+    lab_data: Dict[str, Any],
+) -> None:
+    lab_result_id = _lab_result_id_from_payload(lab_data)
+    if lab_result_id is None:
+        return
+
+    lab_result = db.query(LabResult).filter(LabResult.id == lab_result_id).first()
+    if not lab_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lab result not found",
+        )
+
+    lab_order = db.query(LabOrder).filter(LabOrder.id == lab_result.order_id).first()
+    patient = crud_patient.find_patient(db, phone=patient_phone)
+    if not lab_order or not patient or lab_order.patient_id != patient.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
 
 # ===================== УВЕДОМЛЕНИЯ =====================
 
@@ -211,6 +253,12 @@ async def send_lab_results_notification(
             }
 
         # Формируем данные для шаблона
+        _ensure_lab_notification_belongs_to_phone(
+            db,
+            patient_phone=patient_phone,
+            lab_data=lab_data,
+        )
+
         template_data = {
             "patient_name": lab_data.get("patient_name", "Пациент"),
             "test_type": lab_data.get("test_type", "Лабораторное исследование"),
