@@ -241,6 +241,7 @@ api_router.include_router(
     system_management.router, prefix="/system", tags=["system-management"]
 )
 # Эндпоинты системы webhook'ов
+api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
@@ -281,7 +282,6 @@ api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
 api_router.include_router(board_ep.router, tags=["board"])
-api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_appointments.router, tags=["admin-appointments"])
@@ -375,6 +375,7 @@ api_router.include_router(
 api_router.include_router(
     email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"]
 )
+api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(file_system.router, prefix="/files", tags=["file-system"])
 api_router.include_router(
     file_upload_simple.router, prefix="/files", tags=["file-upload-simple"]
@@ -382,7 +383,6 @@ api_router.include_router(
 api_router.include_router(
     file_upload_json.router, prefix="/files", tags=["file-upload-json"]
 )
-api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
 # Legacy queue router (для обратной совместимости)
 # ⚠️ DEPRECATED: Используйте /queue/qr-tokens/* или /queue/join/* из qr_queue.py
