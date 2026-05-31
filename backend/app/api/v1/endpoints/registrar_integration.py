@@ -2868,28 +2868,10 @@ def get_today_queues(
                                         "price": 0
                                     })
 
-                # [OK] УПРОЩЕНО: Добавляем appointment_id для Visit (если был создан соответствующий Appointment)
-                # Используем проверки вместо try/except (Single Source of Truth)
+                # appointment_id must mean a real Appointment.id for this row.
+                # Visit rows do not have an explicit Appointment FK, so a fuzzy
+                # patient/date/doctor match can expose an unrelated appointment.
                 appointment_id_value = record_id if entry_type == "appointment" else None
-                if entry_type == "visit" and patient_id:
-                    # Проверяем, есть ли Appointment для этого Visit
-                    visit_date = getattr(entry_data, 'visit_date', None) or today
-                    doctor_id = getattr(entry_data, 'doctor_id', None)
-
-                    if visit_date and doctor_id:
-                        existing_appointment = (
-                            db.query(Appointment)
-                            .filter(
-                                and_(
-                                    Appointment.patient_id == patient_id,
-                                    Appointment.appointment_date == visit_date,
-                                    Appointment.doctor_id == doctor_id,
-                                )
-                            )
-                            .first()
-                        )
-                        if existing_appointment:
-                            appointment_id_value = existing_appointment.id
 
                 # ✅ ИСПРАВЛЕНО: Получаем РЕАЛЬНЫЙ номер и queue_time из queue_entries
                 # Используем Table reflection вместо ORM модели для избежания конфликта DailyQueue

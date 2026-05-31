@@ -13,6 +13,7 @@ from app.models.online_queue import DailyQueue
 from app.models.online_queue import OnlineQueueEntry
 from app.models.payment import Payment
 from app.models.visit import Visit
+from app.models.visit import VisitService
 
 
 @pytest.mark.integration
@@ -208,6 +209,69 @@ class TestRegistrarAllAppointments:
         assert found_entry["phone"] == test_patient.phone
         assert found_entry["patient_birth_year"] == 1985
         assert found_entry["address"] == "Clinic Street 1"
+
+    def test_today_queues_visit_rows_do_not_expose_fuzzy_appointment_id(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        test_service,
+    ):
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="10:00",
+            status="waiting",
+            discount_mode="none",
+            department="cardiology",
+            source="desk",
+        )
+        unrelated_appointment = Appointment(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="11:00",
+            status="scheduled",
+            visit_type="paid",
+            payment_type="cash",
+            services=[],
+            notes="same patient/date/doctor but not linked to the visit",
+        )
+        db_session.add_all([visit, unrelated_appointment])
+        db_session.flush()
+        visit_service = VisitService(
+            visit_id=visit.id,
+            service_id=test_service.id,
+            code=test_service.code,
+            name=test_service.name,
+            qty=1,
+            price=test_service.price,
+            currency="UZS",
+        )
+        db_session.add(visit_service)
+        db_session.commit()
+        db_session.refresh(visit)
+        db_session.refresh(unrelated_appointment)
+
+        response = client.get(
+            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        found_visit = next(
+            entry
+            for queue_payload in payload["queues"]
+            for entry in queue_payload["entries"]
+            if entry.get("record_kind") == "visit" and entry.get("id") == visit.id
+        )
+
+        assert found_visit["visit_id"] == visit.id
+        assert found_visit["appointment_id"] is None
 
     def test_today_queues_secondary_doctor_actions_are_backend_owned(self):
         user = type("UserStub", (), {"role": "cardio", "roles": []})()
