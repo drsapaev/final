@@ -635,23 +635,6 @@ async def get_pending_payments(
         raise _appointments_http_error(e, "list_appointments") from e
 
 
-@router.get("/{appointment_id}", response_model=appointment_schemas.Appointment)
-def get_appointment(
-    *,
-    db: Session = Depends(deps.get_db),
-    appointment_id: int,
-    current_user: User = Depends(deps.get_current_user),
-):
-    """
-    Получить запись на прием по ID
-    """
-    appointment = appointment_crud.get(db, id=appointment_id)
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
-    _ensure_appointment_record_access(db, appointment, current_user)
-    return appointment
-
-
 @router.put("/{appointment_id}", response_model=appointment_schemas.Appointment)
 def update_appointment(
     *,
@@ -1283,3 +1266,20 @@ async def get_pending_payments(
 
     except Exception as e:
         raise _appointments_http_error(e, "get_pending_payments") from e
+
+
+@router.get("/{appointment_id}", response_model=appointment_schemas.Appointment)
+def get_appointment(
+    *,
+    db: Session = Depends(deps.get_db),
+    appointment_id: int,
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Получить запись на прием по ID
+    """
+    appointment = appointment_crud.get(db, id=appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    _ensure_appointment_record_access(db, appointment, current_user)
+    return appointment
