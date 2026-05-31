@@ -387,17 +387,15 @@ def find_or_create_today_visit(
 ) -> Visit:
     """Найти или создать визит на сегодня"""
     # Ищем открытый визит на сегодня
-    visit = (
-        db.query(Visit)
-        .filter(
-            and_(
-                Visit.patient_id == patient_id,
-                Visit.visit_date == date.today(),
-                Visit.status == "open",
-            )
-        )
-        .first()
-    )
+    filters = [
+        Visit.patient_id == patient_id,
+        Visit.visit_date == date.today(),
+        Visit.status == "open",
+    ]
+    if doctor_id is not None:
+        filters.append(Visit.doctor_id == doctor_id)
+
+    visit = db.query(Visit).filter(and_(*filters)).first()
 
     if not visit:
         # Создаем новый визит

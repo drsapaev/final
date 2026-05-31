@@ -601,11 +601,7 @@ def start_patient_visit(
             db=db,
             patient_id=queue_entry.patient_id,
             doctor_id=doctor.id,
-            department=(
-                queue_entry.queue.department
-                if hasattr(queue_entry, 'queue')
-                else "general"
-            ),
+            department=getattr(daily_queue, "queue_tag", None) or "general",
         )
 
         # Обновляем время начала приема
