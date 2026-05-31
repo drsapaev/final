@@ -5,6 +5,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -234,5 +235,38 @@ def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes()
                 )
 
     assert not shadow_messages, "Static routes declared after parameter routes:\n" + "\n".join(
+        shadow_messages
+    )
+
+
+def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() -> None:
+    """Router include order must not hide static paths behind earlier path parameters."""
+
+    published_routes: list[tuple[int, str, str, str]] = []
+    for route_index, route in enumerate(app.routes):
+        if not isinstance(route, APIRoute):
+            continue
+        for method in sorted(route.methods or []):
+            if method in {"HEAD", "OPTIONS"}:
+                continue
+            published_routes.append((route_index, method, route.path, route.name))
+
+    shadow_messages: list[str] = []
+    for index, method, route_path, route_name in published_routes:
+        for previous_index, previous_method, previous_route_path, previous_route_name in (
+            published_routes
+        ):
+            if previous_index >= index:
+                break
+            if method != previous_method:
+                continue
+            if not _is_shadowed_static_route(previous_route_path, route_path):
+                continue
+            shadow_messages.append(
+                f"{index}: {method} {route_path} ({route_name}) is shadowed by "
+                f"{previous_route_path} ({previous_route_name}) at {previous_index}"
+            )
+
+    assert not shadow_messages, "Published static routes shadowed by app order:\n" + "\n".join(
         shadow_messages
     )
