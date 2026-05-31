@@ -19,6 +19,7 @@ from app.models.dynamic_pricing import (
     PricingRuleType,
     ServicePackage,
 )
+from app.models.appointment import Appointment
 from app.models.service import Service
 from app.models.visit import Visit
 
@@ -382,6 +383,26 @@ class DynamicPricingService:
                 raise ValueError("Превышен лимит покупок для пациента")
 
         # Создаем покупку
+        if visit_id is not None:
+            visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
+                raise ValueError("Visit not found")
+            if visit.patient_id != patient_id:
+                raise ValueError("Visit does not belong to package purchase patient")
+
+        if appointment_id is not None:
+            appointment = (
+                self.db.query(Appointment)
+                .filter(Appointment.id == appointment_id)
+                .first()
+            )
+            if not appointment:
+                raise ValueError("Appointment not found")
+            if appointment.patient_id != patient_id:
+                raise ValueError(
+                    "Appointment does not belong to package purchase patient"
+                )
+
         purchase = PackagePurchase(
             package_id=package_id,
             patient_id=patient_id,
