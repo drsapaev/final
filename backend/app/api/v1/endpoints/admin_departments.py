@@ -443,7 +443,7 @@ def list_departments(
     return {"success": True, "data": data, "count": len(departments)}
 
 
-@router.get("/overview", response_model=dict, include_in_schema=False)
+@router.get("/overview", response_model=dict)
 def get_departments_overview(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
@@ -851,8 +851,7 @@ def update_queue_settings(
 # ============================================================
 
 
-@router.get("/overview", response_model=dict)
-def get_departments_overview(
+def _legacy_departments_overview_payload(
     db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
     """Получить обзор статистики всех отделений"""
