@@ -113,6 +113,19 @@ def create_patient(
     )
 
 
+@router.get("/deleted", response_model=List[patient_schemas.Patient])
+def get_deleted_patients(
+    *,
+    db: Session = Depends(deps.get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(deps.require_roles("Admin")),
+):
+    from app.crud.patient import get_deleted_patients as do_get_deleted
+
+    return do_get_deleted(db, skip=skip, limit=limit)
+
+
 @router.get("/{patient_id}", response_model=patient_schemas.Patient)
 def get_patient(
     *,
@@ -253,24 +266,6 @@ def restore_patient(
     )
     
     return {"message": "Пациент восстановлен", "patient_id": patient_id}
-
-
-@router.get("/deleted", response_model=List[patient_schemas.Patient])
-def get_deleted_patients(
-    *,
-    db: Session = Depends(deps.get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
-    current_user: User = Depends(deps.require_roles("Admin")),
-):
-    """
-    Получить список удалённых пациентов.
-    
-    Только администраторы могут видеть удалённых пациентов.
-    """
-    from app.crud.patient import get_deleted_patients as do_get_deleted
-    
-    return do_get_deleted(db, skip=skip, limit=limit)
 
 
 # ===================== FAMILY RELATIONS ENDPOINTS =====================

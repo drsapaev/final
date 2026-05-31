@@ -13,6 +13,13 @@ from app.schemas.patient import PatientCreate, PatientUpdate
 
 
 class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
+    def get(self, db: Session, *, id: Any) -> Patient | None:
+        return (
+            db.query(self.model)
+            .filter(self.model.id == id, self.model.is_deleted.is_(False))
+            .first()
+        )
+
     def get_patients(
         self,
         db: Session,
@@ -29,7 +36,7 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
             phone: Точный поиск по номеру телефона (приоритет)
             search_query: Общий поиск по всем полям
         """
-        query = db.query(self.model)
+        query = db.query(self.model).filter(self.model.is_deleted.is_(False))
 
         # Приоритет 1: Точный поиск по телефону
         if phone:
@@ -72,7 +79,11 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
         """
         Получить пациента по номеру телефона
         """
-        return db.query(self.model).filter(self.model.phone == phone).first()
+        return (
+            db.query(self.model)
+            .filter(self.model.phone == phone, self.model.is_deleted.is_(False))
+            .first()
+        )
 
     def has_active_appointments(self, db: Session, *, patient_id: int) -> bool:
         """
@@ -128,12 +139,63 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
 patient = CRUDPatient(Patient)
 
 
+def soft_delete_patient(
+    db: Session, *, patient_id: int, deleted_by: int
+) -> Patient | None:
+    patient_obj = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient_obj or patient_obj.is_deleted:
+        return None
+
+    patient_obj.is_deleted = True
+    patient_obj.deleted_at = datetime.utcnow()
+    patient_obj.deleted_by = deleted_by
+    db.add(patient_obj)
+    db.commit()
+    db.refresh(patient_obj)
+    return patient_obj
+
+
+def restore_patient(db: Session, *, patient_id: int) -> Patient | None:
+    patient_obj = (
+        db.query(Patient)
+        .filter(Patient.id == patient_id, Patient.is_deleted.is_(True))
+        .first()
+    )
+    if not patient_obj:
+        return None
+
+    patient_obj.is_deleted = False
+    patient_obj.deleted_at = None
+    patient_obj.deleted_by = None
+    db.add(patient_obj)
+    db.commit()
+    db.refresh(patient_obj)
+    return patient_obj
+
+
+def get_deleted_patients(
+    db: Session, *, skip: int = 0, limit: int = 100
+) -> list[Patient]:
+    return (
+        db.query(Patient)
+        .filter(Patient.is_deleted.is_(True))
+        .order_by(Patient.deleted_at.desc(), Patient.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
 
 def get_patient_by_user_id(db: Session, user_id: int) -> Patient | None:
     """Получить пациента по ID пользователя"""
-    return db.query(Patient).filter(Patient.user_id == user_id).first()
+    return (
+        db.query(Patient)
+        .filter(Patient.user_id == user_id, Patient.is_deleted.is_(False))
+        .first()
+    )
 
 
 def create_patient_from_user(db: Session, user: User) -> Patient:
@@ -324,7 +386,11 @@ def find_patient(
     """
     # Приоритет 1: Поиск по ID
     if patient_id:
-        return db.query(Patient).filter(Patient.id == patient_id).first()
+        return (
+            db.query(Patient)
+            .filter(Patient.id == patient_id, Patient.is_deleted.is_(False))
+            .first()
+        )
 
     # Приоритет 2: Поиск по телефону
     if phone:
@@ -334,7 +400,10 @@ def find_patient(
         )
         patient = (
             db.query(Patient)
-            .filter(Patient.phone.like(f"%{normalized_phone}%"))
+            .filter(
+                Patient.phone.like(f"%{normalized_phone}%"),
+                Patient.is_deleted.is_(False),
+            )
             .first()
         )
         if patient:
@@ -346,6 +415,7 @@ def find_patient(
         patient = (
             db.query(Patient)
             .filter(
+                Patient.is_deleted.is_(False),
                 or_(
                     Patient.first_name.ilike(search_term),
                     Patient.last_name.ilike(search_term),
