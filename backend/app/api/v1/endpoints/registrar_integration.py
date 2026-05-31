@@ -2164,12 +2164,26 @@ def get_today_queues(
             try:
                 from sqlalchemy import text
 
-                if patient_id:
+                if patient_id and appointment_date and doctor_id is not None:
                     queue_entry_row = db.execute(
                         text(
-                            "SELECT queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"
+                            """
+                            SELECT qe.queue_time
+                            FROM queue_entries qe
+                            JOIN daily_queues dq ON qe.queue_id = dq.id
+                            WHERE qe.patient_id = :patient_id
+                              AND qe.visit_id IS NULL
+                              AND dq.day = :appointment_date
+                              AND dq.specialist_id = :doctor_id
+                            ORDER BY qe.created_at DESC
+                            LIMIT 1
+                            """
                         ),
-                        {"patient_id": patient_id},
+                        {
+                            "patient_id": patient_id,
+                            "appointment_date": appointment_date,
+                            "doctor_id": doctor_id,
+                        },
                     ).first()
                     if queue_entry_row and queue_entry_row.queue_time:
                         appointment_queue_time = queue_entry_row.queue_time
@@ -2932,13 +2946,32 @@ def get_today_queues(
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
                                 queue_entry_time = queue_entry_row.queue_time
-                        elif entry_type == "appointment" and patient_id:
-                            # Для Appointment ищем по patient_id
+                        elif (
+                            entry_type == "appointment"
+                            and patient_id
+                            and appointment_date
+                            and doctor_id is not None
+                        ):
+                            # Для Appointment используем только queue entry того же пациента, дня и врача.
                             queue_entry_row = db.execute(
                                 text(
-                                    "SELECT number, queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"
+                                    """
+                                    SELECT qe.number, qe.queue_time
+                                    FROM queue_entries qe
+                                    JOIN daily_queues dq ON qe.queue_id = dq.id
+                                    WHERE qe.patient_id = :patient_id
+                                      AND qe.visit_id IS NULL
+                                      AND dq.day = :appointment_date
+                                      AND dq.specialist_id = :doctor_id
+                                    ORDER BY qe.created_at DESC
+                                    LIMIT 1
+                                    """
                                 ),
-                                {"patient_id": patient_id},
+                                {
+                                    "patient_id": patient_id,
+                                    "appointment_date": appointment_date,
+                                    "doctor_id": doctor_id,
+                                },
                             ).first()
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number

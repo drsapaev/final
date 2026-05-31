@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -209,6 +209,80 @@ class TestRegistrarAllAppointments:
         assert found_entry["phone"] == test_patient.phone
         assert found_entry["patient_birth_year"] == 1985
         assert found_entry["address"] == "Clinic Street 1"
+
+    def test_today_queues_appointment_does_not_inherit_unrelated_patient_queue_time(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+    ):
+        old_queue = DailyQueue(
+            day=date.today() - timedelta(days=1),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        db_session.add(old_queue)
+        db_session.flush()
+
+        unrelated_queue_time = datetime(
+            2026, 4, 15, 8, 0, tzinfo=ZoneInfo("Asia/Tashkent")
+        )
+        unrelated_entry = OnlineQueueEntry(
+            queue_id=old_queue.id,
+            number=77,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=None,
+            source="desk",
+            status="waiting",
+            queue_time=unrelated_queue_time,
+            created_at=datetime(
+                2026, 4, 16, 12, 0, tzinfo=ZoneInfo("Asia/Tashkent")
+            ),
+        )
+        appointment_created_at = datetime(
+            2026, 4, 16, 10, 0, tzinfo=ZoneInfo("Asia/Tashkent")
+        )
+        appointment = Appointment(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="11:00",
+            status="scheduled",
+            visit_type="paid",
+            payment_type="cash",
+            services=[],
+            notes="same patient but unrelated queue entry from another day",
+            created_at=appointment_created_at,
+        )
+        db_session.add_all([unrelated_entry, appointment])
+        db_session.commit()
+        db_session.refresh(appointment)
+
+        response = client.get(
+            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        appointment_row = next(
+            entry
+            for queue in payload["queues"]
+            for entry in queue["entries"]
+            if entry["record_kind"] == "appointment" and entry["id"] == appointment.id
+        )
+
+        assert appointment_row["number"] != unrelated_entry.number
+        assert appointment_row["queue_position"] != unrelated_entry.number
+        assert appointment_row["queue_time"] != _serialize_registrar_datetime(
+            unrelated_queue_time
+        )
+        assert appointment_row["queue_time"] == appointment_row["created_at"]
 
     def test_today_queues_visit_rows_do_not_expose_fuzzy_appointment_id(
         self,
