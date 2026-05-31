@@ -21,6 +21,7 @@ from app.crud import (
 )
 from app.models.clinic import Doctor
 from app.models.lab import LabOrder
+from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.telegram_bot import get_telegram_bot_service
@@ -171,6 +172,46 @@ def _ensure_lab_results_belong_to_patient(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied",
             )
+
+
+def _payment_id_from_payload(payment_data: Dict[str, Any]) -> int | None:
+    for key in ("payment_id", "id"):
+        value = payment_data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid payment_id",
+            )
+    return None
+
+
+def _ensure_payment_confirmation_belongs_to_patient(
+    db: Session,
+    *,
+    patient_id: int,
+    payment_data: Dict[str, Any],
+) -> None:
+    payment_id = _payment_id_from_payload(payment_data)
+    if payment_id is None:
+        return
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+    if not visit or visit.patient_id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
 
 
 @router.post("/send-appointment-reminder")
@@ -378,6 +419,12 @@ async def send_payment_confirmation(
             )
 
         # Ищем Telegram пользователя
+        _ensure_payment_confirmation_belongs_to_patient(
+            db,
+            patient_id=patient_id,
+            payment_data=payment_data,
+        )
+
         telegram_user = crud_telegram.find_telegram_user_by_phone(db, patient.phone)
         if not telegram_user:
             return {

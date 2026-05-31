@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import BackgroundTasks
@@ -702,6 +702,62 @@ async def test_send_payment_confirmation_message_omits_raw_payment_identifiers(
         "https://clinic.example.com/telegram/mini-app/patient?section=payments"
         in telegram_payload
     )
+
+
+@pytest.mark.asyncio
+async def test_send_payment_confirmation_rejects_payment_for_different_patient(
+    monkeypatch,
+):
+    patient = SimpleNamespace(
+        phone="+998901234567",
+        full_name="Sensitive Patient",
+    )
+    payment = SimpleNamespace(id=456, visit_id=10)
+    visit = SimpleNamespace(id=10, patient_id=999)
+    find_telegram_user = Mock()
+
+    class FakeQuery:
+        def __init__(self, result):
+            self.result = result
+
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def first(self):
+            return self.result
+
+    class FakeDb:
+        def query(self, model):
+            if model is telegram_notifications.Payment:
+                return FakeQuery(payment)
+            if model is telegram_notifications.Visit:
+                return FakeQuery(visit)
+            raise AssertionError(f"Unexpected query model: {model}")
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        lambda _db, _patient_id: patient,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications.crud_telegram,
+        "find_telegram_user_by_phone",
+        find_telegram_user,
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await telegram_notifications.send_payment_confirmation(
+            patient_id=123,
+            payment_data={"payment_id": 456, "amount": 125000},
+            background_tasks=BackgroundTasks(),
+            db=FakeDb(),
+            current_user=SimpleNamespace(role="Cashier"),
+        )
+
+    assert exc_info.value.status_code == 403
+    find_telegram_user.assert_not_called()
 
 
 @pytest.mark.asyncio
