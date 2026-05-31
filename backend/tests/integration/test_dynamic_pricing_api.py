@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
-from app.models.dynamic_pricing import PricingRule, PricingRuleService, ServicePackage
+from app.models.appointment import Appointment
+from app.models.dynamic_pricing import (
+    PackagePurchase,
+    PricingRule,
+    PricingRuleService,
+    ServicePackage,
+)
+from app.models.patient import Patient
 from app.models.service import Service
+from app.models.visit import Visit
 
 
 def _login_admin(client, admin_user, admin_password):
@@ -155,4 +164,77 @@ def test_patient_cannot_read_dynamic_pricing_analytics(client, patient_token):
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_purchase_package_rejects_cross_patient_visit_and_appointment(
+    client,
+    db_session,
+    admin_user,
+    admin_password,
+):
+    purchase_patient = Patient(
+        first_name="Package",
+        last_name="Owner",
+        phone="+998901110001",
+    )
+    other_patient = Patient(
+        first_name="Other",
+        last_name="Context",
+        phone="+998901110002",
+    )
+    db_session.add_all([purchase_patient, other_patient])
+    db_session.flush()
+
+    other_visit = Visit(patient_id=other_patient.id, status="open")
+    other_appointment = Appointment(
+        patient_id=other_patient.id,
+        appointment_date=date.today(),
+        appointment_time="10:00",
+        status="scheduled",
+    )
+    package = ServicePackage(
+        name="Cross Patient Guard Package",
+        package_price=Decimal("9000"),
+        original_price=Decimal("10000"),
+        savings_amount=Decimal("1000"),
+        savings_percentage=10,
+        is_active=True,
+    )
+    db_session.add_all([other_visit, other_appointment, package])
+    db_session.commit()
+    db_session.refresh(purchase_patient)
+    db_session.refresh(other_visit)
+    db_session.refresh(other_appointment)
+    db_session.refresh(package)
+
+    headers = _login_admin(client, admin_user, admin_password)
+
+    visit_response = client.post(
+        "/api/v1/dynamic-pricing/purchase-package",
+        json={
+            "package_id": package.id,
+            "patient_id": purchase_patient.id,
+            "visit_id": other_visit.id,
+        },
+        headers=headers,
+    )
+    appointment_response = client.post(
+        "/api/v1/dynamic-pricing/purchase-package",
+        json={
+            "package_id": package.id,
+            "patient_id": purchase_patient.id,
+            "appointment_id": other_appointment.id,
+        },
+        headers=headers,
+    )
+
+    assert visit_response.status_code == 400, visit_response.text
+    assert appointment_response.status_code == 400, appointment_response.text
+    assert (
+        db_session.query(PackagePurchase)
+        .filter(PackagePurchase.patient_id == purchase_patient.id)
+        .count()
+        == 0
+    )
 
