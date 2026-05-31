@@ -9,8 +9,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud import lab_result
+from app.models.appointment import Appointment
 from app.models.emr import EMR
-from app.models.lab import LabResult
+from app.models.lab import LabOrder, LabResult
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +84,27 @@ class EMRLabIntegrationService:
                 raise ValueError("EMR не найден")
 
             # Получаем лабораторные результаты
+            appointment = (
+                db.query(Appointment)
+                .filter(Appointment.id == emr_record.appointment_id)
+                .first()
+            )
+            if not appointment:
+                raise ValueError("EMR appointment not found")
+
             lab_results = []
             for result_id in lab_result_ids:
                 result = lab_result.get_lab_result(db, result_id)
                 if result:
+                    result_patient_id = (
+                        db.query(LabOrder.patient_id)
+                        .filter(LabOrder.id == result.order_id)
+                        .scalar()
+                    )
+                    if result_patient_id != appointment.patient_id:
+                        raise ValueError(
+                            "Lab result does not belong to the target EMR patient"
+                        )
                     lab_results.append(result)
 
             # Обновляем EMR с лабораторными данными
