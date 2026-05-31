@@ -636,6 +636,71 @@ def test_doctor_emr_lab_integrate_is_limited_to_owned_emr_and_patient_results(
 
 
 @pytest.mark.integration
+def test_admin_emr_lab_integrate_rejects_cross_patient_result(
+    client,
+    auth_headers,
+    db_session,
+) -> None:
+    _own_user, own_doctor = _create_doctor_user(db_session, label="admin_integrate_own")
+    _other_user, other_doctor = _create_doctor_user(
+        db_session,
+        label="admin_integrate_other",
+    )
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    own_visit = _create_visit(
+        db_session,
+        patient_id=own_patient.id,
+        doctor_id=own_doctor.id,
+    )
+    other_visit = _create_visit(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+    )
+    own_emr = _create_emr(
+        db_session,
+        appointment_id=_create_appointment(
+            db_session,
+            patient_id=own_patient.id,
+            doctor_id=own_doctor.id,
+        ).id,
+    )
+    own_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=own_patient.id,
+        visit_id=own_visit.id,
+        test_code="hemoglobin",
+        value="130",
+    )
+    other_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=other_patient.id,
+        visit_id=other_visit.id,
+        test_code="glucose",
+        value="7",
+    )
+
+    own_response = client.post(
+        f"/api/v1/emr/lab/emr/{own_emr.id}/integrate-lab-results",
+        json=[own_result.id],
+        headers=auth_headers,
+    )
+    assert own_response.status_code == 200, own_response.text
+    db_session.refresh(own_emr)
+    assert own_emr.lab_results["hemoglobin"][0]["id"] == own_result.id
+
+    cross_patient_response = client.post(
+        f"/api/v1/emr/lab/emr/{own_emr.id}/integrate-lab-results",
+        json=[other_result.id],
+        headers=auth_headers,
+    )
+    assert cross_patient_response.status_code == 404
+    db_session.refresh(own_emr)
+    assert "glucose" not in own_emr.lab_results
+
+
+@pytest.mark.integration
 def test_lab_template_resolution_api_restricts_template_choices(
     client, auth_headers, db_session, test_patient, test_visit
 ):
