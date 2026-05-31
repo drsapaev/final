@@ -12,14 +12,16 @@ import app.services.lab_reporting_service as lab_reporting_service_module
 from app.models.appointment import Appointment
 from app.models.lab import (
     LabCatalogReferenceRange,
+    LabOrder,
     LabReportFieldDef,
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
 )
+from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 from app.services.notifications import notification_sender_service
 from app.services.lab_reporting_service import (
     LabReportingDomainError,
@@ -402,6 +404,143 @@ class TestLabReportingService:
         assert instance.visit_id is not None
         assert service.repository.get_visit(instance.visit_id) is not None
         assert instance.template.code == "hba1c_panel"
+
+    def test_create_instance_rejects_visit_for_different_patient(
+        self, db_session, test_patient, test_doctor
+    ):
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Patient",
+            phone="+998901111111",
+            birth_date=date(1985, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.flush()
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            department="cardiology",
+        )
+        db_session.add(other_visit)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        cbc_template = next(
+            template
+            for template in service.list_templates()
+            if template.code == "cbc_oak"
+        )
+
+        with pytest.raises(LabReportingDomainError) as exc:
+            service.create_instance(
+                {
+                    "patient_id": test_patient.id,
+                    "visit_id": other_visit.id,
+                    "template_id": cbc_template.id,
+                }
+            )
+
+        assert exc.value.status_code == 409
+        assert "Visit does not belong" in exc.value.detail
+
+    def test_create_instance_rejects_order_for_different_patient(
+        self, db_session, test_patient, test_doctor
+    ):
+        other_patient = Patient(
+            first_name="Order",
+            last_name="Owner",
+            phone="+998902222222",
+            birth_date=date(1986, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.flush()
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:30",
+            status="open",
+            department="cardiology",
+        )
+        db_session.add(other_visit)
+        db_session.flush()
+        other_order = LabOrder(
+            patient_id=other_patient.id,
+            visit_id=other_visit.id,
+            status="ordered",
+        )
+        db_session.add(other_order)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        cbc_template = next(
+            template
+            for template in service.list_templates()
+            if template.code == "cbc_oak"
+        )
+
+        with pytest.raises(LabReportingDomainError) as exc:
+            service.create_instance(
+                {
+                    "patient_id": test_patient.id,
+                    "order_id": other_order.id,
+                    "template_id": cbc_template.id,
+                }
+            )
+
+        assert exc.value.status_code == 409
+        assert "Lab order does not belong" in exc.value.detail
+
+    def test_create_instance_rejects_appointment_for_different_patient_before_visit_creation(
+        self, db_session, test_patient, test_doctor
+    ):
+        other_patient = Patient(
+            first_name="Appointment",
+            last_name="Owner",
+            phone="+998903333333",
+            birth_date=date(1987, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.flush()
+        other_appointment = Appointment(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="15:00",
+            status="scheduled",
+            services=["L24"],
+        )
+        db_session.add(other_appointment)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        hba1c_template = next(
+            template
+            for template in service.list_templates()
+            if template.code == "hba1c_panel"
+        )
+
+        with pytest.raises(LabReportingDomainError) as exc:
+            service.create_instance(
+                {
+                    "patient_id": test_patient.id,
+                    "appointment_id": other_appointment.id,
+                    "template_id": hba1c_template.id,
+                    "service_codes": ["L24"],
+                }
+            )
+
+        assert exc.value.status_code == 409
+        assert "Appointment does not belong" in exc.value.detail
+        assert (
+            db_session.query(Visit)
+            .filter(Visit.patient_id == other_patient.id)
+            .count()
+            == 0
+        )
 
     def test_create_instance_rejects_template_outside_service_binding(
         self, db_session, test_patient, test_visit

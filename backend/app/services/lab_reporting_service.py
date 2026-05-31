@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.appointment import Appointment
 from app.models.lab import (
     FINAL_INSTANCE_STATUSES,
     LabCatalogAnalyte,
@@ -464,11 +465,23 @@ class LabReportingService:
         if not patient:
             raise LabReportingDomainError(404, "Patient not found")
 
+        appointment_id = payload.get("appointment_id")
+        if appointment_id:
+            self._assert_appointment_belongs_to_patient(
+                appointment_id=int(appointment_id),
+                patient_id=int(patient.id),
+            )
+
         visit_id = self._resolve_visit_context(
             visit_id=payload.get("visit_id"),
-            appointment_id=payload.get("appointment_id"),
+            appointment_id=appointment_id,
             create_if_missing=True,
         )
+        if visit_id:
+            self._assert_visit_belongs_to_patient(
+                visit_id=int(visit_id),
+                patient_id=int(patient.id),
+            )
 
         template = self.get_template(payload["template_id"])
         version = self._resolve_instance_version(
@@ -1184,6 +1197,11 @@ class LabReportingService:
             order = self.repository.get_order(order_id)
             if not order:
                 raise LabReportingDomainError(404, "Lab order not found")
+            self._assert_order_belongs_to_context(
+                order=order,
+                patient_id=patient_id,
+                visit_id=visit_id,
+            )
             return order, False
         order = self.repository.find_order_by_visit_and_patient(
             visit_id=visit_id,
@@ -1203,6 +1221,55 @@ class LabReportingService:
                 notes="Auto-created from lab report workflow",
             )
         ), True
+
+    def _assert_appointment_belongs_to_patient(
+        self, *, appointment_id: int, patient_id: int
+    ) -> None:
+        appointment = self.db.get(Appointment, appointment_id)
+        if not appointment:
+            raise LabReportingDomainError(404, "Appointment not found")
+        if appointment.patient_id is None or int(appointment.patient_id) != int(
+            patient_id
+        ):
+            raise LabReportingDomainError(
+                409, "Appointment does not belong to selected patient"
+            )
+
+    def _assert_visit_belongs_to_patient(
+        self, *, visit_id: int, patient_id: int
+    ) -> None:
+        visit = self.repository.get_visit(visit_id)
+        if not visit:
+            raise LabReportingDomainError(404, "Visit not found")
+        if visit.patient_id is None or int(visit.patient_id) != int(patient_id):
+            raise LabReportingDomainError(
+                409, "Visit does not belong to selected patient"
+            )
+
+    def _assert_order_belongs_to_context(
+        self,
+        *,
+        order: LabOrder,
+        patient_id: int,
+        visit_id: int | None,
+    ) -> None:
+        if order.patient_id is not None and int(order.patient_id) != int(patient_id):
+            raise LabReportingDomainError(
+                409, "Lab order does not belong to selected patient"
+            )
+        if order.visit_id is not None:
+            self._assert_visit_belongs_to_patient(
+                visit_id=int(order.visit_id),
+                patient_id=int(patient_id),
+            )
+        if (
+            visit_id is not None
+            and order.visit_id is not None
+            and int(order.visit_id) != int(visit_id)
+        ):
+            raise LabReportingDomainError(
+                409, "Lab order does not belong to selected visit"
+            )
 
     def _emit_lab_new_study_notification(
         self,
