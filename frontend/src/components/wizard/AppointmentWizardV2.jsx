@@ -31,7 +31,7 @@ import {
   isValidUzbekPhone,
   normalizeUzbekPhoneForApi
 } from '../../utils/phoneUtils';
-import { createQueueEntriesBatch, updateOnlineQueueEntry } from '../../api/queue';
+import { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } from '../../api/queue';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -43,6 +43,14 @@ const API_BASE = '/api/v1';
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
 const LEGACY_DRAFT_KEY = 'appointment_wizard_draft';
+
+const getLocalISODate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const normalizeWizardContractValue = (value) => {
   if (value === null || value === undefined) return '';
@@ -150,6 +158,92 @@ const normalizeServiceSelectionName = (serviceValue) => {
   }
 
   return String(serviceValue).trim();
+};
+
+const normalizeGenderForForm = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (['m', 'male', 'man', 'men', '1', 'м', 'муж', 'мужской', 'мужчина', 'erkak'].includes(normalized)) return 'male';
+  if (['f', 'female', 'woman', 'women', '2', 'ж', 'жен', 'женский', 'женщина', 'ayol'].includes(normalized)) return 'female';
+  return value;
+};
+
+const firstNonEmpty = (...values) => {
+  for (const value of values) {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return '';
+};
+
+const resolvePatientGenderValue = (record) => firstNonEmpty(
+  record?.patient_gender,
+  record?.patient_sex,
+  record?.gender,
+  record?.sex,
+  record?.patient?.gender,
+  record?.patient?.sex
+);
+
+const genderToPatientSexForApi = (value) => {
+  const normalized = normalizeGenderForForm(value);
+  if (normalized === 'male') return 'M';
+  if (normalized === 'female') return 'F';
+  return null;
+};
+
+const resolveInitialPatientId = (initialData) => (
+  initialData?.patient_id ??
+  initialData?.patient?.id ??
+  null
+);
+
+const WIZARD_DEPARTMENT_FILTER_KEYS = {
+  cardio: ['cardio'],
+  cardiology: ['cardio', 'cardiology'],
+  echokg: ['cardio', 'echokg', 'ecg'],
+  ecg: ['cardio', 'echokg', 'ecg'],
+  derma: ['derma', 'dermatology'],
+  dermatology: ['derma', 'dermatology'],
+  dental: ['dental', 'dentistry', 'stomatology'],
+  dentistry: ['dental', 'dentistry', 'stomatology'],
+  stomatology: ['dental', 'dentistry', 'stomatology'],
+  lab: ['lab', 'laboratory'],
+  laboratory: ['lab', 'laboratory'],
+  procedures: ['procedures'],
+  procedure: ['procedures']
+};
+
+const getWizardDepartmentFilterKeys = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return WIZARD_DEPARTMENT_FILTER_KEYS[normalized] || [];
+};
+
+const serviceCodeToWizardCategory = (value) => {
+  const prefix = String(value || '').trim().toUpperCase().charAt(0);
+  if (prefix === 'L') return 'laboratory';
+  if (prefix === 'P' || prefix === 'C') return 'procedures';
+  if (prefix === 'K' || prefix === 'D' || prefix === 'S') return 'specialists';
+  return null;
+};
+
+const activeTabToWizardCategory = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['lab', 'laboratory'].includes(normalized)) return 'laboratory';
+  if (['procedures', 'procedure'].includes(normalized)) return 'procedures';
+  return 'specialists';
+};
+
+const resolveInitialServiceCategory = (items = [], activeTabValue = '') => {
+  const firstItem = (Array.isArray(items) ? items : []).find(Boolean);
+  const itemCategory = serviceCodeToWizardCategory(
+    firstItem?.service_code ||
+    firstItem?.code ||
+    firstItem?._temp_name ||
+    firstItem?.service_name
+  );
+  return itemCategory || activeTabToWizardCategory(activeTabValue);
 };
 
 // Категории услуг
@@ -263,10 +357,24 @@ const AppointmentWizardV2 = ({
         // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
         const birthDate = initialData.patient_birth_date || (
         initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
+        const initialCartItems = (() => {
+          logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
+          const items = normalizeServicesFromInitialData(initialData, []);
+          logger.log('📦 Initialized cart with items:', items);
+          logger.log('📦 InitialData full structure:', initialData);
+
+          if (items.length > 0) {
+            logger.log(`✅ SSOT: Услуги извлечены из источника: ${items[0]._source}`);
+          }
+          return items;
+        })();
+        setActiveServiceCategory(resolveInitialServiceCategory(initialCartItems, activeTab));
+        setServiceSearchQuery('');
+        setShowAllServices(false);
 
         setWizardData({
           patient: {
-            id: initialData.patient_id || initialData.patient?.id || null, // ✅ ИСПРАВЛЕНО: Добавлена проверка patient?.id
+            id: resolveInitialPatientId(initialData),
             fio: initialData.patient_fio || initialData.patient_name || initialData.patient?.fio || '',
             birth_date: birthDate, // ✅ ИСПРАВЛЕНО: Приоритет полной даты
             phone: formatUzbekPhoneDisplay(
@@ -275,31 +383,13 @@ const AppointmentWizardV2 = ({
             address: initialData.address || initialData.patient?.address || '',
             gender: (() => {
               // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
-              const genderValue = initialData.patient_gender ||
-              initialData.gender ||
-              initialData.patient?.gender ||
-              initialData.patient?.sex ||
-              initialData.sex ||
-              '';
-              if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
-              if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
-              return genderValue; // Если уже в формате male/female, оставляем как есть
+              const genderValue = resolvePatientGenderValue(initialData);
+              return normalizeGenderForForm(genderValue);
             })()
           },
           cart: {
             // ⭐ SSOT: Используем унифицированную функцию вместо 5 разных источников
-            items: (() => {
-              logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
-              const items = normalizeServicesFromInitialData(initialData, []);
-              logger.log('📦 Initialized cart with items:', items);
-              logger.log('📦 InitialData full structure:', initialData);
-
-              // ✅ SSOT: Логируем источник
-              if (items.length > 0) {
-                logger.log(`✅ SSOT: Услуги извлечены из источника: ${items[0]._source}`);
-              }
-              return items;
-            })(),
+            items: initialCartItems,
             discount_mode: initialData.discount_mode || 'none', // ✅ ИСПРАВЛЕНО: Восстанавливаем скидки
             all_free: initialData.all_free || false,
             notes: initialData.notes || ''
@@ -316,10 +406,62 @@ const AppointmentWizardV2 = ({
         }
 
       } else {
+        setActiveServiceCategory(activeTabToWizardCategory(activeTab));
+        setServiceSearchQuery('');
+        setShowAllServices(false);
         // New appointment mode intentionally avoids persistent draft storage for patient PHI.
       }
     }
-  }, [isOpen, editMode, initialData]);
+  }, [isOpen, editMode, initialData, activeTab]);
+
+  useEffect(() => {
+    if (!isOpen || !editMode || wizardData.patient.gender) return;
+
+    const patientId = wizardData.patient.id || resolveInitialPatientId(initialData);
+    if (!patientId) return;
+
+    let cancelled = false;
+
+    const hydrateMissingEditGender = async () => {
+      const token = tokenManager.getAccessToken();
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) return;
+
+        const patient = await response.json();
+        const normalizedGender = normalizeGenderForForm(resolvePatientGenderValue(patient));
+        if (!normalizedGender || cancelled) return;
+
+        setWizardData((prev) => {
+          if (prev.patient.gender) return prev;
+          return {
+            ...prev,
+            patient: {
+              ...prev.patient,
+              id: prev.patient.id || patientId,
+              gender: normalizedGender
+            }
+          };
+        });
+      } catch (error) {
+        logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
+          patientId,
+          error: error?.message || error
+        });
+      }
+    };
+
+    hydrateMissingEditGender();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, editMode, wizardData.patient.id, wizardData.patient.gender, initialData]);
 
   // ✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии
   useEffect(() => {
@@ -334,6 +476,9 @@ const AppointmentWizardV2 = ({
       setFormattedBirthDate('');
       setRepeatEligibilityByItemId({});
       setIsRepeatEligibilityLoading(false);
+      setActiveServiceCategory('specialists');
+      setServiceSearchQuery('');
+      setShowAllServices(false);
     }
   }, [isOpen]);
 
@@ -596,10 +741,8 @@ const AppointmentWizardV2 = ({
         address: patient.address || '',
         gender: (() => {
           // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
-          const genderValue = patient.gender || patient.sex || '';
-          if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
-          if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
-          return genderValue;
+          const genderValue = resolvePatientGenderValue(patient);
+          return normalizeGenderForForm(genderValue);
         })(), // ✅ Заполняем пол с преобразованием
         // Отдельные поля для обратной совместимости (если нужны)
         lastName: patient.last_name || '',
@@ -632,14 +775,7 @@ const AppointmentWizardV2 = ({
 
   const loadServices = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/registrar/services`, {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/registrar/services');
 
         // Извлекаем все услуги из групп
         let allServices = [];
@@ -655,20 +791,21 @@ const AppointmentWizardV2 = ({
         // Также показываем услуги без department_key (общие услуги)
 
 
-        if (activeTab && activeTab !== 'all') {void
-          allServices.length;
-          allServices = allServices.filter((service) =>
-          service.department_key === activeTab || !service.department_key
-          );
+        const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);
+        if (departmentFilterKeys.length > 0) {
+          const departmentFilterSet = new Set(departmentFilterKeys);
+          allServices = allServices.filter((service) => {
+            const departmentKey = String(service.department_key || service.departmentKey || '').trim().toLowerCase();
+            return !departmentKey || departmentFilterSet.has(departmentKey);
+          });
         }
 
         setServicesData(allServices);
         setFilteredServices(allServices);
-      }
     } catch (error) {
       logger.error('Ошибка загрузки услуг:', error);
     }
-  }, [activeTab]);
+  }, [activeTab, editMode]);
 
   // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
 
@@ -858,16 +995,8 @@ const AppointmentWizardV2 = ({
 
   const loadDoctors = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/registrar/doctors`, {
-        headers: {
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDoctorsData(data);
-      }
+      const { data } = await api.get('/registrar/doctors');
+      setDoctorsData(data);
     } catch (error) {
       logger.error('Ошибка загрузки врачей:', error);
     }
@@ -1420,10 +1549,18 @@ const AppointmentWizardV2 = ({
 
       // ✅ НОВОЕ: Локальная переменная для patient_id, которую будем заполнять по мере создания/поиска пациента
       let patientId = wizardData.patient.id;
+      const initialPatientId = resolveInitialPatientId(initialData);
+      if (editMode && initialPatientId && !patientId) {
+        patientId = initialPatientId;
+        logger.warn('[AppointmentWizardV2] Restored edit-mode patient_id from initialData before submit', {
+          patientId: initialPatientId
+        });
+      }
       const normalizedPhone = wizardData.patient.phone
         ? normalizeUzbekPhoneForApi(wizardData.patient.phone)
         : null;
       const normalizedPhoneDigits = normalizedPhone ? normalizedPhone.replace(/\D/g, '') : '';
+      const selectedPatientSex = genderToPatientSexForApi(wizardData.patient.gender);
 
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
 
@@ -1481,10 +1618,11 @@ const AppointmentWizardV2 = ({
           logger.log('✅ Found existing patient:', foundPatient.id);
 
           // Обновляем данные пациента если нужно
+          const foundPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(foundPatient));
           const needsUpdate =
           wizardData.patient.birth_date && wizardData.patient.birth_date !== foundPatient.birth_date ||
           wizardData.patient.address && wizardData.patient.address !== foundPatient.address ||
-          wizardData.patient.gender && wizardData.patient.gender !== foundPatient.sex;
+          selectedPatientSex && selectedPatientSex !== foundPatientSex;
 
           if (needsUpdate) {
             logger.log('🔄 Updating patient data...');
@@ -1492,7 +1630,7 @@ const AppointmentWizardV2 = ({
 
             if (wizardData.patient.birth_date) updateData.birth_date = wizardData.patient.birth_date;
             if (wizardData.patient.address) updateData.address = wizardData.patient.address;
-            if (wizardData.patient.gender) updateData.sex = wizardData.patient.gender;
+            if (selectedPatientSex) updateData.sex = selectedPatientSex;
 
             try {
               await fetch(`${API_BASE}/patients/${foundPatient.id}`, {
@@ -1517,7 +1655,7 @@ const AppointmentWizardV2 = ({
 
           const patientData = {
             full_name: wizardData.patient.fio.trim(),
-            gender: wizardData.patient.gender || null,
+            sex: selectedPatientSex,
             last_name: wizardData.patient.lastName || '',
             first_name: wizardData.patient.firstName || '',
             middle_name: wizardData.patient.middleName || null,
@@ -1570,7 +1708,7 @@ const AppointmentWizardV2 = ({
         // Подготовка данных пациента - отправляем полное ФИО, backend нормализует
         const patientData = {
           full_name: wizardData.patient.fio.trim(),
-          gender: wizardData.patient.gender, // ✅ Отправляем пол
+          sex: selectedPatientSex,
           // Для обратной совместимости также отправляем отдельные поля (если есть)
           last_name: wizardData.patient.lastName || '',
           first_name: wizardData.patient.firstName || '',
@@ -1670,6 +1808,34 @@ const AppointmentWizardV2 = ({
         });
         toast.error('Не удалось определить пациента. Пожалуйста, перезагрузите страницу и попробуйте ещё раз.');
         return;
+      }
+
+      const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
+      if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
+        const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${tokenManager.getAccessToken()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ sex: selectedPatientSex })
+        });
+
+        if (!patientResponse.ok) {
+          const errorText = await patientResponse.text().catch(() => '');
+          logger.error('[AppointmentWizardV2] Failed to persist patient gender before edit submit', {
+            patientId,
+            status: patientResponse.status,
+            errorText
+          });
+          toast.error('Не удалось сохранить пол пациента. Проверьте доступ и попробуйте ещё раз.');
+          return;
+        }
+
+        logger.log('[AppointmentWizardV2] Persisted edit-mode patient gender before submit', {
+          patientId,
+          sex: selectedPatientSex
+        });
       }
 
       // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
@@ -1779,6 +1945,26 @@ const AppointmentWizardV2 = ({
         const originalServiceCodes = new Set();
         const originalServiceNames = new Set();
         // originalQueueIds moved to higher scope
+
+        if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
+          logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
+          initialData.service_details.forEach((serviceDetail) => {
+            if (!serviceDetail) return;
+
+            const serviceId = serviceDetail.service_id || serviceDetail.id || null;
+            const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
+            const serviceName = serviceDetail.service_name || serviceDetail.name || null;
+            const queueId = serviceDetail.original_queue_id ||
+              serviceDetail.queue_entry_id ||
+              serviceDetail.queue_id ||
+              null;
+
+            if (serviceId) originalServiceIds.add(serviceId);
+            if (queueId) originalQueueIds.add(queueId);
+            if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
+            if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
+          });
+        }
 
         // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
         if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
@@ -1973,7 +2159,9 @@ const AppointmentWizardV2 = ({
             }
 
             // Проверяем, является ли услуга новой
-            const isNewService = !originalServiceIds.has(serviceItem.service_id) &&
+            const hasExistingQueueIdentity = Boolean(serviceItem.original_queue_id);
+            const isNewService = !hasExistingQueueIdentity &&
+            !originalServiceIds.has(serviceItem.service_id) &&
             !originalServiceCodes.has((service.service_code || '').toUpperCase().trim()) &&
             !originalServiceNames.has((service.name || '').toLowerCase().trim());
 
@@ -1982,6 +2170,7 @@ const AppointmentWizardV2 = ({
               inServiceIds: originalServiceIds.has(serviceItem.service_id),
               inServiceCodes: originalServiceCodes.has((service.service_code || '').toUpperCase().trim()),
               inServiceNames: originalServiceNames.has((service.name || '').toLowerCase().trim()),
+              hasExistingQueueIdentity,
               hasDoctorId: !!visit.doctor_id
             });
 
@@ -2027,6 +2216,66 @@ const AppointmentWizardV2 = ({
 
         // ✅ ИСПРАВЛЕНИЕ: Проверяем наличие новых услуг (как с врачами, так и без)
         const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;
+
+        if (editMode && hasNewServices) {
+          const editDeltaServices = [
+            ...newServices,
+            ...newServicesWithoutDoctor.map((item) => ({
+              service_id: item.service_id,
+              quantity: item.quantity,
+              specialist_id: null
+            }))
+          ];
+          const patientDataForEditDelta = {
+            full_name: wizardData.patient.fio || wizardData.patient.name,
+            phone: normalizedPhone,
+            birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate || null,
+            sex: selectedPatientSex,
+            address: wizardData.patient.address || null
+          };
+          Object.keys(patientDataForEditDelta).forEach((key) => {
+            if (patientDataForEditDelta[key] === undefined) {
+              delete patientDataForEditDelta[key];
+            }
+          });
+
+          try {
+            logger.log('[AppointmentWizardV2] edit mode with new services; applying edit delta', {
+              serviceCount: editDeltaServices.length,
+              existingQueueEntryIds: Array.from(originalQueueIds)
+            });
+            const editDeltaResult = await applyRegistrarEditDelta({
+              patientId,
+              targetDate: getLocalISODate(),
+              patientData: patientDataForEditDelta,
+              paymentMethod: wizardData.payment.method,
+              discountMode: wizardData.cart.discount_mode,
+              allFree: wizardData.cart.all_free,
+              services: editDeltaServices,
+              existingQueueEntryIds: Array.from(originalQueueIds)
+            });
+
+            if (!editDeltaResult?.success) {
+              throw new Error(editDeltaResult?.message || 'Edit delta failed');
+            }
+
+            await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'edit-delta');
+            localStorage.removeItem(LEGACY_DRAFT_KEY);
+            toast.success('Запись обновлена');
+            onComplete?.(editDeltaResult);
+            onClose();
+            return;
+          } catch (editDeltaError) {
+            logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
+            toast.error(editDeltaError?.response?.data?.detail || editDeltaError?.message || 'Не удалось обновить запись');
+            return;
+          }
+        }
+
+        if (editMode && !hasNewServices) {
+          logger.log('[AppointmentWizardV2] edit mode without new services; bypassing registrar/cart to avoid duplicate visits');
+          visits = [];
+        }
 
         if (hasNewServices) {
           logger.log(`✅ Найдены новые услуги для ${recordType}:`, {
@@ -2186,7 +2435,7 @@ const AppointmentWizardV2 = ({
           full_name: wizardData.patient.fio || wizardData.patient.name,
           phone: normalizedPhone,
           birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
-          sex: wizardData.patient.gender === 'male' ? 'M' : wizardData.patient.gender === 'female' ? 'F' : null,
+          sex: selectedPatientSex,
           address: wizardData.patient.address
         };
 
@@ -2401,7 +2650,11 @@ const AppointmentWizardV2 = ({
 
       visits[key].services.push({
         service_id: item.service_id,
-        quantity: item.quantity
+        quantity: item.quantity,
+        original_queue_id: item.original_queue_id || null,
+        service_code: item.service_code || null,
+        service_name: item.service_name || item.name || null,
+        _source: item._source || null
       });
     });
 
@@ -2602,6 +2855,7 @@ const AppointmentWizardV2 = ({
       </div>
 
       <button
+      type="button"
       onClick={onClose}
       title="Закрыть"
       aria-label="Закрыть"
@@ -2649,6 +2903,7 @@ const AppointmentWizardV2 = ({
         {categories.map((cat) =>
       <button
         key={cat.id}
+        type="button"
         onClick={() => setActiveServiceCategory(cat.id)}
         style={{
           ...wizardSegmentButtonBase,
@@ -2691,6 +2946,7 @@ const AppointmentWizardV2 = ({
     }}>
         {/* Кнопка обновления */}
         <button
+        type="button"
         onClick={handleReloadServices}
         disabled={isReloadingServices}
         title="Обновить список услуг"
@@ -2727,6 +2983,7 @@ const AppointmentWizardV2 = ({
 
         {/* Кнопка закрытия */}
         <button
+        type="button"
         onClick={onClose}
         title="Закрыть"
         aria-label="Close appointment wizard"
@@ -2879,6 +3136,7 @@ const AppointmentWizardV2 = ({
               errors={errors}
               onReloadServices={loadServices}
               getServiceName={getServiceName} // ✅ SSOT: Передаем функцию для получения названий услуг
+              editMode={editMode}
               activeCategory={activeServiceCategory}
               setActiveCategory={setActiveServiceCategory}
               searchQuery={serviceSearchQuery}
@@ -2921,6 +3179,7 @@ const PatientStepV2 = ({
   phoneError
 }) => {
   const safeData = data || {};
+  const selectedGender = normalizeGenderForForm(safeData.gender);
 
   return (
     <div style={{
@@ -3079,18 +3338,19 @@ const PatientStepV2 = ({
             {['male', 'female'].map((gender) =>
             <button
               key={gender}
+              type="button"
               onClick={() => onUpdate('gender', gender)}
               style={{
                 flex: 1,
                 padding: '8px',
                 border: 'none',
                 borderRadius: 'var(--mac-radius-sm)',
-                background: safeData.gender === gender ? 'var(--mac-bg-primary)' : 'transparent',
-                color: safeData.gender === gender ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-                boxShadow: safeData.gender === gender ? 'var(--mac-shadow-sm)' : 'none',
+                background: selectedGender === gender ? 'var(--mac-bg-primary)' : 'transparent',
+                color: selectedGender === gender ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                boxShadow: selectedGender === gender ? 'var(--mac-shadow-sm)' : 'none',
                 cursor: 'pointer',
                 fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: safeData.gender === gender ? '600' : '400',
+                fontWeight: selectedGender === gender ? '600' : '400',
                 transition: 'all 0.2s ease'
               }}>
 
@@ -3180,6 +3440,7 @@ const PatientStepV2 = ({
                 {phoneError.message}
               </span>
               <button
+              type="button"
               onClick={() => onSelectPatient(phoneError.patient)}
               style={{
                 background: 'var(--mac-error)',
@@ -3437,6 +3698,7 @@ const CartStepV2 = ({
   // New props from parent
   activeCategory,
   searchQuery,
+  editMode = false,
   getServiceName, // ✅ SSOT: Функция для получения названий услуг
   onUpdateItem,
   repeatEligibilityByItemId,
@@ -3466,6 +3728,7 @@ const CartStepV2 = ({
     }
 
     // 2. Фильтрация по категории (если нет поиска)
+    // Edit mode loads every service, but category tabs still filter what is displayed.
     return filtered.filter((service) => {
       const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
       const isConsultation = service.name.toLowerCase().includes('консультация');
@@ -3870,8 +4133,8 @@ const CartStepV2 = ({
                     }}>
 
                         <option value="">Выберите врача</option>
-                        {doctorOptions.map((doctor) =>
-                    <option key={doctor.id} value={doctor.id}>
+                        {doctorOptions.map((doctor, index) =>
+                    <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
                             {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : ''}{doctor.cabinet ? ` · каб. ${doctor.cabinet}` : ''}
                           </option>)}
                       </select>
@@ -3949,6 +4212,7 @@ CartStepV2.propTypes = {
   errors: PropTypes.object,
   activeCategory: PropTypes.string,
   searchQuery: PropTypes.string,
+  editMode: PropTypes.bool,
   getServiceName: PropTypes.func,
   onUpdateItem: PropTypes.func,
   repeatEligibilityByItemId: PropTypes.object,

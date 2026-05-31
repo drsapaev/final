@@ -38,15 +38,62 @@ describe('RegistrarPanel command contract', () => {
       'const loadAppointments = useCallback(async (options = {}) => {',
     );
 
-    expect(source).toContain('if (apt.patient_id && !hasBackendPatientDisplayContract(apt))');
+    expect(source).toContain('if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
     expect(source).toContain('patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name');
     expect(source).toContain('patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year');
     expect(source).toContain('patient_phone: fullEntry.patient_phone ?? fullEntry.phone');
     expect(source).toContain('address: fullEntry.address ?? entry.address');
-    expect(enrichmentBlock).toContain('if (apt.patient_id && !hasBackendPatientDisplayContract(apt))');
+    expect(source).toContain('const gender = normalizePatientGender(record);');
+    expect(source).toContain("String(gender).trim() !== ''");
+    expect(enrichmentBlock).toContain('!hasBackendPatientGenderContract(apt)');
+    expect(enrichmentBlock).toContain('patient_gender: patientGender');
     expect(enrichmentBlock.indexOf('!hasBackendPatientDisplayContract(apt)')).toBeLessThan(
       enrichmentBlock.indexOf('fetchPatientData(apt.patient_id)'),
     );
+  });
+
+  it('keeps Registrar table view separate from edit mode', () => {
+    const source = readRegistrarPanelSource();
+
+    expect(source).toContain('const openRecordPreview = useCallback((row) => {');
+    expect(source).toContain('const openRecordEditor = useCallback((row) => {');
+    expect(source).toContain("case 'view':");
+    expect(source).toContain('openRecordPreview(row);');
+    expect(source).toContain("case 'edit':");
+    expect(source).toContain('openRecordEditor(row);');
+  });
+
+  it('allows edit mode for aggregate all-departments rows while keeping preview separate', () => {
+    const source = readRegistrarPanelSource();
+    const editBlock = extractSourceBlock(
+      source,
+      'const openRecordEditor = useCallback((row) => {',
+      'const handleContextMenuAction = useCallback(async (action, row) => {',
+    );
+
+    expect(source).toContain('const isMultiRecordAggregateRow = (row) => (');
+    expect(source).toContain('hasMultipleRecordRefs(row?.grouped_record_refs)');
+    expect(editBlock).toContain('if (isMultiRecordAggregateRow(row))');
+    expect(editBlock).toContain('Opening edit wizard for aggregate all-departments row');
+    expect(editBlock).not.toContain('openRecordPreview(row);');
+    expect(editBlock).not.toContain('notify.warning');
+    expect(editBlock).toContain('setShowWizard(true);');
+  });
+
+  it('restores post-wizard payment or ticket handoff for creates and paid edit deltas', () => {
+    const source = readRegistrarPanelSource();
+
+    expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult) => {');
+    expect(source).toContain('const normalizeWizardQueueAssignment = (assignment, visitId = null) => {');
+    expect(source).toContain('if (Array.isArray(queueNumbers))');
+    expect(source).toContain('queue_entry_id: assignment.queue_entry_id ?? assignment.queue_id ?? assignment.id ?? null');
+    expect(source).toContain('number: queueNumber');
+    expect(source).toContain('grouped_record_refs: visitIds.map');
+    expect(source).toContain('queue_number: firstQueueNumber?.queue_number ?? null');
+    expect(source).toContain('print_tickets: printTickets');
+    expect(source).toContain('const postWizardPaymentRow = (!wasEditMode || Number(wizardData?.total_amount || 0) > 0)');
+    expect(source).toContain("source: wasEditMode ? 'wizard-edit' : 'wizard-create'");
+    expect(source).toContain("setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });");
   });
 
   it('loads Registrar metadata departments through one registrar endpoint', () => {

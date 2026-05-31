@@ -10,6 +10,7 @@ vi.mock('../client', () => ({
 
 import { api } from '../client';
 import {
+  applyRegistrarEditDelta,
   completeQueueJoinSession,
   fetchPublicQueueProfiles,
   fetchQrTokenInfo,
@@ -52,5 +53,35 @@ describe('queue API', () => {
 
     expect(api.post).toHaveBeenCalledWith('/queue/join/complete', payload);
     expect(data).toEqual({ success: true });
+  });
+
+  it('posts registrar edit deltas without create-like queue endpoints', async () => {
+    api.post.mockResolvedValueOnce({ data: { success: true, total_amount: 25000 } });
+
+    const data = await applyRegistrarEditDelta({
+      patientId: '42',
+      targetDate: '2026-05-31',
+      patientData: { full_name: 'Test Patient', sex: 'F' },
+      services: [
+        { service_id: '7', quantity: '2', specialist_id: null },
+        { service_id: 8, quantity: 1, specialist_id: '3' },
+      ],
+      existingQueueEntryIds: ['10', 11],
+    });
+
+    expect(api.post).toHaveBeenCalledWith('/registrar/cart/edit-delta', {
+      patient_id: 42,
+      target_date: '2026-05-31',
+      patient_data: { full_name: 'Test Patient', sex: 'F' },
+      payment_method: 'cash',
+      discount_mode: 'none',
+      all_free: false,
+      services: [
+        { service_id: 7, quantity: 2, specialist_id: null },
+        { service_id: 8, quantity: 1, specialist_id: 3 },
+      ],
+      existing_queue_entry_ids: [10, 11],
+    });
+    expect(data).toEqual({ success: true, total_amount: 25000 });
   });
 });

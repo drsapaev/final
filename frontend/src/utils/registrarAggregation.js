@@ -52,6 +52,40 @@ const buildRecordRef = (appointment) => {
   return { record_kind: recordKind, record_id: numericId };
 };
 
+const buildPatientGroupKey = (appointment, index = 0) => {
+  const patientId = appointment?.patient_id;
+  if (patientId !== null && patientId !== undefined && String(patientId).trim() !== '') {
+    return `patient:${patientId}`;
+  }
+
+  const fio = String(appointment?.patient_fio || '').trim().toLowerCase();
+  const phone = String(appointment?.patient_phone || appointment?.phone || '').replace(/\D/g, '');
+  const birth = String(
+    appointment?.patient_birth_date ||
+    appointment?.birth_date ||
+    appointment?.patient_birth_year ||
+    ''
+  ).trim();
+  if (fio || phone || birth) {
+    return `identity:${fio}|${phone}|${birth}`;
+  }
+
+  const recordRef = buildRecordRef(appointment);
+  if (recordRef) {
+    return `record:${recordRef.record_kind}:${recordRef.record_id}`;
+  }
+
+  return `row:${appointment?.id ?? index}`;
+};
+
+const pickPatientGender = (appointment) => (
+  appointment?.patient_gender ??
+  appointment?.patient_sex ??
+  appointment?.gender ??
+  appointment?.sex ??
+  null
+);
+
 export const aggregatePatientsForAllDepartments = (appointments = []) => {
   const patientGroups = {};
 
@@ -74,12 +108,13 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     return nextTime < currentTime ? nextValue : currentValue;
   };
 
-  appointments.forEach((appointment) => {
-    const patientKey = appointment.patient_fio;
+  appointments.forEach((appointment, index) => {
+    const patientKey = buildPatientGroupKey(appointment, index);
     const normalizedDiscountMode = normalizeRegistrationMode(appointment.discount_mode);
     const normalizedPayment = normalizePaymentStatus(appointment.payment_status);
     const appointmentCost = getRecordAmount(appointment);
     const recordRef = buildRecordRef(appointment);
+    const patientGender = pickPatientGender(appointment);
 
     if (!patientGroups[patientKey]) {
       const initialVisitId = pickCanonicalVisitId(appointment);
@@ -97,6 +132,9 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         patient_id: appointment.patient_id,
         patient_fio: appointment.patient_fio,
         patient_birth_year: appointment.patient_birth_year,
+        patient_gender: patientGender,
+        gender: patientGender,
+        sex: patientGender,
         patient_phone: appointment.patient_phone,
         address: appointment.address,
         visit_type: appointment.visit_type ?? null,
@@ -109,6 +147,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         created_at: appointment.created_at,
         queue_time: appointment.queue_time,
         services: [],
+        service_details: Array.isArray(appointment.service_details) ? [...appointment.service_details] : [],
         departments: new Set(),
         doctors: new Set(),
         department: appointment.department,
@@ -159,6 +198,12 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         if (!patientGroups[patientKey].queue_entry_id) {
           patientGroups[patientKey].queue_entry_id = nextQueueEntryId;
         }
+      }
+
+      if (!patientGroups[patientKey].patient_gender && patientGender) {
+        patientGroups[patientKey].patient_gender = patientGender;
+        patientGroups[patientKey].gender = patientGender;
+        patientGroups[patientKey].sex = patientGender;
       }
 
       patientGroups[patientKey].queue_time = pickEarlierTimestamp(
@@ -236,6 +281,38 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         if (!patientGroups[patientKey].service_codes.includes(code)) {
           patientGroups[patientKey].service_codes.push(code);
         }
+      });
+    }
+
+    if (Array.isArray(appointment.service_details)) {
+      if (!patientGroups[patientKey].service_details) {
+        patientGroups[patientKey].service_details = [];
+      }
+      const existingServiceDetailKeys = new Set(
+        patientGroups[patientKey].service_details.map((serviceDetail) => (
+          serviceDetail?.service_id ??
+          serviceDetail?.id ??
+          serviceDetail?.service_code ??
+          serviceDetail?.code ??
+          serviceDetail?.service_name ??
+          serviceDetail?.name
+        )).filter((value) => value !== null && value !== undefined).map(String),
+      );
+
+      appointment.service_details.forEach((serviceDetail) => {
+        if (!serviceDetail) return;
+        const serviceDetailKey = serviceDetail.service_id ??
+          serviceDetail.id ??
+          serviceDetail.service_code ??
+          serviceDetail.code ??
+          serviceDetail.service_name ??
+          serviceDetail.name ??
+          null;
+        if (serviceDetailKey === null || serviceDetailKey === undefined || existingServiceDetailKeys.has(String(serviceDetailKey))) {
+          return;
+        }
+        patientGroups[patientKey].service_details.push(serviceDetail);
+        existingServiceDetailKeys.add(String(serviceDetailKey));
       });
     }
 
