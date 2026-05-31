@@ -14,6 +14,9 @@ const makeAppointment = (overrides = {}) => ({
   patient_id: overrides.patient_id ?? 10,
   patient_fio: overrides.patient_fio ?? 'Тест Пациент',
   patient_birth_year: overrides.patient_birth_year ?? 1990,
+  patient_gender: pickOverride(overrides, 'patient_gender', null),
+  gender: pickOverride(overrides, 'gender', overrides.patient_gender ?? null),
+  sex: pickOverride(overrides, 'sex', overrides.gender ?? overrides.patient_gender ?? null),
   patient_phone: overrides.patient_phone ?? '+998900000000',
   address: overrides.address ?? 'Тестовый адрес',
   visit_id: pickOverride(overrides, 'visit_id', overrides.id ?? 1),
@@ -30,6 +33,7 @@ const makeAppointment = (overrides = {}) => ({
   queue_time: overrides.queue_time ?? '2026-04-15T09:45:00+05:00',
   services: overrides.services ?? [],
   service_codes: overrides.service_codes ?? [],
+  service_details: overrides.service_details ?? [],
   department: overrides.department ?? 'cardiology',
   doctor_specialty: overrides.doctor_specialty ?? null,
   queue_numbers: overrides.queue_numbers ?? [],
@@ -221,6 +225,93 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result).toHaveLength(1);
     expect(result[0].queue_time).toBe('2026-04-15T09:30:00+05:00');
     expect(result[0].created_at).toBe('2026-04-15T09:31:00+05:00');
+  });
+
+  it('preserves service_details for all-departments edit mode identity', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Консультация кардиолога' }],
+      }),
+      makeAppointment({
+        id: 2,
+        service_details: [{ service_id: 20, service_code: 'L01', service_name: 'Общий анализ крови' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].service_details).toEqual([
+      { service_id: 10, service_code: 'K01', service_name: 'Консультация кардиолога' },
+      { service_id: 20, service_code: 'L01', service_name: 'Общий анализ крови' },
+    ]);
+  });
+
+  it('preserves patient gender for all-departments edit mode identity', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        patient_id: 13,
+        patient_gender: 'F',
+        gender: 'F',
+        sex: 'F',
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Cardio consult' }],
+      }),
+      makeAppointment({
+        id: 2,
+        patient_id: 13,
+        patient_gender: null,
+        gender: null,
+        sex: null,
+        service_details: [{ service_id: 20, service_code: 'L01', service_name: 'Blood test' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].patient_gender).toBe('F');
+    expect(result[0].gender).toBe('F');
+    expect(result[0].sex).toBe('F');
+  });
+
+  it('does not merge distinct backend patients with the same displayed name', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        patient_id: 101,
+        patient_fio: 'Same Display Name',
+        patient_phone: '+998901111111',
+        canonical_record_id: 301,
+        record_kind: 'visit',
+        visit_id: 301,
+        appointment_id: null,
+        services: ['Cardio consult'],
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Cardio consult' }],
+      }),
+      makeAppointment({
+        id: 2,
+        patient_id: 202,
+        patient_fio: 'Same Display Name',
+        patient_phone: '+998902222222',
+        canonical_record_id: 402,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        visit_id: null,
+        appointment_id: null,
+        queue_entry_id: 402,
+        services: ['Blood test'],
+        service_details: [{ service_id: 20, service_code: 'L01', service_name: 'Blood test' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((row) => row.patient_id)).toEqual([101, 202]);
+    expect(result[0].grouped_record_refs).toEqual([{ record_kind: 'visit', record_id: 301 }]);
+    expect(result[1].grouped_record_refs).toEqual([{ record_kind: 'online_queue', record_id: 402 }]);
+    expect(result[0].service_details).toEqual([
+      { service_id: 10, service_code: 'K01', service_name: 'Cardio consult' },
+    ]);
+    expect(result[1].service_details).toEqual([
+      { service_id: 20, service_code: 'L01', service_name: 'Blood test' },
+    ]);
   });
 });
 

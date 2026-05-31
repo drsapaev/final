@@ -380,6 +380,32 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         };
     };
 
+    const resolveOriginalQueueId = (serviceData = {}) => {
+        if (serviceData.original_queue_id || serviceData.queue_entry_id || serviceData.queue_id) {
+            return serviceData.original_queue_id || serviceData.queue_entry_id || serviceData.queue_id;
+        }
+        if (!Array.isArray(initialData.queue_numbers)) return null;
+
+        const serviceId = serviceData.service_id || serviceData.id || null;
+        const serviceCode = toServiceCode(serviceData.service_code || serviceData.code || serviceData.name || '');
+        const serviceName = String(serviceData.name || serviceData.service_name || '').toLowerCase().trim();
+
+        const match = initialData.queue_numbers.find((queueItem) => {
+            if (!queueItem) return false;
+            if (serviceId && queueItem.service_id && Number(queueItem.service_id) === Number(serviceId)) {
+                return true;
+            }
+            const queueCode = toServiceCode(queueItem.service_code || queueItem.code || queueItem.service_name || '');
+            if (serviceCode && queueCode && serviceCode === queueCode) {
+                return true;
+            }
+            const queueName = String(queueItem.service_name || queueItem.name || '').toLowerCase().trim();
+            return Boolean(serviceName && queueName && serviceName === queueName);
+        });
+
+        return match?.id || match?.queue_id || match?.queue_entry_id || null;
+    };
+
     /**
      * Helper: Дедупликация и сортировка услуг
      */
@@ -414,7 +440,10 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
     if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
         initialData.service_details.forEach(svc => {
             if (svc) {
-                items.push(createCartItem({ ...svc, _source: 'service_details' }));
+                items.push(createCartItem(
+                    { ...svc, _source: 'service_details' },
+                    resolveOriginalQueueId(svc)
+                ));
             }
         });
         return finalizeItems(items);
@@ -442,7 +471,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                     price: serviceItem.price || foundService?.price || 0,
                     quantity: serviceItem.quantity || 1,
                     _source: 'services_array',
-                }));
+                }, resolveOriginalQueueId(serviceItem)));
             } else {
                 // Строка - legacy формат (код или название услуги)
                 const serviceName = serviceItem;
@@ -459,7 +488,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                     code: serviceCode || serviceName,
                     price: foundService?.price || 0,
                     _source: 'services_array',
-                }));
+                }, resolveOriginalQueueId({ name: serviceName, code: serviceCode })));
             }
         });
         return finalizeItems(items);
@@ -480,7 +509,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
                     code: normalizedCode || serviceCode,
                     price: foundService?.price || 0,
                     _source: 'service_codes',
-                }));
+                }, resolveOriginalQueueId({ code: normalizedCode || serviceCode, service_id: foundService?.id || null })));
             }
         });
         return finalizeItems(items);

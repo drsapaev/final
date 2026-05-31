@@ -117,6 +117,38 @@ export async function createQueueEntriesBatch({ patientId, source, services }) {
   return response.data;
 }
 
+export async function applyRegistrarEditDelta({
+  patientId,
+  targetDate,
+  patientData,
+  services,
+  paymentMethod = 'cash',
+  discountMode = 'none',
+  allFree = false,
+  existingQueueEntryIds = [],
+}) {
+  const payload = {
+    patient_id: Number(patientId),
+    target_date: targetDate,
+    patient_data: patientData || null,
+    payment_method: paymentMethod,
+    discount_mode: discountMode,
+    all_free: Boolean(allFree),
+    services: (services || []).map((service) => ({
+      service_id: Number(service.service_id),
+      quantity: Number(service.quantity || 1),
+      specialist_id: service.specialist_id === null || service.specialist_id === undefined
+        ? null
+        : Number(service.specialist_id),
+    })),
+    existing_queue_entry_ids: (existingQueueEntryIds || [])
+      .filter((id) => id !== null && id !== undefined && id !== '')
+      .map((id) => Number(id)),
+  };
+  const response = await api.post('/registrar/cart/edit-delta', payload);
+  return response.data;
+}
+
 /**
  * Обновление существующей QR-записи (вместо создания новой)
  * ⭐ SSOT: Этот endpoint обновляет существующую запись в очереди,

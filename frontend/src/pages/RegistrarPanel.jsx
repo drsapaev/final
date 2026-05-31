@@ -209,6 +209,137 @@ const hasBackendPatientDisplayContract = (record) => {
   return hasName && hasPhone && hasBirthYear && hasAddress;
 };
 
+const normalizePatientGender = (record) => (
+  record?.patient_gender ??
+  record?.patient_sex ??
+  record?.gender ??
+  record?.sex ??
+  null
+);
+
+const hasBackendPatientGenderContract = (record) => {
+  const gender = normalizePatientGender(record);
+  return gender !== null && gender !== undefined && String(gender).trim() !== '';
+};
+
+const formatPreviewList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (typeof item === 'string') return item;
+      return item?.name || item?.service_name || item?.code || item?.queue_name || item?.queue_tag || '';
+    }).filter(Boolean).join(', ');
+  }
+  return value || '';
+};
+
+const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
+  if (!assignment || typeof assignment !== 'object') return null;
+  const queueNumber = assignment.queue_number ??
+    assignment.number ??
+    assignment.ticket_number ??
+    assignment.queue_position ??
+    assignment.queue_no ??
+    null;
+
+  return {
+    ...assignment,
+    id: assignment.queue_id ?? assignment.queue_entry_id ?? assignment.id ?? null,
+    queue_entry_id: assignment.queue_entry_id ?? assignment.queue_id ?? assignment.id ?? null,
+    visit_id: assignment.visit_id ?? (visitId !== null && visitId !== undefined && visitId !== '' ? Number(visitId) : null),
+    queue_number: queueNumber,
+    number: queueNumber
+  };
+};
+
+const flattenWizardQueueNumbers = (queueNumbers) => {
+  if (!queueNumbers) return [];
+
+  if (Array.isArray(queueNumbers)) {
+    return queueNumbers
+      .map((assignment) => normalizeWizardQueueAssignment(assignment, assignment?.visit_id))
+      .filter(Boolean);
+  }
+
+  if (typeof queueNumbers !== 'object') return [];
+
+  return Object.entries(queueNumbers).flatMap(([visitId, assignments]) => {
+    const assignmentList = Array.isArray(assignments) ? assignments : [assignments];
+    return assignmentList
+      .map((assignment) => normalizeWizardQueueAssignment(assignment, visitId))
+      .filter(Boolean);
+  });
+};
+
+const buildPostWizardPaymentRow = (wizardResult) => {
+  if (!wizardResult?.success) return null;
+
+  const visitIds = Array.isArray(wizardResult.visit_ids) ? wizardResult.visit_ids.filter(Boolean) : [];
+  if (visitIds.length === 0) return null;
+
+  const createdVisits = Array.isArray(wizardResult.created_visits) ? wizardResult.created_visits : [];
+  const firstVisit = createdVisits[0] || {};
+  const services = createdVisits.flatMap((visit) =>
+    (Array.isArray(visit.services) ? visit.services : [])
+      .map((service) => service?.name || service?.code)
+      .filter(Boolean)
+  );
+  const queueNumbers = flattenWizardQueueNumbers(wizardResult.queue_numbers);
+  const firstQueueNumber = queueNumbers.find((queueItem) => (
+    queueItem?.queue_number !== null &&
+    queueItem?.queue_number !== undefined &&
+    queueItem?.queue_number !== ''
+  ));
+  const printTickets = (Array.isArray(wizardResult.print_tickets) ? wizardResult.print_tickets : [])
+    .map((ticket, index) => {
+      if (!ticket || typeof ticket !== 'object') return null;
+      const queueNumber = ticket.queue_number ??
+        ticket.number ??
+        ticket.ticket_number ??
+        queueNumbers[index]?.queue_number ??
+        queueNumbers[index]?.number ??
+        null;
+      if (queueNumber === null || queueNumber === undefined || queueNumber === '') return null;
+      return {
+        ...ticket,
+        queue_number: queueNumber
+      };
+    })
+    .filter(Boolean);
+  const totalAmount = Number(wizardResult.total_amount ?? 0);
+
+  return {
+    id: visitIds[0],
+    canonical_record_id: visitIds[0],
+    record_kind: 'visit',
+    visit_id: visitIds[0],
+    visit_ids: visitIds,
+    grouped_record_refs: visitIds.map((visitId) => ({ record_kind: 'visit', record_id: Number(visitId) })),
+    available_actions: ['mark_paid', 'print_ticket'],
+    can_mark_paid: totalAmount > 0,
+    can_print_ticket: true,
+    invoice_id: wizardResult.invoice_id ?? null,
+    patient_fio: firstVisit.patient_name || 'Patient',
+    services,
+    queue_number: firstQueueNumber?.queue_number ?? null,
+    number: firstQueueNumber?.queue_number ?? null,
+    cost: totalAmount,
+    payment_amount: totalAmount,
+    payment_status: totalAmount > 0 ? 'pending' : 'paid',
+    payment_type: null,
+    queue_numbers: queueNumbers,
+    print_tickets: printTickets,
+    created_visits: createdVisits
+  };
+};
+
+const hasMultipleRecordRefs = (value) => Array.isArray(value) && value.filter(Boolean).length > 1;
+
+const isMultiRecordAggregateRow = (row) => (
+  hasMultipleRecordRefs(row?.grouped_record_refs) ||
+  hasMultipleRecordRefs(row?.grouped_records) ||
+  hasMultipleRecordRefs(row?.aggregated_ids)
+);
+
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
@@ -329,6 +460,7 @@ const RegistrarPanel = () => {
   useState(null);
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
+  const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
   // ✅ State for rescheduling
   const [rescheduleData, setRescheduleData] = useState(null);
 
@@ -1181,7 +1313,7 @@ const RegistrarPanel = () => {
       let enrichedApt = { ...apt };
 
       // Обогащаем данными пациента
-      if (apt.patient_id && !hasBackendPatientDisplayContract(apt)) {
+      if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
         const patient = await fetchPatientData(apt.patient_id);
         if (patient) {
           // ✅ ИСПРАВЛЕНО: Формируем patient_fio безопасно, используя все доступные поля
@@ -1201,11 +1333,15 @@ const RegistrarPanel = () => {
             patient_fio = `Пациент ID=${patient.id}`;
           }
 
+          const patientGender = normalizePatientGender(patient);
           enrichedApt = {
             ...enrichedApt,
             patient_fio: patient_fio.trim() || `Пациент ID=${patient.id}`,
             patient_phone: patient.phone,
             patient_birth_year: patient.birth_date ? new Date(patient.birth_date).getFullYear() : null,
+            patient_gender: patientGender,
+            gender: patientGender,
+            sex: patientGender,
             address: patient.address || 'Не указан' // Добавляем адрес из данных пациента
           };
         }
@@ -1363,6 +1499,9 @@ const RegistrarPanel = () => {
               patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? 'Неизвестный пациент',
               patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
               patient_phone: fullEntry.patient_phone ?? fullEntry.phone ?? entry.patient_phone ?? entry.phone ?? '',
+              patient_gender: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
+              gender: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
+              sex: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
               address: fullEntry.address ?? entry.address ?? '',
               services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
               service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
@@ -2518,14 +2657,33 @@ const RegistrarPanel = () => {
 
 
   // Обработчик действий контекстного меню
+  const openRecordPreview = useCallback((row) => {
+    setRecordPreviewDialog({ open: true, row });
+  }, []);
+
+  const openRecordEditor = useCallback((row) => {
+    if (isMultiRecordAggregateRow(row)) {
+      logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
+        patient: row?.patient_fio || row?.patient_name,
+        groupedRecords: row?.grouped_records?.length || 0,
+        recordRefs: row?.grouped_record_refs?.length || 0,
+        aggregatedIds: row?.aggregated_ids?.length || 0
+      });
+    }
+
+    logger.info('[RegistrarPanel] Opening edit wizard for:', row?.patient_fio || row?.patient_name);
+    setWizardEditMode(true);
+    setWizardInitialData(row);
+    setShowWizard(true);
+  }, []);
+
   const handleContextMenuAction = useCallback(async (action, row) => {
     switch (action) {
       case 'view':
-        setWizardEditMode(true);
-        setWizardInitialData(row);
-        setShowWizard(true);
+        openRecordPreview(row);
         break;
       case 'edit':
+        openRecordEditor(row);
         logger.info('Редактирование записи:', row);
         break;
       case 'in_cabinet':
@@ -2569,7 +2727,7 @@ const RegistrarPanel = () => {
         logger.info('Неизвестное действие:', action);
         break;
     }
-  }, [updateAppointmentStatus, handleStartVisit]);
+  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor]);
 
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
@@ -3228,15 +3386,11 @@ const RegistrarPanel = () => {
                       switch (action) {
                         case 'view':
                           logger.info('Просмотр записи:', row);
-                          setWizardEditMode(true);
-                          setWizardInitialData(row);
-                          setShowWizard(true);
+                          openRecordPreview(row);
                           break;
                         case 'edit':
                           logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
-                          setWizardEditMode(true);
-                          setWizardInitialData(row);
-                          setShowWizard(true);
+                          openRecordEditor(row);
                           break;
                         case 'payment':
                           logger.info('Открытие модального окна оплаты для записи (welcome):', row);
@@ -3570,15 +3724,11 @@ const RegistrarPanel = () => {
                 switch (action) {
                   case 'view':
                     logger.info('Просмотр записи:', row);
-                    setWizardEditMode(true);
-                    setWizardInitialData(row);
-                    setShowWizard(true);
+                    openRecordPreview(row);
                     break;
                   case 'edit':
                     logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
-                    setWizardEditMode(true);
-                    setWizardInitialData(row);
-                    setShowWizard(true);
+                    openRecordEditor(row);
                     break;
                   case 'payment':
                     logger.info('Открытие модального окна оплаты для записи:', row);
@@ -3680,6 +3830,66 @@ const RegistrarPanel = () => {
       {/* Мастер создания записи */}
 
       {/* Современные диалоги */}
+      <ModernDialog
+        isOpen={recordPreviewDialog.open}
+        onClose={() => setRecordPreviewDialog({ open: false, row: null })}
+        title="Просмотр записи"
+        maxWidth="36rem"
+        dialogStyle={{
+          backgroundColor: 'var(--mac-bg-primary)'
+        }}
+        actions={[
+          {
+            label: 'Закрыть',
+            variant: 'secondary',
+            onClick: () => setRecordPreviewDialog({ open: false, row: null })
+          },
+          {
+            label: 'Редактировать',
+            variant: 'primary',
+            onClick: () => {
+              const row = recordPreviewDialog.row;
+              setRecordPreviewDialog({ open: false, row: null });
+              if (row) openRecordEditor(row);
+            }
+          }
+        ]}>
+        {recordPreviewDialog.row && (
+          <div style={{ display: 'grid', gap: '12px', color: 'var(--mac-text-primary)' }}>
+            {[
+              ['Пациент', recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
+              ['Телефон', recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
+              ['Год рождения', recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
+              ['Пол', normalizePatientGender(recordPreviewDialog.row)],
+              ['Отделение', recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
+              ['Услуги', formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
+              ['Очередь', formatPreviewList(recordPreviewDialog.row.queue_numbers)],
+              ['Статус', recordPreviewDialog.row.status || recordPreviewDialog.row.canonical_status],
+              ['Оплата', recordPreviewDialog.row.payment_status || recordPreviewDialog.row.payment_type],
+              ['Сумма', recordPreviewDialog.row.cost]
+            ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
+              <div
+                key={label}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(120px, 0.36fr) minmax(0, 1fr)',
+                  gap: '12px',
+                  alignItems: 'start',
+                  padding: '10px 12px',
+                  border: '1px solid var(--mac-separator)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  background: 'var(--mac-bg-secondary)'
+                }}>
+                <span style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>{label}</span>
+                <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>
+                  {String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ModernDialog>
+
       <CancelDialog
         isOpen={cancelDialog.open}
         onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
@@ -3724,10 +3934,14 @@ const RegistrarPanel = () => {
           }
         }}
         onPrintTicket={(appointment) => {
+          const printSource = {
+            ...(paymentDialog.row || {}),
+            ...(appointment || {})
+          };
           setPrintDialog({
             open: true,
             type: 'ticket',
-            data: appointment
+            data: printSource
           });
         }} />
 
@@ -3791,6 +4005,10 @@ const RegistrarPanel = () => {
         setIsProcessing={setIsProcessing}
         onComplete={async (wizardData) => {
           logger.info('AppointmentWizardV2 completed successfully:', wizardData);
+          const wasEditMode = wizardEditMode;
+          const postWizardPaymentRow = (!wasEditMode || Number(wizardData?.total_amount || 0) > 0)
+            ? buildPostWizardPaymentRow(wizardData)
+            : null;
 
           // Обновляем данные (работает и для создания, и для редактирования)
           try {
@@ -3809,10 +4027,17 @@ const RegistrarPanel = () => {
             setWizardEditMode(false); // ✨ Сброс режима
             setWizardInitialData(null); // ✨ Сброс данных
 
-            const message = wizardEditMode ?
+            const message = wasEditMode ?
             'Запись успешно обновлена!' :
             'Запись успешно создана!';
             notify.success(message);
+            if (postWizardPaymentRow) {
+              if (Number(postWizardPaymentRow.cost || 0) > 0) {
+                setPaymentDialog({ open: true, row: postWizardPaymentRow, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
+              } else {
+                setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });
+              }
+            }
           } catch (error) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана

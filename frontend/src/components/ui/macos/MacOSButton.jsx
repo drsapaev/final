@@ -49,7 +49,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-border)',
       hover: {
         backgroundColor: 'var(--mac-bg-tertiary)',
-        borderColor: 'var(--mac-border-hover)'
+        border: '1px solid var(--mac-border-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-bg-quaternary)',
@@ -62,7 +62,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-accent-blue)',
       hover: {
         backgroundColor: 'var(--mac-accent-blue-hover)',
-        borderColor: 'var(--mac-accent-blue-hover)'
+        border: '1px solid var(--mac-accent-blue-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-accent-blue-active)',
@@ -75,7 +75,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-border)',
       hover: {
         backgroundColor: 'var(--mac-bg-secondary)',
-        borderColor: 'var(--mac-border-hover)'
+        border: '1px solid var(--mac-border-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-bg-tertiary)',
@@ -88,7 +88,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-border)',
       hover: {
         backgroundColor: 'var(--mac-bg-secondary)',
-        borderColor: 'var(--mac-border-hover)'
+        border: '1px solid var(--mac-border-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-bg-tertiary)',
@@ -113,7 +113,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-error)',
       hover: {
         backgroundColor: 'var(--mac-error-hover)',
-        borderColor: 'var(--mac-error-hover)'
+        border: '1px solid var(--mac-error-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-error-active)',
@@ -126,7 +126,7 @@ const MacOSButton = ({
       border: '1px solid var(--mac-success)',
       hover: {
         backgroundColor: 'var(--mac-success-hover)',
-        borderColor: 'var(--mac-success-hover)'
+        border: '1px solid var(--mac-success-hover)'
       },
       active: {
         backgroundColor: 'var(--mac-success-active)',

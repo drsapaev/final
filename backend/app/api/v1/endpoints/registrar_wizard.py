@@ -28,6 +28,10 @@ from app.services.feature_flags import is_feature_enabled
 from app.services.registrar_wizard_queue_assignment_service import (
     RegistrarWizardQueueAssignmentService,
 )
+from app.services.registrar_edit_delta_service import (
+    RegistrarEditDeltaItem,
+    RegistrarEditDeltaService,
+)
 from app.services.notifications import notification_sender_service
 from app.services.online_queue_new_service import (
     OnlineQueueNewDomainError,
@@ -110,6 +114,43 @@ class CartResponse(BaseModel):
     created_visits: Optional[List[Dict[str, Any]]] = (
         None  # Информация о созданных визитах
     )
+
+
+class EditDeltaPatientData(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    birth_date: Optional[date] = None
+    sex: Optional[str] = None
+    address: Optional[str] = None
+
+
+class EditDeltaServiceItem(BaseModel):
+    service_id: int
+    quantity: int = Field(default=1, ge=1)
+    specialist_id: Optional[int] = None
+
+
+class EditDeltaRequest(BaseModel):
+    patient_id: int
+    target_date: date = Field(default_factory=date.today)
+    payment_method: str = Field(default="cash")
+    discount_mode: str = Field(default="none")
+    all_free: bool = Field(default=False)
+    patient_data: Optional[EditDeltaPatientData] = None
+    services: List[EditDeltaServiceItem] = Field(default_factory=list)
+    existing_queue_entry_ids: List[int] = Field(default_factory=list)
+
+
+class EditDeltaResponse(BaseModel):
+    success: bool
+    message: str
+    invoice_id: Optional[int] = None
+    visit_ids: List[int] = Field(default_factory=list)
+    total_amount: Decimal = Decimal("0")
+    queue_numbers: Dict[int, List[Dict[str, Any]]] = Field(default_factory=dict)
+    print_tickets: List[Dict[str, Any]] = Field(default_factory=list)
+    created_visits: List[Dict[str, Any]] = Field(default_factory=list)
+    updated_queue_entries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class MarkPaidRequest(BaseModel):
@@ -1119,6 +1160,54 @@ def create_cart_appointments(
 
 
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
+
+
+@router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
+def apply_registrar_cart_edit_delta(
+    request: EditDeltaRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    try:
+        result = RegistrarEditDeltaService(db).apply(
+            patient_id=request.patient_id,
+            services=[
+                RegistrarEditDeltaItem(
+                    service_id=item.service_id,
+                    quantity=item.quantity,
+                    specialist_id=item.specialist_id,
+                )
+                for item in request.services
+            ],
+            target_date=request.target_date,
+            payment_method=request.payment_method,
+            discount_mode=request.discount_mode,
+            all_free=request.all_free,
+            patient_data=(
+                request.patient_data.model_dump(exclude_none=True)
+                if request.patient_data
+                else None
+            ),
+            existing_queue_entry_ids=request.existing_queue_entry_ids,
+            current_user=current_user,
+        )
+        return EditDeltaResponse(**result)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        logger.exception(
+            "REGISTRATION: edit delta failed",
+            extra={"error_class": exc.__class__.__name__},
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка обновления записи",
+        )
 
 
 class PriceOverrideApprovalRequest(BaseModel):
@@ -2467,6 +2556,47 @@ def _preserve_operational_status_on_payment(raw_status: str | None) -> str:
     return raw_status
 
 
+def _sync_payment_invoices_for_paid_visit(
+    db: Session,
+    *,
+    visit_id: int,
+    payment_method: str,
+) -> None:
+    """Mark linked registrar invoices paid once all their visits have paid Payment rows."""
+    from app.models.payment import Payment
+
+    links = (
+        db.query(PaymentInvoiceVisit)
+        .filter(PaymentInvoiceVisit.visit_id == visit_id)
+        .all()
+    )
+    for link in links:
+        invoice = link.invoice
+        if not invoice or invoice.status not in {"pending", "processing"}:
+            continue
+
+        visit_ids = [invoice_visit.visit_id for invoice_visit in invoice.visits]
+        if not visit_ids:
+            continue
+
+        paid_visit_ids = {
+            row[0]
+            for row in (
+                db.query(Payment.visit_id)
+                .filter(
+                    Payment.visit_id.in_(visit_ids),
+                    Payment.status == "paid",
+                )
+                .distinct()
+                .all()
+            )
+        }
+        if all(invoice_visit_id in paid_visit_ids for invoice_visit_id in visit_ids):
+            invoice.status = "paid"
+            invoice.payment_method = payment_method or invoice.payment_method
+            invoice.paid_at = datetime.utcnow()
+
+
 REGISTRAR_COMMAND_ROLE_BY_ACTION = {
     "mark_paid": {"admin", "registrar", "cashier"},
     "start_visit": {
@@ -2844,6 +2974,15 @@ def mark_visit_as_paid(
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
         visit.status = _preserve_operational_status_on_payment(visit.status)
+        _sync_payment_invoices_for_paid_visit(
+            db,
+            visit_id=visit.id,
+            payment_method=(
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+        )
         logger.info(
             "[FIX:PAYMENT_STATUS] Visit marked paid without changing operational status: visit_id=%d, status=%s",
             visit.id,
@@ -3025,6 +3164,15 @@ def mark_queue_entry_as_paid(
         visit.status = _preserve_operational_status_on_payment(visit.status)
         
         entry.status = _preserve_operational_status_on_payment(entry.status)
+        _sync_payment_invoices_for_paid_visit(
+            db,
+            visit_id=visit.id,
+            payment_method=(
+                existing_payment.method
+                if existing_payment and getattr(existing_payment, "method", None)
+                else requested_method
+            ),
+        )
         logger.info(
             "[FIX:PAYMENT_STATUS] Queue entry marked paid without changing operational status: entry_id=%d, visit_id=%d, entry_status=%s, visit_status=%s",
             entry.id,
