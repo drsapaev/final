@@ -559,7 +559,7 @@ const DentistPanelUnified = () => {
           const data = await response.json();
 
           // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-          let allAppointments = [];
+          const allAppointments = [];
           if (data && data.queues && Array.isArray(data.queues)) {
             data.queues.forEach((queue) => {
               if (queue.entries) {
@@ -612,7 +612,7 @@ const DentistPanelUnified = () => {
           }
 
           // Фильтруем только стоматологические записи для отображения
-          let appointmentsData = allAppointments.filter((apt) =>
+          const appointmentsData = allAppointments.filter((apt) =>
             isDentistrySpecialty(apt.specialty)
           );
 

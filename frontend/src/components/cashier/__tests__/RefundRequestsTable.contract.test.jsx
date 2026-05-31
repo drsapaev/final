@@ -8,8 +8,8 @@ const source = fs.readFileSync(path.join(ROOT, 'components/cashier/RefundRequest
 
 describe('RefundRequestsTable command contract', () => {
   it('uses the published refund request list filter query name', () => {
-    expect(source).toContain("params.append('status_filter', filter)");
-    expect(source).not.toContain("params.append('status', filter)");
+    expect(source).toContain('params.append(\'status_filter\', filter)');
+    expect(source).not.toContain('params.append(\'status\', filter)');
   });
 
   it('uses the existing backend process command instead of invented action URLs', () => {
@@ -23,16 +23,16 @@ describe('RefundRequestsTable command contract', () => {
 
   it('renders refund commands only from backend-provided availability', () => {
     expect(source).toContain('const hasBackendRefundAction =');
-    expect(source).toContain("hasBackendRefundAction(request, 'approve')");
-    expect(source).toContain("hasBackendRefundAction(request, 'reject')");
-    expect(source).toContain("hasBackendRefundAction(request, 'complete')");
+    expect(source).toContain('hasBackendRefundAction(request, \'approve\')');
+    expect(source).toContain('hasBackendRefundAction(request, \'reject\')');
+    expect(source).toContain('hasBackendRefundAction(request, \'complete\')');
 
     const renderActionsBlock = source.slice(
       source.indexOf('const renderActions = (request) => {'),
       source.indexOf('const columns = [')
     );
 
-    expect(renderActionsBlock).not.toContain("request.status === 'pending'");
-    expect(renderActionsBlock).not.toContain("request.status === 'approved'");
+    expect(renderActionsBlock).not.toContain('request.status === \'pending\'');
+    expect(renderActionsBlock).not.toContain('request.status === \'approved\'');
   });
 });

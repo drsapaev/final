@@ -190,6 +190,6 @@ describe('panelPrint ticket renderer', () => {
 
     expect(html).toContain('<span>unknown</span>');
     expect(html).not.toContain('<span>paid</span>');
-    expect(html).not.toContain("payment?.status || 'paid'");
+    expect(html).not.toContain('payment?.status || \'paid\'');
   });
 });
