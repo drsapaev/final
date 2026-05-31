@@ -1578,6 +1578,60 @@ def get_today_visits(
         )
 
 
+@router.get("/doctor/visits/statistics")
+def get_visit_statistics(
+    date_from: Optional[str] = Query(
+        None, description="Дата начала в формате YYYY-MM-DD"
+    ),
+    date_to: Optional[str] = Query(
+        None, description="Дата окончания в формате YYYY-MM-DD"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
+    ),
+):
+    """Получить статистику визитов врача"""
+    try:
+        from datetime import datetime
+
+        date_from_obj = None
+        date_to_obj = None
+
+        if date_from:
+            date_from_obj = datetime.strptime(date_from, "%Y-%m-%d").date()
+
+        if date_to:
+            date_to_obj = datetime.strptime(date_to, "%Y-%m-%d").date()
+
+        stats = crud_visit.get_visit_statistics(
+            db=db,
+            doctor_id=_visit_filter_doctor_id(db, current_user),
+            date_from=date_from_obj,
+            date_to=date_to_obj,
+        )
+
+        return {
+            "success": True,
+            "statistics": stats,
+            "period": {"date_from": date_from, "date_to": date_to},
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения статистики: {str(e)}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка назначения визита: {str(e)}",
+        )
+
 @router.get("/doctor/visits/{visit_id}")
 def get_visit_details(
     visit_id: int,
@@ -1774,59 +1828,4 @@ def remove_service_from_visit(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка удаления услуги: {str(e)}",
-        )
-
-
-@router.get("/doctor/visits/statistics")
-def get_visit_statistics(
-    date_from: Optional[str] = Query(
-        None, description="Дата начала в формате YYYY-MM-DD"
-    ),
-    date_to: Optional[str] = Query(
-        None, description="Дата окончания в формате YYYY-MM-DD"
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist")
-    ),
-):
-    """Получить статистику визитов врача"""
-    try:
-        from datetime import datetime
-
-        date_from_obj = None
-        date_to_obj = None
-
-        if date_from:
-            date_from_obj = datetime.strptime(date_from, "%Y-%m-%d").date()
-
-        if date_to:
-            date_to_obj = datetime.strptime(date_to, "%Y-%m-%d").date()
-
-        stats = crud_visit.get_visit_statistics(
-            db=db,
-            doctor_id=_visit_filter_doctor_id(db, current_user),
-            date_from=date_from_obj,
-            date_to=date_to_obj,
-        )
-
-        return {
-            "success": True,
-            "statistics": stats,
-            "period": {"date_from": date_from, "date_to": date_to},
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка назначения визита: {str(e)}",
         )
