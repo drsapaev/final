@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import time
+
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -22,6 +24,12 @@ class CanonicalVisitRepository:
             Visit.patient_id == appointment.patient_id,
             Visit.visit_date == appointment.appointment_date,
         )
+        appointment_times = self._time_match_values(appointment.appointment_time)
+        if not appointment_times:
+            query = query.filter(Visit.visit_time.is_(None))
+        else:
+            query = query.filter(Visit.visit_time.in_(appointment_times))
+
         if appointment.doctor_id is None:
             query = query.filter(Visit.doctor_id.is_(None))
         else:
@@ -33,3 +41,26 @@ class CanonicalVisitRepository:
         self.db.commit()
         self.db.refresh(visit)
         return visit
+
+    @staticmethod
+    def _time_match_values(value: str | time | None) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, time):
+            normalized = value.strftime("%H:%M")
+            return (normalized, f"{normalized}:00")
+
+        text = str(value).strip()
+        parts = text.split(":")
+        values = [text] if text else []
+        if len(parts) >= 2:
+            try:
+                hour = int(parts[0])
+                minute = int(parts[1])
+            except ValueError:
+                return tuple(values)
+            if 0 <= hour <= 23 and 0 <= minute <= 59:
+                normalized = f"{hour:02d}:{minute:02d}"
+                values.extend([normalized, f"{normalized}:00"])
+
+        return tuple(dict.fromkeys(values))
