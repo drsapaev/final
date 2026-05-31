@@ -475,6 +475,30 @@ async def get_webhook_call(
 # ===================== СТАТИСТИКА =====================
 
 
+@router.get("/system/stats", response_model=SystemWebhookStats)
+async def get_system_webhook_stats(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+):
+    """
+    Получает общую статистику системы webhook'ов
+
+    Требует роль: ADMIN или DEVELOPER
+    """
+    try:
+        webhook_service = get_webhook_service(db)
+        stats = webhook_service.get_system_webhook_stats()
+        return SystemWebhookStats(**stats)
+
+    except Exception as e:
+        logger.error(f"Ошибка получения системной статистики: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка получения статистики",
+        )
+
+
 @router.get("/{webhook_id}/stats", response_model=WebhookStats)
 async def get_webhook_stats(
     *,
@@ -507,30 +531,6 @@ async def get_webhook_stats(
 
     stats = crud_webhook.get_stats(db=db, id=webhook_id)
     return WebhookStats(**stats)
-
-
-@router.get("/system/stats", response_model=SystemWebhookStats)
-async def get_system_webhook_stats(
-    *,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
-):
-    """
-    Получает общую статистику системы webhook'ов
-
-    Требует роль: ADMIN или DEVELOPER
-    """
-    try:
-        webhook_service = get_webhook_service(db)
-        stats = webhook_service.get_system_webhook_stats()
-        return SystemWebhookStats(**stats)
-
-    except Exception as e:
-        logger.error(f"Ошибка получения системной статистики: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения статистики",
-        )
 
 
 # ===================== МАССОВЫЕ ОПЕРАЦИИ =====================
