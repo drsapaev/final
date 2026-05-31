@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, datetime, timezone
 
 import pytest
 
-from app.models.online_queue import OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.visit import Visit, VisitService
 
 
@@ -90,3 +91,88 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     linked_visit = db_session.query(Visit).filter(Visit.id == entry.visit_id).one()
     assert linked_visit.discount_mode == "all_free"
     assert linked_visit.approval_status == "pending"
+
+
+@pytest.mark.integration
+def test_full_update_without_visit_id_ignores_unrelated_same_day_patient_entries(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_service,
+):
+    unrelated_queue = DailyQueue(
+        day=date.today(),
+        specialist_id=test_daily_queue.specialist_id,
+        queue_tag=f"unrelated-{test_daily_queue.id}",
+        active=True,
+    )
+    db_session.add(unrelated_queue)
+    db_session.flush()
+
+    unrelated_entry = OnlineQueueEntry(
+        queue_id=unrelated_queue.id,
+        number=10,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        services=json.dumps(
+            [
+                {
+                    "service_id": test_service.id,
+                    "name": test_service.name,
+                    "code": test_service.code,
+                    "quantity": 1,
+                    "price": int(test_service.price or 0),
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    current_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=11,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        queue_time=datetime(2026, 5, 31, 9, 30, tzinfo=timezone.utc),
+        services=json.dumps([], ensure_ascii=False),
+    )
+    db_session.add_all([unrelated_entry, current_entry])
+    db_session.commit()
+    db_session.refresh(current_entry)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{current_entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+                "address": test_patient.address,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": False,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    db_session.refresh(current_entry)
+    db_session.refresh(unrelated_entry)
+    current_services = json.loads(current_entry.services)
+    assert [service["service_id"] for service in current_services] == [test_service.id]
+    assert unrelated_entry.queue_id == unrelated_queue.id
