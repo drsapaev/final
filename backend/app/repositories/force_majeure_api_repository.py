@@ -12,6 +12,7 @@ from app.models.refund_deposit import (
     PatientDeposit,
     RefundRequest,
 )
+from app.models.visit import Visit
 
 
 class ForceMajeureApiRepository:
@@ -75,6 +76,9 @@ class ForceMajeureApiRepository:
 
     def get_patient_deposit(self, *, patient_id: int) -> PatientDeposit | None:
         return self.db.query(PatientDeposit).filter(PatientDeposit.patient_id == patient_id).first()
+
+    def get_visit(self, visit_id: int) -> Visit | None:
+        return self.db.query(Visit).filter(Visit.id == visit_id).first()
 
     def list_deposit_transactions(
         self,

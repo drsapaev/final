@@ -269,22 +269,12 @@ class TestForceMajeureApiService:
         )
         state = {"flushed": False}
 
-        class Query:
-            def filter(self, *args, **kwargs):
-                return self
-
-            def first(self):
-                return SimpleNamespace(id=9, patient_id=99)
-
-        class Db:
-            def query(self, model):
-                return Query()
-
         class Repository:
-            db = Db()
-
             def get_patient_deposit(self, *, patient_id):
                 return deposit
+
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, patient_id=99)
 
             def flush(self):
                 state["flushed"] = True
