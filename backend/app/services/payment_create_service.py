@@ -59,6 +59,18 @@ class PaymentCreateService:
     def _resolve_visit_id(
         self, *, visit_id: int | None, appointment_id: int | None
     ) -> int | None:
+        if visit_id and appointment_id:
+            resolved_appointment_visit_id = self._resolve_visit_id(
+                visit_id=None,
+                appointment_id=appointment_id,
+            )
+            if resolved_appointment_visit_id != visit_id:
+                raise PaymentCreateDomainError(
+                    status_code=409,
+                    detail="visit_id does not match appointment_id",
+                )
+            return visit_id
+
         if visit_id:
             return visit_id
 

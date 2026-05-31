@@ -6,6 +6,7 @@ import pytest
 
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit, VisitService
 from app.services.payment_create_service import (
@@ -145,6 +146,63 @@ class TestPaymentCreateService:
 
         assert exc_info.value.status_code == 409
         assert db_session.query(Payment).count() == 0
+
+    def test_create_payment_rejects_mismatched_visit_and_appointment_ids(
+        self, db_session, test_patient, test_doctor
+    ):
+        visit_date = date.today()
+        appointment_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=visit_date,
+            visit_time="09:00",
+            status="open",
+            discount_mode="none",
+            source="desk",
+        )
+        appointment = Appointment(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=visit_date,
+            appointment_time="09:00",
+        )
+        other_patient = Patient(
+            first_name="Other",
+            last_name="PaymentOwner",
+            phone="+998901990001",
+            birth_date=date(1991, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.flush()
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=visit_date,
+            visit_time="10:00",
+            status="open",
+            discount_mode="none",
+            source="desk",
+        )
+        db_session.add_all([appointment_visit, appointment, other_visit])
+        db_session.commit()
+        db_session.refresh(appointment)
+        db_session.refresh(other_visit)
+
+        service = PaymentCreateService(db_session)
+        with pytest.raises(PaymentCreateDomainError) as exc_info:
+            service.create_payment(
+                visit_id=other_visit.id,
+                appointment_id=appointment.id,
+                amount=75_000.0,
+                currency="UZS",
+                method="cash",
+                note="mixed-id payment",
+            )
+
+        db_session.refresh(other_visit)
+        assert exc_info.value.status_code == 409
+        assert db_session.query(Payment).count() == 0
+        assert other_visit.status == "open"
 
     def test_create_payment_marks_visit_paid_when_fully_covered(
         self, db_session, test_visit, test_service
