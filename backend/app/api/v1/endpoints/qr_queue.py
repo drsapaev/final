@@ -1331,41 +1331,47 @@ def full_update_online_entry(
                 entry.visit_id, computed_aggregated_ids
             )
         else:
-            # Если нет visit_id, используем поиск по patient_id/phone за текущий день
-            # (это случай первой регистрации или когда visit еще не создан)
+            # If there is no visit yet, aggregate only the current service
+            # session. Same-day patient/phone scans can treat unrelated queue
+            # entries as already having the requested services.
+            session_filters = [
+                DailyQueue.day == queue_day,
+                OnlineQueueEntry.visit_id == None,
+                OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
+            ]
+            session_label = None
+
             if entry.patient_id:
-                patient_entries = (
-                    db.query(OnlineQueueEntry)
-                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-                    .filter(
-                        OnlineQueueEntry.patient_id == entry.patient_id,
-                        DailyQueue.day == queue_day,
-                        OnlineQueueEntry.visit_id == None, # ⭐ Только записи без визита (потенциально текущая сессия)
-                        OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
-                    )
-                    .all()
-                )
-                computed_aggregated_ids = list(set([e.id for e in patient_entries] + [entry.id]))
-                logger.info(
-                    "[full_update_online_entry] ⭐ FIX 3: Вычислены aggregated_ids по patient_id=%d (no visit): %s",
-                    entry.patient_id, computed_aggregated_ids
-                )
+                session_filters.append(OnlineQueueEntry.patient_id == entry.patient_id)
+                session_label = "patient_id"
             elif entry.phone:
-                phone_entries = (
+                session_filters.append(OnlineQueueEntry.phone == entry.phone)
+                session_label = "phone"
+
+            if session_label:
+                if entry.session_id:
+                    session_filters.append(
+                        OnlineQueueEntry.session_id == entry.session_id
+                    )
+                    boundary_label = "session_id"
+                else:
+                    session_filters.append(OnlineQueueEntry.queue_id == entry.queue_id)
+                    boundary_label = "queue_id"
+
+                session_entries = (
                     db.query(OnlineQueueEntry)
                     .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-                    .filter(
-                        OnlineQueueEntry.phone == entry.phone,
-                        DailyQueue.day == queue_day,
-                        OnlineQueueEntry.visit_id == None,
-                        OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
-                    )
+                    .filter(*session_filters)
                     .all()
                 )
-                computed_aggregated_ids = list(set([e.id for e in phone_entries] + [entry.id]))
+                computed_aggregated_ids = list(
+                    set([e.id for e in session_entries] + [entry.id])
+                )
                 logger.info(
-                    "[full_update_online_entry] ⭐ FIX 3: Вычислены aggregated_ids по phone=%s (no visit): %s",
-                    entry.phone, computed_aggregated_ids
+                    "[full_update_online_entry] computed %d aggregated ids by %s bounded by %s (no visit)",
+                    len(computed_aggregated_ids),
+                    session_label,
+                    boundary_label,
                 )
         
         # Используем computed_aggregated_ids, frontend's aggregated_ids только как fallback
