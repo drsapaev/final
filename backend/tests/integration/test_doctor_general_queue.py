@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -8,6 +9,7 @@ from app.models.clinic import Doctor
 from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.visit import Visit
 from app.core.security import get_password_hash
 from app.models.user import User
@@ -796,6 +798,138 @@ class TestDoctorGeneralQueue:
         assert payload["success"] is True
         assert payload["entry_id"] == entry.id
         assert payload["status"] == "completed"
+
+    def test_complete_queue_entry_preserves_registration_discount_mode_when_paid(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=doctor.id,
+            queue_tag="general",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=21,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="registrar",
+            status="in_progress",
+        )
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            visit_date=date.today(),
+            status="open",
+            discount_mode="benefit",
+        )
+        db_session.add_all([entry, visit])
+        db_session.commit()
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("10000"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/complete",
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        db_session.refresh(visit)
+        db_session.refresh(entry)
+        assert entry.status == "served"
+        assert visit.status == "completed"
+        assert visit.discount_mode == "benefit"
+
+    def test_complete_visit_record_preserves_registration_discount_mode_when_paid(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+        test_patient,
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=doctor.id,
+            visit_date=date.today(),
+            status="open",
+            discount_mode="repeat",
+        )
+        db_session.add(visit)
+        db_session.commit()
+        db_session.refresh(visit)
+
+        payment = Payment(
+            visit_id=visit.id,
+            amount=Decimal("10000"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        db_session.add(payment)
+        db_session.commit()
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{visit.id}/complete",
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        db_session.refresh(visit)
+        assert visit.status == "completed"
+        assert visit.discount_mode == "repeat"
 
     def test_doctor_stats_reads_daily_queue_by_doctor_id(
         self,
