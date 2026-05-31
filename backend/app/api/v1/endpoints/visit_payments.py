@@ -15,6 +15,21 @@ from app.services.visit_payment_api_service import (
 router = APIRouter()
 
 
+@router.get("/visit-payments/summary", summary="Сводка по платежам визитов")
+def get_visit_payments_summary(
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_roles("Admin", "Registrar")),
+):
+    """Получение сводки по платежам визитов"""
+    service = VisitPaymentApiService(db)
+    try:
+        return service.get_visit_payments_summary()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения сводки: {str(e)}",
+        )
+
 @router.get("/visit-payments/{visit_id}", summary="Информация о платеже для визита")
 def get_visit_payment_info(
     visit_id: int,
@@ -84,23 +99,6 @@ def update_visit_payment_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления статуса платежа: {str(e)}",
         )
-
-
-@router.get("/visit-payments/summary", summary="Сводка по платежам визитов")
-def get_visit_payments_summary(
-    db: Session = Depends(get_db),
-    _: dict = Depends(require_roles("Admin", "Registrar")),
-):
-    """Получение сводки по платежам визитов"""
-    service = VisitPaymentApiService(db)
-    try:
-        return service.get_visit_payments_summary()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сводки: {str(e)}",
-        )
-
 
 @router.post(
     "/visit-payments/{visit_id}/create-from-payment",
