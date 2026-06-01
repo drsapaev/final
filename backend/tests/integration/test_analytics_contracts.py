@@ -283,6 +283,44 @@ def test_doctor_cannot_read_financial_analytics_visualizations(
     assert response.status_code == 403
 
 
+@pytest.mark.parametrize(
+    ("path", "params"),
+    [
+        (
+            "/api/v1/analytics/ai/usage-analytics",
+            {"start_date": "2026-03-08", "end_date": "2026-04-07"},
+        ),
+        ("/api/v1/analytics/ai/usage-summary", {"days": 30}),
+        ("/api/v1/analytics/ai/function-performance/diagnosis", {"days": 7}),
+    ],
+)
+def test_doctor_cannot_read_ai_usage_cost_telemetry(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+    params: dict[str, Any],
+) -> None:
+    response = client.get(path, headers=_auth_headers(doctor_token), params=params)
+
+    assert response.status_code == 403
+
+
+def test_admin_can_read_ai_usage_cost_summary(
+    client: TestClient,
+    admin_token: str,
+) -> None:
+    response = client.get(
+        "/api/v1/analytics/ai/usage-summary",
+        headers=_auth_headers(admin_token),
+        params={"days": 30},
+    )
+
+    assert response.status_code == 200, response.text
+    payload: dict[str, Any] = response.json()
+    assert "total_cost_usd" in payload
+    assert "daily_average_cost" in payload
+
+
 def test_admin_can_read_advanced_revenue_analytics(
     client: TestClient,
     admin_token: str,
