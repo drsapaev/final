@@ -194,6 +194,28 @@ def test_doctor_cannot_read_legacy_revenue_analytics(
 @pytest.mark.parametrize(
     "path",
     [
+        "/api/v1/analytics/kpi-metrics",
+        "/api/v1/analytics/kpi-trends",
+        "/api/v1/analytics/kpi-comparison",
+    ],
+)
+def test_doctor_cannot_read_kpi_financial_analytics(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(doctor_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
         "/api/v1/analytics/export/kpi/export/json",
         "/api/v1/analytics/export/comprehensive/export/json",
         "/api/v1/analytics/export/revenue/export/json",
