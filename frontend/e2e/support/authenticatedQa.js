@@ -181,6 +181,10 @@ function buildQaApiPayload(pathname, profile, method) {
     return [];
   }
 
+  if (lowerPath === '/admin/appointments') {
+    return [];
+  }
+
   if (lowerPath === '/services' || lowerPath === '/services/categories' || lowerPath === '/services/admin/doctors') {
     return [];
   }
