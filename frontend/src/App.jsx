@@ -71,6 +71,7 @@ const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard.jsx'
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement.jsx'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement.jsx'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices.jsx'));
+const UnifiedFinance = lazy(() => import('./components/admin/UnifiedFinance.jsx'));
 const UnifiedSettings = lazy(() => import('./components/admin/UnifiedSettings.jsx'));
 const SystemManagement = lazy(() => import('./components/admin/SystemManagement.jsx'));
 const CloudPrintingManager = lazy(() => import('./components/admin/CloudPrintingManager.jsx'));
@@ -140,6 +141,7 @@ const ROUTE_COMPONENTS = {
   ClinicManagement,
   QueueCabinetManagement,
   AdminServices,
+  UnifiedFinance,
   UnifiedSettings,
   SystemManagement,
   CloudPrintingManager,
