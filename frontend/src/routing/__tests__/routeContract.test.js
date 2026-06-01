@@ -42,6 +42,17 @@ const ADMIN_CONTEXTUAL_ROUTE_IDS = [
   'admin-user-select',
 ];
 
+const ADMIN_OVERVIEW_ROUTE_CONTRACT = {
+  'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminPanel', entry: 'menu' },
+  'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu' },
+  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct' },
+  'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'AdminPanel', entry: 'direct' },
+  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'AdminPanel', entry: 'direct' },
+  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct' },
+  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct' },
+  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct' },
+};
+
 const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
   'clinical-profile',
   'clinical-security',
@@ -163,6 +174,26 @@ describe('route contract invariants', () => {
       expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
       expect(adminSidebarIds.has(route.id)).toBe(false);
       expect(adminSidebarTargets.has(route.path)).toBe(false);
+    });
+  });
+
+  it('keeps overloaded admin overview routes explicit until regrouping', () => {
+    const adminProfile = { role: 'Admin' };
+    const overviewSection = getRouteById('admin-dashboard').nav.section;
+
+    Object.entries(ADMIN_OVERVIEW_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
+      const route = getRouteById(routeId);
+      const chrome = getRouteChromeState(expected.path, '', adminProfile);
+
+      expect(route).toBeTruthy();
+      expect(route.path).toBe(expected.path);
+      expect(route.owner).toBe(expected.owner);
+      expect(route.component).toBe(expected.component);
+      expect(route.entry).toBe(expected.entry);
+      expect(route.nav.section).toBe(overviewSection);
+      expect(route.layout.activeSidebarItem).toBe(routeId);
+      expect(chrome.activeSidebarItem).toBe(routeId);
+      expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
     });
   });
 
