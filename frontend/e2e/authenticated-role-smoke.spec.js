@@ -67,6 +67,13 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
     primaryActionText: /Р”РѕР±Р°РІРёС‚СЊ СѓСЃР»СѓРіСѓ|Добавить услугу|Add service/i,
     openedFormHeading: /Р”РѕР±Р°РІР»РµРЅРёРµ СѓСЃР»СѓРіРё|Добавление услуги|Add service/i,
   },
+  {
+    key: 'admin-doctors',
+    path: '/admin/doctors',
+    routeId: 'admin-doctors',
+    primaryActionText: /Р”РѕР±Р°РІРёС‚СЊ РІСЂР°С‡Р°|Добавить врача|Add doctor/i,
+    openedFormHeading: /Р”РѕР±Р°РІРёС‚СЊ РІСЂР°С‡Р°|Добавить врача|Add doctor/i,
+  },
 ];
 
 async function expectRenderedRolePanel(page, route) {
@@ -198,10 +205,10 @@ async function runAdminRouteActionSmoke(page, testInfo, route) {
   await primaryAction.click();
 
   await expect(
-    page.locator('main').locator('h2, h3, [role="heading"]').filter({ hasText: route.openedFormHeading }).first(),
+    page.locator('h2, h3, [role="heading"]').filter({ hasText: route.openedFormHeading }).first(),
     `${route.key} primary action should open its form`
   ).toBeVisible();
-  await expect(page.locator('main form').first()).toBeVisible();
+  await expect(page.locator('form').first()).toBeVisible();
   await expectNoHorizontalOverflow(page, route);
 
   const screenshotPath = testInfo.outputPath(`admin-route-action-${route.key}.png`);
