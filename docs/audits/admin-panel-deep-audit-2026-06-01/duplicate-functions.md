@@ -1,139 +1,61 @@
-# Admin Panel Deep Audit: Duplicate Functions
+# AdminPanel Deep Audit: Duplicate Function Families
 
 Date: 2026-06-01
+Mode: audit-only
 
-Mode: audit-only. No runtime code changed.
+## Why This Matters
 
-## High-Risk Duplicate / Split Owners
+AdminPanel currently contains both route-level components and internal aggregator components. Some routes are canonical screens; others are hidden/contextual routes that load the same aggregator but do not select the intended sub-screen. This creates duplicate or misleading functions.
 
-### Analytics
+## Duplicate / Ambiguous Families
 
-Evidence:
+| Family | Routes / components | Risk | Recommended owner decision |
+| --- | --- | --- | --- |
+| User management | `/admin/users` -> `UnifiedUserManagement`; `/admin/advanced-users` -> `UserManagement` | Two screens can diverge on RBAC, destructive confirmations, export/transfer flows | Make one canonical; turn the other into a documented advanced tab or route alias |
+| Settings | `/admin/settings` -> `Settings`; many AdminPanel routes -> `UnifiedSettings` | Generic settings and route-specific settings are split; direct contextual routes often show wrong content | Define `Settings` vs `UnifiedSettings` boundary or consolidate behind route-aware adapter |
+| Security | `/admin/security` -> `UnifiedSettings` default, while `SecuritySettings` and `SecurityMonitor` exist | Security route can silently show generic settings instead of security controls | Make `/admin/security` explicitly render `SecuritySettings`/security surface |
+| Billing/benefits/providers | `/admin/finance`; hidden `/admin/benefit-settings`; hidden `/admin/payment-providers`; `UnifiedFinance`; `UnifiedSettings`; `DiscountBenefitsManager`; `PaymentProviderSettings` | Billing functions split between finance tabs and generic settings routes | Billing/payment provider routes should be owned by finance/billing or explicit settings subroutes, not default generic settings |
+| Queue settings/display | `/admin/queue-cabinet-management`; hidden `/admin/queue-settings`; hidden `/admin/display-settings`; `QueueSettings`; `DisplayBoardSettings`; `QueueProfilesManager` | Queue operations, queue profiles, and display settings are adjacent but route behavior is inconsistent | Keep queue cabinets/profiles separate from queue/display settings and test each route |
+| Telegram | `/admin/integrations/telegram` -> `TelegramManager`; hidden `/admin/telegram-settings` -> `UnifiedTelegramManagement`; `TelegramBotManager`; `TelegramSettings` | Token/security/storage/webhook work can land in the wrong component | Treat `/admin/integrations/telegram` as canonical operational Telegram manager unless a settings route is explicitly scoped |
+| Notifications | `/admin/notifications` -> `EmailSMSManager`; `UnifiedNotifications` -> `FCMManager`/`RegistrarNotificationManager` | Email/SMS/FCM/registrar notification settings can split and drift | Create a notification route map by channel and user-facing policy |
+| Analytics | `/admin/analytics` -> `AnalyticsPage`; `AdminPanel` has `case 'analytics'` -> `AnalyticsDashboard` | Same semantic route name has a dedicated route and an internal AdminPanel case | Remove/demote unreachable duplicate or document intentional split |
+| Services/departments | `/admin/services` -> service catalog + queue profiles; `case 'departments'` -> queue profiles deprecated redirect; `DepartmentManagement` still exists | Legacy department model can confuse queue profile/service catalog ownership | Keep service catalog as SSOT; document or retire legacy department UI separately |
 
-- `frontend/src/routing/routeRegistry.js` maps `/admin/analytics` to `AnalyticsPage`.
-- `frontend/src/pages/AdminPanel.jsx` still has `case 'analytics': return <AnalyticsDashboard />`.
+## Findings
 
-Risk:
+### D1: Contextual routes load default aggregator content
 
-- Two analytics implementations can diverge.
-- The AdminPanel branch is likely unreachable for the canonical route, which makes future fixes easy to put in the wrong component.
+The most urgent duplicate-function problem is not just duplication; it is false success. Several hidden routes successfully render a page but do not select the intended subcomponent.
 
-Recommendation:
+Examples:
 
-- Pick one canonical analytics owner.
-- If `AnalyticsPage` is canonical, remove or document the AdminPanel branch in a later runtime cleanup PR.
+- `/admin/payment-providers` should show provider settings, but browser headings show generic settings/clinic content.
+- `/admin/queue-settings` should show queue settings, but browser headings show generic settings/clinic content.
+- `/admin/display-settings` should show display board settings, but browser headings show generic settings/clinic content.
 
-### Settings
+### D2: Dedicated route components and AdminPanel wrappers coexist
 
-Evidence:
+`App.jsx` registers dedicated components for `AnalyticsPage`, `Settings`, `TelegramManager`, `EmailSMSManager`, `FileManager`, `Audit`, and `UserManagement`, while `AdminPanel` also contains wrappers for similar concepts. This is not automatically wrong, but each pair needs an explicit boundary.
 
-- `frontend/src/routing/routeRegistry.js` maps `/admin/settings` to `Settings`.
-- `frontend/src/pages/AdminPanel.jsx` still has `case 'settings': return <UnifiedSettings />`.
-- Hidden/contextual routes such as `/admin/clinic-settings`, `/admin/queue-settings`, `/admin/payment-providers`, `/admin/wizard-settings`, and `/admin/display-settings` also route through `UnifiedSettings`.
+### D3: Aggregator tabs are not consistently route-aware
 
-Risk:
+`UnifiedFinance` and `UnifiedNotifications` read `?section=...`; `UnifiedTelegramManagement` defaults to bot tab; `UnifiedSettings` reads query only. Direct pathname routes do not automatically become query sections.
 
-- Settings behavior can be patched in the wrong component.
-- Hidden settings routes may lose route-specific context if everything collapses into a generic view.
+## Recommended Slices
 
-Recommendation:
+1. Route-state adapter slice:
+   - Make AdminPanel pass an explicit `section` to aggregators based on canonical route id/path.
+   - Add route contract tests for hidden contextual routes.
 
-- Define a canonical settings shell.
-- Make contextual settings routes pass explicit section/tab state rather than relying on a generic default.
+2. Settings/security slice:
+   - Fix `/admin/security`, `/admin/ai-settings`, `/admin/payment-providers`, `/admin/queue-settings`, `/admin/display-settings`, `/admin/wizard-settings`, `/admin/benefit-settings`.
 
-### Telegram
+3. Telegram/notifications route map slice:
+   - Decide canonical Telegram operational route vs settings route.
+   - Decide notification channel route map.
 
-Evidence:
+4. User management consolidation slice:
+   - Make `/admin/users` and `/admin/advanced-users` intentional, tested entry points.
 
-- `/admin/integrations/telegram` maps to standalone `TelegramManager`.
-- `/admin/telegram-settings` maps through `AdminPanel` to `UnifiedTelegramManagement`.
-- `UnifiedTelegramManagement` wraps `TelegramBotManager` and `TelegramSettings`.
-
-Risk:
-
-- Bot API/webhook UX fixes can land in one Telegram surface while users enter through the other.
-- This is especially risky because Telegram work also has DB/security/token ownership rules.
-
-Recommendation:
-
-- Keep Telegram Bot API/UX as one explicit route owner.
-- Do not let Telegram UI skill or route cleanup override DB/Alembic ownership rules.
-
-### Notifications
-
-Evidence:
-
-- `/admin/notifications` maps to `EmailSMSManager`.
-- `AdminPanel` has `fcm-notifications` and `registrar-notifications` branches that render `UnifiedNotifications`.
-
-Risk:
-
-- Notification catalog, FCM, registrar-notification, and anti-noise policies can drift.
-- User-facing entry points may show different controls for the same notification domain.
-
-Recommendation:
-
-- Define one notification admin shell with explicit subroutes/tabs.
-- Preserve notification catalog/settings ownership boundaries.
-
-### User Management
-
-Evidence:
-
-- `/admin/users` renders `UnifiedUserManagement`.
-- `/admin/advanced-users` renders standalone `UserManagement`.
-- `UnifiedUserManagement` also contains a local `AdminTabs` implementation.
-
-Risk:
-
-- Two user-management surfaces can conflict on permissions, exports, transfer, and group permission UX.
-
-Recommendation:
-
-- Decide whether `/admin/advanced-users` is an intentional advanced mode or legacy alias.
-- If intentional, document what only belongs there.
-
-## Lower-Risk Duplication / Design Drift
-
-### Repeated local AdminTabs
-
-Evidence:
-
-- `UnifiedTelegramManagement.jsx`
-- `UnifiedNotifications.jsx`
-- `UnifiedAITools.jsx`
-- `UnifiedFinance.jsx`
-- `UnifiedUserManagement.jsx`
-
-Risk:
-
-- Tabs look similar but are not the same component.
-- Several wrappers use hardcoded colors such as `#3b82f6` and raw `rgba(...)`, bypassing design tokens.
-
-Recommendation:
-
-- Extract or reuse one admin tab primitive in a later UI-system PR.
-- Do not refactor all admin surfaces in one PR.
-
-### Deprecated departments alias
-
-Evidence:
-
-- `AdminPanel.jsx` has a `departments` branch that renders `QueueProfilesManager`.
-- Comment says DepartmentManagement is deprecated and queue profiles are the SSOT.
-
-Risk:
-
-- Low if this remains documented.
-
-Recommendation:
-
-- Keep the alias only if external links still use it.
-- Add route-registry documentation if the alias remains user-visible.
-
-## Fix Slice Order
-
-1. Fix broken route APIs first: services, reports, file management.
-2. Pick canonical owners for duplicated Telegram/notifications/settings/user-management.
-3. Normalize admin tab primitive only after owners are clear.
-4. Reconsider sidebar grouping after functional issues are green.
+5. Legacy services/departments slice:
+   - Document or remove the stale `departments`/`DepartmentManagement` path in a later PR.

@@ -1,103 +1,139 @@
-# Admin Panel Deep Audit Summary
+# AdminPanel Deep Audit Summary
 
 Date: 2026-06-01
-
-Mode: audit-only. No runtime code changed.
+Mode: audit-only
 
 ## Verdict
 
-AdminPanel is route-complete enough to render the full admin map, but not functionally clean yet.
+AdminPanel is functional in many core routes, but the admin architecture is not yet clean. The biggest risk is not visual polish; it is route ownership drift. Several routes render successfully while showing the wrong functional content because direct pathname routes and aggregator `?section=` state are not aligned.
 
-The good news:
+## Top Findings
 
-- No audited route redirected to login, forbidden, not-found, or unknown-section.
-- No horizontal overflow across the four required viewports.
-- No unnamed icon-only buttons were found in the audited route shells.
+1. P0: `/admin/reports` is broken by `GET /api/v1/reports/daily-summary` returning 500.
+2. P1: Direct contextual settings routes render generic settings instead of route-specific screens.
+3. P1: `/admin/telegram-settings` opens Bot Manager by default, not settings.
+4. P1: `/admin/file-management` shows an empty file manager while critical file API calls return 422/401.
+5. P1: User management, Telegram, notifications, settings, and analytics have duplicate or parallel route/component families.
+6. P2: Overview navigation group contains operational/integration tooling and is overloaded.
+7. P2: `AdminPanel.jsx` remains a broad route switch plus implementation container.
+8. P2: Shared component warnings exist in Services and GraphQL routes.
+9. P3: Some routes lack clear top-level heading evidence.
 
-The important problems:
+## P0/P1/P2/P3 Backlog
 
-- Core admin service catalog is blocked by `GET /api/v1/services` 500.
-- File management is broken in browser flow due endpoint mismatch and redirect/auth behavior.
-- Reports daily summary is broken because reporting expects `Visit.total_amount`.
-- Several admin domains have duplicate/split owners, creating wrong-fix risk for future agents.
+### P0
 
-## P0 Backlog
+- Fix `/admin/reports` daily summary failure so Admin Reports does not default to an error screen.
 
-1. Fix `/admin/services` service list.
-   - Evidence: `/api/v1/services` returns 500 in all four viewports.
-   - Likely root: `ServiceOut` serializer/schema mismatch around `specialist`.
-   - Slice: backend serialization fix + targeted service list test + browser smoke.
+### P1
 
-2. Fix `/admin/file-management` file APIs in browser flow.
-   - Evidence: `/api/v1/files/stats` returns 422; `/api/v1/files` redirects to backend `/api/v1/files/` and browser flow receives 401.
-   - Likely root: frontend endpoint mismatch (`stats` vs backend `statistics`) plus redirect/auth loss.
-   - Slice: align endpoint naming and use canonical API client/origin helper.
+- Align direct contextual routes with their intended aggregator sections:
+  - `/admin/ai-settings`
+  - `/admin/security`
+  - `/admin/benefit-settings`
+  - `/admin/wizard-settings`
+  - `/admin/payment-providers`
+  - `/admin/clinic-settings`
+  - `/admin/queue-settings`
+  - `/admin/display-settings`
+- Make `/admin/telegram-settings` open Telegram settings, or rename/redirect it if Bot Manager is canonical.
+- Fix `/admin/file-management` 422/401 ambiguity.
+- Decide canonical user-management route/component.
+- Decide canonical Telegram and notification route map.
 
-## P1 Backlog
+### P2
 
-1. Fix `/admin/reports` daily summary.
-   - Evidence: `/api/v1/reports/daily-summary` returns 500.
-   - Backend log: `Visit object has no attribute total_amount`.
-   - Slice: calculate totals from current payment/visit-service source of truth.
+- Move integration/tooling routes out of "Overview" or rename the section to match reality.
+- Add route contract tests for every AdminPanel-owned contextual route.
+- Resolve `MacOSTable` prop warning in `/admin/services`.
+- Resolve React unknown prop warning in `/admin/graphql-explorer`.
 
-2. Decide canonical owners for duplicate admin surfaces.
-   - Analytics: `AnalyticsPage` vs `AnalyticsDashboard`.
-   - Settings: `Settings` vs `UnifiedSettings`.
-   - Telegram: `TelegramManager` vs `UnifiedTelegramManagement`.
-   - Notifications: `EmailSMSManager` vs `UnifiedNotifications`.
-   - Users: `UnifiedUserManagement` vs `UserManagement`.
+### P3
 
-## P2 Backlog
-
-1. Remove misleading dashboard/analytics quick switcher from webhooks or make it integration-aware.
-2. Give contextual settings routes a parent/breadcrumb/active section.
-3. Fix GraphQL Explorer `textareaStyle` DOM prop warning.
-4. Fix ServiceCatalog table PropTypes and table-nesting warnings after service data loads.
-5. Consolidate repeated local `AdminTabs` implementations into one design-system primitive.
-
-## P3 Backlog
-
-1. Rebalance sidebar grouping after P0/P1 fixes.
-2. Move webhooks/GraphQL toward integrations.
-3. Move cloud printing / medical equipment toward operations/devices.
-4. Tighten naming for hidden/contextual settings routes.
+- Add clear `h1/h2` heading semantics where route heading extraction is weak.
+- Improve density/scanability after functional routing is fixed.
 
 ## Recommended Fix Slices
 
-1. `fix(admin-services): restore service catalog list`
-   - Scope: backend `/services` serialization and targeted frontend smoke.
+### PR-ADMIN-1: Route state adapter
 
-2. `fix(admin-files): align file manager endpoints`
-   - Scope: file-management endpoint names/auth behavior only.
+Scope:
 
-3. `fix(admin-reports): restore daily summary totals`
-   - Scope: reporting service totals only.
+- `frontend/src/pages/AdminPanel.jsx`
+- aggregator props only if needed
+- tests for route -> section mapping
 
-4. `docs(admin): define canonical admin route owners`
-   - Scope: route owner table, no runtime changes.
+Goal:
 
-5. `refactor(admin): consolidate one duplicated admin surface`
-   - Pick only one family: Telegram, notifications, settings, analytics, or users.
+Direct admin contextual routes must render their intended subcomponent without requiring `?section=...`.
 
-6. `fix(admin-ui): normalize admin tab primitive`
-   - Scope: shared tab primitive after owner decisions.
+Validation:
 
-## Validation Evidence
+- Vitest route/section tests.
+- Browser smoke for `/admin/security`, `/admin/payment-providers`, `/admin/queue-settings`, `/admin/display-settings`, `/admin/ai-settings`.
 
-- `.\scripts\check_dev_clinic.ps1`: PASS before browser QA.
-- Playwright browser QA: 35 routes x 4 viewports = 140 checks.
-- `clinic_dev` was used.
-- No DB reset/seed was run.
-- No runtime files were changed.
+### PR-ADMIN-2: Reports empty/low-data hardening
 
-## Remaining Unknowns
+Scope:
 
-- Full create/edit/delete/export/test action behavior was not exercised because this audit PR is read-only.
-- Route ownership cleanup may require product decisions before code changes.
-- API failures should be fixed in targeted PRs with backend tests, not hidden behind frontend fallbacks.
+- Backend reports endpoint and/or frontend report fallback, depending on root cause.
 
-## Stop Conditions
+Goal:
 
-- Do not fix findings inside this audit PR.
-- Do not delete aliases until route-registry compatibility is reviewed.
-- Do not merge UI route owners with DB/security/payment/notification ownership changes in the same PR.
+`/admin/reports` must render an understandable no-data report state instead of a 500-backed error.
+
+### PR-ADMIN-3: File manager auth/params contract
+
+Scope:
+
+- File manager frontend API calls and backend file endpoint expectations.
+
+Goal:
+
+Admin file management must distinguish no files from unauthorized/malformed request.
+
+### PR-ADMIN-4: Canonical admin route map cleanup
+
+Scope:
+
+- Docs/tests first, then one family per PR:
+  - users
+  - Telegram
+  - notifications
+  - settings/security
+
+Goal:
+
+Duplicate families become explicit aliases, tabs, or separate route owners with tests.
+
+### PR-ADMIN-5: Navigation grouping pass
+
+Scope:
+
+- `routeRegistry.js`
+- route selector tests
+
+Goal:
+
+Admin sidebar groups reflect business ownership: Overview vs Management vs System/Integrations/Operations.
+
+## Audit Quality Gate
+
+Completed:
+
+- Static route registry review.
+- AdminPanel render switch review.
+- Admin components inventory.
+- Browser route pass under Admin auth.
+- Mobile sample on representative routes.
+
+Not completed in this docs-only PR:
+
+- No runtime fixes.
+- No destructive action QA.
+- No full four-viewport sweep for every route.
+- No backend trace of report/file failures beyond browser-observed HTTP status.
+
+## Next Smallest Patch
+
+Implement `PR-ADMIN-1: Route state adapter`. It has the highest safety-to-value ratio because it fixes false-success routes without changing admin data contracts, RBAC, or backend behavior.

@@ -1,168 +1,205 @@
-# Admin Panel Deep Audit: Functional Findings
+# AdminPanel Deep Audit: Functional Findings
 
 Date: 2026-06-01
+Mode: audit-only
 
-Mode: audit-only. No runtime code changed.
+## Browser QA Method
 
-## Findings
+Local dev runtime:
 
-### P0: `/admin/services` cannot load service catalog data
+- Backend: `http://localhost:18000`
+- Frontend: `http://localhost:5173`
+- Database: `clinic_dev`
+- Auth: short-lived dev Admin token minted with `backend/app/scripts/mint_dev_token.py`
+- Safety: no create/edit/delete/test actions were clicked
 
-Evidence:
+Browser automation loaded every admin sidebar route plus hidden contextual admin routes at `1280x800`, and sampled `/admin`, `/admin/services`, `/admin/settings`, `/admin/integrations/telegram` at `375x812`.
 
-- Browser QA: `/admin/services` returned `500 http://localhost:5173/api/v1/services` in all four viewports.
-- Frontend console: `GET /services` failed with backend validation error mentioning `ServiceOut` and `specialist` expecting a string.
-- Adjacent service endpoints loaded: `/services/categories`, `/services/admin/doctors`, `/departments`, and `/queues/profiles?active_only=false`.
+## P0
 
-Impact:
-
-- Admin service catalog management is blocked even though the route shell renders.
-- Service catalog is a core admin function and also affects registrar service selection.
-
-Likely root:
-
-- Backend service-list serialization/schema mismatch for at least one service row, not a pure frontend rendering issue.
-
-Recommended slice:
-
-- Backend-first service list serialization fix with a focused `/api/v1/services` regression test.
-- Then run admin service catalog browser smoke.
-
-### P0: `/admin/file-management` file list/stat UX is broken in browser
+### P0-1: `/admin/reports` route fails critical report load
 
 Evidence:
 
-- Browser QA: `/admin/file-management` hit `422 /api/v1/files/stats` and `401 http://localhost:18000/api/v1/files/`.
-- Direct backend call with the same token to `http://localhost:18000/api/v1/files/` returned `200`.
-- Backend log: `/api/v1/files/stats` is parsed as dynamic `{file_id}` and fails integer parsing.
-- Source: `frontend/src/components/files/FileManager.jsx` calls `/api/v1/files/stats`, while backend file-system route exposes `/statistics`.
-- Source: `FileManager.jsx` calls `/api/v1/files` without trailing slash, causing redirect to `/api/v1/files/`; in browser QA the redirected backend-origin request lost auth and returned 401.
+- Route: `/admin/reports`
+- Browser heading: `РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РґР°РЅРЅС‹С…`
+- Failed API: `GET /api/v1/reports/daily-summary` returned `500`
+- Console repeated server errors for the same endpoint
 
 Impact:
 
-- Admin file-management route shell loads but core list/stats behavior is not reliable.
+Admin reports are a top-level sidebar route. A 500 on the default screen means the route is functionally broken for a core admin reporting workflow.
 
-Recommended slice:
+Likely ownership:
 
-- Align frontend with backend file endpoints, or add backend-compatible `/stats`.
-- Avoid cross-origin auth loss by using the existing API client or canonical runtime API origin helper.
+- Frontend surface: `frontend/src/components/admin/UnifiedReports.jsx`
+- Backend/API owner: reports endpoint serving `/api/v1/reports/daily-summary`
+- Route owner: `admin.reports`
 
-### P1: `/admin/reports` quick daily summary fails
+Validation for fix:
+
+- Browser loads `/admin/reports` without error heading.
+- Backend targeted test covers empty `clinic_dev`/low-data report summary.
+- Frontend handles no-data report state without treating it as a fatal route error.
+
+## P1
+
+### P1-1: Contextual settings routes render generic settings instead of their intended section
+
+Affected routes:
+
+- `/admin/ai-settings`
+- `/admin/security`
+- `/admin/benefit-settings`
+- `/admin/wizard-settings`
+- `/admin/payment-providers`
+- `/admin/clinic-settings`
+- `/admin/queue-settings`
+- `/admin/display-settings`
 
 Evidence:
 
-- Browser QA: `/admin/reports` returned `500 /api/v1/reports/daily-summary` in all four viewports.
-- Backend log: `Visit object has no attribute total_amount`.
-- Other report endpoints, such as `/reports/files` and `/reports/available-reports`, returned 200.
+- Browser headings for these direct routes commonly show `Р¦РІРµС‚РѕРІР°СЏ СЃС…РµРјР° РёРЅС‚РµСЂС„РµР№СЃР°`, `РќР°СЃС‚СЂРѕР№РєРё РєР»РёРЅРёРєРё`, `РћСЃРЅРѕРІРЅР°СЏ РёРЅС„РѕСЂРјР°С†РёСЏ`, `РЎРёСЃС‚РµРјРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё`.
+- Static root: `AdminPanel` derives `current` from pathname, but `UnifiedSettings` reads only `?section=` and defaults to `general`.
 
 Impact:
 
-- Reports route loads, but quick daily summary is broken.
-- Users see an error state for a primary report-card area.
+Routes look successful but open the wrong functional screen. This is worse than a visible 404 because Admin can silently edit unrelated settings.
 
-Likely root:
+Likely ownership:
 
-- Reporting service expects `Visit.total_amount`, but current visit/payment model no longer exposes that field directly.
+- `frontend/src/pages/AdminPanel.jsx`
+- `frontend/src/components/admin/UnifiedSettings.jsx`
+- `frontend/src/routing/routeRegistry.js`
 
-Recommended slice:
+Validation for fix:
 
-- Fix `reporting_service` to calculate visit totals from the current payment/visit-service source of truth.
-- Add one regression test for daily summary with current schema.
+- Route contract/browser tests assert direct route -> intended component content:
+  - `/admin/security` -> `SecuritySettings`
+  - `/admin/ai-settings` -> `AISettings`
+  - `/admin/payment-providers` -> `PaymentProviderSettings`
+  - `/admin/queue-settings` -> `QueueSettings`
+  - `/admin/display-settings` -> `DisplayBoardSettings`
+  - `/admin/wizard-settings` -> `WizardSettings`
+  - `/admin/benefit-settings` -> `BenefitSettings`
 
-### P1: Split route owners create wrong-fix risk
+### P1-2: `/admin/telegram-settings` opens Bot Manager, not Telegram settings
 
 Evidence:
 
-- Analytics: `/admin/analytics` uses `AnalyticsPage`, while `AdminPanel` has an `AnalyticsDashboard` branch.
-- Settings: `/admin/settings` uses `Settings`, while `AdminPanel` has `UnifiedSettings` branches.
-- Telegram: `/admin/integrations/telegram` uses `TelegramManager`, while `/admin/telegram-settings` uses `UnifiedTelegramManagement`.
-- Notifications: `/admin/notifications` uses `EmailSMSManager`, while hidden notification branches use `UnifiedNotifications`.
-- Users: `/admin/users` uses `UnifiedUserManagement`, while `/admin/advanced-users` uses `UserManagement`.
+- Route: `/admin/telegram-settings`
+- Browser headings: `Telegram Bot`, `Р‘С‹СЃС‚СЂС‹Рµ РґРµР№СЃС‚РІРёСЏ`
+- Static root: `UnifiedTelegramManagement` defaults `activeTab` to `bot` and does not read pathname or query.
 
 Impact:
 
-- Future agents can fix the wrong surface.
-- Route-specific behavior can silently diverge.
+The route title/owner says settings, but the first screen is bot operation. For Telegram security/token work this can mislead agents and admins into the wrong surface.
 
-Recommended slice:
+Likely ownership:
 
-- Write a canonical owner table first, then clean one duplicated route family per PR.
+- `frontend/src/components/admin/UnifiedTelegramManagement.jsx`
+- `frontend/src/pages/AdminPanel.jsx`
+- `frontend/src/routing/routeRegistry.js`
 
-### P2: Webhooks screen shows dashboard/analytics route switcher
+### P1-3: File management route loads but protected API calls fail
 
 Evidence:
 
-- `AdminPanel.jsx` renders `AdminRouteSwitcher current="dashboard"` inside `case 'webhooks'`.
-- `AdminRouteSwitcher.jsx` only contains dashboard and analytics route cards.
+- Route: `/admin/file-management`
+- Failed API responses:
+  - `GET /api/v1/files/stats` -> `422`
+  - `GET /api/v1/files/` -> `401`
+- Browser still shows `Р¤Р°Р№Р»РѕРІС‹Р№ РјРµРЅРµРґР¶РµСЂ` and `Р¤Р°Р№Р»С‹ РЅРµ РЅР°Р№РґРµРЅС‹`.
 
 Impact:
 
-- Webhooks users see a quick switcher that marks dashboard active and does not mention webhooks.
+Admin sees an empty file manager that may actually be unauthorized or malformed, not truly empty.
 
-Recommended slice:
+Likely ownership:
 
-- Remove the local switcher from webhooks or expand it to relevant integration routes.
+- `frontend/src/components/files/FileManager.jsx`
+- Backend file endpoints/auth dependencies
 
-### P2: Contextual routes have weak navigation state
+### P1-4: Duplicate user-management surfaces can diverge
 
 Evidence:
 
-- `/admin/benefit-settings`, `/admin/wizard-settings`, `/admin/payment-providers`, `/admin/clinic-settings`, `/admin/queue-settings`, `/admin/telegram-settings`, `/admin/display-settings`, and `/admin/user-select` have no sidebar nav metadata.
-- They render, but users do not get a clear active sidebar anchor.
+- `/admin/users` uses `AdminPanel` -> `UnifiedUserManagement`.
+- `/admin/advanced-users` uses dedicated `UserManagement`.
+- Browser headings for both are `РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё`.
 
 Impact:
 
-- Direct links work, but users may not know where they are in Admin.
+Two user admin entry points can drift in permissions, validation, destructive action confirmations, and field coverage.
 
-Recommended slice:
+Recommendation:
 
-- Keep them contextual if intentional, but give each a parent section, breadcrumb, or explicit entry point.
+Pick one canonical user-management component and make the other route an intentional alias/wrapper with contract tests.
 
-### P2: GraphQL Explorer leaks a non-DOM prop
+### P1-5: Duplicate Telegram and notification admin surfaces can diverge
 
 Evidence:
 
-- Browser console on `/admin/graphql-explorer`: React warning for `textareaStyle` passed to a DOM `textarea`.
+- `/admin/integrations/telegram` uses dedicated `TelegramManager`.
+- `/admin/telegram-settings` uses `UnifiedTelegramManagement` -> `TelegramBotManager`/`TelegramSettings`.
+- `/admin/notifications` uses `EmailSMSManager`.
+- `UnifiedNotifications` exists for FCM/Registrar notifications but is not the sidebar route.
 
 Impact:
 
-- Not a task blocker, but it is a noisy React warning in an admin developer tool.
+Integration/security ownership becomes ambiguous. Telegram token/security work is especially sensitive and should not be split across unrelated managers without a clear route map.
 
-Recommended slice:
+## P2
 
-- Fix `MacOSTextarea` prop filtering or GraphQLExplorer prop usage.
+### P2-1: Overview section contains operational/integration tooling
 
-### P2: Service catalog table markup/prop warnings
+Examples:
+
+- Webhooks
+- Reports
+- System
+- Cloud printing
+- Medical equipment
+- GraphQL API
+
+Impact:
+
+The Overview group becomes a mixed toolbox instead of a dashboard/monitoring entry. This increases navigation time and makes ownership harder to infer.
+
+### P2-2: AdminPanel is still an oversized route switch and implementation container
 
 Evidence:
 
-- Browser console on `/admin/services`: `MacOSTable` gets an object `columns[0].title` where PropTypes expects string.
-- Browser console also reports invalid table nesting: `<tr>` cannot appear as a child of `<td>`.
+- `AdminPanel.jsx` handles local routing, dashboard, patients, doctors, appointments, finance, reports, settings wrappers, services, and feature managers.
 
 Impact:
 
-- Accessibility and table semantics are degraded.
-- The warning is separate from the backend 500 and should be fixed after data loads.
+Small admin fixes have high blast radius. Future fixes should be one route-family per PR and should avoid broad AdminPanel refactors.
 
-Recommended slice:
-
-- Once `/services` API works, fix ServiceCatalog table column/title and row rendering semantics.
-
-### P3: Overview section is overloaded
+### P2-3: Prop warnings indicate component contract drift
 
 Evidence:
 
-- Overview includes dashboard, analytics, webhooks, reports, system, cloud printing, medical equipment, and GraphQL.
+- `/admin/services`: `MacOSTable` prop warning, `columns[0].title` object supplied where string expected.
+- `/admin/graphql-explorer`: React unknown prop warning.
 
 Impact:
 
-- Admin sidebar feels like a mixed operations bucket rather than a task-oriented overview.
+These are not immediate blockers, but they are signs that shared component contracts are drifting.
 
-Recommended slice:
+## P3
 
-- After functional fixes, regroup webhooks/GraphQL under integrations and cloud/equipment under operations/devices.
+### P3-1: Some routes have weak visible headings
 
-## Non-Findings
+Examples:
 
-- Browser QA did not find login redirects, forbidden pages, not-found pages, unnamed icon-only buttons, or horizontal overflow across the audited routes/viewports.
-- This does not prove every create/edit/delete action works; the audit did not mutate data.
+- `/admin/system` loaded but browser heading extraction found no clear heading.
+- `/admin/integrations/telegram` loaded but heading extraction found no `h1/h2/h3` heading.
+
+Impact:
+
+Screen-reader and scanability quality can be improved after functional routing is corrected.
+
+## Stop Conditions
+
+No runtime fixes were attempted. Any fix touching backend report APIs, file auth, route state, or destructive admin actions should be planned as a separate PR with tests.
