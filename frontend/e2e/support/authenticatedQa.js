@@ -185,6 +185,10 @@ function buildQaApiPayload(pathname, profile, method) {
     return [];
   }
 
+  if (lowerPath === '/billing/invoices' || lowerPath === '/billing/payments') {
+    return [];
+  }
+
   if (lowerPath === '/services' || lowerPath === '/services/categories' || lowerPath === '/services/admin/doctors') {
     return [];
   }
