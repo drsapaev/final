@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -24,9 +24,21 @@ const stripPasswordFields = (formData) => {
   return persistedSettings;
 };
 
+const ADMIN_SETTINGS_ROUTE_SECTION_MAP = {
+  '/admin/benefit-settings': 'benefit-settings',
+  '/admin/wizard-settings': 'wizard-settings',
+  '/admin/payment-providers': 'payment-providers',
+  '/admin/clinic-settings': 'clinic-settings',
+  '/admin/queue-settings': 'queue-settings',
+  '/admin/display-settings': 'display-settings',
+  '/admin/security': 'security',
+};
+
 const UnifiedSettings = () => {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const section = searchParams.get('section') || 'general';
+  const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '')];
+  const section = routeSection || searchParams.get('section') || 'general';
   const [securitySettings, setSecuritySettings] = useState({});
   const [securityLoading, setSecurityLoading] = useState(false);
 
