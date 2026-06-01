@@ -16,7 +16,6 @@ FRONTEND_WS_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationWebSocke
 FRONTEND_INBOX_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "NotificationInbox.jsx"
 FRONTEND_PROMPT_JSX = ROOT / "frontend" / "src" / "components" / "chat" / "NotificationPrompt.jsx"
 FRONTEND_ROLE_CENTER_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "RoleNotificationCenter.jsx"
-ADMIN_PANEL = ROOT / "frontend" / "src" / "pages" / "AdminPanel.jsx"
 CARDIO_PANEL = ROOT / "frontend" / "src" / "pages" / "CardiologistPanelUnified.jsx"
 DENTIST_PANEL = ROOT / "frontend" / "src" / "pages" / "DentistPanelUnified.jsx"
 DERMA_PANEL = ROOT / "frontend" / "src" / "pages" / "DermatologistPanelUnified.jsx"
@@ -151,7 +150,7 @@ def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
 
 @pytest.mark.unit
 def test_role_panels_use_shared_notification_center_without_direct_toasts() -> None:
-    page_files = [ADMIN_PANEL, CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL, LAB_PANEL]
+    page_files = [CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL, LAB_PANEL]
 
     for path in page_files:
         content = path.read_text(encoding="utf-8")

@@ -104,6 +104,37 @@ def _ensure_doctor_can_integrate_lab_results(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _ensure_lab_result_notification_scope(
+    db: Session,
+    *,
+    result_id: int,
+    patient_id: int,
+    doctor_id: int,
+    current_user: User,
+) -> None:
+    result_owner = (
+        db.query(LabOrder.patient_id)
+        .join(LabResult, LabResult.order_id == LabOrder.id)
+        .filter(LabResult.id == result_id)
+        .scalar()
+    )
+    if result_owner is None:
+        raise HTTPException(status_code=404, detail="Lab result not found")
+    if int(result_owner) != int(patient_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+
+    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, current_user)
+    if int(doctor_id) not in allowed_doctor_ids:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if int(patient_id) not in _doctor_allowed_patient_ids(db, current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/patients/{patient_id}/lab-results")
 async def get_patient_lab_results(
     patient_id: int,
@@ -253,6 +284,13 @@ async def notify_doctor_about_lab_result(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Lab")),
 ) -> Any:
     """Уведомить врача о готовности лабораторного результата"""
+    _ensure_lab_result_notification_scope(
+        db,
+        result_id=result_id,
+        patient_id=patient_id,
+        doctor_id=doctor_id,
+        current_user=current_user,
+    )
     try:
         notification = await emr_lab_integration.notify_doctor_about_lab_results(
             db=db, patient_id=patient_id, doctor_id=doctor_id, result_id=result_id

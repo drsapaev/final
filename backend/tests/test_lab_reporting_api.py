@@ -698,6 +698,98 @@ def test_admin_emr_lab_integrate_rejects_cross_patient_result(
 
 
 @pytest.mark.integration
+def test_emr_lab_notify_doctor_rejects_cross_patient_result(
+    client,
+    auth_headers,
+    db_session,
+    test_doctor,
+) -> None:
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    other_visit = _create_visit(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+    )
+    other_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=other_patient.id,
+        visit_id=other_visit.id,
+        test_code="glucose",
+        value="7",
+    )
+
+    response = client.post(
+        f"/api/v1/emr/lab/lab-results/{other_result.id}/notify-doctor",
+        params={"patient_id": own_patient.id, "doctor_id": test_doctor.id},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_doctor_emr_lab_notify_doctor_is_limited_to_owned_patient(
+    client,
+    db_session,
+) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="notify_own")
+    _other_user, other_doctor = _create_doctor_user(
+        db_session,
+        label="notify_other",
+    )
+    own_patient = _create_patient(db_session)
+    other_patient = _create_patient(db_session)
+    own_visit = _create_visit(
+        db_session,
+        patient_id=own_patient.id,
+        doctor_id=own_doctor.id,
+    )
+    other_visit = _create_visit(
+        db_session,
+        patient_id=other_patient.id,
+        doctor_id=other_doctor.id,
+    )
+    own_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=own_patient.id,
+        visit_id=own_visit.id,
+        test_code="hemoglobin",
+        value="130",
+    )
+    other_result = _create_legacy_lab_result(
+        db_session,
+        patient_id=other_patient.id,
+        visit_id=other_visit.id,
+        test_code="glucose",
+        value="7",
+    )
+    doctor_headers = _doctor_headers(client, own_user)
+
+    own_response = client.post(
+        f"/api/v1/emr/lab/lab-results/{own_result.id}/notify-doctor",
+        params={"patient_id": own_patient.id, "doctor_id": own_doctor.id},
+        headers=doctor_headers,
+    )
+    assert own_response.status_code == 200, own_response.text
+    assert own_response.json()["notification"]["result_id"] == own_result.id
+
+    foreign_result_response = client.post(
+        f"/api/v1/emr/lab/lab-results/{other_result.id}/notify-doctor",
+        params={"patient_id": other_patient.id, "doctor_id": own_doctor.id},
+        headers=doctor_headers,
+    )
+    assert foreign_result_response.status_code == 403
+
+    wrong_doctor_response = client.post(
+        f"/api/v1/emr/lab/lab-results/{own_result.id}/notify-doctor",
+        params={"patient_id": own_patient.id, "doctor_id": other_doctor.id},
+        headers=doctor_headers,
+    )
+    assert wrong_doctor_response.status_code == 403
+
+
+@pytest.mark.integration
 def test_lab_template_resolution_api_restricts_template_choices(
     client, auth_headers, db_session, test_patient, test_visit
 ):
