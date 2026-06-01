@@ -2,9 +2,13 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException
+
 from app.api.v1.endpoints.admin_telegram import (
     StaffActionConfirmRequest,
     confirm_staff_action,
+    _staff_runtime_reference_hash,
 )
 from app.models.clinic import Schedule
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -16,7 +20,15 @@ from app.services.telegram_staff_confirmation_token_service import (
 )
 
 
-def _issue_confirmation(db_session, *, user, operation_key: str, command_key: str):
+def _issue_confirmation(
+    db_session,
+    *,
+    user,
+    operation_key: str,
+    command_key: str,
+    target_type: str | None = None,
+    target_id: int | None = None,
+):
     return TelegramStaffConfirmationTokenService(db_session).issue_token(
         token_hash=f"staff_confirmation_token:{uuid4().hex}",
         staff_user_id=user.id,
@@ -24,8 +36,12 @@ def _issue_confirmation(db_session, *, user, operation_key: str, command_key: st
         operation_key=operation_key,
         command_key=command_key,
         action_payload_hash=f"staff_action_payload:{uuid4().hex}",
-        target_type="telegram_staff_action",
-        target_reference_hash=f"staff_action:{uuid4().hex}",
+        target_type=target_type or "telegram_staff_action",
+        target_reference_hash=(
+            _staff_runtime_reference_hash(target_type, target_id)
+            if target_type and target_id is not None
+            else f"staff_action:{uuid4().hex}"
+        ),
         idempotency_key_hash=f"staff_action_idempotency:{uuid4().hex}",
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=2),
     )
@@ -74,6 +90,8 @@ def test_confirm_skip_executes_only_with_bound_queue_entry(
         user=registrar_user,
         operation_key="queue_call_or_skip_patient",
         command_key="/skip",
+        target_type="queue_entry",
+        target_id=entry.id,
     )
 
     result = confirm_staff_action(
@@ -126,12 +144,16 @@ def test_confirm_cancel_and_move_visit_use_bound_visit_payloads(
         user=admin_user,
         operation_key="visit_cancel_or_move",
         command_key="/cancel_visit",
+        target_type="visit",
+        target_id=cancel_visit.id,
     )
     move_record = _issue_confirmation(
         db_session,
         user=admin_user,
         operation_key="visit_cancel_or_move",
         command_key="/move_visit",
+        target_type="visit",
+        target_id=move_visit.id,
     )
 
     cancel_result = confirm_staff_action(
@@ -188,12 +210,16 @@ def test_confirm_payment_status_and_refund_use_bound_payment_payloads(
         user=admin_user,
         operation_key="payment_status_change",
         command_key="/payment_status",
+        target_type="payment",
+        target_id=status_payment.id,
     )
     refund_record = _issue_confirmation(
         db_session,
         user=admin_user,
         operation_key="refund_issue",
         command_key="/refund",
+        target_type="payment",
+        target_id=refund_payment.id,
     )
 
     status_result = confirm_staff_action(
@@ -241,6 +267,8 @@ def test_confirm_schedule_change_uses_bound_schedule_payload(
         user=admin_user,
         operation_key="doctor_schedule_change",
         command_key="/change_schedule",
+        target_type="schedule",
+        target_id=schedule.id,
     )
 
     result = confirm_staff_action(
@@ -259,3 +287,93 @@ def test_confirm_schedule_change_uses_bound_schedule_payload(
     assert schedule.start_time == time(10, 0)
     assert schedule.end_time == time(16, 0)
     _assert_consumed(db_session, record)
+
+
+def test_confirm_refund_rejects_mismatched_bound_payment_target(
+    db_session, admin_user, test_visit
+):
+    bound_payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("50000"),
+        currency="UZS",
+        method="cash",
+        status="paid",
+    )
+    other_payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("60000"),
+        currency="UZS",
+        method="cash",
+        status="paid",
+    )
+    db_session.add_all([bound_payment, other_payment])
+    db_session.flush()
+    record = _issue_confirmation(
+        db_session,
+        user=admin_user,
+        operation_key="refund_issue",
+        command_key="/refund",
+        target_type="payment",
+        target_id=bound_payment.id,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        confirm_staff_action(
+            record.id,
+            db_session,
+            admin_user,
+            StaffActionConfirmRequest(
+                payment_id=other_payment.id,
+                refund_amount=Decimal("60000"),
+            ),
+        )
+
+    db_session.refresh(record)
+    db_session.refresh(bound_payment)
+    db_session.refresh(other_payment)
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "target_binding_mismatch"
+    assert record.consumed_at is None
+    assert bound_payment.status == "paid"
+    assert other_payment.status == "paid"
+    assert bound_payment.refunded_amount is None
+    assert other_payment.refunded_amount is None
+
+
+def test_confirm_refund_rejects_unbound_command_level_token(
+    db_session, admin_user, test_visit
+):
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("50000"),
+        currency="UZS",
+        method="cash",
+        status="paid",
+    )
+    db_session.add(payment)
+    db_session.flush()
+    record = _issue_confirmation(
+        db_session,
+        user=admin_user,
+        operation_key="refund_issue",
+        command_key="/refund",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        confirm_staff_action(
+            record.id,
+            db_session,
+            admin_user,
+            StaffActionConfirmRequest(
+                payment_id=payment.id,
+                refund_amount=Decimal("50000"),
+            ),
+        )
+
+    db_session.refresh(record)
+    db_session.refresh(payment)
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "target_binding_mismatch"
+    assert record.consumed_at is None
+    assert payment.status == "paid"
+    assert payment.refunded_amount is None
