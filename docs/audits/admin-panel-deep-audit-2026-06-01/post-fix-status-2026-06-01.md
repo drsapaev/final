@@ -26,6 +26,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1531 | merged | phone verification direct route | Routed `/admin/phone-verification` directly to `PhoneVerificationManager`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1534 | merged | activation direct route | Routed `/admin/activation` directly to `ActivationSystem`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1536 | merged | clinic management direct route | Routed `/admin/clinic-management` directly to `ClinicManagement`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
+| #1539 | merged | queue cabinets direct route | Routed `/admin/queue-cabinet-management` directly to `QueueCabinetManagement`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 
 ## Current Verified Status
 
@@ -55,6 +56,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `/admin/clinic-management` is a direct `ClinicManagement` route, reducing
   another visible operations route from the broad `AdminPanel.jsx` switch while
   preserving its sidebar identity.
+- `/admin/queue-cabinet-management` is a direct `QueueCabinetManagement` route,
+  reducing another queue operations route from the broad `AdminPanel.jsx`
+  switch while preserving its sidebar identity.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
