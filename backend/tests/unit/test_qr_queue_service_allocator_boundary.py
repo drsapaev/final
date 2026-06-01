@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from app.models.online_queue import QueueJoinSession, QueueToken
 from app.services.qr_queue_service import QRQueueService
 
 
@@ -27,6 +28,46 @@ class _DbStub:
 
     def query(self, model):
         return _QueryStub(self._results.pop(0))
+
+
+class _ClaimQueryStub:
+    def __init__(self, model, session, qr_token):
+        self._model = model
+        self._session = session
+        self._qr_token = qr_token
+
+    def filter(self, *args, **kwargs):
+        return self
+
+    def update(self, values, synchronize_session=False):
+        if self._model is not QueueJoinSession:
+            return 0
+        if (
+            self._session.status == "pending"
+            and self._session.expires_at > datetime.utcnow()
+        ):
+            self._session.status = next(iter(values.values()))
+            return 1
+        return 0
+
+    def first(self):
+        if self._model is QueueJoinSession:
+            return self._session
+        if self._model is QueueToken:
+            return self._qr_token
+        return None
+
+
+class _ClaimDbStub:
+    def __init__(self, session, qr_token):
+        self._session = session
+        self._qr_token = qr_token
+        self.commit = Mock()
+        self.flush = Mock()
+        self.rollback = Mock()
+
+    def query(self, model):
+        return _ClaimQueryStub(model, self._session, self._qr_token)
 
 
 @pytest.mark.unit
@@ -154,3 +195,62 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
     assert first_call.kwargs["allocation_mode"] == "join_with_token"
     assert first_call.kwargs["specialist_id_override"] == 11
     assert second_call.kwargs["specialist_id_override"] == 22
+
+
+@pytest.mark.unit
+def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch):
+    session = SimpleNamespace(
+        qr_token="qr-token",
+        status="pending",
+        expires_at=datetime.utcnow() + timedelta(hours=1),
+        patient_name=None,
+        phone=None,
+        telegram_id=None,
+        queue_entry_id=None,
+        queue_number=None,
+        joined_at=None,
+    )
+    qr_token = SimpleNamespace(
+        token="qr-token",
+        specialist_id=11,
+        department="cardiology",
+    )
+    db = _ClaimDbStub(session, qr_token)
+    domain_service = Mock()
+
+    def allocate_ticket(**kwargs):
+        assert session.status == "joining"
+        return {
+            "entry": SimpleNamespace(id=88, number=5),
+            "duplicate": True,
+            "queue_length_before": 2,
+            "estimated_wait_minutes": 15,
+            "specialist_name": "Dr. Boundary",
+        }
+
+    domain_service.allocate_ticket.side_effect = allocate_ticket
+
+    service = QRQueueService(db, queue_domain_service=domain_service)
+    monkeypatch.setattr(
+        service,
+        "_find_or_create_patient",
+        lambda patient_name, phone: SimpleNamespace(id=123),
+    )
+
+    service.complete_join_session(
+        session_token="session-token",
+        patient_name="Boundary Patient",
+        phone="+998904040404",
+        telegram_id=77,
+    )
+
+    with pytest.raises(ValueError, match="Сессия"):
+        service.complete_join_session(
+            session_token="session-token",
+            patient_name="Replay Patient",
+            phone="+998904040405",
+            telegram_id=78,
+        )
+
+    assert session.status == "joined"
+    assert domain_service.allocate_ticket.call_count == 1
