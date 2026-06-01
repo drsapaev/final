@@ -81,6 +81,13 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
     primaryActionText: /Добавить пациента|Add patient/i,
     openedFormHeading: /Добавить пациента|Add patient/i,
   },
+  {
+    key: 'admin-appointments',
+    path: '/admin/appointments',
+    routeId: 'admin-appointments',
+    primaryActionText: /Создать запись|Create appointment/i,
+    openedFormHeading: /Создать запись на прием|Создать запись|Create appointment/i,
+  },
 ];
 
 async function expectRenderedRolePanel(page, route) {
