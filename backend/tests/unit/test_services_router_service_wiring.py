@@ -74,6 +74,46 @@ def test_get_service_endpoint_delegates_to_service(client, monkeypatch) -> None:
     assert captured["service_id"] == 42
 
 
+def test_list_services_serializes_department_relationship(client, monkeypatch) -> None:
+    captured = {}
+
+    def fake_list_services(self, **kwargs):
+        captured.update(kwargs)
+        return [
+            SimpleNamespace(
+                id=7,
+                code="K02",
+                service_code="K02",
+                name="Repeat consultation",
+                department=SimpleNamespace(key="cardio", name_ru="Кардиология"),
+                unit="service",
+                price=50000,
+                currency="UZS",
+                active=True,
+                category_id=3,
+                duration_minutes=20,
+                doctor_id=None,
+                category_code="K",
+                requires_doctor=True,
+                queue_tag="cardio",
+                is_consultation=True,
+                allow_doctor_price_override=False,
+                department_key="cardio",
+            )
+        ]
+
+    monkeypatch.setattr(ServicesApiService, "list_services", fake_list_services)
+
+    response = client.get("/api/v1/services", params={"active": "true"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload[0]["id"] == 7
+    assert payload[0]["department"] == "cardio"
+    assert payload[0]["department_key"] == "cardio"
+    assert captured["active"] is True
+
+
 
 def test_queue_groups_endpoint_delegates_to_queue_domain_service(
     client,
