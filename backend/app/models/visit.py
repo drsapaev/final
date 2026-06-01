@@ -35,7 +35,9 @@ class Visit(Base):
     notes: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc)
