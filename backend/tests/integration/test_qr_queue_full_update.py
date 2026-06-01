@@ -184,6 +184,110 @@ def test_full_update_all_free_rejects_entry_linked_to_other_patient_visit(
 
 
 @pytest.mark.integration
+def test_full_update_visit_id_aggregation_ignores_other_patient_queue_entry(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_doctor,
+    test_service,
+):
+    other_patient = Patient(
+        last_name="Other",
+        first_name="Queue",
+        phone="+998900001112",
+    )
+    db_session.add(other_patient)
+    db_session.flush()
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="12:00",
+        status="open",
+        discount_mode="none",
+        approval_status="none",
+        department="cardiology",
+    )
+    db_session.add(other_visit)
+    db_session.flush()
+
+    other_queue_time = datetime(2026, 5, 31, 7, 0, tzinfo=timezone.utc)
+    current_queue_time = datetime(2026, 5, 31, 10, 0, tzinfo=timezone.utc)
+    other_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=80,
+        patient_id=other_patient.id,
+        patient_name="Other Queue",
+        phone=other_patient.phone,
+        visit_id=other_visit.id,
+        source="online",
+        status="waiting",
+        queue_time=other_queue_time,
+        services=json.dumps(
+            [
+                {
+                    "service_id": test_service.id,
+                    "name": test_service.name,
+                    "code": test_service.code,
+                    "quantity": 1,
+                    "price": int(test_service.price or 0),
+                    "queue_time": other_queue_time.isoformat(),
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    current_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=81,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=other_visit.id,
+        source="online",
+        status="waiting",
+        queue_time=current_queue_time,
+        services=json.dumps([], ensure_ascii=False),
+    )
+    db_session.add_all([other_entry, current_entry])
+    db_session.commit()
+    db_session.refresh(current_entry)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{current_entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+                "address": test_patient.address,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": False,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    db_session.refresh(current_entry)
+    db_session.refresh(other_entry)
+    current_services = json.loads(current_entry.services)
+    other_services = json.loads(other_entry.services)
+    assert [service["service_id"] for service in current_services] == [test_service.id]
+    assert current_services[0]["queue_time"] == current_queue_time.replace(
+        tzinfo=None
+    ).isoformat()
+    assert current_services[0]["queue_time"] != other_queue_time.isoformat()
+    assert other_services[0]["queue_time"] == other_queue_time.isoformat()
+
+
+@pytest.mark.integration
 def test_full_update_without_visit_id_ignores_unrelated_same_day_patient_entries(
     client,
     db_session,
