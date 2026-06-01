@@ -59,8 +59,8 @@ const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Операции' },
   'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'CloudPrintingManager', entry: 'direct', section: 'Операции' },
   'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'MedicalEquipmentManager', entry: 'direct', section: 'Операции' },
-  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
-  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
+  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'WebhookManager', entry: 'direct', section: 'Интеграции' },
+  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'GraphQLExplorer', entry: 'direct', section: 'Интеграции' },
 };
 
 const ADMIN_ROUTE_CHROME_HEADING_CONTRACT = {
