@@ -42,20 +42,35 @@ class PaymentWebhookService:
         return getattr(account, key, None)
 
     @staticmethod
-    def _extract_payme_account_targets(
+    def _resolve_payme_account_targets(
+        db: Session,
         account: Any,
-    ) -> tuple[int | None, int | None]:
+    ) -> tuple[int | None, int | None, bool]:
         appointment_id = PaymentWebhookService._optional_int(
             PaymentWebhookService._account_value(account, "appointment_id")
         )
         visit_id = PaymentWebhookService._optional_int(
             PaymentWebhookService._account_value(account, "visit_id")
         )
-        if appointment_id is None and visit_id is None:
-            appointment_id = PaymentWebhookService._optional_int(
-                PaymentWebhookService._account_value(account, "order_id")
+        if appointment_id is not None or visit_id is not None:
+            return appointment_id, visit_id, False
+
+        order_id = PaymentWebhookService._optional_int(
+            PaymentWebhookService._account_value(account, "order_id")
+        )
+        if order_id is None:
+            return None, None, False
+
+        target_type, target_id = (
+            PaymentWebhookService._resolve_numeric_appointment_or_visit_target(
+                db, order_id
             )
-        return appointment_id, visit_id
+        )
+        if target_type == "ambiguous":
+            return None, None, True
+        if target_type == "visit":
+            return None, target_id, False
+        return target_id, None, False
 
     @staticmethod
     def _payme_targets_cross_patient(
@@ -78,10 +93,10 @@ class PaymentWebhookService:
         return int(appointment_patient_id) != int(visit_patient_id)
 
     @staticmethod
-    def _resolve_click_merchant_target(
-        db: Session, merchant_trans_id: Any
+    def _resolve_numeric_appointment_or_visit_target(
+        db: Session, target_value: Any
     ) -> tuple[str | None, int | None]:
-        target_id = PaymentWebhookService._optional_int(merchant_trans_id)
+        target_id = PaymentWebhookService._optional_int(target_value)
         if target_id is None:
             return None, None
 
@@ -101,6 +116,14 @@ class PaymentWebhookService:
         if visit_exists:
             return "visit", target_id
         return "appointment", target_id
+
+    @staticmethod
+    def _resolve_click_merchant_target(
+        db: Session, merchant_trans_id: Any
+    ) -> tuple[str | None, int | None]:
+        return PaymentWebhookService._resolve_numeric_appointment_or_visit_target(
+            db, merchant_trans_id
+        )
 
     @staticmethod
     def verify_payme_signature(
@@ -224,10 +247,11 @@ class PaymentWebhookService:
                     appointment_id = None
                     visit_id = None
 
+                    ambiguous_order_id = False
                     if hasattr(webhook_data, "account") and webhook_data.account:
-                        appointment_id, visit_id = (
-                            PaymentWebhookService._extract_payme_account_targets(
-                                webhook_data.account
+                        appointment_id, visit_id, ambiguous_order_id = (
+                            PaymentWebhookService._resolve_payme_account_targets(
+                                db, webhook_data.account
                             )
                         )
                         logger.info(
@@ -237,10 +261,32 @@ class PaymentWebhookService:
                                 "webhook_record_id": webhook.id,
                                 "has_appointment_target": appointment_id is not None,
                                 "has_visit_target": visit_id is not None,
+                                "ambiguous_order_id": ambiguous_order_id,
                             },
                         )
 
                     # Приоритет: сначала ищем appointment_id, потом visit_id
+                    if ambiguous_order_id:
+                        repository.update_webhook(
+                            webhook.id,
+                            {
+                                "status": "failed",
+                                "processed_at": datetime.utcnow(),
+                                "error_message": (
+                                    "Ambiguous Payme account order_id matches both "
+                                    "Appointment.id and Visit.id"
+                                ),
+                            },
+                        )
+                        logger.warning(
+                            "payment_webhook_payme_ambiguous_account_order_id",
+                            extra={
+                                "payment_provider": "payme",
+                                "webhook_record_id": webhook.id,
+                            },
+                        )
+                        return True, "Webhook processed successfully", webhook
+
                     if (
                         appointment_id is not None
                         and visit_id is not None

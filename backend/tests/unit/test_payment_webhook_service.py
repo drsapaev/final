@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
+from app.models.appointment import Appointment
+from app.models.patient import Patient
+from app.models.visit import Visit
 from app.services.payment_webhook import PaymentWebhookService
 
 
@@ -228,6 +232,151 @@ class TestPaymentWebhookService:
         assert failed_update["error_message"] == (
             "Payme account appointment_id and visit_id belong to different patients"
         )
+
+    def test_payme_numeric_order_id_resolver_detects_appointment_visit_collision(
+        self, db_session
+    ):
+        patient = Patient(last_name="Payme", first_name="Collision")
+        db_session.add(patient)
+        db_session.flush()
+        db_session.add_all(
+            [
+                Appointment(
+                    id=888,
+                    patient_id=patient.id,
+                    appointment_date=date(2026, 2, 14),
+                    status="scheduled",
+                ),
+                Visit(id=888, patient_id=patient.id, status="open"),
+            ]
+        )
+        db_session.commit()
+
+        target_type, target_id = (
+            PaymentWebhookService._resolve_numeric_appointment_or_visit_target(
+                db_session, 888
+            )
+        )
+
+        assert (target_type, target_id) == ("ambiguous", 888)
+
+    def test_payme_webhook_uses_visit_target_when_numeric_order_id_matches_visit_only(
+        self, db_session
+    ):
+        webhook = SimpleNamespace(id=99)
+        repository = SimpleNamespace(
+            get_provider_by_code=Mock(return_value=SimpleNamespace(secret_key="secret")),
+            get_webhook_by_webhook_id=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            create_transaction=Mock(return_value=SimpleNamespace(id=100)),
+            update_webhook=Mock(return_value=webhook),
+        )
+        data = {
+            "id": "payme-tx-1",
+            "state": 2,
+            "amount": 250000,
+            "account": {"order_id": "888"},
+        }
+
+        with (
+            patch(
+                "app.services.payment_webhook.PaymentWebhookProcessingRepository",
+                return_value=repository,
+            ),
+            patch.object(
+                PaymentWebhookService, "verify_payme_signature", return_value=True
+            ),
+            patch.object(
+                PaymentWebhookService,
+                "_resolve_numeric_appointment_or_visit_target",
+                return_value=("visit", 888),
+            ),
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_appointment",
+                return_value=(True, "appointment paid"),
+            ) as process_appointment,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_existing_visit",
+                return_value=(True, "visit paid"),
+            ) as process_visit,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.create_appointment_from_payment",
+                return_value=(True, "created", 501),
+            ) as create_appointment,
+        ):
+            success, message, result_webhook = PaymentWebhookService.process_payme_webhook(
+                db_session, data, "signature"
+            )
+
+        assert success is True
+        assert message == "Webhook processed successfully"
+        assert result_webhook is webhook
+        process_visit.assert_called_once_with(db_session, 888, webhook)
+        process_appointment.assert_not_called()
+        create_appointment.assert_not_called()
+
+    def test_payme_webhook_fails_ambiguous_numeric_order_id_without_mutating_record(
+        self, db_session
+    ):
+        webhook = SimpleNamespace(id=99)
+        repository = SimpleNamespace(
+            get_provider_by_code=Mock(return_value=SimpleNamespace(secret_key="secret")),
+            get_webhook_by_webhook_id=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            create_transaction=Mock(return_value=SimpleNamespace(id=100)),
+            update_webhook=Mock(return_value=webhook),
+        )
+        data = {
+            "id": "payme-tx-1",
+            "state": 2,
+            "amount": 250000,
+            "account": {"order_id": "888"},
+        }
+
+        with (
+            patch(
+                "app.services.payment_webhook.PaymentWebhookProcessingRepository",
+                return_value=repository,
+            ),
+            patch.object(
+                PaymentWebhookService, "verify_payme_signature", return_value=True
+            ),
+            patch.object(
+                PaymentWebhookService,
+                "_resolve_numeric_appointment_or_visit_target",
+                return_value=("ambiguous", 888),
+            ),
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_appointment",
+                return_value=(True, "appointment paid"),
+            ) as process_appointment,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_existing_visit",
+                return_value=(True, "visit paid"),
+            ) as process_visit,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.create_appointment_from_payment",
+                return_value=(True, "created", 501),
+            ) as create_appointment,
+        ):
+            success, message, result_webhook = PaymentWebhookService.process_payme_webhook(
+                db_session, data, "signature"
+            )
+
+        assert success is True
+        assert message == "Webhook processed successfully"
+        assert result_webhook is webhook
+        process_appointment.assert_not_called()
+        process_visit.assert_not_called()
+        create_appointment.assert_not_called()
+
+        _, failed_update = repository.update_webhook.call_args_list[-1].args
+        assert failed_update["status"] == "failed"
+        expected_error = (
+            "Ambiguous Payme account order_id matches both "
+            "Appointment.id and Visit.id"
+        )
+        assert failed_update["error_message"] == expected_error
 
     def test_click_webhook_uses_visit_target_when_merchant_id_matches_visit_only(
         self, db_session
