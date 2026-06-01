@@ -3087,6 +3087,17 @@ def mark_queue_entry_as_paid(
             visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
             logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
         
+        if visit and visit.patient_id != entry.patient_id:
+            logger.warning(
+                "mark_queue_entry_as_paid: entry visit owner mismatch entry_id=%d visit_id=%d",
+                entry.id,
+                visit.id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Queue entry visit does not belong to the queue patient",
+            )
+
         requested_method = (
             str(payment_req.method).strip().lower()
             if payment_req and payment_req.method
