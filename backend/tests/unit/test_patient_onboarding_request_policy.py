@@ -630,6 +630,12 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
     registrar_auth_headers,
 ):
     now = datetime.now(timezone.utc)
+    start_of_today = datetime.combine(
+        now.date(),
+        datetime.min.time(),
+        tzinfo=timezone.utc,
+    )
+    today_created_at = max(now - timedelta(minutes=30), start_of_today)
     pending_request = _create_onboarding_request(db_session, chat_id=9201, status="pending_review")
     needs_info_request = _create_onboarding_request(
         db_session,
@@ -649,8 +655,8 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
     pending_request.created_at = now - timedelta(hours=5)
     needs_info_request.created_at = now - timedelta(hours=3)
     needs_info_request.reviewed_at = now - timedelta(hours=1)
-    linked_request.created_at = now - timedelta(hours=2)
-    linked_request.reviewed_at = now - timedelta(minutes=30)
+    linked_request.created_at = today_created_at
+    linked_request.reviewed_at = max(now - timedelta(minutes=10), today_created_at)
     rejected_request.created_at = now - timedelta(hours=1)
     rejected_request.reviewed_at = now - timedelta(minutes=10)
     today_request.created_at = now

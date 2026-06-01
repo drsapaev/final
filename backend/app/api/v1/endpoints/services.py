@@ -269,17 +269,33 @@ def _should_validate_service_code_alignment(
     return bool(routing_fields.intersection(change_set.keys()))
 
 
+def _coerce_department_value(row: Any) -> str | None:
+    department = getattr(row, "department", None)
+    if isinstance(department, str):
+        return department
+    if department is None:
+        return None
+
+    for attr in ("key", "name_ru", "name", "code"):
+        value = getattr(department, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value
+
+    return None
+
+
 def _row_to_out(r) -> ServiceOut:
     price = None
     try:
         price = float(r.price) if r.price is not None else None
     except Exception:
         price = None
+    department = _coerce_department_value(r)
     return ServiceOut(
         id=r.id,
         code=r.service_code or r.code,
         name=r.name,
-        department=r.department,
+        department=department,
         unit=r.unit,
         price=price,
         currency=r.currency,
