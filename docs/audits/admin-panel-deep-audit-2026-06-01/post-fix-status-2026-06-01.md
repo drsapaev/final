@@ -58,6 +58,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
   - cloud printing
   - medical equipment
   - GraphQL API
+  - Grouping policy is documented in `docs/admin/ADMIN_OVERVIEW_NAVIGATION_GROUPING_PLAN.md`.
 - `AdminPanel.jsx` remains a broad route switch plus implementation container.
 - Some routes still have weak heading semantics and should get route-specific heading checks before UI redesign.
 
@@ -69,8 +70,8 @@ original audit as baseline evidence and records the small PRs merged afterward.
 2. `test(admin): guard duplicate user route ownership`
    - Add route contract around `/admin/users` and `/admin/advanced-users`.
    - No consolidation until a small browser-smoked implementation plan exists.
-3. `docs(admin): plan overview navigation regrouping`
-   - Decide whether operational tooling moves out of "Overview" or the section is renamed.
+3. `test(admin): guard overview route sections`
+   - Add route contract tests before moving operational/integration tooling out of "Overview".
 4. `refactor(admin): extract one AdminPanel route family`
    - Only after a specific family is selected.
    - One family per PR.
