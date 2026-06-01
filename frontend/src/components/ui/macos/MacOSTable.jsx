@@ -294,7 +294,7 @@ MacOSTable.propTypes = {
   columns: PropTypes.arrayOf(
     PropTypes.shape({
       key: PropTypes.string,
-      title: PropTypes.string,
+      title: PropTypes.node,
       sortable: PropTypes.bool,
       render: PropTypes.func
     })
