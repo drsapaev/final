@@ -409,6 +409,22 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/finance', '', adminProfile).activeSidebarItem).toBe('admin-finance');
   });
 
+  it('keeps admin doctors on its direct route owner', () => {
+    const adminProfile = { role: 'Admin' };
+    const doctorsRoute = getRouteById('admin-doctors');
+
+    expect(doctorsRoute).toBeTruthy();
+    expect(doctorsRoute.path).toBe('/admin/doctors');
+    expect(doctorsRoute.owner).toBe('admin.users');
+    expect(doctorsRoute.entry).toBe('direct');
+    expect(doctorsRoute.component).toBe('AdminDoctors');
+    expect(doctorsRoute.component).not.toBe('AdminPanel');
+    expect(doctorsRoute.nav.sidebar).toBe(true);
+    expect(doctorsRoute.layout.activeSidebarItem).toBe('admin-doctors');
+    expect(isRouteAccessibleToProfile(doctorsRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/doctors', '', adminProfile).activeSidebarItem).toBe('admin-doctors');
+  });
+
   it('keeps admin clinic management on its direct route owner', () => {
     const adminProfile = { role: 'Admin' };
     const clinicManagementRoute = getRouteById('admin-clinic-management');
