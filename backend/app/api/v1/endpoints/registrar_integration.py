@@ -1431,6 +1431,16 @@ def start_queue_visit(
                 linked_visit = (
                     db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
                 )
+                if linked_visit and linked_visit.patient_id != queue_entry.patient_id:
+                    logger.warning(
+                        "start_queue_visit: entry visit owner mismatch entry_id=%d visit_id=%d",
+                        queue_entry.id,
+                        linked_visit.id,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Queue entry visit does not belong to the queue patient",
+                    )
 
             changed_at = datetime.now(timezone.utc)
             queue_entry.status = "in_progress"

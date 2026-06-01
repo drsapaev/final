@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_integration import _serialize_registrar_date
 from app.models.appointment import Appointment
 from app.models.online_queue import DailyQueue
 from app.models.online_queue import OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.visit import VisitService
@@ -598,3 +599,66 @@ class TestRegistrarAllAppointments:
         db_session.refresh(unrelated_visit)
         assert entry.status == "in_progress"
         assert unrelated_visit.status == "pending_confirmation"
+
+    def test_start_queue_visit_rejects_entry_linked_to_other_patient_visit(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+    ):
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Patient",
+            phone="+998901119001",
+        )
+        db_session.add_all([queue, other_patient])
+        db_session.flush()
+
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="10:00",
+            status="pending_confirmation",
+            discount_mode="none",
+            department="cardiology",
+            source="desk",
+        )
+        db_session.add(other_visit)
+        db_session.flush()
+
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=other_visit.id,
+            source="desk",
+            status="waiting",
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        response = client.post(
+            f"/api/v1/registrar/queue/{entry.id}/start-visit",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"] == (
+            "Queue entry visit does not belong to the queue patient"
+        )
+
+        db_session.refresh(entry)
+        db_session.refresh(other_visit)
+        assert entry.status == "waiting"
+        assert other_visit.status == "pending_confirmation"
