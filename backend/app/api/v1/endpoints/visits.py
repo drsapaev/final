@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, select, Table
+from sqlalchemy import MetaData, select, Table, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -76,6 +76,33 @@ def _visits(db: Session) -> Table:
 def _vservices(db: Session) -> Table:
     md = MetaData()
     return Table("visit_services", md, autoload_with=db.get_bind())
+
+
+def _update_queue_entries_for_visit_owner(
+    db: Session,
+    *,
+    visit_id: int,
+    patient_id: int | None,
+    status_value: str,
+) -> None:
+    if patient_id is None:
+        return
+
+    db.execute(
+        text(
+            """
+            UPDATE queue_entries
+            SET status = :status_value
+            WHERE visit_id = :visit_id
+              AND patient_id = :patient_id
+            """
+        ),
+        {
+            "status_value": status_value,
+            "visit_id": visit_id,
+            "patient_id": patient_id,
+        },
+    )
 
 
 def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None:
@@ -237,10 +264,11 @@ def set_status(
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
     if status_new == "canceled":
         try:
-            from sqlalchemy import text
-            db.execute(
-                text("UPDATE queue_entries SET status = 'canceled' WHERE visit_id = :visit_id"),
-                {"visit_id": visit_id}
+            _update_queue_entries_for_visit_owner(
+                db,
+                visit_id=visit_id,
+                patient_id=visit.patient_id,
+                status_value="canceled",
             )
         except Exception as e:
             # Ошибка обновления очереди не должна блокировать обновление визита
@@ -319,8 +347,15 @@ def reschedule_visit(
         from sqlalchemy import text
         # Помечаем старую запись очереди как перенесенную
         db.execute(
-            text("UPDATE queue_entries SET status = 'rescheduled' WHERE visit_id = :visit_id"),
-            {"visit_id": visit_id}
+            text(
+                """
+                UPDATE queue_entries
+                SET status = 'rescheduled'
+                WHERE visit_id = :visit_id
+                  AND patient_id = :patient_id
+                """
+            ),
+            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")}
         )
     except Exception:
         pass
@@ -373,8 +408,15 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         from sqlalchemy import text
         # Помечаем старую запись очереди как перенесенную
         db.execute(
-            text("UPDATE queue_entries SET status = 'rescheduled' WHERE visit_id = :visit_id"),
-            {"visit_id": visit_id}
+            text(
+                """
+                UPDATE queue_entries
+                SET status = 'rescheduled'
+                WHERE visit_id = :visit_id
+                  AND patient_id = :patient_id
+                """
+            ),
+            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")}
         )
     except Exception:
         pass

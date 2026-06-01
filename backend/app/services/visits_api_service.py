@@ -46,6 +46,32 @@ class VisitsApiService:
         md = MetaData()
         return Table("users", md, autoload_with=self.repository.get_bind())
 
+    def _update_queue_entries_for_visit_owner(
+        self,
+        *,
+        visit_id: int,
+        patient_id: int | None,
+        status_value: str,
+    ) -> None:
+        if patient_id is None:
+            return
+
+        self.repository.execute(
+            text(
+                """
+                UPDATE queue_entries
+                SET status = :status_value
+                WHERE visit_id = :visit_id
+                  AND patient_id = :patient_id
+                """
+            ),
+            {
+                "status_value": status_value,
+                "visit_id": visit_id,
+                "patient_id": patient_id,
+            },
+        )
+
     def list_visits(
         self,
         *,
@@ -301,11 +327,10 @@ class VisitsApiService:
 
         if status_new == "canceled":
             try:
-                self.repository.execute(
-                    text(
-                        "UPDATE queue_entries SET status = 'canceled' WHERE visit_id = :visit_id"
-                    ),
-                    {"visit_id": visit_id},
+                self._update_queue_entries_for_visit_owner(
+                    visit_id=visit_id,
+                    patient_id=visit.patient_id,
+                    status_value="canceled",
                 )
             except Exception:
                 pass
@@ -345,11 +370,10 @@ class VisitsApiService:
             raise HTTPException(404, "Visit not found")
 
         try:
-            self.repository.execute(
-                text(
-                    "UPDATE queue_entries SET status = 'rescheduled' WHERE visit_id = :visit_id"
-                ),
-                {"visit_id": visit_id},
+            self._update_queue_entries_for_visit_owner(
+                visit_id=visit_id,
+                patient_id=visit_row.get("patient_id"),
+                status_value="rescheduled",
             )
         except Exception:
             pass

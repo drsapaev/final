@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.visit import Visit
 from app.services.visits_api_service import VisitsApiService
 
 
@@ -246,3 +249,122 @@ def test_add_service_endpoint_delegates_to_service(
     assert captured["visit_id"] == test_visit.id
     assert captured["item"].code == "CONSULT"
     assert captured["item"].price == 125000
+
+
+def _create_cross_patient_queue_link(db_session, *, visit: Visit, doctor):
+    other_patient = Patient(
+        first_name="Other",
+        last_name="Queue",
+        phone="+998901239999",
+    )
+    db_session.add(other_patient)
+    db_session.flush()
+
+    queue = DailyQueue(
+        day=date.today(),
+        specialist_id=doctor.id,
+        queue_tag=f"visit_owner_guard_{visit.id}",
+        active=True,
+    )
+    db_session.add(queue)
+    db_session.flush()
+
+    own_entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        visit_id=visit.id,
+        number=1,
+        patient_id=visit.patient_id,
+        patient_name="Visit Owner",
+        phone="+998901230001",
+        source="desk",
+        status="waiting",
+        queue_time=datetime.utcnow().replace(microsecond=0),
+    )
+    wrong_owner_entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        visit_id=visit.id,
+        number=2,
+        patient_id=other_patient.id,
+        patient_name="Wrong Owner",
+        phone="+998901230002",
+        source="desk",
+        status="waiting",
+        queue_time=datetime.utcnow().replace(microsecond=0),
+    )
+    db_session.add_all([own_entry, wrong_owner_entry])
+    db_session.commit()
+    return own_entry, wrong_owner_entry
+
+
+def test_visit_service_cancel_updates_only_same_patient_queue_link(
+    db_session,
+    test_visit,
+    test_doctor,
+) -> None:
+    own_entry, wrong_owner_entry = _create_cross_patient_queue_link(
+        db_session,
+        visit=test_visit,
+        doctor=test_doctor,
+    )
+
+    VisitsApiService(db_session).set_status(
+        visit_id=test_visit.id,
+        status_new="canceled",
+    )
+
+    db_session.refresh(own_entry)
+    db_session.refresh(wrong_owner_entry)
+    assert own_entry.status == "canceled"
+    assert wrong_owner_entry.status == "waiting"
+
+
+def test_visit_endpoint_cancel_updates_only_same_patient_queue_link(
+    client,
+    auth_headers,
+    db_session,
+    test_visit,
+    test_doctor,
+) -> None:
+    own_entry, wrong_owner_entry = _create_cross_patient_queue_link(
+        db_session,
+        visit=test_visit,
+        doctor=test_doctor,
+    )
+
+    response = client.post(
+        f"/api/v1/visits/visits/{test_visit.id}/status",
+        params={"status_new": "canceled"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(own_entry)
+    db_session.refresh(wrong_owner_entry)
+    assert own_entry.status == "canceled"
+    assert wrong_owner_entry.status == "waiting"
+
+
+def test_visit_endpoint_reschedule_updates_only_same_patient_queue_link(
+    client,
+    auth_headers,
+    db_session,
+    test_visit,
+    test_doctor,
+) -> None:
+    own_entry, wrong_owner_entry = _create_cross_patient_queue_link(
+        db_session,
+        visit=test_visit,
+        doctor=test_doctor,
+    )
+
+    response = client.post(
+        f"/api/v1/visits/visits/{test_visit.id}/reschedule",
+        params={"new_date": (date.today() + timedelta(days=1)).isoformat()},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(own_entry)
+    db_session.refresh(wrong_owner_entry)
+    assert own_entry.status == "rescheduled"
+    assert wrong_owner_entry.status == "waiting"

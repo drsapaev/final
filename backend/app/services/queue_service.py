@@ -18,6 +18,7 @@ from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.user import User
+from app.models.visit import Visit
 from app.services.queue_session import (
     get_or_create_session_id,
 )
@@ -1135,11 +1136,18 @@ class QueueBusinessService:
         *,
         visit_id: int,
     ) -> OnlineQueueEntry:
+        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        if not visit:
+            raise QueueNotFoundError(f"Visit {visit_id} not found")
+        if visit.patient_id is None:
+            raise QueueConflictError(f"Visit {visit_id} has no patient owner")
+
         active_statuses = {"waiting", "called", "in_service", "diagnostics"}
         entries = (
             db.query(OnlineQueueEntry)
             .filter(
                 OnlineQueueEntry.visit_id == visit_id,
+                OnlineQueueEntry.patient_id == visit.patient_id,
                 OnlineQueueEntry.status.in_(active_statuses),
             )
             .order_by(
