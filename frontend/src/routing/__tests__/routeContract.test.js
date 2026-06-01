@@ -380,6 +380,21 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/queue-cabinet-management', '', adminProfile).activeSidebarItem).toBe('admin-queue-cabinet-management');
   });
 
+  it('keeps admin clinic settings on its direct route owner', () => {
+    const adminProfile = { role: 'Admin' };
+    const clinicSettingsRoute = getRouteById('admin-clinic-settings');
+
+    expect(clinicSettingsRoute).toBeTruthy();
+    expect(clinicSettingsRoute.path).toBe('/admin/clinic-settings');
+    expect(clinicSettingsRoute.owner).toBe('admin.settings');
+    expect(clinicSettingsRoute.entry).toBe('direct');
+    expect(clinicSettingsRoute.nav).toBe(false);
+    expect(clinicSettingsRoute.component).toBe('UnifiedSettings');
+    expect(clinicSettingsRoute.component).not.toBe('AdminPanel');
+    expect(isRouteAccessibleToProfile(clinicSettingsRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/clinic-settings', '?section=clinic-settings', adminProfile).pageTitle).toBe('Admin Clinic Settings');
+  });
+
   it('keeps admin Telegram operational and settings surfaces explicit', () => {
     const adminProfile = { role: 'Admin' };
     const telegramIntegrationRoute = getRouteById('admin-telegram-integration');
