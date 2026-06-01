@@ -72,6 +72,7 @@ const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement.
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement.jsx'));
 const AdminDoctors = lazy(() => import('./components/admin/AdminDoctors.jsx'));
 const AdminPatients = lazy(() => import('./components/admin/AdminPatients.jsx'));
+const AdminAppointments = lazy(() => import('./components/admin/AdminAppointments.jsx'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices.jsx'));
 const UnifiedFinance = lazy(() => import('./components/admin/UnifiedFinance.jsx'));
 const UnifiedSettings = lazy(() => import('./components/admin/UnifiedSettings.jsx'));
@@ -144,6 +145,7 @@ const ROUTE_COMPONENTS = {
   QueueCabinetManagement,
   AdminDoctors,
   AdminPatients,
+  AdminAppointments,
   AdminServices,
   UnifiedFinance,
   UnifiedSettings,

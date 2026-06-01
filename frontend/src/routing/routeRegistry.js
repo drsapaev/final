@@ -622,7 +622,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Записи', icon: 'calendar', section: 'Управление', order: 60, sidebar: true }),
     title: 'Admin Appointments',
     owner: 'admin.scheduling',
-    component: 'AdminPanel',
+    component: 'AdminAppointments',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-appointments', pageTitle: 'Admin Appointments' }),
   },
