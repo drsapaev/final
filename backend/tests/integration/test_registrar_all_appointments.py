@@ -352,6 +352,97 @@ class TestRegistrarAllAppointments:
         assert found_visit["visit_id"] == visit.id
         assert found_visit["appointment_id"] is None
 
+    def test_today_queues_visit_ignores_other_patient_queue_entry_with_same_visit_id(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        test_service,
+    ):
+        other_patient = Patient(
+            first_name="Other",
+            last_name="QueueOwner",
+            phone="+998901119091",
+        )
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="10:30",
+            status="waiting",
+            discount_mode="none",
+            department="cardiology",
+            source="desk",
+        )
+        db_session.add_all([other_patient, queue, visit])
+        db_session.flush()
+
+        visit_service = VisitService(
+            visit_id=visit.id,
+            service_id=test_service.id,
+            code=test_service.code,
+            name=test_service.name,
+            qty=1,
+            price=test_service.price,
+            currency="UZS",
+        )
+        stale_entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=88,
+            patient_id=other_patient.id,
+            patient_name=other_patient.short_name(),
+            phone=other_patient.phone,
+            visit_id=visit.id,
+            source="online",
+            status="waiting",
+            queue_time=datetime(2026, 4, 16, 8, 0, tzinfo=ZoneInfo("Asia/Tashkent")),
+        )
+        db_session.add_all([visit_service, stale_entry])
+        db_session.commit()
+        db_session.refresh(visit)
+        db_session.refresh(stale_entry)
+
+        response = client.get(
+            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        entries = [
+            entry for queue_payload in payload["queues"] for entry in queue_payload["entries"]
+        ]
+        found_visit = next(
+            (
+                entry
+                for entry in entries
+                if entry.get("record_kind") == "visit"
+                and entry.get("visit_id") == visit.id
+            ),
+            None,
+        )
+
+        assert found_visit is not None
+        assert found_visit["patient_id"] == test_patient.id
+        assert found_visit["queue_entry_id"] is None
+        assert found_visit["number"] != stale_entry.number
+        assert all(entry.get("queue_entry_id") != stale_entry.id for entry in entries)
+        assert all(
+            not (
+                entry.get("record_kind") == "online_queue"
+                and entry.get("id") == stale_entry.id
+            )
+            for entry in entries
+        )
+
     def test_today_queues_secondary_doctor_actions_are_backend_owned(self):
         user = type("UserStub", (), {"role": "cardio", "roles": []})()
 

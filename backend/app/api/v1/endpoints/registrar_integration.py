@@ -1522,8 +1522,33 @@ def get_today_queues(
 
         from app.models.appointment import Appointment
         from app.models.clinic import Doctor
+        from app.models.online_queue import DailyQueue, OnlineQueueEntry
         from app.models.patient import Patient
         from app.models.visit import Visit
+
+        def _same_patient_queue_entry_for_visit_id(
+            visit_id: int | None,
+            patient_id: int | None,
+        ) -> OnlineQueueEntry | None:
+            if visit_id is None or patient_id is None:
+                return None
+            return (
+                db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.visit_id == visit_id,
+                    OnlineQueueEntry.patient_id == patient_id,
+                )
+                .order_by(OnlineQueueEntry.id.asc())
+                .first()
+            )
+
+        def _same_patient_queue_entry_for_visit(
+            visit: Visit,
+        ) -> OnlineQueueEntry | None:
+            return _same_patient_queue_entry_for_visit_id(
+                visit.id,
+                visit.patient_id,
+            )
 
         # [OK] УПРОЩЕНО: Валидация формата даты перед парсингом (Single Source of Truth)
         # Если дата не указана, используем сегодня
@@ -1593,11 +1618,7 @@ def get_today_queues(
 
             # ⭐ PHASE 1.1: Пропускаем Visit если есть связанный OnlineQueueEntry
             # Очередь должна читаться ТОЛЬКО из OnlineQueueEntry (SSOT)
-            from sqlalchemy import text
-            has_queue_entry = db.execute(
-                text("SELECT 1 FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
-                {"visit_id": visit.id}
-            ).first()
+            has_queue_entry = _same_patient_queue_entry_for_visit(visit)
             if has_queue_entry:
                 # ⚠️ НЕ добавляем в seen_visit_ids - пусть OQE обрабатывается
                 logger.debug(
@@ -1735,14 +1756,7 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
                 visit_queue_time = None
                 try:
-                    from sqlalchemy import text
-
-                    queue_entry_row = db.execute(
-                        text(
-                            "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
-                        ),
-                        {"visit_id": visit.id},
-                    ).first()
+                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
                     if queue_entry_row and queue_entry_row.queue_time:
                         visit_queue_time = queue_entry_row.queue_time
                 except Exception:
@@ -1776,14 +1790,7 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
                 visit_queue_time = None
                 try:
-                    from sqlalchemy import text
-
-                    queue_entry_row = db.execute(
-                        text(
-                            "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
-                        ),
-                        {"visit_id": visit.id},
-                    ).first()
+                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
                     if queue_entry_row and queue_entry_row.queue_time:
                         visit_queue_time = queue_entry_row.queue_time
                 except Exception:
@@ -1820,14 +1827,7 @@ def get_today_queues(
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
                 visit_queue_time = None
                 try:
-                    from sqlalchemy import text
-
-                    queue_entry_row = db.execute(
-                        text(
-                            "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
-                        ),
-                        {"visit_id": visit.id},
-                    ).first()
+                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
                     if queue_entry_row and queue_entry_row.queue_time:
                         visit_queue_time = queue_entry_row.queue_time
                 except Exception:
@@ -1875,14 +1875,7 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
             visit_queue_time = None
             try:
-                from sqlalchemy import text
-
-                queue_entry_row = db.execute(
-                    text(
-                        "SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
-                    ),
-                    {"visit_id": visit.id},
-                ).first()
+                queue_entry_row = _same_patient_queue_entry_for_visit(visit)
                 if queue_entry_row and queue_entry_row.queue_time:
                     visit_queue_time = queue_entry_row.queue_time
             except Exception:
@@ -2702,10 +2695,7 @@ def get_today_queues(
                         visit = entry_data
                         # ✅ SSOT FIX: Для QR-визитов нужно получить данные из OnlineQueueEntry
                         # Frontend использует этот ID для вызова full-update endpoint
-                        queue_entry_for_visit = db.execute(
-                            text("SELECT id, number, queue_time, updated_at, total_amount FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
-                            {"visit_id": visit.id}
-                        ).first()
+                        queue_entry_for_visit = _same_patient_queue_entry_for_visit(visit)
                         if queue_entry_for_visit:
                             record_id = queue_entry_for_visit.id
                             # ⭐ PHASE 1 FIX: Сохраняем данные из OQE для использования позже
@@ -2950,12 +2940,10 @@ def get_today_queues(
                             )
                         elif entry_type == "visit":
                             # Ищем запись по visit_id
-                            queue_entry_row = db.execute(
-                                text(
-                                    "SELECT number, queue_time, updated_at FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"
-                                ),
-                                {"visit_id": record_id},
-                            ).first()
+                            queue_entry_row = _same_patient_queue_entry_for_visit_id(
+                                record_id,
+                                patient_id,
+                            )
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
                                 queue_entry_time = queue_entry_row.queue_time
