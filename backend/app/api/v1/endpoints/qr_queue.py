@@ -1358,10 +1358,8 @@ def full_update_online_entry(
             )
             computed_aggregated_ids = [e.id for e in visit_entries]
             logger.info(
-                "[full_update_online_entry] computed aggregated_ids by visit_id=%d and patient_id=%s: %s",
-                entry.visit_id,
-                entry.patient_id,
-                computed_aggregated_ids,
+                "[full_update_online_entry] computed %d aggregated ids by visit_id with same-patient guard",
+                len(computed_aggregated_ids),
             )
         else:
             # If there is no visit yet, aggregate only the current service
