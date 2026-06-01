@@ -59,6 +59,16 @@ const AUTHENTICATED_ADMIN_ROUTE_FAMILY_QA_ROUTES = [
   },
 ];
 
+const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
+  {
+    key: 'admin-services-catalog',
+    path: '/admin/services?servicesTab=catalog',
+    routeId: 'admin-services',
+    primaryActionText: /Р”РѕР±Р°РІРёС‚СЊ СѓСЃР»СѓРіСѓ|Добавить услугу|Add service/i,
+    openedFormHeading: /Р”РѕР±Р°РІР»РµРЅРёРµ СѓСЃР»СѓРіРё|Добавление услуги|Add service/i,
+  },
+];
+
 async function expectRenderedRolePanel(page, route) {
   await expect(page).not.toHaveURL(/\/login$/);
   await expect(page).not.toHaveURL(/\/(?:forbidden|unauthorized)$/);
@@ -145,6 +155,65 @@ async function runAdminRouteFamilyHeadingSmoke(page, testInfo, route) {
   expect(pageErrors).toEqual([]);
 }
 
+async function expectVisibleButtonsHaveNames(page, route) {
+  const unnamedButtons = await page.locator('main button:visible').evaluateAll((buttons) =>
+    buttons
+      .map((button, index) => {
+        const label = [
+          button.getAttribute('aria-label'),
+          button.getAttribute('title'),
+          button.textContent,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        return label ? null : index;
+      })
+      .filter((index) => index !== null)
+  );
+
+  expect(unnamedButtons, `${route.key} should not render unnamed visible buttons`).toEqual([]);
+}
+
+async function runAdminRouteActionSmoke(page, testInfo, route) {
+  const pageErrors = [];
+  page.on('pageerror', (error) => {
+    pageErrors.push(error.message);
+  });
+
+  await installAuthenticatedQaHarness(page, { role: 'Admin' });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(route.path, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+
+  await expectRenderedRolePanel(page, route);
+  await expectVisibleRouteHeading(page, route);
+  await expectVisibleButtonsHaveNames(page, route);
+  await expectNoHorizontalOverflow(page, route);
+
+  const primaryAction = page.locator('main button:visible').filter({ hasText: route.primaryActionText }).first();
+  await expect(primaryAction, `${route.key} primary action should be visible`).toBeVisible();
+  await primaryAction.click();
+
+  await expect(
+    page.locator('main').locator('h2, h3, [role="heading"]').filter({ hasText: route.openedFormHeading }).first(),
+    `${route.key} primary action should open its form`
+  ).toBeVisible();
+  await expect(page.locator('main form').first()).toBeVisible();
+  await expectNoHorizontalOverflow(page, route);
+
+  const screenshotPath = testInfo.outputPath(`admin-route-action-${route.key}.png`);
+  await page.screenshot({ path: screenshotPath, fullPage: true });
+  await testInfo.attach(`admin-route-action-${route.key}`, {
+    path: screenshotPath,
+    contentType: 'image/png',
+  });
+
+  expect(pageErrors).toEqual([]);
+}
+
 test.describe('Authenticated role UI QA harness', () => {
   for (const route of AUTHENTICATED_ROLE_QA_ROUTES) {
     test(`${route.key} route renders with seeded ${route.role} session`, async ({ page }, testInfo) => {
@@ -165,6 +234,14 @@ test.describe('Authenticated admin route family heading smoke', () => {
   for (const route of AUTHENTICATED_ADMIN_ROUTE_FAMILY_QA_ROUTES) {
     test(`${route.key} renders route-specific chrome and heading`, async ({ page }, testInfo) => {
       await runAdminRouteFamilyHeadingSmoke(page, testInfo, route);
+    });
+  }
+});
+
+test.describe('Authenticated admin route action smoke', () => {
+  for (const route of AUTHENTICATED_ADMIN_ACTION_QA_ROUTES) {
+    test(`${route.key} exposes named controls and opens the primary form`, async ({ page }, testInfo) => {
+      await runAdminRouteActionSmoke(page, testInfo, route);
     });
   }
 });
