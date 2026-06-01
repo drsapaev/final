@@ -332,6 +332,22 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/phone-verification', '', adminProfile).activeSidebarItem).toBe('admin-phone-verification');
   });
 
+  it('keeps admin activation on its direct route owner', () => {
+    const adminProfile = { role: 'Admin' };
+    const activationRoute = getRouteById('admin-activation');
+
+    expect(activationRoute).toBeTruthy();
+    expect(activationRoute.path).toBe('/admin/activation');
+    expect(activationRoute.owner).toBe('admin.licensing');
+    expect(activationRoute.entry).toBe('menu');
+    expect(activationRoute.component).toBe('ActivationSystem');
+    expect(activationRoute.component).not.toBe('AdminPanel');
+    expect(activationRoute.legacyRedirectFrom).toContain('/activation');
+    expect(activationRoute.layout.activeSidebarItem).toBe('admin-activation');
+    expect(isRouteAccessibleToProfile(activationRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/activation', '', adminProfile).activeSidebarItem).toBe('admin-activation');
+  });
+
   it('keeps admin Telegram operational and settings surfaces explicit', () => {
     const adminProfile = { role: 'Admin' };
     const telegramIntegrationRoute = getRouteById('admin-telegram-integration');

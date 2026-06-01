@@ -24,6 +24,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1523 | merged | notification route ownership guardrail | Added route contract proof that `/admin/notifications` remains Email/SMS and FCM/registrar notification routes stay unrouted until deliberately exposed. |
 | #1529 | merged | AI settings direct route | Routed `/admin/ai-settings` directly to `AISettings`, while leaving the old AdminPanel query branch as a compatibility path for a later cleanup. |
 | #1531 | merged | phone verification direct route | Routed `/admin/phone-verification` directly to `PhoneVerificationManager`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
+| #1534 | merged | activation direct route | Routed `/admin/activation` directly to `ActivationSystem`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 
 ## Current Verified Status
 
@@ -47,6 +48,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
   sidebar disclaimer.
 - `/admin/phone-verification` is a direct `PhoneVerificationManager` route,
   reducing another visible system route from the broad `AdminPanel.jsx` switch.
+- `/admin/activation` is a direct `ActivationSystem` route, reducing another
+  visible licensing route from the broad `AdminPanel.jsx` switch while
+  preserving `/activation` as a legacy redirect.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
