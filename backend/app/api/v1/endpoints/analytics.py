@@ -15,6 +15,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ANALYTICS_PUBLIC_ERROR = "Internal server error"
+CLINICAL_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
+FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
 
 
 def _build_payment_provider_payload(
@@ -48,7 +50,7 @@ def _build_payment_provider_payload(
 
 @router.get("/quick-stats")
 async def get_quick_stats(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получение быстрой статистики"""
@@ -61,7 +63,7 @@ async def get_quick_stats(
 
 @router.get("/dashboard")
 async def get_dashboard_data(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получение данных для дашборда"""
@@ -75,7 +77,7 @@ async def get_dashboard_data(
 @router.get("/trends")
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получение трендов за последние N дней через SSOT"""
@@ -101,7 +103,7 @@ async def get_appointment_flow_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: str | None = Query(None, description="Отделение"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for appointment flow."""
@@ -124,7 +126,7 @@ async def get_revenue_breakdown_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: str | None = Query(None, description="Отделение"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for revenue breakdown."""
@@ -147,7 +149,7 @@ async def get_payment_provider_analytics(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: str | None = Query(None, description="Отделение"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Legacy-compatible analytics route for provider summary."""
