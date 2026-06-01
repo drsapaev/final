@@ -588,7 +588,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Кабинеты очередей', icon: 'building', section: 'Управление', order: 40, sidebar: true }),
     title: 'Admin Queue Cabinets',
     owner: 'admin.queue',
-    component: 'AdminPanel',
+    component: 'QueueCabinetManagement',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-queue-cabinet-management', pageTitle: 'Admin Queue Cabinets' }),
   },
