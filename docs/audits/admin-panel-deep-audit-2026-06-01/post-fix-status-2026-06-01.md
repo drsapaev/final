@@ -38,6 +38,8 @@ original audit as baseline evidence and records the small PRs merged afterward.
   registrar notification surfaces remain internal until a dedicated route PR.
 - Telegram admin surface policy is documented in
   `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
+- `/admin/telegram-settings` is a direct `TelegramSettings` route, reducing one
+  contextual settings branch from the broad `AdminPanel.jsx` switch.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -72,7 +74,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
   follow `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
 - Telegram route consolidation remains optional and must follow
   `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
-- `AdminPanel.jsx` remains a broad route switch plus implementation container.
+- `AdminPanel.jsx` remains a broad route switch plus implementation container,
+  although `/admin/telegram-settings` has been extracted as the first small
+  contextual route slice.
 - Some routes still have weak heading semantics and should get route-specific heading checks before UI redesign.
 
 ## Recommended Next PR Slices

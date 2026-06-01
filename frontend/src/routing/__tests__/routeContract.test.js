@@ -273,7 +273,7 @@ describe('route contract invariants', () => {
     expect(telegramSettingsRoute.owner).toBe('admin.telegram');
     expect(telegramSettingsRoute.entry).toBe('direct');
     expect(telegramSettingsRoute.nav).toBe(false);
-    expect(telegramSettingsRoute.component).toBe('AdminPanel');
+    expect(telegramSettingsRoute.component).toBe('TelegramSettings');
     expect(isRouteAccessibleToProfile(telegramSettingsRoute, adminProfile)).toBe(true);
 
     expect(routedComponents.has('UnifiedTelegramManagement')).toBe(false);
