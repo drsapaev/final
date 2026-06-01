@@ -20,6 +20,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1514 | merged | overview navigation grouping plan | Documented the staged `Overview` / `Operations` / `Integrations` split. |
 | #1516 | merged | overview route section guardrail | Added route contract coverage before moving sidebar sections. |
 | #1518 | merged | overview sidebar regrouping | Moved system/cloud-printing/medical-equipment to `Операции` and webhooks/GraphQL to `Интеграции`. |
+| #1521 | merged | advanced user route wrapper | Made `/admin/advanced-users` explicit as an advanced/legacy surface wrapping `UserManagement`, while `/admin/users` remains the canonical day-to-day user route. |
 
 ## Current Verified Status
 
@@ -29,6 +30,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `/admin/graphql-explorer` no longer produces the `textareaStyle` unknown DOM prop warning.
 - `/admin/users` and `/admin/advanced-users` have route contract coverage for
   their intentional canonical vs advanced split.
+- `/admin/advanced-users` now renders an explicit advanced/legacy notice before
+  the shared user table, so it no longer looks like an unlabelled duplicate of
+  `/admin/users`.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -48,10 +52,6 @@ original audit as baseline evidence and records the small PRs merged afterward.
 
 ### P1
 
-- User-management duplicate route family:
-  - `/admin/users` is the canonical day-to-day user management route.
-  - `/admin/advanced-users` remains an advanced/legacy route.
-  - Next fix must either make the relationship explicit in UI copy/tests or intentionally alias/wrap one route.
 - Notification route family:
   - `/admin/notifications` currently owns Email/SMS.
   - `UnifiedNotifications` owns FCM/registrar notification surfaces but has no dedicated route map.
@@ -77,9 +77,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
 1. `docs(admin): add notification route channel map`
    - Docs/test-first decision.
    - No runtime route exposure yet.
-2. `test(admin): guard duplicate user route ownership`
-   - Add route contract around `/admin/users` and `/admin/advanced-users`.
-   - No consolidation until a small browser-smoked implementation plan exists.
+2. `docs(admin): plan Telegram operational/settings surface separation`
+   - Keep token/security ownership explicit before implementation.
+   - No runtime changes until the target surface is named.
 3. `refactor(admin): extract one AdminPanel route family`
    - Only after a specific family is selected.
    - One family per PR.
