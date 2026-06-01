@@ -88,6 +88,14 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
     primaryActionText: /Создать запись|Create appointment/i,
     openedFormHeading: /Создать запись на прием|Создать запись|Create appointment/i,
   },
+  {
+    key: 'admin-finance-billing',
+    path: '/admin/finance?section=billing',
+    routeId: 'admin-finance',
+    primaryActionText: /Создать счет|Create invoice/i,
+    openedFormHeading: /Создать счет|Create invoice/i,
+    requiresFormElement: false,
+  },
 ];
 
 async function expectRenderedRolePanel(page, route) {
@@ -219,10 +227,14 @@ async function runAdminRouteActionSmoke(page, testInfo, route) {
   await primaryAction.click();
 
   await expect(
-    page.locator('h2, h3, [role="heading"]').filter({ hasText: route.openedFormHeading }).first(),
+    page.locator('h1, h2, h3, h4, h5, h6, [role="heading"]').filter({ hasText: route.openedFormHeading }).first(),
     `${route.key} primary action should open its form`
   ).toBeVisible();
-  await expect(page.locator('form').first()).toBeVisible();
+  if (route.requiresFormElement === false) {
+    await expect(page.locator('input, textarea, select').first()).toBeVisible();
+  } else {
+    await expect(page.locator('form').first()).toBeVisible();
+  }
   await expectNoHorizontalOverflow(page, route);
 
   const screenshotPath = testInfo.outputPath(`admin-route-action-${route.key}.png`);
