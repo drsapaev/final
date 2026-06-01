@@ -758,7 +758,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'AI Инструменты', icon: 'brain', section: 'Система', order: 20, sidebar: true, ...AI_SIDEBAR_DISCLAIMER_META }),
     title: 'Admin AI Settings',
     owner: 'admin.ai',
-    component: 'AdminPanel',
+    component: 'AISettings',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-ai-settings', pageTitle: 'Admin AI Settings' }),
   },
