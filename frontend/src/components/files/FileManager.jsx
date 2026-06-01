@@ -79,7 +79,8 @@ const FileManager = () => {void
       if (filters.sizeMax) params.append('size_max', filters.sizeMax);
       if (searchQuery) params.append('search', searchQuery);
 
-      const response = await fetch(`/api/v1/files?${params}`, {
+      const query = params.toString();
+      const response = await fetch(`/api/v1/files/${query ? `?${query}` : ''}`, {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
@@ -108,7 +109,7 @@ const FileManager = () => {void
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/v1/files/stats', {
+      const response = await fetch('/api/v1/files/statistics', {
         headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
