@@ -32,6 +32,7 @@ CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
     "in_service",
     "diagnostics",
 )
+CONFIRMATION_PROCESSING_STATUS = "confirmation_processing"
 
 TELEGRAM_TICKET_QR_PREFIX = "tq"
 TELEGRAM_TICKET_QR_HASH_PREFIX = "ticket_qr:"
@@ -161,6 +162,36 @@ class VisitConfirmationService:
         self.security_service = ConfirmationSecurityService(db)
         self.queue_facade = QueueContextFacade(QueueDomainServiceContractAdapter(db))
 
+    def _claim_pending_visit_for_confirmation(self, token: str) -> Visit | None:
+        updated = (
+            self.repository.db.query(Visit)
+            .filter(
+                Visit.confirmation_token == token,
+                Visit.status == "pending_confirmation",
+            )
+            .update(
+                {Visit.status: CONFIRMATION_PROCESSING_STATUS},
+                synchronize_session=False,
+            )
+        )
+        if updated == 0:
+            return None
+        if updated != 1:
+            raise VisitConfirmationDomainError(
+                status_code=409,
+                detail="Ambiguous confirmation token",
+            )
+
+        self.repository.db.flush()
+        return (
+            self.repository.db.query(Visit)
+            .filter(
+                Visit.confirmation_token == token,
+                Visit.status == CONFIRMATION_PROCESSING_STATUS,
+            )
+            .first()
+        )
+
     def confirm_by_telegram(
         self,
         *,
@@ -200,7 +231,7 @@ class VisitConfirmationService:
                     ),
                 )
 
-            visit = self.repository.get_pending_visit_by_token(token)
+            visit = self._claim_pending_visit_for_confirmation(token)
             if not visit:
                 self.security_service.record_confirmation_attempt(
                     visit_id=0,
@@ -289,7 +320,7 @@ class VisitConfirmationService:
                     detail=security_check.reason,
                 )
 
-            visit = self.repository.get_pending_visit_by_token(token)
+            visit = self._claim_pending_visit_for_confirmation(token)
             if not visit:
                 self.security_service.record_confirmation_attempt(
                     visit_id=0,
