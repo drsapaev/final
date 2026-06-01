@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+
 
 def _parse_date_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
     try:
@@ -379,7 +381,7 @@ async def get_predictive_analytics(
     department: Optional[str] = Query(None, description="Отделение"),
     forecast_days: int = Query(30, description="Дни прогноза"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить предиктивную аналитику и прогнозы."""
     start, end = _parse_date_range(start_date, end_date)
@@ -428,7 +430,7 @@ async def get_prediction_accuracy(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить оценочную точность предыдущих прогнозов."""
     start, end = _parse_date_range(start_date, end_date)
@@ -462,7 +464,7 @@ async def get_scenario_analysis(
         "optimistic", description="Сценарий: optimistic, realistic, pessimistic"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить анализ сценариев развития."""
     start, end = _parse_date_range(start_date, end_date)
@@ -512,7 +514,7 @@ async def get_predictive_insights(
         "all", description="Тип инсайтов: all, revenue, patients, efficiency"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить инсайты и паттерны из предиктивной аналитики."""
     start, end = _parse_date_range(start_date, end_date)
