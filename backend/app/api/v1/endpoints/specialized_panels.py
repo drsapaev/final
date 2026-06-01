@@ -17,6 +17,8 @@ from app.services.specialized_panels_api_service import (
 
 router = APIRouter()
 
+FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin", "Manager")
+
 
 @router.get("/cardiology/patients")
 async def get_cardiology_patients(
@@ -60,7 +62,7 @@ async def get_cardiology_visits(
 async def get_cardiology_analytics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    current_user: User = Depends(require_roles("Admin", "Doctor")),
+    current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получить аналитику кардиологического отделения"""
@@ -112,7 +114,7 @@ async def get_dentistry_visits(
 async def get_dentistry_analytics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    current_user: User = Depends(require_roles("Admin", "Doctor")),
+    current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получить аналитику стоматологического отделения"""
@@ -157,7 +159,7 @@ async def get_specialized_patient_history(
 async def get_specialized_statistics(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    current_user: User = Depends(require_roles("Admin", "Doctor")),
+    current_user: User = Depends(require_roles(*FINANCIAL_SPECIALIZED_PANEL_ROLES)),
     db: Session = Depends(get_db),
 ):
     """Получить общую статистику по специализированным отделениям"""
