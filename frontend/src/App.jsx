@@ -69,6 +69,7 @@ const PhoneVerificationManager = lazy(() => import('./components/admin/PhoneVeri
 const ActivationSystem = lazy(() => import('./components/admin/ActivationSystem.jsx'));
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement.jsx'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement.jsx'));
+const UnifiedSettings = lazy(() => import('./components/admin/UnifiedSettings.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
@@ -125,6 +126,7 @@ const ROUTE_COMPONENTS = {
   ActivationSystem,
   ClinicManagement,
   QueueCabinetManagement,
+  UnifiedSettings,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,

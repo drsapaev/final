@@ -724,7 +724,7 @@ export const ROUTE_REGISTRY = [
     nav: false,
     title: 'Admin Clinic Settings',
     owner: 'admin.settings',
-    component: 'AdminPanel',
+    component: 'UnifiedSettings',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Clinic Settings' }),
   },
