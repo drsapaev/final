@@ -54,6 +54,59 @@ def _queue_phone_matches(left: Any, right: Any) -> bool:
     )
 
 # NOTE: Doctor импортируется внутри функций для избежания circular dependency
+QUEUE_DOCTOR_MUTATION_ROLES = {
+    "doctor",
+    "cardio",
+    "cardiology",
+    "cardiologist",
+    "derma",
+    "dermatologist",
+    "dentist",
+}
+
+
+def _role_name(user: User) -> str:
+    role = getattr(user, "role", "")
+    return str(getattr(role, "value", role) or "")
+
+
+def _ensure_doctor_can_mutate_specialist_queue(
+    db: Session,
+    *,
+    specialist_id: int | None,
+    current_user: User,
+) -> None:
+    if _role_name(current_user).strip().lower() not in QUEUE_DOCTOR_MUTATION_ROLES:
+        return
+
+    from app.models.clinic import Doctor
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor or specialist_id != doctor.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+
+def _ensure_doctor_can_mutate_queue_entry(
+    db: Session,
+    *,
+    entry: Any,
+    current_user: User,
+) -> None:
+    queue = getattr(entry, "queue", None)
+    _ensure_doctor_can_mutate_specialist_queue(
+        db,
+        specialist_id=getattr(queue, "specialist_id", None),
+        current_user=current_user,
+    )
+
+
 from app.services.qr_queue_service import QRQueueService
 from app.services.queue_service import (
     queue_service,
@@ -247,6 +300,11 @@ def generate_qr_token(
     qr_service = QRQueueService(db)
 
     try:
+        _ensure_doctor_can_mutate_specialist_queue(
+            db,
+            specialist_id=request.specialist_id,
+            current_user=current_user,
+        )
         target_date = None
         if request.target_date:
             target_date = datetime.strptime(request.target_date, "%Y-%m-%d").date()
@@ -667,6 +725,11 @@ async def call_next_patient(
     
     try:
         # Парсим дату, если передана
+        _ensure_doctor_can_mutate_specialist_queue(
+            db,
+            specialist_id=specialist_id,
+            current_user=current_user,
+        )
         queue_date = None
         if target_date:
             from datetime import datetime
@@ -733,6 +796,8 @@ async def call_next_patient(
 
         return CallNextPatientResponse(**result)
         
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -818,6 +883,12 @@ async def restore_entry_to_next(
             detail="Запись в очереди не найдена"
         )
     
+    _ensure_doctor_can_mutate_queue_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
+
     if entry.status not in ["no_show", "cancelled"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -871,6 +942,12 @@ async def mark_entry_no_show(
             detail="Запись в очереди не найдена"
         )
     
+    _ensure_doctor_can_mutate_queue_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
+
     if entry.status not in ["waiting", "called"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -923,6 +1000,12 @@ def send_entry_to_diagnostics(
             detail="Запись в очереди не найдена"
         )
     
+    _ensure_doctor_can_mutate_queue_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
+
     if entry.status not in ["called", "in_service"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -967,6 +1050,12 @@ def mark_entry_incomplete(
             detail="Запись в очереди не найдена"
         )
     
+    _ensure_doctor_can_mutate_queue_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
+
     if entry.status not in ["called", "in_service", "diagnostics"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1142,6 +1231,12 @@ def update_online_entry(
             )
 
         # Обновляем данные в OnlineQueueEntry
+        _ensure_doctor_can_mutate_queue_entry(
+            db,
+            entry=entry,
+            current_user=current_user,
+        )
+
         if request.patient_name is not None:
             entry.patient_name = request.patient_name
 
@@ -1272,6 +1367,12 @@ def full_update_online_entry(
         )
 
         # 2. Обновляем данные пациента в OnlineQueueEntry
+        _ensure_doctor_can_mutate_queue_entry(
+            db,
+            entry=entry,
+            current_user=current_user,
+        )
+
         original_entry_discount_mode = entry.discount_mode
         patient_data = request.patient_data
         if patient_data.get('patient_name'):
@@ -3080,6 +3181,12 @@ def cancel_service_in_entry(
             )
 
         # Парсим текущие услуги
+        _ensure_doctor_can_mutate_queue_entry(
+            db,
+            entry=entry,
+            current_user=current_user,
+        )
+
         services_list = json.loads(entry.services) if entry.services else []
 
         # Проверяем, что услуги в новом формате (с service_id)

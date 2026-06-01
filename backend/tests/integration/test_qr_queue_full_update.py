@@ -3,13 +3,197 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
+from app.core.security import get_password_hash
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.user import User
 from app.models.visit import Visit, VisitService
+
+
+def _create_queue_doctor(db_session, *, label: str) -> tuple[User, Doctor]:
+    suffix = uuid4().hex[:10]
+    user = User(
+        username=f"qr_owner_{label}_{suffix}",
+        email=f"qr-owner-{label}-{suffix}@test.local",
+        full_name=f"QR Owner {label}",
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="general",
+        active=True,
+        cabinet="401",
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    return user, doctor
+
+
+def _doctor_headers(client, user: User) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": user.username, "password": "doctor123"},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def _create_queue_entry_for_doctor(
+    db_session,
+    *,
+    doctor: Doctor,
+    status: str = "waiting",
+) -> OnlineQueueEntry:
+    queue = DailyQueue(
+        day=date.today(),
+        specialist_id=doctor.id,
+        queue_tag=f"qr-owner-{doctor.id}",
+        active=True,
+    )
+    db_session.add(queue)
+    db_session.commit()
+    db_session.refresh(queue)
+
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=1,
+        patient_name="Guarded Patient",
+        phone="+998901555555",
+        source="online",
+        status=status,
+        services=json.dumps(
+            [
+                {
+                    "service_id": 1,
+                    "name": "Consultation",
+                    "quantity": 1,
+                    "price": 10000,
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    return entry
+
+
+@pytest.mark.integration
+def test_doctor_cannot_generate_qr_token_for_other_doctor_queue(
+    client,
+    db_session,
+) -> None:
+    actor_user, actor_doctor = _create_queue_doctor(db_session, label="actor_token")
+    _other_user, other_doctor = _create_queue_doctor(db_session, label="other_token")
+
+    response = client.post(
+        "/api/v1/queue/admin/qr-tokens/generate",
+        headers=_doctor_headers(client, actor_user),
+        json={
+            "specialist_id": other_doctor.id,
+            "department": "general",
+        },
+    )
+
+    assert actor_doctor.id != other_doctor.id
+    assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_doctor_cannot_call_next_for_other_doctor_queue(
+    client,
+    db_session,
+) -> None:
+    actor_user, actor_doctor = _create_queue_doctor(db_session, label="actor_call")
+    _other_user, other_doctor = _create_queue_doctor(db_session, label="other_call")
+    entry = _create_queue_entry_for_doctor(db_session, doctor=other_doctor)
+
+    response = client.post(
+        f"/api/v1/queue/{other_doctor.id}/call-next",
+        headers=_doctor_headers(client, actor_user),
+    )
+
+    assert actor_doctor.id != other_doctor.id
+    assert response.status_code == 403
+    db_session.refresh(entry)
+    assert entry.status == "waiting"
+
+
+@pytest.mark.integration
+def test_doctor_can_call_next_for_own_doctor_queue(
+    client,
+    db_session,
+) -> None:
+    actor_user, actor_doctor = _create_queue_doctor(db_session, label="own_call")
+    entry = _create_queue_entry_for_doctor(db_session, doctor=actor_doctor)
+
+    response = client.post(
+        f"/api/v1/queue/{actor_doctor.id}/call-next",
+        headers=_doctor_headers(client, actor_user),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["success"] is True
+    db_session.refresh(entry)
+    assert entry.status == "called"
+    assert entry.called_by_user_id == actor_user.id
+
+
+@pytest.mark.integration
+def test_doctor_cannot_mark_other_doctor_queue_entry_no_show(
+    client,
+    db_session,
+) -> None:
+    actor_user, actor_doctor = _create_queue_doctor(db_session, label="actor_no_show")
+    _other_user, other_doctor = _create_queue_doctor(db_session, label="other_no_show")
+    entry = _create_queue_entry_for_doctor(db_session, doctor=other_doctor)
+
+    response = client.post(
+        f"/api/v1/queue/entry/{entry.id}/no-show",
+        headers=_doctor_headers(client, actor_user),
+    )
+
+    assert actor_doctor.id != other_doctor.id
+    assert response.status_code == 403
+    db_session.refresh(entry)
+    assert entry.status == "waiting"
+
+
+@pytest.mark.integration
+def test_doctor_cannot_update_other_doctor_online_entry(
+    client,
+    db_session,
+) -> None:
+    actor_user, actor_doctor = _create_queue_doctor(db_session, label="actor_update")
+    _other_user, other_doctor = _create_queue_doctor(db_session, label="other_update")
+    entry = _create_queue_entry_for_doctor(db_session, doctor=other_doctor)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/update",
+        headers=_doctor_headers(client, actor_user),
+        json={"patient_name": "Tampered Patient"},
+    )
+
+    assert actor_doctor.id != other_doctor.id
+    assert response.status_code == 403
+    db_session.refresh(entry)
+    assert entry.patient_name == "Guarded Patient"
 
 
 @pytest.mark.integration
