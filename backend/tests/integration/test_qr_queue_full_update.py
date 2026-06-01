@@ -455,6 +455,84 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
 
 
 @pytest.mark.integration
+def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_service,
+):
+    unrelated_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=25,
+        patient_id=None,
+        patient_name="Unrelated Queue",
+        phone=None,
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        queue_time=datetime(2026, 5, 31, 9, 0, tzinfo=timezone.utc),
+        services=json.dumps(
+            [
+                {
+                    "service_id": test_service.id,
+                    "name": test_service.name,
+                    "code": test_service.code,
+                    "quantity": 1,
+                    "price": int(test_service.price or 0),
+                    "cancelled": False,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    current_entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=26,
+        patient_id=None,
+        patient_name="Current Queue",
+        phone=None,
+        visit_id=None,
+        session_id=None,
+        source="online",
+        status="waiting",
+        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=timezone.utc),
+        services=json.dumps([], ensure_ascii=False),
+    )
+    db_session.add_all([unrelated_entry, current_entry])
+    db_session.commit()
+    db_session.refresh(unrelated_entry)
+    db_session.refresh(current_entry)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{current_entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": "Current Queue",
+                "birth_year": 1990,
+                "address": "Queue Street",
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": False,
+            "aggregated_ids": [unrelated_entry.id, current_entry.id],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    db_session.refresh(current_entry)
+    db_session.refresh(unrelated_entry)
+    current_services = json.loads(current_entry.services)
+    unrelated_services = json.loads(unrelated_entry.services)
+    assert [service["service_id"] for service in current_services] == [test_service.id]
+    assert [service["service_id"] for service in unrelated_services] == [test_service.id]
+
+
+@pytest.mark.integration
 def test_full_update_all_free_preserves_paid_visit_payment_state(
     client,
     db_session,
