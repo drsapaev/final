@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
 import {
@@ -63,8 +63,11 @@ const hasBackendQueueAction = (entry, action, flagName) => {
   return false;
 };
 
+const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
+
 const DoctorPanel = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();void
   useTouchDevice();
 
@@ -78,6 +81,10 @@ const DoctorPanel = () => {
   const [activeTab, setActiveTab] = useState(() => {
     // Если есть patientId, переходим на вкладку пациентов
     const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get('tab');
+    if (requestedTab && DOCTOR_PANEL_TABS.has(requestedTab)) {
+      return requestedTab;
+    }
     if (params.get('patientId')) {
       return 'patients';
     }
@@ -92,6 +99,37 @@ const DoctorPanel = () => {
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  const setDoctorTab = useCallback((tabId) => {
+    if (!DOCTOR_PANEL_TABS.has(tabId)) {
+      return;
+    }
+
+    setActiveTab(tabId);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tabId);
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTab = params.get('tab');
+    const patientId = params.get('patientId');
+    const nextTab = requestedTab && DOCTOR_PANEL_TABS.has(requestedTab)
+      ? requestedTab
+      : patientId
+        ? 'patients'
+        : 'dashboard';
+
+    if (!requestedTab && patientId) {
+      params.set('tab', nextTab);
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+    }
+
+    if (activeTab !== nextTab) {
+      setActiveTab(nextTab);
+    }
+  }, [activeTab, location.pathname, location.search, navigate]);
 
   // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
   const {
@@ -608,7 +646,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open doctor dashboard tab"
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => setDoctorTab('dashboard')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
 
@@ -619,7 +657,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open patients tab"
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('patients')}
+            onClick={() => setDoctorTab('patients')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'patients', false)}>
 
@@ -630,7 +668,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open appointments tab"
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('appointments')}
+            onClick={() => setDoctorTab('appointments')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'appointments', false)}>
 
@@ -642,7 +680,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open queue tab"
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('queue')}
+            onClick={() => setDoctorTab('queue')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'queue', false)}>
 
@@ -658,7 +696,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open AI assistant tab"
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('ai')}
+            onClick={() => setDoctorTab('ai')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'ai', false)}>
 
@@ -669,7 +707,7 @@ const DoctorPanel = () => {
           <button
             aria-label="Open reports tab"
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('reports')}
+            onClick={() => setDoctorTab('reports')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'reports', false)}>
 

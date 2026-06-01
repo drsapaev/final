@@ -557,6 +557,38 @@ describe('route contract invariants', () => {
     });
   });
 
+  it('keeps doctor route sidebars visible and query-tab driven', () => {
+    const doctorProfile = { role: 'Doctor' };
+    const doctorChrome = getRouteChromeState('/doctor', '?tab=queue', doctorProfile);
+    const cardiologyChrome = getRouteChromeState('/doctor/cardiology', '?tab=visit', doctorProfile);
+    const dermatologyChrome = getRouteChromeState('/doctor/dermatology', '?tab=skin', doctorProfile);
+    const dentistryChrome = getRouteChromeState('/doctor/dentistry', '?tab=dental-chart', doctorProfile);
+
+    expect(doctorChrome.hideSidebar).toBe(false);
+    expect(doctorChrome.sidebarPreset?.queryParam).toBe('tab');
+    expect(doctorChrome.activeSidebarItem).toBe('queue');
+    expect(doctorChrome.sidebarItems.map((item) => item.id)).toEqual([
+      'dashboard',
+      'patients',
+      'appointments',
+      'queue',
+      'ai',
+      'reports',
+    ]);
+
+    [
+      [cardiologyChrome, 'visit'],
+      [dermatologyChrome, 'skin'],
+      [dentistryChrome, 'dental-chart'],
+    ].forEach(([chrome, activeItem]) => {
+      expect(chrome.hideSidebar).toBe(false);
+      expect(chrome.fullscreen).toBe(true);
+      expect(chrome.sidebarPreset?.queryParam).toBe('tab');
+      expect(chrome.activeSidebarItem).toBe(activeItem);
+      expect(chrome.sidebarItems.length).toBeGreaterThan(0);
+    });
+  });
+
   it('keeps route-derived admin and default sidebar targets backed by canonical routes', () => {
     const canonicalPaths = new Set(ROUTE_REGISTRY.map((route) => route.path));
     const routeDerivedSidebarItems = [
