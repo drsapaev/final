@@ -605,7 +605,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Пациенты', icon: 'users', section: 'Управление', order: 50, sidebar: true }),
     title: 'Admin Patients',
     owner: 'admin.patients',
-    component: 'AdminPanel',
+    component: 'AdminPatients',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-patients', pageTitle: 'Admin Patients' }),
   },
