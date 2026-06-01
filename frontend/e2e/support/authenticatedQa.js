@@ -177,6 +177,10 @@ function buildQaApiPayload(pathname, profile, method) {
     };
   }
 
+  if (lowerPath === '/patients' || lowerPath === '/patients/') {
+    return [];
+  }
+
   if (lowerPath === '/services' || lowerPath === '/services/categories' || lowerPath === '/services/admin/doctors') {
     return [];
   }
