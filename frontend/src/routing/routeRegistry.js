@@ -63,6 +63,7 @@ export const SIDEBAR_PRESETS = {
       { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
       { id: 'patients', label: 'Пациенты', icon: 'person.2' },
       { id: 'appointments', label: 'Записи', icon: 'calendar' },
+      { id: 'queue', label: 'Очередь', icon: 'person.2' },
       { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
       { id: 'reports', label: 'Отчёты', icon: 'doc.text' },
     ],
@@ -1017,7 +1018,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.doctor',
     component: 'DoctorPanel',
     legacyRedirectFrom: ['/doctor-panel'],
-    layout: layout({ hideSidebar: true, sidebarPreset: 'doctor', pageTitle: 'Doctor Panel' }),
+    layout: layout({ sidebarPreset: 'doctor', pageTitle: 'Doctor Panel' }),
   },
   {
     id: 'cashier-home',
@@ -1124,7 +1125,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.cardiology',
     component: 'CardiologistPanelUnified',
     legacyRedirectFrom: ['/cardiologist'],
-    layout: layout({ hideSidebar: true, fullscreen: true, sidebarPreset: 'cardiology', pageTitle: 'Cardiology Panel' }),
+    layout: layout({ fullscreen: true, sidebarPreset: 'cardiology', pageTitle: 'Cardiology Panel' }),
   },
   {
     id: 'doctor-dermatology',
@@ -1143,7 +1144,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.dermatology',
     component: 'DermatologistPanelUnified',
     legacyRedirectFrom: ['/dermatologist'],
-    layout: layout({ hideSidebar: true, fullscreen: true, sidebarPreset: 'dermatology', pageTitle: 'Dermatology Panel' }),
+    layout: layout({ fullscreen: true, sidebarPreset: 'dermatology', pageTitle: 'Dermatology Panel' }),
   },
   {
     id: 'doctor-dentistry',
@@ -1162,7 +1163,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.dentistry',
     component: 'DentistPanelUnified',
     legacyRedirectFrom: ['/dentist'],
-    layout: layout({ hideSidebar: true, fullscreen: true, sidebarPreset: 'dentistry', pageTitle: 'Dentistry Panel' }),
+    layout: layout({ fullscreen: true, sidebarPreset: 'dentistry', pageTitle: 'Dentistry Panel' }),
   },
   {
     id: 'clinical-scheduler',
