@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.payment import Payment
+from app.models.refund_deposit import DepositTransaction, PatientDeposit, RefundType
+from app.models.visit import Visit
 from app.repositories.force_majeure_api_repository import ForceMajeureApiRepository
 from app.services.force_majeure_api_service import (
     ForceMajeureApiDomainError,
     ForceMajeureApiService,
 )
+from app.services.force_majeure_service import ForceMajeureService
 
 
 @pytest.mark.unit
@@ -124,6 +129,96 @@ class TestForceMajeureApiService:
         )
 
         assert [entry.id for entry in entries] == [scoped_entry.id]
+
+    def test_cancel_with_refund_rejects_entry_linked_to_other_patient_visit(
+        self,
+        db_session,
+        test_doctor,
+        test_patient,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(
+            "app.services.force_majeure_service.get_fcm_service",
+            lambda: object(),
+        )
+
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="cardiology_common",
+            active=True,
+        )
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Patient",
+            phone="+998901113333",
+        )
+        db_session.add_all([queue, other_patient])
+        db_session.flush()
+
+        other_visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="14:00",
+            status="open",
+            discount_mode="none",
+            department="cardiology",
+            created_at=datetime.utcnow(),
+        )
+        db_session.add(other_visit)
+        db_session.flush()
+
+        payment = Payment(
+            visit_id=other_visit.id,
+            amount=Decimal("120.00"),
+            currency="UZS",
+            method="cash",
+            status="paid",
+        )
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=1,
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            visit_id=other_visit.id,
+            source="online",
+            status="waiting",
+        )
+        db_session.add_all([payment, entry])
+        db_session.commit()
+        db_session.refresh(entry)
+        db_session.refresh(other_visit)
+
+        result = ForceMajeureService(db_session).cancel_entries_with_refund(
+            entries=[entry],
+            reason="Doctor emergency",
+            refund_type=RefundType.DEPOSIT,
+            performed_by_id=1,
+            send_notifications=False,
+        )
+
+        assert result["cancelled"] == 0
+        assert result["failed"] == 1
+        assert "does not belong" in result["errors"][0]["error"]
+
+        db_session.refresh(entry)
+        db_session.refresh(other_visit)
+        assert entry.status == "waiting"
+        assert other_visit.status == "open"
+        assert (
+            db_session.query(PatientDeposit)
+            .filter(PatientDeposit.patient_id == test_patient.id)
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(DepositTransaction)
+            .filter(DepositTransaction.payment_id == payment.id)
+            .count()
+            == 0
+        )
 
     def test_cancel_queue_with_refund_rejects_invalid_type(self, monkeypatch):
         monkeypatch.setattr(

@@ -27,6 +27,7 @@ from app.models.refund_deposit import (
     RefundRequestStatus,
     RefundType,
 )
+from app.models.visit import Visit
 from app.services.fcm_service import get_fcm_service
 
 logger = logging.getLogger(__name__)
@@ -370,6 +371,14 @@ class ForceMajeureService:
         """Получить платёж для записи"""
         if not entry.visit_id:
             return None
+
+        visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+        if not visit:
+            return None
+        if visit.patient_id != entry.patient_id:
+            raise ForceMajeureError(
+                "Queue entry visit does not belong to the queue patient"
+            )
 
         return self.db.query(Payment).filter(
             Payment.visit_id == entry.visit_id,
