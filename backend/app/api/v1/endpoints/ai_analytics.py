@@ -144,7 +144,7 @@ async def get_ai_usage_analytics(
     user_id: Optional[int] = Query(None, description="Фильтр по пользователю"),
     ai_function: Optional[str] = Query(None, description="Фильтр по AI функции"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Doctor"])),
+    current_user: User = Depends(require_roles(["Admin"])),
 ):
     """Получить аналитику использования AI за период"""
     try:
@@ -319,7 +319,7 @@ async def generate_training_dataset(
 async def get_ai_usage_summary(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Doctor"])),
+    current_user: User = Depends(require_roles(["Admin"])),
 ):
     """Получить краткую сводку использования AI за последние дни"""
     try:
@@ -364,7 +364,7 @@ async def get_function_performance(
     function_name: str,
     days: int = Query(7, ge=1, le=90, description="Количество дней для анализа"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Doctor"])),
+    current_user: User = Depends(require_roles(["Admin"])),
 ):
     """Получить детальную информацию о производительности конкретной AI функции"""
     try:
