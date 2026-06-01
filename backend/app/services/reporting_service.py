@@ -33,6 +33,73 @@ class ReportingService:
         self.reports_dir = "reports"
         os.makedirs(self.reports_dir, exist_ok=True)
 
+    @staticmethod
+    def _as_float(value: Any) -> float:
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _visit_service_amount(self, visit: Visit) -> float:
+        total = 0.0
+        for visit_service in getattr(visit, "services", None) or []:
+            quantity = getattr(
+                visit_service,
+                "qty",
+                getattr(visit_service, "quantity", 1),
+            )
+            try:
+                quantity = int(quantity or 1)
+            except (TypeError, ValueError):
+                quantity = 1
+            total += self._as_float(getattr(visit_service, "price", 0)) * quantity
+        return total
+
+    def _visit_invoice_links(self, visit: Visit) -> list[Any]:
+        return list(getattr(visit, "invoices", None) or [])
+
+    def _visit_total_amount(self, visit: Visit) -> float:
+        invoice_links = self._visit_invoice_links(visit)
+        if invoice_links:
+            return sum(
+                self._as_float(getattr(invoice_link, "visit_amount", 0))
+                for invoice_link in invoice_links
+            )
+        return self._visit_service_amount(visit)
+
+    def _visit_payment_status(self, visit: Visit) -> str:
+        statuses = [
+            getattr(getattr(invoice_link, "invoice", None), "status", None)
+            for invoice_link in self._visit_invoice_links(visit)
+        ]
+        if "paid" in statuses:
+            return "paid"
+        if "processing" in statuses:
+            return "processing"
+        if "pending" in statuses:
+            return "pending"
+        if getattr(visit, "discount_mode", None) == "all_free":
+            return "paid"
+        return "unpaid"
+
+    def _visit_payment_method(self, visit: Visit) -> str:
+        if getattr(visit, "discount_mode", None) == "all_free":
+            return "free"
+        for invoice_link in self._visit_invoice_links(visit):
+            invoice = getattr(invoice_link, "invoice", None)
+            if getattr(invoice, "status", None) != "paid":
+                continue
+            method = (getattr(invoice, "payment_method", None) or "").lower()
+            provider = (getattr(invoice, "provider", None) or "").lower()
+            if method in {"cash", "card", "free"}:
+                return method
+            if method in {"online", "click", "payme"} or provider in {
+                "click",
+                "payme",
+            }:
+                return "online"
+        return "card"
+
     # ===================== ОСНОВНЫЕ ОТЧЕТЫ =====================
 
     def generate_patient_report(
@@ -334,9 +401,7 @@ class ReportingService:
                         ),
                         "status": visit.status,
                         "services": services_info,
-                        "total_amount": (
-                            float(visit.total_amount) if visit.total_amount else 0
-                        ),
+                        "total_amount": self._visit_total_amount(visit),
                         "discount_mode": visit.discount_mode,
                         "created_at": (
                             visit.created_at.isoformat() if visit.created_at else None
@@ -386,10 +451,10 @@ class ReportingService:
             payment_methods = {"cash": 0, "card": 0, "online": 0, "free": 0}
 
             for visit in visits:
-                visit_amount = float(visit.total_amount) if visit.total_amount else 0
+                visit_amount = self._visit_total_amount(visit)
                 total_revenue += visit_amount
 
-                if visit.payment_status == "paid":
+                if self._visit_payment_status(visit) == "paid":
                     paid_visits += 1
                 else:
                     unpaid_visits += 1
@@ -424,7 +489,7 @@ class ReportingService:
                     )
                     if service:
                         service_name = service.name
-                        service_price = float(vs.price) if vs.price else 0
+                        service_price = self._as_float(vs.price) * int(vs.qty or 1)
 
                         service_revenue[service_name] = (
                             service_revenue.get(service_name, 0) + service_price
@@ -434,11 +499,12 @@ class ReportingService:
                         )
 
                 # Способы оплаты (упрощенная логика)
-                if visit.payment_status == "paid":
+                if self._visit_payment_status(visit) == "paid":
                     if visit.discount_mode != "all_free":
-                        payment_methods[
-                            "card"
-                        ] += visit_amount  # По умолчанию считаем картой
+                        method = self._visit_payment_method(visit)
+                        payment_methods[method] = (
+                            payment_methods.get(method, 0) + visit_amount
+                        )
 
             # Получаем информацию о врачах
             doctor_names = {}
@@ -657,9 +723,7 @@ class ReportingService:
                 ) + len([v for v in visits if v.status == "completed"])
 
                 # Доходы
-                total_revenue = sum(
-                    [float(v.total_amount) for v in visits if v.total_amount]
-                )
+                total_revenue = sum(self._visit_total_amount(v) for v in visits)
 
                 # Средняя продолжительность приема (упрощенная логика)
                 avg_duration = 30  # По умолчанию 30 минут
@@ -755,9 +819,7 @@ class ReportingService:
 
             # Рассчитываем статистику
             total_patients_served = len(visits)
-            total_revenue = sum(
-                float(v.total_amount) for v in visits if v.total_amount
-            )
+            total_revenue = sum(self._visit_total_amount(v) for v in visits)
 
             # Новые пациенты за сегодня
             new_patients = (
