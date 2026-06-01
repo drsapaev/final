@@ -75,6 +75,7 @@ const CloudPrintingManager = lazy(() => import('./components/admin/CloudPrinting
 const MedicalEquipmentManager = lazy(() => import('./components/admin/MedicalEquipmentManager.jsx'));
 const WebhookManager = lazy(() => import('./components/admin/WebhookManager.jsx'));
 const GraphQLExplorer = lazy(() => import('./components/admin/GraphQLExplorer.jsx'));
+const UnifiedReports = lazy(() => import('./components/admin/UnifiedReports.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
@@ -137,6 +138,7 @@ const ROUTE_COMPONENTS = {
   MedicalEquipmentManager,
   WebhookManager,
   GraphQLExplorer,
+  UnifiedReports,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,
