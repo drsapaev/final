@@ -21,6 +21,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1516 | merged | overview route section guardrail | Added route contract coverage before moving sidebar sections. |
 | #1518 | merged | overview sidebar regrouping | Moved system/cloud-printing/medical-equipment to `Операции` and webhooks/GraphQL to `Интеграции`. |
 | #1521 | merged | advanced user route wrapper | Made `/admin/advanced-users` explicit as an advanced/legacy surface wrapping `UserManagement`, while `/admin/users` remains the canonical day-to-day user route. |
+| #1523 | merged | notification route ownership guardrail | Added route contract proof that `/admin/notifications` remains Email/SMS and FCM/registrar notification routes stay unrouted until deliberately exposed. |
 
 ## Current Verified Status
 
@@ -33,6 +34,10 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `/admin/advanced-users` now renders an explicit advanced/legacy notice before
   the shared user table, so it no longer looks like an unlabelled duplicate of
   `/admin/users`.
+- `/admin/notifications` is guarded as the Email/SMS admin route; FCM and
+  registrar notification surfaces remain internal until a dedicated route PR.
+- Telegram admin surface policy is documented in
+  `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -52,15 +57,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
 
 ### P1
 
-- Notification route family:
-  - `/admin/notifications` currently owns Email/SMS.
-  - `UnifiedNotifications` owns FCM/registrar notification surfaces but has no dedicated route map.
-  - Channel ownership is tracked in `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
-  - Do not expose or merge notification subroutes until a route implementation PR is browser-smoked.
-- Telegram route family:
-  - `/admin/integrations/telegram` remains the operational integration route.
-  - `/admin/telegram-settings` now opens settings content.
-  - Future token/security changes must name which surface owns the work before editing.
+- No open P1 admin route ownership item after the current user,
+  notification, and Telegram guardrails. New runtime route exposure still needs
+  a dedicated plan and browser smoke.
 
 ### P2
 
@@ -69,20 +68,24 @@ original audit as baseline evidence and records the small PRs merged afterward.
   - `Operations`: system, cloud printing, medical equipment
   - `Integrations`: webhooks, GraphQL API
   - Runtime grouping and evidence are recorded in `docs/admin/ADMIN_OVERVIEW_NAVIGATION_GROUPING_PLAN.md`.
+- Notification direct FCM/registrar route exposure remains optional and must
+  follow `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
+- Telegram route consolidation remains optional and must follow
+  `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
 - `AdminPanel.jsx` remains a broad route switch plus implementation container.
 - Some routes still have weak heading semantics and should get route-specific heading checks before UI redesign.
 
 ## Recommended Next PR Slices
 
-1. `docs(admin): add notification route channel map`
-   - Docs/test-first decision.
-   - No runtime route exposure yet.
-2. `docs(admin): plan Telegram operational/settings surface separation`
-   - Keep token/security ownership explicit before implementation.
-   - No runtime changes until the target surface is named.
-3. `refactor(admin): extract one AdminPanel route family`
+1. `refactor(admin): extract one AdminPanel route family`
    - Only after a specific family is selected.
    - One family per PR.
+2. `test(admin): add route-specific heading semantics`
+   - Protect the next UI cleanup from collapsing admin route headings.
+   - Start with one route family.
+3. `docs(admin): plan optional notification or Telegram route exposure`
+   - Only if a real user workflow needs direct FCM/registrar/Telegram subroutes.
+   - No runtime exposure without browser smoke.
 
 ## Stop Conditions
 
