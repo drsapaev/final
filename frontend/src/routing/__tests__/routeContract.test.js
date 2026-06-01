@@ -252,6 +252,33 @@ describe('route contract invariants', () => {
     expect(publicNotificationComponents.has('UnifiedNotifications')).toBe(false);
   });
 
+  it('keeps admin Telegram operational and settings surfaces explicit', () => {
+    const adminProfile = { role: 'Admin' };
+    const telegramIntegrationRoute = getRouteById('admin-telegram-integration');
+    const telegramSettingsRoute = getRouteById('admin-telegram-settings');
+    const routedComponents = new Set(ROUTE_REGISTRY.map((route) => route.component));
+
+    expect(telegramIntegrationRoute).toBeTruthy();
+    expect(telegramIntegrationRoute.path).toBe('/admin/integrations/telegram');
+    expect(telegramIntegrationRoute.owner).toBe('admin.telegram');
+    expect(telegramIntegrationRoute.entry).toBe('menu');
+    expect(telegramIntegrationRoute.component).toBe('TelegramManager');
+    expect(telegramIntegrationRoute.legacyRedirectFrom).toContain('/telegram-integration');
+    expect(telegramIntegrationRoute.layout.activeSidebarItem).toBe('admin-telegram-integration');
+    expect(isRouteAccessibleToProfile(telegramIntegrationRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/integrations/telegram', '', adminProfile).activeSidebarItem).toBe('admin-telegram-integration');
+
+    expect(telegramSettingsRoute).toBeTruthy();
+    expect(telegramSettingsRoute.path).toBe('/admin/telegram-settings');
+    expect(telegramSettingsRoute.owner).toBe('admin.telegram');
+    expect(telegramSettingsRoute.entry).toBe('direct');
+    expect(telegramSettingsRoute.nav).toBe(false);
+    expect(telegramSettingsRoute.component).toBe('AdminPanel');
+    expect(isRouteAccessibleToProfile(telegramSettingsRoute, adminProfile)).toBe(true);
+
+    expect(routedComponents.has('UnifiedTelegramManagement')).toBe(false);
+  });
+
   it('keeps clinical contextual routes registered and out of default sidebar navigation', () => {
     const doctorProfile = { role: 'Doctor' };
     const clinicalChrome = getRouteChromeState('/clinical/search', '', doctorProfile);
