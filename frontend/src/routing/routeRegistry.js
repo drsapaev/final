@@ -452,7 +452,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Отчеты', icon: 'file-text', section: 'Обзор', order: 40, sidebar: true }),
     title: 'Admin Reports',
     owner: 'admin.reports',
-    component: 'AdminPanel',
+    component: 'UnifiedReports',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-reports', pageTitle: 'Admin Reports' }),
   },
