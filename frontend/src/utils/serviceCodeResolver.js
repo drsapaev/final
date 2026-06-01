@@ -380,9 +380,14 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         };
     };
 
+    const pickExplicitQueueEntryId = (value = {}) => (
+        value.original_queue_id ?? value.queue_entry_id ?? null
+    );
+
     const resolveOriginalQueueId = (serviceData = {}) => {
-        if (serviceData.original_queue_id || serviceData.queue_entry_id || serviceData.queue_id) {
-            return serviceData.original_queue_id || serviceData.queue_entry_id || serviceData.queue_id;
+        const explicitQueueEntryId = pickExplicitQueueEntryId(serviceData);
+        if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined && explicitQueueEntryId !== '') {
+            return explicitQueueEntryId;
         }
         if (!Array.isArray(initialData.queue_numbers)) return null;
 
@@ -403,7 +408,21 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
             return Boolean(serviceName && queueName && serviceName === queueName);
         });
 
-        return match?.id || match?.queue_id || match?.queue_entry_id || null;
+        if (!match) return null;
+
+        const matchedQueueEntryId = pickExplicitQueueEntryId(match);
+        if (matchedQueueEntryId !== null && matchedQueueEntryId !== undefined && matchedQueueEntryId !== '') {
+            return matchedQueueEntryId;
+        }
+
+        // In current registrar DTOs `queue_id` is DailyQueue.id, not a
+        // cancelable OnlineQueueEntry.id. If both are present, never treat the
+        // row id as an entry id; it may collide with an unrelated queue entry.
+        if (match.queue_id !== null && match.queue_id !== undefined) {
+            return null;
+        }
+
+        return match.id ?? null;
     };
 
     /**
