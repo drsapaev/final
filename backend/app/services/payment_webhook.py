@@ -58,6 +58,26 @@ class PaymentWebhookService:
         return appointment_id, visit_id
 
     @staticmethod
+    def _payme_targets_cross_patient(
+        db: Session, appointment_id: int, visit_id: int
+    ) -> bool:
+        from app.models.appointment import Appointment
+        from app.models.visit import Visit
+
+        appointment_patient_id = (
+            db.query(Appointment.patient_id)
+            .filter(Appointment.id == appointment_id)
+            .scalar()
+        )
+        visit_patient_id = (
+            db.query(Visit.patient_id).filter(Visit.id == visit_id).scalar()
+        )
+
+        if appointment_patient_id is None or visit_patient_id is None:
+            return False
+        return int(appointment_patient_id) != int(visit_patient_id)
+
+    @staticmethod
     def _resolve_click_merchant_target(
         db: Session, merchant_trans_id: Any
     ) -> tuple[str | None, int | None]:
@@ -221,6 +241,33 @@ class PaymentWebhookService:
                         )
 
                     # Приоритет: сначала ищем appointment_id, потом visit_id
+                    if (
+                        appointment_id is not None
+                        and visit_id is not None
+                        and PaymentWebhookService._payme_targets_cross_patient(
+                            db, appointment_id, visit_id
+                        )
+                    ):
+                        repository.update_webhook(
+                            webhook.id,
+                            {
+                                "status": "failed",
+                                "processed_at": datetime.utcnow(),
+                                "error_message": (
+                                    "Payme account appointment_id and visit_id "
+                                    "belong to different patients"
+                                ),
+                            },
+                        )
+                        logger.warning(
+                            "payment_webhook_payme_conflicting_account_targets",
+                            extra={
+                                "payment_provider": "payme",
+                                "webhook_record_id": webhook.id,
+                            },
+                        )
+                        return True, "Webhook processed successfully", webhook
+
                     if appointment_id:
                         # Обрабатываем платёж для существующей записи
                         success, message = (
