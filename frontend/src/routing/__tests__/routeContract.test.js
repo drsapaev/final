@@ -43,6 +43,15 @@ const ADMIN_CONTEXTUAL_ROUTE_IDS = [
   'admin-user-select',
 ];
 
+const ADMIN_CONTEXTUAL_SETTINGS_DIRECT_ROUTE_IDS = [
+  'admin-benefit-settings',
+  'admin-wizard-settings',
+  'admin-payment-providers',
+  'admin-clinic-settings',
+  'admin-queue-settings',
+  'admin-display-settings',
+];
+
 const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminPanel', entry: 'menu', section: 'Обзор' },
   'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
@@ -228,6 +237,21 @@ describe('route contract invariants', () => {
       expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
       expect(adminSidebarIds.has(route.id)).toBe(false);
       expect(adminSidebarTargets.has(route.path)).toBe(false);
+    });
+  });
+
+  it('keeps hidden contextual settings routes on UnifiedSettings direct ownership', () => {
+    const adminProfile = { role: 'Admin' };
+
+    ADMIN_CONTEXTUAL_SETTINGS_DIRECT_ROUTE_IDS.forEach((routeId) => {
+      const route = getRouteById(routeId);
+
+      expect(route).toBeTruthy();
+      expect(route.nav).toBe(false);
+      expect(route.entry).toBe('direct');
+      expect(route.component).toBe('UnifiedSettings');
+      expect(route.component).not.toBe('AdminPanel');
+      expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
     });
   });
 

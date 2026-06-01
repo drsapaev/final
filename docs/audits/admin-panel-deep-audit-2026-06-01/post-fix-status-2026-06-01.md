@@ -28,6 +28,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1536 | merged | clinic management direct route | Routed `/admin/clinic-management` directly to `ClinicManagement`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1539 | merged | queue cabinets direct route | Routed `/admin/queue-cabinet-management` directly to `QueueCabinetManagement`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1541 | merged | clinic settings direct route | Routed `/admin/clinic-settings` directly to `UnifiedSettings`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
+| #1544 | merged | contextual settings direct routes | Routed hidden contextual settings routes for benefit, wizard, payment providers, queue, and display settings directly to `UnifiedSettings`, while leaving old AdminPanel switch branches as compatibility paths for later cleanup. |
 
 ## Current Verified Status
 
@@ -63,6 +64,10 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `/admin/clinic-settings` is a direct `UnifiedSettings` route, reducing one
   contextual settings route from the broad `AdminPanel.jsx` switch while
   preserving its hidden/direct route identity.
+- Hidden contextual settings routes for benefit settings, wizard settings,
+  payment providers, queue settings, and display settings are now direct
+  `UnifiedSettings` routes, preserving `nav: false` and reducing more broad
+  `AdminPanel.jsx` routing.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
