@@ -5,6 +5,20 @@ Date: 2026-06-01
 This is a status addendum for the AdminPanel deep audit. It preserves the
 original audit as baseline evidence and records the small PRs merged afterward.
 
+## Final Route-Owner Closeout
+
+As of PR #1571, no active route in `frontend/src/routing/routeRegistry.js`
+renders the legacy `AdminPanel` component owner. `frontend/src/pages/AdminPanel.jsx`
+has been deleted after the last extraction-bound admin routes were moved to
+direct route owners and the route contract was updated to prevent regression.
+
+Historical audit files below still mention `AdminPanel` because they are baseline
+evidence from before the route-owner rollout. Current source-of-truth checks are:
+
+- `rg "component: 'AdminPanel'" frontend/src/routing/routeRegistry.js` returns no matches.
+- `rg "AdminPanel\.jsx|pages/AdminPanel" frontend/src` returns no active source references.
+- `npm.cmd run test:run -- src/routing/__tests__/routeContract.test.js src/routing/__tests__/routeOwnershipEnforcement.test.js src/__tests__/notificationGuardrails.test.js` passes.
+
 ## Merged Fix Slices
 
 | PR | Status | Scope | Result |
@@ -35,6 +49,13 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1552 | merged | users direct route | Routed `/admin/users` directly to `UnifiedUserManagement` while preserving `/admin/advanced-users` as the advanced/legacy user-management surface. |
 | #1553 | merged | all-free direct route | Routed `/admin/all-free` directly to `AllFreeApproval` and added standalone management route contract coverage. |
 | #1555 | merged | security settings direct route | Routed `/admin/security` directly to `UnifiedSettings` and made `UnifiedSettings` derive contextual sections from canonical `/admin/<section>` paths. |
+| #1563 | merged | dashboard direct route | Routed `/admin` directly to `AdminDashboard`. |
+| #1564 | merged | finance direct route | Routed `/admin/finance` directly to `UnifiedFinance`. |
+| #1566 | merged | doctors direct route | Routed `/admin/doctors` directly to `AdminDoctors`. |
+| #1568 | merged | patients direct route | Routed `/admin/patients` directly to `AdminPatients`. |
+| #1569 | merged | appointments direct route | Routed `/admin/appointments` directly to `AdminAppointments`. |
+| #1570 | merged | legacy registration cleanup | Removed the unused `AdminPanel` lazy registration from `App.jsx` and added a no-legacy-admin-route invariant. |
+| #1571 | merged | legacy file cleanup | Deleted the unused `AdminPanel.jsx` file and stale tests/audit references that tried to read it. |
 
 ## Current Verified Status
 
@@ -82,18 +103,10 @@ original audit as baseline evidence and records the small PRs merged afterward.
   `/admin/webhooks`, `/admin/graphql-explorer`, `/admin/reports`,
   `/admin/users`, and `/admin/all-free` are now direct route owners instead of
   broad `AdminPanel.jsx` switch branches.
-- Remaining `AdminPanel`-owned routes are:
-  - `/admin` dashboard
-  - `/admin/doctors`
-  - `/admin/services`
-  - `/admin/patients`
-  - `/admin/appointments`
-  - `/admin/finance`
-- These remaining routes are extraction-bound, not simple direct switches:
-  dashboard, doctors, patients, appointments, and finance depend on internal
-  `AdminPanel.jsx` render functions/state; services needs a dedicated
-  `AdminServices` wrapper to preserve both Service Catalog and Queue Profiles
-  tabs before it can be routed directly.
+- No `AdminPanel`-owned routes remain in `routeRegistry.js`.
+- The old `AdminPanel.jsx` implementation file has been deleted. Future admin
+  route work should start from the direct route owner component, not from the
+  deleted broad switch.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -134,41 +147,33 @@ original audit as baseline evidence and records the small PRs merged afterward.
   follow `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
 - Telegram route consolidation remains optional and must follow
   `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
-- `AdminPanel.jsx` still owns six extraction-bound routes: dashboard, doctors,
-  services, patients, appointments, and finance. These should not be converted
-  by pointing routes to existing partial components unless route-specific
-  behavior is preserved.
+- Route ownership cleanup is complete. Remaining admin work is now route-family
+  QA, grouping polish, and browser-visible workflow verification, not broad
+  `AdminPanel.jsx` extraction.
 - Remaining heading-semantics work is now primarily browser/visual QA, not route
   chrome contract coverage.
 
 ## Recommended Next PR Slices
 
-1. `refactor(admin): extract services route wrapper`
-   - Create a dedicated `AdminServices` wrapper from the existing services tab
-     UI.
-   - Preserve Service Catalog and Queue Profiles tabs, `servicesTab` query
-     behavior, localStorage fallback, and dark/light theme handling.
-   - Then route `/admin/services` directly to `AdminServices`.
-2. `refactor(admin): extract one data-heavy AdminPanel route family`
-   - Choose exactly one of dashboard, doctors, patients, appointments, or
-     finance.
-   - Extract state/data dependencies first; do not point a route to a partial
-     component that drops actions, filters, modals, or summaries.
-3. `test(admin): add browser-visible heading smoke for admin route families`
+1. `test(admin): add browser-visible heading smoke for admin route families`
    - Route chrome headings are now covered for operations, integrations,
      management, and contextual admin routes.
    - Continue with browser-visible headings only when a route family is selected.
-4. `docs(admin): plan optional notification or Telegram route exposure`
+2. `docs(admin): plan optional notification or Telegram route exposure`
    - Only if a real user workflow needs direct FCM/registrar/Telegram subroutes.
    - No runtime exposure without browser smoke.
+3. `test(admin): add per-route action smoke for data-heavy admin screens`
+   - Cover doctors, patients, appointments, services, and finance one route
+     family at a time.
+   - Keep API/RBAC behavior unchanged unless a route-specific finding proves a
+     backend contract issue.
 
 ## Stop Conditions
 
 - Do not merge user-management routes without naming the canonical owner and preserving advanced workflows.
 - Do not expose notification subroutes without channel ownership and role/browser smoke.
 - Do not move Telegram token/security work between operational and settings surfaces without a Telegram-specific contract review.
-- Do not broaden an AdminPanel fix into a general redesign.
-- Do not route `/admin/services` directly to `ServiceCatalog` alone; that would
-  drop the Queue Profiles tab that currently lives under the services route.
-- Do not route `/admin/finance` directly to `UnifiedFinance` until the finance
-  overview renderer is owned by `UnifiedFinance` or an equivalent wrapper.
+- Do not reintroduce `AdminPanel.jsx` as a broad route switch.
+- Do not broaden a route-family fix into a general admin redesign.
+- Do not collapse direct route owner components back into a generic admin
+  surface.
