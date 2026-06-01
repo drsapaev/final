@@ -6,6 +6,7 @@ import pytest
 from app.models.audit import AuditLog
 from app.models.clinic import Schedule
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.services.telegram_staff_action_adapter_service import (
@@ -38,6 +39,22 @@ def _linked_queue_entry(db_session, *, visit_id: int, test_doctor, test_patient)
     return entry
 
 
+def _other_patient_queue_entry(db_session, *, visit_id: int, test_doctor):
+    other_patient = Patient(
+        first_name="Other",
+        last_name="Queue",
+        phone="+998901239998",
+    )
+    db_session.add(other_patient)
+    db_session.flush()
+    return _linked_queue_entry(
+        db_session,
+        visit_id=visit_id,
+        test_doctor=test_doctor,
+        test_patient=other_patient,
+    )
+
+
 def _audit_actions(db_session) -> list[str]:
     return [
         row.action
@@ -55,6 +72,11 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
         test_doctor=test_doctor,
         test_patient=test_patient,
     )
+    wrong_owner_entry = _other_patient_queue_entry(
+        db_session,
+        visit_id=test_visit.id,
+        test_doctor=test_doctor,
+    )
     db_session.flush()
 
     result = TelegramStaffActionAdapterService(db_session).staff_cancel_visit(
@@ -68,6 +90,7 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
     assert result["action"] == "staff_cancel_visit"
     assert test_visit.status == "cancelled"
     assert entry.status == "cancelled"
+    assert wrong_owner_entry.status == "waiting"
     assert result["queue"]["queue_time_preserved"] is True
     assert _audit_actions(db_session) == [
         "staff_action_confirmed",
@@ -97,6 +120,11 @@ def test_staff_move_visit_adapter_updates_date_and_preserves_queue_time(
         test_doctor=test_doctor,
         test_patient=test_patient,
     )
+    wrong_owner_entry = _other_patient_queue_entry(
+        db_session,
+        visit_id=test_visit.id,
+        test_doctor=test_doctor,
+    )
     original_queue_time = entry.queue_time
     db_session.flush()
 
@@ -112,6 +140,7 @@ def test_staff_move_visit_adapter_updates_date_and_preserves_queue_time(
     assert result["success"] is True
     assert test_visit.visit_date == new_date
     assert entry.status == "rescheduled"
+    assert wrong_owner_entry.status == "waiting"
     assert entry.queue_time == original_queue_time
     assert result["queue"]["queue_time_preserved"] is True
     assert _audit_actions(db_session) == [
