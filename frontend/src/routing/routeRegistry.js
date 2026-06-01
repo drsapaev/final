@@ -945,7 +945,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Расширенные пользователи', icon: 'users', section: 'Система', order: 110, sidebar: true }),
     title: 'Admin Advanced Users',
     owner: 'admin.users',
-    component: 'UserManagement',
+    component: 'AdvancedUserManagement',
     legacyRedirectFrom: ['/advanced-users'],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-advanced-users', pageTitle: 'Admin Advanced Users' }),
   },

@@ -220,7 +220,7 @@ describe('route contract invariants', () => {
     expect(advancedUsersRoute.path).toBe('/admin/advanced-users');
     expect(advancedUsersRoute.owner).toBe('admin.users');
     expect(advancedUsersRoute.entry).toBe('direct');
-    expect(advancedUsersRoute.component).toBe('UserManagement');
+    expect(advancedUsersRoute.component).toBe('AdvancedUserManagement');
     expect(advancedUsersRoute.legacyRedirectFrom).toContain('/advanced-users');
     expect(advancedUsersRoute.layout.activeSidebarItem).toBe('admin-advanced-users');
     expect(isRouteAccessibleToProfile(advancedUsersRoute, adminProfile)).toBe(true);
