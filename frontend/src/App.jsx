@@ -66,6 +66,7 @@ const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPa
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
+const AdvancedUserManagement = lazy(() => import('./components/admin/AdvancedUserManagement.jsx'));
 const UserManagement = lazy(() => import('./components/admin/UserManagement.jsx'));
 const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo.jsx'));
 
@@ -85,6 +86,7 @@ const ROUTE_COMPONENTS = {
   Audit,
   TelegramManager,
   EmailSMSManager,
+  AdvancedUserManagement,
   UserManagement,
   FileManager,
   UserSelect,
