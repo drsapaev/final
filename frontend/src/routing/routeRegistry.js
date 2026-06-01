@@ -537,7 +537,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Пользователи', icon: 'users', section: 'Управление', order: 10, sidebar: true }),
     title: 'Admin Users',
     owner: 'admin.users',
-    component: 'AdminPanel',
+    component: 'UnifiedUserManagement',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-users', pageTitle: 'Admin Users' }),
   },
