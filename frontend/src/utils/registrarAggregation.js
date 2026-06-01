@@ -40,13 +40,59 @@ const pickCanonicalVisitId = (appointment) => appointment?.visit_id ?? appointme
 
 const pickCanonicalAppointmentId = (appointment) => appointment?.appointment_id ?? null;
 
+const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
+
+const pickQueueNumberEntryId = (queueNumber) => {
+  if (!queueNumber || typeof queueNumber !== 'object') return null;
+
+  const explicitQueueEntryId = queueNumber.original_queue_id ??
+    queueNumber.queue_entry_id ??
+    queueNumber.doctor_queue_entry_id ??
+    null;
+  if (hasQueueIdentityValue(explicitQueueEntryId)) {
+    return explicitQueueEntryId;
+  }
+
+  if (hasQueueIdentityValue(queueNumber.queue_id)) {
+    return null;
+  }
+
+  return hasQueueIdentityValue(queueNumber.id) ? queueNumber.id : null;
+};
+
+const pickCanonicalQueueEntryId = (appointment) => {
+  const explicitQueueEntryId = appointment?.queue_entry_id ??
+    appointment?.original_queue_id ??
+    appointment?.doctor_queue_entry_id ??
+    null;
+  if (hasQueueIdentityValue(explicitQueueEntryId)) {
+    return explicitQueueEntryId;
+  }
+
+  return pickQueueNumberEntryId(appointment?.queue_numbers?.[0]);
+};
+
+const pickOnlineQueueRecordId = (appointment) => {
+  const queueEntryId = pickCanonicalQueueEntryId(appointment);
+  if (hasQueueIdentityValue(queueEntryId)) {
+    return queueEntryId;
+  }
+  if (
+    hasQueueIdentityValue(appointment?.queue_id) ||
+    hasQueueIdentityValue(appointment?.queue_numbers?.[0]?.queue_id)
+  ) {
+    return null;
+  }
+  return appointment?.id;
+};
+
 const buildRecordRef = (appointment) => {
   const recordKind = normalizeRecordKind(appointment);
   const recordId = appointment?.canonical_record_id
     ?? (recordKind === 'visit' ? appointment?.visit_id : null)
-    ?? (recordKind === 'online_queue' ? appointment?.queue_entry_id : null)
+    ?? (recordKind === 'online_queue' ? pickOnlineQueueRecordId(appointment) : null)
     ?? (recordKind === 'appointment' ? appointment?.appointment_id : null)
-    ?? appointment?.id;
+    ?? (recordKind === 'online_queue' ? null : appointment?.id);
 
   if (!['visit', 'online_queue', 'appointment'].includes(recordKind)) return null;
   const numericId = Number(recordId);
@@ -134,7 +180,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     if (!patientGroups[patientKey]) {
       const initialVisitId = pickCanonicalVisitId(appointment);
       const initialAppointmentId = pickCanonicalAppointmentId(appointment);
-      const initialQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
+      const initialQueueEntryId = pickCanonicalQueueEntryId(appointment);
 
       patientGroups[patientKey] = {
         id: appointment.id,
@@ -193,7 +239,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
 
       const nextVisitId = pickCanonicalVisitId(appointment);
       const nextAppointmentId = pickCanonicalAppointmentId(appointment);
-      const nextQueueEntryId = appointment.queue_entry_id || appointment.queue_numbers?.[0]?.id || null;
+      const nextQueueEntryId = pickCanonicalQueueEntryId(appointment);
 
       if (nextVisitId !== null && nextVisitId !== undefined) {
         patientGroups[patientKey].visit_ids.push(nextVisitId);
