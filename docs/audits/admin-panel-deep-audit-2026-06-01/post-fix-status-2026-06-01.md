@@ -47,6 +47,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - Operations and integrations routes have route-contract coverage for
   route-specific chrome headings, so future UI cleanup must keep distinct page
   identities instead of collapsing them into a generic AdminPanel surface.
+- Management and contextual admin routes have route-contract coverage for
+  route-specific chrome headings, including hidden direct settings routes, so
+  future extraction work must preserve distinct page identities.
 - Contextual settings routes deep-link to their intended screens:
   - `/admin/security?section=security`
   - `/admin/ai-settings?section=ai-settings`
@@ -80,17 +83,18 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `AdminPanel.jsx` remains a broad route switch plus implementation container,
   although `/admin/telegram-settings` has been extracted as the first small
   contextual route slice.
-- Some management/contextual routes still have weak heading semantics and should
-  get route-specific heading checks before UI redesign.
+- Remaining heading-semantics work is now primarily browser/visual QA, not route
+  chrome contract coverage.
 
 ## Recommended Next PR Slices
 
 1. `refactor(admin): extract one AdminPanel route family`
    - Only after a specific family is selected.
    - One family per PR.
-2. `test(admin): add route-specific heading semantics for another route family`
-   - Operations/integrations chrome headings are covered.
-   - Continue one route family at a time.
+2. `test(admin): add browser-visible heading smoke for admin route families`
+   - Route chrome headings are now covered for operations, integrations,
+     management, and contextual admin routes.
+   - Continue with browser-visible headings only when a route family is selected.
 3. `docs(admin): plan optional notification or Telegram route exposure`
    - Only if a real user workflow needs direct FCM/registrar/Telegram subroutes.
    - No runtime exposure without browser smoke.

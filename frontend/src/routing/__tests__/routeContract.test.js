@@ -62,6 +62,29 @@ const ADMIN_ROUTE_CHROME_HEADING_CONTRACT = {
   'admin-graphql-explorer': { path: '/admin/graphql-explorer', pageTitle: 'Admin GraphQL Explorer' },
 };
 
+const ADMIN_MANAGEMENT_ROUTE_CHROME_HEADING_CONTRACT = {
+  'admin-users': { path: '/admin/users', pageTitle: 'Admin Users' },
+  'admin-doctors': { path: '/admin/doctors', pageTitle: 'Admin Doctors' },
+  'admin-services': { path: '/admin/services', pageTitle: 'Admin Services' },
+  'admin-queue-cabinet-management': { path: '/admin/queue-cabinet-management', pageTitle: 'Admin Queue Cabinets' },
+  'admin-patients': { path: '/admin/patients', pageTitle: 'Admin Patients' },
+  'admin-appointments': { path: '/admin/appointments', pageTitle: 'Admin Appointments' },
+  'admin-all-free': { path: '/admin/all-free', pageTitle: 'Admin All Free' },
+};
+
+const ADMIN_CONTEXTUAL_ROUTE_CHROME_HEADING_CONTRACT = {
+  'admin-benefit-settings': { path: '/admin/benefit-settings', pageTitle: 'Admin Benefit Settings' },
+  'admin-wizard-settings': { path: '/admin/wizard-settings', pageTitle: 'Admin Wizard Settings' },
+  'admin-payment-providers': { path: '/admin/payment-providers', pageTitle: 'Admin Payment Providers' },
+  'admin-clinic-settings': { path: '/admin/clinic-settings', pageTitle: 'Admin Clinic Settings' },
+  'admin-queue-settings': { path: '/admin/queue-settings', pageTitle: 'Admin Queue Settings' },
+  'admin-ai-settings': { path: '/admin/ai-settings', pageTitle: 'Admin AI Settings' },
+  'admin-telegram-settings': { path: '/admin/telegram-settings', pageTitle: 'Admin Telegram Settings' },
+  'admin-display-settings': { path: '/admin/display-settings', pageTitle: 'Admin Display Settings' },
+  'admin-security': { path: '/admin/security', pageTitle: 'Admin Security' },
+  'admin-user-select': { path: '/admin/user-select', pageTitle: 'Admin User Switcher' },
+};
+
 const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
   'clinical-profile',
   'clinical-security',
@@ -78,6 +101,26 @@ function assertAiSidebarDisclaimer(item) {
 
 function getRouteById(routeId) {
   return ROUTE_REGISTRY.find((route) => route.id === routeId);
+}
+
+function assertRouteSpecificChromeHeadings(routeHeadingContract) {
+  const adminProfile = { role: 'Admin' };
+
+  Object.entries(routeHeadingContract).forEach(([routeId, expected]) => {
+    const route = getRouteById(routeId);
+    const chrome = getRouteChromeState(expected.path, '', adminProfile);
+
+    expect(route).toBeTruthy();
+    expect(route.layout.pageTitle).toBe(expected.pageTitle);
+    expect(route.title).toBeTruthy();
+    expect(chrome.pageTitle).toBe(expected.pageTitle);
+    expect(chrome.pageTitle).not.toBe('AdminPanel');
+    expect(chrome.pageTitle).not.toBe('Admin');
+
+    if (route.layout.activeSidebarItem) {
+      expect(chrome.activeSidebarItem).toBe(route.layout.activeSidebarItem);
+    }
+  });
 }
 
 describe('route contract invariants', () => {
@@ -212,20 +255,15 @@ describe('route contract invariants', () => {
   });
 
   it('keeps operations and integrations routes on route-specific chrome headings', () => {
-    const adminProfile = { role: 'Admin' };
+    assertRouteSpecificChromeHeadings(ADMIN_ROUTE_CHROME_HEADING_CONTRACT);
+  });
 
-    Object.entries(ADMIN_ROUTE_CHROME_HEADING_CONTRACT).forEach(([routeId, expected]) => {
-      const route = getRouteById(routeId);
-      const chrome = getRouteChromeState(expected.path, '', adminProfile);
+  it('keeps management routes on route-specific chrome headings', () => {
+    assertRouteSpecificChromeHeadings(ADMIN_MANAGEMENT_ROUTE_CHROME_HEADING_CONTRACT);
+  });
 
-      expect(route).toBeTruthy();
-      expect(route.layout.pageTitle).toBe(expected.pageTitle);
-      expect(route.title).toBeTruthy();
-      expect(chrome.pageTitle).toBe(expected.pageTitle);
-      expect(chrome.activeSidebarItem).toBe(routeId);
-      expect(chrome.pageTitle).not.toBe('AdminPanel');
-      expect(chrome.pageTitle).not.toBe('Admin');
-    });
+  it('keeps contextual admin routes on route-specific chrome headings', () => {
+    assertRouteSpecificChromeHeadings(ADMIN_CONTEXTUAL_ROUTE_CHROME_HEADING_CONTRACT);
   });
 
   it('keeps admin user routes split between canonical and advanced ownership', () => {
