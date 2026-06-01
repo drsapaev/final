@@ -1186,6 +1186,14 @@ async def create_payment(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Визит не найден"
                 )
+            if (
+                payment_data.patient_id is not None
+                and visit.patient_id != payment_data.patient_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cashier payment patient_id does not match visit ownership",
+                )
             patient_id = visit.patient_id
             
             # === ВАЛИДАЦИЯ ПЕРЕПЛАТЫ ===

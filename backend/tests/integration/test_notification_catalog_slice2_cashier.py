@@ -196,6 +196,42 @@ def test_cashier_create_payment_rejects_mismatched_visit_and_appointment(
     ) == []
 
 
+def test_cashier_create_payment_rejects_mismatched_patient_and_visit(
+    client,
+    db_session,
+    auth_headers,
+):
+    patient, _own_visit = _create_patient_visit(db_session, suffix="0104")
+    other_patient, other_visit = _create_patient_visit(db_session, suffix="0105")
+
+    response = client.post(
+        "/api/v1/cashier/payments",
+        json={
+            "patient_id": patient.id,
+            "visit_id": other_visit.id,
+            "amount": 45000,
+            "method": "cash",
+            "note": "mixed patient visit cashier payment",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Cashier payment patient_id does not match visit ownership"
+    )
+    assert (
+        db_session.query(Payment)
+        .filter(Payment.visit_id == other_visit.id)
+        .count()
+        == 0
+    )
+    assert _payment_event_deliveries(
+        db_session,
+        recipient_id=other_patient.user_id,
+    ) == []
+
+
 def test_cashier_grouped_payment_allocates_by_backend_remaining_debt(
     client,
     db_session,
