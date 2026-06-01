@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
+from app.models.clinic import Doctor
 from app.models.user import User
 from app.services.queue_position_api_service import (
     QueuePositionApiDomainError,
@@ -29,6 +30,43 @@ from app.services.queue_position_notifications import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+QUEUE_POSITION_DOCTOR_NOTIFY_ROLES = {
+    "doctor",
+    "cardio",
+    "cardiology",
+    "cardiologist",
+    "derma",
+    "dermatologist",
+    "dentist",
+}
+
+
+def _role_name(user: User) -> str:
+    role = getattr(user, "role", "")
+    return str(getattr(role, "value", role) or "")
+
+
+def _ensure_doctor_can_notify_entry(
+    db: Session,
+    *,
+    entry: Any,
+    current_user: User,
+) -> None:
+    if _role_name(current_user).strip().lower() not in QUEUE_POSITION_DOCTOR_NOTIFY_ROLES:
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    queue = getattr(entry, "queue", None)
+    if not doctor or getattr(queue, "specialist_id", None) != doctor.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
 
 
 # ========================= СХЕМЫ =========================
@@ -138,6 +176,7 @@ async def send_position_notification(
         entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
 
     service = get_queue_position_service(db)
     people_ahead = service._count_people_ahead(entry)
@@ -168,6 +207,7 @@ async def send_call_notification(
         entry = QueuePositionApiService(db).get_position_entry(entry_id=request.entry_id)
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
 
     result = await get_queue_position_service(db).notify_patient_called(
         entry=entry,
@@ -223,6 +263,7 @@ async def send_diagnostics_return_notification(
         entry = QueuePositionApiService(db).get_diagnostics_entry_or_error(entry_id=entry_id)
     except QueuePositionApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    _ensure_doctor_can_notify_entry(db, entry=entry, current_user=current_user)
 
     # Doctor identity lives on the related User profile in the current schema.
     specialist_name = "врач"
