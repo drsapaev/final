@@ -42,6 +42,13 @@ interchangeable without checking the intended owner first.
 
 ## Current Duplicate Decisions
 
+### Overview navigation
+
+The Admin sidebar `Overview` section is intentionally documented before any
+runtime route move because it currently mixes summary, operations, integration,
+and developer tooling. The staged grouping policy lives in
+`docs/admin/ADMIN_OVERVIEW_NAVIGATION_GROUPING_PLAN.md`.
+
 ### Users
 
 Keep both routes for now:
