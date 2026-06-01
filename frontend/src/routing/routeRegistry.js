@@ -775,7 +775,7 @@ export const ROUTE_REGISTRY = [
     nav: false,
     title: 'Admin Telegram Settings',
     owner: 'admin.telegram',
-    component: 'AdminPanel',
+    component: 'TelegramSettings',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Telegram Settings' }),
   },

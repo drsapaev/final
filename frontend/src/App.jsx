@@ -63,6 +63,7 @@ const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
 const ButtonShowcase = lazy(() => import('./components/buttons/ButtonShowcase.jsx'));
 const TelegramManager = lazy(() => import('./components/TelegramManager.jsx'));
 const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPatientShell.jsx'));
+const TelegramSettings = lazy(() => import('./components/admin/TelegramSettings.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
@@ -113,6 +114,7 @@ const ROUTE_COMPONENTS = {
   CSSTestPage,
   ButtonShowcase,
   TelegramMiniAppPatientShell,
+  TelegramSettings,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,

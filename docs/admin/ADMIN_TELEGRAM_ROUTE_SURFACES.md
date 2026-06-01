@@ -22,7 +22,7 @@ Keep the Telegram admin routes separate:
 | Surface | Route | Component path | Owner | Entry | Owns |
 | --- | --- | --- | --- | --- | --- |
 | Operational integration | `/admin/integrations/telegram` | `frontend/src/components/TelegramManager.jsx` | `admin.telegram` | sidebar/menu | Bot status, webhook visibility/actions, templates, Telegram users, test messages, operational troubleshooting. |
-| Settings/configuration | `/admin/telegram-settings` | `frontend/src/pages/AdminPanel.jsx` -> `TelegramSettings` | `admin.telegram` | contextual/direct | Token/config form, webhook-info/settings stats, setup instructions, settings save/test actions. |
+| Settings/configuration | `/admin/telegram-settings` | `frontend/src/components/admin/TelegramSettings.jsx` | `admin.telegram` | contextual/direct | Token/config form, webhook-info/settings stats, setup instructions, settings save/test actions. |
 | Unified admin helper | no public route | `frontend/src/components/admin/UnifiedTelegramManagement.jsx` | internal helper | unrouted | Internal tab helper for bot/settings content. It is not the canonical sidebar route. |
 | Patient Mini App | `/telegram/mini-app/patient` | `frontend/src/pages/TelegramMiniAppPatientShell.jsx` | `telegram.mini_app` | public mini-app | Telegram WebApp patient UX. It must not inherit admin route assumptions. |
 

@@ -136,7 +136,6 @@ import AllFreeApproval from '../components/admin/AllFreeApproval';
 
 import AnalyticsInsights from '../components/ai/AnalyticsInsights';
 import UnifiedTelegramManagement from '../components/admin/UnifiedTelegramManagement';
-import TelegramSettings from '../components/admin/TelegramSettings';
 import UnifiedSettings from '../components/admin/UnifiedSettings';
 import UnifiedFinance from '../components/admin/UnifiedFinance';
 import UnifiedNotifications from '../components/admin/UnifiedNotifications';
@@ -184,8 +183,7 @@ const ADMIN_ROUTE_SECTION_PARAMS = {
   'queue-settings': 'queue-settings',
   'display-settings': 'display-settings',
   'ai-settings': 'ai-settings',
-  security: 'security',
-  'telegram-settings': 'settings'
+  security: 'security'
 };
 
 const getAppointmentPatientDisplayName = (appointment) => {
@@ -2607,8 +2605,6 @@ const AdminPanel = () => {
         return <UnifiedAITools />;
       case 'telegram-bot':
         return <UnifiedTelegramManagement />;
-      case 'telegram-settings':
-        return <TelegramSettings />;
       case 'fcm-notifications':
       case 'registrar-notifications':
         return <UnifiedNotifications />;
