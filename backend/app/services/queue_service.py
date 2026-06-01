@@ -61,9 +61,64 @@ class QueueBusinessService:
     DEFAULT_MAX_SLOTS = 15
     QUEUE_QR_TOKEN_MIN_TTL_MINUTES = 5
     QUEUE_QR_TOKEN_MAX_TTL_MINUTES = 15
+    QR_HIDDEN_PROFILE_KEYS = {"ecg", "general"}
+    QR_SPECIALTY_ALIASES = {
+        "cardio": "cardiology",
+        "derma": "dermatology",
+        "dentist": "stomatology",
+        "dentistry": "stomatology",
+        "laboratory": "lab",
+    }
 
     def __init__(self) -> None:
         self._cached_settings: dict[str, Any] | None = None
+
+    @classmethod
+    def _normalize_qr_specialty_key(cls, value: Any) -> str:
+        normalized = str(value or "").strip().lower()
+        return cls.QR_SPECIALTY_ALIASES.get(normalized, normalized)
+
+    @classmethod
+    def _is_qr_visible_profile(cls, profile: Any) -> bool:
+        key = cls._normalize_qr_specialty_key(getattr(profile, "key", None))
+        return (
+            bool(key)
+            and key not in cls.QR_HIDDEN_PROFILE_KEYS
+            and bool(getattr(profile, "is_active", False))
+            and bool(getattr(profile, "show_on_qr_page", False))
+        )
+
+    @classmethod
+    def _get_qr_visible_profile_for_doctor(cls, db: Session, doctor: Doctor):
+        from app.models.queue_profile import QueueProfile
+
+        doctor_specialty = cls._normalize_qr_specialty_key(
+            getattr(doctor, "specialty", None)
+        )
+        if not doctor_specialty:
+            return None
+
+        profiles = (
+            db.query(QueueProfile)
+            .filter(
+                QueueProfile.is_active == True,
+                QueueProfile.show_on_qr_page == True,
+            )
+            .all()
+        )
+        for profile in profiles:
+            if not cls._is_qr_visible_profile(profile):
+                continue
+            profile_keys = {
+                cls._normalize_qr_specialty_key(profile.key),
+                *(
+                    cls._normalize_qr_specialty_key(tag)
+                    for tag in (profile.queue_tags or [])
+                ),
+            }
+            if doctor_specialty in profile_keys:
+                return profile
+        return None
 
     @staticmethod
     def _increment_token_usage(queue_token: QueueToken) -> None:
@@ -740,10 +795,20 @@ class QueueBusinessService:
             # Сначала проверяем, не является ли это QueueProfile.id
             from app.models.queue_profile import QueueProfile
 
-            queue_profile = db.query(QueueProfile).filter(
+            queue_profile_by_id = db.query(QueueProfile).filter(
                 QueueProfile.id == specialist_id_override,
-                QueueProfile.is_active == True
             ).first()
+            if queue_profile_by_id and not self._is_qr_visible_profile(
+                queue_profile_by_id
+            ):
+                raise QueueValidationError("Специалист недоступен для QR-записи")
+
+            queue_profile = (
+                queue_profile_by_id
+                if queue_profile_by_id
+                and self._is_qr_visible_profile(queue_profile_by_id)
+                else None
+            )
 
             if queue_profile:
                 # ⭐ Это QueueProfile.id - ищем врача по specialty, соответствующему профилю
@@ -801,6 +866,10 @@ class QueueBusinessService:
                 )
                 if not doctor:
                     raise QueueValidationError("Специалист недоступен для записи")
+
+                qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
+                if not qr_profile:
+                    raise QueueValidationError("Специалист недоступен для QR-записи")
 
                 queue_tag = doctor.specialty
                 defaults = {

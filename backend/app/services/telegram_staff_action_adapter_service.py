@@ -24,7 +24,10 @@ class TelegramStaffActionAdapterError(ValueError):
 
 def _reference_hash(kind: str, value: Any) -> str:
     digest = hashlib.sha256(f"{kind}:{value}".encode("utf-8")).hexdigest()
-    return f"{kind}:{digest[:24]}"
+    alphabetic_digest = digest[:24].translate(
+        str.maketrans("0123456789abcdef", "abcdefghijklmnop")
+    )
+    return f"{kind}:{alphabetic_digest}"
 
 
 class TelegramStaffActionAdapterService:

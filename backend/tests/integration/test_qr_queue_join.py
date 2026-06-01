@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.queue_profile import QueueProfile
 from app.services.queue_service import QueueBusinessService
@@ -197,3 +198,75 @@ def test_clinic_wide_qr_exposes_backend_selectable_specialists(
         "message",
     ):
         assert start_queue_info[key] == info_payload[key]
+
+
+@pytest.mark.queue
+def test_clinic_wide_qr_rejects_non_selectable_specialist_ids(
+    client, db_session, test_doctor, monkeypatch
+):
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
+
+    test_doctor.specialty = "cardio"
+    hidden_doctor = Doctor(id=9001, specialty="ecg", active=True)
+    visible_profile = QueueProfile(
+        key="cardiology",
+        title="Cardiology",
+        title_ru="Cardiology",
+        queue_tags=["cardio", "cardiology", "cardiology_common"],
+        display_order=1,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    hidden_profile = QueueProfile(
+        key="ecg",
+        title="ECG",
+        title_ru="ECG",
+        queue_tags=["ecg", "echokg"],
+        display_order=2,
+        is_active=True,
+        show_on_qr_page=False,
+    )
+    db_session.add_all([hidden_doctor, visible_profile, hidden_profile])
+
+    token_value = "test-clinic-wide-hidden-specialist-token"
+    local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
+    token = QueueToken(
+        token=token_value,
+        day=date.today(),
+        specialist_id=None,
+        department="clinic",
+        is_clinic_wide=True,
+        expires_at=local_now + timedelta(hours=2),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    start_resp = client.post("/api/v1/queue/join/start", json={"token": token_value})
+    assert start_resp.status_code == 200
+    hidden_doctor_resp = client.post(
+        "/api/v1/queue/join/complete",
+        json={
+            "session_token": start_resp.json()["session_token"],
+            "patient_name": "Hidden Doctor Patient",
+            "phone": "+998909991111",
+            "specialist_ids": [hidden_doctor.id],
+        },
+    )
+    assert hidden_doctor_resp.status_code == 400
+
+    start_resp = client.post("/api/v1/queue/join/start", json={"token": token_value})
+    assert start_resp.status_code == 200
+    hidden_profile_resp = client.post(
+        "/api/v1/queue/join/complete",
+        json={
+            "session_token": start_resp.json()["session_token"],
+            "patient_name": "Hidden Profile Patient",
+            "phone": "+998909992222",
+            "specialist_ids": [hidden_profile.id],
+        },
+    )
+    assert hidden_profile_resp.status_code == 400
+
+    entries = db_session.query(OnlineQueueEntry).all()
+    assert entries == []
