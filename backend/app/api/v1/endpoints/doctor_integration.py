@@ -146,6 +146,41 @@ def _ensure_visit_doctor_access(visit: Visit, current_user: User) -> None:
     )
 
 
+def _ensure_legacy_complete_doctor_access(
+    db: Session,
+    *,
+    record_doctor_id: int | None,
+    current_user: User,
+) -> None:
+    if current_user.role == "Admin":
+        return
+
+    if record_doctor_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No access to complete this record",
+        )
+
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == record_doctor_id).first()
+    if assigned_doctor:
+        if assigned_doctor.user_id == current_user.id:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No access to complete this record",
+        )
+
+    # Legacy writers sometimes stored User.id in doctor_id. Preserve that only
+    # when the value does not point at another real Doctor row.
+    if record_doctor_id == current_user.id:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No access to complete this record",
+    )
+
+
 def _visit_filter_doctor_id(db: Session, current_user: User) -> int:
     doctor = (
         db.query(Doctor)
@@ -774,6 +809,11 @@ def complete_patient_visit(
                 )
                 visit = None
         if visit:
+            _ensure_legacy_complete_doctor_access(
+                db,
+                record_doctor_id=visit.doctor_id,
+                current_user=current_user,
+            )
             # Обновляем статус визита
             visit.status = "completed"
             visit.updated_at = datetime.now(timezone.utc)
@@ -813,6 +853,11 @@ def complete_patient_visit(
                 )
                 appointment = None
         if appointment:
+            _ensure_legacy_complete_doctor_access(
+                db,
+                record_doctor_id=appointment.doctor_id,
+                current_user=current_user,
+            )
             # Обновляем статус appointment
             appointment.status = "completed"
 

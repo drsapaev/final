@@ -581,8 +581,17 @@ class TestDoctorGeneralQueue:
         db_session,
         test_doctor_user,
         test_patient,
-        test_doctor,
     ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="101",
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
         other_patient = Patient(
             first_name="Unrelated",
             last_name="Visit",
@@ -608,7 +617,7 @@ class TestDoctorGeneralQueue:
         appointment = Appointment(
             id=collision_id,
             patient_id=test_patient.id,
-            doctor_id=test_doctor.id,
+            doctor_id=doctor.id,
             appointment_date=date.today(),
             appointment_time="12:30",
             status="paid",
@@ -930,6 +939,159 @@ class TestDoctorGeneralQueue:
         db_session.refresh(visit)
         assert visit.status == "completed"
         assert visit.discount_mode == "repeat"
+
+    def test_complete_visit_record_rejects_other_doctor_visit(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+    ):
+        actor_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="301",
+        )
+        other_user = User(
+            username="other_visit_doctor",
+            email="other.visit.doctor@test.com",
+            full_name="Other Visit Doctor",
+            hashed_password=get_password_hash("other123"),
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Visit",
+            middle_name="Doctor",
+            phone="+998901333333",
+            birth_date=date(1984, 7, 7),
+            address="Other doctor visit address",
+        )
+        db_session.add_all([actor_doctor, other_user, other_patient])
+        db_session.commit()
+        db_session.refresh(actor_doctor)
+        db_session.refresh(other_user)
+        db_session.refresh(other_patient)
+
+        other_doctor = Doctor(
+            user_id=other_user.id,
+            specialty="general",
+            active=True,
+            cabinet="303",
+        )
+        db_session.add(other_doctor)
+        db_session.commit()
+        db_session.refresh(other_doctor)
+
+        visit = Visit(
+            patient_id=other_patient.id,
+            doctor_id=other_doctor.id,
+            visit_date=date.today(),
+            status="open",
+            discount_mode="none",
+        )
+        db_session.add(visit)
+        db_session.commit()
+        db_session.refresh(visit)
+
+        assert actor_doctor.id != other_doctor.id
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{visit.id}/complete",
+            json={"patient_id": other_patient.id, "notes": "wrong doctor"},
+            headers=headers,
+        )
+
+        assert response.status_code == 403
+        db_session.refresh(visit)
+        assert visit.status == "open"
+
+    def test_complete_appointment_record_rejects_other_doctor_appointment(
+        self,
+        client,
+        db_session,
+        test_doctor_user,
+    ):
+        actor_doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+            cabinet="302",
+        )
+        other_user = User(
+            username="other_appointment_doctor",
+            email="other.appointment.doctor@test.com",
+            full_name="Other Appointment Doctor",
+            hashed_password=get_password_hash("other123"),
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        other_patient = Patient(
+            first_name="Other",
+            last_name="Appointment",
+            middle_name="Doctor",
+            phone="+998901444444",
+            birth_date=date(1986, 8, 8),
+            address="Other doctor appointment address",
+        )
+        db_session.add_all([actor_doctor, other_user, other_patient])
+        db_session.commit()
+        db_session.refresh(actor_doctor)
+        db_session.refresh(other_user)
+        db_session.refresh(other_patient)
+
+        other_doctor = Doctor(
+            user_id=other_user.id,
+            specialty="general",
+            active=True,
+            cabinet="304",
+        )
+        db_session.add(other_doctor)
+        db_session.commit()
+        db_session.refresh(other_doctor)
+
+        appointment = Appointment(
+            patient_id=other_patient.id,
+            doctor_id=other_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="14:30",
+            status="paid",
+            visit_type="paid",
+            payment_type="cash",
+            services=["consultation"],
+        )
+        db_session.add(appointment)
+        db_session.commit()
+        db_session.refresh(appointment)
+
+        assert actor_doctor.id != other_doctor.id
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": test_doctor_user.username, "password": "doctor123"},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{appointment.id}/complete",
+            json={"patient_id": other_patient.id, "notes": "wrong doctor"},
+            headers=headers,
+        )
+
+        assert response.status_code == 403
+        db_session.refresh(appointment)
+        assert appointment.status == "paid"
 
     def test_doctor_stats_reads_daily_queue_by_doctor_id(
         self,
