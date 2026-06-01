@@ -43,6 +43,9 @@ Examples:
 
 ## Recommended Slices
 
+Canonical owner decisions are now tracked in
+`docs/admin/ADMIN_ROUTE_OWNERSHIP.md`.
+
 1. Route-state adapter slice:
    - Make AdminPanel pass an explicit `section` to aggregators based on canonical route id/path.
    - Add route contract tests for hidden contextual routes.
