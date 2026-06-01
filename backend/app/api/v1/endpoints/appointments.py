@@ -38,6 +38,18 @@ APPOINTMENT_DOCTOR_ROLES = {
 }
 APPOINTMENT_PATIENT_ROLES = {"Patient"}
 APPOINTMENT_PENDING_PAYMENT_ROLES = {"Admin", "Registrar", "Cashier"}
+APPOINTMENT_RESTRICTED_UPDATE_FIELDS = {
+    "payment_amount",
+    "payment_currency",
+    "payment_processed_at",
+    "payment_provider",
+    "payment_transaction_id",
+    "payment_type",
+    "payment_webhook_id",
+    "services",
+    "status",
+    "visit_type",
+}
 
 
 def _appointments_http_error(exc: Exception, operation: str) -> HTTPException:
@@ -196,6 +208,21 @@ def _ensure_pending_payment_access(current_user: User) -> None:
     if getattr(current_user, "is_superuser", False):
         return
     raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_appointment_update_fields_allowed(
+    appointment_in: appointment_schemas.AppointmentUpdate,
+    current_user: User,
+) -> None:
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    update_fields = appointment_in.model_dump(exclude_unset=True).keys()
+    if APPOINTMENT_RESTRICTED_UPDATE_FIELDS.intersection(update_fields):
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
 # Схема для ответа pending-payments
@@ -652,6 +679,7 @@ def update_appointment(
 
     # Проверяем, не занято ли новое время у врача
     _ensure_appointment_record_access(db, appointment, current_user)
+    _ensure_appointment_update_fields_allowed(appointment_in, current_user)
 
     if (
         appointment_in.appointment_date

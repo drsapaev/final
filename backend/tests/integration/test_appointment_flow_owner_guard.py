@@ -293,6 +293,83 @@ def test_patient_cannot_update_other_patient_legacy_appointment(
     assert other_appointment.notes == "original"
 
 
+def test_patient_cannot_mutate_own_legacy_appointment_payment_fields(
+    client,
+    db_session,
+) -> None:
+    own_user, own_patient = _create_patient_user(db_session, label="own_payment")
+    own_appointment = Appointment(
+        patient_id=own_patient.id,
+        appointment_date=date.today(),
+        appointment_time="12:30",
+        status="scheduled",
+        notes="original",
+        payment_amount=None,
+        payment_transaction_id=None,
+        payment_provider=None,
+    )
+    db_session.add(own_appointment)
+    db_session.commit()
+    db_session.refresh(own_appointment)
+
+    response = client.put(
+        f"/api/v1/appointments/{own_appointment.id}",
+        json={
+            "notes": "keep me out",
+            "status": "paid",
+            "payment_amount": 100000,
+            "payment_provider": "cash",
+            "payment_transaction_id": "patient-forged",
+        },
+        headers=_patient_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    db_session.refresh(own_appointment)
+    assert own_appointment.status == "scheduled"
+    assert own_appointment.notes == "original"
+    assert own_appointment.payment_amount is None
+    assert own_appointment.payment_provider is None
+    assert own_appointment.payment_transaction_id is None
+
+
+def test_admin_can_update_legacy_appointment_payment_fields(
+    client,
+    auth_headers,
+    db_session,
+) -> None:
+    patient = _create_patient(db_session, label="admin_payment")
+    appointment = Appointment(
+        patient_id=patient.id,
+        appointment_date=date.today(),
+        appointment_time="15:00",
+        status="scheduled",
+        payment_amount=None,
+        payment_transaction_id=None,
+    )
+    db_session.add(appointment)
+    db_session.commit()
+    db_session.refresh(appointment)
+
+    response = client.put(
+        f"/api/v1/appointments/{appointment.id}",
+        json={
+            "status": "paid",
+            "payment_amount": 100000,
+            "payment_provider": "cash",
+            "payment_transaction_id": "admin-marked",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(appointment)
+    assert appointment.status == "paid"
+    assert appointment.payment_amount == 100000
+    assert appointment.payment_provider == "cash"
+    assert appointment.payment_transaction_id == "admin-marked"
+
+
 def test_patient_cannot_delete_other_patient_legacy_appointment(
     client,
     db_session,
