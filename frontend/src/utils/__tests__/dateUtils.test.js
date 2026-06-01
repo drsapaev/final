@@ -43,5 +43,29 @@ describe('parseRegistrarTimestamp', () => {
     expect(display.showChanged).toBe(true);
     expect(display.changedTime).toBe('09:45:00');
   });
-});
 
+  it('honors backend display_time_kind when queue_time is only a fallback value', () => {
+    const display = getRegistrarTimestampDisplay({
+      display_time_kind: 'created_at',
+      queue_time: '2026-06-02T00:28:48+05:00',
+      created_at: '2026-06-02T00:28:48+05:00',
+    });
+
+    expect(display.primaryKind).toBe('created_at');
+    expect(display.primaryLabel).toBe('Создано');
+    expect(display.primaryDate).toBe('02.06.2026');
+    expect(display.primaryTime).toBe('00:28:48');
+  });
+
+  it('does not show changed timestamp for immediate post-create system updates', () => {
+    const display = getRegistrarTimestampDisplay({
+      display_time_kind: 'created_at',
+      created_at: '2026-06-02T00:28:48+05:00',
+      updated_at: '2026-06-02T00:28:54+05:00',
+    });
+
+    expect(display.showChanged).toBe(false);
+    expect(display.changedDate).toBe('');
+    expect(display.changedTime).toBe('');
+  });
+});

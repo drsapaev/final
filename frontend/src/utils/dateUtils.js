@@ -63,17 +63,25 @@ export const formatRegistrarDateTime = (value, locale = 'ru-RU', options = {}) =
     return [date, time].filter(Boolean).join(' ');
 };
 
-const timestampsDiffer = (a, b) => {
+const REGISTRAR_CHANGED_TIMESTAMP_THRESHOLD_MS = 60 * 1000;
+const REGISTRAR_PRIMARY_TIME_KINDS = new Set(['queue_time', 'created_at']);
+
+const timestampsDiffer = (a, b, thresholdMs = REGISTRAR_CHANGED_TIMESTAMP_THRESHOLD_MS) => {
     const first = parseRegistrarTimestamp(a);
     const second = parseRegistrarTimestamp(b);
     if (!first || !second) return false;
-    return Math.abs(first.getTime() - second.getTime()) > 1000;
+    return Math.abs(first.getTime() - second.getTime()) > thresholdMs;
 };
 
 export const getRegistrarTimestampDisplay = (record = {}, locale = 'ru-RU') => {
-    const primaryValue = record.queue_time || record.created_at || null;
+    const requestedPrimaryKind = REGISTRAR_PRIMARY_TIME_KINDS.has(record.display_time_kind)
+        ? record.display_time_kind
+        : null;
+    const primaryKind = requestedPrimaryKind || (record.queue_time ? 'queue_time' : 'created_at');
+    const primaryValue = primaryKind === 'queue_time'
+        ? record.queue_time || record.created_at || null
+        : record.created_at || record.queue_time || null;
     const changedValue = record.last_changed_at || record.updated_at || null;
-    const primaryKind = record.queue_time ? 'queue_time' : 'created_at';
     const showChanged = Boolean(changedValue && primaryValue && timestampsDiffer(primaryValue, changedValue));
 
     return {
