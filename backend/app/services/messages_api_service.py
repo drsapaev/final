@@ -7,6 +7,7 @@ import hashlib
 import logging
 import os
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,11 @@ def _find_chat_upload_file(filename: str) -> Path:
             return resolved_path
 
     raise HTTPException(status_code=404, detail="Файл не найден")
+
+
+def _build_chat_storage_filename(*, user_id: int, original_filename: str) -> str:
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return f"{timestamp}_{user_id}_{uuid.uuid4().hex}_{original_filename}"
 
 
 async def _read_upload_bounded(
@@ -563,7 +569,10 @@ class MessagesApiService:
 
         content = await _read_upload_bounded(file, max_bytes=MAX_CHAT_UPLOAD_BYTES)
         original_filename = os.path.basename(file.filename or "file")
-        safe_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{original_filename}"
+        safe_filename = _build_chat_storage_filename(
+            user_id=current_user.id,
+            original_filename=original_filename,
+        )
         upload_dir = "uploads/chat"
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, safe_filename)
@@ -630,7 +639,6 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -813,18 +821,26 @@ async def download_chat_file(
     filename = _safe_chat_storage_filename(filename)
     file_record = db.query(FileModel).filter(FileModel.filename == filename).first()
     if file_record:
-        message = db.query(Message).filter(Message.file_id == file_record.id).first()
+        candidate_messages = (
+            db.query(Message).filter(Message.file_id == file_record.id).all()
+        )
     else:
-        message = db.query(Message).filter(
-            or_(
-                Message.content.contains(f"/download/{filename}"),
-                Message.content.contains(f"name={filename}"),
-            )
-        ).first()
+        candidate_messages = (
+            db.query(Message)
+            .filter(Message.content.contains(f"/download/{filename}"))
+            .all()
+        )
 
-    if not message or (
-        current_user.id != message.sender_id and current_user.id != message.recipient_id
-    ):
+    message = next(
+        (
+            item
+            for item in candidate_messages
+            if current_user.id == item.sender_id or current_user.id == item.recipient_id
+        ),
+        None,
+    )
+
+    if not message:
         raise HTTPException(status_code=403, detail="Нет доступа к этому файлу")
 
     file_path = _find_chat_upload_file(filename)
