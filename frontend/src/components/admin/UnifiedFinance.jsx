@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import BillingManager from './BillingManager';
 import DynamicPricingManager from './DynamicPricingManager';
 import DiscountBenefitsManager from './DiscountBenefitsManager';
+import AdminFinanceOverview from './AdminFinanceOverview';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Простой компонент вкладок для админки
@@ -85,7 +86,7 @@ const UnifiedFinance = ({ renderFinance }) => {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return renderFinance ? renderFinance() : <div>Finance Overview Content</div>;
+        return renderFinance ? renderFinance() : <AdminFinanceOverview />;
       case 'billing':
         return <BillingManager />;
       case 'pricing':
@@ -93,7 +94,7 @@ const UnifiedFinance = ({ renderFinance }) => {
       case 'discounts':
         return <DiscountBenefitsManager />;
       default:
-        return renderFinance ? renderFinance() : <div>Finance Overview Content</div>;
+        return renderFinance ? renderFinance() : <AdminFinanceOverview />;
     }
   };
 

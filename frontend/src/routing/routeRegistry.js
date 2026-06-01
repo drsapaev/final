@@ -877,7 +877,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Финансы', icon: 'dollarsign.circle', section: 'Система', order: 70, sidebar: true }),
     title: 'Admin Finance',
     owner: 'admin.billing',
-    component: 'AdminPanel',
+    component: 'UnifiedFinance',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-finance', pageTitle: 'Admin Finance' }),
   },

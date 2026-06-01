@@ -394,6 +394,21 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/activation', '', adminProfile).activeSidebarItem).toBe('admin-activation');
   });
 
+  it('keeps admin finance on its direct route owner', () => {
+    const adminProfile = { role: 'Admin' };
+    const financeRoute = getRouteById('admin-finance');
+
+    expect(financeRoute).toBeTruthy();
+    expect(financeRoute.path).toBe('/admin/finance');
+    expect(financeRoute.owner).toBe('admin.billing');
+    expect(financeRoute.entry).toBe('direct');
+    expect(financeRoute.component).toBe('UnifiedFinance');
+    expect(financeRoute.component).not.toBe('AdminPanel');
+    expect(financeRoute.layout.activeSidebarItem).toBe('admin-finance');
+    expect(isRouteAccessibleToProfile(financeRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/finance', '', adminProfile).activeSidebarItem).toBe('admin-finance');
+  });
+
   it('keeps admin clinic management on its direct route owner', () => {
     const adminProfile = { role: 'Admin' };
     const clinicManagementRoute = getRouteById('admin-clinic-management');
