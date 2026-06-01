@@ -65,18 +65,38 @@ const getWizardSourceKind = (record) => normalizeWizardContractValue(
   record?.source_kind ?? record?.source
 );
 
+const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
+
+const resolveExplicitQueueEntryId = (record, { allowLegacyId = true } = {}) => {
+  if (!record || typeof record !== 'object') return null;
+
+  const explicitQueueEntryId = record.original_queue_id ??
+    record.queue_entry_id ??
+    record.doctor_queue_entry_id ??
+    null;
+  if (hasQueueIdentityValue(explicitQueueEntryId)) {
+    return explicitQueueEntryId;
+  }
+
+  if (!allowLegacyId || hasQueueIdentityValue(record.queue_id)) {
+    return null;
+  }
+
+  return hasQueueIdentityValue(record.id) ? record.id : null;
+};
+
 const getFirstQueueNumberId = (record) => {
   if (!Array.isArray(record?.queue_numbers) || record.queue_numbers.length === 0) {
     return null;
   }
-  return record.queue_numbers[0]?.id ?? null;
+  return resolveExplicitQueueEntryId(record.queue_numbers[0]);
 };
 
 const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) => {
   if (!record || recordKind !== 'online_queue' || effectiveSource !== 'online') {
     return null;
   }
-  return record.queue_entry_id ?? getFirstQueueNumberId(record) ?? record.id ?? null;
+  return resolveExplicitQueueEntryId(record) ?? getFirstQueueNumberId(record);
 };
 
 const getRemovedQueueEntryIds = (originalQueueIds, cartItems = []) => {
@@ -1954,10 +1974,7 @@ const AppointmentWizardV2 = ({
             const serviceId = serviceDetail.service_id || serviceDetail.id || null;
             const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
             const serviceName = serviceDetail.service_name || serviceDetail.name || null;
-            const queueId = serviceDetail.original_queue_id ||
-              serviceDetail.queue_entry_id ||
-              serviceDetail.queue_id ||
-              null;
+            const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });
 
             if (serviceId) originalServiceIds.add(serviceId);
             if (queueId) originalQueueIds.add(queueId);
@@ -2058,7 +2075,8 @@ const AppointmentWizardV2 = ({
           initialData.queue_numbers.forEach((q) => {
             if (q && q.service_id) {
               originalServiceIds.add(q.service_id);
-              if (q.id) originalQueueIds.add(q.id); // ✅ Сохраняем ID записи очереди
+              const queueId = resolveExplicitQueueEntryId(q);
+              if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
               // Находим service_code и name по service_id
               const service = servicesData.find((s) => s.id === q.service_id);
               if (service) {

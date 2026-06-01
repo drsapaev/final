@@ -85,8 +85,11 @@ describe('RegistrarPanel command contract', () => {
 
     expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult) => {');
     expect(source).toContain('const normalizeWizardQueueAssignment = (assignment, visitId = null) => {');
+    expect(source).toContain('const resolveWizardQueueEntryId = (assignment) => {');
+    expect(source).toContain('if (hasQueueIdentityValue(assignment.queue_id)) return null;');
     expect(source).toContain('if (Array.isArray(queueNumbers))');
-    expect(source).toContain('queue_entry_id: assignment.queue_entry_id ?? assignment.queue_id ?? assignment.id ?? null');
+    expect(source).toContain('queue_entry_id: queueEntryId');
+    expect(source).not.toContain('queue_entry_id: assignment.queue_entry_id ?? assignment.queue_id ?? assignment.id ?? null');
     expect(source).toContain('number: queueNumber');
     expect(source).toContain('grouped_record_refs: visitIds.map');
     expect(source).toContain('queue_number: firstQueueNumber?.queue_number ?? null');

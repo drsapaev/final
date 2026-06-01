@@ -57,6 +57,9 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(groupingBlock).toContain('original_queue_id: item.original_queue_id || null');
     expect(newServiceBlock).toContain('const hasExistingQueueIdentity = Boolean(serviceItem.original_queue_id);');
     expect(newServiceBlock).toContain('const isNewService = !hasExistingQueueIdentity');
+    expect(source).toContain('const resolveExplicitQueueEntryId = (record, { allowLegacyId = true } = {}) => {');
+    expect(source).toContain('if (!allowLegacyId || hasQueueIdentityValue(record.queue_id))');
+    expect(source).toContain('return resolveExplicitQueueEntryId(record) ?? getFirstQueueNumberId(record);');
   });
 
   it('maps service-array initial data back to queue_numbers before edit saves', () => {
@@ -167,6 +170,10 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(existingServicesBlock).toContain('Array.isArray(initialData.service_details)');
     expect(existingServicesBlock).toContain('const serviceId = serviceDetail.service_id || serviceDetail.id || null;');
     expect(existingServicesBlock).toContain('if (serviceId) originalServiceIds.add(serviceId);');
+    expect(existingServicesBlock).toContain('const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });');
+    expect(existingServicesBlock).not.toContain('serviceDetail.queue_id ||');
+    expect(existingServicesBlock).toContain('const queueId = resolveExplicitQueueEntryId(q);');
+    expect(existingServicesBlock).not.toContain('if (q.id) originalQueueIds.add(q.id)');
     expect(existingServicesBlock).toContain('if (queueId) originalQueueIds.add(queueId);');
   });
 

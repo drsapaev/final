@@ -232,8 +232,24 @@ const formatPreviewList = (value) => {
   return value || '';
 };
 
+const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
+
+const resolveWizardQueueEntryId = (assignment) => {
+  if (!assignment || typeof assignment !== 'object') return null;
+  const explicitQueueEntryId = assignment.queue_entry_id ??
+    assignment.original_queue_id ??
+    assignment.doctor_queue_entry_id ??
+    null;
+  if (hasQueueIdentityValue(explicitQueueEntryId)) return explicitQueueEntryId;
+
+  if (hasQueueIdentityValue(assignment.queue_id)) return null;
+
+  return hasQueueIdentityValue(assignment.id) ? assignment.id : null;
+};
+
 const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
   if (!assignment || typeof assignment !== 'object') return null;
+  const queueEntryId = resolveWizardQueueEntryId(assignment);
   const queueNumber = assignment.queue_number ??
     assignment.number ??
     assignment.ticket_number ??
@@ -243,8 +259,8 @@ const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
 
   return {
     ...assignment,
-    id: assignment.queue_id ?? assignment.queue_entry_id ?? assignment.id ?? null,
-    queue_entry_id: assignment.queue_entry_id ?? assignment.queue_id ?? assignment.id ?? null,
+    id: assignment.queue_id ?? queueEntryId ?? assignment.id ?? null,
+    queue_entry_id: queueEntryId,
     visit_id: assignment.visit_id ?? (visitId !== null && visitId !== undefined && visitId !== '' ? Number(visitId) : null),
     queue_number: queueNumber,
     number: queueNumber
