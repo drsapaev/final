@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
+from app.models.clinic import Doctor
 from app.models.user import User
 from app.services.queue_api_service import QueueApiService
 from app.services.queue_service import (
@@ -49,6 +50,33 @@ QUEUE_STATUS_ROLES = (
     "dentist",
     "Dentist",
 )
+
+
+def _role_name(user: User) -> str:
+    role = getattr(user, "role", "")
+    return str(getattr(role, "value", role) or "")
+
+
+def _ensure_doctor_can_call_legacy_entry(
+    db: Session,
+    *,
+    entry,
+    current_user: User,
+) -> None:
+    if _role_name(current_user) != "Doctor":
+        return
+
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    queue = getattr(entry, "queue", None)
+    if not queue or getattr(queue, "specialist_id", None) != doctor.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
 # Pydantic схемы
@@ -463,6 +491,12 @@ def call_patient(
 
     if not entry:
         raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    _ensure_doctor_can_call_legacy_entry(
+        db,
+        entry=entry,
+        current_user=current_user,
+    )
 
     if entry.status != "waiting":
         raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
