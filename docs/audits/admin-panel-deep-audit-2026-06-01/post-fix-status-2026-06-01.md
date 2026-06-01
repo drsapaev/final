@@ -29,6 +29,12 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1539 | merged | queue cabinets direct route | Routed `/admin/queue-cabinet-management` directly to `QueueCabinetManagement`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1541 | merged | clinic settings direct route | Routed `/admin/clinic-settings` directly to `UnifiedSettings`, while leaving the old AdminPanel switch branch as a compatibility path for a later cleanup. |
 | #1544 | merged | contextual settings direct routes | Routed hidden contextual settings routes for benefit, wizard, payment providers, queue, and display settings directly to `UnifiedSettings`, while leaving old AdminPanel switch branches as compatibility paths for later cleanup. |
+| #1546 | merged | operations direct routes | Routed `/admin/system`, `/admin/cloud-printing`, and `/admin/medical-equipment` directly to their route-specific components. |
+| #1548 | merged | integrations direct routes | Routed `/admin/webhooks` and `/admin/graphql-explorer` directly to their route-specific components. |
+| #1550 | merged | reports direct route | Routed `/admin/reports` directly to `UnifiedReports`. |
+| #1552 | merged | users direct route | Routed `/admin/users` directly to `UnifiedUserManagement` while preserving `/admin/advanced-users` as the advanced/legacy user-management surface. |
+| #1553 | merged | all-free direct route | Routed `/admin/all-free` directly to `AllFreeApproval` and added standalone management route contract coverage. |
+| #1555 | merged | security settings direct route | Routed `/admin/security` directly to `UnifiedSettings` and made `UnifiedSettings` derive contextual sections from canonical `/admin/<section>` paths. |
 
 ## Current Verified Status
 
@@ -68,6 +74,26 @@ original audit as baseline evidence and records the small PRs merged afterward.
   payment providers, queue settings, and display settings are now direct
   `UnifiedSettings` routes, preserving `nav: false` and reducing more broad
   `AdminPanel.jsx` routing.
+- `/admin/security` is now a direct `UnifiedSettings` route. `UnifiedSettings`
+  now derives route-owned sections from canonical admin paths, so contextual
+  settings routes no longer require `?section=...` to render their intended
+  settings panel.
+- `/admin/system`, `/admin/cloud-printing`, `/admin/medical-equipment`,
+  `/admin/webhooks`, `/admin/graphql-explorer`, `/admin/reports`,
+  `/admin/users`, and `/admin/all-free` are now direct route owners instead of
+  broad `AdminPanel.jsx` switch branches.
+- Remaining `AdminPanel`-owned routes are:
+  - `/admin` dashboard
+  - `/admin/doctors`
+  - `/admin/services`
+  - `/admin/patients`
+  - `/admin/appointments`
+  - `/admin/finance`
+- These remaining routes are extraction-bound, not simple direct switches:
+  dashboard, doctors, patients, appointments, and finance depend on internal
+  `AdminPanel.jsx` render functions/state; services needs a dedicated
+  `AdminServices` wrapper to preserve both Service Catalog and Queue Profiles
+  tabs before it can be routed directly.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -78,24 +104,24 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - Management and contextual admin routes have route-contract coverage for
   route-specific chrome headings, including hidden direct settings routes, so
   future extraction work must preserve distinct page identities.
-- Contextual settings routes deep-link to their intended screens:
-  - `/admin/security?section=security`
-  - `/admin/ai-settings?section=ai-settings`
-  - `/admin/wizard-settings?section=wizard-settings`
-  - `/admin/payment-providers?section=payment-providers`
-  - `/admin/benefit-settings?section=benefit-settings`
-  - `/admin/clinic-settings?section=clinic-settings`
-  - `/admin/queue-settings?section=queue-settings`
-  - `/admin/display-settings?section=display-settings`
-  - `/admin/telegram-settings?section=settings`
+- Contextual settings routes deep-link to their intended screens by path first:
+  - `/admin/security`
+  - `/admin/wizard-settings`
+  - `/admin/payment-providers`
+  - `/admin/benefit-settings`
+  - `/admin/clinic-settings`
+  - `/admin/queue-settings`
+  - `/admin/display-settings`
+  - `/admin/telegram-settings`
 
 ## Remaining Backlog
 
 ### P1
 
-- No open P1 admin route ownership item after the current user,
-  notification, and Telegram guardrails. New runtime route exposure still needs
-  a dedicated plan and browser smoke.
+- No open P1 admin route ownership item after the current settings, user,
+  notification, Telegram, operations, integrations, reports, all-free, and
+  security route slices. New runtime route exposure still needs a dedicated plan
+  and browser smoke.
 
 ### P2
 
@@ -108,22 +134,31 @@ original audit as baseline evidence and records the small PRs merged afterward.
   follow `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
 - Telegram route consolidation remains optional and must follow
   `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
-- `AdminPanel.jsx` remains a broad route switch plus implementation container,
-  although `/admin/telegram-settings` has been extracted as the first small
-  contextual route slice.
+- `AdminPanel.jsx` still owns six extraction-bound routes: dashboard, doctors,
+  services, patients, appointments, and finance. These should not be converted
+  by pointing routes to existing partial components unless route-specific
+  behavior is preserved.
 - Remaining heading-semantics work is now primarily browser/visual QA, not route
   chrome contract coverage.
 
 ## Recommended Next PR Slices
 
-1. `refactor(admin): extract one AdminPanel route family`
-   - Only after a specific family is selected.
-   - One family per PR.
-2. `test(admin): add browser-visible heading smoke for admin route families`
+1. `refactor(admin): extract services route wrapper`
+   - Create a dedicated `AdminServices` wrapper from the existing services tab
+     UI.
+   - Preserve Service Catalog and Queue Profiles tabs, `servicesTab` query
+     behavior, localStorage fallback, and dark/light theme handling.
+   - Then route `/admin/services` directly to `AdminServices`.
+2. `refactor(admin): extract one data-heavy AdminPanel route family`
+   - Choose exactly one of dashboard, doctors, patients, appointments, or
+     finance.
+   - Extract state/data dependencies first; do not point a route to a partial
+     component that drops actions, filters, modals, or summaries.
+3. `test(admin): add browser-visible heading smoke for admin route families`
    - Route chrome headings are now covered for operations, integrations,
      management, and contextual admin routes.
    - Continue with browser-visible headings only when a route family is selected.
-3. `docs(admin): plan optional notification or Telegram route exposure`
+4. `docs(admin): plan optional notification or Telegram route exposure`
    - Only if a real user workflow needs direct FCM/registrar/Telegram subroutes.
    - No runtime exposure without browser smoke.
 
@@ -133,3 +168,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - Do not expose notification subroutes without channel ownership and role/browser smoke.
 - Do not move Telegram token/security work between operational and settings surfaces without a Telegram-specific contract review.
 - Do not broaden an AdminPanel fix into a general redesign.
+- Do not route `/admin/services` directly to `ServiceCatalog` alone; that would
+  drop the Queue Profiles tab that currently lives under the services route.
+- Do not route `/admin/finance` directly to `UnifiedFinance` until the finance
+  overview renderer is owned by `UnifiedFinance` or an equivalent wrapper.
