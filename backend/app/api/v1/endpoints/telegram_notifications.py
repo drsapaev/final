@@ -97,7 +97,7 @@ def _safe_payment_template_data(payment_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+def _doctor_allowed_doctor_ids(db: Session, current_user: User) -> set[int]:
     doctor = (
         db.query(Doctor)
         .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
@@ -115,7 +115,11 @@ def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
     # when the value does not target another real Doctor row.
     if not assigned_doctor:
         allowed_doctor_ids.add(current_user.id)
+    return allowed_doctor_ids
 
+
+def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
+    allowed_doctor_ids = _doctor_allowed_doctor_ids(db, current_user)
     rows = (
         db.query(Visit.patient_id)
         .filter(
@@ -125,6 +129,24 @@ def _doctor_allowed_patient_ids(db: Session, current_user: User) -> set[int]:
         .all()
     )
     return {row[0] for row in rows if row[0] is not None}
+
+
+def _ensure_doctor_can_send_appointment_reminder(
+    db: Session,
+    appointment: Any,
+    current_user: User,
+) -> None:
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+    if getattr(appointment, "doctor_id", None) not in _doctor_allowed_doctor_ids(
+        db, current_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
 
 
 def _ensure_doctor_can_send_patient_lab_results(
@@ -232,6 +254,9 @@ async def send_appointment_reminder(
             )
 
         # Получаем данные пациента
+        _ensure_doctor_can_send_appointment_reminder(
+            db, appointment, current_user
+        )
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(

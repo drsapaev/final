@@ -11,12 +11,52 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.crud import appointment as crud_appointment, patient as crud_patient
+from app.models.clinic import Doctor
 from app.models.payment import Payment
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.email_sms_enhanced import get_email_sms_enhanced_service
 
 router = APIRouter()
+
+
+def _doctor_allowed_doctor_ids(db: Session, current_user: User) -> set[int]:
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+        .first()
+    )
+    if not doctor:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+    allowed_doctor_ids = {doctor.id}
+    assigned_doctor = db.query(Doctor).filter(Doctor.id == current_user.id).first()
+    # Some legacy visit writers stored User.id in doctor_id. Allow that only
+    # when the value does not target another real Doctor row.
+    if not assigned_doctor:
+        allowed_doctor_ids.add(current_user.id)
+    return allowed_doctor_ids
+
+
+def _ensure_doctor_can_send_appointment_reminder(
+    db: Session,
+    appointment: Any,
+    current_user: User,
+) -> None:
+    if current_user.role != "Doctor":
+        return
+    if current_user.is_superuser:
+        return
+    if getattr(appointment, "doctor_id", None) not in _doctor_allowed_doctor_ids(
+        db, current_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
 
 
 def _payment_id_from_payload(payment_data: Dict[str, Any]) -> int | None:
@@ -78,6 +118,9 @@ async def send_appointment_reminder_enhanced(
             )
 
         # Получаем данные пациента
+        _ensure_doctor_can_send_appointment_reminder(
+            db, appointment, current_user
+        )
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(

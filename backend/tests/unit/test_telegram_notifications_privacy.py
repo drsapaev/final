@@ -131,6 +131,48 @@ async def test_send_appointment_reminder_response_hides_patient_contact_metadata
 
 
 @pytest.mark.asyncio
+async def test_doctor_cannot_send_appointment_reminder_for_other_doctor(
+    monkeypatch,
+):
+    appointment = SimpleNamespace(
+        id=457,
+        patient_id=123,
+        doctor_id=99,
+    )
+
+    monkeypatch.setattr(
+        telegram_notifications.crud_appointment,
+        "get_appointment",
+        lambda _db, _appointment_id: appointment,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        telegram_notifications,
+        "_doctor_allowed_doctor_ids",
+        lambda _db, _current_user: {42},
+    )
+    get_patient = Mock()
+    monkeypatch.setattr(
+        telegram_notifications.crud_patient,
+        "get_patient",
+        get_patient,
+        raising=False,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await telegram_notifications.send_appointment_reminder(
+            appointment_id=457,
+            reminder_type="24h",
+            background_tasks=BackgroundTasks(),
+            db=object(),
+            current_user=SimpleNamespace(role="Doctor", is_superuser=False),
+        )
+
+    assert exc_info.value.status_code == 403
+    get_patient.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_send_appointment_reminder_unregistered_response_hides_patient_phone(
     monkeypatch,
 ):
