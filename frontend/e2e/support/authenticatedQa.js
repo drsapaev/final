@@ -166,6 +166,49 @@ function buildQaApiPayload(pathname, profile, method) {
     return { success: true, id: 'qa-write-disabled' };
   }
 
+  if (lowerPath === '/users/users') {
+    return {
+      users: [],
+      page: 1,
+      per_page: 20,
+      total: 0,
+      total_pages: 0,
+      success: true,
+    };
+  }
+
+  if (lowerPath === '/services' || lowerPath === '/services/categories' || lowerPath === '/services/admin/doctors') {
+    return [];
+  }
+
+  if (lowerPath === '/departments') {
+    return { success: true, data: [], count: 0 };
+  }
+
+  if (lowerPath === '/queues/profiles') {
+    return { success: true, profiles: [] };
+  }
+
+  if (lowerPath === '/webhooks' || lowerPath === '/webhooks/') {
+    return { success: true, items: [] };
+  }
+
+  if (lowerPath === '/webhooks/system/stats') {
+    return {
+      success: true,
+      total_webhooks: 0,
+      active_webhooks: 0,
+      recent_24h: {
+        total_calls: 0,
+        success_rate: 0,
+      },
+    };
+  }
+
+  if (lowerPath.startsWith('/webhooks/') && lowerPath.endsWith('/calls')) {
+    return { success: true, items: [] };
+  }
+
   if (lowerPath.includes('summary') || lowerPath.includes('stats') || lowerPath.includes('dashboard')) {
     return {
       success: true,
