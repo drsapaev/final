@@ -401,7 +401,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Обзор', icon: 'chart.bar', section: 'Обзор', order: 10, menu: true, sidebar: true }),
     title: 'Админ: обзор',
     owner: 'admin.operations',
-    component: 'AdminPanel',
+    component: 'AdminDashboard',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-dashboard', pageTitle: 'Обзор' }),
   },

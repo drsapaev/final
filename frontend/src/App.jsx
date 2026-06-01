@@ -67,6 +67,7 @@ const TelegramSettings = lazy(() => import('./components/admin/TelegramSettings.
 const AISettings = lazy(() => import('./components/admin/AISettings.jsx'));
 const PhoneVerificationManager = lazy(() => import('./components/admin/PhoneVerificationManager.jsx'));
 const ActivationSystem = lazy(() => import('./components/admin/ActivationSystem.jsx'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard.jsx'));
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement.jsx'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement.jsx'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices.jsx'));
@@ -135,6 +136,7 @@ const ROUTE_COMPONENTS = {
   AISettings,
   PhoneVerificationManager,
   ActivationSystem,
+  AdminDashboard,
   ClinicManagement,
   QueueCabinetManagement,
   AdminServices,
