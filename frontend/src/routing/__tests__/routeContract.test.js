@@ -82,6 +82,7 @@ const ADMIN_MANAGEMENT_ROUTE_CHROME_HEADING_CONTRACT = {
 };
 
 const ADMIN_STANDALONE_MANAGEMENT_COMPONENT_CONTRACT = {
+  'admin-services': { path: '/admin/services', owner: 'admin.catalog', component: 'AdminServices', entry: 'direct' },
   'admin-all-free': { path: '/admin/all-free', owner: 'admin.operations', component: 'AllFreeApproval', entry: 'direct' },
 };
 

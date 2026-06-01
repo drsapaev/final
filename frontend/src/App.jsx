@@ -69,6 +69,7 @@ const PhoneVerificationManager = lazy(() => import('./components/admin/PhoneVeri
 const ActivationSystem = lazy(() => import('./components/admin/ActivationSystem.jsx'));
 const ClinicManagement = lazy(() => import('./components/admin/ClinicManagement.jsx'));
 const QueueCabinetManagement = lazy(() => import('./components/admin/QueueCabinetManagement.jsx'));
+const AdminServices = lazy(() => import('./components/admin/AdminServices.jsx'));
 const UnifiedSettings = lazy(() => import('./components/admin/UnifiedSettings.jsx'));
 const SystemManagement = lazy(() => import('./components/admin/SystemManagement.jsx'));
 const CloudPrintingManager = lazy(() => import('./components/admin/CloudPrintingManager.jsx'));
@@ -136,6 +137,7 @@ const ROUTE_COMPONENTS = {
   ActivationSystem,
   ClinicManagement,
   QueueCabinetManagement,
+  AdminServices,
   UnifiedSettings,
   SystemManagement,
   CloudPrintingManager,
