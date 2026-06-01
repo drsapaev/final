@@ -11,6 +11,7 @@ const MacOSTextarea = React.forwardRef(({
   autoResize = true,
   minRows = 3,
   maxRows = 10,
+  textareaStyle = {},
   ...props
 }, ref) => {
   const textareaRef = useRef(null);
@@ -56,7 +57,7 @@ const MacOSTextarea = React.forwardRef(({
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
-  const textareaStyle = {
+  const textareaStyles = {
     width: '100%',
     borderRadius: 'var(--mac-radius-md)',
     fontSize: currentSize.fontSize,
@@ -73,7 +74,8 @@ const MacOSTextarea = React.forwardRef(({
       cursor: 'not-allowed',
       background: 'var(--mac-bg-tertiary)'
     }),
-    ...style
+    ...style,
+    ...textareaStyle
   };
 
   const handleFocus = (e) => {
@@ -113,7 +115,7 @@ const MacOSTextarea = React.forwardRef(({
     <textarea
       ref={internalRef}
       className={className}
-      style={textareaStyle}
+      style={textareaStyles}
       disabled={disabled}
       onFocus={handleFocus}
       onBlur={handleBlur}
@@ -136,6 +138,7 @@ MacOSTextarea.propTypes = {
   minRows: PropTypes.any,
   size: PropTypes.any,
   style: PropTypes.any,
+  textareaStyle: PropTypes.object,
   value: PropTypes.any,
   variant: PropTypes.any,
 };
