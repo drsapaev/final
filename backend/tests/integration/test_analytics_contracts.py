@@ -149,6 +149,29 @@ def test_predictive_auxiliary_routes_are_alive(
 @pytest.mark.parametrize(
     "path",
     [
+        "/api/v1/analytics/predictive",
+        "/api/v1/analytics/predictive/accuracy",
+        "/api/v1/analytics/predictive/scenarios",
+        "/api/v1/analytics/predictive/insights",
+    ],
+)
+def test_doctor_cannot_read_predictive_financial_analytics(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(doctor_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
         "/api/v1/analytics/kpi-metrics",
         "/api/v1/analytics/predictive",
         "/api/v1/analytics/advanced/revenue/advanced",
