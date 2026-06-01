@@ -6,6 +6,7 @@ import pytest
 
 from app.models.appointment import Appointment
 from app.models.online_queue import OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 
@@ -121,6 +122,70 @@ def test_queue_mark_paid_without_visit_id_does_not_pay_unrelated_patient_visit(
     assert (
         db_session.query(Payment)
         .filter(Payment.visit_id == unrelated_visit.id)
+        .count()
+        == 0
+    )
+
+
+@pytest.mark.integration
+def test_queue_mark_paid_rejects_entry_linked_to_other_patient_visit(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_doctor,
+):
+    other_patient = Patient(
+        first_name="Other",
+        last_name="Patient",
+        phone="+998901119999",
+    )
+    db_session.add(other_patient)
+    db_session.flush()
+
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="12:30",
+        status="open",
+        discount_mode="none",
+        department="cardiology",
+        created_at=datetime.utcnow(),
+    )
+    db_session.add(other_visit)
+    db_session.flush()
+
+    entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=100,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=other_visit.id,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(entry)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/v1/registrar/queue/entry/{entry.id}/mark-paid",
+        headers=registrar_auth_headers,
+        json={"method": "cash"},
+    )
+
+    assert response.status_code == 409, response.text
+    assert "does not belong" in response.json()["detail"]
+
+    db_session.refresh(entry)
+    db_session.refresh(other_visit)
+    assert entry.status == "waiting"
+    assert other_visit.status == "open"
+    assert (
+        db_session.query(Payment)
+        .filter(Payment.visit_id == other_visit.id)
         .count()
         == 0
     )
