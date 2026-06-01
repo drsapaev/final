@@ -1,16 +1,16 @@
 # Admin Overview Navigation Grouping Plan
 
 Date: 2026-06-01
-Mode: docs-only route grouping decision, no runtime navigation change
+Mode: route grouping decision and implementation guide
 
 This document records the intended direction for the overloaded Admin sidebar
 `Overview` section. It exists so future agents do not move admin routes by
 visual similarity or personal preference without preserving route ownership,
 auth, browser behavior, and existing staff workflows.
 
-## Current State
+## Original Audit State
 
-The route registry currently places these routes in the same sidebar section:
+The original admin deep audit found these routes in the same sidebar section:
 
 | Route | Owner | Current role in UI | Grouping issue |
 | --- | --- | --- | --- |
@@ -34,9 +34,9 @@ sidebar label `Overview` currently mixes:
 That makes the AdminPanel feel broader than one section should be and gives
 future agents weak ownership signals.
 
-## Recommended Final Grouping
+## Current Target Grouping
 
-Do not move all routes at once. The safe target grouping is:
+The accepted target grouping is:
 
 | Target section | Routes | Boundary |
 | --- | --- | --- |
@@ -44,9 +44,9 @@ Do not move all routes at once. The safe target grouping is:
 | `Operations` | `/admin/system`, `/admin/cloud-printing`, `/admin/medical-equipment` | Operational tooling that admins use to keep the clinic running. |
 | `Integrations` | `/admin/webhooks`, `/admin/graphql-explorer` | External/API/developer integration surfaces. |
 
-Leave `Management`, `System`, Telegram, notifications, files, finance, settings,
-security, and audit unchanged until their own route-family PRs name the owner
-and validation plan.
+`Management`, `System`, Telegram, notifications, files, finance, settings,
+security, and audit remain unchanged until their own route-family PRs name the
+owner and validation plan.
 
 ## Runtime Change Policy
 
@@ -63,11 +63,10 @@ Do not combine this grouping change with AdminPanel extraction, settings
 consolidation, Telegram/notification route changes, or user-management route
 aliasing. Those are separate risk families.
 
-## Suggested Small PR Order
+## Small PR Order
 
 1. `test(admin): guard overview route sections`
-   - Add contract tests for the current and target grouping decision.
-   - No route move yet if the team wants one more green guardrail first.
+   - Add contract tests for the current grouping decision.
 2. `refactor(admin): regroup overview sidebar routes`
    - Change only `nav.section` and related route tests for the selected routes.
    - Browser-smoke each moved route.
