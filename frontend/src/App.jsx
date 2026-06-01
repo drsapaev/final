@@ -81,6 +81,7 @@ const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManag
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
 const AdvancedUserManagement = lazy(() => import('./components/admin/AdvancedUserManagement.jsx'));
 const UserManagement = lazy(() => import('./components/admin/UserManagement.jsx'));
+const UnifiedUserManagement = lazy(() => import('./components/admin/UnifiedUserManagement.jsx'));
 const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo.jsx'));
 
 const ROUTE_COMPONENTS = {
@@ -101,6 +102,7 @@ const ROUTE_COMPONENTS = {
   EmailSMSManager,
   AdvancedUserManagement,
   UserManagement,
+  UnifiedUserManagement,
   FileManager,
   UserSelect,
   RegistrarPanel,

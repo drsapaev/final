@@ -301,7 +301,7 @@ describe('route contract invariants', () => {
     expect(canonicalUsersRoute.path).toBe('/admin/users');
     expect(canonicalUsersRoute.owner).toBe('admin.users');
     expect(canonicalUsersRoute.entry).toBe('menu');
-    expect(canonicalUsersRoute.component).toBe('AdminPanel');
+    expect(canonicalUsersRoute.component).toBe('UnifiedUserManagement');
     expect(canonicalUsersRoute.layout.activeSidebarItem).toBe('admin-users');
     expect(isRouteAccessibleToProfile(canonicalUsersRoute, adminProfile)).toBe(true);
 
