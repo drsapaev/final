@@ -843,7 +843,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Верификация телефонов', icon: 'phone', section: 'Система', order: 50, sidebar: true }),
     title: 'Admin Phone Verification',
     owner: 'admin.integrations',
-    component: 'AdminPanel',
+    component: 'PhoneVerificationManager',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-phone-verification', pageTitle: 'Admin Phone Verification' }),
   },
