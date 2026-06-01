@@ -22,6 +22,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1518 | merged | overview sidebar regrouping | Moved system/cloud-printing/medical-equipment to `Операции` and webhooks/GraphQL to `Интеграции`. |
 | #1521 | merged | advanced user route wrapper | Made `/admin/advanced-users` explicit as an advanced/legacy surface wrapping `UserManagement`, while `/admin/users` remains the canonical day-to-day user route. |
 | #1523 | merged | notification route ownership guardrail | Added route contract proof that `/admin/notifications` remains Email/SMS and FCM/registrar notification routes stay unrouted until deliberately exposed. |
+| #1529 | merged | AI settings direct route | Routed `/admin/ai-settings` directly to `AISettings`, while leaving the old AdminPanel query branch as a compatibility path for a later cleanup. |
 
 ## Current Verified Status
 
@@ -40,6 +41,9 @@ original audit as baseline evidence and records the small PRs merged afterward.
   `docs/admin/ADMIN_TELEGRAM_ROUTE_SURFACES.md`.
 - `/admin/telegram-settings` is a direct `TelegramSettings` route, reducing one
   contextual settings branch from the broad `AdminPanel.jsx` switch.
+- `/admin/ai-settings` is a direct `AISettings` route, reducing one visible
+  settings route from the broad `AdminPanel.jsx` switch while preserving the AI
+  sidebar disclaimer.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment

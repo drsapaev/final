@@ -204,6 +204,8 @@ describe('route contract invariants', () => {
 
     const adminAiRoute = ROUTE_REGISTRY.find((route) => route.id === 'admin-ai-settings');
     assertAiSidebarDisclaimer(adminAiRoute.nav);
+    expect(adminAiRoute.component).toBe('AISettings');
+    expect(adminAiRoute.component).not.toBe('AdminPanel');
 
     const adminChrome = getRouteChromeState('/admin/ai-settings', '', { role: 'Admin' });
     const adminAiItem = adminChrome.sidebarItems.find((item) => item.id === 'admin-ai-settings');
