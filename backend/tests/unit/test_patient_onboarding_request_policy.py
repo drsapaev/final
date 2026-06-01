@@ -644,6 +644,7 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
         status="rejected",
         review_message="Please contact the clinic.",
     )
+    today_request = _create_onboarding_request(db_session, chat_id=9206, status="pending_review")
 
     pending_request.created_at = now - timedelta(hours=5)
     needs_info_request.created_at = now - timedelta(hours=3)
@@ -652,6 +653,7 @@ def test_onboarding_analytics_summary_returns_safe_dashboard_metrics(
     linked_request.reviewed_at = now - timedelta(minutes=30)
     rejected_request.created_at = now - timedelta(hours=1)
     rejected_request.reviewed_at = now - timedelta(minutes=10)
+    today_request.created_at = now
     db_session.add_all(
         [
             AuditLog(
