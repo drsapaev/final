@@ -56,6 +56,13 @@ evidence from before the route-owner rollout. Current source-of-truth checks are
 | #1569 | merged | appointments direct route | Routed `/admin/appointments` directly to `AdminAppointments`. |
 | #1570 | merged | legacy registration cleanup | Removed the unused `AdminPanel` lazy registration from `App.jsx` and added a no-legacy-admin-route invariant. |
 | #1571 | merged | legacy file cleanup | Deleted the unused `AdminPanel.jsx` file and stale tests/audit references that tried to read it. |
+| #1576 | merged | browser-visible heading smoke | Added authenticated browser smoke coverage for representative Admin route-family headings. |
+| #1577 | merged | optional route exposure decision gate | Documented that optional notification/Telegram route exposure needs a dedicated route-owner and browser-smoke plan before runtime changes. |
+| #1579 | merged | services action smoke | Added authenticated browser smoke coverage for the Services catalog primary action. |
+| #1581 | merged | doctors action smoke | Added authenticated browser smoke coverage for the Doctors primary action. |
+| #1583 | merged | patients action smoke | Added authenticated browser smoke coverage for the Patients primary action. |
+| #1585 | merged | appointments action smoke | Added authenticated browser smoke coverage for the Appointments primary action. |
+| #1587 | merged | finance action smoke | Added authenticated browser smoke coverage for the Finance billing primary action. |
 
 ## Current Verified Status
 
@@ -107,6 +114,10 @@ evidence from before the route-owner rollout. Current source-of-truth checks are
 - The old `AdminPanel.jsx` implementation file has been deleted. Future admin
   route work should start from the direct route owner component, not from the
   deleted broad switch.
+- Authenticated browser smoke now covers Admin route-family headings plus the
+  primary action path for Services, Doctors, Patients, Appointments, and
+  Finance billing. This keeps the key data-heavy admin screens from silently
+  losing their named create/manage entry points.
 - Admin sidebar grouping is now:
   - `Overview`: dashboard, analytics, reports
   - `Операции`: system, cloud printing, medical equipment
@@ -152,6 +163,8 @@ evidence from before the route-owner rollout. Current source-of-truth checks are
   `AdminPanel.jsx` extraction.
 - Remaining heading-semantics work is now primarily browser/visual QA, not route
   chrome contract coverage.
+- Data-heavy primary-action smoke is complete for the planned first pass:
+  Services, Doctors, Patients, Appointments, and Finance billing.
 
 ## Recommended Next PR Slices
 
@@ -166,10 +179,24 @@ evidence from before the route-owner rollout. Current source-of-truth checks are
    - Use `docs/admin/ADMIN_OPTIONAL_ROUTE_EXPOSURE_PLAN.md` as the decision
      gate before any runtime route exposure PR.
 3. `test(admin): add per-route action smoke for data-heavy admin screens`
-   - Cover doctors, patients, appointments, services, and finance one route
-     family at a time.
-   - Keep API/RBAC behavior unchanged unless a route-specific finding proves a
-     backend contract issue.
+   - Completed across PRs #1579, #1581, #1583, #1585, and #1587.
+   - The first pass covers Services, Doctors, Patients, Appointments, and
+     Finance billing one route family at a time.
+   - Any deeper destructive-action, edit/delete, export, or integration-test
+     browser QA should be planned separately because those flows may mutate data
+     or require backend contract evidence.
+
+## Current Next Smallest Patch
+
+No P1 admin route ownership item remains from the original AdminPanel audit.
+The next smallest admin work should be chosen from live user pain, not from the
+deleted broad `AdminPanel.jsx` switch. Good candidates are:
+
+1. browser QA for a single mutating admin workflow with a rollback-safe fixture;
+2. optional notification/Telegram route exposure after route-owner approval;
+3. heading/visual polish on one route family at a time;
+4. a non-mutating smoke for Files, All-Free, or Settings if a user workflow
+   needs stronger evidence.
 
 ## Stop Conditions
 
