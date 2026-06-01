@@ -156,6 +156,14 @@ describe('route contract invariants', () => {
     });
   });
 
+  it('keeps admin routes off the legacy AdminPanel component owner', () => {
+    const legacyAdminPanelRoutes = ROUTE_REGISTRY.filter(
+      (route) => route.group === 'admin' && route.component === 'AdminPanel'
+    );
+
+    expect(legacyAdminPanelRoutes).toEqual([]);
+  });
+
   it('keeps internal demo routes out of navigation', () => {
     getInternalDemoRoutes().forEach((route) => {
       expect(route.nav).toBe(false);

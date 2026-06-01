@@ -37,7 +37,6 @@ const Audit = lazy(() => import('./pages/Audit.jsx'));
 const Scheduler = lazy(() => import('./pages/Scheduler.jsx'));
 const Appointments = lazy(() => import('./pages/Appointments.jsx'));
 const VisitDetails = lazy(() => import('./pages/VisitDetails.jsx'));
-const AdminPanel = lazy(() => import('./pages/AdminPanel.jsx'));
 const RegistrarPanel = lazy(() => import('./pages/RegistrarPanel.jsx'));
 const DoctorPanel = lazy(() => import('./pages/DoctorPanel.jsx'));
 const CardiologistPanelUnified = lazy(() => import('./pages/CardiologistPanelUnified.jsx'));
@@ -101,7 +100,6 @@ const ROUTE_COMPONENTS = {
   PaymentCancel,
   DisplayBoardUnified,
   Setup,
-  AdminPanel,
   AnalyticsPage,
   Settings,
   Audit,
