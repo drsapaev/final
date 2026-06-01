@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit, VisitService
 
@@ -93,6 +94,93 @@ def test_full_update_all_free_without_visit_id_does_not_reuse_unrelated_visit(
     linked_visit = db_session.query(Visit).filter(Visit.id == entry.visit_id).one()
     assert linked_visit.discount_mode == "all_free"
     assert linked_visit.approval_status == "pending"
+
+
+@pytest.mark.integration
+def test_full_update_all_free_rejects_entry_linked_to_other_patient_visit(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_daily_queue,
+    test_patient,
+    test_doctor,
+    test_service,
+):
+    other_patient = Patient(
+        last_name="Other",
+        first_name="Queue",
+        phone="+998900001111",
+    )
+    db_session.add(other_patient)
+    db_session.flush()
+    other_visit = Visit(
+        patient_id=other_patient.id,
+        doctor_id=test_doctor.id,
+        visit_date=date.today(),
+        visit_time="12:00",
+        status="open",
+        discount_mode="none",
+        approval_status="none",
+        department="cardiology",
+    )
+    db_session.add(other_visit)
+    db_session.flush()
+    db_session.add(
+        VisitService(
+            visit_id=other_visit.id,
+            service_id=test_service.id,
+            code=test_service.code,
+            name=test_service.name,
+            qty=1,
+            price=test_service.price,
+            currency="UZS",
+        )
+    )
+    entry = OnlineQueueEntry(
+        queue_id=test_daily_queue.id,
+        number=78,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        visit_id=other_visit.id,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    db_session.refresh(other_visit)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+                "address": test_patient.address,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": 1}],
+            "all_free": True,
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert "does not belong" in response.json()["detail"]
+
+    db_session.refresh(other_visit)
+    assert other_visit.discount_mode == "none"
+    assert other_visit.approval_status == "none"
+    assert other_visit.department == "cardiology"
+    assert (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == other_visit.id)
+        .count()
+        == 1
+    )
 
 
 @pytest.mark.integration
