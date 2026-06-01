@@ -36,7 +36,7 @@ MODEL_ALIASES = {
 
 EXPLICIT_PATH_RE = re.compile(
     r"(?P<path>(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\."
-    r"(?:py|js|jsx|ts|tsx|json|md|yml|yaml|toml|sh|ps1|bat|txt))"
+    r"(?:jsx|tsx|js|ts|py|json|yaml|yml|toml|ps1|bat|sh|md|txt))"
 )
 
 MIGRATION_TASK_RE = re.compile(
@@ -242,7 +242,18 @@ def unique_paths(paths: list[str]) -> list[str]:
 
 def explicit_paths(task: str, repo_root: Path, tracked: set[str]) -> list[str]:
     candidates = [match.group("path") for match in EXPLICIT_PATH_RE.finditer(task)]
-    return unique_existing(repo_root, tracked, candidates)
+    seen: set[str] = set()
+    result: list[str] = []
+    for path in candidates:
+        rel = normalize_rel_path(path)
+        if rel in seen:
+            continue
+        # Explicit first-touch paths may name a new file for extraction work.
+        # Allow that only when the parent directory already exists in checkout.
+        if path_exists(repo_root, rel, tracked) or (repo_root / rel).parent.exists():
+            seen.add(rel)
+            result.append(rel)
+    return result
 
 
 def rule_matches(task: str, repo_root: Path, tracked: set[str]) -> tuple[list[str], list[str]]:
@@ -506,7 +517,7 @@ def main(argv: list[str] | None = None) -> int:
     files.extend(matched_files)
     reasons.extend(matched_reasons)
 
-    initial_first_touch = unique_existing(repo_root, tracked, files)
+    initial_first_touch = unique_paths(files)
     known = normalize_rel_path(args.known_root_cause) if args.known_root_cause else None
     gate_misroute = False
     override_used = False
@@ -559,7 +570,7 @@ def main(argv: list[str] | None = None) -> int:
             reasons.append("known-root-cause override")
             initial_first_touch.insert(0, known)
 
-    first_touch = unique_existing(repo_root, tracked, initial_first_touch)
+    first_touch = unique_paths(initial_first_touch)
     if not first_touch:
         print(
             "Result: stop\n"
