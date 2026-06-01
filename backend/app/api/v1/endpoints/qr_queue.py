@@ -2251,11 +2251,9 @@ def full_update_online_entry(
                 if visit:
                     if visit.patient_id != patient_id_for_visit:
                         logger.warning(
-                            "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d entry_patient_id=%s visit_patient_id=%s",
+                            "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d",
                             entry.id,
                             visit.id,
-                            patient_id_for_visit,
-                            visit.patient_id,
                         )
                         raise HTTPException(
                             status_code=status.HTTP_409_CONFLICT,
