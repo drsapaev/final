@@ -29,6 +29,14 @@ class QueueReorderApiService:
         self.repository = repository or QueueReorderApiRepository(db)
         self.domain_service = domain_service or QueueDomainService(db)
 
+    def _ensure_doctor_can_mutate_queue(self, *, current_user, queue) -> None:
+        if current_user.role != "Doctor":
+            return
+
+        doctor = self.repository.get_active_doctor_by_user_id(current_user.id)
+        if not doctor or queue.specialist_id != doctor.id:
+            raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
+
     @staticmethod
     def _queue_info(queue, entries: list) -> dict:
         return {
@@ -71,8 +79,7 @@ class QueueReorderApiService:
         if not queue:
             raise QueueReorderApiDomainError(404, "Очередь не найдена")
 
-        if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
-            raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
+        self._ensure_doctor_can_mutate_queue(current_user=current_user, queue=queue)
 
         entries = self.repository.list_active_entries(queue_id=queue_id)
         if not entries:
@@ -127,8 +134,7 @@ class QueueReorderApiService:
         if not queue:
             raise QueueReorderApiDomainError(404, "Очередь не найдена")
 
-        if current_user.role == "Doctor" and queue.specialist_id != current_user.id:
-            raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
+        self._ensure_doctor_can_mutate_queue(current_user=current_user, queue=queue)
 
         all_entries = self.repository.list_active_entries(queue_id=entry.queue_id)
         if new_position > len(all_entries):

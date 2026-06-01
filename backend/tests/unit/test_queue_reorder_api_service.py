@@ -12,6 +12,31 @@ from app.services.queue_reorder_api_service import (
 
 @pytest.mark.unit
 class TestQueueReorderApiService:
+    @staticmethod
+    def _queue(*, specialist_id: int):
+        return SimpleNamespace(
+            id=1,
+            day=SimpleNamespace(isoformat=lambda: "2026-01-01"),
+            specialist=SimpleNamespace(user=SimpleNamespace(full_name="Doctor")),
+            specialist_id=specialist_id,
+            active=True,
+            opened_at=None,
+        )
+
+    @staticmethod
+    def _entry(*, entry_id: int, number: int):
+        return SimpleNamespace(
+            id=entry_id,
+            queue_id=1,
+            number=number,
+            patient_name=f"Patient {entry_id}",
+            phone="1",
+            status="waiting",
+            source="online",
+            created_at=SimpleNamespace(isoformat=lambda: "2026-01-01T00:00:00"),
+            called_at=None,
+        )
+
     def test_reorder_queue_raises_when_queue_missing(self):
         class Repository:
             def get_queue(self, queue_id):
@@ -27,6 +52,60 @@ class TestQueueReorderApiService:
             )
 
         assert exc_info.value.status_code == 404
+
+    def test_doctor_reorders_queue_by_linked_doctor_id_not_user_id(self):
+        queue = self._queue(specialist_id=7)
+        entries = [self._entry(entry_id=10, number=1), self._entry(entry_id=11, number=2)]
+
+        class Repository:
+            def get_queue(self, queue_id):
+                return queue
+
+            def list_active_entries(self, *, queue_id):
+                return entries
+
+            def get_active_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7)
+
+            def commit(self):
+                return None
+
+        service = QueueReorderApiService(
+            db=None,
+            repository=Repository(),
+        )
+        updated_count, _ = service.reorder_queue(
+            queue_id=1,
+            entry_orders=[{"entry_id": 10, "new_position": 2}],
+            current_user=SimpleNamespace(id=100, role="Doctor"),
+        )
+
+        assert updated_count == 1
+        assert entries[0].number == 2
+
+    def test_doctor_cannot_reorder_queue_when_only_user_id_matches_specialist_id(self):
+        queue = self._queue(specialist_id=100)
+
+        class Repository:
+            def get_queue(self, queue_id):
+                return queue
+
+            def get_active_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7)
+
+        service = QueueReorderApiService(
+            db=None,
+            repository=Repository(),
+        )
+
+        with pytest.raises(QueueReorderApiDomainError) as exc_info:
+            service.reorder_queue(
+                queue_id=1,
+                entry_orders=[{"entry_id": 10, "new_position": 2}],
+                current_user=SimpleNamespace(id=100, role="Doctor"),
+            )
+
+        assert exc_info.value.status_code == 403
 
     def test_move_queue_entry_returns_unchanged_message(self):
         queue = SimpleNamespace(

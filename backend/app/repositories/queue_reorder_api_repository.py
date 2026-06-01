@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.queue_status import REORDER_ACTIVE_RAW_STATUSES
 
@@ -46,6 +47,13 @@ class QueueReorderApiRepository:
                 OnlineQueueEntry.id == entry_id,
                 OnlineQueueEntry.status.in_(self.ACTIVE_ENTRY_STATUSES),
             )
+            .first()
+        )
+
+    def get_active_doctor_by_user_id(self, user_id: int) -> Doctor | None:
+        return (
+            self.db.query(Doctor)
+            .filter(Doctor.user_id == user_id, Doctor.active == True)
             .first()
         )
 
