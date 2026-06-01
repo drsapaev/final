@@ -15,6 +15,8 @@ from app.services.analytics import AnalyticsService
 
 router = APIRouter()
 
+FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+
 
 def _parse_date_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
     try:
@@ -171,7 +173,7 @@ async def get_kpi_metrics(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить KPI метрики для аналитики."""
     start, end = _parse_date_range(start_date, end_date)
@@ -246,7 +248,7 @@ async def get_kpi_trends(
     department: Optional[str] = Query(None, description="Отделение"),
     metric: Optional[str] = Query(None, description="Конкретная метрика"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить тренды KPI метрик."""
     start, end = _parse_date_range(start_date, end_date)
@@ -275,7 +277,7 @@ async def get_kpi_comparison(
     department: Optional[str] = Query(None, description="Отделение"),
     comparison_period: str = Query("previous", description="Период сравнения"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить сравнение KPI с предыдущими периодами."""
     start, end = _parse_date_range(start_date, end_date)
