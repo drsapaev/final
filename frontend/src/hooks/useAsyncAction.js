@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import logger from '../utils/logger';
 /**
  * Универсальный хук для async действий с обработкой ошибок
- * Устраняет дублирование async обработчиков в AdminPanel
+ * Устраняет дублирование async обработчиков в панелях
  */
 export const useAsyncAction = () => {
   const [loading, setLoading] = useState(false);

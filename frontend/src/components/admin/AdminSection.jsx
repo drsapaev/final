@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 
 /**
  * Базовый компонент для разделов админ панели
- * Устраняет дублирование в render функциях AdminPanel
+ * Устраняет дублирование в render функциях админ-разделов
  */
 const AdminSection = ({ 
   title, 

@@ -22,8 +22,7 @@ const DesignValidator = ({ onValidationComplete }) => {
   const availableComponents = [
   { id: 'CardiologistPanelUnified', name: 'Панель кардиолога', path: 'frontend/src/pages/CardiologistPanelUnified.jsx' },
   { id: 'RegistrarPanel', name: 'Панель регистратора', path: 'frontend/src/pages/RegistrarPanel.jsx' },
-  { id: 'DentistPanelUnified', name: 'Панель стоматолога', path: 'frontend/src/pages/DentistPanelUnified.jsx' },
-  { id: 'AdminPanel', name: 'Админ панель', path: 'frontend/src/pages/AdminPanel.jsx' }];
+  { id: 'DentistPanelUnified', name: 'Панель стоматолога', path: 'frontend/src/pages/DentistPanelUnified.jsx' }];
 
 
   const validateComponent = async (componentId) => {

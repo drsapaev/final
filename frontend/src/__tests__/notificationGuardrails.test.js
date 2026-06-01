@@ -13,7 +13,6 @@ const NOTIFICATION_FILES = [
 ];
 
 const PANEL_FILES = [
-  'pages/AdminPanel.jsx',
   'pages/RegistrarPanel.jsx',
   'pages/CardiologistPanelUnified.jsx',
   'pages/DentistPanelUnified.jsx',
