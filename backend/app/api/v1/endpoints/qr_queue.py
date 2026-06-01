@@ -1337,18 +1337,31 @@ def full_update_online_entry(
         
         if entry.visit_id:
             # ⭐ FIX 4: Если есть visit_id, ищем строго по нему (это одна сессия обслуживания)
+            visit_entry_filters = [
+                OnlineQueueEntry.visit_id == entry.visit_id,
+                OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
+            ]
+            if entry.patient_id is not None:
+                visit_entry_filters.append(
+                    OnlineQueueEntry.patient_id == entry.patient_id
+                )
+            else:
+                visit_entry_filters.append(OnlineQueueEntry.id == entry.id)
+                logger.warning(
+                    "[full_update_online_entry] visit-linked entry %d has no patient_id; using current entry only for aggregation",
+                    entry.id,
+                )
             visit_entries = (
                 db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.visit_id == entry.visit_id,
-                    OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
-                )
+                .filter(*visit_entry_filters)
                 .all()
             )
             computed_aggregated_ids = [e.id for e in visit_entries]
             logger.info(
-                "[full_update_online_entry] ⭐ FIX 4: Вычислены aggregated_ids по visit_id=%d: %s",
-                entry.visit_id, computed_aggregated_ids
+                "[full_update_online_entry] computed aggregated_ids by visit_id=%d and patient_id=%s: %s",
+                entry.visit_id,
+                entry.patient_id,
+                computed_aggregated_ids,
             )
         else:
             # If there is no visit yet, aggregate only the current service
