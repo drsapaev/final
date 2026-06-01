@@ -25,12 +25,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ANALYTICS_EXPORT_PUBLIC_ERROR = "Internal server error"
+CLINICAL_ANALYTICS_EXPORT_ROLES = ["admin", "doctor", "nurse"]
+FINANCIAL_ANALYTICS_EXPORT_ROLES = ["admin", "manager"]
 
 
 @router.get("/formats")
 async def get_export_formats(
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_EXPORT_ROLES)),
 ):
     """Получить список поддерживаемых форматов экспорта"""
     try:
@@ -56,7 +58,7 @@ async def export_kpi_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_EXPORT_ROLES)),
 ):
     """Экспорт отчета KPI в указанном формате"""
     try:
@@ -106,7 +108,7 @@ async def export_comprehensive_report(
         True, description="Включить предиктивную аналитику"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_EXPORT_ROLES)),
 ):
     """Экспорт комплексного отчета в указанном формате"""
     try:
@@ -177,7 +179,7 @@ async def export_doctor_performance_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(CLINICAL_ANALYTICS_EXPORT_ROLES)),
 ):
     """Экспорт отчета по эффективности врачей в указанном формате"""
     try:
@@ -225,7 +227,7 @@ async def export_revenue_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_EXPORT_ROLES)),
 ):
     """Экспорт отчета по доходам в указанном формате"""
     try:

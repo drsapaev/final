@@ -18,6 +18,16 @@ def admin_token(client: TestClient, admin_user: User, admin_password: str) -> st
     return response.json()["access_token"]
 
 
+@pytest.fixture
+def doctor_token(client: TestClient, test_doctor_user: User) -> str:
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": test_doctor_user.username, "password": "doctor123"},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -158,3 +168,38 @@ def test_patient_cannot_read_staff_analytics_extension_routes(
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/analytics/export/kpi/export/json",
+        "/api/v1/analytics/export/comprehensive/export/json",
+        "/api/v1/analytics/export/revenue/export/json",
+    ],
+)
+def test_doctor_cannot_export_clinic_financial_analytics(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(doctor_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_can_export_revenue_analytics(
+    client: TestClient,
+    admin_token: str,
+) -> None:
+    response = client.get(
+        "/api/v1/analytics/export/revenue/export/json",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 200, response.text
