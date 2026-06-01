@@ -86,8 +86,9 @@ describe('Doctor panels SSOT contract', () => {
       const source = read(filePath);
 
       expect(source).toContain('function resolveDoctorQueueEntryId(row)');
-      expect(source).toContain("recordKind === 'online_queue'");
+      expect(source).toContain('const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;');
       expect(source).toContain('/doctor/queue/${queueEntryId}/start-visit');
+      expect(source).not.toContain("recordKind === 'online_queue' && row?.id");
       expect(source).not.toContain('/doctor/queue/${row.id}/start-visit');
       expect(source).not.toContain('completeVisit(selectedPatient.id');
       expect(source).not.toContain('const entryId = selectedPatient?.id || currentAppointment?.id');

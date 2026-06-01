@@ -2730,6 +2730,7 @@ def get_today_queues(
                         # entry_data это OnlineQueueEntry (обычный случай)
                         online_entry = entry_data
                         record_id = online_entry.id
+                        entry_wrapper["queue_entry_id"] = online_entry.id
                         patient_id = online_entry.patient_id
                         patient_name = online_entry.patient_name or "Неизвестный пациент"
                         phone = online_entry.phone or "Не указан"
