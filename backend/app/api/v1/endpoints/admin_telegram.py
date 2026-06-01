@@ -1716,6 +1716,44 @@ def _validate_staff_action_target_request(
     return "command_executor_not_supported"
 
 
+def _staff_action_expected_target_binding(
+    command_key: str,
+    request: StaffActionConfirmRequest,
+) -> tuple[str, int] | None:
+    command = command_key.lower()
+    if command == "/call":
+        return None
+    if command == "/skip" and request.entry_id is not None:
+        return ("queue_entry", int(request.entry_id))
+    if command in {"/cancel_visit", "/move_visit"} and request.visit_id is not None:
+        return ("visit", int(request.visit_id))
+    if command in {"/payment_status", "/refund"} and request.payment_id is not None:
+        return ("payment", int(request.payment_id))
+    if command == "/change_schedule" and request.schedule_id is not None:
+        return ("schedule", int(request.schedule_id))
+    return None
+
+
+def _validate_staff_action_target_binding(
+    record: TelegramStaffConfirmationToken,
+    command_key: str,
+    request: StaffActionConfirmRequest,
+) -> str | None:
+    expected = _staff_action_expected_target_binding(command_key, request)
+    if expected is None:
+        return None
+
+    target_type, target_id = expected
+    expected_hash = _staff_runtime_reference_hash(target_type, target_id)
+    if not record.target_reference_hash:
+        return "target_binding_required"
+    if str(record.target_type or "") != target_type:
+        return "target_binding_mismatch"
+    if str(record.target_reference_hash) != expected_hash:
+        return "target_binding_mismatch"
+    return None
+
+
 @router.post("/telegram/ai-approval-alerts")
 async def send_telegram_ai_approval_alert(
     request: TelegramAiApprovalAlertRequest,
@@ -2022,6 +2060,26 @@ def confirm_staff_action(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=target_error,
+        )
+
+    target_binding_error = _validate_staff_action_target_binding(
+        record,
+        command_key,
+        request,
+    )
+    if target_binding_error:
+        _record_staff_action_execution_failure(
+            db,
+            record=record,
+            current_user=current_user,
+            operation_key=operation_key,
+            command_key=command_key,
+            reason=target_binding_error,
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=target_binding_error,
         )
 
     consume_result = TelegramStaffConfirmationTokenService(db).consume_for_confirmation(
