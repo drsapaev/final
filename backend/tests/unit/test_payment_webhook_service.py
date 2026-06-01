@@ -169,6 +169,66 @@ class TestPaymentWebhookService:
             )
             process_appointment.assert_not_called()
 
+    def test_payme_webhook_rejects_cross_patient_account_targets(self, db_session):
+        webhook = SimpleNamespace(id=99)
+        repository = SimpleNamespace(
+            get_provider_by_code=Mock(return_value=SimpleNamespace(secret_key="secret")),
+            get_webhook_by_webhook_id=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            create_transaction=Mock(return_value=SimpleNamespace(id=100)),
+            update_webhook=Mock(return_value=webhook),
+        )
+        data = {
+            "id": "payme-tx-1",
+            "state": 2,
+            "amount": 250000,
+            "account": {"appointment_id": "123", "visit_id": "789"},
+        }
+
+        with (
+            patch(
+                "app.services.payment_webhook.PaymentWebhookProcessingRepository",
+                return_value=repository,
+            ),
+            patch.object(
+                PaymentWebhookService, "verify_payme_signature", return_value=True
+            ),
+            patch.object(
+                PaymentWebhookService,
+                "_payme_targets_cross_patient",
+                return_value=True,
+            ) as targets_cross_patient,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_appointment",
+                return_value=(True, "appointment paid"),
+            ) as process_appointment,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.process_payment_for_existing_visit",
+                return_value=(True, "visit paid"),
+            ) as process_visit,
+            patch(
+                "app.services.payment_webhook.VisitPaymentIntegrationService.create_appointment_from_payment",
+                return_value=(True, "created", 501),
+            ) as create_appointment,
+        ):
+            success, message, result_webhook = PaymentWebhookService.process_payme_webhook(
+                db_session, data, "signature"
+            )
+
+        assert success is True
+        assert message == "Webhook processed successfully"
+        assert result_webhook is webhook
+        targets_cross_patient.assert_called_once_with(db_session, 123, 789)
+        process_appointment.assert_not_called()
+        process_visit.assert_not_called()
+        create_appointment.assert_not_called()
+
+        _, failed_update = repository.update_webhook.call_args_list[-1].args
+        assert failed_update["status"] == "failed"
+        assert failed_update["error_message"] == (
+            "Payme account appointment_id and visit_id belong to different patients"
+        )
+
     def test_click_webhook_uses_visit_target_when_merchant_id_matches_visit_only(
         self, db_session
     ):
