@@ -54,6 +54,14 @@ const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
 };
 
+const ADMIN_ROUTE_CHROME_HEADING_CONTRACT = {
+  'admin-system': { path: '/admin/system', pageTitle: 'Admin System' },
+  'admin-cloud-printing': { path: '/admin/cloud-printing', pageTitle: 'Admin Cloud Printing' },
+  'admin-medical-equipment': { path: '/admin/medical-equipment', pageTitle: 'Admin Medical Equipment' },
+  'admin-webhooks': { path: '/admin/webhooks', pageTitle: 'Вебхуки' },
+  'admin-graphql-explorer': { path: '/admin/graphql-explorer', pageTitle: 'Admin GraphQL Explorer' },
+};
+
 const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
   'clinical-profile',
   'clinical-security',
@@ -200,6 +208,23 @@ describe('route contract invariants', () => {
       expect(chrome.activeSidebarItem).toBe(routeId);
       expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
       expect(navSection.items.some((item) => item.id === routeId)).toBe(true);
+    });
+  });
+
+  it('keeps operations and integrations routes on route-specific chrome headings', () => {
+    const adminProfile = { role: 'Admin' };
+
+    Object.entries(ADMIN_ROUTE_CHROME_HEADING_CONTRACT).forEach(([routeId, expected]) => {
+      const route = getRouteById(routeId);
+      const chrome = getRouteChromeState(expected.path, '', adminProfile);
+
+      expect(route).toBeTruthy();
+      expect(route.layout.pageTitle).toBe(expected.pageTitle);
+      expect(route.title).toBeTruthy();
+      expect(chrome.pageTitle).toBe(expected.pageTitle);
+      expect(chrome.activeSidebarItem).toBe(routeId);
+      expect(chrome.pageTitle).not.toBe('AdminPanel');
+      expect(chrome.pageTitle).not.toBe('Admin');
     });
   });
 
