@@ -56,9 +56,9 @@ const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
   'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminPanel', entry: 'menu', section: 'Обзор' },
   'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
   'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'AdminPanel', entry: 'direct', section: 'Обзор' },
-  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
-  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
-  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
+  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Операции' },
+  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'CloudPrintingManager', entry: 'direct', section: 'Операции' },
+  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'MedicalEquipmentManager', entry: 'direct', section: 'Операции' },
   'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
   'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
 };
