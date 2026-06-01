@@ -22,6 +22,8 @@ from app.services.analytics_visualization_service import (
 
 router = APIRouter()
 
+FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+
 
 @router.get("/dashboard")
 async def get_dashboard_visualization(
@@ -29,7 +31,7 @@ async def get_dashboard_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить визуализацию для дашборда"""
     try:
@@ -91,7 +93,7 @@ async def get_kpi_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить визуализацию KPI метрик"""
     try:
@@ -238,7 +240,7 @@ async def get_revenue_analytics_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить визуализацию аналитики доходов"""
     try:
@@ -291,7 +293,7 @@ async def get_comprehensive_visualization(
         True, description="Включить предиктивную аналитику"
     ),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(FINANCIAL_ANALYTICS_ROLES)),
 ):
     """Получить полную визуализацию для комплексного отчета"""
     try:

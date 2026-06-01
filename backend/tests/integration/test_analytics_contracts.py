@@ -260,6 +260,29 @@ def test_doctor_cannot_read_advanced_financial_analytics(
     assert response.status_code == 403
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/analytics/visualization/dashboard",
+        "/api/v1/analytics/visualization/kpi",
+        "/api/v1/analytics/visualization/revenue",
+        "/api/v1/analytics/visualization/comprehensive",
+    ],
+)
+def test_doctor_cannot_read_financial_analytics_visualizations(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(doctor_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_admin_can_read_advanced_revenue_analytics(
     client: TestClient,
     admin_token: str,
@@ -272,6 +295,20 @@ def test_admin_can_read_advanced_revenue_analytics(
 
     assert response.status_code == 200, response.text
     assert "total_revenue" in response.json()
+
+
+def test_admin_can_read_revenue_analytics_visualization(
+    client: TestClient,
+    admin_token: str,
+) -> None:
+    response = client.get(
+        "/api/v1/analytics/visualization/revenue",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert "revenue_data" in response.json()
 
 
 @pytest.mark.parametrize(
