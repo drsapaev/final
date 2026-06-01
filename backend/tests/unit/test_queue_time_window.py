@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 import app.services.queue_service as queue_service
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.visit import Visit
 from app.services.queue_service import QueueBusinessService
 
 
@@ -153,6 +155,39 @@ def _queue_with_entries(db_session, *, target_day: date):
     return daily_queue, first, second
 
 
+def _link_entry_to_visit(
+    db_session,
+    entry: OnlineQueueEntry,
+    *,
+    doctor_id: int,
+    target_day: date,
+    phone: str,
+) -> Visit:
+    patient = Patient(
+        first_name="Queue",
+        last_name="Owner",
+        phone=phone,
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    visit = Visit(
+        patient_id=patient.id,
+        doctor_id=doctor_id,
+        visit_date=target_day,
+        visit_time="09:00",
+        status="open",
+        department="cardiology",
+    )
+    db_session.add(visit)
+    db_session.flush()
+
+    entry.patient_id = patient.id
+    entry.visit_id = visit.id
+    db_session.flush()
+    return visit
+
+
 def test_staff_call_next_patient_preserves_queue_time(db_session, monkeypatch):
     target_day = date(2026, 1, 1)
     _freeze_datetime(monkeypatch, datetime(2026, 1, 1, 9, 0))
@@ -206,23 +241,28 @@ def test_staff_skip_queue_entry_preserves_queue_time(db_session):
 
 def test_staff_cancel_visit_queue_link_preserves_queue_time(db_session):
     target_day = date(2026, 1, 1)
-    _daily_queue, first, _second = _queue_with_entries(
+    daily_queue, first, _second = _queue_with_entries(
         db_session,
         target_day=target_day,
     )
-    first.visit_id = 1001
-    db_session.flush()
+    visit = _link_entry_to_visit(
+        db_session,
+        first,
+        doctor_id=daily_queue.specialist_id,
+        target_day=target_day,
+        phone="+998901001001",
+    )
 
     result = QueueBusinessService().staff_cancel_visit_queue_link(
         db_session,
-        visit_id=1001,
+        visit_id=visit.id,
         actor_user_id=42,
         commit=False,
     )
 
     assert result["success"] is True
     assert result["action"] == "staff_cancel_visit_queue_link"
-    assert result["visit_id"] == 1001
+    assert result["visit_id"] == visit.id
     assert result["previous_status"] == "waiting"
     assert result["status"] == "cancelled"
     assert result["queue_time_preserved"] is True
@@ -232,23 +272,28 @@ def test_staff_cancel_visit_queue_link_preserves_queue_time(db_session):
 
 def test_staff_move_visit_queue_link_preserves_queue_time(db_session):
     target_day = date(2026, 1, 1)
-    _daily_queue, first, _second = _queue_with_entries(
+    daily_queue, first, _second = _queue_with_entries(
         db_session,
         target_day=target_day,
     )
-    first.visit_id = 1002
-    db_session.flush()
+    visit = _link_entry_to_visit(
+        db_session,
+        first,
+        doctor_id=daily_queue.specialist_id,
+        target_day=target_day,
+        phone="+998901001002",
+    )
 
     result = QueueBusinessService().staff_move_visit_queue_link(
         db_session,
-        visit_id=1002,
+        visit_id=visit.id,
         actor_user_id=42,
         commit=False,
     )
 
     assert result["success"] is True
     assert result["action"] == "staff_move_visit_queue_link"
-    assert result["visit_id"] == 1002
+    assert result["visit_id"] == visit.id
     assert result["previous_status"] == "waiting"
     assert result["status"] == "rescheduled"
     assert result["queue_time_preserved"] is True
