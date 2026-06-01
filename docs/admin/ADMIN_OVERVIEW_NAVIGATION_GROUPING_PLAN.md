@@ -48,6 +48,21 @@ The accepted target grouping is:
 security, and audit remain unchanged until their own route-family PRs name the
 owner and validation plan.
 
+## Implementation Evidence
+
+The target grouping was implemented by PR `#1518`:
+
+- route paths, owners, components, RBAC roles, and compatibility aliases stayed
+  unchanged;
+- only Admin route `nav.section` metadata and section ordering changed;
+- `frontend/src/routing/__tests__/routeContract.test.js` now guards the
+  expected `Overview`, `Управление`, `Операции`, `Интеграции`, and `Система`
+  section order;
+- local browser smoke opened `/admin`, `/admin/analytics`, `/admin/reports`,
+  `/admin/system`, `/admin/cloud-printing`, `/admin/medical-equipment`,
+  `/admin/webhooks`, and `/admin/graphql-explorer` without login or forbidden
+  redirects.
+
 ## Runtime Change Policy
 
 A future runtime PR may move route `nav.section` values only if it also includes:

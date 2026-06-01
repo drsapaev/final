@@ -15,6 +15,11 @@ original audit as baseline evidence and records the small PRs merged afterward.
 | #1507 | merged | `MacOSTable` header PropTypes | Fixed `/admin/services` table warning by allowing React node headers. |
 | #1508 | merged | `MacOSTextarea` DOM prop handling | Fixed `/admin/graphql-explorer` React unknown-prop warning by consuming `textareaStyle` inside the UI primitive. |
 | #1509 | merged | AdminPanel route-state guardrail test | Added a test protecting contextual route section mappings and Telegram settings routing. |
+| #1511 | merged | notification route channel map | Documented Email/SMS, FCM, registrar, in-app, Telegram, and preference ownership boundaries. |
+| #1513 | merged | duplicate user route guardrail | Added route contract coverage for `/admin/users` and `/admin/advanced-users`. |
+| #1514 | merged | overview navigation grouping plan | Documented the staged `Overview` / `Operations` / `Integrations` split. |
+| #1516 | merged | overview route section guardrail | Added route contract coverage before moving sidebar sections. |
+| #1518 | merged | overview sidebar regrouping | Moved system/cloud-printing/medical-equipment to `Операции` and webhooks/GraphQL to `Интеграции`. |
 
 ## Current Verified Status
 
@@ -22,6 +27,12 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - `/admin/file-management` uses the canonical file endpoints and no longer produces the previous 401/422 sequence in local smoke.
 - `/admin/services` no longer produces the `MacOSTable` column-title PropTypes warning.
 - `/admin/graphql-explorer` no longer produces the `textareaStyle` unknown DOM prop warning.
+- `/admin/users` and `/admin/advanced-users` have route contract coverage for
+  their intentional canonical vs advanced split.
+- Admin sidebar grouping is now:
+  - `Overview`: dashboard, analytics, reports
+  - `Операции`: system, cloud printing, medical equipment
+  - `Интеграции`: webhooks, GraphQL API
 - Contextual settings routes deep-link to their intended screens:
   - `/admin/security?section=security`
   - `/admin/ai-settings?section=ai-settings`
@@ -57,7 +68,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
   - `Overview`: dashboard, analytics, reports
   - `Operations`: system, cloud printing, medical equipment
   - `Integrations`: webhooks, GraphQL API
-  - Grouping policy lives in `docs/admin/ADMIN_OVERVIEW_NAVIGATION_GROUPING_PLAN.md`.
+  - Runtime grouping and evidence are recorded in `docs/admin/ADMIN_OVERVIEW_NAVIGATION_GROUPING_PLAN.md`.
 - `AdminPanel.jsx` remains a broad route switch plus implementation container.
 - Some routes still have weak heading semantics and should get route-specific heading checks before UI redesign.
 
@@ -69,9 +80,7 @@ original audit as baseline evidence and records the small PRs merged afterward.
 2. `test(admin): guard duplicate user route ownership`
    - Add route contract around `/admin/users` and `/admin/advanced-users`.
    - No consolidation until a small browser-smoked implementation plan exists.
-3. `docs(admin): record overview regrouping evidence`
-   - Add post-merge browser evidence for the regrouped sidebar sections.
-4. `refactor(admin): extract one AdminPanel route family`
+3. `refactor(admin): extract one AdminPanel route family`
    - Only after a specific family is selected.
    - One family per PR.
 
