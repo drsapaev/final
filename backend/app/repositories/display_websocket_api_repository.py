@@ -41,6 +41,13 @@ class DisplayWebSocketApiRepository:
             .first()
         )
 
+    def get_active_doctor_by_user_id(self, user_id: int) -> Doctor | None:
+        return (
+            self.db.query(Doctor)
+            .filter(Doctor.user_id == user_id, Doctor.active.is_(True))
+            .first()
+        )
+
     def get_daily_queue_for_specialist(
         self,
         *,

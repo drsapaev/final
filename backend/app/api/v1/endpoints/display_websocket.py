@@ -134,6 +134,7 @@ async def call_patient_to_board(
         return await DisplayWebSocketApiService(db).call_patient(
             entry_id=entry_id,
             board_ids=board_ids,
+            current_user=current_user,
         )
     except DisplayWebSocketApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -354,6 +355,7 @@ async def quick_call_next_patient(
         return await DisplayWebSocketApiService(db).quick_call_next(
             specialty=specialty,
             board_id=board_id,
+            current_user=current_user,
         )
     except DisplayWebSocketApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

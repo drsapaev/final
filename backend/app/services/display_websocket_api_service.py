@@ -32,11 +32,48 @@ class DisplayWebSocketApiService:
         self.repository = repository or DisplayWebSocketApiRepository(db)
         self._manager_provider = manager_provider
 
+    @staticmethod
+    def _role_name(current_user: object) -> str:
+        role = getattr(current_user, "role", "")
+        return str(getattr(role, "value", role) or "").strip().lower()
+
+    @staticmethod
+    def _same_specialty(left: str | None, right: str | None) -> bool:
+        return str(left or "").strip().lower() == str(right or "").strip().lower()
+
+    def _current_doctor_or_403(self, current_user: object) -> object:
+        doctor = self.repository.get_active_doctor_by_user_id(
+            getattr(current_user, "id", None)
+        )
+        if not doctor:
+            raise DisplayWebSocketApiDomainError(
+                status_code=403,
+                detail="Doctor profile is required to call queue patients",
+            )
+        return doctor
+
+    def _ensure_doctor_can_call_queue(
+        self,
+        *,
+        current_user: object,
+        queue: object,
+    ) -> None:
+        if self._role_name(current_user) != "doctor":
+            return
+
+        doctor = self._current_doctor_or_403(current_user)
+        if getattr(queue, "specialist_id", None) != getattr(doctor, "id", None):
+            raise DisplayWebSocketApiDomainError(
+                status_code=403,
+                detail="Doctor can only call patients from their own queue",
+            )
+
     async def call_patient(
         self,
         *,
         entry_id: int,
         board_ids: list[str],
+        current_user: object,
     ) -> dict:
         queue_entry = self.repository.get_queue_entry(entry_id)
         if not queue_entry:
@@ -44,6 +81,11 @@ class DisplayWebSocketApiService:
                 status_code=404,
                 detail="Запись в очереди не найдена",
             )
+
+        self._ensure_doctor_can_call_queue(
+            current_user=current_user,
+            queue=queue_entry.queue,
+        )
 
         queue_entry.status = "called"
         queue_entry.called_at = datetime.utcnow()
@@ -112,20 +154,32 @@ class DisplayWebSocketApiService:
         *,
         specialty: str,
         board_id: str | None,
+        current_user: object,
     ) -> dict:
-        doctor = self.repository.get_active_doctor_by_specialty(specialty)
+        if self._role_name(current_user) == "doctor":
+            doctor = self._current_doctor_or_403(current_user)
+            if not self._same_specialty(getattr(doctor, "specialty", None), specialty):
+                raise DisplayWebSocketApiDomainError(
+                    status_code=403,
+                    detail="Doctor can only quick-call patients for their own specialty",
+                )
+        else:
+            doctor = self.repository.get_active_doctor_by_specialty(specialty)
         if not doctor:
             raise DisplayWebSocketApiDomainError(
                 status_code=404,
                 detail=f"Врач специальности {specialty} не найден",
             )
 
-        doctor_user_id = doctor.user_id if doctor.user_id else None
-        daily_queue = None
-        if doctor_user_id:
-            daily_queue = self.repository.get_daily_queue_for_specialist(
-                day=date.today(),
-                specialist_id=doctor_user_id,
+        daily_queue = self.repository.get_daily_queue_for_specialist(
+            day=date.today(),
+            specialist_id=doctor.id,
+        )
+
+        if daily_queue:
+            self._ensure_doctor_can_call_queue(
+                current_user=current_user,
+                queue=daily_queue,
             )
 
         if not daily_queue:
@@ -145,4 +199,5 @@ class DisplayWebSocketApiService:
         return await self.call_patient(
             entry_id=next_entry.id,
             board_ids=[board_id] if board_id else [],
+            current_user=current_user,
         )
