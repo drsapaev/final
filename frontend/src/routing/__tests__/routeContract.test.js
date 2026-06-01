@@ -166,6 +166,34 @@ describe('route contract invariants', () => {
     });
   });
 
+  it('keeps admin user routes split between canonical and advanced ownership', () => {
+    const adminProfile = { role: 'Admin' };
+    const canonicalUsersRoute = getRouteById('admin-users');
+    const advancedUsersRoute = getRouteById('admin-advanced-users');
+
+    expect(canonicalUsersRoute).toBeTruthy();
+    expect(canonicalUsersRoute.path).toBe('/admin/users');
+    expect(canonicalUsersRoute.owner).toBe('admin.users');
+    expect(canonicalUsersRoute.entry).toBe('menu');
+    expect(canonicalUsersRoute.component).toBe('AdminPanel');
+    expect(canonicalUsersRoute.layout.activeSidebarItem).toBe('admin-users');
+    expect(isRouteAccessibleToProfile(canonicalUsersRoute, adminProfile)).toBe(true);
+
+    expect(advancedUsersRoute).toBeTruthy();
+    expect(advancedUsersRoute.path).toBe('/admin/advanced-users');
+    expect(advancedUsersRoute.owner).toBe('admin.users');
+    expect(advancedUsersRoute.entry).toBe('direct');
+    expect(advancedUsersRoute.component).toBe('UserManagement');
+    expect(advancedUsersRoute.legacyRedirectFrom).toContain('/advanced-users');
+    expect(advancedUsersRoute.layout.activeSidebarItem).toBe('admin-advanced-users');
+    expect(isRouteAccessibleToProfile(advancedUsersRoute, adminProfile)).toBe(true);
+
+    expect(canonicalUsersRoute.component).not.toBe(advancedUsersRoute.component);
+    expect(canonicalUsersRoute.path).not.toBe(advancedUsersRoute.path);
+    expect(getRouteChromeState('/admin/users', '', adminProfile).activeSidebarItem).toBe('admin-users');
+    expect(getRouteChromeState('/admin/advanced-users', '', adminProfile).activeSidebarItem).toBe('admin-advanced-users');
+  });
+
   it('keeps clinical contextual routes registered and out of default sidebar navigation', () => {
     const doctorProfile = { role: 'Doctor' };
     const clinicalChrome = getRouteChromeState('/clinical/search', '', doctorProfile);
