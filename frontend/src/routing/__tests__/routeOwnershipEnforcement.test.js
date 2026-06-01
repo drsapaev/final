@@ -8,15 +8,16 @@ function read(relativePath) {
 
 describe('routing anti-regression enforcement', () => {
   it('keeps legacy consumers free from hand-maintained route tables', () => {
+    const routeRegistry = read('src/routing/routeRegistry.js');
+
     expect(read('src/components/layout/Nav.jsx')).not.toContain('const routes = [');
     expect(read('src/constants/routes.js')).not.toContain('const routeMap =');
-    expect(read('src/pages/AdminPanel.jsx')).not.toContain('const navigationSections = [');
+    expect(routeRegistry).not.toContain("component: 'AdminPanel'");
   });
 
   it('uses the routing subsystem as the route source of truth', () => {
     expect(read('src/App.jsx')).toContain('from \'./routing/routeRegistry.js\'');
     expect(read('src/App.jsx')).toContain('ROUTE_REGISTRY.map');
-    expect(read('src/pages/AdminPanel.jsx')).toContain('getAdminNavSections');
     expect(read('src/components/layout/Nav.jsx')).toContain('getVisibleRoutesForShell');
   });
 });

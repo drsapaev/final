@@ -319,22 +319,6 @@ export const FRONTEND_FILE_MAP = {
   },
 
   // Страницы
-  'src/pages/AdminPanel.jsx': {
-    purpose: 'Панель администратора',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/admin/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/admin/']
-  },
-  
-  'src/pages/AdminPanelNew.jsx': {
-    purpose: 'Новая панель администратора',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/admin/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/admin/']
-  },
-  
   'src/pages/AnalyticsPage.jsx': {
     purpose: 'Страница аналитики',
     currentLocation: 'src/pages/',
@@ -702,8 +686,6 @@ export function getRecommendedStructure() {
       'useUsers.js'
     ],
     'src/pages/admin/': [
-      'AdminPanel.jsx',
-      'AdminPanelNew.jsx',
       'AnalyticsPage.jsx',
       'Audit.jsx',
       'SecurityPage.jsx',
