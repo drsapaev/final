@@ -82,6 +82,7 @@ const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
 const AdvancedUserManagement = lazy(() => import('./components/admin/AdvancedUserManagement.jsx'));
 const UserManagement = lazy(() => import('./components/admin/UserManagement.jsx'));
 const UnifiedUserManagement = lazy(() => import('./components/admin/UnifiedUserManagement.jsx'));
+const AllFreeApproval = lazy(() => import('./components/admin/AllFreeApproval.jsx'));
 const IntegrationDemo = lazy(() => import('./components/integration/IntegrationDemo.jsx'));
 
 const ROUTE_COMPONENTS = {
@@ -103,6 +104,7 @@ const ROUTE_COMPONENTS = {
   AdvancedUserManagement,
   UserManagement,
   UnifiedUserManagement,
+  AllFreeApproval,
   FileManager,
   UserSelect,
   RegistrarPanel,

@@ -81,6 +81,10 @@ const ADMIN_MANAGEMENT_ROUTE_CHROME_HEADING_CONTRACT = {
   'admin-all-free': { path: '/admin/all-free', pageTitle: 'Admin All Free' },
 };
 
+const ADMIN_STANDALONE_MANAGEMENT_COMPONENT_CONTRACT = {
+  'admin-all-free': { path: '/admin/all-free', owner: 'admin.operations', component: 'AllFreeApproval', entry: 'direct' },
+};
+
 const ADMIN_CONTEXTUAL_ROUTE_CHROME_HEADING_CONTRACT = {
   'admin-benefit-settings': { path: '/admin/benefit-settings', pageTitle: 'Admin Benefit Settings' },
   'admin-wizard-settings': { path: '/admin/wizard-settings', pageTitle: 'Admin Wizard Settings' },
@@ -286,6 +290,23 @@ describe('route contract invariants', () => {
 
   it('keeps management routes on route-specific chrome headings', () => {
     assertRouteSpecificChromeHeadings(ADMIN_MANAGEMENT_ROUTE_CHROME_HEADING_CONTRACT);
+  });
+
+  it('keeps standalone admin management routes on direct component owners', () => {
+    const adminProfile = { role: 'Admin' };
+
+    Object.entries(ADMIN_STANDALONE_MANAGEMENT_COMPONENT_CONTRACT).forEach(([routeId, expected]) => {
+      const route = getRouteById(routeId);
+
+      expect(route).toBeTruthy();
+      expect(route.path).toBe(expected.path);
+      expect(route.owner).toBe(expected.owner);
+      expect(route.component).toBe(expected.component);
+      expect(route.component).not.toBe('AdminPanel');
+      expect(route.entry).toBe(expected.entry);
+      expect(route.layout.activeSidebarItem).toBe(routeId);
+      expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
+    });
   });
 
   it('keeps contextual admin routes on route-specific chrome headings', () => {
