@@ -72,13 +72,7 @@ import {
   Trash2,
 
   DollarSign,
-  AlertCircle,
-
-
-
-
-
-  FolderTree } from
+  AlertCircle } from
 'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
@@ -158,6 +152,7 @@ import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
 import QueueCabinetManagement from '../components/admin/QueueCabinetManagement';
+import AdminServices from '../components/admin/AdminServices';
 import { getApiOrigin } from '../api/runtime';
 
 
@@ -171,7 +166,6 @@ import '../styles/admin-styles.css';
 
 const LazyGraphQLExplorer = React.lazy(() => import('../components/admin/GraphQLExplorer'));
 const LazyQueueProfilesManager = React.lazy(() => import('../components/admin/QueueProfilesManager'));
-const LazyServiceCatalog = React.lazy(() => import('../components/admin/ServiceCatalog'));
 const LazyUnifiedReports = React.lazy(() => import('../components/admin/UnifiedReports'));
 const LazyWaitTimeAnalytics = React.lazy(() => import('../components/analytics/WaitTimeAnalytics'));
 
@@ -520,21 +514,6 @@ const AdminPanel = () => {
   useEffect(() => {
     localStorage.setItem('settingsSubTab', settingsSubTab);
   }, [settingsSubTab]);
-
-  // Состояние для вкладок секции Services
-  const [servicesTab, setServicesTab] = useState(() => {
-    const params = new URLSearchParams(location.search);
-    const tabFromUrl = params.get('servicesTab');
-    if (tabFromUrl) {
-      return tabFromUrl;
-    }
-    return localStorage.getItem('servicesTab') || 'catalog';
-  });
-
-  // Сохраняем выбранную вкладку services
-  useEffect(() => {
-    localStorage.setItem('servicesTab', servicesTab);
-  }, [servicesTab]);
 
   // Состояние для логотипа
   const [, setLogoFile] = useState(null);
@@ -2631,86 +2610,8 @@ const AdminPanel = () => {
             <LazyGraphQLExplorer />
           </React.Suspense>
         );
-      case 'services':{
-          // Вкладки для секции Services
-          // ⭐ SSOT: DepartmentManagement удалён - QueueProfilesManager теперь единственный источник для вкладок регистратуры
-          const serviceTabs = [
-          { key: 'catalog', label: 'Справочник услуг', icon: Package },
-          { key: 'queue-profiles', label: 'Вкладки регистратуры', icon: FolderTree } // ⭐ SSOT: Dynamic queue tabs
-          ];
-
-          return (
-            <div>
-            {/* Вкладки */}
-            <div style={{
-                display: 'flex',
-                gap: '8px',
-                marginBottom: '24px',
-                borderBottom: '1px solid var(--mac-border)',
-                paddingBottom: '0'
-              }}>
-              {serviceTabs.map((tab) => {
-                  const TabIcon = tab.icon;
-                  const isActive = servicesTab === tab.key;
-                  return (
-                    <button
-                      type="button"
-                      key={tab.key}
-                      aria-label={tab.label}
-                      onClick={() => {
-                        setServicesTab(tab.key);
-                        // Обновляем URL
-                        const params = new URLSearchParams(location.search);
-                        params.set('servicesTab', tab.key);
-                        navigate(`?${params.toString()}`, { replace: true });
-                      }}
-                      style={{
-                        padding: '12px 20px',
-                        background: 'transparent',
-                        border: 'none',
-                        borderBottom: isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
-                        color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '14px',
-                        fontWeight: isActive ? '600' : '500',
-                        transition: 'all 0.2s ease',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.color = 'var(--mac-text-primary)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.color = 'var(--mac-text-secondary)';
-                        }
-                      }}>
-
-                    <TabIcon size={18} />
-                    {tab.label}
-                  </button>);
-
-                })}
-            </div>
-
-            {/* Содержимое вкладок */}
-            {servicesTab === 'catalog' && (
-              <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
-                <LazyServiceCatalog />
-              </React.Suspense>
-            )}
-            {servicesTab === 'queue-profiles' && (
-              <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
-                <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
-              </React.Suspense>
-            )}
-          </div>);
-
-        }
+      case 'services':
+        return <AdminServices />;
       case 'departments':
         // ⭐ DEPRECATED: Redirect to SSOT queue-profiles
         return (

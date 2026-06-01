@@ -571,7 +571,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Услуги', icon: 'list', section: 'Управление', order: 30, sidebar: true }),
     title: 'Admin Services',
     owner: 'admin.catalog',
-    component: 'AdminPanel',
+    component: 'AdminServices',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-services', pageTitle: 'Admin Services' }),
   },
