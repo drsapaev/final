@@ -85,8 +85,7 @@ function resolveDoctorQueueEntryId(row) {
     return explicitQueueEntryId;
   }
 
-  const recordKind = String(row?.record_kind ?? row?.record_type ?? row?.type ?? '').trim().toLowerCase();
-  return recordKind === 'online_queue' && row?.id !== null && row?.id !== undefined ? row.id : null;
+  return null;
 }
 
 function getRecentDermatologyCache(cacheEntry, fallbackValue) {
