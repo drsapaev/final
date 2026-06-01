@@ -41,6 +41,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+JOIN_SESSION_PROCESSING_STATUS = "joining"
+
 
 class QRQueueService:
     """Сервис для управления QR очередями"""
@@ -227,8 +229,8 @@ class QRQueueService:
 
         if patient:
             logger.info(
-                "[QRQueueService._find_or_create_patient] ✅ Найден существующий пациент ID=%d по телефону %s",
-                patient.id, phone
+                "[QRQueueService._find_or_create_patient] ✅ Найден существующий пациент ID=%d",
+                patient.id,
             )
             return patient
 
@@ -251,11 +253,47 @@ class QRQueueService:
         self.db.flush()
 
         logger.info(
-            "[QRQueueService._find_or_create_patient] ✅ Создан новый пациент ID=%d для QR-регистрации: %s, %s",
-            patient.id, patient_name, phone
+            "[QRQueueService._find_or_create_patient] ✅ Создан новый пациент ID=%d для QR-регистрации",
+            patient.id,
         )
 
         return patient
+
+    def _claim_pending_join_session(self, session_token: str) -> QueueJoinSession | None:
+        now_utc = datetime.utcnow()
+        pending_filter = (
+            QueueJoinSession.session_token == session_token,
+            QueueJoinSession.status == "pending",
+            QueueJoinSession.expires_at > now_utc,
+        )
+        query = self.db.query(QueueJoinSession).filter(*pending_filter)
+
+        if not hasattr(query, "update"):
+            session = query.first()
+            if session:
+                session.status = JOIN_SESSION_PROCESSING_STATUS
+                if hasattr(self.db, "flush"):
+                    self.db.flush()
+            return session
+
+        updated = query.update(
+            {QueueJoinSession.status: JOIN_SESSION_PROCESSING_STATUS},
+            synchronize_session=False,
+        )
+        if updated == 0:
+            return None
+        if updated != 1:
+            raise ValueError("Ambiguous queue join session")
+
+        self.db.flush()
+        return (
+            self.db.query(QueueJoinSession)
+            .filter(
+                QueueJoinSession.session_token == session_token,
+                QueueJoinSession.status == JOIN_SESSION_PROCESSING_STATUS,
+            )
+            .first()
+        )
 
     def _create_visit_for_qr(
         self,
@@ -316,8 +354,9 @@ class QRQueueService:
         self.db.flush()
 
         logger.info(
-            "[QRQueueService._create_visit_for_qr] ✅ Создан Visit ID=%d для QR-пациента %d с %d услугами",
-            visit.id, patient_id, len(services)
+            "[QRQueueService._create_visit_for_qr] ✅ Создан Visit ID=%d с %d услугами",
+            visit.id,
+            len(services),
         )
 
         return visit
@@ -867,17 +906,7 @@ class QRQueueService:
         """
         # Находим сессию
         # expires_at сохраняется в UTC (datetime.utcnow()), поэтому сравниваем с UTC
-        now_utc = datetime.utcnow()
-
-        session = (
-            self.db.query(QueueJoinSession)
-            .filter(
-                QueueJoinSession.session_token == session_token,
-                QueueJoinSession.status == "pending",
-                QueueJoinSession.expires_at > now_utc,
-            )
-            .first()
-        )
+        session = self._claim_pending_join_session(session_token)
 
         if not session:
             raise ValueError("Сессия не найдена или истекла")
@@ -890,6 +919,7 @@ class QRQueueService:
         )
 
         if not qr_token:
+            self.db.rollback()
             raise ValueError("QR токен не найден")
 
         # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
@@ -898,8 +928,7 @@ class QRQueueService:
 
         if not patient_id:
             logger.warning(
-                "[complete_join_session] ⚠️ Не удалось создать/найти пациента для %s, %s",
-                patient_name, phone
+                "[complete_join_session] ⚠️ Не удалось создать/найти пациента"
             )
 
         try:
@@ -913,6 +942,7 @@ class QRQueueService:
                 source="online",
             )
         except (QueueValidationError, QueueConflictError, QueueNotFoundError) as exc:
+            self.db.rollback()
             raise ValueError(str(exc)) from exc
 
         queue_entry = join_result["entry"]
@@ -980,17 +1010,7 @@ class QRQueueService:
             raise ValueError("Не выбраны специалисты для записи")
 
         # expires_at сохраняется в UTC (datetime.utcnow()), поэтому сравниваем с UTC
-        now_utc = datetime.utcnow()
-
-        session = (
-            self.db.query(QueueJoinSession)
-            .filter(
-                QueueJoinSession.session_token == session_token,
-                QueueJoinSession.status == "pending",
-                QueueJoinSession.expires_at > now_utc,
-            )
-            .first()
-        )
+        session = self._claim_pending_join_session(session_token)
 
         if not session:
             raise ValueError("Сессия не найдена или истекла")
@@ -1001,6 +1021,7 @@ class QRQueueService:
             .first()
         )
         if not qr_token:
+            self.db.rollback()
             raise ValueError("QR токен не найден")
 
         # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
@@ -1009,8 +1030,7 @@ class QRQueueService:
 
         if not patient_id:
             logger.warning(
-                "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента для %s, %s",
-                patient_name, phone
+                "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента"
             )
 
         entries: list[dict[str, Any]] = []
@@ -1056,6 +1076,10 @@ class QRQueueService:
                         "error": str(exc),
                     }
                 )
+
+        if errors and not entries:
+            self.db.rollback()
+            raise ValueError(errors[0]["error"])
 
         session.status = "joined"
         session.patient_name = patient_name
