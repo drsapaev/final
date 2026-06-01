@@ -22,6 +22,8 @@ const makeAppointment = (overrides = {}) => ({
   visit_id: pickOverride(overrides, 'visit_id', overrides.id ?? 1),
   appointment_id: pickOverride(overrides, 'appointment_id', overrides.id ?? 1),
   queue_entry_id: overrides.queue_entry_id ?? null,
+  queue_id: overrides.queue_id ?? null,
+  canonical_record_id: overrides.canonical_record_id,
   visit_type: overrides.visit_type ?? null,
   payment_type: overrides.payment_type ?? null,
   payment_status: overrides.payment_status ?? 'pending',
@@ -206,6 +208,61 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result[0].grouped_record_refs).toEqual([
       { record_kind: 'online_queue', record_id: 900001 },
     ]);
+  });
+
+  it('promotes only explicit queue entry identity from queue_numbers', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 31,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        canonical_record_id: null,
+        visit_id: null,
+        appointment_id: null,
+        queue_entry_id: null,
+        queue_numbers: [
+          {
+            id: 31,
+            queue_id: 31,
+            queue_entry_id: 9001,
+            number: 4,
+          },
+        ],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].queue_entry_id).toBe(9001);
+    expect(result[0].queue_entry_ids).toEqual([9001]);
+    expect(result[0].grouped_record_refs).toEqual([
+      { record_kind: 'online_queue', record_id: 9001 },
+    ]);
+  });
+
+  it('does not promote DailyQueue ids into online queue record refs', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 31,
+        record_kind: 'online_queue',
+        record_type: 'online_queue',
+        canonical_record_id: null,
+        visit_id: null,
+        appointment_id: null,
+        queue_entry_id: null,
+        queue_numbers: [
+          {
+            id: 31,
+            queue_id: 31,
+            number: 4,
+          },
+        ],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].queue_entry_id).toBeNull();
+    expect(result[0].queue_entry_ids).toEqual([]);
+    expect(result[0].grouped_record_refs).toEqual([]);
   });
 
   it('preserves the earliest queue_time when grouping all departments', () => {
