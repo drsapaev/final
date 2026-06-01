@@ -348,6 +348,22 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/activation', '', adminProfile).activeSidebarItem).toBe('admin-activation');
   });
 
+  it('keeps admin clinic management on its direct route owner', () => {
+    const adminProfile = { role: 'Admin' };
+    const clinicManagementRoute = getRouteById('admin-clinic-management');
+
+    expect(clinicManagementRoute).toBeTruthy();
+    expect(clinicManagementRoute.path).toBe('/admin/clinic-management');
+    expect(clinicManagementRoute.owner).toBe('admin.operations');
+    expect(clinicManagementRoute.entry).toBe('direct');
+    expect(clinicManagementRoute.component).toBe('ClinicManagement');
+    expect(clinicManagementRoute.component).not.toBe('AdminPanel');
+    expect(clinicManagementRoute.nav.sidebar).toBe(true);
+    expect(clinicManagementRoute.layout.activeSidebarItem).toBe('admin-clinic-management');
+    expect(isRouteAccessibleToProfile(clinicManagementRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/clinic-management', '', adminProfile).activeSidebarItem).toBe('admin-clinic-management');
+  });
+
   it('keeps admin Telegram operational and settings surfaces explicit', () => {
     const adminProfile = { role: 'Admin' };
     const telegramIntegrationRoute = getRouteById('admin-telegram-integration');
