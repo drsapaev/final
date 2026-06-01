@@ -4,6 +4,7 @@ import { resolveSetupRedirect } from '../routeGuards.jsx';
 import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry.js';
 import {
   getCompatibilityRedirects,
+  getAdminNavSections,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
   getProtectedPatientFormsEntryPath,
@@ -42,15 +43,15 @@ const ADMIN_CONTEXTUAL_ROUTE_IDS = [
   'admin-user-select',
 ];
 
-const ADMIN_OVERVIEW_ROUTE_CONTRACT = {
-  'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminPanel', entry: 'menu' },
-  'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu' },
-  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct' },
-  'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'AdminPanel', entry: 'direct' },
-  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'AdminPanel', entry: 'direct' },
-  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct' },
-  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct' },
-  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct' },
+const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
+  'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminPanel', entry: 'menu', section: 'Обзор' },
+  'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
+  'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'AdminPanel', entry: 'direct', section: 'Обзор' },
+  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
+  'admin-cloud-printing': { path: '/admin/cloud-printing', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
+  'admin-medical-equipment': { path: '/admin/medical-equipment', owner: 'admin.operations', component: 'AdminPanel', entry: 'direct', section: 'Операции' },
+  'admin-webhooks': { path: '/admin/webhooks', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
+  'admin-graphql-explorer': { path: '/admin/graphql-explorer', owner: 'admin.integrations', component: 'AdminPanel', entry: 'direct', section: 'Интеграции' },
 };
 
 const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
@@ -177,23 +178,28 @@ describe('route contract invariants', () => {
     });
   });
 
-  it('keeps overloaded admin overview routes explicit until regrouping', () => {
+  it('keeps admin overview, operations, and integrations route sections explicit', () => {
     const adminProfile = { role: 'Admin' };
-    const overviewSection = getRouteById('admin-dashboard').nav.section;
+    const navSections = getAdminNavSections(adminProfile);
+    const sectionTitles = navSections.map((section) => section.title);
 
-    Object.entries(ADMIN_OVERVIEW_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
+    expect(sectionTitles).toEqual(['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система']);
+
+    Object.entries(ADMIN_NAV_GROUPING_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
       const route = getRouteById(routeId);
       const chrome = getRouteChromeState(expected.path, '', adminProfile);
+      const navSection = navSections.find((section) => section.title === expected.section);
 
       expect(route).toBeTruthy();
       expect(route.path).toBe(expected.path);
       expect(route.owner).toBe(expected.owner);
       expect(route.component).toBe(expected.component);
       expect(route.entry).toBe(expected.entry);
-      expect(route.nav.section).toBe(overviewSection);
+      expect(route.nav.section).toBe(expected.section);
       expect(route.layout.activeSidebarItem).toBe(routeId);
       expect(chrome.activeSidebarItem).toBe(routeId);
       expect(isRouteAccessibleToProfile(route, adminProfile)).toBe(true);
+      expect(navSection.items.some((item) => item.id === routeId)).toBe(true);
     });
   });
 

@@ -2,7 +2,7 @@ import { generatePath, matchPath } from 'react-router-dom';
 import { buildRouteDocsSnapshot } from './routeDocsSnapshot.js';
 import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
 
-const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Система'];
+const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система'];
 export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 export const PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID = 'patient-booking-entry';
 export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
