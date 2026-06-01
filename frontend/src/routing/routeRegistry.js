@@ -639,7 +639,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Заявки All Free', icon: 'exclamationmark.triangle', section: 'Управление', order: 70, sidebar: true }),
     title: 'Admin All Free',
     owner: 'admin.operations',
-    component: 'AdminPanel',
+    component: 'AllFreeApproval',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-all-free', pageTitle: 'Admin All Free' }),
   },
