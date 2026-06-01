@@ -911,7 +911,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Безопасность', icon: 'lock', section: 'Система', order: 90, sidebar: true }),
     title: 'Admin Security',
     owner: 'admin.security',
-    component: 'AdminPanel',
+    component: 'UnifiedSettings',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-security', pageTitle: 'Admin Security' }),
   },
