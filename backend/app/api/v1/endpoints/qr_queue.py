@@ -2249,6 +2249,16 @@ def full_update_online_entry(
             if entry.visit_id:
                 visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
                 if visit:
+                    if visit.patient_id != patient_id_for_visit:
+                        logger.warning(
+                            "[full_update_online_entry] entry visit owner mismatch entry_id=%d visit_id=%d",
+                            entry.id,
+                            visit.id,
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Queue entry visit does not belong to the queue patient",
+                        )
                     logger.info(
                         "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
                         visit.id,
