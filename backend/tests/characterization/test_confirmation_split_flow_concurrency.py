@@ -8,11 +8,16 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 
 from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
+from app.services.visit_confirmation_service import (
+    VisitConfirmationDomainError,
+    VisitConfirmationService,
+)
 
 
 def _make_pending_confirmation_visit(
@@ -157,6 +162,80 @@ def test_parallel_confirmation_pending_lookup_can_observe_same_pending_visit(tes
     finally:
         cleanup = session_local()
         try:
+            cleanup.query(Visit).filter(Visit.id == visit_id).delete()
+            cleanup.query(Patient).filter(Patient.id == patient_id).delete()
+            cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
+            cleanup.query(User).filter(User.id == user_id).delete()
+            cleanup.commit()
+        finally:
+            cleanup.close()
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_parallel_telegram_confirmation_claim_allows_only_one_mutation(test_db):
+    token, visit_id, patient_id, doctor_id, user_id = _make_pending_confirmation_visit(
+        test_db,
+        suffix=uuid.uuid4().hex[:8],
+    )
+    session_local = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
+    barrier = threading.Barrier(2)
+    successes: list[int] = []
+    failures: list[int] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        session = session_local()
+        try:
+            barrier.wait()
+            service = VisitConfirmationService(session)
+            try:
+                result = service.confirm_by_telegram(
+                    token=token,
+                    telegram_user_id="123456789",
+                    source_ip="127.0.0.1",
+                    user_agent="Mozilla/5.0",
+                )
+                with lock:
+                    successes.append(int(result["visit_id"]))
+            except VisitConfirmationDomainError:
+                with lock:
+                    failures.append(1)
+        finally:
+            session.close()
+
+    try:
+        threads = [threading.Thread(target=worker), threading.Thread(target=worker)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        verify = session_local()
+        try:
+            visit = verify.query(Visit).filter(Visit.id == visit_id).one()
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
+            )
+            assert successes == [visit_id]
+            assert failures == [1]
+            assert visit.status == "open"
+            assert len(entries) == 1
+            assert entries[0].source == "confirmation"
+        finally:
+            verify.close()
+    finally:
+        cleanup = session_local()
+        try:
+            cleanup.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.visit_id == visit_id
+            ).delete()
+            cleanup.query(DailyQueue).filter(
+                DailyQueue.specialist_id == doctor_id
+            ).delete()
             cleanup.query(Visit).filter(Visit.id == visit_id).delete()
             cleanup.query(Patient).filter(Patient.id == patient_id).delete()
             cleanup.query(Doctor).filter(Doctor.id == doctor_id).delete()
