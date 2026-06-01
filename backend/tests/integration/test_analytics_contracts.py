@@ -216,6 +216,44 @@ def test_doctor_cannot_read_kpi_financial_analytics(
 @pytest.mark.parametrize(
     "path",
     [
+        "/api/v1/analytics/advanced/kpi",
+        "/api/v1/analytics/advanced/doctors/performance",
+        "/api/v1/analytics/advanced/revenue/advanced",
+        "/api/v1/analytics/advanced/predictive",
+        "/api/v1/analytics/advanced/comprehensive/advanced",
+    ],
+)
+def test_doctor_cannot_read_advanced_financial_analytics(
+    client: TestClient,
+    doctor_token: str,
+    path: str,
+) -> None:
+    response = client.get(
+        path,
+        headers=_auth_headers(doctor_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_can_read_advanced_revenue_analytics(
+    client: TestClient,
+    admin_token: str,
+) -> None:
+    response = client.get(
+        "/api/v1/analytics/advanced/revenue/advanced",
+        headers=_auth_headers(admin_token),
+        params={"start_date": "2026-03-08", "end_date": "2026-04-07"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert "total_revenue" in response.json()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
         "/api/v1/analytics/export/kpi/export/json",
         "/api/v1/analytics/export/comprehensive/export/json",
         "/api/v1/analytics/export/revenue/export/json",
