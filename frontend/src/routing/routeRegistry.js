@@ -860,7 +860,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Активация', icon: 'key', section: 'Система', order: 60, sidebar: true }),
     title: 'Admin Activation',
     owner: 'admin.licensing',
-    component: 'AdminPanel',
+    component: 'ActivationSystem',
     legacyRedirectFrom: ['/activation'],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-activation', pageTitle: 'Admin Activation' }),
   },

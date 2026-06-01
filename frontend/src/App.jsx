@@ -66,6 +66,7 @@ const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPa
 const TelegramSettings = lazy(() => import('./components/admin/TelegramSettings.jsx'));
 const AISettings = lazy(() => import('./components/admin/AISettings.jsx'));
 const PhoneVerificationManager = lazy(() => import('./components/admin/PhoneVerificationManager.jsx'));
+const ActivationSystem = lazy(() => import('./components/admin/ActivationSystem.jsx'));
 const EmailSMSManager = lazy(() => import('./components/notifications/EmailSMSManager.jsx'));
 const TwoFactorManager = lazy(() => import('./components/security/TwoFactorManager.jsx'));
 const FileManager = lazy(() => import('./components/files/FileManager.jsx'));
@@ -119,6 +120,7 @@ const ROUTE_COMPONENTS = {
   TelegramSettings,
   AISettings,
   PhoneVerificationManager,
+  ActivationSystem,
   UnauthorizedPage,
   ForbiddenPage,
   NotFoundPage,
