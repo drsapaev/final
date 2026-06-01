@@ -156,12 +156,15 @@ evidence from before the route-owner rollout. Current source-of-truth checks are
 ## Recommended Next PR Slices
 
 1. `test(admin): add browser-visible heading smoke for admin route families`
-   - Route chrome headings are now covered for operations, integrations,
-     management, and contextual admin routes.
-   - Continue with browser-visible headings only when a route family is selected.
+   - Completed in PR #1576.
+   - Route chrome headings are now browser-smoked for representative operations,
+     integrations, management, notification/Telegram, finance, dashboard, and
+     contextual admin route families.
 2. `docs(admin): plan optional notification or Telegram route exposure`
    - Only if a real user workflow needs direct FCM/registrar/Telegram subroutes.
    - No runtime exposure without browser smoke.
+   - Use `docs/admin/ADMIN_OPTIONAL_ROUTE_EXPOSURE_PLAN.md` as the decision
+     gate before any runtime route exposure PR.
 3. `test(admin): add per-route action smoke for data-heavy admin screens`
    - Cover doctors, patients, appointments, services, and finance one route
      family at a time.
