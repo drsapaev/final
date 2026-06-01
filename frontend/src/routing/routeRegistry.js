@@ -707,7 +707,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Управление клиникой', icon: 'building', section: 'Система', order: 10, sidebar: true }),
     title: 'Admin Clinic Management',
     owner: 'admin.operations',
-    component: 'AdminPanel',
+    component: 'ClinicManagement',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-clinic-management', pageTitle: 'Admin Clinic Management' }),
   },
