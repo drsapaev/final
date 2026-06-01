@@ -554,7 +554,7 @@ export const ROUTE_REGISTRY = [
     nav: nav({ label: 'Врачи', icon: 'user-plus', section: 'Управление', order: 20, sidebar: true }),
     title: 'Admin Doctors',
     owner: 'admin.users',
-    component: 'AdminPanel',
+    component: 'AdminDoctors',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-doctors', pageTitle: 'Admin Doctors' }),
   },
