@@ -44,7 +44,8 @@ original audit as baseline evidence and records the small PRs merged afterward.
 - Notification route family:
   - `/admin/notifications` currently owns Email/SMS.
   - `UnifiedNotifications` owns FCM/registrar notification surfaces but has no dedicated route map.
-  - Do not expose or merge notification subroutes until a channel ownership map is written and browser-smoked.
+  - Channel ownership is tracked in `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
+  - Do not expose or merge notification subroutes until a route implementation PR is browser-smoked.
 - Telegram route family:
   - `/admin/integrations/telegram` remains the operational integration route.
   - `/admin/telegram-settings` now opens settings content.
