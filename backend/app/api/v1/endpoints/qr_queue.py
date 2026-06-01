@@ -1410,13 +1410,76 @@ def full_update_online_entry(
                     boundary_label,
                 )
         
-        # Используем computed_aggregated_ids, frontend's aggregated_ids только как fallback
-        final_aggregated_ids = computed_aggregated_ids if computed_aggregated_ids else (request.aggregated_ids or [])
-        if not computed_aggregated_ids and request.aggregated_ids:
+        def _same_fallback_aggregation_scope(
+            candidate: OnlineQueueEntry,
+        ) -> bool:
+            if candidate.id == entry.id:
+                return True
+
+            if entry.visit_id:
+                if candidate.visit_id != entry.visit_id:
+                    return False
+                if entry.patient_id is None:
+                    return False
+                return candidate.patient_id == entry.patient_id
+
+            if candidate.visit_id is not None:
+                return False
+
+            if entry.patient_id is not None:
+                return candidate.patient_id == entry.patient_id
+
+            if entry.phone:
+                same_boundary = (
+                    candidate.session_id == entry.session_id
+                    if entry.session_id
+                    else candidate.queue_id == entry.queue_id
+                )
+                return same_boundary and _queue_phone_matches(candidate.phone, entry.phone)
+
+            return False
+
+        # Используем computed_aggregated_ids; frontend aggregated_ids are only
+        # an advisory fallback and must not cross queue-entry identity scopes.
+        if computed_aggregated_ids:
+            final_aggregated_ids = computed_aggregated_ids
+        elif request.aggregated_ids:
+            requested_aggregated_ids = [
+                int(aggregated_id)
+                for aggregated_id in request.aggregated_ids
+                if aggregated_id is not None
+            ]
+            fallback_entries = (
+                db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id.in_(requested_aggregated_ids))
+                .all()
+                if requested_aggregated_ids
+                else []
+            )
+            safe_fallback_ids = [
+                candidate.id
+                for candidate in fallback_entries
+                if _same_fallback_aggregation_scope(candidate)
+            ]
+            if entry.id not in safe_fallback_ids:
+                safe_fallback_ids.append(entry.id)
+
+            ignored_fallback_ids = sorted(
+                set(requested_aggregated_ids) - set(safe_fallback_ids)
+            )
+            if ignored_fallback_ids:
+                logger.warning(
+                    "[full_update_online_entry] ignored frontend aggregated_ids outside current entry scope: %s",
+                    ignored_fallback_ids,
+                )
+
+            final_aggregated_ids = safe_fallback_ids
             logger.warning(
                 "[full_update_online_entry] ⚠️ Используем aggregated_ids из frontend (fallback): %s",
-                request.aggregated_ids
+                final_aggregated_ids
             )
+        else:
+            final_aggregated_ids = []
         
         # ⭐ DEBUG: Логируем начальное состояние
         logger.info(
