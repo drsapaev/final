@@ -231,6 +231,27 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/advanced-users', '', adminProfile).activeSidebarItem).toBe('admin-advanced-users');
   });
 
+  it('keeps admin notification channels separated until routed deliberately', () => {
+    const adminProfile = { role: 'Admin' };
+    const notificationsRoute = getRouteById('admin-notifications');
+    const publicNotificationPaths = new Set(ROUTE_REGISTRY.map((route) => route.path));
+    const publicNotificationComponents = new Set(ROUTE_REGISTRY.map((route) => route.component));
+
+    expect(notificationsRoute).toBeTruthy();
+    expect(notificationsRoute.path).toBe('/admin/notifications');
+    expect(notificationsRoute.owner).toBe('admin.notifications');
+    expect(notificationsRoute.entry).toBe('menu');
+    expect(notificationsRoute.component).toBe('EmailSMSManager');
+    expect(notificationsRoute.legacyRedirectFrom).toContain('/notifications');
+    expect(notificationsRoute.layout.activeSidebarItem).toBe('admin-notifications');
+    expect(isRouteAccessibleToProfile(notificationsRoute, adminProfile)).toBe(true);
+    expect(getRouteChromeState('/admin/notifications', '', adminProfile).activeSidebarItem).toBe('admin-notifications');
+
+    expect(publicNotificationPaths.has('/admin/fcm-notifications')).toBe(false);
+    expect(publicNotificationPaths.has('/admin/registrar-notifications')).toBe(false);
+    expect(publicNotificationComponents.has('UnifiedNotifications')).toBe(false);
+  });
+
   it('keeps clinical contextual routes registered and out of default sidebar navigation', () => {
     const doctorProfile = { role: 'Doctor' };
     const clinicalChrome = getRouteChromeState('/clinical/search', '', doctorProfile);
