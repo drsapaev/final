@@ -70,6 +70,7 @@ notification map:
 
 - `/admin/notifications`: current Email/SMS manager.
 - `UnifiedNotifications`: FCM and registrar notification surfaces.
+- Channel ownership details live in `docs/admin/ADMIN_NOTIFICATION_ROUTE_CHANNELS.md`.
 
 Do not merge them until each channel has owner, settings, runtime policy, and
 negative-noise validation.
