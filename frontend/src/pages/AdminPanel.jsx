@@ -136,6 +136,7 @@ import AllFreeApproval from '../components/admin/AllFreeApproval';
 
 import AnalyticsInsights from '../components/ai/AnalyticsInsights';
 import UnifiedTelegramManagement from '../components/admin/UnifiedTelegramManagement';
+import TelegramSettings from '../components/admin/TelegramSettings';
 import UnifiedSettings from '../components/admin/UnifiedSettings';
 import UnifiedFinance from '../components/admin/UnifiedFinance';
 import UnifiedNotifications from '../components/admin/UnifiedNotifications';
@@ -174,6 +175,18 @@ const LazyQueueProfilesManager = React.lazy(() => import('../components/admin/Qu
 const LazyServiceCatalog = React.lazy(() => import('../components/admin/ServiceCatalog'));
 const LazyUnifiedReports = React.lazy(() => import('../components/admin/UnifiedReports'));
 const LazyWaitTimeAnalytics = React.lazy(() => import('../components/analytics/WaitTimeAnalytics'));
+
+const ADMIN_ROUTE_SECTION_PARAMS = {
+  'benefit-settings': 'benefit-settings',
+  'wizard-settings': 'wizard-settings',
+  'payment-providers': 'payment-providers',
+  'clinic-settings': 'clinic-settings',
+  'queue-settings': 'queue-settings',
+  'display-settings': 'display-settings',
+  'ai-settings': 'ai-settings',
+  security: 'security',
+  'telegram-settings': 'settings'
+};
 
 const getAppointmentPatientDisplayName = (appointment) => {
   const rawName =
@@ -1223,18 +1236,35 @@ const AdminPanel = () => {
   // Вычисляем текущую вкладку из URL параметров или пути
   const searchParams = new URLSearchParams(location.search);
   const sectionFromQuery = searchParams.get('section');
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const sectionFromPath = pathParts.length >= 2 && pathParts[0] === 'admin' ?
+    pathParts[1] || 'dashboard' :
+    'dashboard';
+  const canonicalSectionParam = ADMIN_ROUTE_SECTION_PARAMS[sectionFromPath];
 
   // Если секция указана в query параметре, используем её
   // Иначе пытаемся извлечь из пути URL
-  let current = sectionFromQuery;
+  let current = canonicalSectionParam ? sectionFromPath : sectionFromQuery;
   if (!current) {
-    const pathParts = location.pathname.split('/').filter(Boolean);
-    if (pathParts.length >= 2 && pathParts[0] === 'admin') {
-      current = pathParts[1] || 'dashboard';
-    } else {
-      current = 'dashboard';
-    }
+    current = sectionFromPath;
   }
+
+  useEffect(() => {
+    if (!canonicalSectionParam) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    if (params.get('section') === canonicalSectionParam) {
+      return;
+    }
+
+    params.set('section', canonicalSectionParam);
+    navigate({
+      pathname: location.pathname,
+      search: `?${params.toString()}`
+    }, { replace: true });
+  }, [canonicalSectionParam, location.pathname, location.search, navigate]);
 
   const dashboardKpis = [
     {
@@ -2576,8 +2606,9 @@ const AdminPanel = () => {
       case 'quality-control':
         return <UnifiedAITools />;
       case 'telegram-bot':
-      case 'telegram-settings':
         return <UnifiedTelegramManagement />;
+      case 'telegram-settings':
+        return <TelegramSettings />;
       case 'fcm-notifications':
       case 'registrar-notifications':
         return <UnifiedNotifications />;
