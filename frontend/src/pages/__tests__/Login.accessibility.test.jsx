@@ -15,6 +15,14 @@ vi.mock('../../api/client', () => ({
   setToken: vi.fn(),
 }));
 
+vi.mock('../../hooks/useSetupStatus.js', () => ({
+  useSetupStatus: () => ({
+    initialized: true,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 function renderLogin() {
   return render(
     <MemoryRouter>
