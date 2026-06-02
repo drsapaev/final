@@ -6,6 +6,9 @@ import RescheduleDialog from '../components/RescheduleDialog';
 
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+import { getCanonicalRouteById } from '../routing/routeSelectors.js';
+
+const clinicalAppointmentsPath = getCanonicalRouteById('clinical-appointments')?.path || '/clinical/appointments';
 
 function normalizeVisitDetailPayload(data) {
   if (!data) return null;
@@ -42,7 +45,7 @@ function resolveVisitSchedule(visit) {
  * - Allows opening RescheduleDialog
  * - Quick actions: reschedule to tomorrow (one-click)
  *
- * Route: /visits/:id
+ * Route: clinical-visit-details in routeRegistry
  */
 function VisitDetails() {
   const { id } = useParams();
@@ -172,7 +175,7 @@ function VisitDetails() {
           
           Назад
         </button>
-        <Link to="/visits" className="px-3 py-2 border rounded bg-white hover:bg-gray-50">Список приёмов</Link>
+        <Link to={clinicalAppointmentsPath} className="px-3 py-2 border rounded bg-white hover:bg-gray-50">Список приёмов</Link>
       </div>
 
       <RescheduleDialog

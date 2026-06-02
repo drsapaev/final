@@ -217,9 +217,10 @@ const PaymentWidget = ({
             };
 
             setPaymentData(confirmedPaymentData);
-            setPaymentStatus('completed');
+            const confirmedStatus = String(confirmResponse.data?.status || '');
+            setPaymentStatus(confirmedStatus || 'initialized');
 
-            if (onSuccess) {
+            if (confirmedStatus === 'paid' && onSuccess) {
               onSuccess(confirmedPaymentData);
             }
 
@@ -259,10 +260,11 @@ const PaymentWidget = ({
       const response = await apiClient.get(`/payments/${paymentData.payment_id}`);
 
       if (response.data?.status) {
-        const nextStatus = normalizePaymentStatus(response.data.status);
+        // Keep exact backend payment status; frontend must not collapse provider/status aliases.
+        const nextStatus = String(response.data.status);
         setPaymentStatus(nextStatus);
 
-        if (nextStatus === 'completed' && onSuccess) {
+        if (nextStatus === 'paid' && onSuccess) {
           onSuccess({
             ...paymentData,
             ...response.data,
@@ -300,28 +302,6 @@ const PaymentWidget = ({
     }).format(amountValue);
   };
 
-  const normalizePaymentStatus = (status) => {
-    const normalized = String(status || '').toLowerCase();
-
-    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
-      return 'completed';
-    }
-
-    if (normalized === 'processing') {
-      return 'redirected';
-    }
-
-    if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'failed') {
-      return 'failed';
-    }
-
-    if (normalized === 'initialized' || normalized === 'redirected' || normalized === 'pending') {
-      return normalized;
-    }
-
-    return normalized || 'pending';
-  };
-
   // Рендер статуса платежа
   const renderPaymentStatus = () => {
     switch (paymentStatus) {
@@ -338,6 +318,7 @@ const PaymentWidget = ({
           </Alert>);
 
       case 'redirected':
+      case 'processing':
         return (
           <Alert severity="info" icon={<InfoIcon />}>
             Перенаправление на страницу оплаты...
@@ -350,20 +331,32 @@ const PaymentWidget = ({
             </Button>
           </Alert>);
 
-      case 'completed':
+      case 'paid':
         return (
           <Alert severity="success" icon={<CheckIcon />}>
             Платеж успешно завершен!
           </Alert>);
 
       case 'failed':
+      case 'cancelled':
+      case 'canceled':
         return (
           <Alert severity="error" icon={<ErrorIcon />}>
             Платеж не удался. Попробуйте еще раз.
           </Alert>);
 
+      case 'refunded':
+      case 'void':
+        return (
+          <Alert severity="warning" icon={<ErrorIcon />}>
+            Status: {paymentStatus}
+          </Alert>);
+
       default:
-        return null;
+        return paymentStatus ? (
+          <Alert severity="info" icon={<InfoIcon />}>
+            Status: {paymentStatus}
+          </Alert>) : null;
     }
   };
 
@@ -479,7 +472,7 @@ const PaymentWidget = ({
             size="large"
             fullWidth
             onClick={confirmPayment}
-            disabled={loading || !selectedProvider || paymentStatus === 'completed'}>
+            disabled={loading || !selectedProvider || paymentStatus === 'paid'}>
             
             {loading ?
             <>

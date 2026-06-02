@@ -138,7 +138,7 @@ const PaymentSuccess = () => {
         setPaymentData(response.data);
 
         // Если платеж успешен, генерируем квитанцию
-        if (response.data.status === 'completed') {
+        if (response.data.status === 'paid') {
           generateReceipt();
         }
       } else {
@@ -261,40 +261,30 @@ const PaymentSuccess = () => {
     return names[provider] || provider;
   };
 
-  const normalizePaymentStatus = (status) => {
-    const normalized = String(status || '').toLowerCase();
-
-    if (normalized === 'paid' || normalized === 'completed' || normalized === 'success') {
-      return 'completed';
-    }
-
-    return normalized;
-  };
-
   const getStatusText = (status) => {
     const texts = {
       pending: 'Ожидает',
       processing: 'Обработка',
-      completed: 'Завершен',
       paid: 'Оплачен',
       failed: 'Неудачно',
-      cancelled: 'Отменен'
+      cancelled: 'Отменен',
+      refunded: 'Возвращен',
+      void: 'Аннулирован'
     };
-    const normalized = String(status || '').toLowerCase();
-    return texts[normalized] || status;
+    return texts[status] || status;
   };
 
   const getStatusColor = (status) => {
     const colors = {
       pending: 'warning',
       processing: 'info',
-      completed: 'success',
       paid: 'success',
       failed: 'danger',
-      cancelled: 'default'
+      cancelled: 'default',
+      refunded: 'warning',
+      void: 'default'
     };
-    const normalized = String(status || '').toLowerCase();
-    return colors[normalized] || 'default';
+    return colors[status] || 'default';
   };
 
   if (loading) {
@@ -350,7 +340,7 @@ const PaymentSuccess = () => {
     );
   }
 
-  const isSuccess = normalizePaymentStatus(paymentData?.status) === 'completed';
+  const isSuccess = paymentData?.status === 'paid';
 
   return (
     <main style={pageStyle}>

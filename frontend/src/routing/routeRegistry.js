@@ -385,7 +385,7 @@ export const ROUTE_REGISTRY = [
     title: 'Clinic Setup',
     owner: 'platform.setup',
     component: 'Setup',
-    legacyRedirectFrom: [],
+    legacyRedirectFrom: ['/register'],
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic Setup' }),
   },
   {
