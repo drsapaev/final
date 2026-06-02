@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -62,6 +62,7 @@ REGISTRAR_START_STATUSES = {"waiting", "queued"}
 REGISTRAR_PRINT_STATUSES = {"waiting", "queued"}
 REGISTRAR_COMPLETE_STATUSES = {"called", "in_cabinet", "in_progress"}
 REGISTRAR_CANCEL_BLOCKED_STATUSES = {"canceled", "cancelled", "completed", "done", "served"}
+REGISTRAR_HIDDEN_QUEUE_STATUSES = {"canceled", "cancelled", "no_show"}
 REGISTRAR_VIEW_EMR_STATUSES = {"completed", "done", "served"}
 REGISTRAR_SCHEDULE_NEXT_STATUSES = {"completed", "done", "served"}
 
@@ -1582,11 +1583,27 @@ def get_today_queues(
             )
 
         # Получаем все визиты на сегодня (новая система)
-        visits = db.query(Visit).filter(Visit.visit_date == today).all()
+        visits = (
+            db.query(Visit)
+            .filter(
+                Visit.visit_date == today,
+                ~func.lower(func.coalesce(Visit.status, "")).in_(
+                    REGISTRAR_HIDDEN_QUEUE_STATUSES
+                ),
+            )
+            .all()
+        )
 
         # Получаем все appointments на сегодня (старая система)
         appointments = (
-            db.query(Appointment).filter(Appointment.appointment_date == today).all()
+            db.query(Appointment)
+            .filter(
+                Appointment.appointment_date == today,
+                ~func.lower(func.coalesce(Appointment.status, "")).in_(
+                    REGISTRAR_HIDDEN_QUEUE_STATUSES
+                ),
+            )
+            .all()
         )
 
         # [OK] ДОБАВЛЕНО: Получаем записи из онлайн-очереди (OnlineQueueEntry)
@@ -2575,6 +2592,8 @@ def get_today_queues(
                         "in_progress": "called",
                         "completed": "served",
                         "cancelled": "no_show",
+                        "canceled": "no_show",
+                        "no_show": "no_show",
                     }
                     entry_status = status_mapping.get(visit.status, "waiting")
 
@@ -2661,6 +2680,8 @@ def get_today_queues(
                         "in_visit": "called",
                         "completed": "served",
                         "cancelled": "no_show",
+                        "canceled": "no_show",
+                        "no_show": "no_show",
                     }
                     entry_status = status_mapping.get(appointment.status, "waiting")
 
