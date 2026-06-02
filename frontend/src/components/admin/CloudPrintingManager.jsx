@@ -4,7 +4,8 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
+  SegmentedControl,
   MacOSTextarea,
   AppEmpty,
 
@@ -460,18 +461,19 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }} htmlFor="provider">Провайдер</label>
-              <MacOSSelect
+              <Select
               id="provider"
               value={printForm.provider_name}
-              onChange={(e) => setPrintForm({
+              onChange={(value) => setPrintForm({
                 ...printForm,
-                provider_name: e.target.value,
+                provider_name: value,
                 printer_id: ''
               })}
               options={[
                 { value: '', label: 'Выберите провайдера' },
                 ...getProviderOptions(providers)
-              ]} />
+              ]}
+              size="large" />
             
             </div>
 
@@ -483,14 +485,15 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }} htmlFor="printer">Принтер</label>
-              <MacOSSelect
+              <Select
               id="printer"
               value={printForm.printer_id}
-              onChange={(e) => setPrintForm({ ...printForm, printer_id: e.target.value })}
+              onChange={(value) => setPrintForm({ ...printForm, printer_id: value })}
               options={[
               { value: '', label: 'Выберите принтер' },
               ...getPrinterOptions(printers, printForm.provider_name)]
-              } />
+              }
+              size="large" />
             
             </div>
 
@@ -518,15 +521,16 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }} htmlFor="format">Формат</label>
-              <MacOSSelect
+              <Select
               id="format"
               value={printForm.format}
-              onChange={(e) => setPrintForm({ ...printForm, format: e.target.value })}
+              onChange={(value) => setPrintForm({ ...printForm, format: value })}
               options={[
               { value: 'html', label: 'HTML' },
               { value: 'text', label: 'Текст' },
               { value: 'pdf', label: 'PDF' }]
-              } />
+              }
+              size="large" />
             
             </div>
 
@@ -641,18 +645,19 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>Провайдер</label>
-              <MacOSSelect
+              <Select
               id="med-provider"
               value={medicalForm.provider_name}
-              onChange={(e) => setMedicalForm({
+              onChange={(value) => setMedicalForm({
                 ...medicalForm,
-                provider_name: e.target.value,
+                provider_name: value,
                 printer_id: ''
               })}
               options={[
                 { value: '', label: 'Выберите провайдера' },
                 ...getProviderOptions(providers)
-              ]} />
+              ]}
+              size="large" />
             </div>
 
             <div>
@@ -663,14 +668,15 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>Принтер</label>
-              <MacOSSelect
+              <Select
               id="med-printer"
               value={medicalForm.printer_id}
-              onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}
+              onChange={(value) => setMedicalForm({ ...medicalForm, printer_id: value })}
               options={[
                 { value: '', label: 'Выберите принтер' },
                 ...getPrinterOptions(printers, medicalForm.provider_name)
-              ]} />
+              ]}
+              size="large" />
             </div>
 
             <div>
@@ -681,16 +687,17 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>Тип документа</label>
-              <MacOSSelect
+              <Select
               id="doc-type"
               value={medicalForm.document_type}
-              onChange={(e) => setMedicalForm({ ...medicalForm, document_type: e.target.value })}>
-              
-                <option value="prescription">Рецепт</option>
-                <option value="receipt">Чек</option>
-                <option value="ticket">Талон</option>
-                <option value="report">Отчет</option>
-              </MacOSSelect>
+              onChange={(value) => setMedicalForm({ ...medicalForm, document_type: value })}
+              options={[
+                { value: 'prescription', label: 'Рецепт' },
+                { value: 'receipt', label: 'Чек' },
+                { value: 'ticket', label: 'Талон' },
+                { value: 'report', label: 'Отчет' }
+              ]}
+              size="large" />
             </div>
 
             <h5 style={{
@@ -994,67 +1001,53 @@ const CloudPrintingManager = () => {
 
       {/* Табы */}
       <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
+        maxWidth: '100%',
+        overflowX: 'auto',
+        paddingBottom: '6px',
+        marginBottom: '24px',
+        scrollbarWidth: 'thin'
       }}>
-        <button
-          onClick={() => setActiveTab('printers')}
+        <SegmentedControl
+          aria-label="Разделы облачной печати"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            {
+              value: 'printers',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Printer size={14} aria-hidden="true" />
+                  Принтеры
+                </span>
+              )
+            },
+            {
+              value: 'print',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Printer size={14} aria-hidden="true" />
+                  Печать документа
+                </span>
+              )
+            },
+            {
+              value: 'medical',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <TestTube size={14} aria-hidden="true" />
+                  Медицинские документы
+                </span>
+              )
+            }
+          ]}
+          size="large"
           style={{
-            padding: '16px 24px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: activeTab === 'printers' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-            borderBottom: activeTab === 'printers' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
-          
-          Принтеры
-        </button>
-        <button
-          onClick={() => setActiveTab('print')}
-          style={{
-            padding: '16px 24px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: activeTab === 'print' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-            borderBottom: activeTab === 'print' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
-          
-          Печать документа
-        </button>
-        <button
-          onClick={() => setActiveTab('medical')}
-          style={{
-            padding: '16px 24px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--mac-font-size-sm)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            color: activeTab === 'medical' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-            borderBottom: activeTab === 'medical' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-          }}>
-          
-          Медицинские документы
-        </button>
+            minWidth: 'max-content',
+            background: 'var(--mac-gradient-sidebar)',
+            border: '1px solid var(--mac-main-shell-border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--mac-main-shell-shadow)'
+          }} />
       </div>
 
       {activeTab === 'printers' && renderPrintersTab()}

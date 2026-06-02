@@ -21,7 +21,7 @@ import {
 
 
 'lucide-react';
-import { AppError, AppLoading, Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
+import { AppError, AppLoading, Card, Button, Badge, MacOSInput, MacOSTable, MacOSCheckbox, Select } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
@@ -377,9 +377,9 @@ const ActivationSystem = () => {
               <Filter style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Статус
             </label>
-            <MacOSSelect
+            <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(value) => setStatusFilter(value)}
               options={[
               { value: 'all', label: 'Все статусы' },
               { value: 'issued', label: 'Созданные' },
@@ -388,6 +388,7 @@ const ActivationSystem = () => {
               { value: 'expired', label: 'Истекшие' },
               { value: 'revoked', label: 'Отозванные' }]
               }
+              size="large"
               style={{ width: '100%' }} />
             
           </div>
@@ -653,14 +654,15 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             }}>
               Тип лицензии
             </label>
-            <MacOSSelect
+            <Select
               value={formData.key_type}
-              onChange={(e) => handleChange('key_type', e.target.value)}
+              onChange={(value) => handleChange('key_type', value)}
               options={[
               { value: 'trial', label: 'Пробная (30 дней)' },
               { value: 'full', label: 'Полная лицензия' },
               { value: 'enterprise', label: 'Корпоративная' }]
               }
+              size="large"
               style={{ width: '100%' }} />
             
           </div>

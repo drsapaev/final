@@ -18,7 +18,7 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSCheckbox,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
@@ -348,17 +348,16 @@ const BranchManagement = () => {
             }} />
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <MacOSSelect
+            <Select
               aria-label="Фильтр филиалов по статусу"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все статусы</option>
-              {statusOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'Все статусы' },
+                ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
             <MacOSButton
               onClick={() => setShowAddForm(true)}
               style={{
@@ -525,14 +524,12 @@ const BranchManagement = () => {
               }}>
                   Статус
                 </label>
-                <MacOSSelect
+                <Select
+                aria-label="Статус филиала"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                
-                  {statusOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, status: value })}
+                options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
+                size="large" />
               </div>
               <div>
                 <label style={{

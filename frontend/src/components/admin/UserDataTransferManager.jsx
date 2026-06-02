@@ -1,10 +1,57 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, MacOSInput, MacOSCheckbox } from '../ui/macos';
+import { Card, Button, MacOSInput, MacOSCheckbox, SegmentedControl } from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const toArray = (value, fallbackKeys = []) => {
+  if (Array.isArray(value)) return value;
+
+  for (const key of fallbackKeys) {
+    if (Array.isArray(value?.[key])) {
+      return value[key];
+    }
+  }
+
+  return [];
+};
+
+const normalizeDataTypes = (payload) =>
+  toArray(payload, ['data_types', 'dataTypes', 'items', 'results']).map((item) => {
+    if (typeof item === 'string') {
+      return { key: item, name: item, description: '' };
+    }
+
+    const key = item?.key || item?.value || item?.id || item?.name;
+    if (!key) return null;
+
+    return {
+      ...item,
+      key,
+      name: item?.name || item?.label || key,
+      description: item?.description || ''
+    };
+  }).filter(Boolean);
+
+const normalizeDataSummary = (payload) => ({
+  ...(payload || {}),
+  data_counts: {
+    appointments: 0,
+    visits: 0,
+    queue_entries: 0,
+    ...(payload?.data_counts || {})
+  }
+});
+
+const normalizeStatistics = (payload) => ({
+  total_transfers: 0,
+  successful_transfers: 0,
+  failed_transfers: 0,
+  ...(payload || {})
+});
+
 const UserDataTransferManager = () => {
   const [activeTab, setActiveTab] = useState('transfer');
   const [sourceUser, setSourceUser] = useState(null);
@@ -27,7 +74,7 @@ const UserDataTransferManager = () => {
   const loadAvailableDataTypes = async () => {
     try {
       const response = await api.get('/admin/user-data/transfer/data-types');
-      setAvailableDataTypes(response.data.data_types);
+      setAvailableDataTypes(normalizeDataTypes(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки типов данных:', error);
       toast.error('Ошибка загрузки типов данных');
@@ -43,7 +90,7 @@ const UserDataTransferManager = () => {
     setIsSearching(true);
     try {
       const response = await api.get(`/admin/user-data/users/search?query=${encodeURIComponent(query)}&limit=10`);
-      setSearchResults(response.data.users);
+      setSearchResults(toArray(response.data, ['users', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка поиска пользователей:', error);
       toast.error('Ошибка поиска пользователей');
@@ -56,7 +103,7 @@ const UserDataTransferManager = () => {
   const getUserDataSummary = async (userId) => {
     try {
       const response = await api.get(`/admin/user-data/users/${userId}/data-summary`);
-      setUserDataSummary(response.data);
+      setUserDataSummary(normalizeDataSummary(response.data));
     } catch (error) {
       logger.error('Ошибка получения сводки данных:', error);
       toast.error('Ошибка получения данных пользователя');
@@ -71,9 +118,10 @@ const UserDataTransferManager = () => {
 
     try {
       const response = await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`);
+      const validation = response.data || {};
 
-      if (!response.data.valid) {
-        toast.error(response.data.message);
+      if (!validation.valid) {
+        toast.error(validation.message || 'Transfer validation failed');
         return false;
       }
 
@@ -98,12 +146,13 @@ const UserDataTransferManager = () => {
         data_types: selectedDataTypes,
         confirmation_required: false
       });
+      const transferResult = response.data || {};
 
-      if (response.data.success) {
+      if (transferResult.success) {
         toast.success('Данные успешно переданы!');
 
         // Показываем результаты передачи
-        const transferred = response.data.transferred;
+        const transferred = transferResult.transferred || {};
         let message = 'Передано:\n';
 
         if (transferred.appointments?.success) {
@@ -141,7 +190,7 @@ const UserDataTransferManager = () => {
   const loadTransferHistory = async () => {
     try {
       const response = await api.get('/admin/user-data/transfer/history?limit=50');
-      setTransferHistory(response.data.history);
+      setTransferHistory(toArray(response.data, ['history', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка загрузки истории:', error);
       toast.error('Ошибка загрузки истории');
@@ -151,7 +200,7 @@ const UserDataTransferManager = () => {
   const loadStatistics = async () => {
     try {
       const response = await api.get('/admin/user-data/transfer/statistics?period_days=30');
-      setStatistics(response.data);
+      setStatistics(normalizeStatistics(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
       toast.error('Ошибка загрузки статистики');
@@ -731,145 +780,62 @@ const UserDataTransferManager = () => {
 
       {/* Навигация по вкладкам */}
       <div style={{
-        display: 'flex',
-        marginBottom: '24px'
+        maxWidth: '100%',
+        overflowX: 'auto',
+        paddingBottom: '6px',
+        marginBottom: '24px',
+        scrollbarWidth: 'thin'
       }}>
-        <button
-          onClick={() => setActiveTab('transfer')}
+        <SegmentedControl
+          aria-label="Разделы передачи данных пользователей"
+          value={activeTab}
+          onChange={(value) => {
+            setActiveTab(value);
+            if (value === 'history') {
+              loadTransferHistory();
+            }
+            if (value === 'statistics') {
+              loadStatistics();
+            }
+          }}
+          options={[
+            {
+              value: 'transfer',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <ArrowRight size={14} aria-hidden="true" />
+                  Передача данных
+                </span>
+              )
+            },
+            {
+              value: 'history',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <History size={14} aria-hidden="true" />
+                  История
+                </span>
+              )
+            },
+            {
+              value: 'statistics',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <BarChart3 size={14} aria-hidden="true" />
+                  Статистика
+                </span>
+              )
+            }
+          ]}
+          size="large"
           style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'transfer' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'transfer' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'transfer') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'transfer') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          Передача данных
-          {activeTab === 'transfer' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
+            minWidth: 'max-content',
+            background: 'var(--mac-gradient-sidebar)',
+            border: '1px solid var(--mac-main-shell-border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--mac-main-shell-shadow)'
           }} />
-          }
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('history');
-            loadTransferHistory();
-          }}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'history' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'history' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'history') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'history') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          История
-          {activeTab === 'history' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('statistics');
-            loadStatistics();
-          }}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'statistics' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'statistics' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'statistics') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'statistics') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          Статистика
-          {activeTab === 'statistics' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
       </div>
-      
-      {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
 
       {/* Контент вкладок */}
       {activeTab === 'transfer' && renderTransferTab()}

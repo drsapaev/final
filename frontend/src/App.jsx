@@ -21,6 +21,7 @@ import Landing from './pages/Landing.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
 import Setup from './pages/Setup.jsx';
 import { useSetupStatus } from './hooks/useSetupStatus.js';
+import { useBreakpoint } from './hooks/useEnhancedMediaQuery.js';
 import auth from './stores/auth.js';
 import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards.jsx';
@@ -170,8 +171,10 @@ function AppShell({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() => auth.getState());
   const chrome = getRouteChromeState(location.pathname, location.search, authState.profile);
+  const compactSidebar = isMobile && !chrome.hideSidebar;
 
   useEffect(() => auth.subscribe(setAuthState), []);
 
@@ -200,8 +203,8 @@ function AppShell({ children }) {
         className="app-shell-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: chrome.hideSidebar ? '1fr' : 'auto 1fr',
-          gap: '16px',
+          gridTemplateColumns: chrome.hideSidebar ? '1fr' : compactSidebar ? '72px minmax(0, 1fr)' : 'auto minmax(0, 1fr)',
+          gap: compactSidebar ? '8px' : '16px',
           flex: 1,
           minHeight: 0,
           width: '100%',
@@ -212,13 +215,14 @@ function AppShell({ children }) {
         }}
       >
         {!chrome.hideSidebar && (
-          <div style={{ marginTop: '0', marginLeft: '12px' }}>
+          <div style={{ marginTop: '0', marginLeft: compactSidebar ? '4px' : '12px', minWidth: 0 }}>
             <Sidebar
               items={chrome.sidebarItems}
               activeItem={chrome.activeSidebarItem}
               onItemClick={handleSidebarClick}
-              defaultCollapsed={false}
-              collapsible
+              collapsed={compactSidebar ? true : undefined}
+              defaultCollapsed={compactSidebar}
+              collapsible={!compactSidebar}
             />
           </div>
         )}

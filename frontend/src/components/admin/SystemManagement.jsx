@@ -29,10 +29,10 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
   MacOSCheckbox,
   MacOSTable,
-  MacOSEmptyState } from
+  MacOSEmptyState,
+  Select } from
 
 '../ui/macos';
 import { toast } from 'react-toastify';
@@ -491,14 +491,15 @@ const SystemManagement = () => {
           }}>
               Тип бэкапа
             </label>
-            <MacOSSelect
+            <Select
             value={backupForm.backup_type}
-            onChange={(e) => setBackupForm((prev) => ({ ...prev, backup_type: e.target.value }))}
+            onChange={(value) => setBackupForm((prev) => ({ ...prev, backup_type: value }))}
             options={[
             { value: 'database', label: 'База данных' },
             { value: 'full', label: 'Полный бэкап' },
             { value: 'configuration', label: 'Конфигурация' }]
             }
+            size="large"
             style={{ width: '100%' }} />
 
           </div>

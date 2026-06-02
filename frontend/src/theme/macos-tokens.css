@@ -357,9 +357,44 @@
   box-shadow: var(--mac-shadow-md);
 }
 
+.mac-button:hover .mac-button-overlay {
+  opacity: 1 !important;
+}
+
 .mac-button:active {
   transform: scale(0.98);
   box-shadow: var(--mac-shadow-sm);
+}
+
+.mac-button:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+@keyframes mac-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-color-scheme: dark) {
+  .mac-button {
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mac-button,
+  .mac-button-overlay {
+    transition: none !important;
+  }
+
+  .mac-button-spinner {
+    animation: none !important;
+  }
+
+  .mac-button:active {
+    transform: none !important;
+  }
 }
 
 .mac-button--primary {

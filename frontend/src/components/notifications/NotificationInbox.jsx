@@ -7,8 +7,16 @@ import {
   Search,
   Sparkles
 } from 'lucide-react';
+import { Select } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: '\u0412\u0441\u0435' },
+  { value: 'unread', label: '\u041d\u0435\u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u043d\u044b\u0435' },
+  { value: 'seen', label: '\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u043d\u044b\u0435' },
+  { value: 'archived', label: '\u0410\u0440\u0445\u0438\u0432' }
+];
 
 function formatDate(value) {
   if (!value) return '';
@@ -314,23 +322,14 @@ export default function NotificationInbox({ userRole, onClose }) {
             {showUnreadOnly ? 'Все уведомления' : 'Только непрочитанные'}
           </button>
 
-          <select
+          <Select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            style={{
-              padding: '7px 10px',
-              borderRadius: 999,
-              border: '1px solid var(--mac-border)',
-              background: 'var(--mac-bg-secondary)',
-              color: 'var(--mac-text-primary)'
-            }}
-            aria-label="Фильтр по статусу"
-          >
-            <option value="all">Все</option>
-            <option value="unread">Непрочитанные</option>
-            <option value="seen">Просмотренные</option>
-            <option value="archived">Архив</option>
-          </select>
+            onChange={setStatusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            size="small"
+            style={{ minWidth: 190 }}
+            aria-label={'\u0424\u0438\u043b\u044c\u0442\u0440 \u043f\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u0443'}
+          ></Select>
 
           <button
             type="button"

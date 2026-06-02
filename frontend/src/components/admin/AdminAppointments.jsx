@@ -14,7 +14,8 @@ import {
   MacOSEmptyState,
   MacOSInput,
   MacOSLoadingSkeleton,
-  MacOSSelect,
+  Button,
+  Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
 
@@ -146,34 +147,23 @@ const getDoctorOptionLabel = (doctor) => {
 };
 
 const IconButton = ({ label, tone = 'default', onClick, children }) => (
-  <button
+  <Button
     type="button"
+    variant="ghost"
+    size="small"
     onClick={onClick}
     aria-label={label}
     title={label}
     style={{
       width: '32px',
       height: '32px',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       padding: 0,
-      border: '1px solid transparent',
       borderRadius: 'var(--mac-radius-sm)',
       color: tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)',
-      backgroundColor: 'transparent',
-      cursor: 'pointer',
-      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
-    }}
-    onMouseEnter={(event) => {
-      event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
-    }}
-    onMouseLeave={(event) => {
-      event.currentTarget.style.backgroundColor = 'transparent';
     }}
   >
     {children}
-  </button>
+  </Button>
 );
 
 IconButton.propTypes = {
@@ -376,10 +366,11 @@ const AdminAppointments = () => {
             iconPosition="left"
             aria-label="Поиск записей"
           />
-          <MacOSSelect
+          <Select
             value={filterStatus}
-            onChange={(event) => setFilterStatus(event.target.value)}
+            onChange={setFilterStatus}
             options={statusOptions}
+            size="large"
             aria-label="Фильтр по статусу записи"
           />
           <MacOSInput
@@ -388,10 +379,11 @@ const AdminAppointments = () => {
             onChange={(event) => setFilterDate(event.target.value)}
             aria-label="Фильтр по дате записи"
           />
-          <MacOSSelect
+          <Select
             value={filterDoctor}
-            onChange={(event) => setFilterDoctor(event.target.value)}
+            onChange={setFilterDoctor}
             options={doctorOptions}
+            size="large"
             aria-label="Фильтр по врачу"
           />
         </div>

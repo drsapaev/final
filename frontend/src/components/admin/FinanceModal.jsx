@@ -1,9 +1,30 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { X, Save, CreditCard, DollarSign, Calendar, User, AlertCircle, Receipt, Building } from 'lucide-react';
+import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { Card, Button } from '../ui/native';
+import { Select } from '../ui/macos';
 
 import logger from '../../utils/logger';
+
+const TRANSACTION_TYPE_OPTIONS = [
+  { value: 'income', label: '\u0414\u043e\u0445\u043e\u0434' },
+  { value: 'expense', label: '\u0420\u0430\u0441\u0445\u043e\u0434' }
+];
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'cash', label: '\u041d\u0430\u043b\u0438\u0447\u043d\u044b\u0435' },
+  { value: 'card', label: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0430\u044f \u043a\u0430\u0440\u0442\u0430' },
+  { value: 'transfer', label: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u043f\u0435\u0440\u0435\u0432\u043e\u0434' },
+  { value: 'mobile', label: '\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u044b\u0439 \u043f\u043b\u0430\u0442\u0435\u0436' }
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: '\u0421\u0442\u0430\u0442\u0443\u0441 \u043d\u0435 \u043f\u0435\u0440\u0435\u0434\u0430\u043d' },
+  { value: 'pending', label: '\u041e\u0436\u0438\u0434\u0430\u0435\u0442' },
+  { value: 'completed', label: '\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430' },
+  { value: 'cancelled', label: '\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430' },
+  { value: 'refunded', label: '\u0412\u043e\u0437\u0432\u0440\u0430\u0442' }
+];
 const FinanceModal = ({ 
   isOpen, 
   onClose, 
@@ -235,25 +256,12 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Тип операции *
                   </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                                style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.type}
-                      onChange={(e) => handleChange('type', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.type ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.type ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    >
-                      <option value="income">Доход</option>
-                      <option value="expense">Расход</option>
-                    </select>
-                  </div>
+                  <Select
+                    value={formData.type}
+                    onChange={(value) => handleChange('type', value)}
+                    options={TRANSACTION_TYPE_OPTIONS}
+                    size="large"
+                    style={{ width: '100%' }} />
                   {errors.type && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
                       <AlertCircle className="w-4 h-4 mr-1" />
@@ -267,27 +275,18 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Категория *
                   </label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                              style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.category}
-                      onChange={(e) => handleChange('category', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.category ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.category ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Выберите категорию</option>
-                      {(formData.type === 'income' ? getIncomeCategories() : getExpenseCategories()).map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    value={formData.category}
+                    onChange={(value) => handleChange('category', value)}
+                    options={[
+                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e' },
+                      ...(formData.type === 'income' ? getIncomeCategories() : getExpenseCategories()).map((category) => ({
+                        value: category,
+                        label: category
+                      }))
+                    ]}
+                    size="large"
+                    style={{ width: '100%' }} />
                   {errors.category && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
                       <AlertCircle className="w-4 h-4 mr-1" />
@@ -409,27 +408,20 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Пациент
                   </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.patientId}
-                      onChange={(e) => handleChange('patientId', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Выберите пациента</option>
-                      {patients.map(patient => (
-                        <option key={patient.id} value={patient.id}>
-                          {patient.lastName} {patient.firstName} {patient.middleName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    value={formData.patientId === '' ? '' : String(formData.patientId)}
+                    onChange={(value) => handleChange('patientId', value)}
+                    options={[
+                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0430\u0446\u0438\u0435\u043d\u0442\u0430' },
+                      ...patients.map((patient) => ({
+                        value: String(patient.id),
+                        label: [patient.lastName, patient.firstName, patient.middleName]
+                          .filter(Boolean)
+                          .join(' ') || patient.fullName || patient.name || `\u041f\u0430\u0446\u0438\u0435\u043d\u0442 #${patient.id}`
+                      }))
+                    ]}
+                    size="large"
+                    style={{ width: '100%' }} />
                 </div>
 
                 {/* Врач */}
@@ -437,27 +429,18 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Врач
                   </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.doctorId}
-                      onChange={(e) => handleChange('doctorId', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Выберите врача</option>
-                      {doctors.map(doctor => (
-                        <option key={doctor.id} value={doctor.id}>
-                          {getDoctorName(doctor.id) || doctor.user?.full_name || doctor.name || `Врач #${doctor.id}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Select
+                    value={formData.doctorId === '' ? '' : String(formData.doctorId)}
+                    onChange={(value) => handleChange('doctorId', value)}
+                    options={[
+                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0440\u0430\u0447\u0430' },
+                      ...doctors.map((doctor) => ({
+                        value: String(doctor.id),
+                        label: getDoctorName(doctor.id) || doctor.user?.full_name || doctor.name || `\u0412\u0440\u0430\u0447 #${doctor.id}`
+                      }))
+                    ]}
+                    size="large"
+                    style={{ width: '100%' }} />
                 </div>
               </div>
             </div>
@@ -473,25 +456,12 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Способ оплаты
                   </label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                                style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.paymentMethod}
-                      onChange={(e) => handleChange('paymentMethod', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                    >
-                      <option value="cash">Наличные</option>
-                      <option value="card">Банковская карта</option>
-                      <option value="transfer">Банковский перевод</option>
-                      <option value="mobile">Мобильный платеж</option>
-                    </select>
-                  </div>
+                  <Select
+                    value={formData.paymentMethod}
+                    onChange={(value) => handleChange('paymentMethod', value)}
+                    options={PAYMENT_METHOD_OPTIONS}
+                    size="large"
+                    style={{ width: '100%' }} />
                 </div>
 
                 {/* Статус */}
@@ -499,22 +469,12 @@ const FinanceModal = ({
                   <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Статус
                   </label>
-                  <select
+                  <Select
                     value={formData.status}
-                    onChange={(e) => handleChange('status', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                  >
-                    <option value="">Статус не передан</option>
-                    <option value="pending">Ожидает</option>
-                    <option value="completed">Завершена</option>
-                    <option value="cancelled">Отменена</option>
-                    <option value="refunded">Возврат</option>
-                  </select>
+                    onChange={(value) => handleChange('status', value)}
+                    options={STATUS_OPTIONS}
+                    size="large"
+                    style={{ width: '100%' }} />
                 </div>
               </div>
 

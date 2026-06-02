@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Card, Button, Badge } from '../ui/native';
+import { Select } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { validateComponentDesign } from '../../utils/designValidator';
 
@@ -88,24 +89,13 @@ const DesignValidator = ({ onValidationComplete }) => {
         }}>
           Выберите компонент для проверки:
         </label>
-        <select
+        <Select
           id={componentSelectId}
           value={selectedComponent}
-          onChange={(e) => setSelectedComponent(e.target.value)}
-          style={{
-            width: '100%',
-            padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-            border: `1px solid ${getColor('border')}`,
-            borderRadius: '6px',
-            backgroundColor: getColor('surface'),
-            color: getColor('text'),
-            fontSize: getFontSize('base')
-          }}>
-          
-          {availableComponents.map((comp) =>
-          <option key={comp.id} value={comp.id}>{comp.name}</option>
-          )}
-        </select>
+          onChange={setSelectedComponent}
+          options={availableComponents.map((comp) => ({ value: comp.id, label: comp.name }))}
+          size="large"
+          style={{ width: '100%' }} />
       </div>
 
       <Button

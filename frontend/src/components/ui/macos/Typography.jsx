@@ -23,7 +23,16 @@ const colorMap = {
   danger: 'var(--mac-danger)'
 };
 
-const Typography = ({ children, variant = 'body1', color, gutterBottom = false, style = {}, paragraph, ...props }) => {
+const Typography = ({
+  children,
+  variant = 'body1',
+  color,
+  gutterBottom = false,
+  style = {},
+  paragraph,
+  component,
+  ...props
+}) => {
   const styles = {
     margin: 0,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
@@ -33,7 +42,7 @@ const Typography = ({ children, variant = 'body1', color, gutterBottom = false, 
     ...(paragraph ? { marginBottom: '16px' } : {}),
     ...style
   };
-  const Tag = variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p';
+  const Tag = component || (variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p');
   return <Tag style={styles} {...props}>{children}</Tag>;
 };
 
@@ -42,6 +51,7 @@ Typography.propTypes = {
   ...(Typography.propTypes || {}),
   children: PropTypes.any,
   color: PropTypes.any,
+  component: PropTypes.elementType,
   gutterBottom: PropTypes.any,
   paragraph: PropTypes.any,
   style: PropTypes.any,

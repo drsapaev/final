@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
+import { Save, Calendar, Clock, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
 
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
   MacOSModal } from
 '../ui/macos';
@@ -210,18 +210,18 @@ const AppointmentModal = ({
               }}>
                     Пациент *
                   </label>
-                  <MacOSSelect
+                  <Select
                 value={formData.patientId}
-                onChange={(e) => handleChange('patientId', e.target.value)}
+                onChange={(value) => handleChange('patientId', value)}
                 options={[
                 { value: '', label: 'Выберите пациента' },
                 ...patients.map((patient) => ({
-                  value: patient.id,
+                  value: String(patient.id),
                   label: `${getPatientDisplayName(patient)}${patient.phone ? ` - ${patient.phone}` : ''}`
                 }))]
                 }
                 error={errors.patientId}
-                icon={<User style={{ width: '16px', height: '16px' }} />} />
+                size="large" />
               
                   {errors.patientId &&
               <p style={{
@@ -249,18 +249,18 @@ const AppointmentModal = ({
               }}>
                     Врач *
                   </label>
-                  <MacOSSelect
+                  <Select
                 value={formData.doctorId}
-                onChange={(e) => handleChange('doctorId', e.target.value)}
+                onChange={(value) => handleChange('doctorId', value)}
                 options={[
                 { value: '', label: 'Выберите врача' },
                 ...doctors.map((doctor) => ({
-                  value: doctor.id,
+                  value: String(doctor.id),
                   label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • кабинет ${doctor.cabinet}` : ''}`
                 }))]
                 }
                 error={errors.doctorId}
-                icon={<Stethoscope style={{ width: '16px', height: '16px' }} />} />
+                size="large" />
               
                   {errors.doctorId &&
               <p style={{
@@ -392,9 +392,9 @@ const AppointmentModal = ({
             }}>
                   Статус записи
                 </label>
-                <MacOSSelect
+                <Select
               value={formData.status}
-              onChange={(e) => handleChange('status', e.target.value)}
+              onChange={(value) => handleChange('status', value)}
               options={[
               { value: '', label: 'По умолчанию backend' },
               { value: 'pending', label: 'Ожидает' },
@@ -404,7 +404,8 @@ const AppointmentModal = ({
               { value: 'completed', label: 'Завершена' },
               { value: 'cancelled', label: 'Отменена' },
               { value: 'no_show', label: 'Не явился' }]
-              } />
+              }
+              size="large" />
             
               </div>
             </div>

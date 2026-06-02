@@ -56,7 +56,6 @@ describe('MacOSTable Accessibility', () => {
   it('adds role="status" and aria-live="polite" to loading state', () => {
     render(<MacOSTable columns={columns} loading={true} />);
 
-    // Using a more robust way to find the status role since text might vary or be localized
     const loadingStatus = screen.getByRole('status');
     expect(loadingStatus).toHaveAttribute('aria-live', 'polite');
     expect(loadingStatus).toHaveTextContent(/Загрузка|Loading/i);
@@ -68,5 +67,28 @@ describe('MacOSTable Accessibility', () => {
     const emptyStatus = screen.getByRole('status');
     expect(emptyStatus).toHaveAttribute('aria-live', 'polite');
     expect(emptyStatus).toHaveTextContent(/Нет данных|No data/i);
+  });
+
+  it('wraps custom empty state content without nested table rows', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <MacOSTable
+        columns={columns}
+        data={[]}
+        emptyState={<div data-testid="empty-state-content">No rows yet</div>}
+      />
+    );
+
+    const emptyContent = screen.getByTestId('empty-state-content');
+    expect(emptyContent.closest('td')).toBe(screen.getByRole('status'));
+    expect(emptyContent.closest('tr')).toBe(screen.getByRole('status').closest('tr'));
+
+    const nestingWarnings = consoleError.mock.calls.filter((call) =>
+      call.join(' ').includes('validateDOMNesting')
+    );
+    expect(nestingWarnings).toEqual([]);
+
+    consoleError.mockRestore();
   });
 });

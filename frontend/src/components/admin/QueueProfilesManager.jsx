@@ -39,6 +39,13 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import logger from '../../utils/logger';
+import { Select } from '../ui/macos';
+
+const STATUS_FILTER_OPTIONS = [
+    { value: 'all', label: '\u0412\u0441\u0435' },
+    { value: 'active', label: '\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435' },
+    { value: 'inactive', label: '\u0421\u043a\u0440\u044b\u0442\u044b\u0435' },
+];
 
 // Available icons for selection
 const AVAILABLE_ICONS = [
@@ -611,15 +618,12 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         </div>
 
                         {/* Status filter */}
-                        <select
-                            style={styles.select}
+                        <Select
                             value={statusFilter}
-                            onChange={e => setStatusFilter(e.target.value)}
-                        >
-                            <option value="all">Все</option>
-                            <option value="active">Активные</option>
-                            <option value="inactive">Скрытые</option>
-                        </select>
+                            onChange={setStatusFilter}
+                            options={STATUS_FILTER_OPTIONS}
+                            size="large"
+                            style={{ width: '160px' }}/>
 
                         {/* Export */}
                         <button style={styles.button} onClick={handleExport} disabled={saving}>

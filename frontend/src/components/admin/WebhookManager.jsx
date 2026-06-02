@@ -28,11 +28,11 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSBadge,
-  MacOSTab,
+  SegmentedControl,
   MacOSStatCard,
 
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSEmptyState,
   MacOSLoadingSkeleton,
 
@@ -278,16 +278,16 @@ const WebhookManager = () => {
       }
 
       {/* Табы */}
-      <MacOSTab
-        tabs={[
-        { id: 'webhooks', label: 'Webhook\'и', icon: Globe },
-        { id: 'calls', label: 'Вызовы', icon: Activity },
-        { id: 'events', label: 'События', icon: Clock }]
+      <SegmentedControl
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+        { value: 'webhooks', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Globe style={{ width: '14px', height: '14px' }} />Webhook&apos;{'\u0438'}</span> },
+        { value: 'calls', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Activity style={{ width: '14px', height: '14px' }} />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
+        { value: 'events', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Clock style={{ width: '14px', height: '14px' }} />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
         }
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        size="md"
-        variant="default" />
+        size="large"
+        style={{ flexWrap: 'wrap', rowGap: '4px' }} />
 
 
       {/* Контент табов */}
@@ -330,16 +330,16 @@ const WebhookManager = () => {
               }}>
                   Статус
                 </label>
-                <MacOSSelect
+                <Select
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, status: value })}
                 options={[
-                { value: '', label: 'Все статусы' },
-                { value: 'active', label: 'Активен' },
-                { value: 'inactive', label: 'Неактивен' },
-                { value: 'suspended', label: 'Приостановлен' },
-                { value: 'failed', label: 'Ошибка' }]
-                } />
+                { value: '', label: '\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b' },
+                { value: 'active', label: '\u0410\u043a\u0442\u0438\u0432\u0435\u043d' },
+                { value: 'inactive', label: '\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u0435\u043d' },
+                { value: 'suspended', label: '\u041f\u0440\u0438\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d' },
+                { value: 'failed', label: '\u041e\u0448\u0438\u0431\u043a\u0430' }]
+                }></Select>
 
               </div>
               
@@ -353,16 +353,16 @@ const WebhookManager = () => {
               }}>
                   Тип события
                 </label>
-                <MacOSSelect
+                <Select
                 value={filters.event_type}
-                onChange={(e) => setFilters({ ...filters, event_type: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, event_type: value })}
                 options={[
-                { value: '', label: 'Все события' },
-                { value: 'patient.created', label: 'Пациент создан' },
-                { value: 'appointment.created', label: 'Запись создана' },
-                { value: 'visit.completed', label: 'Визит завершен' },
-                { value: 'payment.completed', label: 'Платеж завершен' }]
-                } />
+                { value: '', label: '\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f' },
+                { value: 'patient.created', label: '\u041f\u0430\u0446\u0438\u0435\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d' },
+                { value: 'appointment.created', label: '\u0417\u0430\u043f\u0438\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u043d\u0430' },
+                { value: 'visit.completed', label: '\u0412\u0438\u0437\u0438\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d' },
+                { value: 'payment.completed', label: '\u041f\u043b\u0430\u0442\u0435\u0436 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d' }]
+                }></Select>
 
               </div>
               
@@ -577,17 +577,17 @@ const WebhookManager = () => {
               }}>
                   Webhook
                 </label>
-                <MacOSSelect
-                value={selectedWebhook?.id || ''}
-                onChange={(e) => {
-                  const webhook = webhooks.find((w) => w.id === e.target.value);
+                <Select
+                value={selectedWebhook?.id ? String(selectedWebhook.id) : ''}
+                onChange={(value) => {
+                  const webhook = webhooks.find((w) => String(w.id) === value);
                   setSelectedWebhook(webhook);
                   if (webhook) loadWebhookCalls(webhook.id);
                 }}
                 options={[
-                { value: '', label: 'Все webhook\'и' },
-                ...webhooks.map((webhook) => ({ value: webhook.id, label: webhook.name }))]
-                } />
+                { value: '', label: '\u0412\u0441\u0435 webhook\'\u0438' },
+                ...webhooks.map((webhook) => ({ value: String(webhook.id), label: webhook.name }))]
+                }></Select>
 
               </div>
               
@@ -601,16 +601,16 @@ const WebhookManager = () => {
               }}>
                   Статус вызова
                 </label>
-                <MacOSSelect
+                <Select
                 value={filters.call_status || ''}
-                onChange={(e) => setFilters({ ...filters, call_status: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, call_status: value })}
                 options={[
-                { value: '', label: 'Все статусы' },
-                { value: 'success', label: 'Успешные' },
-                { value: 'failed', label: 'Ошибки' },
-                { value: 'pending', label: 'Ожидание' },
-                { value: 'retrying', label: 'Повтор' }]
-                } />
+                { value: '', label: '\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b' },
+                { value: 'success', label: '\u0423\u0441\u043f\u0435\u0448\u043d\u044b\u0435' },
+                { value: 'failed', label: '\u041e\u0448\u0438\u0431\u043a\u0438' },
+                { value: 'pending', label: '\u041e\u0436\u0438\u0434\u0430\u043d\u0438\u0435' },
+                { value: 'retrying', label: '\u041f\u043e\u0432\u0442\u043e\u0440' }]
+                }></Select>
 
               </div>
             </div>

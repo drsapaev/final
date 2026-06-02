@@ -15,7 +15,7 @@ import {
   Package,
   Bell } from
 'lucide-react';
-import { Card, Badge, Button } from '../ui/macos';
+import { Card, Badge, Button, Select } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
@@ -210,24 +210,18 @@ const AllFreeApproval = () => {void
             {/* Фильтр по статусу */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Filter size={16} style={{ color: 'var(--mac-text-tertiary)' }} />
-              <select
+              <Select
+                aria-label="Фильтр заявок All Free по статусу"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: 'var(--mac-radius-sm)',
-                  background: 'var(--mac-bg-primary)',
-                  color: 'var(--mac-text-primary)',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}>
-                
-                <option value="pending">Ожидают одобрения</option>
-                <option value="approved">Одобренные</option>
-                <option value="rejected">Отклоненные</option>
-                <option value="all">Все</option>
-              </select>
+                onChange={setStatusFilter}
+                options={[
+                  { value: 'pending', label: 'Ожидают одобрения' },
+                  { value: 'approved', label: 'Одобренные' },
+                  { value: 'rejected', label: 'Отклоненные' },
+                  { value: 'all', label: 'Все' }
+                ]}
+                size="large"
+                style={{ minWidth: '200px' }} />
             </div>
             
             {/* Кнопка обновления */}

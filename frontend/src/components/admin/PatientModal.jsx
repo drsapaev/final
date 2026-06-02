@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
+import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
 
   MacOSButton,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
   MacOSModal } from
 '../ui/macos';
@@ -362,15 +362,16 @@ const PatientModal = ({
               }}>
                 Пол *
               </label>
-              <MacOSSelect
+              <Select
                 value={formData.gender}
-                onChange={(e) => handleChange('gender', e.target.value)}
+                onChange={(value) => handleChange('gender', value)}
                 options={[
                 { value: '', label: 'Выберите пол' },
                 { value: 'male', label: 'Мужской' },
                 { value: 'female', label: 'Женский' }]
                 }
-                error={errors.gender} />
+                error={errors.gender}
+                size="large" />
 
               {errors.gender &&
               <p style={{
@@ -615,9 +616,9 @@ const PatientModal = ({
               }}>
                 Группа крови
               </label>
-              <MacOSSelect
+              <Select
                 value={formData.bloodType}
-                onChange={(e) => handleChange('bloodType', e.target.value)}
+                onChange={(value) => handleChange('bloodType', value)}
                 options={[
                 { value: '', label: 'Не указано' },
                 { value: 'A+', label: 'A+' },
@@ -629,7 +630,7 @@ const PatientModal = ({
                 { value: 'O+', label: 'O+' },
                 { value: 'O-', label: 'O-' }]
                 }
-                icon={Heart} />
+                size="large" />
 
             </div>
             <div>

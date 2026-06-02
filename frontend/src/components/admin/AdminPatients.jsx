@@ -12,7 +12,8 @@ import {
   MacOSEmptyState,
   MacOSInput,
   MacOSLoadingSkeleton,
-  MacOSSelect,
+  Button,
+  Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
 
@@ -99,34 +100,23 @@ const formatAge = (patient, calculateAge) => {
 };
 
 const IconButton = ({ label, tone = 'default', onClick, children }) => (
-  <button
+  <Button
     type="button"
+    variant="ghost"
+    size="small"
     onClick={onClick}
     aria-label={label}
     title={label}
     style={{
       width: '32px',
       height: '32px',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       padding: 0,
-      border: '1px solid transparent',
       borderRadius: 'var(--mac-radius-sm)',
       color: tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)',
-      backgroundColor: 'transparent',
-      cursor: 'pointer',
-      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
-    }}
-    onMouseEnter={(event) => {
-      event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
-    }}
-    onMouseLeave={(event) => {
-      event.currentTarget.style.backgroundColor = 'transparent';
     }}
   >
     {children}
-  </button>
+  </Button>
 );
 
 IconButton.propTypes = {
@@ -264,22 +254,25 @@ const AdminPatients = () => {
             iconPosition="left"
             aria-label="Поиск пациентов"
           />
-          <MacOSSelect
+          <Select
             value={filterGender}
-            onChange={(event) => setFilterGender(event.target.value)}
+            onChange={setFilterGender}
             options={genderOptions}
+            size="large"
             aria-label="Фильтр по полу"
           />
-          <MacOSSelect
+          <Select
             value={filterAgeRange}
-            onChange={(event) => setFilterAgeRange(event.target.value)}
+            onChange={setFilterAgeRange}
             options={ageOptions}
+            size="large"
             aria-label="Фильтр по возрасту"
           />
-          <MacOSSelect
+          <Select
             value={filterBloodType}
-            onChange={(event) => setFilterBloodType(event.target.value)}
+            onChange={setFilterBloodType}
             options={bloodTypeOptions}
+            size="large"
             aria-label="Фильтр по группе крови"
           />
         </div>

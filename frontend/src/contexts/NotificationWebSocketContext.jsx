@@ -7,7 +7,7 @@ import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import { useNotificationCenter } from './NotificationCenterContext';
 import { clearNotificationQueryCache } from '../api/services';
-import { getEffectiveRouteByPath } from '../routing/routeSelectors';
+import { isPublicRoutePath } from '../routing/routeSelectors';
 
 const NotificationWebSocketContext = createContext(null);
 
@@ -271,8 +271,7 @@ export function NotificationWebSocketProvider({ children }) {
   connectRef.current = connect;
 
   useEffect(() => {
-    const route = getEffectiveRouteByPath(location.pathname);
-    const isPublicRoute = !route || route.auth === 'public';
+    const isPublicRoute = isPublicRoutePath(location.pathname);
 
     shouldReconnect.current = !isPublicRoute;
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Calendar,
   CreditCard,
@@ -18,7 +17,7 @@ import {
   MacOSEmptyState,
   MacOSInput,
   MacOSLoadingSkeleton,
-  MacOSSelect,
+  Select,
 } from '../ui/macos';
 import useDoctors from '../../hooks/useDoctors';
 import useFinance from '../../hooks/useFinance';
@@ -268,23 +267,23 @@ const AdminFinanceOverview = () => {
               iconPosition="left"
             />
           </div>
-          <MacOSSelect
+          <Select
             value={filterType}
-            onChange={(event) => setFilterType(event.target.value)}
+            onChange={(value) => setFilterType(value)}
             options={[
               { value: '', label: 'Все типы' },
               { value: 'income', label: 'Доходы' },
               { value: 'expense', label: 'Расходы' },
             ]}
           />
-          <MacOSSelect
+          <Select
             value={filterCategory}
-            onChange={(event) => setFilterCategory(event.target.value)}
+            onChange={(value) => setFilterCategory(value)}
             options={categoryOptions}
           />
-          <MacOSSelect
+          <Select
             value={filterDateRange}
-            onChange={(event) => setFilterDateRange(event.target.value)}
+            onChange={(value) => setFilterDateRange(value)}
             options={[
               { value: '', label: 'Все время' },
               { value: 'today', label: 'Сегодня' },
@@ -293,9 +292,9 @@ const AdminFinanceOverview = () => {
               { value: 'year', label: 'Год' },
             ]}
           />
-          <MacOSSelect
+          <Select
             value={financeFilterStatus}
-            onChange={(event) => setFinanceFilterStatus(event.target.value)}
+            onChange={(value) => setFinanceFilterStatus(value)}
             options={[
               { value: '', label: 'Все статусы' },
               { value: 'pending', label: 'Ожидает' },

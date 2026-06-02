@@ -984,7 +984,7 @@ const TelegramManager = () => {
     onboardingRequests.filter((item) => getOnboardingAgeBadge(getOnboardingValue(item, 'createdAt', 'created_at', '')).label === 'Overdue').length
   },
   {
-    label: "Today's submitted",
+    label: 'Today\'s submitted',
     value: onboardingAnalytics?.dashboard?.todaySubmitted ?? 0
   },
   {
@@ -1003,6 +1003,40 @@ const TelegramManager = () => {
     width: 32,
     minHeight: 32,
     padding: 0
+  };
+  const capabilityPanelStyle = {
+    border: '1px solid var(--mac-card-border, rgba(27, 46, 73, 0.14))',
+    borderRadius: 'var(--mac-radius-lg)',
+    background: 'var(--mac-bg-secondary, rgba(238, 246, 255, 0.88))',
+    boxShadow: 'var(--mac-shadow-sm)',
+    padding: '16px'
+  };
+  const capabilityGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '10px'
+  };
+  const capabilityCardStyle = {
+    border: '1px solid var(--mac-card-border, rgba(27, 46, 73, 0.14))',
+    borderRadius: 'var(--mac-radius-md)',
+    background: 'var(--mac-card-bg, rgba(255, 255, 255, 0.82))',
+    boxShadow: 'var(--mac-shadow-sm)',
+    padding: '12px',
+    minHeight: 136,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  };
+  const capabilityIconStyle = {
+    width: 28,
+    height: 28,
+    borderRadius: 'var(--mac-radius-sm)',
+    background: 'var(--mac-accent-bg, rgba(0, 122, 255, 0.1))',
+    color: 'var(--mac-accent-blue, #007aff)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: '0 0 auto'
   };
   const dialogRequest = onboardingRequests.find((item) => item.id === onboardingDialog.requestId) || null;
   const dialogForm = onboardingDialog.requestId ? onboardingReviewForms[onboardingDialog.requestId] || {} : {};
@@ -1053,7 +1087,12 @@ const TelegramManager = () => {
 
       <Grid container spacing={3}>
         <Grid item xs={12}>
-          <Card>
+          <Card
+            style={{
+              backgroundColor: 'var(--mac-bg-secondary)',
+              border: '1px solid var(--mac-border)',
+              boxShadow: 'var(--mac-shadow-sm)'
+            }}>
             <CardContent>
               <Box
                 display="flex"
@@ -1077,11 +1116,7 @@ const TelegramManager = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} md={8}>
                   <Box
-                    sx={{
-                      border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
-                      borderRadius: 8,
-                      p: 2
-                    }}>
+                    style={capabilityPanelStyle}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                       <Typography variant="subtitle1">
                         Пациентский бот
@@ -1091,37 +1126,27 @@ const TelegramManager = () => {
                       </Badge>
                     </Box>
                     <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        gap: 1.25
-                      }}>
+                      style={capabilityGridStyle}>
                       {patientCapabilities.map((item) => {
                         const Icon = item.icon;
                         return (
                           <Box
                             key={item.key}
-                            sx={{
-                              border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
-                              borderRadius: 6,
-                              p: 1.25,
-                              minHeight: 128,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 1
-                            }}>
+                            style={capabilityCardStyle}>
                             <Box display="flex" alignItems="center" gap={1}>
-                              <Icon size={16} />
+                              <span style={capabilityIconStyle}>
+                                <Icon size={15} />
+                              </span>
                               <Typography variant="body2" fontWeight={600}>
-                                {item.menu}
+                                {item.label}
                               </Typography>
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" style={{ lineHeight: 1.45 }}>
                               {item.detail}
                             </Typography>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mt="auto" gap={1}>
                               <Typography variant="caption" color="text.secondary">
-                                {item.label}
+                                {'\u041a\u043e\u043c\u0430\u043d\u0434\u0430'}
                               </Typography>
                               <Badge variant="info" size="small">
                                 {item.command}
@@ -1135,12 +1160,7 @@ const TelegramManager = () => {
 
                 <Grid item xs={12} md={4}>
                   <Box
-                    sx={{
-                      border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
-                      borderRadius: 8,
-                      p: 2,
-                      height: '100%'
-                    }}>
+                    style={{ ...capabilityPanelStyle, height: '100%' }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                       <Typography variant="subtitle1">
                         Staff/admin bot
@@ -1155,18 +1175,16 @@ const TelegramManager = () => {
                         return (
                           <Box
                             key={item.key}
-                            sx={{
-                              border: '1px solid var(--mac-border-color, rgba(0,0,0,0.12))',
-                              borderRadius: 6,
-                              p: 1.25
-                            }}>
+                            style={capabilityCardStyle}>
                             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                              <Icon size={16} />
+                              <span style={capabilityIconStyle}>
+                                <Icon size={15} />
+                              </span>
                               <Typography variant="body2" fontWeight={600}>
                                 {item.label}
                               </Typography>
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" style={{ lineHeight: 1.45 }}>
                               {item.detail}
                             </Typography>
                           </Box>);

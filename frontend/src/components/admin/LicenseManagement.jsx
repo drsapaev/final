@@ -24,7 +24,7 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
 
   MacOSLoadingSkeleton,
@@ -120,6 +120,11 @@ const LicenseManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.name.trim() || !formData.type || !formData.license_key.trim()) {
+      setMessage({ type: 'error', text: 'Заполните обязательные поля' });
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -328,28 +333,26 @@ const LicenseManagement = () => {
             }} />
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <MacOSSelect
+            <Select
               aria-label="Фильтр лицензий по статусу"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все статусы</option>
-              {statusOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
-            <MacOSSelect
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'Все статусы' },
+                ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
+            <Select
               aria-label="Фильтр лицензий по типу"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все типы</option>
-              {typeOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
+              onChange={setTypeFilter}
+              options={[
+                { value: 'all', label: 'Все типы' },
+                ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
             <MacOSButton
               onClick={() => setShowAddForm(true)}
               style={{
@@ -434,16 +437,15 @@ const LicenseManagement = () => {
               }}>
                   Тип *
                 </label>
-                <MacOSSelect
-                required
+                <Select
+                aria-label="Тип лицензии"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                
-                  <option value="">Выберите тип</option>
-                  {typeOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, type: value })}
+                options={[
+                  { value: '', label: 'Выберите тип' },
+                  ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
+                ]}
+                size="large" />
               </div>
               <div>
                 <label style={{
@@ -490,14 +492,12 @@ const LicenseManagement = () => {
               }}>
                   Статус
                 </label>
-                <MacOSSelect
+                <Select
+                aria-label="Статус лицензии"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                
-                  {statusOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, status: value })}
+                options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
+                size="large" />
               </div>
               <div>
                 <label style={{

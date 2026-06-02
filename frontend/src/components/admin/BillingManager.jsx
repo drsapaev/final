@@ -4,10 +4,10 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
-  MacOSEmptyState } from
+  MacOSEmptyState,
+  Select } from
 
 '../ui/macos';
 import {
@@ -501,10 +501,11 @@ const BillingManager = () => {
           }}>
                 Тип счета
               </label>
-              <MacOSSelect
+              <Select
             value={invoiceForm.invoice_type}
-            onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_type: e.target.value })}
-            options={INVOICE_TYPE_OPTIONS} />
+            onChange={(value) => setInvoiceForm({ ...invoiceForm, invoice_type: value })}
+            options={INVOICE_TYPE_OPTIONS}
+            size="large" />
           
             </div>
 
@@ -757,10 +758,11 @@ const BillingManager = () => {
           }}>
                 Способ оплаты
               </label>
-              <MacOSSelect
+              <Select
             value={paymentForm.payment_method}
-            onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
-            options={PAYMENT_METHOD_OPTIONS} />
+            onChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
+            options={PAYMENT_METHOD_OPTIONS}
+            size="large" />
           
             </div>
 

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
 import MacOSModal from '../ui/macos/MacOSModal';
 import MacOSInput from '../ui/macos/MacOSInput';
-import MacOSSelect from '../ui/macos/MacOSSelect';
 import MacOSButton from '../ui/macos/MacOSButton';
 import MacOSCheckbox from '../ui/macos/MacOSCheckbox';
+import { Select } from '../ui/macos';
 import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
@@ -259,10 +259,11 @@ const UserModal = ({
 
         {/* Role */}
         <FormField label="Роль" icon={Shield}>
-          <MacOSSelect
+          <Select
             value={formData.role}
-            onChange={(e) => handleChange('role', e.target.value)}
+            onChange={(value) => handleChange('role', value)}
             options={roleOptions}
+            size="large"
             style={{ paddingLeft: '40px' }}
           />
         </FormField>

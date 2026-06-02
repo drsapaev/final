@@ -23,7 +23,7 @@ import {
   Plus,
   Edit } from
 'lucide-react';
-import { Card, Button } from '../ui/macos';
+import { Card, Button, Select } from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -285,17 +285,15 @@ const DisplayBoardSettings = () => {
                 <Palette size={16} className="inline mr-1" />
                 Тема оформления
               </label>
-              <select
+              <Select
                 value={selectedBoard.theme}
-                onChange={(e) => handleBoardSettingChange('theme', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                
-                {themes.map((theme) =>
-                <option key={theme.id} value={theme.name}>
-                    {theme.display_name}
-                  </option>
-                )}
-              </select>
+                onChange={(value) => handleBoardSettingChange('theme', value)}
+                options={themes.map((theme) => ({
+                  value: theme.name,
+                  label: theme.display_name
+                }))}
+                size="large"
+                style={{ width: '100%' }} />
             </div>
 
             <div>
@@ -303,17 +301,15 @@ const DisplayBoardSettings = () => {
                 <Eye size={16} className="inline mr-1" />
                 Отображение пациентов
               </label>
-              <select
+              <Select
                 value={selectedBoard.show_patient_names}
-                onChange={(e) => handleBoardSettingChange('show_patient_names', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                
-                {privacyOptions.map((option) =>
-                <option key={option.value} value={option.value}>
-                    {option.label} - {option.description}
-                  </option>
-                )}
-              </select>
+                onChange={(value) => handleBoardSettingChange('show_patient_names', value)}
+                options={privacyOptions.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} - ${option.description}`
+                }))}
+                size="large"
+                style={{ width: '100%' }} />
               <p className="text-sm text-gray-500 mt-1">
                 Уровень конфиденциальности для пациентов
               </p>
@@ -439,17 +435,15 @@ const DisplayBoardSettings = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Язык озвучки
                   </label>
-                  <select
+                  <Select
                   value={selectedBoard.voice_language}
-                  onChange={(e) => handleBoardSettingChange('voice_language', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                  
-                    {voiceLanguages.map((lang) =>
-                  <option key={lang.value} value={lang.value}>
-                        {lang.label}
-                      </option>
-                  )}
-                  </select>
+                  onChange={(value) => handleBoardSettingChange('voice_language', value)}
+                  options={voiceLanguages.map((lang) => ({
+                    value: lang.value,
+                    label: lang.label
+                  }))}
+                  size="large"
+                  style={{ width: '100%' }} />
                 </div>
 
                 <div>

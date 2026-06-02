@@ -15,6 +15,7 @@ import {
 'lucide-react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+import { Select } from '../ui/macos';
 
 const QRTokenManager = () => {
   const [tokens, setTokens] = useState([]);
@@ -381,18 +382,18 @@ const QRTokenManager = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Специалист
                   </label>
-                  <select
-                value={createForm.specialist_id}
-                onChange={(e) => setCreateForm((prev) => ({ ...prev, specialist_id: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                
-                    <option value="">Выберите специалиста</option>
-                    {specialists.map((specialist) =>
-                <option key={specialist.id} value={specialist.id}>
-                        {specialist.name}
-                      </option>
-                )}
-                  </select>
+                  <Select
+                value={createForm.specialist_id === '' ? '' : String(createForm.specialist_id)}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, specialist_id: value }))}
+                options={[
+                  { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u0430' },
+                  ...specialists.map((specialist) => ({
+                    value: String(specialist.id),
+                    label: specialist.name
+                  }))
+                ]}
+                size="large"
+                style={{ width: '100%' }}></Select>
                 </div>
             }
 
@@ -402,18 +403,18 @@ const QRTokenManager = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Отделение
                   </label>
-                  <select
+                  <Select
                 value={createForm.department}
-                onChange={(e) => setCreateForm((prev) => ({ ...prev, department: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                
-                    <option value="">Выберите отделение</option>
-                    {departments.map((dept) =>
-                <option key={dept.value} value={dept.value}>
-                        {dept.label}
-                      </option>
-                )}
-                  </select>
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, department: value }))}
+                options={[
+                  { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0442\u0434\u0435\u043b\u0435\u043d\u0438\u0435' },
+                  ...departments.map((dept) => ({
+                    value: String(dept.value),
+                    label: dept.label
+                  }))
+                ]}
+                size="large"
+                style={{ width: '100%' }}></Select>
                 </div>
             }
 

@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
-import { Button, CardContent, Badge, Icon } from '../ui/macos';
+import { Button, CardContent, Badge, Icon, Select } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import QueueTable from './QueueTable';
@@ -329,30 +329,25 @@ const ModernQueueManager = ({
               <label className="mqm-label" htmlFor="modern-queue-doctor">
                 Врач
               </label>
-              <select
+              <Select
                 id="modern-queue-doctor"
-                aria-label="Врач очереди"
-                value={effectiveDoctor}
-                onChange={(e) => {
-                  const newDoctor = e.target.value;
+                aria-label={'\u0412\u0440\u0430\u0447 \u043e\u0447\u0435\u0440\u0435\u0434\u0438'}
+                value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
+                onChange={(newDoctor) => {
                   setInternalDoctor(newDoctor);
                   if (onDoctorChange) {
                     onDoctorChange(newDoctor);
                   }
                 }}
-                className="mqm-select">
-
-                <option value="">Выберите специалиста</option>
-                {doctorOptions.length > 0 ?
-                doctorOptions.map((opt) =>
-                <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                ) :
-
-                <option disabled>Загрузка специалистов...</option>
-                }
-              </select>
+                options={[
+                  { value: '', label: doctorOptions.length > 0 ? '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u0430' : '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u043e\u0432...' },
+                  ...doctorOptions.map((opt) => ({
+                    value: String(opt.id),
+                    label: opt.label
+                  }))
+                ]}
+                className="mqm-select"
+                style={{ width: '100%' }}></Select>
             </div>
 
             <div className="mqm-actions">

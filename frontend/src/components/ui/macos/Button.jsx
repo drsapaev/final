@@ -211,49 +211,6 @@ const Button = React.forwardRef(({
         }} />
 
       }
-
-      <style>{`
-        @keyframes mac-spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        button:hover .mac-button-overlay {
-          opacity: 1 !important;
-        }
-
-        button:active {
-          transform: scale(0.98) !important;
-        }
-
-        /* Focus ring for accessibility */
-        button:focus-visible {
-          outline: 2px solid #007aff;
-          outline-offset: 2px;
-        }
-
-        /* Dark mode adjustments */
-        @media (prefers-color-scheme: dark) {
-          button {
-            color-scheme: dark;
-          }
-        }
-
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          button {
-            transition: none;
-          }
-
-          .mac-button-spinner {
-            animation: none;
-          }
-
-          button:active {
-            transform: none !important;
-          }
-        }
-      `}</style>
     </button>);
 
 });

@@ -1,49 +1,56 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
+import { Database, Download, Shield, Users } from 'lucide-react';
+import { SegmentedControl } from '../ui/macos';
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
 import GroupPermissionsManager from './GroupPermissionsManager';
 
-// Простой компонент вкладок для админки
+const TAB_ICONS = {
+  Users,
+  Database,
+  Download,
+  Shield
+};
+
 const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
+  const options = tabs.map((tab) => {
+    const Icon = TAB_ICONS[tab.icon];
+
+    return {
+      value: tab.id,
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {Icon ? <Icon size={14} aria-hidden="true" /> : null}
+          {tab.label}
+        </span>
+      )
+    };
+  });
+
   return (
     <div style={{
-      display: 'flex',
-      gap: '4px',
-      padding: '8px',
-      background: 'var(--mac-gradient-sidebar)',
-      borderRadius: '18px',
-      border: '1px solid var(--mac-main-shell-border)',
-      boxShadow: 'var(--mac-main-shell-shadow)',
-      backdropFilter: 'var(--mac-blur-light)',
-      WebkitBackdropFilter: 'var(--mac-blur-light)',
-      marginBottom: '20px'
+      maxWidth: '100%',
+      overflowX: 'auto',
+      paddingBottom: '6px',
+      marginBottom: '20px',
+      scrollbarWidth: 'thin'
     }}>
-      {tabs.map((tab) =>
-      <button
-        key={tab.id}
-        onClick={() => onTabChange(tab.id)}
+      <SegmentedControl
+        aria-label="Разделы управления пользователями"
+        value={activeTab}
+        onChange={onTabChange}
+        options={options}
+        size="large"
         style={{
-          padding: '8px 16px',
-          borderRadius: '10px',
-          border: activeTab === tab.id ? '1px solid var(--mac-nav-item-active-border)' : '1px solid transparent',
-          background: activeTab === tab.id ? 'var(--mac-nav-item-active)' : 'var(--mac-nav-item-bg)',
-          color: activeTab === tab.id ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
-          fontSize: '14px',
-          fontWeight: activeTab === tab.id ? '600' : '400',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none'
-        }}>
-        
-          {tab.label}
-        </button>
-      )}
+          minWidth: 'max-content',
+          background: 'var(--mac-gradient-sidebar)',
+          border: '1px solid var(--mac-main-shell-border)',
+          borderRadius: '14px',
+          boxShadow: 'var(--mac-main-shell-shadow)'
+        }} />
     </div>);
 
 };
@@ -51,7 +58,8 @@ const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
 AdminTabs.propTypes = {
   tabs: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired
+    label: PropTypes.string.isRequired,
+    icon: PropTypes.string
   })).isRequired,
   activeTab: PropTypes.string.isRequired,
   onTabChange: PropTypes.func.isRequired

@@ -5,7 +5,7 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTable,
   MacOSBadge,
   MacOSModal,
@@ -366,15 +366,6 @@ const UserManagement = () => {
     cursor: 'pointer'
   };
 
-  const actionMenuIconStyle = {
-    width: '18px',
-    minWidth: '18px',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--mac-text-secondary)'
-  };
-
   // Table Columns Configuration
   const columns = [
   {
@@ -510,24 +501,28 @@ const UserManagement = () => {
 
           {/* Role Filter */}
           <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Роль</label>
-            <MacOSSelect
+            <Select
+              label="Роль"
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={setRoleFilter}
               options={roleOptions}
-              placeholder="Все роли" />
-            
+              placeholder="Все роли"
+              size="large"
+              style={{ width: '100%' }} />
+
           </div>
 
           {/* Status Filter */}
           <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Статус</label>
-            <MacOSSelect
+            <Select
+              label="Статус"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={setStatusFilter}
               options={statusOptions}
-              placeholder="Все статусы" />
-            
+              placeholder="Все статусы"
+              size="large"
+              style={{ width: '100%' }} />
+
           </div>
 
           {/* Refresh Button */}
@@ -536,10 +531,9 @@ const UserManagement = () => {
             <MacOSButton
               variant="secondary"
               onClick={loadUsers}
+              startIcon={<RefreshCw size={16} />}
               style={{ width: '100%', justifyContent: 'center' }}
               disabled={loading}>
-              
-              <RefreshCw size={16} style={{ marginRight: '8px' }} />
               Обновить
             </MacOSButton>
           </div>
@@ -577,25 +571,37 @@ const UserManagement = () => {
           gap: '2px'
         }}>
 
-        <button type="button" role="menuitem" style={actionMenuItemStyle} onClick={handleEditFromActionsMenu}>
-          <span style={actionMenuIconStyle}><Edit size={16} /></span>
-          <span>Редактировать</span>
-        </button>
-        <button type="button" role="menuitem" style={actionMenuItemStyle} onClick={handleToggleStatusFromActionsMenu}>
-          <span style={actionMenuIconStyle}>
-            {actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
-          </span>
-          <span>{actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}</span>
-        </button>
-        <div role="separator" style={{ height: '1px', background: 'var(--mac-border)', margin: '4px 0' }} />
-        <button
+        <MacOSButton
           type="button"
           role="menuitem"
+          variant="ghost"
+          size="sm"
+          style={actionMenuItemStyle}
+          startIcon={<Edit size={16} />}
+          onClick={handleEditFromActionsMenu}>
+          Редактировать
+        </MacOSButton>
+        <MacOSButton
+          type="button"
+          role="menuitem"
+          variant="ghost"
+          size="sm"
+          style={actionMenuItemStyle}
+          startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
+          onClick={handleToggleStatusFromActionsMenu}>
+          {actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}
+        </MacOSButton>
+        <div role="separator" style={{ height: '1px', background: 'var(--mac-border)', margin: '4px 0' }} />
+        <MacOSButton
+          type="button"
+          role="menuitem"
+          variant="ghost"
+          size="sm"
+          startIcon={<Trash2 size={16} />}
           style={{ ...actionMenuItemStyle, color: 'var(--mac-error)' }}
           onClick={handleDeleteFromActionsMenu}>
-          <span style={{ ...actionMenuIconStyle, color: 'var(--mac-error)' }}><Trash2 size={16} /></span>
-          <span>Удалить</span>
-        </button>
+          Удалить
+        </MacOSButton>
       </div>
       }
 

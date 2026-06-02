@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTextarea } from '../ui/macos';
+import { Card, Button, Badge, MacOSInput, Select, MacOSTextarea } from '../ui/macos';
 import {
   Bell,
   Users,
@@ -168,9 +168,9 @@ const RegistrarNotificationManager = () => {
           }}>
               Тип уведомления
             </label>
-            <MacOSSelect
+            <Select
             value={notificationForm.alert_type}
-            onChange={(e) => setNotificationForm({ ...notificationForm, alert_type: e.target.value })}
+            onChange={(value) => setNotificationForm({ ...notificationForm, alert_type: value })}
             options={[
             { value: 'system_error', label: 'Системная ошибка' },
             { value: 'payment_issue', label: 'Проблема с оплатой' },
@@ -179,6 +179,7 @@ const RegistrarNotificationManager = () => {
             { value: 'security_alert', label: 'Безопасность' },
             { value: 'maintenance', label: 'Техническое обслуживание' }]
             }
+            size="large"
             style={{ width: '100%' }} />
           
           </div>
@@ -193,14 +194,15 @@ const RegistrarNotificationManager = () => {
           }}>
               Приоритет
             </label>
-            <MacOSSelect
+            <Select
             value={notificationForm.priority}
-            onChange={(e) => setNotificationForm({ ...notificationForm, priority: e.target.value })}
+            onChange={(value) => setNotificationForm({ ...notificationForm, priority: value })}
             options={[
             { value: 'normal', label: 'Обычный' },
             { value: 'warning', label: 'Предупреждение' },
             { value: 'critical', label: 'Критический' }]
             }
+            size="large"
             style={{ width: '100%' }} />
           
           </div>
