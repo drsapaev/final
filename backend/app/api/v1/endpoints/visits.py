@@ -152,6 +152,25 @@ def _doctor_allowed_visit_doctor_ids(db: Session, current_user) -> set[int]:
     return allowed_ids
 
 
+def _ensure_doctor_can_create_visit_for_payload(
+    db: Session,
+    payload: VisitCreate,
+    current_user,
+) -> None:
+    if getattr(current_user, "role", None) == "Admin" or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+    if getattr(current_user, "role", None) != "Doctor":
+        return
+
+    doctor_id = getattr(payload, "doctor_id", None)
+    if doctor_id is None or doctor_id not in _doctor_allowed_visit_doctor_ids(
+        db, current_user
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/visits", response_model=List[VisitOut], summary="Список визитов")
 def list_visits(
     patient_id: Optional[int] = Query(default=None),
@@ -193,6 +212,7 @@ def create_visit(
     db: Session = Depends(get_db),
     current_user = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
+    _ensure_doctor_can_create_visit_for_payload(db, payload, current_user)
     result = VisitsApiService(db).create_visit(
         request=request,
         payload=payload,

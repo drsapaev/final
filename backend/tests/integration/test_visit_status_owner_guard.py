@@ -158,6 +158,60 @@ def test_doctor_visit_list_is_limited_to_own_doctor_id(client, db_session) -> No
     assert unscoped_response.status_code == 403
 
 
+def test_doctor_cannot_create_visit_for_other_doctor(client, db_session) -> None:
+    own_user, _own_doctor = _create_doctor_user(db_session, label="create_own")
+    _other_user, other_doctor = _create_doctor_user(
+        db_session, label="create_other"
+    )
+    other_patient = _create_patient(db_session)
+
+    response = client.post(
+        "/api/v1/visits/visits",
+        json={
+            "patient_id": other_patient.id,
+            "doctor_id": other_doctor.id,
+            "notes": "wrong owner create",
+            "planned_date": str(date.today()),
+            "source": "desk",
+        },
+        headers=_doctor_headers(client, own_user),
+    )
+
+    assert response.status_code == 403
+    assert (
+        db_session.query(Visit)
+        .filter(
+            Visit.patient_id == other_patient.id,
+            Visit.doctor_id == other_doctor.id,
+            Visit.notes == "wrong owner create",
+        )
+        .count()
+        == 0
+    )
+
+
+def test_doctor_can_create_visit_for_own_doctor_id(client, db_session) -> None:
+    own_user, own_doctor = _create_doctor_user(db_session, label="create_allowed")
+    patient = _create_patient(db_session)
+
+    response = client.post(
+        "/api/v1/visits/visits",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": own_doctor.id,
+            "notes": "own doctor create",
+            "planned_date": str(date.today()),
+            "source": "desk",
+        },
+        headers=_doctor_headers(client, own_user),
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["patient_id"] == patient.id
+    assert payload["doctor_id"] == own_doctor.id
+
+
 def test_doctor_cannot_add_service_to_other_doctor_visit(client, db_session) -> None:
     own_user, _own_doctor = _create_doctor_user(db_session, label="svc_own")
     _other_user, other_doctor = _create_doctor_user(db_session, label="svc_other")
