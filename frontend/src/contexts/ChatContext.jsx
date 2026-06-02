@@ -12,14 +12,9 @@ import {
   MESSAGING_CONTRACT_VERSION,
   isSupportedMessagingContractVersion,
 } from '../constants/messagingContract';
+import { isPublicRoutePath } from '../routing/routeSelectors';
 
 const ChatContext = createContext(null);
-const PUBLIC_PATH_PREFIXES = ['/login', '/health', '/setup', '/forbidden', '/unauthorized', '/not-found'];
-
-function isPublicPath(pathname) {
-  const normalizedPath = String(pathname || '/').toLowerCase();
-  return normalizedPath === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
-}
 
 export const ChatProvider = ({ children }) => {
   const location = useLocation();
@@ -27,7 +22,7 @@ export const ChatProvider = ({ children }) => {
   const user = authState.profile;
   const token = authState.token;
   const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
-  const isPublicRoute = isPublicPath(location.pathname);
+  const isPublicRoute = isPublicRoutePath(location.pathname);
 
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);

@@ -98,6 +98,11 @@ export function getEffectiveRouteByPath(pathname) {
   return legacyRedirect?.route || null;
 }
 
+export function isPublicRoutePath(pathname) {
+  const route = getEffectiveRouteByPath(pathname);
+  return !route || route.auth === 'public';
+}
+
 export function isRouteAccessibleToProfile(route, profile, options = {}) {
   if (!route) return false;
   if (route.group === 'internal-demo' && !options.internalDemoEnabled) {
