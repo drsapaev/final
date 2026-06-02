@@ -1,22 +1,38 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, LayoutDashboard, LineChart } from 'lucide-react';
+import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 
-const ROUTES = [
-  {
-    id: 'dashboard',
-    path: '/admin',
-    label: 'Обзор',
+const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'];
+
+const ROUTE_PRESENTATION_BY_ID = {
+  'admin-dashboard': {
     description: 'Сводка по клинике и операционные карточки',
     icon: LayoutDashboard,
   },
-  {
-    id: 'analytics',
-    path: '/admin/analytics',
-    label: 'Аналитика',
+  'admin-analytics': {
     description: 'Подробные разрезы, KPI и прогнозы',
     icon: LineChart,
   },
-];
+};
+
+const switcherRoutes = SWITCHER_ROUTE_IDS
+  .map((routeId) => {
+    const route = getCanonicalRouteById(routeId);
+    const presentation = ROUTE_PRESENTATION_BY_ID[routeId];
+
+    if (!route || !presentation) {
+      return null;
+    }
+
+    return {
+      id: route.id,
+      path: route.path,
+      label: route.nav?.label || route.title,
+      description: presentation.description,
+      icon: presentation.icon,
+    };
+  })
+  .filter(Boolean);
 
 const switcherStyle = {
   display: 'grid',
@@ -87,11 +103,12 @@ const getRouteIconStyle = (isActive) => ({
   flex: '0 0 auto',
 });
 
-export default function AdminRouteSwitcher({ current }) {
+export default function AdminRouteSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const activeId = current || (location.pathname.startsWith('/admin/analytics') ? 'analytics' : 'dashboard');
+  const currentRoute = getEffectiveRouteByPath(location.pathname);
+  const activeId = SWITCHER_ROUTE_IDS.includes(currentRoute?.id) ? currentRoute.id : 'admin-dashboard';
 
   return (
     <section
@@ -103,7 +120,7 @@ export default function AdminRouteSwitcher({ current }) {
         Быстрый переход между экранами
       </div>
       <div style={routeGridStyle}>
-        {ROUTES.map((route) => {
+        {switcherRoutes.map((route) => {
           const Icon = route.icon;
           const isActive = activeId === route.id;
 
