@@ -60,9 +60,9 @@ describe('FinanceModal', () => {
       },
     });
 
-    const statusSelect = screen.getByDisplayValue('Статус не передан');
+    const statusSelect = screen.getByRole('button', { name: 'Статус не передан' });
 
-    expect(statusSelect).toHaveValue('');
-    expect(statusSelect).not.toHaveValue('completed');
+    expect(statusSelect).toHaveTextContent('Статус не передан');
+    expect(statusSelect).not.toHaveTextContent('Завершена');
   });
 });
