@@ -6,13 +6,19 @@ import { api, buildApiUrl, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
-import { getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
+import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
+import { useSetupStatus } from '../../hooks/useSetupStatus.js';
 import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
 import logger from '../../utils/logger';
+
+const landingRoute = getCanonicalRouteById('landing')?.path || '/';
+const loginRoute = getCanonicalRouteById('login')?.path || '/login';
+const changePasswordRequiredRoute = getCanonicalRouteById('change-password-required')?.path || '/change-password-required';
+const setupRoute = getCanonicalRouteById('setup')?.path || '/setup';
 
 // macOS-стиль анимации для декоративных элементов
 const floatingAnimation = `
@@ -33,7 +39,9 @@ const LoginFormStyled = () => {void
   useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  const setupStatus = useSetupStatus();
+  const from = location.state?.from?.pathname || landingRoute;
+  const showSetupCta = setupStatus.initialized === false;
   const authControlStyles = {
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     color: '#0f172a',
@@ -161,7 +169,7 @@ const LoginFormStyled = () => {void
         if (data.must_change_password) {
           setToken(accessToken);
           localStorage.setItem('auth_token', accessToken);
-          navigate('/change-password-required', {
+          navigate(changePasswordRequiredRoute, {
             state: { currentPassword: formData.password },
             replace: true
           });
@@ -181,11 +189,11 @@ const LoginFormStyled = () => {void
           const state = auth.getState ? auth.getState() : { profile: null };
           const profile = state?.profile || null;
           const computedRoute = getRouteForProfile(profile);
-          const fromClean = from || '/';
+          const fromClean = from || landingRoute;
 
           // Если from ведёт на другой защищённый раздел панели — игнорируем его
           let target = computedRoute;
-          if (fromClean && fromClean !== '/' && fromClean !== '/login') {
+          if (fromClean && fromClean !== landingRoute && fromClean !== loginRoute) {
             if (isProtectedPanelPath(fromClean)) {
               if (fromClean === computedRoute) target = fromClean;
             } else {
@@ -206,7 +214,7 @@ const LoginFormStyled = () => {void
           navigate(target, { replace: true });
         } catch (profileError) {
           logger.warn('Не удалось получить профиль:', profileError);
-          navigate('/', { replace: true });
+          navigate(landingRoute, { replace: true });
         }
       } else {
         throw new Error('Не получен токен доступа');
@@ -260,7 +268,7 @@ const LoginFormStyled = () => {void
         const state = auth.getState ? auth.getState() : { profile: null };
         const profile = state?.profile || null;
         const computedRoute = getRouteForProfile(profile);
-        const target = computedRoute || from || '/';
+        const target = computedRoute || from || landingRoute;
 
         navigate(target, { replace: true });
       }
@@ -570,13 +578,15 @@ const LoginFormStyled = () => {void
           </form>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate('/register')} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
+            {showSetupCta && (
+            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate(setupRoute)} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <UserPlus size={16} />
-                Регистрация
+                Создать клинику
               </span>
             </Button>
-            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate('/')} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
+            )}
+            <Button type="button" variant="outline" fullWidth size="small" onClick={() => navigate(landingRoute)} style={{ ...authSecondaryButtonStyles, ...authButtonBaseStyles }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <UserRound size={16} />
                 Гость

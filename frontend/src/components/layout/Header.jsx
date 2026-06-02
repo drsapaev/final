@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
+import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 import '../../styles/cursor-effects.css';
 import '../../styles/animations.css';
 import '../ui/animations.css';
@@ -38,6 +39,11 @@ export default function Header() {
   // Normalize receptionist to registrar for UI consistency
   const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
   const view = new URLSearchParams(location.search).get('view');
+  const cashierHomeRoute = getRoleHomeRoute('cashier');
+  const cardiologyHomeRoute = getCanonicalRouteById('doctor-cardiology')?.path || getRoleHomeRoute('cardio');
+  const dermatologyHomeRoute = getCanonicalRouteById('doctor-dermatology')?.path || getRoleHomeRoute('derma');
+  const dentistryHomeRoute = getCanonicalRouteById('doctor-dentistry')?.path || getRoleHomeRoute('dentist');
+  const registrarHomeRoute = getRoleHomeRoute('registrar');
 
   // Используем централизованную систему дизайна вместо дублированных токенов
   const {
@@ -55,14 +61,14 @@ export default function Header() {
   const navItems = [];
   // Для администратора навигационные пункты скрыты
   if (roleNormalized !== 'admin') {
-    if (roleNormalized === 'registrar') navItems.push({ to: '/cashier-panel', label: 'Кассир', icon: <CreditCard size={16} /> });
-    if (roleNormalized === 'cashier') navItems.push({ to: '/cashier-panel', label: 'Касса', icon: <CreditCard size={16} /> });
+    if (roleNormalized === 'registrar') navItems.push({ to: cashierHomeRoute, label: 'Кассир', icon: <CreditCard size={16} /> });
+    if (roleNormalized === 'cashier') navItems.push({ to: cashierHomeRoute, label: 'Касса', icon: <CreditCard size={16} /> });
   }
 
   // Специализированные роли
-  if (roleLower === 'cardio') navItems.push({ to: '/cardiologist', label: 'Кардиолог', icon: '❤️' });
-  if (roleLower === 'derma') navItems.push({ to: '/dermatologist', label: 'Дерматолог', icon: '✨' });
-  if (roleLower === 'dentist') navItems.push({ to: '/dentist', label: 'Стоматолог', icon: '🦷' });
+  if (roleLower === 'cardio') navItems.push({ to: cardiologyHomeRoute, label: 'Кардиолог', icon: '❤️' });
+  if (roleLower === 'derma') navItems.push({ to: dermatologyHomeRoute, label: 'Дерматолог', icon: '✨' });
+  if (roleLower === 'dentist') navItems.push({ to: dentistryHomeRoute, label: 'Стоматолог', icon: '🦷' });
 
   // Стили в стиле RegistrarPanel - на весь экран
   void {
@@ -339,7 +345,7 @@ export default function Header() {
           })}
 
           {/* Быстрые ссылки для регистратора внутри панели */}
-          {roleNormalized === 'registrar' && location.pathname === '/registrar-panel' &&
+          {roleNormalized === 'registrar' && location.pathname === registrarHomeRoute &&
           <>
               <button
               className="interactive-element hover-lift ripple-effect focus-ring"
@@ -367,7 +373,7 @@ export default function Header() {
                   boxShadow: 'none'
                 })
               }}
-              onClick={() => navigate('/registrar-panel?view=welcome')}
+              onClick={() => navigate(`${registrarHomeRoute}?view=welcome`)}
               title="Главная">
               
                 <Home size={16} />
@@ -399,7 +405,7 @@ export default function Header() {
                   boxShadow: 'none'
                 })
               }}
-              onClick={() => navigate('/registrar-panel?view=queue')}
+              onClick={() => navigate(`${registrarHomeRoute}?view=queue`)}
               title="Онлайн‑записи">
               
                 <span>📱</span>
@@ -429,7 +435,7 @@ export default function Header() {
                   const val = e.currentTarget.value;
                   if (val) params.set('date', val);else params.delete('date');
                   params.set('view', 'welcome');
-                  navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                  navigate(`${registrarHomeRoute}?${params.toString()}`, { replace: true });
                 }} />
               
                   <div style={{ position: 'relative' }}>
@@ -468,7 +474,7 @@ export default function Header() {
                       const val = e.currentTarget.value.trim();
                       if (val) params.set('q', val);else params.delete('q');
                       params.set('view', 'welcome');
-                      navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                      navigate(`${registrarHomeRoute}?${params.toString()}`, { replace: true });
                     }
                   }} />
                 
@@ -537,7 +543,7 @@ export default function Header() {
           {user ?
           <>
               <button
-              onClick={() => navigate('/registrar-panel')}
+              onClick={() => navigate(registrarHomeRoute)}
               className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
               style={{
                 height: '40px',

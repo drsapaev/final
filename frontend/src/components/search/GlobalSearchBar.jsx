@@ -4,11 +4,34 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { generatePath, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+
+const patientSearchRouteByRole = {
+  registrar: getRoleHomeRoute('registrar'),
+  receptionist: getRoleHomeRoute('registrar'),
+  cardio: getRoleHomeRoute('cardio'),
+  derma: getRoleHomeRoute('derma'),
+  dentist: getRoleHomeRoute('dentist'),
+  doctor: getRoleHomeRoute('doctor'),
+  lab: getRoleHomeRoute('lab'),
+  cashier: getRoleHomeRoute('cashier'),
+  admin: getRoleHomeRoute('admin'),
+};
+const clinicalPickupPath = getCanonicalRouteById('clinical-pickup')?.path || '/clinical/pickup/:patientId';
+
+function routeWithQuery(path, params) {
+  const searchParams = new URLSearchParams(params);
+  return `${path}?${searchParams.toString()}`;
+}
+
+function patientPickupRoute(patientId) {
+  return generatePath(clinicalPickupPath, { patientId });
+}
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -178,44 +201,22 @@ export default function GlobalSearchBar({ className = '' }) {
       case 'patient':
         // Role-based navigation for patients
         // All panels now support ?patientId parameter
-        if (role === 'registrar' || role === 'receptionist') {
-          // Registrar, Receptionist -> Registrar panel with patient search
-          navigate(`/registrar?patientId=${item.id}`);
-        } else if (role === 'cardio') {
-          // Cardiologist -> Cardiology panel with patient context
-          navigate(`/doctor/cardiology?patientId=${item.id}`);
-        } else if (role === 'derma') {
-          // Dermatologist -> Dermatology panel with patient context
-          navigate(`/doctor/dermatology?patientId=${item.id}`);
-        } else if (role === 'dentist') {
-          // Dentist -> Dentist panel with patient context
-          navigate(`/doctor/dentistry?patientId=${item.id}`);
-        } else if (role === 'doctor') {
-          // General doctor -> Doctor panel with patient context
-          navigate(`/doctor?patientId=${item.id}`);
-        } else if (role === 'lab') {
-          // Lab -> Lab panel with patient context
-          navigate(`/lab?patientId=${item.id}`);
-        } else if (role === 'cashier') {
-          // Cashier -> Cashier panel with patient context
-          navigate(`/cashier?patientId=${item.id}`);
-        } else if (role === 'admin') {
-          // Admin -> Admin panel with patient search
-          navigate(`/admin?patientId=${item.id}`);
+        if (patientSearchRouteByRole[role]) {
+          navigate(routeWithQuery(patientSearchRouteByRole[role], { patientId: item.id }));
         } else {
           // Fallback for any other role
-          navigate(`/clinical/pickup/${item.id}`);
+          navigate(patientPickupRoute(item.id));
         }
         break;
       case 'visit':
         if (role === 'doctor') {
-          navigate(`/doctor?visitId=${item.id}`);
+          navigate(routeWithQuery(patientSearchRouteByRole.doctor, { visitId: item.id }));
         } else {
-          navigate(`/registrar?visitId=${item.id}&patientId=${item.patient_id}`);
+          navigate(routeWithQuery(patientSearchRouteByRole.registrar, { visitId: item.id, patientId: item.patient_id }));
         }
         break;
       case 'lab':
-        navigate(`/clinical/pickup/${item.patient_id}?tab=lab&orderId=${item.id}`);
+        navigate(routeWithQuery(patientPickupRoute(item.patient_id), { tab: 'lab', orderId: item.id }));
         break;
     }
   };

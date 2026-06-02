@@ -9,9 +9,14 @@ import { Button, Icon } from '../ui/macos';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
-import { getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 
 import logger from '../../utils/logger';
+
+const landingRoute = getCanonicalRouteById('landing')?.path || '/';
+const loginRoute = getCanonicalRouteById('login')?.path || '/login';
+const profileRoute = getCanonicalRouteById('clinical-profile')?.path || '/clinical/profile';
+const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 export function isThemeMenuInteraction(event, themeMenuRoot) {
   const path = event.composedPath ? event.composedPath() : [];
@@ -162,7 +167,7 @@ export default function HeaderNew() {
   <Button
     variant="ghost"
     size="sm"
-    onClick={() => navigate('/')}
+    onClick={() => navigate(landingRoute)}
     title="На главную"
     style={{
       color: 'var(--mac-text-primary)',
@@ -213,7 +218,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Главная"
-        onClick={() => navigate('/registrar?tab=welcome')}
+        onClick={() => navigate(`${registrarHomeRoute}?tab=welcome`)}
         className="hdr-hide-md"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -224,7 +229,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Онлайн‑записи"
-        onClick={() => navigate('/registrar?tab=queue')}
+        onClick={() => navigate(`${registrarHomeRoute}?tab=queue`)}
         className="hdr-hide-xs"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -407,7 +412,7 @@ export default function HeaderNew() {
           <Button
         variant="outline"
         size="small"
-        onClick={() => navigate('/clinical/profile')}
+        onClick={() => navigate(profileRoute)}
         title="Профиль пользователя"
         className="hdr-hide-sm"
         style={{
@@ -428,7 +433,7 @@ export default function HeaderNew() {
         id="logout-header-btn"
         variant="danger"
         size="small"
-        onClick={() => {auth.clearToken();setProfile(null);navigate('/login');}}
+        onClick={() => {auth.clearToken();setProfile(null);navigate(loginRoute);}}
         title="Выйти"
         className="hdr-hide-sm"
         style={{
@@ -446,7 +451,7 @@ export default function HeaderNew() {
     <Button
       variant="primary"
       size="small"
-      onClick={() => navigate('/login')}
+      onClick={() => navigate(loginRoute)}
       className="hdr-hide-sm"
       style={{
         display: 'flex',

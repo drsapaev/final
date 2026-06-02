@@ -1,6 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import auth from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
+import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+
+const cashierHomeRoute = getRoleHomeRoute('cashier');
+const cardiologyHomeRoute = getCanonicalRouteById('doctor-cardiology')?.path || getRoleHomeRoute('cardio');
+const dermatologyHomeRoute = getCanonicalRouteById('doctor-dermatology')?.path || getRoleHomeRoute('derma');
+const dentistryHomeRoute = getCanonicalRouteById('doctor-dentistry')?.path || getRoleHomeRoute('dentist');
+const labHomeRoute = getRoleHomeRoute('lab');
+const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 export default function Sidebar() {
   const { getColor, getSpacing } = useTheme();
@@ -8,10 +16,10 @@ export default function Sidebar() {
   const profile = st.profile || st.user || {};
   const role = String(profile?.role || profile?.role_name || '').toLowerCase();
   const location = useLocation();
-  const isCardioRoute = location.pathname.startsWith('/cardiologist');
-  const isDermaRoute = location.pathname.startsWith('/dermatologist');
-  const isDentistRoute = location.pathname.startsWith('/dentist');
-  const isLabRoute = location.pathname.startsWith('/lab-panel');
+  const isCardioRoute = location.pathname.startsWith(cardiologyHomeRoute);
+  const isDermaRoute = location.pathname.startsWith(dermatologyHomeRoute);
+  const isDentistRoute = location.pathname.startsWith(dentistryHomeRoute);
+  const isLabRoute = location.pathname.startsWith(labHomeRoute);
 
   const common = [];
 
@@ -20,52 +28,52 @@ export default function Sidebar() {
   // Если мы на специализированной странице, показываем ТОЛЬКО кнопки этой специальности
   if (isCardioRoute) {
     byRole.push(
-      { to: '/cardiologist?tab=queue', label: 'Очередь' },
-      { to: '/cardiologist?tab=appointments', label: 'Записи' },
-      { to: '/cardiologist?tab=visit', label: 'Прием' },
-      { to: '/cardiologist?tab=ecg', label: 'ЭКГ' },
-      { to: '/cardiologist?tab=blood', label: 'Анализы' },
-      { to: '/cardiologist?tab=ai', label: 'AI Помощник' },
-      { to: '/cardiologist?tab=services', label: 'Услуги' },
-      { to: '/cardiologist?tab=history', label: 'История' }
+      { to: `${cardiologyHomeRoute}?tab=queue`, label: 'Очередь' },
+      { to: `${cardiologyHomeRoute}?tab=appointments`, label: 'Записи' },
+      { to: `${cardiologyHomeRoute}?tab=visit`, label: 'Прием' },
+      { to: `${cardiologyHomeRoute}?tab=ecg`, label: 'ЭКГ' },
+      { to: `${cardiologyHomeRoute}?tab=blood`, label: 'Анализы' },
+      { to: `${cardiologyHomeRoute}?tab=ai`, label: 'AI Помощник' },
+      { to: `${cardiologyHomeRoute}?tab=services`, label: 'Услуги' },
+      { to: `${cardiologyHomeRoute}?tab=history`, label: 'История' }
     );
   } else if (isDermaRoute) {
     byRole.push(
-      { to: '/dermatologist?tab=queue', label: 'Очередь' },
-      { to: '/dermatologist?tab=appointments', label: 'Записи' },
-      { to: '/dermatologist?tab=visit', label: 'Прием' },
-      { to: '/dermatologist?tab=patients', label: 'Пациенты' },
-      { to: '/dermatologist?tab=photos', label: 'Фото' },
-      { to: '/dermatologist?tab=skin', label: 'Осмотр кожи' },
-      { to: '/dermatologist?tab=cosmetic', label: 'Косметология' },
-      { to: '/dermatologist?tab=ai', label: 'AI Помощник' },
-      { to: '/dermatologist?tab=services', label: 'Услуги' },
-      { to: '/dermatologist?tab=history', label: 'История' }
+      { to: `${dermatologyHomeRoute}?tab=queue`, label: 'Очередь' },
+      { to: `${dermatologyHomeRoute}?tab=appointments`, label: 'Записи' },
+      { to: `${dermatologyHomeRoute}?tab=visit`, label: 'Прием' },
+      { to: `${dermatologyHomeRoute}?tab=patients`, label: 'Пациенты' },
+      { to: `${dermatologyHomeRoute}?tab=photos`, label: 'Фото' },
+      { to: `${dermatologyHomeRoute}?tab=skin`, label: 'Осмотр кожи' },
+      { to: `${dermatologyHomeRoute}?tab=cosmetic`, label: 'Косметология' },
+      { to: `${dermatologyHomeRoute}?tab=ai`, label: 'AI Помощник' },
+      { to: `${dermatologyHomeRoute}?tab=services`, label: 'Услуги' },
+      { to: `${dermatologyHomeRoute}?tab=history`, label: 'История' }
     );
   } else if (isDentistRoute) {
     byRole.push(
-      { to: '/dentist?tab=dashboard', label: 'Дашборд' },
-      { to: '/dentist?tab=patients', label: 'Пациенты' },
-      { to: '/dentist?tab=appointments', label: 'Записи' },
-      { to: '/dentist?tab=examinations', label: 'Осмотры' },
-      { to: '/dentist?tab=diagnoses', label: 'Диагнозы' },
-      { to: '/dentist?tab=visits', label: 'Протоколы' },
-      { to: '/dentist?tab=photos', label: 'Архив' },
-      { to: '/dentist?tab=templates', label: 'Шаблоны' },
-      { to: '/dentist?tab=reports', label: 'Отчеты' },
-      { to: '/dentist?tab=dental-chart', label: 'Схемы зубов' },
-      { to: '/dentist?tab=treatment-plans', label: 'Планы лечения' },
-      { to: '/dentist?tab=prosthetics', label: 'Протезирование' },
-      { to: '/dentist?tab=ai-assistant', label: 'AI Помощник' }
+      { to: `${dentistryHomeRoute}?tab=dashboard`, label: 'Дашборд' },
+      { to: `${dentistryHomeRoute}?tab=patients`, label: 'Пациенты' },
+      { to: `${dentistryHomeRoute}?tab=appointments`, label: 'Записи' },
+      { to: `${dentistryHomeRoute}?tab=examinations`, label: 'Осмотры' },
+      { to: `${dentistryHomeRoute}?tab=diagnoses`, label: 'Диагнозы' },
+      { to: `${dentistryHomeRoute}?tab=visits`, label: 'Протоколы' },
+      { to: `${dentistryHomeRoute}?tab=photos`, label: 'Архив' },
+      { to: `${dentistryHomeRoute}?tab=templates`, label: 'Шаблоны' },
+      { to: `${dentistryHomeRoute}?tab=reports`, label: 'Отчеты' },
+      { to: `${dentistryHomeRoute}?tab=dental-chart`, label: 'Схемы зубов' },
+      { to: `${dentistryHomeRoute}?tab=treatment-plans`, label: 'Планы лечения' },
+      { to: `${dentistryHomeRoute}?tab=prosthetics`, label: 'Протезирование' },
+      { to: `${dentistryHomeRoute}?tab=ai-assistant`, label: 'AI Помощник' }
     );
   } else if (isLabRoute) {
     byRole.push(
-      { to: '/lab-panel?tab=tests', label: 'Анализы' },
-      { to: '/lab-panel?tab=appointments', label: 'Записи' },
-      { to: '/lab-panel?tab=results', label: 'Результаты' },
-      { to: '/lab-panel?tab=patients', label: 'Пациенты' },
-      { to: '/lab-panel?tab=reports', label: 'Отчеты' },
-      { to: '/lab-panel?tab=ai', label: 'AI Анализ' }
+      { to: `${labHomeRoute}?tab=tests`, label: 'Анализы' },
+      { to: `${labHomeRoute}?tab=appointments`, label: 'Записи' },
+      { to: `${labHomeRoute}?tab=results`, label: 'Результаты' },
+      { to: `${labHomeRoute}?tab=patients`, label: 'Пациенты' },
+      { to: `${labHomeRoute}?tab=reports`, label: 'Отчеты' },
+      { to: `${labHomeRoute}?tab=ai`, label: 'AI Анализ' }
     );
   } else {
     // Обычная логика для других страниц
@@ -80,8 +88,8 @@ export default function Sidebar() {
     }
     if (role === 'registrar') {
       byRole.push(
-        { to: '/registrar-panel', label: 'Панель регистратора' },
-        { to: '/cashier-panel', label: 'Касса' }
+        { to: registrarHomeRoute, label: 'Панель регистратора' },
+        { to: cashierHomeRoute, label: 'Касса' }
       );
     }
     if (role === 'doctor') {
@@ -89,12 +97,12 @@ export default function Sidebar() {
     }
     if (role === 'lab') {
       byRole.push(
-        { to: '/lab-panel', label: 'Лаборатория' }
+        { to: labHomeRoute, label: 'Лаборатория' }
       );
     }
     if (role === 'cashier') {
       byRole.push(
-        { to: '/cashier-panel', label: 'Касса' }
+        { to: cashierHomeRoute, label: 'Касса' }
       );
     }
     if (role === 'nurse') {
