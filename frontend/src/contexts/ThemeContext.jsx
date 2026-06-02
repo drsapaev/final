@@ -13,12 +13,12 @@ import {
 import apiClient from '../api/client.js';
 import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
+import { isPublicRoutePath } from '../routing/routeSelectors.js';
 
 const ThemeContext = createContext();
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
 const THEME_PREFERENCE_CACHE_MS = 30_000;
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
-const PUBLIC_PATH_PREFIXES = ['/login', '/health', '/setup', '/forbidden', '/unauthorized', '/not-found'];
 const themePreferenceCache = new Map();
 const themePreferenceRequestPromiseByToken = new Map();
 
@@ -32,11 +32,6 @@ function getAuthTokenSnapshot() {
   } catch {
     return null;
   }
-}
-
-function isPublicPath(pathname) {
-  const normalizedPath = String(pathname || '/').toLowerCase();
-  return normalizedPath === '/' || PUBLIC_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
 }
 
 function ThemeRouteSync({ onPathnameChange }) {
@@ -319,7 +314,7 @@ export const ThemeProvider = ({ children }) => {
     let cancelled = false;
     const currentPath = pathname;
 
-    if (!authToken || isPublicPath(currentPath)) {
+    if (!authToken || isPublicRoutePath(currentPath)) {
       hydratedTokenRef.current = null;
       lastSavedPreferenceRef.current = null;
       setPreferencesReady(true);
@@ -461,7 +456,7 @@ export const ThemeProvider = ({ children }) => {
       saveTimeoutRef.current = null;
     }
 
-    if (!authToken || !preferencesReady || isPublicPath(pathname)) {
+    if (!authToken || !preferencesReady || isPublicRoutePath(pathname)) {
       return undefined;
     }
 
