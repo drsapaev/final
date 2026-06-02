@@ -20,11 +20,51 @@ import {
   Clock,
   User } from
 'lucide-react';
-import { Card, Button, Badge, MacOSInput, MacOSSelect, Skeleton } from '../ui/macos';
+import { Card, Button, Badge, MacOSInput, Select, SegmentedControl, Skeleton } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+
+const toArray = (value, fallbackKeys = []) => {
+  if (Array.isArray(value)) return value;
+
+  for (const key of fallbackKeys) {
+    if (Array.isArray(value?.[key])) {
+      return value[key];
+    }
+  }
+
+  return [];
+};
+
+const normalizeCacheStats = (payload) => ({
+  cache_ttl: 0,
+  cache_size: 0,
+  ...(payload || {}),
+  cached_users: toArray(payload?.cached_users)
+});
+
+const normalizeUserPermissions = (payload) => ({
+  ...(payload || {}),
+  roles: toArray(payload?.roles),
+  groups: toArray(payload?.groups),
+  permissions: toArray(payload?.permissions),
+  permissions_count: payload?.permissions_count ?? toArray(payload?.permissions).length
+});
+
+const normalizeGroupSummary = (payload) => ({
+  ...(payload || {}),
+  roles: toArray(payload?.roles),
+  permissions_by_category: payload?.permissions_by_category && typeof payload.permissions_by_category === 'object' ?
+    Object.fromEntries(
+      Object.entries(payload.permissions_by_category).map(([category, permissions]) => [category, toArray(permissions)])
+    ) :
+    {},
+  users_count: payload?.users_count ?? 0,
+  permissions_count: payload?.permissions_count ?? 0
+});
+
 const GroupPermissionsManager = () => {
   // Состояние
   const [activeTab, setActiveTab] = useState('users');
@@ -32,6 +72,8 @@ const GroupPermissionsManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
+  const [permissionToCheck, setPermissionToCheck] = useState('');
+  const [roleToAssign, setRoleToAssign] = useState('');
 
   // Данные
   const [users, setUsers] = useState([]);
@@ -62,11 +104,11 @@ const GroupPermissionsManager = () => {
       api.get('/admin/permissions/cache/stats')]
       );
 
-      setUsers(usersRes.data.users || usersRes.data || []);
-      setGroups(groupsRes.data);
-      setRoles(rolesRes.data);
-      setPermissions(permissionsRes.data);
-      setCacheStats(cacheRes.data.cache_stats);
+      setUsers(toArray(usersRes.data, ['users', 'items', 'results']));
+      setGroups(toArray(groupsRes.data, ['groups', 'items', 'results']));
+      setRoles(toArray(rolesRes.data, ['roles', 'items', 'results']));
+      setPermissions(toArray(permissionsRes.data, ['permissions', 'items', 'results']));
+      setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных');
@@ -81,7 +123,7 @@ const GroupPermissionsManager = () => {
     setLoading(true);
     try {
       const response = await api.get(`/admin/permissions/users/${userId}/permissions`);
-      setUserPermissions(response.data);
+      setUserPermissions(normalizeUserPermissions(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки разрешений пользователя:', error);
       toast.error('Ошибка загрузки разрешений пользователя');
@@ -96,7 +138,7 @@ const GroupPermissionsManager = () => {
     setLoading(true);
     try {
       const response = await api.get(`/admin/permissions/groups/${groupId}/permissions`);
-      setGroupSummary(response.data);
+      setGroupSummary(normalizeGroupSummary(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки сводки группы:', error);
       toast.error('Ошибка загрузки сводки группы');
@@ -117,7 +159,7 @@ const GroupPermissionsManager = () => {
         params: { permission }
       });
 
-      const hasPermission = response.data.has_permission;
+      const hasPermission = Boolean(response.data?.has_permission);
       toast.success(
         hasPermission ?
         `✅ У пользователя есть разрешение "${permission}"` :
@@ -206,7 +248,7 @@ const GroupPermissionsManager = () => {
 
       // Обновляем статистику кэша
       const cacheRes = await api.get('/admin/permissions/cache/stats');
-      setCacheStats(cacheRes.data.cache_stats);
+      setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка очистки кэша:', error);
       toast.error('Ошибка очистки кэша');
@@ -214,16 +256,18 @@ const GroupPermissionsManager = () => {
   };
 
   // Фильтрация данных
+  const normalizedSearchTerm = searchTerm.toLowerCase();
+
   const filteredGroups = groups.filter((group) =>
-  group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  group.display_name.toLowerCase().includes(searchTerm.toLowerCase())
+  String(group.name || '').toLowerCase().includes(normalizedSearchTerm) ||
+  String(group.display_name || '').toLowerCase().includes(normalizedSearchTerm)
   );
 
   const filteredUsers = users.filter((user) =>
-  user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  user.role?.toLowerCase().includes(searchTerm.toLowerCase())
+  user.username?.toLowerCase().includes(normalizedSearchTerm) ||
+  user.full_name?.toLowerCase().includes(normalizedSearchTerm) ||
+  user.email?.toLowerCase().includes(normalizedSearchTerm) ||
+  user.role?.toLowerCase().includes(normalizedSearchTerm)
   );
 
   // Стили
@@ -468,10 +512,12 @@ const GroupPermissionsManager = () => {
                   </h4>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
                     <div style={{ flex: 1 }}>
-                      <MacOSSelect
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      checkUserPermission(selectedUser.id, e.target.value);
+                      <Select
+                  value={permissionToCheck}
+                  onChange={(value) => {
+                    setPermissionToCheck(value);
+                    if (value) {
+                      checkUserPermission(selectedUser.id, value);
                     }
                   }}
                   options={[
@@ -481,6 +527,7 @@ const GroupPermissionsManager = () => {
                     label: `${perm.name} (${perm.codename})`
                   }))]
                   }
+                  size="large"
                   style={{ width: '100%' }} />
                 
                     </div>
@@ -667,11 +714,13 @@ const GroupPermissionsManager = () => {
                   {/* Добавление новой роли */}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
                     <div style={{ flex: 1 }}>
-                      <MacOSSelect
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      assignRoleToGroup(selectedGroup.id, parseInt(e.target.value));
-                      e.target.value = '';
+                      <Select
+                  value={roleToAssign}
+                  onChange={(value) => {
+                    setRoleToAssign(value);
+                    if (value) {
+                      assignRoleToGroup(selectedGroup.id, parseInt(value));
+                      setRoleToAssign('');
                     }
                   }}
                   options={[
@@ -681,6 +730,7 @@ const GroupPermissionsManager = () => {
                     label: role.display_name
                   }))]
                   }
+                  size="large"
                   style={{ width: '100%' }} />
                 
                     </div>
@@ -889,154 +939,54 @@ const GroupPermissionsManager = () => {
 
       {/* Табы */}
       <div style={{
-        display: 'flex',
-        marginBottom: '24px'
+        maxWidth: '100%',
+        overflowX: 'auto',
+        paddingBottom: '6px',
+        marginBottom: '24px',
+        scrollbarWidth: 'thin'
       }}>
-        <button
-          onClick={() => setActiveTab('users')}
+        <SegmentedControl
+          aria-label="Разделы разрешений групп"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            {
+              value: 'users',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <User size={14} aria-hidden="true" />
+                  Пользователи
+                </span>
+              )
+            },
+            {
+              value: 'groups',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={14} aria-hidden="true" />
+                  Группы
+                </span>
+              )
+            },
+            {
+              value: 'cache',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Settings size={14} aria-hidden="true" />
+                  Кэш
+                </span>
+              )
+            }
+          ]}
+          size="large"
           style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'users' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'users' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'users') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'users') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          <User style={{
-            width: '16px',
-            height: '16px',
-            color: activeTab === 'users' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+            minWidth: 'max-content',
+            background: 'var(--mac-gradient-sidebar)',
+            border: '1px solid var(--mac-main-shell-border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--mac-main-shell-shadow)'
           }} />
-          Пользователи
-          {activeTab === 'users' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
-        <button
-          onClick={() => setActiveTab('groups')}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'groups' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'groups' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'groups') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'groups') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          <Users style={{
-            width: '16px',
-            height: '16px',
-            color: activeTab === 'groups' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-          }} />
-          Группы
-          {activeTab === 'groups' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
-        <button
-          onClick={() => setActiveTab('cache')}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'cache' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'cache' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'cache') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'cache') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-          
-          <Settings style={{
-            width: '16px',
-            height: '16px',
-            color: activeTab === 'cache' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-          }} />
-          Кэш
-          {activeTab === 'cache' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
       </div>
-      
-      {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
 
       {/* Содержимое табов */}
       {activeTab === 'users' && renderUsersTab()}

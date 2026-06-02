@@ -20,7 +20,7 @@ import {
 
 
 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, MacOSSelect } from '../ui/macos';
+import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, Select } from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const SecurityMonitor = ({
@@ -708,19 +708,18 @@ const SecurityMonitor = ({
                   }} />
                 
                 </div>
-                <MacOSSelect
+                <Select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={setFilterStatus}
                 options={[
-                { value: '', label: 'Все статусы' },
-                { value: 'success', label: 'Успешно' },
-                { value: 'failed', label: 'Ошибка' },
-                { value: 'denied', label: 'Отклонено' }]
+                { value: '', label: '\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b' },
+                { value: 'success', label: '\u0423\u0441\u043f\u0435\u0448\u043d\u043e' },
+                { value: 'failed', label: '\u041e\u0448\u0438\u0431\u043a\u0430' },
+                { value: 'denied', label: '\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u043e' }]
                 }
                 style={{
-                  padding: '8px 12px',
                   minWidth: '120px'
-                }} />
+                }}></Select>
               
               </div>
             </div>

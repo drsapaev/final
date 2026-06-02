@@ -18,7 +18,7 @@ import {
 import {
   MacOSCard,
   MacOSButton,
-  MacOSTab,
+  SegmentedControl,
 
   MacOSStatCard,
   MacOSLoadingSkeleton,
@@ -607,11 +607,38 @@ const ClinicManagement = () => {
           }
 
         {/* Навигация по вкладкам */}
-        <MacOSTab
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab} />
-          
+        <div style={{
+          maxWidth: '100%',
+          overflowX: 'auto',
+          paddingBottom: '6px',
+          marginBottom: '24px',
+          scrollbarWidth: 'thin'
+        }}>
+          <SegmentedControl
+            aria-label="Разделы управления клиникой"
+            value={activeTab}
+            onChange={setActiveTab}
+            options={tabs.map((tab) => {
+              const IconComponent = tab.icon;
+              return {
+                value: tab.id,
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    {IconComponent && <IconComponent size={14} aria-hidden="true" />}
+                    {tab.label}
+                  </span>
+                )
+              };
+            })}
+            size="large"
+            style={{
+              minWidth: 'max-content',
+              background: 'var(--mac-gradient-sidebar)',
+              border: '1px solid var(--mac-main-shell-border)',
+              borderRadius: '14px',
+              boxShadow: 'var(--mac-main-shell-shadow)'
+            }} />
+        </div>
 
         {/* Содержимое вкладок */}
         {activeTab === 'overview' && renderOverview()}

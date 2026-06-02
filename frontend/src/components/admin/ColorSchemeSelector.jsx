@@ -4,7 +4,7 @@ import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun, SwatchBook } fr
 import { useTheme } from '../../contexts/ThemeContext';
 import { useMacOSTheme } from '../../theme/macosTheme.jsx';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
-import { MacOSCard, MacOSSelect } from '../ui/macos';
+import { MacOSCard, Select } from '../ui/macos';
 
 const ICONS = {
   light: Sun,
@@ -262,16 +262,17 @@ export default function ColorSchemeSelector() {
         }}>
           Быстрый выбор схемы
         </label>
-        <MacOSSelect
+        <Select
           id={quickSelectId}
           value={colorScheme}
-          onChange={(event) => setColorScheme(event.target.value)}
+          onChange={setColorScheme}
           aria-describedby={helpTextId}
           options={colorSchemes.map((scheme) => ({
             value: scheme.id,
             label: scheme.name,
           }))}
           placeholder="Выберите схему"
+          size="large"
         />
       </div>
 

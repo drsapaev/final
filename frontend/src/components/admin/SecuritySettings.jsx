@@ -19,11 +19,11 @@ import {
 'lucide-react';
 import {
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSButton,
   MacOSCheckbox,
   MacOSBadge,
-  MacOSTab,
+  SegmentedControl,
   MacOSCard } from
 '../ui/macos';
 import PropTypes from 'prop-types';
@@ -203,10 +203,20 @@ const SecuritySettings = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Вкладки */}
-      <MacOSTab
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={setActiveTab} />
+      <SegmentedControl
+        value={activeTab}
+        onChange={setActiveTab}
+        options={tabs.map(({ id, label, icon: TabIcon }) => ({
+          value: id,
+          label: (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <TabIcon style={{ width: '14px', height: '14px' }} />
+              {label}
+            </span>
+          )
+        }))}
+        size="large"
+        style={{ flexWrap: 'wrap', rowGap: '4px' }} />
       
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -463,15 +473,15 @@ const SecuritySettings = ({
               }}>
                     Метод аутентификации
                   </label>
-                  <MacOSSelect
+                  <Select
                 value={formData.twoFactorMethod}
-                onChange={(e) => handleChange('twoFactorMethod', e.target.value)}
+                onChange={(value) => handleChange('twoFactorMethod', value)}
                 options={[
                 { value: 'sms', label: 'SMS' },
                 { value: 'email', label: 'Email' },
-                { value: 'app', label: 'Приложение-аутентификатор' }]
+                { value: 'app', label: '\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435-\u0430\u0443\u0442\u0435\u043d\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u043e\u0440' }]
                 }
-                placeholder="Выберите метод" />
+                placeholder={'\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043c\u0435\u0442\u043e\u0434'}></Select>
               
                 </div>
             }

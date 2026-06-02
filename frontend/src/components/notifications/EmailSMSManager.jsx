@@ -1,38 +1,95 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
+import {
+  AlertCircle,
+  BarChart3,
+  CheckCircle,
+  Edit,
+  Eye,
+  FileText,
+  Mail,
+  MessageSquare,
+  Settings,
+  Users
+} from 'lucide-react';
+
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
 import {
-  Mail,
-  MessageSquare,
+  AppEmpty,
+  AppLoading,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  MacOSTable,
+  SegmentedControl,
+  Select,
+  Textarea
+} from '../ui/macos';
 
-  Users,
-  BarChart3,
-  Settings,
+const pageStyles = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '16px',
+  width: '100%',
+  minWidth: 0,
+  padding: 'clamp(12px, 2vw, 20px)'
+};
 
+const headerStyles = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: '12px',
+  flexWrap: 'wrap'
+};
 
+const gridStyles = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+  gap: '12px'
+};
 
-  FileText,
-  AlertCircle,
-  CheckCircle,
+const formGridStyles = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+  gap: '12px'
+};
 
+const stackStyles = {
+  display: 'grid',
+  gap: '12px'
+};
 
+const iconButtonStyle = {
+  width: '32px',
+  height: '32px',
+  padding: 0
+};
 
+const priorityOptions = [
+  { value: 'normal', label: 'Обычный' },
+  { value: 'high', label: 'Высокий' }
+];
 
-  Eye,
-  Edit } from
+const bulkTypeOptions = [
+  { value: 'email', label: 'Email' },
+  { value: 'sms', label: 'SMS' }
+];
 
+const parseRecipients = (value) =>
+  value
+    .split(/[\n,;]+/)
+    .map((recipient) => recipient.trim())
+    .filter(Boolean);
 
-
-
-
-'lucide-react';
-
-/**
- * Менеджер Email/SMS уведомлений
- * Управление массовыми рассылками, шаблонами и статистикой
- */
-const EmailSMSManager = () => {void
+const EmailSMSManager = () => {
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -40,7 +97,6 @@ const EmailSMSManager = () => {void
   const [templates, setTemplates] = useState({ email: [], sms: [] });
   const [testResults, setTestResults] = useState(null);
 
-  // Состояние для форм
   const [emailForm, setEmailForm] = useState({
     to: '',
     subject: '',
@@ -60,6 +116,7 @@ const EmailSMSManager = () => {void
   const [bulkForm, setBulkForm] = useState({
     type: 'email',
     recipients: [],
+    recipientsText: '',
     subject: '',
     template: '',
     message: '',
@@ -76,7 +133,7 @@ const EmailSMSManager = () => {void
     try {
       setLoading(true);
       const response = await fetch('/api/v1/email-sms/statistics', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
       if (data.success) {
@@ -92,11 +149,11 @@ const EmailSMSManager = () => {void
   const loadTemplates = async () => {
     try {
       const response = await fetch('/api/v1/email-sms/templates', {
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
       if (data.success) {
-        setTemplates(data.templates);
+        setTemplates(data.templates || { email: [], sms: [] });
       }
     } catch (error) {
       logger.error('Ошибка загрузки шаблонов:', error);
@@ -110,7 +167,7 @@ const EmailSMSManager = () => {void
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           to_email: emailForm.to,
@@ -135,7 +192,7 @@ const EmailSMSManager = () => {void
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           phone: smsForm.phone,
@@ -160,7 +217,7 @@ const EmailSMSManager = () => {void
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`
         },
         body: JSON.stringify({
           recipients: bulkForm.recipients,
@@ -186,7 +243,7 @@ const EmailSMSManager = () => {void
       setLoading(true);
       const response = await fetch('/api/v1/email-sms/reset-statistics', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
+        headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
       const data = await response.json();
       if (data.success) {
@@ -199,656 +256,432 @@ const EmailSMSManager = () => {void
     }
   };
 
-  const tabs = [
-  { id: 'overview', label: 'Обзор', icon: BarChart3 },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'sms', label: 'SMS', icon: MessageSquare },
-  { id: 'bulk', label: 'Массовые рассылки', icon: Users },
-  { id: 'templates', label: 'Шаблоны', icon: FileText },
-  { id: 'settings', label: 'Настройки', icon: Settings }];
+  const tabs = useMemo(() => [
+    { value: 'overview', label: <TabLabel icon={BarChart3} text="Обзор" /> },
+    { value: 'email', label: <TabLabel icon={Mail} text="Email" /> },
+    { value: 'sms', label: <TabLabel icon={MessageSquare} text="SMS" /> },
+    { value: 'bulk', label: <TabLabel icon={Users} text="Массовые" /> },
+    { value: 'templates', label: <TabLabel icon={FileText} text="Шаблоны" /> },
+    { value: 'settings', label: <TabLabel icon={Settings} text="Настройки" /> }
+  ], []);
 
+  const emailTemplateOptions = useMemo(() => [
+    { value: '', label: 'Выберите шаблон' },
+    ...templates.email.map((template) => ({ value: template.name, label: template.title }))
+  ], [templates.email]);
 
-  const renderOverview = () =>
-  <div className="space-y-6">
-      {/* Статистика */}
-      {statistics &&
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Email отправлено</p>
-                <p className="text-2xl font-bold text-blue-900">{statistics.emails_sent || 0}</p>
-              </div>
-              <Mail className="w-8 h-8 text-blue-600" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-blue-600">
-                Успешность: {statistics.email_success_rate?.toFixed(1) || 0}%
+  const smsTemplateOptions = useMemo(() => [
+    { value: '', label: 'Выберите шаблон' },
+    ...templates.sms.map((template) => ({ value: template.name, label: template.title }))
+  ], [templates.sms]);
+
+  const currentBulkTemplates = bulkForm.type === 'email' ? emailTemplateOptions : smsTemplateOptions;
+
+  const updateBulkRecipients = (value) => {
+    setBulkForm((prev) => ({
+      ...prev,
+      recipientsText: value,
+      recipients: parseRecipients(value)
+    }));
+  };
+
+  const clearEmailForm = () => {
+    setEmailForm({ to: '', subject: '', template: '', message: '', priority: 'normal' });
+  };
+
+  const clearSMSForm = () => {
+    setSmsForm({ phone: '', message: '', template: '', sender: '', priority: 'normal' });
+  };
+
+  const clearBulkForm = () => {
+    setBulkForm({
+      type: 'email',
+      recipients: [],
+      recipientsText: '',
+      subject: '',
+      template: '',
+      message: '',
+      batchSize: 50,
+      delay: 1.0
+    });
+  };
+
+  const renderTestResult = () => {
+    if (!testResults) return null;
+
+    const isSuccess = Boolean(testResults.success);
+    const Icon = isSuccess ? CheckCircle : AlertCircle;
+    const label = testResults.type === 'email' ? 'Email' : testResults.type === 'sms' ? 'SMS' : 'Массовая рассылка';
+
+    return (
+      <Card
+        padding="small"
+        style={{
+          borderColor: isSuccess ? 'var(--mac-success)' : 'var(--mac-danger)',
+          background: isSuccess ? 'rgba(52, 199, 89, 0.08)' : 'rgba(255, 59, 48, 0.08)'
+        }}
+      >
+        <CardContent style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <Icon size={20} style={{ color: isSuccess ? 'var(--mac-success)' : 'var(--mac-danger)', marginTop: '2px' }} />
+          <div>
+            <strong>{label}</strong>
+            <p style={{ margin: '4px 0 0', color: 'var(--mac-text-secondary)' }}>
+              {testResults.message}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderStatCard = ({ title, value, detail, icon: Icon, tone = 'blue' }) => {
+    const toneColor = {
+      blue: 'var(--mac-accent-blue)',
+      green: 'var(--mac-success)',
+      red: 'var(--mac-danger)',
+      orange: 'var(--mac-warning)'
+    }[tone];
+
+    return (
+      <Card padding="small" shadow="small">
+        <CardContent style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+          <div>
+            <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: '13px', fontWeight: 600 }}>{title}</p>
+            <strong style={{ display: 'block', marginTop: '8px', fontSize: '26px', color: 'var(--mac-text-primary)' }}>
+              {value}
+            </strong>
+            {detail && (
+              <span style={{ display: 'block', marginTop: '4px', color: toneColor, fontSize: '12px' }}>
+                {detail}
               </span>
-            </div>
+            )}
           </div>
+          <Icon size={30} style={{ color: toneColor }} />
+        </CardContent>
+      </Card>
+    );
+  };
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">SMS отправлено</p>
-                <p className="text-2xl font-bold text-green-900">{statistics.sms_sent || 0}</p>
-              </div>
-              <MessageSquare className="w-8 h-8 text-green-600" />
-            </div>
-            <div className="mt-2">
-              <span className="text-sm text-green-600">
-                Успешность: {statistics.sms_success_rate?.toFixed(1) || 0}%
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-600">Email ошибки</p>
-                <p className="text-2xl font-bold text-red-900">{statistics.emails_failed || 0}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-red-600" />
-            </div>
-          </div>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600">SMS ошибки</p>
-                <p className="text-2xl font-bold text-orange-900">{statistics.sms_failed || 0}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-orange-600" />
-            </div>
-          </div>
+  const renderOverview = () => (
+    <div style={stackStyles}>
+      {loading && !statistics ? (
+        <Card padding="small">
+          <AppLoading title="Загрузка статистики..." />
+        </Card>
+      ) : statistics ? (
+        <div style={gridStyles}>
+          {renderStatCard({
+            title: 'Email отправлено',
+            value: statistics.emails_sent || 0,
+            detail: `Успешность: ${statistics.email_success_rate?.toFixed(1) || 0}%`,
+            icon: Mail,
+            tone: 'blue'
+          })}
+          {renderStatCard({
+            title: 'SMS отправлено',
+            value: statistics.sms_sent || 0,
+            detail: `Успешность: ${statistics.sms_success_rate?.toFixed(1) || 0}%`,
+            icon: MessageSquare,
+            tone: 'green'
+          })}
+          {renderStatCard({
+            title: 'Email ошибки',
+            value: statistics.emails_failed || 0,
+            icon: AlertCircle,
+            tone: 'red'
+          })}
+          {renderStatCard({
+            title: 'SMS ошибки',
+            value: statistics.sms_failed || 0,
+            icon: AlertCircle,
+            tone: 'orange'
+          })}
         </div>
-    }
+      ) : (
+        <Card padding="small">
+          <AppEmpty title="Статистика недоступна" description="Данные появятся после успешной загрузки." />
+        </Card>
+      )}
 
-      {/* Быстрые действия */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Mail className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold">Тест Email</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Отправить тестовое письмо</p>
-          <button
-          onClick={() => setActiveTab('email')}
-          className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          
-            Перейти к тестированию
-          </button>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <MessageSquare className="w-6 h-6 text-green-600" />
-            <h3 className="text-lg font-semibold">Тест SMS</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Отправить тестовое SMS</p>
-          <button
-          onClick={() => setActiveTab('sms')}
-          className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-          
-            Перейти к тестированию
-          </button>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Users className="w-6 h-6 text-purple-600" />
-            <h3 className="text-lg font-semibold">Массовые рассылки</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Отправить уведомления группе</p>
-          <button
-          onClick={() => setActiveTab('bulk')}
-          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-          
-            Перейти к рассылкам
-          </button>
-        </div>
+      <div style={gridStyles}>
+        <ActionCard
+          icon={Mail}
+          title="Тест Email"
+          description="Отправить тестовое письмо"
+          actionLabel="Перейти к тестированию"
+          onAction={() => setActiveTab('email')}
+          variant="primary"
+        />
+        <ActionCard
+          icon={MessageSquare}
+          title="Тест SMS"
+          description="Отправить тестовое SMS"
+          actionLabel="Перейти к тестированию"
+          onAction={() => setActiveTab('sms')}
+          variant="success"
+        />
+        <ActionCard
+          icon={Users}
+          title="Массовые рассылки"
+          description="Отправить уведомления группе"
+          actionLabel="Перейти к рассылкам"
+          onAction={() => setActiveTab('bulk')}
+          variant="secondary"
+        />
       </div>
 
-      {/* Результаты тестов */}
-      {testResults &&
-    <div className={`p-4 rounded-lg ${testResults.success ?
-    'bg-green-50 border border-green-200' :
-    'bg-red-50 border border-red-200'}`
-    }>
-          <div className="flex items-center space-x-2">
-            {testResults.success ?
-        <CheckCircle className="w-5 h-5 text-green-600" /> :
+      {renderTestResult()}
+    </div>
+  );
 
-        <AlertCircle className="w-5 h-5 text-red-600" />
-        }
-            <span className={`font-medium ${testResults.success ? 'text-green-800' : 'text-red-800'}`
-        }>
-              {testResults.type === 'email' ? 'Email' :
-          testResults.type === 'sms' ? 'SMS' : 'Массовая рассылка'}
-            </span>
-          </div>
-          <p className={`mt-1 ${testResults.success ? 'text-green-700' : 'text-red-700'}`
-      }>
-            {testResults.message}
-          </p>
-        </div>
-    }
-    </div>;
-
-
-  const renderEmailForm = () =>
-  <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Отправка Email</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Получатель
-            </label>
-            <input
+  const renderEmailForm = () => (
+    <Card padding="default">
+      <CardHeader>
+        <CardTitle>Отправка Email</CardTitle>
+        <CardDescription>Проверьте доставку письма на один адрес</CardDescription>
+      </CardHeader>
+      <CardContent style={stackStyles}>
+        <div style={formGridStyles}>
+          <Input
             type="email"
+            label="Получатель"
             aria-label="Email recipient"
             value={emailForm.to}
-            onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="example@email.com" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Тема
-            </label>
-            <input
+            onChange={(event) => setEmailForm({ ...emailForm, to: event.target.value })}
+            placeholder="example@email.com"
+          />
+          <Input
             type="text"
+            label="Тема"
             aria-label="Email subject"
             value={emailForm.subject}
-            onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Тема письма" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон
-            </label>
-            <select
+            onChange={(event) => setEmailForm({ ...emailForm, subject: event.target.value })}
+            placeholder="Тема письма"
+          />
+          <Select
+            label="Шаблон"
             value={emailForm.template}
-            onChange={(e) => setEmailForm({ ...emailForm, template: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            
-              <option value="">Выберите шаблон</option>
-              {templates.email.map((template) =>
-            <option key={template.name} value={template.name}>
-                  {template.title}
-                </option>
-            )}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Приоритет
-            </label>
-            <select
+            onChange={(value) => setEmailForm({ ...emailForm, template: value })}
+            options={emailTemplateOptions}
+          />
+          <Select
+            label="Приоритет"
             value={emailForm.priority}
-            onChange={(e) => setEmailForm({ ...emailForm, priority: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            
-              <option value="normal">Обычный</option>
-              <option value="high">Высокий</option>
-            </select>
-          </div>
+            onChange={(value) => setEmailForm({ ...emailForm, priority: value })}
+            options={priorityOptions}
+          />
         </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Сообщение
-          </label>
-          <textarea
+        <Textarea
+          label="Сообщение"
           aria-label="Email message"
           value={emailForm.message}
-          onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Текст сообщения" />
-        
-        </div>
-
-        <div className="mt-6 flex space-x-4">
-          <button
-          onClick={sendTestEmail}
-          disabled={loading || !emailForm.to}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          
-            {loading ? 'Отправка...' : 'Отправить тест'}
-          </button>
-
-          <button
-          onClick={() => setEmailForm({
-            to: '', subject: '', template: '', message: '', priority: 'normal'
-          })}
-          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-          
+          onChange={(event) => setEmailForm({ ...emailForm, message: event.target.value })}
+          minRows={4}
+          placeholder="Текст сообщения"
+        />
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button variant="primary" onClick={sendTestEmail} disabled={loading || !emailForm.to} loading={loading && activeTab === 'email'}>
+            {loading && activeTab === 'email' ? 'Отправка...' : 'Отправить тест'}
+          </Button>
+          <Button variant="secondary" onClick={clearEmailForm}>
             Очистить
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>;
+      </CardContent>
+    </Card>
+  );
 
-
-  const renderSMSForm = () =>
-  <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Отправка SMS</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Номер телефона
-            </label>
-            <input
+  const renderSMSForm = () => (
+    <Card padding="default">
+      <CardHeader>
+        <CardTitle>Отправка SMS</CardTitle>
+        <CardDescription>Проверьте доставку SMS на один номер</CardDescription>
+      </CardHeader>
+      <CardContent style={stackStyles}>
+        <div style={formGridStyles}>
+          <Input
             type="tel"
+            label="Номер телефона"
             aria-label="SMS phone number"
             value={smsForm.phone}
-            onChange={(e) => setSmsForm({ ...smsForm, phone: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="+998901234567" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Отправитель
-            </label>
-            <input
+            onChange={(event) => setSmsForm({ ...smsForm, phone: event.target.value })}
+            placeholder="+998901234567"
+          />
+          <Input
             type="text"
+            label="Отправитель"
             aria-label="SMS sender"
             value={smsForm.sender}
-            onChange={(e) => setSmsForm({ ...smsForm, sender: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="Clinic" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон
-            </label>
-            <select
+            onChange={(event) => setSmsForm({ ...smsForm, sender: event.target.value })}
+            placeholder="Clinic"
+          />
+          <Select
+            label="Шаблон"
             value={smsForm.template}
-            onChange={(e) => setSmsForm({ ...smsForm, template: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
-            
-              <option value="">Выберите шаблон</option>
-              {templates.sms.map((template) =>
-            <option key={template.name} value={template.name}>
-                  {template.title}
-                </option>
-            )}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Приоритет
-            </label>
-            <select
+            onChange={(value) => setSmsForm({ ...smsForm, template: value })}
+            options={smsTemplateOptions}
+          />
+          <Select
+            label="Приоритет"
             value={smsForm.priority}
-            onChange={(e) => setSmsForm({ ...smsForm, priority: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
-            
-              <option value="normal">Обычный</option>
-              <option value="high">Высокий</option>
-            </select>
-          </div>
+            onChange={(value) => setSmsForm({ ...smsForm, priority: value })}
+            options={priorityOptions}
+          />
         </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Сообщение
-          </label>
-          <textarea
+        <Textarea
+          label="Сообщение"
           aria-label="SMS message"
           value={smsForm.message}
-          onChange={(e) => setSmsForm({ ...smsForm, message: e.target.value })}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          placeholder="Текст SMS сообщения" />
-        
-        </div>
-
-        <div className="mt-6 flex space-x-4">
-          <button
-          onClick={sendTestSMS}
-          disabled={loading || !smsForm.phone}
-          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          
-            {loading ? 'Отправка...' : 'Отправить тест'}
-          </button>
-
-          <button
-          onClick={() => setSmsForm({
-            phone: '', message: '', template: '', sender: '', priority: 'normal'
-          })}
-          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-          
+          onChange={(event) => setSmsForm({ ...smsForm, message: event.target.value })}
+          minRows={3}
+          placeholder="Текст SMS сообщения"
+        />
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button variant="success" onClick={sendTestSMS} disabled={loading || !smsForm.phone} loading={loading && activeTab === 'sms'}>
+            {loading && activeTab === 'sms' ? 'Отправка...' : 'Отправить тест'}
+          </Button>
+          <Button variant="secondary" onClick={clearSMSForm}>
             Очистить
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>;
+      </CardContent>
+    </Card>
+  );
 
-
-  const renderBulkForm = () =>
-  <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Массовые рассылки</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Тип рассылки
-            </label>
-            <select
+  const renderBulkForm = () => (
+    <Card padding="default">
+      <CardHeader>
+        <CardTitle>Массовые рассылки</CardTitle>
+        <CardDescription>Список получателей можно разделять строками, запятыми или точками с запятой</CardDescription>
+      </CardHeader>
+      <CardContent style={stackStyles}>
+        <div style={formGridStyles}>
+          <Select
+            label="Тип рассылки"
             value={bulkForm.type}
-            onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Размер батча
-            </label>
-            <input
+            onChange={(value) => setBulkForm({ ...bulkForm, type: value, template: '' })}
+            options={bulkTypeOptions}
+          />
+          <Input
             type="number"
+            label="Размер батча"
             aria-label="Bulk batch size"
             value={bulkForm.batchSize}
-            onChange={(e) => setBulkForm({ ...bulkForm, batchSize: parseInt(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            onChange={(event) => setBulkForm({ ...bulkForm, batchSize: Number.parseInt(event.target.value, 10) || 1 })}
             min="1"
-            max="1000" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Задержка между батчами (сек)
-            </label>
-            <input
+            max="1000"
+          />
+          <Input
             type="number"
             step="0.1"
+            label="Задержка между батчами"
             aria-label="Bulk delay between batches"
             value={bulkForm.delay}
-            onChange={(e) => setBulkForm({ ...bulkForm, delay: parseFloat(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            onChange={(event) => setBulkForm({ ...bulkForm, delay: Number.parseFloat(event.target.value) || 0 })}
             min="0"
-            max="10" />
-          
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон
-            </label>
-            <select
+            max="10"
+          />
+          <Select
+            label="Шаблон"
             value={bulkForm.template}
-            onChange={(e) => setBulkForm({ ...bulkForm, template: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            
-              <option value="">Выберите шаблон</option>
-              {(bulkForm.type === 'email' ? templates.email : templates.sms).map((template) =>
-            <option key={template.name} value={template.name}>
-                  {template.title}
-                </option>
-            )}
-            </select>
-          </div>
+            onChange={(value) => setBulkForm({ ...bulkForm, template: value })}
+            options={currentBulkTemplates}
+          />
         </div>
 
-        {bulkForm.type === 'email' &&
-      <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Тема письма
-            </label>
-            <input
-          type="text"
-          aria-label="Bulk email subject"
-          value={bulkForm.subject}
-          onChange={(e) => setBulkForm({ ...bulkForm, subject: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-          placeholder="Тема письма" />
-        
-          </div>
-      }
+        {bulkForm.type === 'email' && (
+          <Input
+            type="text"
+            label="Тема письма"
+            aria-label="Bulk email subject"
+            value={bulkForm.subject}
+            onChange={(event) => setBulkForm({ ...bulkForm, subject: event.target.value })}
+            placeholder="Тема письма"
+          />
+        )}
 
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Сообщение
-          </label>
-          <textarea
+        <Textarea
+          label={`Получатели (${bulkForm.recipients.length})`}
+          aria-label="Bulk recipients"
+          value={bulkForm.recipientsText}
+          onChange={(event) => updateBulkRecipients(event.target.value)}
+          minRows={4}
+          placeholder={bulkForm.type === 'email' ? 'patient@example.com, team@example.com' : '+998901234567, +998901234568'}
+        />
+
+        <Textarea
+          label="Сообщение"
           aria-label="Bulk message"
           value={bulkForm.message}
-          onChange={(e) => setBulkForm({ ...bulkForm, message: e.target.value })}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-          placeholder="Текст сообщения" />
-        
-        </div>
+          onChange={(event) => setBulkForm({ ...bulkForm, message: event.target.value })}
+          minRows={4}
+          placeholder="Текст сообщения"
+        />
 
-        <div className="mt-6 flex space-x-4">
-          <button
-          onClick={sendBulkNotification}
-          disabled={loading || bulkForm.recipients.length === 0}
-          className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          
-            {loading ? 'Отправка...' : 'Запустить рассылку'}
-          </button>
-
-          <button
-          onClick={() => setBulkForm({
-            type: 'email', recipients: [], subject: '', template: '', message: '', batchSize: 50, delay: 1.0
-          })}
-          className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors">
-          
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button
+            variant="primary"
+            onClick={sendBulkNotification}
+            disabled={loading || bulkForm.recipients.length === 0}
+            loading={loading && activeTab === 'bulk'}
+          >
+            {loading && activeTab === 'bulk' ? 'Отправка...' : 'Запустить рассылку'}
+          </Button>
+          <Button variant="secondary" onClick={clearBulkForm}>
             Очистить
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>;
+      </CardContent>
+    </Card>
+  );
 
+  const renderTemplates = () => (
+    <div style={gridStyles}>
+      <TemplateColumn title="Email шаблоны" icon={Mail} templates={templates.email} tone="var(--mac-accent-blue)" />
+      <TemplateColumn title="SMS шаблоны" icon={MessageSquare} templates={templates.sms} tone="var(--mac-success)" />
+    </div>
+  );
 
-  const renderTemplates = () =>
-  <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Email шаблоны */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Mail className="w-5 h-5 mr-2 text-blue-600" />
-            Email шаблоны
-          </h3>
-          <div className="space-y-3">
-            {templates.email.map((template) =>
-          <div key={template.name} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">{template.title}</h4>
-                    <p className="text-sm text-gray-600">{template.description}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      className="p-2 text-gray-400 hover:text-blue-600"
-                      aria-label={`View email template ${template.title}`}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-400 hover:text-blue-600"
-                      aria-label={`Edit email template ${template.title}`}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-xs text-gray-500">
-                    Переменные: {template.variables.join(', ')}
-                  </span>
-                </div>
-              </div>
-          )}
-          </div>
+  const renderSettings = () => (
+    <Card padding="default">
+      <CardHeader>
+        <CardTitle>Настройки Email/SMS</CardTitle>
+        <CardDescription>Параметры провайдеров и технические действия</CardDescription>
+      </CardHeader>
+      <CardContent style={stackStyles}>
+        <div style={gridStyles}>
+          <Card padding="small" shadow="small">
+            <CardHeader>
+              <CardTitle>Email настройки</CardTitle>
+            </CardHeader>
+            <CardContent style={stackStyles}>
+              <Input type="text" label="SMTP сервер" aria-label="SMTP server" placeholder="smtp.gmail.com" />
+              <Input type="number" label="Порт" aria-label="SMTP port" placeholder="587" />
+              <Input type="email" label="Email" aria-label="SMTP email" placeholder="clinic@example.com" />
+            </CardContent>
+          </Card>
+
+          <Card padding="small" shadow="small">
+            <CardHeader>
+              <CardTitle>SMS настройки</CardTitle>
+            </CardHeader>
+            <CardContent style={stackStyles}>
+              <Input type="url" label="API URL" aria-label="SMS API URL" placeholder="https://api.sms-provider.com" />
+              <Input type="password" label="API ключ" aria-label="SMS API key" placeholder="••••••••••••••••" />
+              <Input type="text" label="Отправитель" aria-label="SMS default sender" placeholder="Clinic" />
+            </CardContent>
+          </Card>
         </div>
 
-        {/* SMS шаблоны */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <MessageSquare className="w-5 h-5 mr-2 text-green-600" />
-            SMS шаблоны
-          </h3>
-          <div className="space-y-3">
-            {templates.sms.map((template) =>
-          <div key={template.name} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">{template.title}</h4>
-                    <p className="text-sm text-gray-600">{template.description}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      className="p-2 text-gray-400 hover:text-green-600"
-                      aria-label={`View SMS template ${template.title}`}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-400 hover:text-green-600"
-                      aria-label={`Edit SMS template ${template.title}`}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-xs text-gray-500">
-                    Переменные: {template.variables.join(', ')}
-                  </span>
-                </div>
-              </div>
-          )}
-          </div>
-        </div>
-      </div>
-    </div>;
-
-
-  const renderSettings = () =>
-  <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Настройки Email/SMS</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-medium mb-3">Email настройки</h4>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SMTP сервер
-                </label>
-                <input
-                type="text"
-                aria-label="SMTP server"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="smtp.gmail.com" />
-              
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Порт
-                </label>
-                <input
-                type="number"
-                aria-label="SMTP port"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="587" />
-              
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                type="email"
-                aria-label="SMTP email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="clinic@example.com" />
-              
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-3">SMS настройки</h4>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API URL
-                </label>
-                <input
-                type="url"
-                aria-label="SMS API URL"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="https://api.sms-provider.com" />
-              
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API ключ
-                </label>
-                <input
-                type="password"
-                aria-label="SMS API key"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="••••••••••••••••" />
-              
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Отправитель
-                </label>
-                <input
-                type="text"
-                aria-label="SMS default sender"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="Clinic" />
-              
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex space-x-4">
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-            Сохранить настройки
-          </button>
-
-          <button
-          onClick={resetStatistics}
-          className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
-          
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button variant="primary">Сохранить настройки</Button>
+          <Button variant="danger" onClick={resetStatistics} disabled={loading}>
             Сбросить статистику
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>;
-
+      </CardContent>
+    </Card>
+  );
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -870,30 +703,143 @@ const EmailSMSManager = () => {void
   };
 
   return (
-    <div className="space-y-6">
-      {/* Навигация */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {tabs.map((tab) =>
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ?
-            'border-blue-500 text-blue-600' :
-            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
-            }>
-            
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          )}
-        </nav>
+    <div style={pageStyles}>
+      <div style={headerStyles}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '28px', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
+            Email/SMS уведомления
+          </h1>
+          <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
+            Управление тестовыми отправками, шаблонами и массовыми рассылками
+          </p>
+        </div>
+        <Button variant="secondary" onClick={loadStatistics} disabled={loading}>
+          <BarChart3 size={16} />
+          Обновить статистику
+        </Button>
       </div>
 
-      {/* Контент */}
-      {renderTabContent()}
-    </div>);
+      <Card padding="small" shadow="small">
+        <CardContent style={{ overflowX: 'auto' }}>
+          <SegmentedControl value={activeTab} onChange={setActiveTab} options={tabs} />
+        </CardContent>
+      </Card>
 
+      {renderTabContent()}
+    </div>
+  );
+};
+
+const TabLabel = ({ icon: Icon, text }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+    <Icon size={14} />
+    {text}
+  </span>
+);
+
+TabLabel.propTypes = {
+  icon: PropTypes.elementType.isRequired,
+  text: PropTypes.string.isRequired
+};
+
+const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, variant }) => (
+  <Card padding="default" shadow="small">
+    <CardContent style={{ display: 'grid', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Icon size={24} style={{ color: variant === 'success' ? 'var(--mac-success)' : 'var(--mac-accent-blue)' }} />
+        <h3 style={{ margin: 0, fontSize: '17px' }}>{title}</h3>
+      </div>
+      <p style={{ margin: 0, color: 'var(--mac-text-secondary)' }}>{description}</p>
+      <Button variant={variant} onClick={onAction} fullWidth>
+        {actionLabel}
+      </Button>
+    </CardContent>
+  </Card>
+);
+
+ActionCard.propTypes = {
+  actionLabel: PropTypes.string.isRequired,
+  description: PropTypes.string.isRequired,
+  icon: PropTypes.elementType.isRequired,
+  onAction: PropTypes.func.isRequired,
+  title: PropTypes.string.isRequired,
+  variant: PropTypes.string.isRequired
+};
+
+const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
+  const columns = [
+    {
+      key: 'title',
+      title: 'Шаблон',
+      render: (_value, template) => (
+        <div style={{ minWidth: '180px' }}>
+          <strong>{template.title}</strong>
+          <p style={{ margin: '4px 0 0', color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+            {template.description}
+          </p>
+        </div>
+      )
+    },
+    {
+      key: 'variables',
+      title: 'Переменные',
+      render: (_value, template) => (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {(template.variables || []).map((variable) => (
+            <Badge key={variable} size="small" variant="outline">
+              {variable}
+            </Badge>
+          ))}
+        </div>
+      )
+    },
+    {
+      key: 'actions',
+      title: 'Действия',
+      render: (_value, template) => (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+          <Button variant="ghost" size="small" aria-label={`View template ${template.title}`} style={iconButtonStyle}>
+            <Eye size={16} />
+          </Button>
+          <Button variant="ghost" size="small" aria-label={`Edit template ${template.title}`} style={iconButtonStyle}>
+            <Edit size={16} />
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <Card padding="default" shadow="small">
+      <CardHeader>
+        <CardTitle style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <Icon size={20} style={{ color: tone }} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {templates.length === 0 ? (
+          <AppEmpty title="Шаблоны не найдены" description="Список появится после загрузки шаблонов." />
+        ) : (
+          <MacOSTable columns={columns} data={templates} sortable={false} />
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+TemplateColumn.propTypes = {
+  icon: PropTypes.elementType.isRequired,
+  templates: PropTypes.arrayOf(
+    PropTypes.shape({
+      description: PropTypes.node,
+      name: PropTypes.string,
+      title: PropTypes.node,
+      variables: PropTypes.arrayOf(PropTypes.string)
+    })
+  ).isRequired,
+  title: PropTypes.string.isRequired,
+  tone: PropTypes.string.isRequired
 };
 
 export default EmailSMSManager;

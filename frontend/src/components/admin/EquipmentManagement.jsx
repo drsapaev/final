@@ -22,7 +22,7 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
 
   MacOSLoadingSkeleton,
@@ -135,6 +135,12 @@ const EquipmentManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const hasBranch = formData.branch_id !== null && formData.branch_id !== undefined && formData.branch_id !== '';
+    if (!formData.name.trim() || !formData.type || !hasBranch) {
+      setMessage({ type: 'error', text: 'Заполните обязательные поля' });
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -330,39 +336,36 @@ const EquipmentManagement = () => {
             }} />
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <MacOSSelect
+            <Select
               aria-label="Фильтр оборудования по статусу"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все статусы</option>
-              {statusOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
-            <MacOSSelect
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'Все статусы' },
+                ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
+            <Select
               aria-label="Фильтр оборудования по типу"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все типы</option>
-              {typeOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
-            <MacOSSelect
+              onChange={setTypeFilter}
+              options={[
+                { value: 'all', label: 'Все типы' },
+                ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
+            <Select
               aria-label="Фильтр оборудования по филиалу"
               value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все филиалы</option>
-              {branches.map((branch) =>
-              <option key={branch.id} value={branch.id}>{branch.name}</option>
-              )}
-            </MacOSSelect>
+              onChange={setBranchFilter}
+              options={[
+                { value: 'all', label: 'Все филиалы' },
+                ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
             <MacOSButton
               onClick={() => setShowAddForm(true)}
               style={{
@@ -447,16 +450,15 @@ const EquipmentManagement = () => {
               }}>
                   Тип *
                 </label>
-                <MacOSSelect
-                required
+                <Select
+                aria-label="Тип оборудования"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                
-                  <option value="">Выберите тип</option>
-                  {typeOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, type: value })}
+                options={[
+                  { value: '', label: 'Выберите тип' },
+                  ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
+                ]}
+                size="large" />
               </div>
               <div>
                 <label style={{
@@ -502,16 +504,15 @@ const EquipmentManagement = () => {
               }}>
                   Филиал *
                 </label>
-                <MacOSSelect
-                required
-                value={formData.branch_id || ''}
-                onChange={(e) => setFormData({ ...formData, branch_id: parseInt(e.target.value) })}>
-                
-                  <option value="">Выберите филиал</option>
-                  {branches.map((branch) =>
-                <option key={branch.id} value={branch.id}>{branch.name}</option>
-                )}
-                </MacOSSelect>
+                <Select
+                aria-label="Филиал оборудования"
+                value={formData.branch_id ? String(formData.branch_id) : ''}
+                onChange={(value) => setFormData({ ...formData, branch_id: value ? Number(value) : null })}
+                options={[
+                  { value: '', label: 'Выберите филиал' },
+                  ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
+                ]}
+                size="large" />
               </div>
               <div>
                 <label style={{
@@ -523,14 +524,12 @@ const EquipmentManagement = () => {
               }}>
                   Статус
                 </label>
-                <MacOSSelect
+                <Select
+                aria-label="Статус оборудования"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                
-                  {statusOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, status: value })}
+                options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
+                size="large" />
               </div>
               <div>
                 <label style={{

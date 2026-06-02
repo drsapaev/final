@@ -16,8 +16,8 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSInput,
-  MacOSSelect,
-  MacOSCheckbox
+  MacOSCheckbox,
+  Select
 } from '../ui/macos';
 import {
   fetchPaymentProviderSettings,
@@ -542,13 +542,14 @@ const PaymentProviderSettings = () => {
                 }}>
                   Провайдер по умолчанию
                 </label>
-                <MacOSSelect
+                <Select
                   value={settings.default_provider}
-                  onChange={(e) => updateGeneralSetting('default_provider', e.target.value)}
+                  onChange={(value) => updateGeneralSetting('default_provider', value)}
                   options={settings.enabled_providers.map(provider => ({
                     value: provider,
                     label: provider.toUpperCase()
                   }))}
+                  size="large"
                   style={{ width: '100%' }}
                 />
               </div>

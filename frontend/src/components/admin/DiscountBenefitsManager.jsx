@@ -7,10 +7,10 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
-  MacOSEmptyState } from
+  MacOSEmptyState,
+  Select } from
 
 '../ui/macos';
 import {
@@ -278,10 +278,11 @@ const DiscountBenefitsManager = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Тип скидки</label>
-          <MacOSSelect
+          <Select
           value={discountForm.discount_type}
-          onChange={(e) => setDiscountForm({ ...discountForm, discount_type: e.target.value })}
-          options={Object.entries(discountTypes).map(([key, value]) => ({ value: key, label: value }))} />
+          onChange={(value) => setDiscountForm({ ...discountForm, discount_type: value })}
+          options={Object.entries(discountTypes).map(([key, value]) => ({ value: key, label: value }))}
+          size="large" />
         
         </div>
         <div>
@@ -403,10 +404,11 @@ const DiscountBenefitsManager = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Тип льготы</label>
-          <MacOSSelect
+          <Select
           value={benefitForm.benefit_type}
-          onChange={(e) => setBenefitForm({ ...benefitForm, benefit_type: e.target.value })}
-          options={Object.entries(benefitTypes).map(([key, value]) => ({ value: key, label: value }))} />
+          onChange={(value) => setBenefitForm({ ...benefitForm, benefit_type: value })}
+          options={Object.entries(benefitTypes).map(([key, value]) => ({ value: key, label: value }))}
+          size="large" />
         
         </div>
         <div>

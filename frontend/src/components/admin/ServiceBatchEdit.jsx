@@ -4,7 +4,6 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   CheckSquare,
-  Edit3,
   X,
   Save,
   AlertCircle,
@@ -17,10 +16,8 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSInput,
-  MacOSSelect,
   MacOSCheckbox,
-  MacOSBadge,
-  MacOSAlert
+  Select
 } from '../ui/macos';
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
@@ -296,7 +293,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
                 if (field.type === 'select') {
                   const options = fieldKey === 'category_id'
-                    ? field.options.map(cat => ({ value: cat.id, label: cat.name_ru }))
+                    ? field.options.map(cat => ({ value: String(cat.id), label: cat.name_ru }))
                     : field.options.map(opt => ({ value: opt, label: opt }));
 
                   return (
@@ -310,13 +307,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                       }}>
                         {field.label}
                       </label>
-                      <MacOSSelect
+                      <Select
                         value={updates[fieldKey] || ''}
-                        onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                        onChange={(value) => handleFieldChange(fieldKey, value)}
                         options={[
                           { value: '', label: `Выберите ${field.label.toLowerCase()}` },
                           ...options
                         ]}
+                        size="large"
                       />
                     </div>
                   );

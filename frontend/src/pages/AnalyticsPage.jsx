@@ -6,6 +6,7 @@ import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
+import { Input, MacOSButton, Select, SegmentedControl } from '../components/ui/macos';
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -855,26 +856,19 @@ export default function AnalyticsPage() {
               Быстрый обзор вынесен отдельно, а здесь собраны подробные разрезы по записям, выручке, провайдерам и прогнозам.
             </p>
           </div>
-          <button
+          <MacOSButton
+            variant="primary"
+            size="lg"
+            startIcon={<Download size={16} />}
             onClick={() => exportData('json')}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '10px',
-              border: 'none',
               borderRadius: '14px',
-              padding: '12px 18px',
-              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-              color: '#fff',
-              cursor: 'pointer',
-              fontWeight: 700,
               boxShadow: '0 10px 24px rgba(37, 99, 235, 0.22)',
               width: isCompactLayout ? '100%' : 'auto',
               justifyContent: 'center'
             }}>
-            <Download size={16} />
             Экспорт JSON
-          </button>
+          </MacOSButton>
         </div>
       </section>
 
@@ -924,25 +918,22 @@ export default function AnalyticsPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {[7, 30, 90].map((days) =>
-          <button
-            key={days}
-            onClick={() => setQuickRange(days)}
+          <SegmentedControl
+            aria-label="Быстрый диапазон аналитики"
+            value={activePreset || ''}
+            onChange={(days) => setQuickRange(Number(days))}
+            options={[7, 30, 90].map((days) => ({
+              value: days,
+              label: `${days} дней`
+            }))}
+            size="large"
             style={{
-              border: '1px solid',
-              borderColor: activePreset === days ? '#2563eb' : 'color-mix(in srgb, var(--mac-card-border), white 8%)',
-              background: activePreset === days ? 'rgba(37, 99, 235, 0.1)' : analyticsInsetSurface,
-              color: activePreset === days ? '#2563eb' : analyticsTextPrimary,
-              padding: '9px 14px',
-              borderRadius: '999px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-              flex: isCompactLayout ? '1 1 92px' : '0 0 auto'
-            }}>
-              {days} дней
-            </button>
-          )}
+              width: isCompactLayout ? '100%' : 'auto',
+              overflowX: 'auto',
+              background: analyticsInsetSurface,
+              border: analyticsBorder,
+              borderRadius: '14px'
+            }} />
         </div>
 
         <div style={{
@@ -952,80 +943,62 @@ export default function AnalyticsPage() {
           flexWrap: 'wrap',
           flexDirection: isCompactLayout ? 'column' : 'row'
         }}>
-          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
-            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Начало периода</span>
-            <input
+          <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <Input
               type="date"
+              label="Начало периода"
               aria-label="Дата начала периода"
               value={dateRange.start}
               onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
               style={{
-                padding: '11px 12px',
-                border: analyticsBorder,
+                width: '100%',
+                minHeight: '40px',
                 borderRadius: '12px',
-                background: analyticsInsetSurface,
-                color: analyticsTextPrimary
+                boxSizing: 'border-box'
               }} />
-          </label>
+          </div>
 
-          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
-            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Конец периода</span>
-            <input
+          <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <Input
               type="date"
+              label="Конец периода"
               aria-label="Дата окончания периода"
               value={dateRange.end}
               onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
               style={{
-                padding: '11px 12px',
-                border: analyticsBorder,
+                width: '100%',
+                minHeight: '40px',
                 borderRadius: '12px',
-                background: analyticsInsetSurface,
-                color: analyticsTextPrimary
+                boxSizing: 'border-box'
               }} />
-          </label>
+          </div>
 
-          <label style={{ display: 'grid', gap: '8px', flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
-            <span style={{ fontSize: '13px', color: analyticsTextSecondary }}>Отделение</span>
-            <select
+          <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
+            <Select
+              label="Отделение"
               value={department}
-              onChange={(e) => setDepartment(e.target.value)}
+              onChange={setDepartment}
+              options={DEPARTMENT_OPTIONS}
+              size="large"
               style={{
-                padding: '11px 12px',
-                border: analyticsBorder,
-                borderRadius: '12px',
-                background: analyticsInsetSurface,
-                color: analyticsTextPrimary
-              }}>
-              {DEPARTMENT_OPTIONS.map((option) =>
-              <option key={option.value || 'all'} value={option.value}>
-                  {option.label}
-                </option>
-              )}
-            </select>
-          </label>
+                width: '100%'
+              }} />
+          </div>
 
-          <button
+          <MacOSButton
+            variant="primary"
+            size="lg"
             onClick={() => loadAnalytics()}
             disabled={loading}
+            startIcon={<RefreshCw size={16} style={loading ? { animation: 'mac-spin 1s linear infinite' } : undefined} />}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '12px 18px',
-              border: 'none',
               borderRadius: '14px',
-              background: loading ? 'rgba(148, 163, 184, 0.45)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#fff',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
               minWidth: '156px',
               flex: isCompactLayout ? '1 1 100%' : '0 0 auto',
               width: isCompactLayout ? '100%' : 'auto'
             }}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             {loading ? 'Обновляем...' : 'Обновить'}
-          </button>
+          </MacOSButton>
         </div>
       </section>
 
@@ -1048,34 +1021,28 @@ export default function AnalyticsPage() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <MacOSButton
                 key={tab.id}
+                type="button"
+                variant={isActive ? 'primary' : 'secondary'}
+                size={isCompactLayout ? 'md' : 'lg'}
+                startIcon={<Icon size={16} />}
                 onClick={() => handleTabChange(tab.id)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '9px',
-                  border: isActive ? 'none' : analyticsBorder,
                   borderRadius: '14px',
-                  padding: isCompactLayout ? '11px 14px' : '12px 16px',
-                  background: isActive ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : analyticsInsetSurface,
-                  color: isActive ? '#fff' : analyticsTextPrimary,
-                  cursor: 'pointer',
-                  fontWeight: 700,
                   boxShadow: isActive ? '0 10px 20px rgba(37, 99, 235, 0.18)' : 'var(--mac-shadow-sm)',
                   whiteSpace: 'nowrap',
                   flex: isCompactLayout ? '0 0 auto' : 'none'
                 }}>
-                <Icon size={16} />
                 {tab.label}
-              </button>);
+              </MacOSButton>);
           })}
         </div>
       </section>
 
       {loading ?
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: isCompactLayout ? '160px' : '200px', color: analyticsTextSecondary }}>
-          <RefreshCw size={24} className="animate-spin" />
+          <RefreshCw size={24} style={{ animation: 'mac-spin 1s linear infinite' }} />
           <span style={{ marginLeft: '12px' }}>Подготавливаем аналитический срез...</span>
         </div> :
       renderCurrentTab()

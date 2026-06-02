@@ -24,12 +24,12 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
   MacOSTextarea,
   MacOSCheckbox,
   MacOSPagination,
   MacOSModal,
 
+  Select,
   Switch } from
 '../ui/macos';
 import { toast } from 'react-toastify';
@@ -103,6 +103,22 @@ const CATEGORY_OPTIONS = [
 
 
 
+
+const STATUS_FILTER_OPTIONS = [
+{ value: 'all', label: 'Все статусы' },
+{ value: 'active', label: 'Активные' },
+{ value: 'inactive', label: 'Неактивные' }];
+
+const SORT_OPTIONS = [
+{ value: 'name', label: 'По названию' },
+{ value: 'key', label: 'По ключу' },
+{ value: 'order', label: 'По порядку' }];
+
+const PAGE_SIZE_OPTIONS = [
+{ value: 5, label: '5' },
+{ value: 10, label: '10' },
+{ value: 20, label: '20' },
+{ value: 50, label: '50' }];
 
 const DepartmentManagement = () => {
   const [departments, setDepartments] = useState([]);
@@ -870,25 +886,17 @@ const DepartmentManagement = () => {
               
                         </div>
 
-                        <MacOSSelect
+                        <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '120px' }}>
-              
-                            <option value="all">Все статусы</option>
-                            <option value="active">Активные</option>
-                            <option value="inactive">Неактивные</option>
-                        </MacOSSelect>
+              onChange={(value) => setStatusFilter(value)}
+              options={STATUS_FILTER_OPTIONS}
+              style={{ minWidth: '120px' }} />
 
-                        <MacOSSelect
+                        <Select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              style={{ minWidth: '140px' }}>
-              
-                            <option value="name">По названию</option>
-                            <option value="key">По ключу</option>
-                            <option value="order">По порядку</option>
-                        </MacOSSelect>
+              onChange={(value) => setSortBy(value)}
+              options={SORT_OPTIONS}
+              style={{ minWidth: '140px' }} />
 
                         <MacOSButton
               variant="secondary"
@@ -1078,14 +1086,10 @@ const DepartmentManagement = () => {
                   
                                         </div>
                                         <div>
-                                            <MacOSSelect
+                                            <Select
                     value={serviceMapping.service_category_code}
-                    onChange={(e) => setServiceMapping({ ...serviceMapping, service_category_code: e.target.value })}>
-                    
-                                                {CATEGORY_OPTIONS.map((opt) =>
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    )}
-                                            </MacOSSelect>
+                    onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
+                    options={CATEGORY_OPTIONS} />
                                         </div>
                                         <div>
                                             <MacOSInput
@@ -1459,19 +1463,14 @@ const DepartmentManagement = () => {
                                 <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
                                     Показывать:
                                 </span>
-                                <MacOSSelect
+                                <Select
                 value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
+                onChange={(value) => {
+                  setItemsPerPage(Number(value));
                   setCurrentPage(1);
                 }}
-                style={{ width: '70px' }}>
-                
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                </MacOSSelect>
+                options={PAGE_SIZE_OPTIONS}
+                style={{ width: '70px' }} />
                                 <span style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
                                     из {totalItems}
                                 </span>
@@ -1665,14 +1664,10 @@ const DepartmentManagement = () => {
               }}>
                                     Категория услуги
                                 </label>
-                                <MacOSSelect
+                                <Select
                 value={serviceMapping.service_category_code}
-                onChange={(e) => setServiceMapping({ ...serviceMapping, service_category_code: e.target.value })}>
-                
-                                    {CATEGORY_OPTIONS.map((opt) =>
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                )}
-                                </MacOSSelect>
+                onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
+                options={CATEGORY_OPTIONS} />
                             </div>
                             <div>
                                 <MacOSInput

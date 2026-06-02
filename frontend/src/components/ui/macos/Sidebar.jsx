@@ -14,6 +14,8 @@ const Sidebar = React.forwardRef(({
   onItemClick,
   collapsible = true,
   defaultCollapsed = false,
+  collapsed,
+  onCollapsedChange,
   header,
   footer,
   variant = 'default',
@@ -23,7 +25,16 @@ const Sidebar = React.forwardRef(({
 }, ref) => {void
   useTheme();
   void variant;
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
+  const isControlled = typeof collapsed === 'boolean';
+  const isCollapsed = isControlled ? collapsed : internalCollapsed;
+
+  const setCollapsed = (nextCollapsed) => {
+    if (!isControlled) {
+      setInternalCollapsed(nextCollapsed);
+    }
+    onCollapsedChange?.(nextCollapsed);
+  };
 
   const sidebarStyles = {
     width: isCollapsed ? '72px' : '280px', // Стандартные размеры macOS
@@ -69,7 +80,7 @@ const Sidebar = React.forwardRef(({
 
   const toggleCollapsed = () => {
     if (collapsible) {
-      setIsCollapsed(!isCollapsed);
+      setCollapsed(!isCollapsed);
     }
   };
 
@@ -81,7 +92,7 @@ const Sidebar = React.forwardRef(({
       {...props}>
 
       {/* Header */}
-      {header &&
+      {header ?
       <div className="mac-sidebar-header" style={headerStyles}>
           {!isCollapsed &&
         <div className="mac-sidebar-header-content">
@@ -113,6 +124,31 @@ const Sidebar = React.forwardRef(({
             </Button>
         }
         </div>
+       :
+      collapsible &&
+      <div className="mac-sidebar-header" style={headerStyles}>
+        <Button
+          variant="ghost"
+          size="small"
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={toggleCollapsed}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: 'var(--mac-radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mac-text-primary)'
+          }}>
+
+          <Icon
+            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
+            size="small"
+            style={{ color: 'var(--mac-text-primary)' }} />
+
+        </Button>
+      </div>
       }
 
       {/* Navigation Items */}
@@ -477,9 +513,11 @@ Sidebar.propTypes = {
   activeItem: PropTypes.any,
   onItemClick: PropTypes.func,
   collapsible: PropTypes.bool,
+  collapsed: PropTypes.bool,
   defaultCollapsed: PropTypes.bool,
   header: PropTypes.node,
   footer: PropTypes.node,
+  onCollapsedChange: PropTypes.func,
   variant: PropTypes.string,
   className: PropTypes.string,
   style: PropTypes.object

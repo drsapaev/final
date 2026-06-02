@@ -21,12 +21,12 @@ import {
 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 import {
-  MacOSTab,
   MacOSStatCard,
   MacOSTable,
   MacOSInput,
-  MacOSSelect,
-  MacOSEmptyState } from
+  MacOSEmptyState,
+  Select,
+  SegmentedControl } from
 
 '../ui/macos';
 import { toast } from 'react-toastify';
@@ -251,13 +251,14 @@ const ReportsManager = () => {
             marginBottom: '8px',
             color: 'var(--mac-text-secondary)' // Improved contrast
           }}>Тип отчета</label>
-            <MacOSSelect
+            <Select
             value={reportForm.type}
-            onChange={(e) => setReportForm((prev) => ({ ...prev, type: e.target.value }))}
+            onChange={(value) => setReportForm((prev) => ({ ...prev, type: value }))}
             options={availableReports.map((report) => ({
               value: report.type,
               label: report.name
             }))}
+            size="large"
             placeholder="Выберите тип отчета" />
 
           </div>
@@ -270,15 +271,16 @@ const ReportsManager = () => {
             marginBottom: '8px',
             color: 'var(--mac-text-secondary)'
           }}>Формат</label>
-            <MacOSSelect
+            <Select
             value={reportForm.format}
-            onChange={(e) => setReportForm((prev) => ({ ...prev, format: e.target.value }))}
+            onChange={(value) => setReportForm((prev) => ({ ...prev, format: value }))}
             options={[
             { value: 'json', label: 'JSON' },
             { value: 'excel', label: 'Excel' },
             { value: 'csv', label: 'CSV' },
             { value: 'pdf', label: 'PDF' }]
-            } />
+            }
+            size="large" />
 
           </div>
 
@@ -840,15 +842,16 @@ const ReportsManager = () => {
           </div>
 
           {/* Табы */}
-          <MacOSTab
-          tabs={[
-          { id: 'generate', label: 'Генерация', icon: BarChart3 },
-          { id: 'files', label: 'Файлы', icon: FileSpreadsheet },
-          { id: 'settings', label: 'Настройки', icon: Settings }]
+          <SegmentedControl
+          aria-label="Reports sections"
+          options={[
+          { value: 'generate', label: 'Генерация', icon: BarChart3 },
+          { value: 'files', label: 'Файлы', icon: FileSpreadsheet },
+          { value: 'settings', label: 'Настройки', icon: Settings }]
           }
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          size="md"
+          value={activeTab}
+          onChange={setActiveTab}
+          size="large"
           variant="default" />
 
 

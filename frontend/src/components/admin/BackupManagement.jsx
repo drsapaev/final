@@ -16,7 +16,7 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
   MacOSCheckbox,
   MacOSLoadingSkeleton,
@@ -347,28 +347,26 @@ const BackupManagement = () => {
             }} />
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <MacOSSelect
+            <Select
               aria-label="Фильтр резервных копий по статусу"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все статусы</option>
-              {statusOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
-            <MacOSSelect
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'Все статусы' },
+                ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
+            <Select
               aria-label="Фильтр резервных копий по типу"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ minWidth: '150px' }}>
-              
-              <option value="all">Все типы</option>
-              {typeOptions.map((option) =>
-              <option key={option.value} value={option.value}>{option.label}</option>
-              )}
-            </MacOSSelect>
+              onChange={setTypeFilter}
+              options={[
+                { value: 'all', label: 'Все типы' },
+                ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
+              ]}
+              size="large"
+              style={{ minWidth: '150px' }} />
             <MacOSButton
               onClick={() => setShowAddForm(true)}
               style={{
@@ -466,15 +464,12 @@ const BackupManagement = () => {
               }}>
                   Тип копии *
                 </label>
-                <MacOSSelect
-                required
+                <Select
+                aria-label="Тип резервной копии"
                 value={formData.backup_type}
-                onChange={(e) => setFormData({ ...formData, backup_type: e.target.value })}>
-                
-                  {typeOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, backup_type: value })}
+                options={typeOptions.map((option) => ({ value: option.value, label: option.label }))}
+                size="large" />
               </div>
               <div>
                 <label style={{
@@ -486,14 +481,12 @@ const BackupManagement = () => {
               }}>
                   Расписание
                 </label>
-                <MacOSSelect
+                <Select
+                aria-label="Расписание резервной копии"
                 value={formData.schedule}
-                onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}>
-                
-                  {scheduleOptions.map((option) =>
-                <option key={option.value} value={option.value}>{option.label}</option>
-                )}
-                </MacOSSelect>
+                onChange={(value) => setFormData({ ...formData, schedule: value })}
+                options={scheduleOptions.map((option) => ({ value: option.value, label: option.label }))}
+                size="large" />
               </div>
               <div>
                 <label style={{

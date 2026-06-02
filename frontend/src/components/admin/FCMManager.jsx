@@ -5,7 +5,7 @@ import {
   MacOSBadge,
   MacOSLoadingSkeleton,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
   MacOSCheckbox } from
 '../ui/macos';
@@ -407,15 +407,16 @@ const FCMManager = () => {
           }}>
               Звук
             </label>
-            <MacOSSelect
+            <Select
             value={notificationForm.sound}
-            onChange={(e) => setNotificationForm((prev) => ({ ...prev, sound: e.target.value }))}
+            onChange={(value) => setNotificationForm((prev) => ({ ...prev, sound: value }))}
             options={[
             { value: 'default', label: 'По умолчанию' },
             { value: 'notification', label: 'Уведомление' },
             { value: 'alert', label: 'Предупреждение' },
             { value: 'chime', label: 'Звонок' }]
             }
+            size="large"
             style={{ width: '100%' }} />
           
           </div>

@@ -29,7 +29,7 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTable,
   MacOSEmptyState,
 
@@ -452,9 +452,9 @@ const ServiceCatalog = () => {
             }}>
               Специальность
             </label>
-            <MacOSSelect
+            <Select
               value={selectedSpecialty}
-              onChange={(e) => setSelectedSpecialty(e.target.value)}
+              onChange={(value) => setSelectedSpecialty(value)}
               options={[
               { value: 'all', label: 'Все специальности' },
               { value: 'cardiology', label: 'Кардиология' },
@@ -476,9 +476,9 @@ const ServiceCatalog = () => {
             }}>
               Категория
             </label>
-            <MacOSSelect
+            <Select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(value) => setSelectedCategory(value)}
               options={[
               { value: 'all', label: 'Все категории' },
               ...categories.map((category) => ({
@@ -499,9 +499,9 @@ const ServiceCatalog = () => {
             }}>
               Отделение
             </label>
-            <MacOSSelect
+            <Select
               value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
+              onChange={(value) => setSelectedDepartment(value)}
               options={[
               { value: 'all', label: 'Все отделения' },
               ...departments.map((dept) => ({
@@ -801,9 +801,7 @@ const ServiceCatalog = () => {
             };
           })}
           emptyState={
-          <tr>
-              <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center' }}>
-                <MacOSEmptyState
+          <MacOSEmptyState
                 icon={Package}
                 title="Услуги не найдены"
                 description={searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all' || selectedDepartment !== 'all' ?
@@ -815,9 +813,6 @@ const ServiceCatalog = () => {
                       Добавить услугу
                     </MacOSButton>
                 } />
-
-              </td>
-            </tr>
           } />
 
       </MacOSCard>
@@ -1233,17 +1228,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Категория *
               </label>
-              <MacOSSelect
+              <Select
               value={formData.category_id}
-              onChange={(e) => handleChange('category_id', e.target.value)}
+              onChange={(value) => handleChange('category_id', value)}
               options={[
               { value: '', label: 'Выберите категорию' },
               ...categories.map((category) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
               }))]
-              }
-              required />
+              } />
 
             </div>
 
@@ -1266,9 +1260,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 step="0.01"
                 style={{ flex: 1 }} />
 
-                <MacOSSelect
+                <Select
                 value={formData.currency}
-                onChange={(e) => handleChange('currency', e.target.value)}
+                onChange={(value) => handleChange('currency', value)}
                 options={[
                 { value: 'UZS', label: 'UZS' },
                 { value: 'USD', label: 'USD' }]
@@ -1307,9 +1301,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Врач (опционально)
               </label>
-              <MacOSSelect
+              <Select
               value={formData.doctor_id}
-              onChange={(e) => handleChange('doctor_id', e.target.value)}
+              onChange={(value) => handleChange('doctor_id', value)}
               options={[
               { value: '', label: 'Все врачи' },
               ...doctors.map((doctor) => ({
@@ -1347,9 +1341,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Вкладка регистратуры
               </label>
-              <MacOSSelect
+              <Select
               value={formData.queue_tag}
-              onChange={(e) => handleChange('queue_tag', e.target.value)}
+              onChange={(value) => handleChange('queue_tag', value)}
               options={[
               { value: '', label: 'Без очереди (услуга не появится в регистратуре)' },
               ...queueProfiles.

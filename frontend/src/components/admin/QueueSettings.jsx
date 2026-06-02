@@ -28,7 +28,7 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSInput,
-  MacOSSelect } from
+  Select } from
 
 '../ui/macos';
 
@@ -44,6 +44,13 @@ const ICON_MAP = {
   'Scissors': Scissors,
   'Zap': Zap
 };
+
+const TIMEZONE_OPTIONS = [
+  { value: 'Asia/Tashkent', label: '\u0422\u0430\u0448\u043a\u0435\u043d\u0442 (UTC+5)' },
+  { value: 'Asia/Almaty', label: '\u0410\u043b\u043c\u0430\u0442\u044b (UTC+6)' },
+  { value: 'Europe/Moscow', label: '\u041c\u043e\u0441\u043a\u0432\u0430 (UTC+3)' },
+  { value: 'Asia/Dubai', label: '\u0414\u0443\u0431\u0430\u0439 (UTC+4)' }
+];
 
 const normalizeNumber = (value, fallback) => {
   const parsed = Number(value);
@@ -471,14 +478,14 @@ const QueueSettings = () => {
                   <Clock style={{ width: '16px', height: '16px' }} />
                   Час начала онлайн-очереди
                 </label>
-                <MacOSSelect
-                  value={settings.queue_start_hour}
-                  onChange={(e) => handleSettingChange('queue_start_hour', parseInt(e.target.value))}
+                <Select
+                  value={Number(settings.queue_start_hour)}
+                  onChange={(value) => handleSettingChange('queue_start_hour', parseInt(value, 10))}
                   options={Array.from({ length: 24 }, (_, i) => ({
                     value: i,
                     label: `${String(i).padStart(2, '0')}:00`
                   }))}
-                  style={{ width: '100%' }} />
+                  style={{ width: '100%' }}></Select>
                 
                 <p style={{
                   fontSize: 'var(--mac-font-size-xs)',
@@ -526,16 +533,11 @@ const QueueSettings = () => {
                 }}>
                   Часовой пояс
                 </label>
-                <MacOSSelect
+                <Select
                   value={settings.timezone}
-                  onChange={(e) => handleSettingChange('timezone', e.target.value)}
-                  options={[
-                  { value: 'Asia/Tashkent', label: 'Ташкент (UTC+5)' },
-                  { value: 'Asia/Almaty', label: 'Алматы (UTC+6)' },
-                  { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
-                  { value: 'Asia/Dubai', label: 'Дубай (UTC+4)' }]
-                  }
-                  style={{ width: '100%' }} />
+                  onChange={(value) => handleSettingChange('timezone', value)}
+                  options={TIMEZONE_OPTIONS}
+                  style={{ width: '100%' }}></Select>
                 
               </div>
             </div>

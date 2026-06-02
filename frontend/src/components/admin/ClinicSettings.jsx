@@ -27,7 +27,7 @@ import {
   MacOSCard,
   MacOSButton,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea,
   MacOSCheckbox
 } from '../ui/macos';
@@ -479,10 +479,12 @@ const ClinicSettings = () => {
                   <Clock style={{ width: '16px', height: '16px' }} />
                   Часовой пояс
                 </label>
-                <MacOSSelect
+                <Select
+                  aria-label="Часовой пояс клиники"
                   value={settings.timezone || 'Asia/Tashkent'}
-                  onChange={(e) => handleInputChange('timezone', e.target.value)}
+                  onChange={(value) => handleInputChange('timezone', value)}
                   options={timezones}
+                  size="large"
                   style={{ width: '100%' }}
                 />
                 <p style={{

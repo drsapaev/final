@@ -19,7 +19,7 @@ import {
   Button as MacOSButton,
 
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSCheckbox } from
 '../ui/macos';
 import { api } from '../../api/client';
@@ -516,9 +516,9 @@ const ReportGenerator = ({
             }}>
               Отделение
             </label>
-            <MacOSSelect
+            <Select
               value={filters.department}
-              onChange={(e) => handleFilterChange('department', e.target.value)}
+              onChange={(value) => handleFilterChange('department', value)}
               options={[
               { value: '', label: 'Все отделения' },
               { value: 'cardiology', label: 'Кардиология' },
@@ -527,16 +527,8 @@ const ReportGenerator = ({
               { value: 'pediatrics', label: 'Педиатрия' },
               { value: 'surgery', label: 'Хирургия' }]
               }
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }} />
+              size="large"
+              style={{ width: '100%' }} />
             
           </div>
           
@@ -550,25 +542,17 @@ const ReportGenerator = ({
             }}>
               Статус
             </label>
-            <MacOSSelect
+            <Select
               value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
+              onChange={(value) => handleFilterChange('status', value)}
               options={[
               { value: '', label: 'Все статусы' },
               { value: 'completed', label: 'Завершено' },
               { value: 'pending', label: 'Ожидает' },
               { value: 'cancelled', label: 'Отменено' }]
               }
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }} />
+              size="large"
+              style={{ width: '100%' }} />
             
           </div>
           
@@ -582,9 +566,9 @@ const ReportGenerator = ({
             }}>
               Способ оплаты
             </label>
-            <MacOSSelect
+            <Select
               value={filters.paymentMethod}
-              onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
+              onChange={(value) => handleFilterChange('paymentMethod', value)}
               options={[
               { value: '', label: 'Все способы' },
               { value: 'cash', label: 'Наличные' },
@@ -592,16 +576,8 @@ const ReportGenerator = ({
               { value: 'transfer', label: 'Перевод' },
               { value: 'mobile', label: 'Мобильный' }]
               }
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)',
-                background: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }} />
+              size="large"
+              style={{ width: '100%' }} />
             
           </div>
         </div>

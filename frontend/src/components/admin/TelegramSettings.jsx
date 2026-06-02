@@ -18,10 +18,17 @@ import {
   Webhook } from
 
 'lucide-react';
-import { Card, Button, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
+import { Card, Button, MacOSInput, Select, MacOSCheckbox } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+
+const DEFAULT_LANGUAGE_OPTIONS = [
+  { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
+  { value: 'uz', label: 'O\'zbekcha' },
+  { value: 'en', label: 'English' }
+];
+
 const TelegramSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -544,15 +551,13 @@ const TelegramSettings = () => {
                 <Globe style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
                 Язык по умолчанию
               </label>
-              <MacOSSelect
+              <Select
                 value={settings.default_language}
-                onChange={(e) => handleSettingChange('default_language', e.target.value)}
-                options={[
-                { value: 'ru', label: 'Русский' },
-                { value: 'uz', label: 'O\'zbekcha' },
-                { value: 'en', label: 'English' }]
-                }
-                style={{ width: '100%' }} />
+                onChange={(value) => handleSettingChange('default_language', value)}
+                options={DEFAULT_LANGUAGE_OPTIONS}
+                style={{ width: '100%' }}
+                aria-label={'\u042f\u0437\u044b\u043a \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e'}
+              ></Select>
               
             </div>
 

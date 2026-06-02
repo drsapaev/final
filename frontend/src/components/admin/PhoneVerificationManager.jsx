@@ -5,7 +5,7 @@ import {
   MacOSBadge,
   MacOSLoadingSkeleton,
   MacOSInput,
-  MacOSSelect,
+  Select,
   MacOSTextarea } from
 '../ui/macos';
 import {
@@ -355,15 +355,16 @@ const PhoneVerificationManager = () => {
           }}>
               Цель верификации
             </label>
-            <MacOSSelect
+            <Select
             value={adminForm.purpose}
-            onChange={(e) => setAdminForm((prev) => ({ ...prev, purpose: e.target.value }))}
+            onChange={(value) => setAdminForm((prev) => ({ ...prev, purpose: value }))}
             options={[
             { value: 'verification', label: 'Подтверждение номера' },
             { value: 'password_reset', label: 'Сброс пароля' },
             { value: 'phone_change', label: 'Смена номера' },
             { value: 'registration', label: 'Регистрация' }]
             }
+            size="large"
             style={{ width: '100%' }} />
           
           </div>
@@ -378,15 +379,16 @@ const PhoneVerificationManager = () => {
           }}>
               SMS провайдер (опционально)
             </label>
-            <MacOSSelect
+            <Select
             value={adminForm.provider}
-            onChange={(e) => setAdminForm((prev) => ({ ...prev, provider: e.target.value }))}
+            onChange={(value) => setAdminForm((prev) => ({ ...prev, provider: value }))}
             options={[
             { value: '', label: 'По умолчанию' },
             { value: 'eskiz', label: 'Eskiz' },
             { value: 'playmobile', label: 'PlayMobile' },
             { value: 'mock', label: 'Mock (тест)' }]
             }
+            size="large"
             style={{ width: '100%' }} />
           
           </div>

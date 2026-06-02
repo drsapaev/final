@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import {
   MacOSCard,
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  MacOSCheckbox,
+  Select,
   MacOSTextarea,
   MacOSLoadingSkeleton,
   MacOSEmptyState } from
@@ -47,8 +49,133 @@ const PRICING_RULE_TYPE_LABELS = {
   dynamic: 'Динамическое'
 };
 
+const PRICING_RULE_TYPE_OPTIONS = Object.entries(PRICING_RULE_TYPE_LABELS)
+  .map(([value, label]) => ({ value, label }));
+
+const DISCOUNT_TYPE_OPTIONS = [
+  { value: 'percentage', label: 'Процентная' },
+  { value: 'fixed_amount', label: 'Фиксированная сумма' },
+  { value: 'buy_x_get_y', label: 'Купи X получи Y' },
+  { value: 'tiered', label: 'Ступенчатая' }
+];
+
 const normalizePricingEnumValue = (value) =>
   typeof value === 'string' ? value.toLowerCase() : value;
+
+const normalizeServiceId = (value) => Number.parseInt(String(value), 10);
+
+const getSelectedServiceIds = (value) =>
+  Array.isArray(value)
+    ? value.map(normalizeServiceId).filter((id) => !Number.isNaN(id))
+    : [];
+
+const toggleServiceId = (selectedIds, serviceId) => {
+  const normalizedId = normalizeServiceId(serviceId);
+  if (Number.isNaN(normalizedId)) {
+    return getSelectedServiceIds(selectedIds);
+  }
+
+  const next = new Set(getSelectedServiceIds(selectedIds));
+  if (next.has(normalizedId)) {
+    next.delete(normalizedId);
+  } else {
+    next.add(normalizedId);
+  }
+
+  return Array.from(next);
+};
+
+const ServiceChecklist = ({ services = [], value = [], onChange }) => {
+  const selectedIds = getSelectedServiceIds(value);
+
+  if (!services.length) {
+    return (
+      <div
+        style={{
+          minHeight: '96px',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-md)',
+          background: 'var(--mac-bg-secondary)',
+          color: 'var(--mac-text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}
+      >
+        {'\u0423\u0441\u043b\u0443\u0433\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b'}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="group"
+      style={{
+        maxHeight: '220px',
+        overflowY: 'auto',
+        border: '1px solid var(--mac-border)',
+        borderRadius: 'var(--mac-radius-md)',
+        background: 'var(--mac-bg-primary)',
+        padding: '8px',
+        display: 'grid',
+        gap: '6px'
+      }}
+    >
+      <div
+        style={{
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-xs)',
+          padding: '0 2px 4px'
+        }}
+      >
+        {selectedIds.length
+          ? `${selectedIds.length} ${'\u0432\u044b\u0431\u0440\u0430\u043d\u043e'}`
+          : '\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d\u043e'}
+      </div>
+      {services.map((service) => {
+        const serviceId = normalizeServiceId(service.id);
+        const checked = selectedIds.includes(serviceId);
+
+        return (
+          <div
+            key={service.id}
+            style={{
+              padding: '8px',
+              borderRadius: 'var(--mac-radius-sm)',
+              background: checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)'
+            }}
+          >
+            <MacOSCheckbox
+              checked={checked}
+              onChange={() => onChange(toggleServiceId(selectedIds, service.id))}
+              label={
+                <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span>{service.name}</span>
+                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
+                    {service.price} {'\u20bd'}
+                  </span>
+                </span>
+              }
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+ServiceChecklist.propTypes = {
+  services: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      name: PropTypes.node,
+      price: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+    })
+  ),
+  value: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
+  onChange: PropTypes.func.isRequired
+};
 
 const buildPricingRulePayload = (form) =>
   Object.fromEntries(
@@ -531,17 +658,11 @@ const DynamicPricingManager = () => {
           }}>
                 Тип правила
               </label>
-              <MacOSSelect
+              <Select
             value={ruleForm.rule_type}
-            onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}>
-            
-                <option value="time_based">По времени</option>
-                <option value="volume_based">По объему</option>
-                <option value="seasonal">Сезонное</option>
-                <option value="loyalty">Лояльность</option>
-                <option value="package">Пакетное</option>
-                <option value="dynamic">Динамическое</option>
-              </MacOSSelect>
+            onChange={(value) => setRuleForm({ ...ruleForm, rule_type: value })}
+            options={PRICING_RULE_TYPE_OPTIONS}
+            size="large" />
             </div>
 
             <div>
@@ -554,15 +675,11 @@ const DynamicPricingManager = () => {
           }}>
                 Тип скидки
               </label>
-              <MacOSSelect
+              <Select
             value={ruleForm.discount_type}
-            onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}>
-            
-                <option value="percentage">Процентная</option>
-                <option value="fixed_amount">Фиксированная сумма</option>
-                <option value="buy_x_get_y">Купи X получи Y</option>
-                <option value="tiered">Ступенчатая</option>
-              </MacOSSelect>
+            onChange={(value) => setRuleForm({ ...ruleForm, discount_type: value })}
+            options={DISCOUNT_TYPE_OPTIONS}
+            size="large" />
             </div>
 
             <div>
@@ -680,20 +797,11 @@ const DynamicPricingManager = () => {
           }}>
                 Услуги
               </label>
-              <MacOSSelect
-            multiple
+              <ServiceChecklist
+            services={services}
             value={ruleForm.service_ids}
-            onChange={(e) => {
-              const values = Array.from(e.target.selectedOptions, (option) => parseInt(option.value));
-              setRuleForm({ ...ruleForm, service_ids: values });
-            }}>
-            
-                {services.map((service) =>
-            <option key={service.id} value={service.id}>
-                    {service.name} - {service.price} ₽
-                  </option>
-            )}
-              </MacOSSelect>
+            onChange={(serviceIds) => setRuleForm({ ...ruleForm, service_ids: serviceIds })}
+          ></ServiceChecklist>
             </div>
           </div>
 
@@ -1027,20 +1135,11 @@ const DynamicPricingManager = () => {
           }}>
                 Услуги в пакете
               </label>
-              <MacOSSelect
-            multiple
+              <ServiceChecklist
+            services={services}
             value={packageForm.service_ids}
-            onChange={(e) => {
-              const values = Array.from(e.target.selectedOptions, (option) => parseInt(option.value));
-              setPackageForm({ ...packageForm, service_ids: values });
-            }}>
-            
-                {services.map((service) =>
-            <option key={service.id} value={service.id}>
-                    {service.name} - {service.price} ₽
-                  </option>
-            )}
-              </MacOSSelect>
+            onChange={(serviceIds) => setPackageForm({ ...packageForm, service_ids: serviceIds })}
+          ></ServiceChecklist>
             </div>
           </div>
 

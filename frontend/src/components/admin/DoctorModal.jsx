@@ -8,7 +8,7 @@ import {
   MacOSBadge,
   MacOSInput,
   MacOSModal,
-  MacOSSelect,
+  Select,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 
@@ -180,11 +180,12 @@ const DoctorModal = ({
           <Label required style={{ display: 'block', marginBottom: '8px' }}>
             Пользователь
           </Label>
-          <MacOSSelect
+          <Select
             value={formData.userId}
-            onChange={(event) => handleChange('userId', event.target.value)}
+            onChange={(value) => handleChange('userId', value)}
             options={userOptions}
             disabled={loading}
+            size="large"
           />
           {renderFieldError('userId')}
         </div>

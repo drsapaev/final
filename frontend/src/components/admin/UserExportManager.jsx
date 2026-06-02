@@ -16,7 +16,7 @@ import {
   FileText as FilePdf,
   File } from
 'lucide-react';
-import { Card, Button, MacOSInput, MacOSSelect, MacOSCheckbox, Skeleton } from '../ui/macos';
+import { Card, Button, MacOSInput, Select, MacOSCheckbox, SegmentedControl, Skeleton } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -242,15 +242,16 @@ const UserExportManager = () => {
         }}>
             Формат файла:
           </label>
-          <MacOSSelect
+          <Select
           value={exportForm.format}
-          onChange={(e) => setExportForm((prev) => ({ ...prev, format: e.target.value }))}
+          onChange={(value) => setExportForm((prev) => ({ ...prev, format: value }))}
           options={[
           { value: 'csv', label: 'CSV' },
           { value: 'excel', label: 'Excel (XLSX)' },
           { value: 'json', label: 'JSON' },
           { value: 'pdf', label: 'PDF' }]
           }
+          size="large"
           style={{ width: '100%' }} />
 
         </div>
@@ -433,13 +434,14 @@ const UserExportManager = () => {
           }}>
               Роль:
             </label>
-            <MacOSSelect
+            <Select
             value={exportForm.filters.role}
-            onChange={(e) => setExportForm((prev) => ({
+            onChange={(value) => setExportForm((prev) => ({
               ...prev,
-              filters: { ...prev.filters, role: e.target.value }
+              filters: { ...prev.filters, role: value }
             }))}
             options={userRoles}
+            size="large"
             style={{ width: '100%' }} />
 
           </div>
@@ -454,13 +456,13 @@ const UserExportManager = () => {
           }}>
               Статус:
             </label>
-            <MacOSSelect
+            <Select
             value={exportForm.filters.is_active === null ? '' : exportForm.filters.is_active.toString()}
-            onChange={(e) => setExportForm((prev) => ({
+            onChange={(value) => setExportForm((prev) => ({
               ...prev,
               filters: {
                 ...prev.filters,
-                is_active: e.target.value === '' ? null : e.target.value === 'true'
+                is_active: value === '' ? null : value === 'true'
               }
             }))}
             options={[
@@ -468,6 +470,7 @@ const UserExportManager = () => {
             { value: 'true', label: 'Только активные' },
             { value: 'false', label: 'Только неактивные' }]
             }
+            size="large"
             style={{ width: '100%' }} />
 
           </div>
@@ -664,108 +667,45 @@ const UserExportManager = () => {
 
       {/* Табы */}
       <div style={{
-        display: 'flex',
-        marginBottom: '24px'
+        maxWidth: '100%',
+        overflowX: 'auto',
+        paddingBottom: '6px',
+        marginBottom: '24px',
+        scrollbarWidth: 'thin'
       }}>
-        <button
-          onClick={() => setActiveTab('export')}
+        <SegmentedControl
+          aria-label="Разделы экспорта пользователей"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            {
+              value: 'export',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Download size={14} aria-hidden="true" />
+                  Экспорт
+                </span>
+              )
+            },
+            {
+              value: 'files',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={14} aria-hidden="true" />
+                  Файлы ({exportFiles.length})
+                </span>
+              )
+            }
+          ]}
+          size="large"
           style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'export' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'export' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'export') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'export') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-
-          <Download style={{
-            width: '16px',
-            height: '16px',
-            color: activeTab === 'export' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+            minWidth: 'max-content',
+            background: 'var(--mac-gradient-sidebar)',
+            border: '1px solid var(--mac-main-shell-border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--mac-main-shell-shadow)'
           }} />
-          Экспорт
-          {activeTab === 'export' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
-        <button
-          onClick={() => setActiveTab('files')}
-          style={{
-            padding: '12px 20px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: activeTab === 'files' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-            fontWeight: activeTab === 'files' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-            fontSize: 'var(--mac-font-size-sm)',
-            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-            position: 'relative',
-            marginBottom: '-1px'
-          }}
-          onMouseEnter={(e) => {
-            if (activeTab !== 'files') {
-              e.target.style.color = 'var(--mac-text-primary)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'files') {
-              e.target.style.color = 'var(--mac-text-secondary)';
-            }
-          }}>
-
-          <FileText style={{
-            width: '16px',
-            height: '16px',
-            color: activeTab === 'files' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
-          }} />
-          Файлы ({exportFiles.length})
-          {activeTab === 'files' &&
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            left: '0',
-            right: '0',
-            height: '3px',
-            backgroundColor: 'var(--mac-accent-blue)',
-            borderRadius: '2px 2px 0 0'
-          }} />
-          }
-        </button>
       </div>
-      
-      {/* Разделительная линия */}
-      <div style={{
-        borderBottom: '1px solid var(--mac-border)',
-        marginBottom: '24px'
-      }} />
 
       {/* Содержимое табов */}
       {activeTab === 'export' && renderExportTab()}

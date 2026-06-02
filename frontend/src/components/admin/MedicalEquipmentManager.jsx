@@ -4,7 +4,8 @@ import {
   MacOSButton,
   MacOSBadge,
   MacOSInput,
-  MacOSSelect,
+  Select,
+  SegmentedControl,
   MacOSLoadingSkeleton,
   MacOSEmptyState } from
 
@@ -20,6 +21,7 @@ import {
   Wrench,
   BarChart3,
   Download,
+  History,
   RefreshCw,
   Stethoscope,
   Heart,
@@ -504,10 +506,10 @@ const MedicalEquipmentManager = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '8px'
           }}>Тип устройства</label>
-            <MacOSSelect
+            <Select
             id="device-type-filter"
             value={filters.device_type}
-            onChange={(e) => setFilters({ ...filters, device_type: e.target.value })}
+            onChange={(value) => setFilters({ ...filters, device_type: value })}
             options={[
             { value: '', label: 'Все типы' },
             { value: 'blood_pressure', label: 'Тонометр' },
@@ -516,7 +518,8 @@ const MedicalEquipmentManager = () => {
             { value: 'thermometer', label: 'Термометр' },
             { value: 'scale', label: 'Весы' },
             { value: 'ecg', label: 'ЭКГ' }]
-            } />
+            }
+            size="large" />
           
           </div>
           <div>
@@ -527,17 +530,18 @@ const MedicalEquipmentManager = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '8px'
           }}>Статус</label>
-            <MacOSSelect
+            <Select
             id="status-filter"
             value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            onChange={(value) => setFilters({ ...filters, status: value })}
             options={[
             { value: '', label: 'Все статусы' },
             { value: 'online', label: 'В сети' },
             { value: 'offline', label: 'Не в сети' },
             { value: 'error', label: 'Ошибка' },
             { value: 'busy', label: 'Занято' }]
-            } />
+            }
+            size="large" />
           
           </div>
           <div>
@@ -669,19 +673,20 @@ const MedicalEquipmentManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>Устройство</label>
-              <MacOSSelect
+              <Select
               id="measurement-device"
               value={measurementForm.device_id}
-              onChange={(e) => setMeasurementForm({ ...measurementForm, device_id: e.target.value })}
+              onChange={(value) => setMeasurementForm({ ...measurementForm, device_id: value })}
               options={[
               { value: '', label: 'Выберите устройство' },
               ...devices.
               filter((d) => d.status === 'online').
               map((device) => ({
-                value: device.id,
+                value: String(device.id),
                 label: `${device.name} (${getDeviceTypeName(device.device_type)})`
               }))]
-              } />
+              }
+              size="large" />
             
             </div>
 
@@ -789,10 +794,10 @@ const MedicalEquipmentManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Тип устройства</label>
-              <MacOSSelect
+              <Select
                 id="measurements-device-type"
                 value={filters.device_type}
-                onChange={(e) => setFilters({ ...filters, device_type: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, device_type: value })}
                 options={[
                 { value: '', label: 'Все типы' },
                 { value: 'blood_pressure', label: 'Тонометр' },
@@ -800,7 +805,8 @@ const MedicalEquipmentManager = () => {
                 { value: 'glucometer', label: 'Глюкометр' },
                 { value: 'thermometer', label: 'Термометр' },
                 { value: 'scale', label: 'Весы' }]
-                } />
+                }
+                size="large" />
               
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -897,76 +903,63 @@ const MedicalEquipmentManager = () => {
         </div>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid var(--mac-border)'
-        }}>
-          <button
-            onClick={() => setActiveTab('overview')}
-            style={{
-              padding: '16px 24px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'overview' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-              color: activeTab === 'overview' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-              fontWeight: activeTab === 'overview' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-              fontSize: 'var(--mac-font-size-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}>
-            
-            Обзор
-          </button>
-          <button
-            onClick={() => setActiveTab('devices')}
-            style={{
-              padding: '16px 24px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'devices' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-              color: activeTab === 'devices' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-              fontWeight: activeTab === 'devices' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-              fontSize: 'var(--mac-font-size-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}>
-            
-            Устройства
-          </button>
-          <button
-            onClick={() => setActiveTab('measurement')}
-            style={{
-              padding: '16px 24px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'measurement' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-              color: activeTab === 'measurement' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-              fontWeight: activeTab === 'measurement' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-              fontSize: 'var(--mac-font-size-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}>
-            
-            Измерение
-          </button>
-          <button
-            onClick={() => setActiveTab('measurements')}
-            style={{
-              padding: '16px 24px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'measurements' ? '2px solid var(--mac-accent)' : '2px solid transparent',
-              color: activeTab === 'measurements' ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-              fontWeight: activeTab === 'measurements' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
-              fontSize: 'var(--mac-font-size-sm)',
-              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-            }}>
-            
-            История
-          </button>
-        </div>
+      <div style={{
+        maxWidth: '100%',
+        overflowX: 'auto',
+        paddingBottom: '6px',
+        marginBottom: '24px',
+        scrollbarWidth: 'thin'
+      }}>
+        <SegmentedControl
+          aria-label="Разделы медицинского оборудования"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            {
+              value: 'overview',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <BarChart3 size={14} aria-hidden="true" />
+                  Обзор
+                </span>
+              )
+            },
+            {
+              value: 'devices',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Stethoscope size={14} aria-hidden="true" />
+                  Устройства
+                </span>
+              )
+            },
+            {
+              value: 'measurement',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={14} aria-hidden="true" />
+                  Измерение
+                </span>
+              )
+            },
+            {
+              value: 'measurements',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <History size={14} aria-hidden="true" />
+                  История
+                </span>
+              )
+            }
+          ]}
+          size="large"
+          style={{
+            minWidth: 'max-content',
+            background: 'var(--mac-gradient-sidebar)',
+            border: '1px solid var(--mac-main-shell-border)',
+            borderRadius: '14px',
+            boxShadow: 'var(--mac-main-shell-shadow)'
+          }} />
       </div>
 
       {activeTab === 'overview' && renderOverviewTab()}
