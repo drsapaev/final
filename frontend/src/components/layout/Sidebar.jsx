@@ -10,6 +10,26 @@ const dentistryHomeRoute = getCanonicalRouteById('doctor-dentistry')?.path || ge
 const labHomeRoute = getRoleHomeRoute('lab');
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
+const ADMIN_NAV_ITEM_SOURCES = [
+  { routeId: 'admin-dashboard', label: 'Админ: Дашборд' },
+  { routeId: 'admin-users', label: 'Админ: Пользователи' },
+  { routeId: 'admin-analytics', label: 'Админ: Аналитика' },
+  { routeId: 'admin-settings', label: 'Админ: Настройки' },
+  { routeId: 'admin-security', label: 'Админ: Безопасность' },
+];
+
+const adminNavItems = ADMIN_NAV_ITEM_SOURCES
+  .map(({ routeId, label }) => {
+    const route = getCanonicalRouteById(routeId);
+
+    if (!route) {
+      return null;
+    }
+
+    return { to: route.path, label };
+  })
+  .filter(Boolean);
+
 export default function Sidebar() {
   const { getColor, getSpacing } = useTheme();
   const st = auth.getState();
@@ -78,13 +98,7 @@ export default function Sidebar() {
   } else {
     // Обычная логика для других страниц
     if (role === 'admin') {
-      byRole.push(
-        { to: '/admin', label: 'Админ: Дашборд' },
-        { to: '/admin/users', label: 'Админ: Пользователи' },
-        { to: '/admin/analytics', label: 'Админ: Аналитика' },
-        { to: '/admin/settings', label: 'Админ: Настройки' },
-        { to: '/admin/security', label: 'Админ: Безопасность' }
-      );
+      byRole.push(...adminNavItems);
     }
     if (role === 'registrar') {
       byRole.push(
