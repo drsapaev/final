@@ -27,7 +27,7 @@ describe('Telegram manager onboarding request review', () => {
 
     expect(loader).toContain('/telegram/onboarding/requests');
     expect(loader).toContain('/telegram/onboarding/analytics/summary');
-    expect(loader).toContain("onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter");
+    expect(loader).toContain('onboardingStatusFilter === \'all\' ? \'\' : onboardingStatusFilter');
     expect(loader).toContain('/search-patients');
     expect(loader).not.toContain('/telegram/mini-app/onboarding');
     expect(loader).not.toContain('/telegram/mini-app/appointments');
@@ -42,15 +42,15 @@ describe('Telegram manager onboarding request review', () => {
     );
 
     expect(actionHandler).toContain('/telegram/onboarding/requests/');
-    expect(actionHandler).toContain("action === 'link-existing'");
-    expect(actionHandler).toContain("action === 'create-patient'");
+    expect(actionHandler).toContain('action === \'link-existing\'');
+    expect(actionHandler).toContain('action === \'create-patient\'');
     expect(actionHandler).toContain('candidateId');
     expect(actionHandler).toContain('/create-patient');
     expect(actionHandler).toContain('confirmCreateDespiteDuplicates');
     expect(actionHandler).toContain('reviewCandidateId');
     expect(actionHandler).toContain('patient: {');
-    expect(managerSource).toContain("'request-more-info'");
-    expect(managerSource).toContain("'reject'");
+    expect(managerSource).toContain('\'request-more-info\'');
+    expect(managerSource).toContain('\'reject\'');
     expect(actionHandler).not.toContain('/telegram/mini-app/appointments');
     expect(actionHandler).not.toContain('patientId');
     expect(actionHandler).not.toMatch(/entryToken|payment|invoice|diagnosis|lab|emr/i);

@@ -15,13 +15,13 @@ describe('print service route contract', () => {
   it('uses the canonical mounted print-template list route', () => {
     const source = readPrintServiceSource();
 
-    expect(source).toContain("api.get('/print/templates/templates'");
+    expect(source).toContain('api.get(\'/print/templates/templates\'');
     expect(API_ENDPOINTS.PRINT.TEMPLATES).toBe('/print/templates/templates');
   });
 
   it('does not call the stale print-template list route', () => {
     const source = readPrintServiceSource();
 
-    expect(source).not.toContain("api.get('/print/templates',");
+    expect(source).not.toContain('api.get(\'/print/templates\',');
   });
 });

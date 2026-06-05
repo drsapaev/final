@@ -12,9 +12,9 @@ describe('hosted payment provider ticket contract', () => {
     it(`${fileName} uses the authenticated api client for protected registrar invoice endpoints`, () => {
       const source = readProvider(fileName);
 
-      expect(source).toContain("import { api } from '../../api/client'");
-      expect(source).toContain("api.post('/registrar/invoice/init-payment'");
-      expect(source).toContain("api.get(`/registrar/invoice/${invoiceId}/status`");
+      expect(source).toContain('import { api } from \'../../api/client\'');
+      expect(source).toContain('api.post(\'/registrar/invoice/init-payment\'');
+      expect(source).toContain('api.get(`/registrar/invoice/${invoiceId}/status`');
       expect(source).not.toContain('fetch(`${API_BASE}/registrar/invoice/init-payment');
       expect(source).not.toContain('fetch(`${API_BASE}/registrar/invoice/${invoiceId}/status');
       expect(source).not.toContain('response.json()');
