@@ -547,7 +547,7 @@ const MacOSCardiologistPanelUnified = () => {
         const data = await response.json();
 
         // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        let allAppointments = [];
+        const allAppointments = [];
         const seenIds = new Set(); // Для отслеживания уже добавленных записей
 
         if (data && data.queues && Array.isArray(data.queues)) {
@@ -611,7 +611,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         // ✅ Фильтруем только кардиологические записи, исключая ЭКГ
-        let appointmentsData = allAppointments.filter((apt) => {
+        const appointmentsData = allAppointments.filter((apt) => {
           // Исключаем записи из очереди ЭКГ
           if (apt.specialty === 'echokg' || apt.specialty === 'ecg') {
             return false;

@@ -15,8 +15,8 @@ describe('auth refresh API contract', () => {
   it('uses the canonical authentication refresh route for proactive refresh', () => {
     const clientSource = readSource('client.js');
 
-    expect(clientSource).toContain("buildApiUrl('/authentication/refresh')");
-    expect(clientSource).not.toContain("buildApiUrl('/auth/refresh')");
+    expect(clientSource).toContain('buildApiUrl(\'/authentication/refresh\')');
+    expect(clientSource).not.toContain('buildApiUrl(\'/auth/refresh\')');
   });
 
   it('uses the canonical authentication refresh route in endpoint constants', () => {
@@ -26,7 +26,7 @@ describe('auth refresh API contract', () => {
   it('does not keep stale refresh route exceptions in interceptors', () => {
     const interceptorsSource = readSource('interceptors.js');
 
-    expect(interceptorsSource).toContain("requestUrl.includes('/authentication/refresh')");
-    expect(interceptorsSource).not.toContain("requestUrl.includes('/auth/refresh')");
+    expect(interceptorsSource).toContain('requestUrl.includes(\'/authentication/refresh\')');
+    expect(interceptorsSource).not.toContain('requestUrl.includes(\'/auth/refresh\')');
   });
 });

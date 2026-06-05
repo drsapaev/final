@@ -32,12 +32,12 @@ describe('AllFreeApproval action contract', () => {
 
     const actionRendering = sourceSlice(
       source,
-      "{(hasBackendAllFreeAction(request, 'approve')",
+      '{(hasBackendAllFreeAction(request, \'approve\')',
       '{showApprovalModal && selectedRequest &&'
     );
 
-    expect(actionRendering).toContain("hasBackendAllFreeAction(request, 'approve')");
-    expect(actionRendering).toContain("hasBackendAllFreeAction(request, 'reject')");
-    expect(actionRendering).not.toContain("request.approval_status === 'pending'");
+    expect(actionRendering).toContain('hasBackendAllFreeAction(request, \'approve\')');
+    expect(actionRendering).toContain('hasBackendAllFreeAction(request, \'reject\')');
+    expect(actionRendering).not.toContain('request.approval_status === \'pending\'');
   });
 });

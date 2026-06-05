@@ -18,8 +18,8 @@ describe('password change API contract', () => {
     const unifiedSettingsSource = readSource(unifiedSettingsPath);
     const changePasswordRequiredSource = readSource(changePasswordRequiredPath);
 
-    expect(unifiedSettingsSource).toContain("api.post('/authentication/password-change'");
-    expect(changePasswordRequiredSource).toContain("api.post('/authentication/password-change'");
+    expect(unifiedSettingsSource).toContain('api.post(\'/authentication/password-change\'');
+    expect(changePasswordRequiredSource).toContain('api.post(\'/authentication/password-change\'');
   });
 
   it('does not call the stale auth password-change route', () => {

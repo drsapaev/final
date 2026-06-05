@@ -27,10 +27,10 @@ describe('LabPanel queue/report status contract', () => {
     );
 
     expect(formatBlock).toContain('const latestLabReport = entry.latest_lab_report || null');
-    expect(formatBlock).toContain("status_source: 'queue'");
+    expect(formatBlock).toContain('status_source: \'queue\'');
     expect(formatBlock).toContain('queue_status: entry.status || null');
     expect(formatBlock).toContain('lab_report_status: latestLabReport?.status || null');
-    expect(formatBlock).toContain("report_status_source: latestLabReport ? 'lab-report' : null");
+    expect(formatBlock).toContain('report_status_source: latestLabReport ? \'lab-report\' : null');
     const lines = formatBlock.split('\n').map((line) => line.trim());
     expect(lines).not.toContain('status: latestLabReport?.status || entry.status,');
     expect(lines).not.toContain('status: latestLabReport?.status || null,');
@@ -47,9 +47,9 @@ describe('LabPanel queue/report status contract', () => {
     expect(formatBlock).toContain('payment_status: entry.payment_status || null');
     expect(formatBlock).toContain('queue_status: entry.status || null');
     expect(formatBlock).toContain('status: entry.status || null');
-    expect(formatBlock).not.toContain("payment_status: entry.payment_status || 'pending'");
-    expect(formatBlock).not.toContain("queue_status: entry.status || 'waiting'");
-    expect(formatBlock).not.toContain("status: entry.status || 'waiting'");
+    expect(formatBlock).not.toContain('payment_status: entry.payment_status || \'pending\'');
+    expect(formatBlock).not.toContain('queue_status: entry.status || \'waiting\'');
+    expect(formatBlock).not.toContain('status: entry.status || \'waiting\'');
   });
 
   it('does not add BFF-lite endpoints for the lab queue contract repair', () => {
@@ -67,9 +67,9 @@ describe('LabPanel queue/report status contract', () => {
       'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
     );
 
-    expect(loadBlock).toContain("new URLSearchParams({ department: 'lab' })");
+    expect(loadBlock).toContain('new URLSearchParams({ department: \'lab\' })');
     expect(loadBlock).toContain('/registrar/queues/today?${queueParams.toString()}');
-    expect(loadBlock).not.toContain(".filter((queue) => ['lab', 'laboratory'].includes(queue.specialty))");
+    expect(loadBlock).not.toContain('.filter((queue) => [\'lab\', \'laboratory\'].includes(queue.specialty))');
   });
 
   it('does not fetch report instances by visit_ids to enrich normal queue rows', () => {

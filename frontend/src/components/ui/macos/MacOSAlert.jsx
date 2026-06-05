@@ -194,6 +194,7 @@ const MacOSAlert = ({
           onMouseEnter={handleDismissMouseEnter}
           onMouseLeave={handleDismissMouseLeave}
           aria-label="Закрыть уведомление"
+          title="Закрыть уведомление"
         >
           <X size={16} />
         </button>

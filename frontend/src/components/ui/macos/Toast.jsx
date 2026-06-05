@@ -121,7 +121,8 @@ const Toast = React.forwardRef(({
           opacity: 0.7,
           transition: 'opacity var(--mac-duration-fast) var(--mac-ease)'
         }}
-        aria-label="Close notification">
+        aria-label="Close notification"
+        title="Close notification">
         
         ✕
       </button>

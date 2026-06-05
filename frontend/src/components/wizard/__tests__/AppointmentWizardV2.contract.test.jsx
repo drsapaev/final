@@ -33,12 +33,12 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'useEffect(() => {',
     );
 
-    expect(servicesLoadBlock).toContain("api.get('/registrar/services')");
-    expect(doctorsLoadBlock).toContain("api.get('/registrar/doctors')");
+    expect(servicesLoadBlock).toContain('api.get(\'/registrar/services\')');
+    expect(doctorsLoadBlock).toContain('api.get(\'/registrar/doctors\')');
     expect(servicesLoadBlock).not.toContain('fetch(`${API_BASE}/registrar/services`');
     expect(doctorsLoadBlock).not.toContain('fetch(`${API_BASE}/registrar/doctors`');
-    expect(servicesLoadBlock).not.toContain("'Authorization': `Bearer ${tokenManager.getAccessToken()}`");
-    expect(doctorsLoadBlock).not.toContain("'Authorization': `Bearer ${tokenManager.getAccessToken()}`");
+    expect(servicesLoadBlock).not.toContain('\'Authorization\': `Bearer ${tokenManager.getAccessToken()}`');
+    expect(doctorsLoadBlock).not.toContain('\'Authorization\': `Bearer ${tokenManager.getAccessToken()}`');
   });
 
   it('preserves existing queue identity when grouping edit-mode cart items', () => {
@@ -86,8 +86,8 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     );
 
     expect(source).toContain('const normalizeGenderForForm = (value) => {');
-    expect(source).toContain("['m', 'male', 'man', 'men', '1',");
-    expect(source).toContain("['f', 'female', 'woman', 'women', '2',");
+    expect(source).toContain('[\'m\', \'male\', \'man\', \'men\', \'1\',');
+    expect(source).toContain('[\'f\', \'female\', \'woman\', \'women\', \'2\',');
     expect(source).toContain('const resolvePatientGenderValue = (record) => firstNonEmpty(');
     expect(source).toContain('record?.patient_sex');
     expect(source).toContain('const genderToPatientSexForApi = (value) => {');
@@ -118,10 +118,10 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
 
     expect(source).toContain('const WIZARD_DEPARTMENT_FILTER_KEYS = {');
     expect(source).toContain('const getWizardDepartmentFilterKeys = (value) => {');
-    expect(source).toContain("echokg: ['cardio', 'echokg', 'ecg']");
+    expect(source).toContain('echokg: [\'cardio\', \'echokg\', \'ecg\']');
     expect(servicesLoadBlock).toContain('const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);');
     expect(servicesLoadBlock).toContain('if (departmentFilterKeys.length > 0)');
-    expect(servicesLoadBlock).not.toContain("if (activeTab && activeTab !== 'all')");
+    expect(servicesLoadBlock).not.toContain('if (activeTab && activeTab !== \'all\')');
   });
 
   it('loads all services in edit mode while keeping category tabs active', () => {
@@ -148,15 +148,15 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(initBlock).toContain('const initialCartItems = (() => {');
     expect(initBlock).toContain('setActiveServiceCategory(resolveInitialServiceCategory(initialCartItems, activeTab));');
     expect(initBlock).toContain('setActiveServiceCategory(activeTabToWizardCategory(activeTab));');
-    expect(initBlock).toContain("setServiceSearchQuery('');");
+    expect(initBlock).toContain('setServiceSearchQuery(\'\');');
     expect(source).toContain('editMode={editMode}');
     expect(servicesLoadBlock).toContain('const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab);');
     expect(displayedServicesBlock).not.toContain('if (editMode) {');
     expect(displayedServicesBlock).toContain('switch (activeCategory)');
-    expect(displayedServicesBlock).toContain("case 'specialists':");
-    expect(displayedServicesBlock).toContain("case 'laboratory':");
-    expect(displayedServicesBlock).toContain("case 'procedures':");
-    expect(displayedServicesBlock).toContain("case 'other':");
+    expect(displayedServicesBlock).toContain('case \'specialists\':');
+    expect(displayedServicesBlock).toContain('case \'laboratory\':');
+    expect(displayedServicesBlock).toContain('case \'procedures\':');
+    expect(displayedServicesBlock).toContain('case \'other\':');
   });
 
   it('treats service_details as existing services in edit mode to avoid duplicate queues', () => {
@@ -199,6 +199,6 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const source = readWizardSource();
 
     expect(source).toContain('doctorOptions.map((doctor, index)');
-    expect(source).toContain("key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`}");
+    expect(source).toContain('key={`${doctor.id ?? \'doctor\'}-${doctor.specialty ?? \'\'}-${index}`}');
   });
 });
