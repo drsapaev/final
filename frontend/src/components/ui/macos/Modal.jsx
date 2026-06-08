@@ -132,7 +132,8 @@ const Modal = ({
         onKeyDown={handleBackdropKeyDown}
         role="button"
         tabIndex={0}
-        aria-label="Закрыть модальное окно" />
+        aria-label="Закрыть модальное окно"
+        title="Закрыть модальное окно" />
 
 
       {/* Modal Content */}
