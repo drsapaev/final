@@ -161,6 +161,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                             onClick={startRecording}
                             className="btn-record"
                             title="Записать голосовое сообщение"
+                            aria-label="Записать голосовое сообщение"
                         >
                             <Mic size={20} />
                             <span>Записать голосовое</span>
@@ -171,7 +172,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                                 <div className="pulse-dot" />
                                 <span className="recording-time">{formatTime(duration)}</span>
                             </div>
-                            <button onClick={stopRecording} className="btn-stop">
+                            <button onClick={stopRecording} className="btn-stop" aria-label="Остановить запись">
                                 <Square size={18} />
                                 <span>Остановить</span>
                             </button>
@@ -188,7 +189,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                         <button onClick={handleCancel} className="btn-cancel" title="Отменить" aria-label="Отменить голосовое сообщение">
                             <Trash2 size={18} />
                         </button>
-                        <button onClick={handleSend} className="btn-send" title="Отправить">
+                        <button onClick={handleSend} className="btn-send" title="Отправить" aria-label="Отправить">
                             <Send size={18} />
                             <span>Отправить</span>
                         </button>
