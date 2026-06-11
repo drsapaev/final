@@ -2055,7 +2055,8 @@ const EnhancedAppointmentsTable = ({
                           fontSize: '12px',
                           fontWeight: '500'
                         }}
-                        title="Оплата">
+                        title="Оплата"
+                        aria-label="Оплата">
 
                               💸 Оплата
                             </button>
@@ -2084,7 +2085,8 @@ const EnhancedAppointmentsTable = ({
                           fontSize: '12px',
                           fontWeight: '500'
                         }}
-                        title="Вызвать">
+                        title="Вызвать"
+                        aria-label="Вызвать">
 
                             📢 Вызвать
                           </button>
@@ -2142,7 +2144,8 @@ const EnhancedAppointmentsTable = ({
                           fontSize: '12px',
                           fontWeight: '500'
                         }}
-                        title="Завершить">
+                        title="Завершить"
+                        aria-label="Завершить">
 
                             ✅ Завершить
                           </button>
@@ -2311,7 +2314,8 @@ const EnhancedAppointmentsTable = ({
                           fontSize: '12px',
                           fontWeight: '500'
                         }}
-                        title="Назначить следующий визит">
+                        title="Назначить следующий визит"
+                        aria-label="Назначить следующий визит">
 
                             📅 Следующий
                           </button>
