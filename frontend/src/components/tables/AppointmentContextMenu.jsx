@@ -47,6 +47,8 @@ const AppointmentContextMenu = ({
 }) => {
   const menuRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [hoveredItemId, setHoveredItemId] = useState(null);
+  const [focusedItemId, setFocusedItemId] = useState(null);
 
   const isDark = theme === 'dark';
   const colors = {
@@ -252,7 +254,7 @@ const AppointmentContextMenu = ({
                 width: '100%',
                 padding: '8px 16px',
                 border: 'none',
-                backgroundColor: 'transparent',
+                backgroundColor: hoveredItemId === item.id || focusedItemId === item.id ? colors.hover : 'transparent',
                 color: item.color,
                 fontSize: '14px',
                 textAlign: 'left',
@@ -260,14 +262,14 @@ const AppointmentContextMenu = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                transition: 'background-color 0.15s ease'
+                transition: 'background-color 0.15s ease',
+                outline: focusedItemId === item.id ? `2px solid ${colors.accent}` : 'none',
+                outlineOffset: '-2px'
               }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = colors.hover;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-              }}>
+              onMouseEnter={() => setHoveredItemId(item.id)}
+              onMouseLeave={() => setHoveredItemId(null)}
+              onFocus={() => setFocusedItemId(item.id)}
+              onBlur={() => setFocusedItemId(null)}>
               
               <Icon size={16} />
               <span>{item.label}</span>
