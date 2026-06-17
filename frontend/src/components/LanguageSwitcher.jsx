@@ -37,6 +37,7 @@ const LanguageSwitcher = ({ compact = false }) => {
                 size="small"
                 onClick={() => setIsOpen(!isOpen)}
                 title={t('common.language')}
+                aria-label={t('common.language')}
                 style={{
                     display: 'flex',
                     alignItems: 'center',
