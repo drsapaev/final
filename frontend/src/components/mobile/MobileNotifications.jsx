@@ -181,7 +181,7 @@ const MobileNotifications = () => {
           onClick={() => window.open('chrome://settings/content/notifications')}
           variant="outline"
           size="sm">
-          
+
           <Settings className="w-4 h-4 mr-2" />
           Открыть настройки
         </Button>
@@ -209,7 +209,7 @@ const MobileNotifications = () => {
             onClick={requestNotificationPermission}
             size="sm"
             variant="outline">
-            
+
               Включить
             </Button>
           }
@@ -219,7 +219,7 @@ const MobileNotifications = () => {
             onClick={markAllAsRead}
             size="sm"
             variant="ghost">
-            
+
               <Check className="w-4 h-4 mr-1" />
               Все прочитано
             </Button>
@@ -246,8 +246,16 @@ const MobileNotifications = () => {
           'bg-gray-50' :
           'bg-blue-50 border-blue-200'}`
           }
-          onClick={() => markAsRead(notification.id)}>
-          
+          role="button"
+          tabIndex={0}
+          onClick={() => markAsRead(notification.id)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              markAsRead(notification.id);
+            }
+          }}>
+
               <div className="flex items-start space-x-3">
                 <div className="text-lg">
                   {getNotificationIcon(notification.type)}
