@@ -55,7 +55,7 @@ jobs:
       ops_changed: ${{ steps.scope.outputs.ops_changed }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -298,7 +298,7 @@ jobs:
       )
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Validate changed repository metadata
       shell: bash
@@ -389,7 +389,7 @@ jobs:
       )
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -606,7 +606,7 @@ jobs:
       )
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v6
@@ -653,7 +653,7 @@ jobs:
       )
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v6
@@ -690,7 +690,7 @@ jobs:
       )
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v6
@@ -724,7 +724,7 @@ jobs:
       )
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v6
@@ -788,7 +788,7 @@ jobs:
       PYTHONUTF8: '1'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -881,7 +881,7 @@ jobs:
       needs.ci-scope.outputs.architecture_required == 'true'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -950,7 +950,7 @@ jobs:
       !contains(needs.*.result, 'cancelled')
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
       uses: actions/setup-python@v6
@@ -1027,7 +1027,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -1116,7 +1116,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐳 Настройка Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -1189,7 +1189,7 @@ jobs:
       PYTHONUTF8: '1'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -1497,7 +1497,7 @@ jobs:
       PYTHONUTF8: '1'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
       uses: actions/setup-python@v6
@@ -1652,7 +1652,7 @@ jobs:
       WS_DEV_ALLOW: '1'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
       uses: actions/setup-python@v6
@@ -1826,7 +1826,7 @@ jobs:
       WS_DEV_ALLOW: '1'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v6
@@ -1997,7 +1997,7 @@ jobs:
       PYTHONUTF8: '1'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: рџђЌ Setup Python
       uses: actions/setup-python@v6
@@ -2155,7 +2155,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: Staging readiness summary
       run: |
@@ -2176,7 +2176,7 @@ jobs:
       name: production
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: Production readiness summary
       run: |
