@@ -193,7 +193,7 @@ const ModernForm = ({
 
       {/* Индикатор загрузки */}
       {(loading || isSubmitting) &&
-      <div className="form-loading">
+      <div className="form-loading" role="status" aria-live="polite">
           <Loader size={16} className="spinning" />
           <span>Обработка...</span>
         </div>
