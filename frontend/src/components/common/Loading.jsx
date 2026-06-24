@@ -121,7 +121,7 @@ export function Loading({
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} aria-busy={true} aria-live="polite" role="status">
       {renderLoader()}
       {text && <div style={textStyle}>{text}</div>}
     </div>);
@@ -154,7 +154,7 @@ export function ButtonLoading({ loading, children, style = {}, disabled = false,
   };
 
   return (
-    <button {...props} style={buttonStyle} disabled={loading || disabled}>
+    <button {...props} style={buttonStyle} disabled={loading || disabled} aria-busy={loading}>
       {loading && <div style={spinnerStyle} />}
       {children}
     </button>);
@@ -194,7 +194,7 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
   };
 
   return (
-    <table style={tableStyle}>
+    <table style={tableStyle} aria-busy={true}>
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) =>
@@ -265,7 +265,7 @@ export function CardLoadingOld({ count = 3 }) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} aria-busy={true}>
       {Array.from({ length: count }).map((_, i) =>
       <div key={i} style={cardStyle}>
           <div style={{ ...skeletonStyle, height: '24px', marginBottom: getSpacing('md') }} />
@@ -323,7 +323,7 @@ export function ListLoading({ count = 5 }) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} aria-busy={true}>
       {Array.from({ length: count }).map((_, i) =>
       <div key={i} style={itemStyle}>
           <div style={avatarStyle} />
