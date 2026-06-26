@@ -221,7 +221,7 @@ const MacOSTable = ({
 
   if (loading) {
     return (
-      <div style={{ overflowX: 'auto' }} aria-busy="true">
+      <div style={{ overflowX: 'auto' }} aria-busy={loading} aria-live="polite">
         <table className={className} style={tableStyle}>
           {renderHeaders()}
           <tbody>
@@ -234,7 +234,7 @@ const MacOSTable = ({
 
   if (children) {
     return (
-      <div style={{ overflowX: 'auto' }} aria-busy={loading}>
+      <div style={{ overflowX: 'auto' }} aria-busy={loading} aria-live="polite">
         <table className={className} style={tableStyle}>
           {children}
         </table>
@@ -244,7 +244,7 @@ const MacOSTable = ({
 
   if (!data || data.length === 0) {
     return (
-      <div style={{ overflowX: 'auto' }} aria-busy={loading}>
+      <div style={{ overflowX: 'auto' }} aria-busy={loading} aria-live="polite">
         <table className={className} style={tableStyle}>
           {renderHeaders()}
           <tbody>
@@ -256,7 +256,7 @@ const MacOSTable = ({
   }
 
   return (
-    <div style={{ overflowX: 'auto' }} aria-busy={loading}>
+    <div style={{ overflowX: 'auto' }} aria-busy={loading} aria-live="polite">
       <table className={className} style={tableStyle}>
         {renderHeaders()}
         <tbody>
