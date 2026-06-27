@@ -1,3 +1,6 @@
 ## 2024-05-12 - Missing aria-busy on Complex Loading States
 **Learning:** While buttons effectively communicated their loading states via `aria-busy`, larger container components in the design system (Tables, Lists, Stat Cards) with custom loading skeletons or empty states completely lacked this attribute. This creates a confusing experience for screen reader users who aren't notified when these regions are processing or waiting for data.
 **Action:** Always add `aria-busy="true"` (or `aria-busy={loading}`) to the root container of complex UI components that handle asynchronous data loading, especially when rendering custom loading skeletons or empty states instead of standard UI elements.
+## 2024-05-13 - Focus Styles on Interactive List Items
+**Learning:** Some custom UI components (like MacOSList) managed pseudo-class hover effects directly via DOM mutation (`e.currentTarget.style.backgroundColor`) in JS, completely omitting keyboard focus (`onFocus` / `onBlur`) states. This hides interactivity from keyboard-only users.
+**Action:** When implementing custom interactive lists or options, use React state (e.g., `focusedIndex`) and apply focus outline styles dynamically (`outline: 2px solid var(--mac-accent-blue)`) while attaching `onFocus`/`onBlur` handlers to ensure keyboard accessibility matches mouse hover behavior.
