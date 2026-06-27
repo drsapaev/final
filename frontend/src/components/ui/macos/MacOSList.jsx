@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 
 const MacOSList = ({
@@ -16,6 +17,9 @@ const MacOSList = ({
   className,
   style
 }) => {
+  const [hoveredIndex, setHoveredIndex] = useState(-1);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+
   const sizeStyles = {
     sm: {
       padding: '8px 0',
@@ -66,17 +70,19 @@ const MacOSList = ({
     ...style
   };
 
-  const itemStyle = (index, isSelected = false) => ({
+  const itemStyle = (index, isSelected = false, isHovered = false, isFocused = false) => ({
     padding: currentSize.itemPadding,
     fontSize: currentSize.fontSize,
     color: 'var(--mac-text-primary)',
     cursor: hoverable || selectable ? 'pointer' : 'default',
-    background: isSelected ? 'var(--mac-bg-blue)' : 'transparent',
+    background: isSelected ? 'var(--mac-bg-blue)' : (isHovered && hoverable ? 'var(--mac-bg-secondary)' : 'transparent'),
     borderBottom: dividers && index < items.length - 1 ? '1px solid var(--mac-separator)' : 'none',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    outline: isFocused ? '2px solid var(--mac-accent-blue)' : 'none',
+    outlineOffset: '-2px'
   });
 
   const handleItemClick = (item, index) => {
@@ -88,16 +94,24 @@ const MacOSList = ({
     }
   };
 
-  const handleMouseEnter = (e, isSelected) => {
+  const handleMouseEnter = (index) => {
     if (hoverable) {
-      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'var(--mac-bg-secondary)';
+      setHoveredIndex(index);
     }
   };
 
-  const handleMouseLeave = (e, isSelected) => {
+  const handleMouseLeave = () => {
     if (hoverable) {
-      e.currentTarget.style.backgroundColor = isSelected ? 'var(--mac-bg-blue)' : 'transparent';
+      setHoveredIndex(-1);
     }
+  };
+
+  const handleFocus = (index) => {
+    setFocusedIndex(index);
+  };
+
+  const handleBlur = () => {
+    setFocusedIndex(-1);
   };
 
   const handleKeyDown = (e, item, index) => {
@@ -188,14 +202,19 @@ const MacOSList = ({
         const isSelected = selectedIndex === index;
         const isInteractive = selectable || Boolean(onItemClick);
 
+        const isHovered = hoveredIndex === index;
+        const isFocused = focusedIndex === index;
+
         if (isInteractive) {
           return (
             <div
               key={index}
-              style={itemStyle(index, isSelected)}
+              style={itemStyle(index, isSelected, isHovered, isFocused)}
               onClick={() => handleItemClick(item, index)}
-              onPointerEnter={(e) => handleMouseEnter(e, isSelected)}
-              onPointerLeave={(e) => handleMouseLeave(e, isSelected)}
+              onPointerEnter={() => handleMouseEnter(index)}
+              onPointerLeave={handleMouseLeave}
+              onFocus={() => handleFocus(index)}
+              onBlur={handleBlur}
               onKeyDown={(e) => handleKeyDown(e, item, index)}
               tabIndex={0}
               role="button"
@@ -208,9 +227,9 @@ const MacOSList = ({
         return (
           <div
             key={index}
-            style={itemStyle(index, isSelected)}
-            onPointerEnter={(e) => handleMouseEnter(e, isSelected)}
-            onPointerLeave={(e) => handleMouseLeave(e, isSelected)}
+            style={itemStyle(index, isSelected, isHovered, isFocused)}
+            onPointerEnter={() => handleMouseEnter(index)}
+            onPointerLeave={handleMouseLeave}
             role="listitem">
             
             {renderItem ? renderItem(item, index) : renderDefaultItem(item, index)}
