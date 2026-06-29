@@ -24,6 +24,6 @@ not applicable - Micro-UX frontend improvement only.
 - [x] no durable memory update needed
 
 ## Validation
-- Targeted tests or smoke run: Frontend tests (`pnpm test --run`)
+- Targeted tests or smoke run: Frontend unit tests (`pnpm test`)
 - Result: 504 passed, 108 test files passed. No regressions introduced.
-- Not checked: End-to-end Playwright tests as they are not currently running locally for this small change.
+- Not checked: Visual e2e testing.
