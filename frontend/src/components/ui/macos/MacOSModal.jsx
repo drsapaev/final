@@ -210,6 +210,7 @@ const MacOSModal = ({
                 onMouseEnter={handleCloseMouseEnter}
                 onMouseLeave={handleCloseMouseLeave}
                 aria-label="Закрыть модальное окно"
+                title="Закрыть модальное окно"
               >
                 <X size={20} />
               </button>
