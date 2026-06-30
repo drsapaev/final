@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+// P-009 fix: shared doctor panel state hook
+import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import {
   FileText,
   User,
@@ -84,43 +86,22 @@ const MacOSCardiologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize, getShadow } = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
+  // P-009: navigate removed — useDoctorPanelState handles tab URL sync
 
-  // Получаем активную вкладку и patientId из URL параметров
-  const getInitialTab = () => {
-    const params = new URLSearchParams(location.search);
-    const visitIdParam = params.get('visitId') || params.get('visit_id');
-
-    // Deep-link по visitId должен сразу открывать прием,
-    // а deep-link по patientId по умолчанию ведет в appointments.
-    if (visitIdParam) {
-      return params.get('tab') || 'visit';
-    }
-    if (params.get('patientId')) {
-      return 'appointments';
-    }
-    return params.get('tab') || 'appointments';
-  };
-
-  // Получаем patientId из URL для автоматической загрузки пациента
-  const getPatientIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
-  }, [location.search]);
-
-  const getVisitIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const visitIdParam = params.get('visitId') || params.get('visit_id');
-    if (!visitIdParam) {
-      return null;
-    }
-
-    const parsed = parseInt(visitIdParam, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [location.search]);
-
-  const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
+  const {
+    activeTab,
+    setActiveTab,
+    handleTabChange: goToTab,
+    patientIdFromUrl,
+    visitIdFromUrl,
+    selectedPatient,
+    setSelectedPatient,
+  } = useDoctorPanelState({
+    defaultTab: 'appointments',
+    visitDeepLinkTab: 'visit',
+    patientDeepLinkTab: 'appointments',
+  });
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
@@ -366,9 +347,8 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   const hydratePatientFromUrl = useCallback(async () => {
-    const patientIdFromUrl = getPatientIdFromUrl();
+    // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
     if (!patientIdFromUrl) return;
-    const visitIdFromUrl = getVisitIdFromUrl();
 
     const selectedPatientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || null;
     const selectedVisitId = selectedPatient?.visit_id || null;
@@ -413,24 +393,16 @@ const MacOSCardiologistPanelUnified = () => {
         text: getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.')
       });
     }
-  }, [getPatientIdFromUrl, getVisitIdFromUrl, selectedPatient]);
+  }, [patientIdFromUrl, visitIdFromUrl, selectedPatient]);
 
   useEffect(() => {
     hydratePatientFromUrl();
   }, [hydratePatientFromUrl, authRefreshTick]);
 
-  const patientIdFromUrl = getPatientIdFromUrl();
-  const visitIdFromUrl = getVisitIdFromUrl();
+  // P-009: patientIdFromUrl / visitIdFromUrl now come from useDoctorPanelState
   const shouldHydrateAppointmentContext = Boolean(patientIdFromUrl || visitIdFromUrl);
 
-  // Смена вкладки с синхронизацией URL
-  const goToTab = (tabId) => {
-    if (!tabId) return;
-    setActiveTab(tabId);
-    const params = new URLSearchParams(location.search);
-    params.set('tab', tabId);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  };
+  // P-009: goToTab is now handleTabChange from useDoctorPanelState
 
   const ensureCanonicalVisitId = useCallback(async (row) => {
     const appointmentId = row?.appointment_id || null;
@@ -446,8 +418,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   useEffect(() => {
-    const patientIdFromUrl = getPatientIdFromUrl();
-    const visitIdFromUrl = getVisitIdFromUrl();
+    // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
     if ((!patientIdFromUrl && !visitIdFromUrl) || appointments.length === 0) {
       return;
     }
@@ -501,7 +472,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       return didChange ? nextPatient : prev;
     });
-  }, [appointments, getPatientIdFromUrl, getVisitIdFromUrl]);
+  }, [appointments, patientIdFromUrl, visitIdFromUrl]);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
