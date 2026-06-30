@@ -1,20 +1,20 @@
 # Frontend-Backend Parity Report
 
-Generated at: 2026-02-25T07:03:34.547174+00:00
+Generated at: 2026-06-30T08:11:18.515835+00:00
 
 ## Summary
 
 - Backend operations total: **1111**
 - Frontend calls total: **222**
-- Implemented matches: **128**
-- Partial (unresolved frontend calls): **6**
-- Missing in frontend: **989**
-- Frontend orphan calls: **88**
-- Coverage: **11.52%**
+- Implemented matches: **130**
+- Partial (unresolved frontend calls): **9**
+- Missing in frontend: **987**
+- Frontend orphan calls: **83**
+- Coverage: **11.7%**
 
 ## Critical Missing (auth/queue/billing/emr)
 
-- `/api/v1/auth`: **23** missing operations
+- `/api/v1/auth`: **21** missing operations
 - `/api/v1/queue`: **31** missing operations
 - `/api/v1/billing`: **16** missing operations
 - `/api/v1/emr`: **62** missing operations
@@ -37,6 +37,9 @@ Generated at: 2026-02-25T07:03:34.547174+00:00
 
 ## Partial Preview (first 40)
 
+- `GET` ``${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`` (frontend/src/api/services.js:600) reason=`unresolved_constant_ref`
+- `GET` `API_ENDPOINTS.NOTIFICATIONS.GET(id)` (frontend/src/api/services.js:607) reason=`unresolved_constant_ref`
+- `GET` `API_ENDPOINTS.NOTIFICATIONS.TYPES` (frontend/src/api/services.js:637) reason=`unresolved_constant_ref`
 - `GET` `cleanUrl` (frontend/src/hooks/useAdminData.js:45) reason=`unresolved_expression`
 - `GET` `endpoint` (frontend/src/hooks/useApi.js:79) reason=`unresolved_expression`
 - `POST` `endpoint` (frontend/src/hooks/useApi.js:217) reason=`unresolved_expression`
@@ -47,8 +50,6 @@ Generated at: 2026-02-25T07:03:34.547174+00:00
 ## Frontend Orphan Preview (first 40)
 
 - `GET` `/api/v1/visits` (frontend/src/api/client.js:214)
-- `POST` `/api/v1/auth/logout` (frontend/src/api/services.js:31)
-- `POST` `/api/v1/auth/refresh` (frontend/src/api/services.js:38)
 - `GET` `/api/v1/users` (frontend/src/api/services.js:51)
 - `GET` `/api/v1/users/{id}` (frontend/src/api/services.js:58)
 - `POST` `/api/v1/users` (frontend/src/api/services.js:65)
@@ -86,3 +87,5 @@ Generated at: 2026-02-25T07:03:34.547174+00:00
 - `GET` `/api/v1/analytics/revenue` (frontend/src/api/services.js:502)
 - `GET` `/api/v1/analytics/patients` (frontend/src/api/services.js:510)
 - `GET` `/api/v1/analytics/appointments` (frontend/src/api/services.js:518)
+- `GET` `/api/v1/analytics/doctors` (frontend/src/api/services.js:526)
+- `GET` `/api/v1/analytics/departments` (frontend/src/api/services.js:534)

@@ -1073,7 +1073,7 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     // P-001 fix: previously roles omitted 'Patient', so a patient logging in via the
     // standard form was bounced to /forbidden by RouteAccessBoundary because
-    // homeForRoles:['patient'] pointed them here while the route's role guard
+    // homeForRoles:['patient'] pointed them here while the role guard for the route
     // rejected them. Patient role is now included so the home-route resolves and
     // the guard accepts the patient. Admin/Registrar/Doctor retain access for
     // support / debug purposes.
@@ -1209,7 +1209,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     // P-014 fix: previously roles:[Admin, Registrar] excluded Doctor, Cashier, Lab.
     // Cashier needs to look up appointments to take payments; Lab needs to find
-    // patients for sample collection; Doctor needs to see peers' schedules.
+    // patients for sample collection; Doctor needs to see schedules of peers.
     // All clinical roles now have read access to the appointments list.
     roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
     entry: 'menu',

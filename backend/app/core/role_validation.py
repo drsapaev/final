@@ -14,6 +14,7 @@ CRITICAL_ROLES = {
     "Lab",
     "Doctor",
     "Cashier",
+    "Patient",  # P-001 fix: Patient role exists in roles.py and is used in auth, but was missing here
     "cardio",
     "derma",
     "dentist",
@@ -26,6 +27,7 @@ ROLE_ROUTES = {
     "Lab": "/lab-panel",
     "Doctor": "/doctor-panel",
     "Cashier": "/cashier-panel",
+    "Patient": "/patient",  # P-001 fix: canonical patient home route
     "cardio": "/cardiologist",
     "derma": "/dermatologist",
     "dentist": "/dentist",
