@@ -469,7 +469,7 @@ const requiredHintStyle = {
 const hintActionStyle = {
   border: 0,
   background: 'transparent',
-  color: '#2563eb',
+  color: 'var(--mac-accent-blue, #2563eb)',
   cursor: 'pointer',
   font: 'inherit',
   fontWeight: 700,
