@@ -141,6 +141,57 @@ const AnalyticsDashboard = ({
 
   }
 
+  // P-025 fix: when not loading but data is empty/null, show an explicit empty
+  // state instead of rendering zero-state charts with no explanation. Previously
+  // the user saw empty graphs and "0 ₽" metrics, which looked like a bug rather
+  // than a legitimate "no data yet" state.
+  const hasAnyData = data && (
+    (data.overview && (data.overview.total_revenue > 0 || data.overview.total_appointments > 0 || data.overview.total_patients > 0))
+    || (data.revenue && data.revenue.length > 0)
+    || (data.appointments && data.appointments.length > 0)
+    || (data.patients && data.patients.length > 0)
+  );
+
+  if (!loading && !hasAnyData) {
+    return (
+      <div
+        role="status"
+        aria-label="Нет данных для аналитики"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          padding: '64px 24px',
+          textAlign: 'center'
+        }}
+      >
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: 'color-mix(in srgb, var(--mac-text-secondary, #6b7280) 10%, transparent)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--mac-text-secondary, #6b7280)'
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M7 14l3-3 3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+          Данные аналитики пока недоступны
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', maxWidth: '380px', lineHeight: 1.5 }}>
+          На этой панели появится статистика по выручке, записям и пациентам, как только в системе появятся первые данные. Если вы ожидаете данные — проверьте выбранный период или подключение к серверу.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Обзорные метрики */}

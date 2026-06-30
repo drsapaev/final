@@ -51,6 +51,8 @@ import {
 } from './sections/specialty';
 
 import './EMRContainerV2.css';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 /**
  * EMRContainerV2 Component
@@ -63,6 +65,8 @@ import './EMRContainerV2.css';
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete
  */
 export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }) {
+    // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+    const [confirm, confirmDialog] = useConfirm();
     const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,
@@ -392,11 +396,20 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
 
     // Actions
     const handleSign = useCallback(async () => {
-        if (!window.confirm('Подписать ЭМК? После подписания редактирование возможно только через поправку.')) {
+        // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+        const ok = await confirm({
+            title: 'Подписание ЭМК',
+            message: 'Подписать ЭМК?',
+            description: 'После подписания редактирование возможно только через поправку.',
+            confirmLabel: 'Подписать',
+            cancelLabel: 'Отмена',
+            intent: 'primary',
+        });
+        if (!ok) {
             return;
         }
         await signEMR();
-    }, [signEMR]);
+    }, [signEMR, confirm]);
 
     // Keyboard shortcuts (must be after handleSign declaration)
     useEMRKeyboard({
@@ -802,6 +815,8 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
                 isOpen={showHelp}
                 onClose={() => setShowHelp(false)}
             />
+            {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+            {confirmDialog}
         </div>
     );
 }

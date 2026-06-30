@@ -81,13 +81,21 @@ export function useNavigationGuard({
     /**
      * Confirm navigation - for use with custom modal
      * Returns true if navigation should proceed
+     *
+     * P-013 note: this hook intentionally keeps window.confirm() because:
+     *   1. Hooks cannot render JSX (useConfirm returns a dialog node that must
+     *      be mounted by a component).
+     *   2. Navigation guards require synchronous confirmation — React Router
+     *      blockers do not await async dialogs.
+     * If a custom modal is desired here, the calling component must own the
+     * dialog state and call forceNavigate() instead of safeNavigate().
      */
     const confirmNavigation = useCallback((to) => {
         if (!isBlocking) {
             return true;
         }
 
-        // Show browser confirm dialog
+        // Show browser confirm dialog (kept intentionally — see P-013 note above)
         const shouldNavigate = window.confirm(message);
 
         if (shouldNavigate) {
@@ -106,6 +114,8 @@ export function useNavigationGuard({
 
     /**
      * Safe navigate - use this instead of navigate() directly
+     *
+     * P-013 note: kept as window.confirm() — same reason as confirmNavigation.
      */
     const safeNavigate = useCallback((to, options) => {
         if (!isBlocking || window.confirm(message)) {

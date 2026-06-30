@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -163,6 +163,58 @@ export default function HeaderNew() {
     localStorage.setItem('lang', v);
   };
 
+  // QW-05 fix: global Back button. Previously navigate(-1) was used only in 2 of ~50
+  // pages, leaving users on detail screens (VisitDetails, PatientPickupView, etc.)
+  // to rely on the browser back button. The header now renders an ArrowLeft button
+  // whenever the user is not on a top-level surface (landing, login, role home).
+  // Heuristic: hide on the root path and on each role's home route, where "back"
+  // has no meaningful destination.
+  const roleHomePath = useMemo(() => {
+    try {
+      return getRoleHomeRoute(roleNormalized) || '/';
+    } catch {
+      return '/';
+    }
+  }, [roleNormalized]);
+
+  const canGoBack = useMemo(() => {
+    const p = location.pathname;
+    if (p === '/' || p === landingRoute || p === loginRoute) return false;
+    if (p === roleHomePath) return false;
+    // No history beyond the current entry (new tab / deep link)
+    if (!window.history || window.history.length <= 1) return false;
+    return true;
+    // landingRoute/loginRoute are module-level constants, not React state.
+  }, [location.pathname, roleHomePath]);
+
+  const handleBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(roleHomePath || landingRoute);
+    }
+    // landingRoute is a module-level constant.
+  }, [navigate, roleHomePath]);
+
+  const backButton = canGoBack ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleBack}
+      title="Назад"
+      aria-label="Назад"
+      style={{
+        color: 'var(--mac-text-primary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '8px 10px',
+        flexShrink: 0
+      }}>
+      <Icon name="chevron.left" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+    </Button>
+  ) : null;
+
   const brand =
   <Button
     variant="ghost"
@@ -218,7 +270,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Главная"
-        onClick={() => navigate(`${registrarHomeRoute}?tab=welcome`)}
+        onClick={() => navigate(`${registrarHomeRoute}?view=welcome`)}
         className="hdr-hide-md"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -229,7 +281,7 @@ export default function HeaderNew() {
         variant="outline"
         size="small"
         title="Онлайн‑записи"
-        onClick={() => navigate(`${registrarHomeRoute}?tab=queue`)}
+        onClick={() => navigate(`${registrarHomeRoute}?view=queue`)}
         className="hdr-hide-xs"
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : undefined }}>
 
@@ -241,8 +293,17 @@ export default function HeaderNew() {
         size="small"
         title="Новая запись"
         onClick={() => {
-          // Отправляем событие для открытия мастера записи
-          window.dispatchEvent(new CustomEvent('openAppointmentWizard'));
+          // P-008 fix: previously dispatched a CustomEvent('openAppointmentWizard')
+          // that only RegistrarPanel listens to — making the button a silent no-op on
+          // any other page. Now the button always navigates to the registrar route
+          // with ?action=new, and RegistrarPanel reads that query param on mount to
+          // auto-open the wizard. Falls back to the CustomEvent when already on the
+          // registrar route (preserves the existing in-page UX).
+          if (isRegistrarPanel) {
+            window.dispatchEvent(new CustomEvent('openAppointmentWizard'));
+          } else {
+            navigate(`${registrarHomeRoute}?action=new`);
+          }
         }}
         style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
 
@@ -469,7 +530,10 @@ export default function HeaderNew() {
 
   return (
     <div className="app-header" style={headerStyle}>
-      <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{brand}</div>
+      <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {backButton}
+        {brand}
+      </div>
       <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
         <GlobalSearchBar />
         {roleNav}

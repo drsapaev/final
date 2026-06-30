@@ -7,6 +7,8 @@ import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
 import GroupPermissionsManager from './GroupPermissionsManager';
+// P-025 fix: wrap child panels in ErrorBoundary to catch unexpected render errors.
+import ErrorBoundary from '../common/ErrorBoundary';
 
 const TAB_ICONS = {
   Users,
@@ -116,7 +118,12 @@ const UnifiedUserManagement = () => {
         onTabChange={setActiveTab} />
       
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {renderContent()}
+        {/* P-025 fix: ErrorBoundary catches runtime errors in child panels
+            (UserManagement, UserDataTransferManager, etc.) so the user sees
+            a recovery UI instead of a blank screen. */}
+        <ErrorBoundary>
+          {renderContent()}
+        </ErrorBoundary>
       </div>
     </div>);
 

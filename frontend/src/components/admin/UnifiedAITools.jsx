@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import MedicalImageAnalyzer from '../ai/MedicalImageAnalyzer';
+import ErrorBoundary from '../common/ErrorBoundary';
 import TreatmentRecommendations from '../ai/TreatmentRecommendations';
 import DrugInteractionChecker from '../ai/DrugInteractionChecker';
 import RiskAssessment from '../ai/RiskAssessment';
@@ -131,7 +132,10 @@ const UnifiedAITools = () => {
         onTabChange={setActiveTab} />
       
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {renderContent()}
+        <ErrorBoundary>
+          {/* P-025 fix: catch runtime errors in child panels */}
+          {renderContent()}
+        </ErrorBoundary>
       </div>
     </div>);
 

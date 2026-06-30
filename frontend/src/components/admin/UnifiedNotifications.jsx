@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import { useTheme } from '../../contexts/ThemeContext';
+import ErrorBoundary from '../common/ErrorBoundary';
 
 // Простой компонент вкладок для админки
 const AdminTabs = ({ tabs, activeTab, onTabChange }) => {
@@ -112,7 +113,10 @@ const UnifiedNotifications = () => {
         aria-labelledby={`notifications-tab-${activeTab}`}
         style={{ flex: 1, overflow: 'auto' }}
       >
-        {renderContent()}
+        <ErrorBoundary>
+          {/* P-025 fix: catch runtime errors in child panels */}
+          {renderContent()}
+        </ErrorBoundary>
       </div>
     </div>);
 

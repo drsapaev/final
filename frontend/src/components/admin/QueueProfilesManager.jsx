@@ -40,6 +40,8 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 import { Select } from '../ui/macos';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const STATUS_FILTER_OPTIONS = [
     { value: 'all', label: '\u0412\u0441\u0435' },
@@ -72,6 +74,8 @@ const PRESET_COLORS = [
 ];
 
 const QueueProfilesManager = ({ theme = 'light' }) => {
+    // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
+    const [confirm, confirmDialog] = useConfirm();
     const [profiles, setProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -174,7 +178,16 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
     // Delete profile
     const handleDelete = async (profileKey) => {
-        if (!window.confirm(`Удалить вкладку "${profileKey}"? Это действие необратимо.`)) {
+        // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+        const ok = await confirm({
+            title: 'Удаление вкладки очереди',
+            message: `Удалить вкладку «${profileKey}»?`,
+            description: 'Это действие необратимо.',
+            confirmLabel: 'Удалить',
+            cancelLabel: 'Отмена',
+            intent: 'danger',
+        });
+        if (!ok) {
             return;
         }
 
@@ -218,7 +231,16 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     const handleBulkDelete = async () => {
         if (selectedProfiles.length === 0) return;
 
-        if (!window.confirm(`Удалить ${selectedProfiles.length} вкладок? Это действие необратимо.`)) {
+        // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+        const ok = await confirm({
+            title: 'Массовое удаление вкладок',
+            message: `Удалить ${selectedProfiles.length} вкладок?`,
+            description: 'Это действие нельзя отменить.',
+            confirmLabel: 'Удалить все',
+            cancelLabel: 'Отмена',
+            intent: 'destructive',
+        });
+        if (!ok) {
             return;
         }
 
@@ -891,6 +913,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         isEdit
                     />
                 )}
+                {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+                {confirmDialog}
             </div>
         </div>
     );

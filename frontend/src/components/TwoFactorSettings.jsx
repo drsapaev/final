@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from './common/ConfirmDialog';
 import {
   Shield,
 
@@ -17,6 +19,8 @@ import {
 'lucide-react';
 
 const TwoFactorSettings = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
+  const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -89,7 +93,16 @@ const TwoFactorSettings = () => {
   };
 
   const handleRegenerateBackupCodes = async () => {
-    if (!confirm('Перегенерировать backup коды? Старые коды станут недействительными.')) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Перегенерация backup-кодов',
+      message: 'Перегенерировать backup-коды?',
+      description: 'Старые коды станут недействительными.',
+      confirmLabel: 'Перегенерировать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) {
       return;
     }
 
@@ -109,7 +122,16 @@ const TwoFactorSettings = () => {
   };
 
   const handleUntrustDevice = async (deviceId) => {
-    if (!confirm('Отозвать доверие к этому устройству?')) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Отзыв доверия',
+      message: 'Отозвать доверие к этому устройству?',
+      description: 'При следующем входе потребуется повторная 2FA-верификация.',
+      confirmLabel: 'Отозвать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) {
       return;
     }
 
@@ -560,6 +582,8 @@ const TwoFactorSettings = () => {
           }
         </div>
       </div>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

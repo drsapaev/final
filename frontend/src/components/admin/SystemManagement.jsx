@@ -39,7 +39,11 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 const SystemManagement = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('monitoring');
   const [loading, setLoading] = useState(false);
 
@@ -152,7 +156,16 @@ const SystemManagement = () => {
   };
 
   const deleteBackup = async (backupName) => {
-    if (!window.confirm(`Удалить бэкап ${backupName}?`)) {
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление бэкапа',
+      message: `Удалить бэкап ${backupName}?`,
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -907,6 +920,8 @@ const SystemManagement = () => {
       {activeTab === 'monitoring' && renderMonitoringTab()}
       {activeTab === 'backups' && renderBackupsTab()}
       {activeTab === 'settings' && renderSettingsTab()}
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

@@ -32,24 +32,19 @@ const PRODUCTION_ROLE_HOMES = {
 const AI_SIDEBAR_BADGE = 'Черновик · не медицинское заключение';
 const AI_SIDEBAR_ACCESSIBLE_COPY = /черновик, не диагноз, не медицинское заключение/i;
 
+// P-003 fix: 7 of the 8 previously orphaned admin-settings routes are now surfaced
+// in the sidebar under the new 'Настройки' section. Only admin-user-select remains
+// nav:false — it is an impersonation tool intended for contextual invocation, not
+// sidebar discovery.
 const ADMIN_CONTEXTUAL_ROUTE_IDS = [
-  'admin-benefit-settings',
-  'admin-wizard-settings',
-  'admin-payment-providers',
-  'admin-clinic-settings',
-  'admin-queue-settings',
-  'admin-telegram-settings',
-  'admin-display-settings',
   'admin-user-select',
 ];
 
+// P-003 fix: the following routes used to be nav:false entry:'direct' on
+// UnifiedSettings — they are now entry:'menu' with section:'Настройки'. The
+// contract below tracks the remaining truly-hidden route only.
 const ADMIN_CONTEXTUAL_SETTINGS_DIRECT_ROUTE_IDS = [
-  'admin-benefit-settings',
-  'admin-wizard-settings',
-  'admin-payment-providers',
-  'admin-clinic-settings',
-  'admin-queue-settings',
-  'admin-display-settings',
+  // intentionally empty — all 7 settings routes now visible in the sidebar
 ];
 
 const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
@@ -217,9 +212,18 @@ describe('route contract invariants', () => {
   });
 
   it('labels AI sidebar navigation as draft support, not a diagnosis', () => {
-    const presetAiItems = Object.values(SIDEBAR_PRESETS)
-      .flatMap((preset) => preset.items || [])
-      .filter((item) => item.id === 'ai' || item.id === 'ai-assistant');
+    // P-010 fix: presets may use either flat `items` or grouped `sections`.
+    // Flatten both to find all AI-related items across every preset.
+    const allPresetItems = Object.values(SIDEBAR_PRESETS).flatMap((preset) => {
+      const flatItems = preset.items || [];
+      const sectionItems = Array.isArray(preset.sections)
+        ? preset.sections.flatMap((section) => section.items || [])
+        : [];
+      return [...flatItems, ...sectionItems];
+    });
+    const presetAiItems = allPresetItems.filter(
+      (item) => item.id === 'ai' || item.id === 'ai-assistant'
+    );
 
     expect(presetAiItems).toHaveLength(4);
     presetAiItems.forEach(assertAiSidebarDisclaimer);
@@ -273,7 +277,10 @@ describe('route contract invariants', () => {
     const navSections = getAdminNavSections(adminProfile);
     const sectionTitles = navSections.map((section) => section.title);
 
-    expect(sectionTitles).toEqual(['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система']);
+    // P-003 fix: 'Настройки' section added to surface 7 previously orphaned
+    // admin-settings routes (benefit-settings, wizard-settings, payment-providers,
+    // clinic-settings, queue-settings, telegram-settings, display-settings).
+    expect(sectionTitles).toEqual(['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система', 'Настройки']);
 
     Object.entries(ADMIN_NAV_GROUPING_ROUTE_CONTRACT).forEach(([routeId, expected]) => {
       const route = getRouteById(routeId);
@@ -497,22 +504,27 @@ describe('route contract invariants', () => {
     expect(getRouteChromeState('/admin/queue-cabinet-management', '', adminProfile).activeSidebarItem).toBe('admin-queue-cabinet-management');
   });
 
-  it('keeps admin clinic settings on its direct route owner', () => {
+  it('keeps admin clinic settings surfaced in the Настройки section (P-003 fix)', () => {
     const adminProfile = { role: 'Admin' };
     const clinicSettingsRoute = getRouteById('admin-clinic-settings');
 
     expect(clinicSettingsRoute).toBeTruthy();
     expect(clinicSettingsRoute.path).toBe('/admin/clinic-settings');
     expect(clinicSettingsRoute.owner).toBe('admin.settings');
-    expect(clinicSettingsRoute.entry).toBe('direct');
-    expect(clinicSettingsRoute.nav).toBe(false);
+    // P-003 fix: previously entry:'direct' + nav:false — orphan route unreachable
+    // from the sidebar. Now entry:'menu' with nav.sidebar:true under 'Настройки'.
+    expect(clinicSettingsRoute.entry).toBe('menu');
+    expect(clinicSettingsRoute.nav).not.toBe(false);
+    expect(clinicSettingsRoute.nav.sidebar).toBe(true);
+    expect(clinicSettingsRoute.nav.section).toBe('Настройки');
     expect(clinicSettingsRoute.component).toBe('UnifiedSettings');
     expect(clinicSettingsRoute.component).not.toBe('AdminPanel');
+    expect(clinicSettingsRoute.layout.activeSidebarItem).toBe('admin-clinic-settings');
     expect(isRouteAccessibleToProfile(clinicSettingsRoute, adminProfile)).toBe(true);
     expect(getRouteChromeState('/admin/clinic-settings', '?section=clinic-settings', adminProfile).pageTitle).toBe('Admin Clinic Settings');
   });
 
-  it('keeps admin Telegram operational and settings surfaces explicit', () => {
+  it('keeps admin Telegram operational and settings surfaces explicit (P-003 fix)', () => {
     const adminProfile = { role: 'Admin' };
     const telegramIntegrationRoute = getRouteById('admin-telegram-integration');
     const telegramSettingsRoute = getRouteById('admin-telegram-settings');
@@ -531,8 +543,11 @@ describe('route contract invariants', () => {
     expect(telegramSettingsRoute).toBeTruthy();
     expect(telegramSettingsRoute.path).toBe('/admin/telegram-settings');
     expect(telegramSettingsRoute.owner).toBe('admin.telegram');
-    expect(telegramSettingsRoute.entry).toBe('direct');
-    expect(telegramSettingsRoute.nav).toBe(false);
+    // P-003 fix: previously entry:'direct' + nav:false. Now visible under 'Настройки'.
+    expect(telegramSettingsRoute.entry).toBe('menu');
+    expect(telegramSettingsRoute.nav).not.toBe(false);
+    expect(telegramSettingsRoute.nav.sidebar).toBe(true);
+    expect(telegramSettingsRoute.nav.section).toBe('Настройки');
     expect(telegramSettingsRoute.component).toBe('TelegramSettings');
     expect(isRouteAccessibleToProfile(telegramSettingsRoute, adminProfile)).toBe(true);
 
@@ -603,38 +618,44 @@ describe('route contract invariants', () => {
     });
   });
 
-  it('keeps protected patient payment entry authenticated and non-navigational', () => {
+  it('keeps protected patient payment entry restricted to Patient role (P-002 fix)', () => {
     const route = getRouteById('patient-payment-entry');
 
     expect(route).toBeTruthy();
     expect(getProtectedPatientPaymentEntryPath()).toBe('/patient/payments');
     expect(route.path).toBe('/patient/payments');
-    expect(route.auth).toBe('authenticated');
-    expect(route.roles).toEqual([]);
+    // P-002 fix: previously auth:'authenticated' + roles:[] allowed ANY logged-in
+    // staff member to open patient payment pages, exposing patient financial data.
+    // Now restricted to Patient role only.
+    expect(route.auth).toBe('role-scoped');
+    expect(route.roles).toEqual(['Patient']);
     expect(route.nav).toBe(false);
     expect(route.component).toBe('PatientPanel');
     expect(isRouteAccessibleToProfile(route, null)).toBe(false);
-    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(true);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Patient' })).toBe(true);
 
-    const chrome = getRouteChromeState('/patient/payments', '', { role: 'Doctor' });
+    const chrome = getRouteChromeState('/patient/payments', '', { role: 'Patient' });
     expect(chrome.activeSidebarItem).toBe('payments');
     expect(chrome.hideSidebar).toBe(true);
   });
 
-  it('adds protected patient booking entry as its own route contract', () => {
+  it('adds protected patient booking entry as its own route contract (P-002 fix)', () => {
     const route = getRouteById('patient-booking-entry');
 
     expect(route).toBeTruthy();
     expect(getProtectedPatientBookingEntryPath()).toBe('/patient/bookings');
     expect(route.path).toBe('/patient/bookings');
-    expect(route.auth).toBe('authenticated');
-    expect(route.roles).toEqual([]);
+    // P-002 fix: same hardening as patient-payment-entry.
+    expect(route.auth).toBe('role-scoped');
+    expect(route.roles).toEqual(['Patient']);
     expect(route.nav).toBe(false);
     expect(route.component).toBe('PatientPanel');
     expect(isRouteAccessibleToProfile(route, null)).toBe(false);
-    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(true);
+    expect(isRouteAccessibleToProfile(route, { role: 'Doctor' })).toBe(false);
+    expect(isRouteAccessibleToProfile(route, { role: 'Patient' })).toBe(true);
 
-    const chrome = getRouteChromeState('/patient/bookings', '', { role: 'Doctor' });
+    const chrome = getRouteChromeState('/patient/bookings', '', { role: 'Patient' });
     expect(chrome.activeSidebarItem).toBe('appointments');
     expect(chrome.hideSidebar).toBe(true);
   });

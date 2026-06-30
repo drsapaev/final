@@ -12,6 +12,8 @@ import VoiceRecorder from './VoiceRecorder';
 import VoiceMessage from './VoiceMessage';
 import EmojiPicker from './EmojiPicker';
 import Avatar from '../common/Avatar';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
+import { useConfirm } from '../common/ConfirmDialog';
 import MessageContextMenu from './MessageContextMenu';
 import ReactMarkdown from 'react-markdown';
 import LinkPreview from './LinkPreview';
@@ -78,6 +80,8 @@ const groupMessagesByDate = (msgs) => {
 };
 
 const ChatWindow = ({ isOpen, onClose }) => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
   const { addToast } = useToast();
@@ -389,7 +393,16 @@ const ChatWindow = ({ isOpen, onClose }) => {
         logger.error('Failed to copy text:', err);
       }
     } else if (action === 'delete') {
-      if (window.confirm('Удалить это сообщение у себя?')) {
+      // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+      const ok = await confirm({
+        title: 'Удаление сообщения',
+        message: 'Удалить это сообщение у себя?',
+        description: 'Сообщение будет удалено только из вашего просмотра. Другие участники чата по-прежнему будут его видеть.',
+        confirmLabel: 'Удалить',
+        cancelLabel: 'Отмена',
+        intent: 'danger',
+      });
+      if (ok) {
         try {
           await deleteMessage(msg.id);
           addToast({ type: 'success', message: 'Сообщение удалено' });
@@ -617,7 +630,10 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const activeUser = getActiveUser();
 
   // Используем Portal для рендеринга вне иерархии (z-index проблема)
-  return ReactDOM.createPortal(
+  // P-013 fix: wrapped in a fragment so we can also render the confirmDialog
+  // portal alongside the chat portal (both mount to document.body via their
+  // own createPortal calls).
+  const chatWindowElement = ReactDOM.createPortal(
     <div className="chat-window-overlay" style={{ pointerEvents: 'none', background: 'transparent' }}>
             <div
         className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
@@ -1208,6 +1224,15 @@ const ChatWindow = ({ isOpen, onClose }) => {
             </div>
         </div>,
     document.body
+  );
+  // P-013 fix: portal-mounted ConfirmDialog rendered outside the chat portal
+  // (useConfirm's createPortal already mounts to document.body, so we just
+  // need to invoke it from this component's render tree).
+  return (
+    <>
+      {chatWindowElement}
+      {confirmDialog}
+    </>
   );
 };
 

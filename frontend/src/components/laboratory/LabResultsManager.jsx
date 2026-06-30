@@ -48,6 +48,8 @@ import { AIButton, AIAssistant } from '../ai';
 
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 import PropTypes from 'prop-types';
 // Категории анализов
 const LAB_CATEGORIES = {
@@ -69,6 +71,8 @@ const RESULT_STATUS = {
 const tabButtonClassName = (isActive) => `theme-tab-button${isActive ? ' theme-tab-button--active' : ''}`;
 
 const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('all');
   const [results, setResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState(null);
@@ -172,7 +176,16 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
 
   // Удаление результата
   const handleDeleteResult = async (resultId) => {
-    if (!window.confirm('Удалить результат?')) return;
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление результата',
+      message: 'Удалить результат?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.delete(`/lab-results/${resultId}`);
@@ -645,6 +658,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           </DialogActions>
         </Dialog>
       }
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </Box>);
 
 };

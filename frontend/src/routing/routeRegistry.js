@@ -39,22 +39,14 @@ export const SIDEBAR_PRESETS = {
     navigation: 'path',
     defaultItem: 'clinical-search',
   },
-  registrar: {
-    navigation: 'query',
-    queryParam: 'tab',
-    defaultItem: 'welcome',
-    items: [
-      { id: 'welcome', label: 'Главная', icon: 'house' },
-      { id: 'appointments', label: 'Все записи', icon: 'calendar' },
-      { id: 'cardio', label: 'Кардиология', icon: 'heart' },
-      { id: 'echokg', label: 'ЭКГ', icon: 'waveform.path.ecg' },
-      { id: 'derma', label: 'Дерматология', icon: 'face.smiling' },
-      { id: 'dental', label: 'Стоматология', icon: 'smile' },
-      { id: 'lab', label: 'Лаборатория', icon: 'testtube.2' },
-      { id: 'procedures', label: 'Процедуры', icon: 'list' },
-      { id: 'queue', label: 'Онлайн-очередь', icon: 'list' },
-    ],
-  },
+  // P-016 fix: removed the `registrar`, `patient`, and `cashier` presets —
+  // all routes that referenced them set hideSidebar:true, so the items below
+  // were never rendered. The actual navigation for these roles lives in:
+  //   - registrar: HeaderNew.jsx (hardcoded buttons) + ModernTabs in page body
+  //   - patient:   TelegramMiniAppPatientShell (separate surface, no sidebar)
+  //   - cashier:   HeaderNew.jsx (single "Касса" button) + tabs in CashierPanel
+  // Keeping dead preset configuration here was misleading: it looked
+  // authoritative but never surfaced in the UI.
   doctor: {
     navigation: 'query',
     queryParam: 'tab',
@@ -66,29 +58,6 @@ export const SIDEBAR_PRESETS = {
       { id: 'queue', label: 'Очередь', icon: 'person.2' },
       { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
       { id: 'reports', label: 'Отчёты', icon: 'doc.text' },
-    ],
-  },
-  patient: {
-    navigation: 'query',
-    queryParam: 'tab',
-    defaultItem: 'appointments',
-    items: [
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'payments', label: 'Платежи', icon: 'creditcard' },
-      { id: 'results', label: 'Результаты анализов', icon: 'doc.text' },
-      { id: 'profile', label: 'Профиль', icon: 'person' },
-    ],
-  },
-  cashier: {
-    navigation: 'query',
-    queryParam: 'tab',
-    defaultItem: 'dashboard',
-    items: [
-      { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
-      { id: 'payments', label: 'Платежи', icon: 'creditcard' },
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'reports', label: 'Отчёты', icon: 'doc.text' },
-      { id: 'settings', label: 'Настройки', icon: 'gear' },
     ],
   },
   lab: {
@@ -137,20 +106,52 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'dashboard',
-    items: [
-      { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
-      { id: 'patients', label: 'Пациенты', icon: 'person.2' },
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'examinations', label: 'Осмотры', icon: 'eye' },
-      { id: 'diagnoses', label: 'Диагнозы', icon: 'stethoscope' },
-      { id: 'visits', label: 'Протоколы визитов', icon: 'doc.text' },
-      { id: 'photos', label: 'Фотоархив', icon: 'camera' },
-      { id: 'templates', label: 'Шаблоны', icon: 'doc' },
-      { id: 'reports', label: 'Отчёты', icon: 'chart.bar' },
-      { id: 'dental-chart', label: 'Зубная карта', icon: 'smile' },
-      { id: 'treatment-plans', label: 'Планы лечения', icon: 'list' },
-      { id: 'prosthetics', label: 'Протезирование', icon: 'smile' },
-      { id: 'ai-assistant', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+    // P-010 fix: replaced flat 13-item list with 4 grouped sections.
+    // Previously: 13 flat items exceeded Miller's 7±2 cognitive limit and
+    // made it hard for dentists to find tabs. Now grouped into:
+    //   - Обзор (1 item): dashboard
+    //   - Клиническая работа (6 items): patients, appointments, examinations, diagnoses, visits, photos
+    //   - Зубная карта и планы (3 items): dental-chart, treatment-plans, prosthetics
+    //   - Администрирование (3 items): templates, reports, ai-assistant
+    // Each section is well under the cognitive limit; muscle memory is now
+    // "go to section → pick tab" instead of "scan 13-item list".
+    // NOTE: `items` is intentionally removed — sections replace it.
+    // routeSelectors.js flattens sections into sidebarItems for any
+    // backward-compat consumer that still reads .sidebarItems.
+    sections: [
+      {
+        title: 'Обзор',
+        items: [
+          { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
+        ],
+      },
+      {
+        title: 'Клиническая работа',
+        items: [
+          { id: 'patients', label: 'Пациенты', icon: 'person.2' },
+          { id: 'appointments', label: 'Записи', icon: 'calendar' },
+          { id: 'examinations', label: 'Осмотры', icon: 'eye' },
+          { id: 'diagnoses', label: 'Диагнозы', icon: 'stethoscope' },
+          { id: 'visits', label: 'Протоколы визитов', icon: 'doc.text' },
+          { id: 'photos', label: 'Фотоархив', icon: 'camera' },
+        ],
+      },
+      {
+        title: 'Зубная карта и планы',
+        items: [
+          { id: 'dental-chart', label: 'Зубная карта', icon: 'smile' },
+          { id: 'treatment-plans', label: 'Планы лечения', icon: 'list' },
+          { id: 'prosthetics', label: 'Протезирование', icon: 'smile' },
+        ],
+      },
+      {
+        title: 'Администрирование',
+        items: [
+          { id: 'templates', label: 'Шаблоны', icon: 'doc' },
+          { id: 'reports', label: 'Отчёты', icon: 'chart.bar' },
+          { id: 'ai-assistant', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+        ],
+      },
     ],
   },
 };
@@ -653,13 +654,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Льготы и скидки', icon: 'percent', section: 'Настройки', order: 10, sidebar: true }),
     title: 'Admin Benefit Settings',
     owner: 'admin.billing',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Benefit Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-benefit-settings', pageTitle: 'Admin Benefit Settings' }),
   },
   {
     id: 'admin-wizard-settings',
@@ -670,13 +672,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Мастер записи', icon: 'wand.and.stars', section: 'Настройки', order: 20, sidebar: true }),
     title: 'Admin Wizard Settings',
     owner: 'admin.settings',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Wizard Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-wizard-settings', pageTitle: 'Admin Wizard Settings' }),
   },
   {
     id: 'admin-payment-providers',
@@ -687,13 +690,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Платёжные системы', icon: 'creditcard', section: 'Настройки', order: 30, sidebar: true }),
     title: 'Admin Payment Providers',
     owner: 'admin.billing',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Payment Providers' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-payment-providers', pageTitle: 'Admin Payment Providers' }),
   },
   {
     id: 'admin-clinic-management',
@@ -721,13 +725,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Профиль клиники', icon: 'building', section: 'Настройки', order: 40, sidebar: true }),
     title: 'Admin Clinic Settings',
     owner: 'admin.settings',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Clinic Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-clinic-settings', pageTitle: 'Admin Clinic Settings' }),
   },
   {
     id: 'admin-queue-settings',
@@ -738,13 +743,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Настройки очереди', icon: 'list.bullet', section: 'Настройки', order: 50, sidebar: true }),
     title: 'Admin Queue Settings',
     owner: 'admin.queue',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Queue Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-queue-settings', pageTitle: 'Admin Queue Settings' }),
   },
   {
     id: 'admin-ai-settings',
@@ -772,13 +778,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Настройки Telegram', icon: 'paperplane', section: 'Настройки', order: 60, sidebar: true }),
     title: 'Admin Telegram Settings',
     owner: 'admin.telegram',
     component: 'TelegramSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Telegram Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-telegram-settings', pageTitle: 'Admin Telegram Settings' }),
   },
   {
     id: 'admin-display-settings',
@@ -789,13 +796,14 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin'],
-    entry: 'direct',
-    nav: false,
+    entry: 'menu',
+    // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
+    nav: nav({ label: 'Табло очереди', icon: 'tv', section: 'Настройки', order: 70, sidebar: true }),
     title: 'Admin Display Settings',
     owner: 'admin.queue',
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
-    layout: layout({ sidebarPreset: 'admin', pageTitle: 'Admin Display Settings' }),
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-display-settings', pageTitle: 'Admin Display Settings' }),
   },
   {
     id: 'admin-telegram-integration',
@@ -1063,8 +1071,13 @@ export const ROUTE_REGISTRY = [
     surface: 'screen',
     lifecycle: stable,
     shell: 'app-shell',
-    auth: 'role-scoped',
-    roles: ['Admin', 'Registrar', 'Doctor'],
+    // P-001 fix: previously roles omitted 'Patient', so a patient logging in via the
+    // standard form was bounced to /forbidden by RouteAccessBoundary because
+    // homeForRoles:['patient'] pointed them here while the route's role guard
+    // rejected them. Patient role is now included so the home-route resolves and
+    // the guard accepts the patient. Admin/Registrar/Doctor retain access for
+    // support / debug purposes.
+    roles: ['Admin', 'Registrar', 'Doctor', 'Patient'],
     homeForRoles: ['patient'],
     entry: 'direct',
     nav: false,
@@ -1081,8 +1094,11 @@ export const ROUTE_REGISTRY = [
     surface: 'screen',
     lifecycle: stable,
     shell: 'app-shell',
-    auth: 'authenticated',
-    roles: [],
+    // P-002 fix: previously auth:'authenticated' + roles:[] allowed ANY logged-in
+    // staff member (lab tech, doctor, cashier) to open patient payment pages,
+    // exposing patient financial data without scope. Restricted to Patient role.
+    auth: 'role-scoped',
+    roles: ['Patient'],
     entry: 'direct',
     nav: false,
     title: 'Patient Payments',
@@ -1098,8 +1114,9 @@ export const ROUTE_REGISTRY = [
     surface: 'screen',
     lifecycle: stable,
     shell: 'app-shell',
-    auth: 'authenticated',
-    roles: [],
+    // P-002 fix: same as patient-payment-entry — restrict to Patient role only.
+    auth: 'role-scoped',
+    roles: ['Patient'],
     entry: 'direct',
     nav: false,
     title: 'Patient Booking',
@@ -1190,7 +1207,11 @@ export const ROUTE_REGISTRY = [
     lifecycle: stable,
     shell: 'app-shell',
     auth: 'role-scoped',
-    roles: ['Admin', 'Registrar'],
+    // P-014 fix: previously roles:[Admin, Registrar] excluded Doctor, Cashier, Lab.
+    // Cashier needs to look up appointments to take payments; Lab needs to find
+    // patients for sample collection; Doctor needs to see peers' schedules.
+    // All clinical roles now have read access to the appointments list.
+    roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
     entry: 'menu',
     nav: nav({ label: 'Записи', icon: 'calendar', section: 'Clinical', order: 90, menu: true }),
     title: 'Clinical Appointments',
@@ -1207,7 +1228,9 @@ export const ROUTE_REGISTRY = [
     lifecycle: stable,
     shell: 'app-shell',
     auth: 'role-scoped',
-    roles: ['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist'],
+    // P-014 fix: previously excluded Cashier and Lab. Both roles need patient
+    // lookup to do their jobs (find a patient for payment / sample collection).
+    roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
     entry: 'menu',
     nav: nav({ label: 'Поиск', icon: 'magnifyingglass', section: 'Clinical', order: 100, menu: true }),
     title: 'Clinical Search',

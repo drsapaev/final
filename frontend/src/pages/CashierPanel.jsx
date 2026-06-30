@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
+import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
 import { Card, Badge, Button } from '../components/ui/macos';
+import { useConfirm } from '../components/common/ConfirmDialog';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import PaymentWidget from '../components/payment/PaymentWidget';
@@ -348,6 +349,10 @@ const hasBackendPaymentAction = (paymentRow, action) => {
 
 const CashierPanel = () => {void
   useBreakpoint();
+  // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+  // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
+  // in the component tree (we render it at the end of the JSX below).
+  const [confirm, confirmDialog] = useConfirm();
   const location = useLocation();
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
@@ -688,7 +693,18 @@ const CashierPanel = () => {void
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
   const confirmPayment = async (paymentId) => {
-    if (!window.confirm('Вы уверены, что хотите подтвердить этот платеж вручную?')) {
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    // The new dialog names the specific action and uses primary intent
+    // (Confirm is a constructive action, not destructive).
+    const ok = await confirm({
+      title: 'Подтверждение платежа',
+      message: 'Подтвердить этот платеж вручную?',
+      description: 'Платеж будет отмечен как полученный. Действие можно отменить только через процедуру возврата.',
+      confirmLabel: 'Принять',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) {
       return;
     }
 
@@ -1452,44 +1468,47 @@ const CashierPanel = () => {void
                                 </Badge>
                               </td>
                               <td style={{ padding: '12px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {/* QW-07 fix: differentiated variants by intent.
+                                    Previously all 4 buttons used variant="outline" with emoji icons,
+                                    making destructive (Cancel, Refund) visually identical to constructive
+                                    (Confirm). Now: Confirm=success (green), Cancel=danger (red),
+                                    Refund=warning (orange), Print=ghost (low-emphasis secondary).
+                                    Lucide icons replace emoji for better a11y and visual scanning. */}
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant="success"
                                   onClick={() => confirmPayment(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'confirm')}
                                   aria-label={`Confirm ${getPaymentActionContext(row)}`}>
-                                  ✅ Принять
+                                  <CheckCircle size={14} /> Принять
                                 </Button>
                                 <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openCancelDialog(row.id)}
-                          disabled={!hasBackendPaymentAction(row, 'cancel')}
-                          aria-label={`Cancel ${getPaymentActionContext(row)}`}>
-
-                                  ❌ Отмена
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={() => openCancelDialog(row.id)}
+                                  disabled={!hasBackendPaymentAction(row, 'cancel')}
+                                  aria-label={`Cancel ${getPaymentActionContext(row)}`}>
+                                  <XCircle size={14} /> Отмена
                                 </Button>
                                 {/* ✅ v2.0: Кнопка возврата */}
                                 <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openRefundDialog(row)}
-                          disabled={!hasBackendPaymentAction(row, 'refund')}
-                          aria-label={`Refund ${getPaymentActionContext(row)}`}
-                          title="Возврат средств">
-
-                                  💸 Возврат
+                                  size="sm"
+                                  variant="warning"
+                                  onClick={() => openRefundDialog(row)}
+                                  disabled={!hasBackendPaymentAction(row, 'refund')}
+                                  aria-label={`Refund ${getPaymentActionContext(row)}`}
+                                  title="Возврат средств">
+                                  <Undo2 size={14} /> Возврат
                                 </Button>
                                 {/* ✅ v2.0: Кнопка печати чека */}
                                 <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handlePrintReceipt(row)}
-                          disabled={!hasBackendPaymentAction(row, 'print_receipt')}
-                          aria-label={`Print receipt for ${getPaymentActionContext(row)}`}
-                          title="Печать чека">
-
-                                  🧾 Чек
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handlePrintReceipt(row)}
+                                  disabled={!hasBackendPaymentAction(row, 'print_receipt')}
+                                  aria-label={`Print receipt for ${getPaymentActionContext(row)}`}
+                                  title="Печать чека">
+                                  <Receipt size={14} /> Чек
                                 </Button>
                               </td>
                             </tr>
@@ -1787,6 +1806,8 @@ const CashierPanel = () => {void
           </Dialog>
         </div>
       </div>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

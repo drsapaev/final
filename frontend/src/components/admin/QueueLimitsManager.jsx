@@ -22,12 +22,16 @@ import {
   MacOSTable } from
 
 '../ui/macos';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 /**
  * Компонент управления лимитами очередей
  * Позволяет настраивать максимальное количество записей по специальностям
  */
 const QueueLimitsManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [limits, setLimits] = useState([]);
   const [queueStatus, setQueueStatus] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +122,18 @@ const QueueLimitsManager = () => {
 
   // Сброс лимитов
   const resetLimits = async (specialty = null) => {
-    if (!confirm(specialty ?
-    `Сбросить лимиты для специальности "${specialty}"?` :
-    'Сбросить все лимиты к значениям по умолчанию?'
-    )) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Сброс лимитов',
+      message: specialty
+        ? `Сбросить лимиты для специальности «${specialty}»?`
+        : 'Сбросить все лимиты к значениям по умолчанию?',
+      description: 'Текущие настройки будут заменены стандартными значениями.',
+      confirmLabel: 'Сбросить',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) {
       return;
     }
 
@@ -618,10 +630,12 @@ const QueueLimitsManager = () => {
               }))}
               emptyState="Нет данных о статусе очередей" />
             
-            </MacOSCard>
+          </MacOSCard>
           }
         </div>
       </MacOSCard>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

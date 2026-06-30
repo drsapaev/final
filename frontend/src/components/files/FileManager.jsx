@@ -22,6 +22,8 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
 import { tokenManager } from '../../utils/tokenManager';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 import {
   AppEmpty,
   AppLoading,
@@ -128,6 +130,8 @@ const fileTypeColors = {
 
 const FileManager = () => {
   useTheme();
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
   const [, setFolders] = useState([]);
@@ -345,7 +349,16 @@ const FileManager = () => {
   };
 
   const handleDelete = async (fileId) => {
-    if (!confirm('Вы уверены, что хотите удалить этот файл?')) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление файла',
+      message: 'Удалить этот файл?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const response = await fetch(`/api/v1/files/${fileId}`, {
@@ -855,6 +868,8 @@ const FileManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>
   );
 };

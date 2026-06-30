@@ -5,6 +5,8 @@ import DoctorModal from './DoctorModal';
 import useDoctors from '../../hooks/useDoctors';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
+import { useConfirm } from '../common/ConfirmDialog';
 import {
   MacOSBadge,
   MacOSButton,
@@ -102,6 +104,8 @@ IconButton.propTypes = {
 };
 
 const AdminDoctors = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const {
     doctors,
     availableUsers,
@@ -137,9 +141,15 @@ const AdminDoctors = () => {
 
   const handleDeleteDoctor = async (doctor) => {
     const doctorName = getDoctorName(doctor);
-    const confirmed = window.confirm(
-      `Вы уверены, что хотите деактивировать врача "${doctorName}"?\n\nВрач будет отмечен как неактивный, но останется в базе данных.`
-    );
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const confirmed = await confirm({
+      title: 'Деактивация врача',
+      message: `Деактивировать врача «${doctorName}»?`,
+      description: 'Врач будет отмечен как неактивный, но останется в базе данных. Записи к этому врачу будут скрыты из расписания.',
+      confirmLabel: 'Деактивировать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
 
     if (!confirmed) {
       return;
@@ -428,6 +438,8 @@ const AdminDoctors = () => {
         availableUsers={availableUsers}
         loading={doctorModal.loading}
       />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>
   );
 };

@@ -25,6 +25,8 @@ import { AppError, AppLoading, Card, Button, Badge, MacOSInput, MacOSTable, MacO
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const buildStats = (items = []) => ({
   total_activations: items.length,
@@ -44,6 +46,8 @@ const parseMeta = (meta) => {
 };
 
 const ActivationSystem = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(true);
   const [activations, setActivations] = useState([]);
   const [stats, setStats] = useState({});
@@ -119,7 +123,16 @@ const ActivationSystem = () => {
   };
 
   const revokeActivation = async (activationKey) => {
-    if (!confirm('Отозвать активацию? Устройство будет заблокировано.')) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Отзыв активации',
+      message: 'Отозвать активацию?',
+      description: 'Устройство будет заблокировано.',
+      confirmLabel: 'Отозвать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) return;
 
     try {
       await api.post('/activation/revoke', { key: activationKey });
@@ -595,6 +608,8 @@ const ActivationSystem = () => {
           <p style={{ margin: 0 }}>• Все активации логируются для аудита</p>
         </div>
       </Card>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

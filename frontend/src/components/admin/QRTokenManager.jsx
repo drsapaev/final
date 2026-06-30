@@ -16,8 +16,12 @@ import {
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { Select } from '../ui/macos';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const QRTokenManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -142,7 +146,16 @@ const QRTokenManager = () => {
   };
 
   const deleteToken = async (token) => {
-    if (!confirm('Вы уверены, что хотите деактивировать этот QR токен?')) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Деактивация QR-токена',
+      message: 'Деактивировать этот QR-токен?',
+      description: 'После деактивации токен перестанет работать.',
+      confirmLabel: 'Деактивировать',
+      cancelLabel: 'Отмена',
+      intent: 'warning',
+    });
+    if (!ok) {
       return;
     }
 
@@ -499,6 +512,8 @@ const QRTokenManager = () => {
           </div>
         </div>
       }
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

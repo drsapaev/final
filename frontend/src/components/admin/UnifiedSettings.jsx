@@ -14,6 +14,8 @@ import WizardSettings from './WizardSettings';
 import ClinicSettings from './ClinicSettings';
 import ColorSchemeSelector from './ColorSchemeSelector.jsx';
 import AccentPicker from '../ui/macos/AccentPicker.jsx';
+// P-025 fix: shared loading/error/empty wrapper for Unified* panels.
+import StateWrapper from '../common/StateWrapper.jsx';
 
 const stripPasswordFields = (formData) => {
   const persistedSettings = { ...(formData || {}) };
@@ -41,10 +43,16 @@ const UnifiedSettings = () => {
   const section = routeSection || searchParams.get('section') || 'general';
   const [securitySettings, setSecuritySettings] = useState({});
   const [securityLoading, setSecurityLoading] = useState(false);
+  // P-025 fix: track load error explicitly so the StateWrapper can render
+  // a proper error state instead of silently rendering SecuritySettings
+  // with empty {} (which previously made the form look broken without
+  // explanation).
+  const [securityError, setSecurityError] = useState(null);
 
   const loadSecuritySettings = useCallback(async () => {
     try {
       setSecurityLoading(true);
+      setSecurityError(null);
       const response = await api.get('/users/me/preferences');
       const persistedSecuritySettings = response?.data?.security_settings;
       setSecuritySettings(
@@ -54,6 +62,10 @@ const UnifiedSettings = () => {
       );
     } catch (error) {
       logger.warn('Error loading security settings:', error);
+      // P-025 fix: capture error for StateWrapper. Keep securitySettings
+      // as-is (likely {} on first load) so the user can still see the form
+      // structure if they retry.
+      setSecurityError(error?.message || 'Не удалось загрузить настройки безопасности. Проверьте соединение с сервером.');
       setSecuritySettings({});
     } finally {
       setSecurityLoading(false);
@@ -123,11 +135,23 @@ const UnifiedSettings = () => {
       case 'clinic-settings':
         return <ClinicSettings />;
       case 'security':
+        // P-025 fix: wrap SecuritySettings in StateWrapper so loading shows
+        // a skeleton, errors show a retry-friendly message, and the actual
+        // form only renders once data is available.
         return (
-          <SecuritySettings
-            settings={securitySettings}
-            onSave={handleSaveSecuritySettings}
-            loading={securityLoading} />);
+          <StateWrapper
+            isLoading={securityLoading}
+            error={securityError}
+            onRetry={() => { void loadSecuritySettings(); }}
+            emptyTitle="Настройки безопасности не загружены"
+            emptyMessage="Нажмите «Повторить», чтобы загрузить настройки безопасности."
+          >
+            <SecuritySettings
+              settings={securitySettings}
+              onSave={handleSaveSecuritySettings}
+              loading={securityLoading} />
+          </StateWrapper>
+        );
 
 
       case 'settings':
