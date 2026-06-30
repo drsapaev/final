@@ -138,7 +138,7 @@ function AnalyticsSectionCard({ title, subtitle, children, action, compact = fal
     </section>);
 }
 
-function AnalyticsStatCard({ icon, label, value, helper, accent = '#2563eb', format = 'count', compact = false }) {
+function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-accent-blue, #2563eb)', format = 'count', compact = false }) {
   return (
     <article style={{
       background: analyticsSurfaceStrong,
@@ -204,7 +204,7 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = '#2563eb', for
     </article>);
 }
 
-function AnalyticsComparisonList({ items, format = 'count', accent = '#2563eb' }) {
+function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)' }) {
   if (!items.length) {
     return <div style={{ color: analyticsTextSecondary }}>Данных пока недостаточно для сравнения.</div>;
   }
@@ -246,7 +246,7 @@ function AnalyticsComparisonList({ items, format = 'count', accent = '#2563eb' }
     </div>);
 }
 
-function AnalyticsLineTrend({ items, format = 'count', accent = '#2563eb', compact = false }) {
+function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false }) {
   if (!items.length) {
     return <div style={{ color: analyticsTextSecondary }}>История для графика пока пуста.</div>;
   }
@@ -470,7 +470,7 @@ export default function AnalyticsPage() {
       label: 'Визиты сегодня',
       value: today?.visits?.total_visits || 0,
       helper: 'Сегодня',
-      accent: '#2563eb',
+      accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Calendar size={18} />
     },
     {
@@ -519,7 +519,7 @@ export default function AnalyticsPage() {
             subtitle="Быстрый обзор нагрузки по дням недели."
             compact={isCompactLayout}
           >
-            <AnalyticsLineTrend items={visitTrend} accent="#2563eb" compact={isCompactLayout} />
+            <AnalyticsLineTrend items={visitTrend} accent="var(--mac-accent-blue, #2563eb)" compact={isCompactLayout} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
             title="Доход по отделениям"
@@ -549,7 +549,7 @@ export default function AnalyticsPage() {
       label: 'Всего записей',
       value: summary.total_appointments || 0,
       helper: 'Поток',
-      accent: '#2563eb',
+      accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Calendar size={18} />
     },
     {
@@ -598,7 +598,7 @@ export default function AnalyticsPage() {
             subtitle="Что происходит с записями в текущем окне."
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={statuses} accent="#2563eb" />
+            <AnalyticsComparisonList items={statuses} accent="var(--mac-accent-blue, #2563eb)" />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
             title="Качество воронки"
@@ -638,7 +638,7 @@ export default function AnalyticsPage() {
       label: 'Транзакций',
       value: total_transactions,
       helper: 'Платежи',
-      accent: '#2563eb',
+      accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Activity size={18} />
     },
     {
@@ -702,7 +702,7 @@ export default function AnalyticsPage() {
       label: 'Активных провайдеров',
       value: summary.active_providers || 0,
       helper: 'Каналы',
-      accent: '#2563eb',
+      accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Building2 size={18} />
     },
     {
@@ -752,7 +752,7 @@ export default function AnalyticsPage() {
             subtitle="Сравнение по выручке без визуального шума."
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={providerAmount} format="revenue" accent="#2563eb" />
+            <AnalyticsComparisonList items={providerAmount} format="revenue" accent="var(--mac-accent-blue, #2563eb)" />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
             title="Успешность операций"

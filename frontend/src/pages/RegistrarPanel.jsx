@@ -3337,7 +3337,7 @@ const RegistrarPanel = () => {
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: '#3b82f6',
+                          background: 'var(--mac-accent-blue, #3b82f6)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
@@ -3346,8 +3346,8 @@ const RegistrarPanel = () => {
                           cursor: 'pointer',
                           transition: 'all 0.2s'
                         }}
-                        onMouseOver={(e) => e.target.style.background = '#2563eb'}
-                        onMouseOut={(e) => e.target.style.background = '#3b82f6'}>
+                        onMouseOver={(e) => e.target.style.background = 'var(--mac-accent-blue, #2563eb)'}
+                        onMouseOut={(e) => e.target.style.background = 'var(--mac-accent-blue, #3b82f6)'}>
 
                                 🔑 Войти снова
                               </button>
@@ -4237,7 +4237,7 @@ const RegistrarPanel = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.14)',
-                color: '#3b82f6',
+                color: 'var(--mac-accent-blue, #3b82f6)',
                 flexShrink: 0
               }}>
                 📅

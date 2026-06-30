@@ -472,7 +472,7 @@ export default function DisplayBoardUnified({
       'waiting': '#f59e0b',
       'called': '#dc3545',
       'serving': '#10b981',
-      'completed': '#3b82f6',
+      'completed': 'var(--mac-accent-blue, #3b82f6)',
       'cancelled': '#6c757d'
     };
     return colors[status] || '#6c757d';
