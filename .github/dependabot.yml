@@ -1,13 +1,15 @@
 version: 2
 updates:
-  # Обновление Python зависимостей
+  # Python зависимости (backend)
+  # P-009 cleanup: groups minor/patch into one PR, limits to 5 open PRs,
+  # ignores major versions for critical packages that need manual testing.
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     reviewers:
       - "drsapaev"
     assignees:
@@ -18,7 +20,30 @@ updates:
     labels:
       - "dependencies"
       - "python"
-      
+    groups:
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+        excludes:
+          - "fastapi"
+          - "pydantic"
+          - "SQLAlchemy"
+          - "alembic"
+          - "psycopg"
+    ignore:
+      # Major versions: manual review required (breaking changes likely)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # protobuf 5→7 is a breaking migration; skip until explicitly planned
+      - dependency-name: "protobuf"
+        update-types: ["version-update:semver-major"]
+      # redis 5→9 is a major rewrite; skip until explicitly planned
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]
+
   # Root npm dependencies
   - package-ecosystem: "npm"
     directory: "/"
@@ -26,7 +51,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "12:00"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
     reviewers:
       - "drsapaev"
     assignees:
@@ -56,7 +81,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "13:00"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
     reviewers:
       - "drsapaev"
     assignees:
@@ -75,18 +100,24 @@ updates:
         update-types:
           - "minor"
           - "patch"
+        excludes:
+          # Keep these as standalone PRs (security-sensitive or breaking-prone)
+          - "react"
+          - "react-dom"
+          - "react-router"
+          - "react-router-dom"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
-  # Обновление GitHub Actions
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "10:00"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     reviewers:
       - "drsapaev"
     assignees:
@@ -97,15 +128,17 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-      
-  # Обновление Docker образов
+
+  # Docker images (ops/)
+  # P-009 cleanup: kept but limit lowered to 1 — Docker base image bumps
+  # should be manual (require rebuild + integration testing)
   - package-ecosystem: "docker"
     directory: "/ops"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "monday"
       time: "11:00"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
     reviewers:
       - "drsapaev"
     assignees:
@@ -116,11 +149,8 @@ updates:
     labels:
       - "dependencies"
       - "docker"
-    # Игнорировать определенные обновления для стабильности
     ignore:
-      # Игнорировать обновления Python до стабильной версии (3.14.0 нестабильна)
       - dependency-name: "python"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # Игнорировать обновления Node.js до стабильной версии  
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
