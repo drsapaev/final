@@ -11,6 +11,8 @@ import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
 import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../components/common/ConfirmDialog';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -48,6 +50,8 @@ function Row({ k, v, onSave }) {
 export default function Settings() {void
   useTheme();void
   useState('Settings');
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [tab, setTab] = useState('license');
 
   // license tab
@@ -124,7 +128,16 @@ export default function Settings() {void
   }
 
   async function deleteProvider(providerId) {
-    if (!confirm('Вы уверены, что хотите удалить этого провайдера?')) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление провайдера',
+      message: 'Удалить этого провайдера?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) {
       return;
     }
     try {
@@ -410,12 +423,14 @@ export default function Settings() {void
                 showPhoneInput={true}
                 title="Верификация телефона"
                 onVerified={() => alert('Телефон успешно подтверждён!')} />
-              
+
               </div>
             </div>
           }
         </div>
       </RoleGate>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 }

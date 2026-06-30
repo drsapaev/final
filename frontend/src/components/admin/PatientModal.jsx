@@ -10,6 +10,8 @@ import {
   MacOSModal } from
 '../ui/macos';
 import PropTypes from 'prop-types';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const PatientModal = ({
   isOpen,
@@ -18,6 +20,8 @@ const PatientModal = ({
   onSave,
   loading = false
 }) => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -176,9 +180,18 @@ const PatientModal = ({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (isDirty) {
-      if (window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть окно?')) {
+      // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+      const ok = await confirm({
+        title: 'Несохранённые изменения',
+        message: 'У вас есть несохранённые изменения. Закрыть окно?',
+        description: 'Изменения будут потеряны.',
+        confirmLabel: 'Закрыть без сохранения',
+        cancelLabel: 'Отмена',
+        intent: 'warning',
+      });
+      if (ok) {
         onClose();
       }
     } else {
@@ -734,6 +747,8 @@ const PatientModal = ({
           </MacOSButton>
         </div>
       </form>
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </MacOSModal>);
 
 };

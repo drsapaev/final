@@ -176,6 +176,19 @@ function AppShell({ children }) {
   const chrome = getRouteChromeState(location.pathname, location.search, authState.profile);
   const compactSidebar = isMobile && !chrome.hideSidebar;
 
+  // P-018 fix: allow mobile users to expand the sidebar via a hamburger toggle.
+  // Previously App.jsx:225 set collapsible={!compactSidebar} which hard-disabled
+  // expand on mobile — leaving users to tap icons with no visible labels.
+  // mobileSidebarExpanded now lets the user toggle the sidebar open/closed on
+  // narrow viewports; auto-collapse on route change for predictability.
+  const [mobileSidebarExpanded, setMobileSidebarExpanded] = useState(false);
+
+  // Auto-collapse the expanded mobile sidebar whenever the route changes,
+  // so navigating to a new section doesn't leave the sidebar blocking content.
+  useEffect(() => {
+    setMobileSidebarExpanded(false);
+  }, [location.pathname, location.search]);
+
   useEffect(() => auth.subscribe(setAuthState), []);
 
   const handleSidebarClick = (item) => {
@@ -183,11 +196,14 @@ function AppShell({ children }) {
       const params = new URLSearchParams(location.search);
       params.set(chrome.sidebarPreset.queryParam, item.id);
       navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+      // Collapse after navigation on mobile
+      if (compactSidebar) setMobileSidebarExpanded(false);
       return;
     }
 
     if (item.to) {
       navigate(item.to);
+      if (compactSidebar) setMobileSidebarExpanded(false);
     }
   };
 
@@ -203,7 +219,9 @@ function AppShell({ children }) {
         className="app-shell-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: chrome.hideSidebar ? '1fr' : compactSidebar ? '72px minmax(0, 1fr)' : 'auto minmax(0, 1fr)',
+          // P-018 fix: when mobile sidebar is expanded, give it the full
+          // expanded width (220px) instead of the 72px compact column.
+          gridTemplateColumns: chrome.hideSidebar ? '1fr' : (compactSidebar && !mobileSidebarExpanded) ? '72px minmax(0, 1fr)' : (compactSidebar && mobileSidebarExpanded) ? '220px minmax(0, 1fr)' : 'auto minmax(0, 1fr)',
           gap: compactSidebar ? '8px' : '16px',
           flex: 1,
           minHeight: 0,
@@ -215,13 +233,63 @@ function AppShell({ children }) {
         }}
       >
         {!chrome.hideSidebar && (
-          <div style={{ marginTop: '0', marginLeft: compactSidebar ? '4px' : '12px', minWidth: 0 }}>
+          <div style={{ marginTop: '0', marginLeft: compactSidebar ? '4px' : '12px', minWidth: 0, position: 'relative' }}>
+            {/* P-018 fix: hamburger toggle button visible only on mobile, lets
+                the user expand the sidebar to see labels (previously impossible
+                because collapsible was hard-disabled on compactSidebar). */}
+            {compactSidebar && (
+              <button
+                type="button"
+                onClick={() => setMobileSidebarExpanded((v) => !v)}
+                aria-label={mobileSidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
+                aria-expanded={mobileSidebarExpanded}
+                title={mobileSidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  zIndex: 10,
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
+                  backgroundColor: 'var(--mac-bg-secondary, rgba(0,0,0,0.04))',
+                  color: 'var(--mac-text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                {/* Inline hamburger / chevron icon (3 horizontal lines when collapsed, X when expanded) */}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  {mobileSidebarExpanded ? (
+                    <>
+                      <line x1="3" y1="3" x2="11" y2="11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="11" y1="3" x2="3" y2="11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </>
+                  ) : (
+                    <>
+                      <line x1="2" y1="4" x2="12" y2="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="2" y1="10" x2="12" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            )}
             <Sidebar
               items={chrome.sidebarItems}
+              // P-010 fix: pass sectioned structure to Sidebar for grouped rendering.
+              sections={chrome.sidebarSections}
               activeItem={chrome.activeSidebarItem}
               onItemClick={handleSidebarClick}
-              collapsed={compactSidebar ? true : undefined}
-              defaultCollapsed={compactSidebar}
+              // When mobile+expanded → show full sidebar (labels visible).
+              // When mobile+collapsed → compact icons-only (default).
+              // When desktop → defer to Sidebar's internal collapse logic.
+              collapsed={compactSidebar ? !mobileSidebarExpanded : undefined}
+              defaultCollapsed={compactSidebar ? !mobileSidebarExpanded : undefined}
               collapsible={!compactSidebar}
             />
           </div>

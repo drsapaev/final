@@ -26,6 +26,8 @@ import { useModal } from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import FinanceModal from './FinanceModal';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const adminSectionShellStyle = {
   background: 'var(--mac-gradient-sidebar)',
@@ -106,6 +108,8 @@ function truncateDescription(description = '') {
 }
 
 const AdminFinanceOverview = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const {
     transactions,
     loading: financeLoading,
@@ -141,7 +145,16 @@ const AdminFinanceOverview = () => {
   };
 
   const handleDeleteTransaction = async (transaction) => {
-    if (!window.confirm(`Удалить транзакцию "${transaction.description}"?`)) {
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление транзакции',
+      message: `Удалить транзакцию «${transaction.description}»?`,
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -455,6 +468,8 @@ const AdminFinanceOverview = () => {
         patients={patients}
         doctors={activeDoctors}
       />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>
   );
 };

@@ -42,7 +42,11 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 const WebhookManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('webhooks');
   const [webhooks, setWebhooks] = useState([]);
   const [calls, setCalls] = useState([]);
@@ -143,7 +147,16 @@ const WebhookManager = () => {
 
 
   const handleDeleteWebhook = async (webhookId) => {
-    if (!confirm('Вы уверены, что хотите удалить этот webhook?')) {
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление webhook',
+      message: 'Удалить этот webhook?',
+      description: 'Это действие необратимо. Связанные вызовы останутся в журнале.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -890,6 +903,8 @@ const WebhookManager = () => {
           </div>
         </MacOSModal>
       }
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

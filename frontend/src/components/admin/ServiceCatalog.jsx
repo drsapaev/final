@@ -5,6 +5,8 @@ import logger from '../../utils/logger';
 import ServiceAuditHistory from './ServiceAuditHistory';
 import ServiceChangesPreview from './ServiceChangesPreview';
 import ServiceBatchEdit from './ServiceBatchEdit';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 import {
   Package,
   Plus,
@@ -99,6 +101,8 @@ const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => 
 const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey] || [];
 
 const ServiceCatalog = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
+  const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -275,7 +279,16 @@ const ServiceCatalog = () => {
   };
 
   const handleDeleteService = async (serviceId) => {
-    if (!confirm('Удалить услугу?')) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление услуги',
+      message: 'Удалить услугу?',
+      description: 'Услуга будет деактивирована. При необходимости её можно восстановить через администратора.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     // Сохраняем старое состояние для отката
     const oldServices = [...services];
@@ -910,6 +923,8 @@ const ServiceCatalog = () => {
           </div>
         </div>
       )}
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

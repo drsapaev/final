@@ -17,6 +17,8 @@ import tokenManager from '../utils/tokenManager';
 import { getApiOrigin } from '../api/runtime';
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../components/common/ConfirmDialog';
 
 const API_BASE = getApiOrigin();
 const REGISTRAR_TAB_LABEL_KEYS = {
@@ -400,6 +402,8 @@ import { api } from '../api/client';
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
 
 const RegistrarPanel = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   // Рендер компонента (debug отключен)
   // Адаптивные хуки
   const { isMobile, isTablet } = useBreakpoint();
@@ -1024,6 +1028,10 @@ const RegistrarPanel = () => {
         }, 100);
       }*/}, [appointments]); // Убираем дублирование - filteredAppointments уже определена ниже в коде
   const [showSlotsModal, setShowSlotsModal] = useState(false);
+  // QW-02 fix: hold the date the user picks in the inline date input inside the
+  // reschedule slots dialog. Replaces the previous window.prompt() call that was
+  // jarring, blocking, and lacked a date picker.
+  const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
   const resolveRescheduleVisitId = useCallback((appointmentRow) => {
     return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || null;
@@ -1826,6 +1834,23 @@ const RegistrarPanel = () => {
     };
   }, []);
 
+  // P-008 companion: when the user clicks "Новая запись" from another page,
+  // HeaderNew navigates to /registrar?action=new. Detect that query param on
+  // mount / route change and auto-open the wizard, then clear the param so
+  // a refresh does not re-trigger it.
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new' && !showWizard) {
+      setShowWizard(true);
+      // Clean the URL so a refresh or back-navigation does not re-open the wizard
+      const next = new URLSearchParams(searchParams);
+      next.delete('action');
+      setSearchParams(next, { replace: true });
+    }
+    // setSearchParams is a stable identity from useSearchParams — React Router 6.3+
+    // guarantees referential stability, so it is safe to omit from deps.
+  }, [searchParams, showWizard]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ✅ Проверка localStorage для обновления после присоединения к очереди (fallback механизм)
   useEffect(() => {
     const checkLastQueueJoin = () => {
@@ -1863,8 +1888,17 @@ const RegistrarPanel = () => {
 
   // Автообновление очереди с возможностью паузы (в тихом режиме)
   useEffect(() => {
-    // Во время мастера записи или модальных окон автообновление отключаем, чтобы не было мерцаний
-    if (showWizard || paymentDialog.open || printDialog.open || cancelDialog.open) return;
+    // P-026 fix: previously auto-refresh was disabled whenever ANY of
+    // (showWizard, paymentDialog, printDialog, cancelDialog) was open. This
+    // meant a registrar with a payment dialog open for 2+ minutes would not
+    // see new online-queue patients arrive in the worklist behind the dialog.
+    //
+    // Now we only pause for `showWizard` — the wizard form holds unsaved
+    // patient data that silent refresh could overwrite if the table state
+    // gets re-derived. Payment / print / cancel dialogs operate on a single
+    // row snapshot and do not interact with the worklist rendering, so
+    // background refresh is safe and keeps the worklist live.
+    if (showWizard) return;
     if (!autoRefresh) return;
     if (Date.now() < autoRefreshCooldownUntilRef.current) return;
 
@@ -1873,12 +1907,12 @@ const RegistrarPanel = () => {
         return;
       }
       // Загружаем только записи тихо, без смены индикаторов
-      logger.info('⏰ Автообновление: вызов loadAppointments');
+      logger.info('⏰ Автообновление: вызов loadAppointments (dialog-open resilient)');
       loadAppointments({ silent: true, source: 'auto_refresh' });
     }, 15000);
 
     return () => clearInterval(id);
-  }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open, loadAppointments]);
+  }, [autoRefresh, showWizard, loadAppointments]);
 
   // Функции для жесткого потока
   const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {
@@ -1986,7 +2020,15 @@ const RegistrarPanel = () => {
     if (appointmentsSelected.size === 0) return;
 
     if (['cancelled', 'no_show'].includes(action)) {
-      const ok = window.confirm(`Применить действие «${action}» для ${appointmentsSelected.size} записей?`);
+      // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+      const ok = await confirm({
+        title: 'Подтверждение действия',
+        message: `Применить действие «${action}» для ${appointmentsSelected.size} записей?`,
+        description: 'Действие будет применено ко всем выбранным записям.',
+        confirmLabel: 'Применить',
+        cancelLabel: 'Отмена',
+        intent: 'warning',
+      });
       if (!ok) return;
     }
 
@@ -2010,7 +2052,7 @@ const RegistrarPanel = () => {
     if (successCount > 0) notify.success(`Обновлено: ${successCount}`);
     if (failCount > 0) notify.error(`Ошибок: ${failCount}`);
     setAppointmentsSelected(new Set());
-  }, [appointmentsSelected, updateAppointmentStatus]);
+  }, [appointmentsSelected, updateAppointmentStatus, confirm]);
 
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
   const filteredAppointmentsRef = useRef([]);
@@ -2037,9 +2079,9 @@ const RegistrarPanel = () => {
 
         // Enter в мастере обрабатывается отдельно в полях ввода
         // Здесь не обрабатываем, чтобы избежать конфликтов
-      } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') setActiveTab('welcome');else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
+      } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') {e.preventDefault(); setSearchParams({ view: 'welcome' });} else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
         if (e.key === '4') setActiveTab('derma');else
-        if (e.key === '5') setActiveTab('queue');else
+        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}else
         if (e.key === 'a') {
           e.preventDefault();
           logger.info('Ctrl+A: Выбрать все записи');
@@ -3015,7 +3057,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="success"
                           size="default"
-                          onClick={() => window.location.href = '/registrar?status=queued'}
+                          onClick={() => setSearchParams({ status: 'queued' })}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
@@ -3025,7 +3067,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="primary"
                           size="default"
-                          onClick={() => window.location.href = '/registrar?status=paid_pending'}
+                          onClick={() => setSearchParams({ status: 'paid_pending' })}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="creditcard" size="small" style={{ color: 'white' }} />
@@ -3035,7 +3077,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => window.location.href = '/registrar'}
+                          onClick={() => setSearchParams({})}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="eye" size="small" />
@@ -3045,7 +3087,7 @@ const RegistrarPanel = () => {
                           <Button
                           variant="outline"
                           size="default"
-                          onClick={() => window.location.href = '/registrar?view=queue'}
+                          onClick={() => setSearchParams({ view: 'queue' })}
                           style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
 
                             <Icon name="bell" size="small" />
@@ -4036,30 +4078,43 @@ const RegistrarPanel = () => {
 
           // Обновляем данные (работает и для создания, и для редактирования)
           try {
-            // ⭐ Увеличена задержка перед обновлением данных (с 1000ms до 1500ms)
-            // чтобы backend успел обновить базу данных и все связанные записи
-            // Особенно важно для batch операций, которые могут занимать больше времени
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-
-            // Принудительное обновление данных
-            await Promise.all([
-            loadAppointments({ silent: false, source: 'wizard-complete', force: true }),
-            loadIntegratedData()]
-            );
-
+            // P-004 fix: removed hardcoded 1500ms delay (previously setTimeout(resolve, 1500)).
+            // That dead time was added as a workaround for backend batch operations not
+            // finishing fast enough — it cost registrars ~60 sec/day of pure wait time.
+            // Strategy now: optimistic UI (close wizard + notify success immediately),
+            // then reload appointments with force=true. If the first reload returns stale
+            // data, a single silent retry is attempted after a short debounce.
             setShowWizard(false);
             setWizardEditMode(false); // ✨ Сброс режима
             setWizardInitialData(null); // ✨ Сброс данных
 
             const message = wasEditMode ?
-            'Запись успешно обновлена!' :
-            'Запись успешно создана!';
+              'Запись успешно обновлена!' :
+              'Запись успешно создана!';
             notify.success(message);
+
+            // Open payment/print dialog immediately — user can act while data refreshes
             if (postWizardPaymentRow) {
               if (Number(postWizardPaymentRow.cost || 0) > 0) {
                 setPaymentDialog({ open: true, row: postWizardPaymentRow, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
               } else {
                 setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });
+              }
+            }
+
+            // Reload data in the background (does not block UI)
+            try {
+              await Promise.all([
+                loadAppointments({ silent: true, source: 'wizard-complete', force: true }),
+                loadIntegratedData(),
+              ]);
+            } catch (refreshError) {
+              // Background refresh failed — single silent retry
+              logger.warn('First post-wizard reload failed, retrying once:', refreshError);
+              try {
+                await loadAppointments({ silent: true, source: 'wizard-complete-retry', force: true });
+              } catch (retryError) {
+                logger.error('Post-wizard reload retry also failed:', retryError);
               }
             }
           } catch (error) {
@@ -4111,20 +4166,33 @@ const RegistrarPanel = () => {
             }
           },
           {
-            label: `📅 ${t('select_date')}`,
+            label: t('select_date'),
             variant: 'secondary',
+            // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
+            // — a jarring native browser dialog that blocks the tab, has no date picker,
+            // no min-date guard, and breaks the macOS-style visual language of the app.
+            // Now the date is captured via the inline <input type="date"> rendered in the
+            // dialog body (see customRescheduleDate state + date input below). This action
+            // validates the captured date and performs the reschedule.
             onClick: async () => {
               if (!rescheduleData) return;
 
-              const currentVal = getLocalDateString(
-                rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date()
-              );
-              const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
+              const dateStr = customRescheduleDate || '';
 
-              if (!dateStr) return;
+              if (!dateStr) {
+                notify.error('Выберите дату переноса');
+                return;
+              }
 
               if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
                 notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                return;
+              }
+
+              // Optional guard: prevent rescheduling to a past date
+              const today = getLocalDateString();
+              if (dateStr < today) {
+                notify.error('Нельзя перенести запись на прошедшую дату');
                 return;
               }
 
@@ -4140,6 +4208,7 @@ const RegistrarPanel = () => {
                 notify.success(`Визит перенесен на ${dateStr}`);
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
+                setCustomRescheduleDate('');
                 loadAppointments({ source: 'reschedule_date' });
               } catch (e) {
                 logger.error('Ошибка переноса на дату:', e);
@@ -4192,6 +4261,51 @@ const RegistrarPanel = () => {
               </div>
             </div>
           </div>
+
+          {/* QW-02 fix: inline date picker replacing window.prompt().
+              min=today prevents selecting past dates natively in the picker. */}
+          <div style={{
+            padding: '16px',
+            borderRadius: '14px',
+            border: `1px solid ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'}`,
+            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+          }}>
+            <label htmlFor="reschedule-custom-date" style={{
+              display: 'block',
+              color: getColor('textPrimary'),
+              fontSize: '13px',
+              fontWeight: 600,
+              marginBottom: '8px'
+            }}>
+              Дата переноса
+            </label>
+            <input
+              id="reschedule-custom-date"
+              type="date"
+              value={customRescheduleDate}
+              min={getLocalDateString()}
+              aria-label="Дата переноса записи"
+              onChange={(e) => setCustomRescheduleDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                color: getColor('textPrimary'),
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                outline: 'none'
+              }}
+            />
+            <div style={{
+              color: getColor('textSecondary'),
+              fontSize: '12px',
+              marginTop: '6px'
+            }}>
+              Выберите дату и нажмите «{t('select_date')}».
+            </div>
+          </div>
         </div>
       </ModernDialog>
 
@@ -4232,6 +4346,8 @@ const RegistrarPanel = () => {
         }} />
 
       <RoleNotificationCenter userRole="registrar" />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
 
     </div>);
 

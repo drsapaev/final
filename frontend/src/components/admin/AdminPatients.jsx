@@ -16,6 +16,8 @@ import {
   Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const genderOptions = [
   { value: '', label: 'Все полы' },
@@ -127,6 +129,8 @@ IconButton.propTypes = {
 };
 
 const AdminPatients = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const {
     patients,
     loading,
@@ -159,9 +163,17 @@ const AdminPatients = () => {
 
   const handleDeletePatient = async (patient) => {
     const patientName = getPatientName(patient);
-    const confirmed = window.confirm(`Вы уверены, что хотите удалить пациента "${patientName}"?`);
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление пациента',
+      message: `Удалить пациента «${patientName}»?`,
+      description: 'Это действие необратимо. Все связанные записи будут помечены как удалённые.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
 
-    if (!confirmed) {
+    if (!ok) {
       return;
     }
 
@@ -446,6 +458,8 @@ const AdminPatients = () => {
         onSave={handleSavePatient}
         loading={patientModal.loading}
       />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>
   );
 };

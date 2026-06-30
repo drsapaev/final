@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import ReportsManager from './ReportsManager';
 import ReportGenerator from './ReportGenerator';
 import { useTheme } from '../../contexts/ThemeContext';
+import ErrorBoundary from '../common/ErrorBoundary';
 
 const UnifiedReports = () => {
   const [activeTab, setActiveTab] = useState('manager');
@@ -98,7 +99,10 @@ const UnifiedReports = () => {
         aria-labelledby={`reports-tab-${activeTab}`}
         style={{ flex: 1, overflow: 'auto' }}
       >
-        {renderContent()}
+        <ErrorBoundary>
+          {/* P-025 fix: catch runtime errors in child panels */}
+          {renderContent()}
+        </ErrorBoundary>
       </div>
     </div>
   );

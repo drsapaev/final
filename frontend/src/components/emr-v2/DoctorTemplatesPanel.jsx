@@ -17,6 +17,8 @@ import PropTypes from 'prop-types';
 import { History, Pin, Edit2, Trash2, X, Save, Plus } from 'lucide-react';
 import { useDoctorSectionTemplates, SECTION_LABELS } from '../../hooks/useDoctorSectionTemplates';
 import './DoctorTemplatesPanel.css';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 /**
  * DoctorTemplatesPanel Component
@@ -48,6 +50,8 @@ export function DoctorTemplatesPanel({
     // Edit state
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [editText, setEditText] = useState('');
+    // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+    const [confirm, confirmDialog] = useConfirm();
 
     // Handle template click (apply)
     const handleApply = useCallback((template) => {
@@ -83,10 +87,19 @@ export function DoctorTemplatesPanel({
     // Handle delete
     const handleDelete = useCallback(async (template, e) => {
         e.stopPropagation();
-        if (window.confirm('Удалить этот шаблон?')) {
+        // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+        const ok = await confirm({
+            title: 'Удаление шаблона',
+            message: 'Удалить этот шаблон?',
+            description: 'Это действие необратимо.',
+            confirmLabel: 'Удалить',
+            cancelLabel: 'Отмена',
+            intent: 'danger',
+        });
+        if (ok) {
             await deleteTemplate(template.id);
         }
-    }, [deleteTemplate]);
+    }, [deleteTemplate, confirm]);
 
     // Handle close
     const handleClose = useCallback(() => {
@@ -278,6 +291,8 @@ export function DoctorTemplatesPanel({
                     Кликните на шаблон, чтобы вставить в текст
                 </div>
             </div>
+            {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+            {confirmDialog}
         </div>
     );
 }

@@ -18,6 +18,8 @@ import {
   Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const statusOptions = [
   { value: '', label: 'Все статусы' },
@@ -211,6 +213,8 @@ StatCard.propTypes = {
 };
 
 const AdminAppointments = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const { allDoctors } = useDoctors();
   const { patients } = usePatients();
   const {
@@ -258,9 +262,17 @@ const AdminAppointments = () => {
   const handleDeleteAppointment = async (appointment) => {
     const patientName = getAppointmentPatientDisplayName(appointment);
     const doctorName = getAppointmentDoctorDisplayName(appointment);
-    const confirmed = window.confirm(`Вы уверены, что хотите удалить запись "${patientName} - ${doctorName}"?`);
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление записи',
+      message: `Удалить запись «${patientName} — ${doctorName}»?`,
+      description: 'Это действие необратимо. Запись будет удалена из журнала.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
 
-    if (!confirmed) {
+    if (!ok) {
       return;
     }
 
@@ -626,6 +638,8 @@ const AdminAppointments = () => {
         doctors={allDoctors}
         patients={patients}
       />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>
   );
 };

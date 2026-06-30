@@ -42,7 +42,11 @@ import './AppointmentWizardV2.css';
 const API_BASE = '/api/v1';
 const PATIENT_NAME_PATTERN = /^[\p{L}\s\-']+$/u;
 const MIXED_REPEAT_WARNING = 'В текущей модели repeat применяется на весь checkout; для точного применения разделите оформление по специалистам.';
-const LEGACY_DRAFT_KEY = 'appointment_wizard_draft';
+// QW-08 fix: removed LEGACY_DRAFT_KEY constant — it was a dead-code remnant from a
+// draft-autosave feature that was disabled to keep patient PHI out of browser storage.
+// All 7 `localStorage.removeItem(LEGACY_DRAFT_KEY)` call sites were no-ops (removing
+// a key that was never written) and have been deleted. clearDraft() now performs a
+// pure in-memory reset without misleading the user with a "draft cleared" toast.
 
 const getLocalISODate = () => {
   const now = new Date();
@@ -364,7 +368,6 @@ const AppointmentWizardV2 = ({
   // Эффект для инициализации данных при открытии
   useEffect(() => {
     if (isOpen) {
-      localStorage.removeItem(LEGACY_DRAFT_KEY);
 
       // ✅ ИСПРАВЛЕНО: Строгая проверка editMode перед загрузкой данных
       if (editMode === true && initialData !== null && initialData !== undefined) {
@@ -604,9 +607,10 @@ const AppointmentWizardV2 = ({
   // Persistent draft loading is disabled to keep patient PHI out of browser storage.
 
 
-  // Очистка черновика
+  // Reset wizard to initial state. QW-08 fix: previously called clearDraft and showed
+  // a misleading "Черновик очищен" toast even though no persistent draft existed.
+  // Renamed intent is purely in-memory form reset.
   const clearDraft = () => {
-    localStorage.removeItem(LEGACY_DRAFT_KEY);
     setWizardData({
       patient: { id: null, fio: '', birth_date: '', phone: '', address: '', gender: '' },
       cart: { items: [], discount_mode: 'none', all_free: false, notes: '' },
@@ -614,7 +618,7 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(1);
-    toast.success('Черновик очищен');
+    toast.success('Форма очищена');
   };
 
   // ===================== МАСКИ ВВОДА =====================
@@ -1487,20 +1491,45 @@ const AppointmentWizardV2 = ({
   const handleComplete = async () => {
     if (!validateStep(currentStep)) return;
 
+    // P-022 fix: previously used toast.warning/toast.info as blocking validation
+    // (early return after toast). Toasts are non-modal and easy to miss — the
+    // user clicks "Завершить" and nothing visible happens besides a transient
+    // notification. Now we surface these as inline errors in the cart via
+    // errors.repeat, which is rendered next to the cart content (see cart
+    // error block at the bottom of Step 2). Toasts are kept only for the
+    // auth-token check below, which is not cart-validation.
     const isRepeatMode = wizardData.cart.discount_mode === 'repeat' && !wizardData.cart.all_free;
     if (isRepeatMode) {
       if (!repeatSuggestionSummary.hasConsultations) {
-        toast.warning('Повторная скидка применяется только к консультациям');
+        setErrors((prev) => ({ ...prev, repeat: 'Повторная скидка применяется только к консультациям. Добавьте консультацию в корзину или выберите другой тип скидки.' }));
+        setCurrentStep(2); // Ensure user is on the cart step to see the error
         return;
       }
       if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
-        toast.info('Дождитесь завершения проверки повторной скидки');
+        setErrors((prev) => ({ ...prev, repeat: 'Дождитесь завершения проверки повторной скидки перед завершением.' }));
+        setCurrentStep(2);
         return;
       }
       if (!repeatSuggestionSummary.fullyEligible) {
-        toast.warning(MIXED_REPEAT_WARNING);
+        setErrors((prev) => ({ ...prev, repeat: MIXED_REPEAT_WARNING }));
+        setCurrentStep(2);
         return;
       }
+      // Clear any prior repeat error if validation now passes
+      setErrors((prev) => {
+        if (!prev.repeat) return prev;
+        const next = { ...prev };
+        delete next.repeat;
+        return next;
+      });
+    } else {
+      // Clear stale repeat error when not in repeat mode
+      setErrors((prev) => {
+        if (!prev.repeat) return prev;
+        const next = { ...prev };
+        delete next.repeat;
+        return next;
+      });
     }
 
     // Проверяем токен авторизации
@@ -1945,9 +1974,7 @@ const AppointmentWizardV2 = ({
             toast.success('Запись успешно обновлена');
 
             // Завершаем без создания новых записей
-            if (!editMode) {
-              localStorage.removeItem(LEGACY_DRAFT_KEY);
-            }
+            // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
             onComplete?.(updateResult);
             onClose();
             return; // ⭐ ВАЖНО: Завершаем handleComplete, не продолжаем с cart endpoint
@@ -2278,7 +2305,6 @@ const AppointmentWizardV2 = ({
             }
 
             await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'edit-delta');
-            localStorage.removeItem(LEGACY_DRAFT_KEY);
             toast.success('Запись обновлена');
             onComplete?.(editDeltaResult);
             onClose();
@@ -2377,9 +2403,7 @@ const AppointmentWizardV2 = ({
                     logger.log('ℹ️ Нет удаленных записей очереди для отмены');
                   }
 
-                  if (!editMode) {
-                    localStorage.removeItem(LEGACY_DRAFT_KEY);
-                  }
+                  // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
                   onComplete?.(batchResult);
                   onClose();
                   return;
@@ -2476,7 +2500,6 @@ const AppointmentWizardV2 = ({
           if (patientResponse.ok) {
             logger.log('✅ Данные пациента успешно обновлены');
             // ✅ ИСПРАВЛЕНО: Очищаем draft после успешного обновления
-            localStorage.removeItem(LEGACY_DRAFT_KEY);
             toast.success('Данные пациента обновлены');
 
             // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
@@ -2547,10 +2570,7 @@ const AppointmentWizardV2 = ({
 
         // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
         // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
-        // Очищаем черновик только если это не редактирование (хотя clearDraft безопасен)
-        if (!editMode) {
-          localStorage.removeItem(LEGACY_DRAFT_KEY);
-        }
+        // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
         toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
 
@@ -2741,7 +2761,7 @@ const AppointmentWizardV2 = ({
 
   const actions = [
   {
-    label: 'Очистить черновик',
+    label: 'Очистить форму',
     onClick: clearDraft,
     variant: 'secondary',
     icon: <Trash2 size={16} />,
@@ -4169,7 +4189,7 @@ const CartStepV2 = ({
         }
 
         {/* Ошибки валидации */}
-        {(errors.cart || errors.doctors) &&
+        {(errors.cart || errors.doctors || errors.repeat) &&
         <div style={{
           padding: '8px',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
@@ -4182,7 +4202,7 @@ const CartStepV2 = ({
           gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle size={14} />
-            {errors.cart || errors.doctors}
+            {errors.cart || errors.doctors || errors.repeat}
           </div>
         }
       </div>

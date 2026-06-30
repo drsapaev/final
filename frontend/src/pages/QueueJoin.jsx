@@ -1085,7 +1085,10 @@ const QueueJoin = () => {
                 marginBottom: '8px',
                 letterSpacing: '-0.02em'
               }}>
-                Мутахассисларни танланг
+                {/* P-024 fix: previously "Мутахассисларни танланг" (UZ) while the
+                    rest of the screen is Russian — mixed i18n on a public kiosk flow.
+                    Unified to Russian to match the surrounding copy. */}
+                Выберите специалистов
               </h3>
               <p style={{
                 color: 'var(--mac-text-secondary)',
@@ -1093,7 +1096,7 @@ const QueueJoin = () => {
                 lineHeight: '1.5',
                 margin: 0
               }}>
-                Бир нечта мутахассисни бир вақтда танлаш мумкин
+                Можно выбрать несколько специалистов одновременно
               </p>
             </div>
 

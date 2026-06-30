@@ -21,7 +21,11 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 const UserExportManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   // Состояние
   const [activeTab, setActiveTab] = useState('export');
   const [loading, setLoading] = useState(false);
@@ -155,7 +159,16 @@ const UserExportManager = () => {
   };
 
   const handleDeleteFile = async (filename) => {
-    if (!confirm(`Удалить файл ${filename}?`)) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление файла',
+      message: `Удалить файл ${filename}?`,
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.delete(`/users/users/export/files/${filename}`);
@@ -710,6 +723,8 @@ const UserExportManager = () => {
       {/* Содержимое табов */}
       {activeTab === 'export' && renderExportTab()}
       {activeTab === 'files' && renderFilesTab()}
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

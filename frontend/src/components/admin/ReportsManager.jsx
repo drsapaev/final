@@ -33,8 +33,12 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const ReportsManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('generate');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null); // Global error state
@@ -201,7 +205,16 @@ const ReportsManager = () => {
   };
 
   const cleanupOldReports = async () => {
-    if (!window.confirm('Удалить старые файлы отчетов (старше 30 дней)?')) {
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Очистка старых отчётов',
+      message: 'Удалить старые файлы отчётов (старше 30 дней)?',
+      description: 'Это действие необратимо. Файлы будут удалены навсегда.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -861,6 +874,8 @@ const ReportsManager = () => {
           {activeTab === 'settings' && renderSettingsTab()}
         </>
       }
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

@@ -7,10 +7,14 @@ describe('RBAC route parity', () => {
     expect(roles).toEqual(['Admin', 'Registrar']);
   });
 
-  it('does not expose frontend-only Patient role on patient panel route', () => {
+  it('exposes Patient role on patient panel route (P-001 fix)', () => {
+    // P-001 fix: previously 'Patient' was excluded from patient-home.roles,
+    // which caused every patient login to bounce to /forbidden because
+    // homeForRoles:['patient'] resolved to /patient while the role guard
+    // rejected the patient. Patient is now an explicit role on the route.
     const roles = routeToRoles('/patient');
-    expect(roles).toEqual(['Admin', 'Registrar', 'Doctor']);
-    expect(roles).not.toContain('Patient');
+    expect(roles).toEqual(['Admin', 'Registrar', 'Doctor', 'Patient']);
+    expect(roles).toContain('Patient');
   });
 
   it('keeps receptionist compatibility through registrar alias', () => {

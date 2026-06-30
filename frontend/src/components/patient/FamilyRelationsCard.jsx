@@ -25,6 +25,8 @@ import {
 import apiClient from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 const RELATION_TYPES = {
   parent: { label: 'Родитель', Icon: Users },
@@ -250,6 +252,8 @@ export default function FamilyRelationsCard({
   canEdit = false,
   onFamilyChange
 }) {
+  // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
+  const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [family, setFamily] = useState([]);
@@ -279,7 +283,16 @@ export default function FamilyRelationsCard({
   }, [loadFamily]);
 
   const handleDeleteRelation = async (relationId) => {
-    if (!window.confirm('Удалить эту семейную связь?')) return;
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление семейной связи',
+      message: 'Удалить эту семейную связь?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await apiClient.delete(`/patients/${patientId}/family/${relationId}`);
@@ -400,6 +413,8 @@ export default function FamilyRelationsCard({
           onFamilyChange?.();
         }}
       />
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </Card>
   );
 }

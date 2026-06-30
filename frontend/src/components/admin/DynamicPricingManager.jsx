@@ -36,6 +36,8 @@ import { toast } from 'react-toastify';
 import { getApiOrigin } from '../../api/runtime';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 
 // API base URL with fallback for development
 void getApiOrigin();
@@ -201,6 +203,8 @@ const buildPricingRulePayload = (form) =>
   );
 
 const DynamicPricingManager = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
+  const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('rules');
   const [pricingRules, setPricingRules] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
@@ -360,7 +364,16 @@ const DynamicPricingManager = () => {
   };
 
   const handleDeleteRule = async (ruleId) => {
-    if (!confirm('Вы уверены, что хотите удалить это правило?')) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление правила',
+      message: 'Удалить это правило?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.delete(`/dynamic-pricing/pricing-rules/${ruleId}`);
@@ -373,7 +386,16 @@ const DynamicPricingManager = () => {
   };
 
   const handleDeletePackage = async (packageId) => {
-    if (!confirm('Вы уверены, что хотите удалить этот пакет?')) return;
+    // P-013 fix: replaced native confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление пакета',
+      message: 'Удалить этот пакет?',
+      description: 'Это действие необратимо.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.delete(`/dynamic-pricing/service-packages/${packageId}`);
@@ -1455,6 +1477,8 @@ const DynamicPricingManager = () => {
           {activeTab === 'analytics' && renderAnalyticsTab()}
         </>
       }
+      {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+      {confirmDialog}
     </div>);
 
 };

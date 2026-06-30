@@ -39,6 +39,8 @@ import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
+// P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
+import { useConfirm } from '../common/ConfirmDialog';
 const API_BASE = getApiOrigin();
 
 const DEFAULT_STATS = {
@@ -121,6 +123,8 @@ const PAGE_SIZE_OPTIONS = [
 { value: 50, label: '50' }];
 
 const DepartmentManagement = () => {
+  // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
+  const [confirm, confirmDialog] = useConfirm();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState(null);
@@ -384,7 +388,16 @@ const DepartmentManagement = () => {
   };
 
   const handleDeleteDepartment = async (id) => {
-    if (!window.confirm('Удалить отделение? Это действие необратимо.')) return;
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const ok = await confirm({
+      title: 'Удаление отделения',
+      message: 'Удалить отделение?',
+      description: 'Это действие необратимо. Все связанные сервисы будут отвязаны.',
+      confirmLabel: 'Удалить',
+      cancelLabel: 'Отмена',
+      intent: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/admin/departments/${id}`);
       toast.success('Отделение удалено');
@@ -627,9 +640,15 @@ const DepartmentManagement = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Вы уверены, что хотите удалить ${selectedDepartments.length} отделений? Это действие нельзя отменить.`
-    );
+    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
+    const confirmed = await confirm({
+      title: 'Массовое удаление отделений',
+      message: `Удалить ${selectedDepartments.length} отделений?`,
+      description: 'Это действие нельзя отменить. Все связанные сервисы будут отвязаны.',
+      confirmLabel: 'Удалить все',
+      cancelLabel: 'Отмена',
+      intent: 'destructive',
+    });
 
     if (!confirmed) return;
 
@@ -1746,7 +1765,10 @@ const DepartmentManagement = () => {
                     </MacOSButton>
                 </div>
             </MacOSModal>
-        </div>);
+            {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
+            {confirmDialog}
+        </div>
+      );
 
 };
 

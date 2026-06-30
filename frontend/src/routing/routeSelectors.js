@@ -2,7 +2,13 @@ import { generatePath, matchPath } from 'react-router-dom';
 import { buildRouteDocsSnapshot } from './routeDocsSnapshot.js';
 import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
 
-const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система'];
+// P-003 fix: added 'Настройки' section to surface the 8 previously orphaned
+// admin-settings routes (benefit-settings, wizard-settings, payment-providers,
+// clinic-settings, queue-settings, telegram-settings, display-settings,
+// user-select) so an administrator can discover them from the sidebar instead
+// of having to guess URLs. Section placed last so it appears at the bottom of
+// the admin sidebar — predictable location for "low-frequency configuration".
+const ADMIN_SECTION_ORDER = ['Обзор', 'Управление', 'Операции', 'Интеграции', 'Система', 'Настройки'];
 export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 export const PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID = 'patient-booking-entry';
 export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
@@ -254,6 +260,17 @@ export function getRouteChromeState(pathname, search = '', profile = null) {
   const searchParams = new URLSearchParams(search);
 
   let sidebarItems = sidebarPreset?.items || [];
+  // P-010 fix: support sectioned sidebar presets. If a preset declares `sections`
+  // (array of { title, items }), we pass both `sidebarSections` and a flattened
+  // `sidebarItems` (for backward compatibility with any consumer that still
+  // reads .sidebarItems). Sidebar.jsx renders sections when present, else falls
+  // back to the flat items list.
+  let sidebarSections = null;
+  if (Array.isArray(sidebarPreset?.sections) && sidebarPreset.sections.length > 0) {
+    sidebarSections = sidebarPreset.sections;
+    // Flatten sections into sidebarItems for backward-compat consumers
+    sidebarItems = sidebarPreset.sections.flatMap((section) => section.items || []);
+  }
   if (sidebarPresetKey === 'admin') {
     sidebarItems = getAdminNavRoutes(profile, { internalDemoEnabled: isInternalDemoEnabled() }).map((navRoute) => ({
       id: navRoute.id,
@@ -290,6 +307,7 @@ export function getRouteChromeState(pathname, search = '', profile = null) {
     fullscreen: Boolean(routeLayout.fullscreen),
     sidebarPreset,
     sidebarItems,
+    sidebarSections,
     activeSidebarItem,
   };
 }
