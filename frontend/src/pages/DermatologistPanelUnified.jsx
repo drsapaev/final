@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+// P-009 fix: shared doctor panel state hook
+import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import {
   Activity,
   FileText,
@@ -167,59 +169,22 @@ const DermatologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
+  // P-009: navigate removed — useDoctorPanelState handles tab URL sync
 
-  // Синхронизация активной вкладки с URL
-  const getActiveTabFromURL = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const visitIdParam = params.get('visitId') || params.get('visit_id');
-
-    // Deep-link по visitId должен сразу открывать прием.
-    if (visitIdParam) {
-      return params.get('tab') || 'visit';
-    }
-    // Deep-link по patientId требует выбора канонического визита из очереди
-    if (params.get('patientId')) {
-      return 'appointments';
-    }
-    return params.get('tab') || 'appointments';
-  }, [location.search]);
-
-  // Получаем patientId из URL для автоматической загрузки пациента
-  const getPatientIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
-  }, [location.search]);
-
-  const getVisitIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const visitIdParam = params.get('visitId') || params.get('visit_id');
-    if (!visitIdParam) {
-      return null;
-    }
-
-    const parsed = parseInt(visitIdParam, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [location.search]);
-
-  const [activeTab, setActiveTab] = useState(() => getActiveTabFromURL());
-  const [selectedPatient, setSelectedPatient] = useState(null);
-
-  // Синхронизация URL с активной вкладкой
-  useEffect(() => {
-    const urlTab = getActiveTabFromURL();
-    if (urlTab !== activeTab) {
-      setActiveTab(urlTab);
-    }
-  }, [activeTab, getActiveTabFromURL]);
-
-  // Функция для изменения активной вкладки с обновлением URL
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    const params = new URLSearchParams(location.search);
-    params.set('tab', tabId);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  };
+  // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
+  const {
+    activeTab,
+    setActiveTab,
+    handleTabChange,
+    patientIdFromUrl,
+    visitIdFromUrl,
+    selectedPatient,
+    setSelectedPatient,
+  } = useDoctorPanelState({
+    defaultTab: 'appointments',
+    visitDeepLinkTab: 'visit',
+    patientDeepLinkTab: 'appointments',
+  });
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
@@ -887,8 +852,7 @@ const DermatologistPanelUnified = () => {
   // ✅ Автоматическая загрузка пациента из URL параметра patientId / visitId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
-      const patientIdFromUrl = getPatientIdFromUrl();
-      const visitIdFromUrl = getVisitIdFromUrl();
+      // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
       const searchKey = location.search;
 
       if (!patientIdFromUrl && !visitIdFromUrl) {
@@ -1020,7 +984,7 @@ const DermatologistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, getPatientIdFromUrl, getVisitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments]);
+  }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments]);
 
   useEffect(() => {
     const appointmentId = currentAppointment?.appointment_id || null;

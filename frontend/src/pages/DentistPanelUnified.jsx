@@ -1,5 +1,7 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+// P-009 fix: shared doctor panel state hook
+import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button, Badge, Card } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
@@ -164,7 +166,7 @@ function loadStoredDentistDocuments() {
  */
 const DentistPanelUnified = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  // P-009: navigate removed — useDoctorPanelState handles tab URL sync
   const [authState, setAuthState] = useState(auth.getState());
 
   useEffect(() => {
@@ -174,56 +176,20 @@ const DentistPanelUnified = () => {
 
   const user = authState.profile;
 
-  // Синхронизация активной вкладки с URL
-  const getActiveTabFromURL = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const explicitTab = params.get('tab');
-    if (explicitTab) {
-      return explicitTab;
-    }
-
-    if (params.get('visitId') || params.get('visit_id')) {
-      return 'visits';
-    }
-
-    return 'appointments';
-  }, [location.search]);
-
-  // Получаем patientId из URL для автоматической загрузки пациента
-  const getPatientIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
-  }, [location.search]);
-
-  const getVisitIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const visitIdParam = params.get('visitId') || params.get('visit_id');
-    if (!visitIdParam) {
-      return null;
-    }
-
-    const parsed = parseInt(visitIdParam, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [location.search]);
-
-  // Состояние
-  const [activeTab, setActiveTab] = useState(() => getActiveTabFromURL());
-
-  // Синхронизация URL с активной вкладкой
-  useEffect(() => {
-    const urlTab = getActiveTabFromURL();
-    if (urlTab !== activeTab) {
-      setActiveTab(urlTab);
-    }
-  }, [activeTab, getActiveTabFromURL]);
-
-  // Функция для изменения активной вкладки с обновлением URL
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    const params = new URLSearchParams(location.search);
-    params.set('tab', tabId);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  };
+  // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
+  // Dentistry uses 'visits' (plural) for visitDeepLinkTab.
+  const {
+    activeTab,
+    handleTabChange,
+    patientIdFromUrl,
+    visitIdFromUrl,
+    selectedPatient,
+    setSelectedPatient,
+  } = useDoctorPanelState({
+    defaultTab: 'appointments',
+    visitDeepLinkTab: 'visits',
+    patientDeepLinkTab: 'appointments',
+  });
 
   const handleCardKeyDown = useCallback((event, action) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -235,7 +201,7 @@ const DentistPanelUnified = () => {
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
   const [savedVisitProtocols, setSavedVisitProtocols] = useState(
     () => loadStoredDentistDocuments().visitProtocols
   );
@@ -930,8 +896,7 @@ const DentistPanelUnified = () => {
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
     const loadPatientFromUrl = async () => {
-      const patientIdFromUrl = getPatientIdFromUrl();
-      const visitIdFromUrl = getVisitIdFromUrl();
+      // P-009: patientIdFromUrl / visitIdFromUrl come from useDoctorPanelState
       if (!patientIdFromUrl && !visitIdFromUrl) return;
 
       // Если пациент уже загружен с этим ID/визитом, пропускаем
@@ -1028,7 +993,7 @@ const DentistPanelUnified = () => {
     };
 
     loadPatientFromUrl();
-  }, [location.search, getPatientIdFromUrl, getVisitIdFromUrl, appointmentsTableData, loadDentistryAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.search, patientIdFromUrl, visitIdFromUrl, appointmentsTableData, loadDentistryAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Обработчики
   const handlePatientSelect = (patient) => {
