@@ -13,362 +13,22 @@ import {
   signerFieldLabels
 } from './labUiLabels';
 
-function extractFieldValue(field) {
-  if (field.value_numeric !== null && field.value_numeric !== undefined) {
-    return formatDecimalInputValue(field.value_numeric);
-  }
-  return field.value_text || '';
-}
-
-function formatDecimalInputValue(value) {
-  if (value === null || value === undefined || value === '') {
-    return '';
-  }
-  const text = String(value);
-  if (!text.includes('.')) {
-    return text;
-  }
-  const [integerPart, decimalPart = ''] = text.split('.');
-  const trimmedDecimal = decimalPart.replace(/0+$/, '');
-  return trimmedDecimal ? `${integerPart}.${trimmedDecimal}` : integerPart;
-}
-
-function flagVariant(flag, severity = null) {
-  if (severity !== null && severity >= 300) {
-    return 'danger';
-  }
-  if (flag === 'high' || flag === 'warning' || flag === 'abnormal') {
-    return 'warning';
-  }
-  if (flag === 'low') {
-    return 'primary';
-  }
-  return 'info';
-}
-
-function formatFlagLabel(field) {
-  if (!field?.resolved_flag) {
-    return 'норма';
-  }
-  const label = {
-    high: 'выше нормы',
-    low: 'ниже нормы',
-    warning: 'предупреждение',
-    abnormal: 'отклонение',
-    critical: 'критично'
-  }[field.resolved_flag] || field.resolved_flag;
-  const direction = field?.resolved_flag_meta?.direction;
-  return direction ? `${label} ${direction}` : label;
-}
-
-function formatThreshold(meta) {
-  const matchedThreshold = meta?.matched_threshold;
-  if (!matchedThreshold?.value) {
-    return '';
-  }
-  const operator = {
-    lt: '<',
-    lte: '<=',
-    gt: '>',
-    gte: '>='
-  }[matchedThreshold.operator] || matchedThreshold.operator || '';
-  return `${operator} ${formatDecimalInputValue(matchedThreshold.value)}`.trim();
-}
-
-function historySeverityState(item) {
-  if ((item.critical_findings_count || 0) > 0) {
-    return { label: 'critical', variant: 'danger', order: 300 };
-  }
-  if ((item.max_flag_severity || 0) >= 200) {
-    return { label: 'flagged', variant: 'warning', order: 200 };
-  }
-  if ((item.max_flag_severity || 0) >= 100) {
-    return { label: 'warning', variant: 'warning', order: 100 };
-  }
-  return { label: 'clean', variant: 'success', order: 0 };
-}
-
-function matchesHistoryFilter(item, filter) {
-  const severity = historySeverityState(item);
-  if (filter === 'critical') {
-    return severity.label === 'critical';
-  }
-  if (filter === 'flagged') {
-    return severity.order >= 100;
-  }
-  if (filter === 'clean') {
-    return severity.order === 0;
-  }
-  return true;
-}
-
-const LAB_REPORT_ACTION_CAN_FIELD = {
-  edit: 'can_edit',
-  save_draft: 'can_save_draft',
-  mark_ready: 'can_mark_ready',
-  finalize: 'can_finalize',
-  revise: 'can_revise',
-  print: 'can_print'
-};
-
-function hasLabReportAction(instance, action) {
-  const normalizedAction = String(action || '').trim().toLowerCase();
-  if (!instance || !normalizedAction) {
-    return false;
-  }
-
-  if (Array.isArray(instance.available_actions)) {
-    return instance.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
-    );
-  }
-
-  const canField = LAB_REPORT_ACTION_CAN_FIELD[normalizedAction];
-  if (canField && Object.prototype.hasOwnProperty.call(instance, canField)) {
-    return Boolean(instance[canField]);
-  }
-
-  return false;
-}
-
-function getServiceContextItems(appointment) {
-  const serviceDetails = appointment?.service_details || [];
-  if (serviceDetails.length > 0) {
-    return serviceDetails
-      .map((item) => ({
-        key: item.id || item.code || item.name,
-        label: item.name || item.code || 'Услуга',
-        code: item.code || ''
-      }))
-      .filter((item) => item.key);
-  }
-  const serviceCodes = appointment?.service_codes || [];
-  return serviceCodes.map((code) => ({
-    key: code,
-    label: code,
-    code
-  }));
-}
-
-function normalizeLabSections(sections = []) {
-  return sections.map((section, sectionIndex) => ({
-    key: section.key || section.section_key || section.id || `section-${sectionIndex}`,
-    title: section.title || section.name || section.key || `Раздел ${sectionIndex + 1}`,
-    fields: (section.fields || []).map((field, fieldIndex) => ({
-      field_key: field.field_key || field.key || field.id || `${section.key || `section-${sectionIndex}`}-field-${fieldIndex}`,
-      label: field.label || field.name || field.field_key || `Показатель ${fieldIndex + 1}`,
-      value_numeric: field.value_numeric ?? null,
-      value_text: field.value_text ?? '',
-      reference_text: field.reference_text ?? '',
-      unit: field.unit ?? '',
-      resolved_flag: field.resolved_flag ?? null,
-      resolved_flag_severity: field.resolved_flag_severity ?? null
-    }))
-  }));
-}
-
-function flattenLabResults(sections = []) {
-  return sections.flatMap((section) =>
-    (section.fields || []).map((field) => ({
-      section_key: section.key,
-      section_title: section.title,
-      field_key: field.field_key,
-      label: field.label,
-      value_numeric: field.value_numeric,
-      value_text: field.value_text,
-      reference_text: field.reference_text,
-      unit: field.unit,
-      resolved_flag: field.resolved_flag,
-      resolved_flag_severity: field.resolved_flag_severity
-    }))
-  );
-}
-
-function buildLabPrintPayload(instance, appointment) {
-  const sections = normalizeLabSections(instance?.sections || []);
-  const patientSnapshot = instance?.patient_snapshot || {};
-  const appointmentSnapshot = appointment || {};
-  const clinic = instance?.clinic || appointmentSnapshot?.clinic || {};
-  const templateName = instance?.template?.name || instance?.template_name || 'Лабораторный бланк';
-  const reportDate =
-    instance?.printed_at
-    || instance?.finalized_at
-    || instance?.updated_at
-    || instance?.created_at
-    || new Date().toISOString();
-
-  return {
-    lab_order: {
-      id: instance?.id || null,
-      visit_id: instance?.visit_id || appointmentSnapshot?.visit_id || null,
-      patient_id: instance?.patient_id || appointmentSnapshot?.patient_id || null,
-      template_id: instance?.template_id || null,
-      template_name: templateName,
-      status: instance?.status || null,
-      created_at: instance?.created_at || null,
-      finalized_at: instance?.finalized_at || null,
-      printed_at: instance?.printed_at || null
-    },
-    lab_results: flattenLabResults(sections),
-    patient: {
-      full_name:
-        patientSnapshot.full_name
-        || appointmentSnapshot.patient_fio
-        || appointmentSnapshot.patient_name
-        || `Пациент #${instance?.patient_id || appointmentSnapshot.patient_id || ''}`,
-      birth_date: patientSnapshot.birth_date || appointmentSnapshot.patient_birth_year || '',
-      address: patientSnapshot.address || appointmentSnapshot.address || '',
-      phone: patientSnapshot.phone || appointmentSnapshot.patient_phone || '',
-      sex: patientSnapshot.sex || appointmentSnapshot.sex || ''
-    },
-    clinic: {
-      name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
-      address: clinic.address || '',
-      phone: clinic.phone || '',
-      website: clinic.website || ''
-    },
-    branding: {
-      clinic_name: clinic.name || clinic.clinic_name || 'МЕДИЦИНСКАЯ КЛИНИКА',
-      address: clinic.address || '',
-      phone: clinic.phone || '',
-      document_title: templateName,
-      document_subtitle: instance?.template?.subtitle || ''
-    },
-    signers: instance?.signer_snapshot || {},
-    sections,
-    template_name: templateName,
-    report_date: typeof reportDate === 'string' ? reportDate : new Date(reportDate).toISOString(),
-    footer_notes: instance?.footer_notes || instance?.template?.footer_notes || '',
-    critical_findings: instance?.critical_findings || [],
-    smear_matrix_mode: Boolean(instance?.template?.layout_mode === 'smear_matrix'),
-    oam_docx_mode: Boolean(instance?.template?.layout_mode === 'oam'),
-    docx_three_column_mode: Boolean(instance?.template?.layout_mode === 'docx_three_column')
-  };
-}
-
-// P-20 fix: визуальный stepper жизненного цикла лабораторного бланка.
-// State machine: DRAFT → IN_PROGRESS → READY → FINALIZED → PRINTED
-// (с возможностью revise() — возвратом на DRAFT из FINALIZED).
-// Раньше статус отображался одним Badge без контекста «куда двигаться дальше».
-// Stepper показывает пройденные шаги, текущий и будущие.
-const LAB_REPORT_STEPS = [
-  { key: 'DRAFT',       label: 'Черновик' },
-  { key: 'IN_PROGRESS', label: 'Заполняется' },
-  { key: 'READY',       label: 'Готов' },
-  { key: 'FINALIZED',   label: 'Финализирован' },
-  { key: 'PRINTED',     label: 'Напечатан' },
-];
-
-function getLabReportStepIndex(status) {
-  if (!status) return -1;
-  const idx = LAB_REPORT_STEPS.findIndex((s) => s.key === status);
-  return idx;
-}
-
-function LabStatusStepper({ status }) {
-  const currentIndex = getLabReportStepIndex(status);
-  if (currentIndex < 0) {
-    // Неизвестный статус — fallback на Badge
-    return null;
-  }
-
-  return (
-    <div
-      role="navigation"
-      aria-label="Прогресс бланка"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        flexWrap: 'wrap',
-        marginTop: '8px',
-      }}
-    >
-      {LAB_REPORT_STEPS.map((step, index) => {
-        const isCompleted = index < currentIndex;
-        const isCurrent = index === currentIndex;
-        const isFuture = index > currentIndex;
-        const isLast = index === LAB_REPORT_STEPS.length - 1;
-
-        return (
-          <div
-            key={step.key}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: isCurrent ? 600 : 400,
-                background: isCurrent
-                  ? 'var(--mac-accent)'
-                  : isCompleted
-                    ? 'color-mix(in oklab, var(--mac-accent) 15%, var(--mac-bg-primary))'
-                    : 'var(--mac-bg-tertiary)',
-                color: isCurrent
-                  ? 'white'
-                  : isCompleted
-                    ? 'var(--mac-accent)'
-                    : 'var(--mac-text-muted)',
-                border: `1px solid ${
-                  isCurrent
-                    ? 'var(--mac-accent)'
-                    : isCompleted
-                      ? 'color-mix(in oklab, var(--mac-accent) 30%, transparent)'
-                      : 'var(--mac-border)'
-                }`,
-              }}
-              aria-current={isCurrent ? 'step' : undefined}
-              title={
-                isCompleted
-                  ? `${step.label} — пройден`
-                  : isCurrent
-                    ? `${step.label} — текущий шаг`
-                    : `${step.label} — предстоит`
-              }
-            >
-              {isCompleted && (
-                <Icon name="checkmark.circle.fill" size={12} />
-              )}
-              {isCurrent && (
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: 'white',
-                    display: 'inline-block',
-                  }}
-                  aria-hidden="true"
-                />
-              )}
-              {step.label}
-            </div>
-            {!isLast && (
-              <div
-                style={{
-                  width: '12px',
-                  height: '1px',
-                  background: isFuture ? 'var(--mac-border)' : 'var(--mac-accent)',
-                  opacity: isFuture ? 0.5 : 0.8,
-                }}
-                aria-hidden="true"
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-LabStatusStepper.propTypes = {
-  status: PropTypes.string,
-};
+// P-04 fix: декомпозиция монолитного компонента (969 → ~530 строк).
+// Helper-функции и подкомпоненты вынесены в отдельные модули:
+import {
+  extractFieldValue,
+  formatFlagLabel,
+  formatThreshold,
+  getServiceContextItems,
+  buildLabPrintPayload,
+} from './utils/labReportNormalize';
+import {
+  hasLabReportAction,
+  flagVariant,
+} from './utils/labReportActions';
+import LabStatusStepper from './LabStatusStepper';
+import LabReportActionsBar from './LabReportActionsBar';
+import LabReportHistoryPanel from './LabReportHistoryPanel';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -408,28 +68,6 @@ export default function LabReportWorkbench({
   const singleAllowedTemplate =
     serviceContextPresent && templateOptions.length === 1 ? templateOptions[0] : null;
 
-  const filteredHistory = useMemo(() => {
-    const items = reportHistory.filter((item) => matchesHistoryFilter(item, historySeverityFilter));
-    return [...items].sort((left, right) => {
-      const leftSeverity = historySeverityState(left);
-      const rightSeverity = historySeverityState(right);
-      if (rightSeverity.order !== leftSeverity.order) {
-        return rightSeverity.order - leftSeverity.order;
-      }
-      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
-    });
-  }, [historySeverityFilter, reportHistory]);
-  const filteredRecentReports = useMemo(() => {
-    const items = recentReports.filter((item) => matchesHistoryFilter(item, historySeverityFilter));
-    return [...items].sort((left, right) => {
-      const leftSeverity = historySeverityState(left);
-      const rightSeverity = historySeverityState(right);
-      if (rightSeverity.order !== leftSeverity.order) {
-        return rightSeverity.order - leftSeverity.order;
-      }
-      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
-    });
-  }, [historySeverityFilter, recentReports]);
   const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
   const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit');
   const canSaveDraft = hasLabReportAction(activeInstance, 'save_draft');
@@ -817,36 +455,21 @@ export default function LabReportWorkbench({
                   <LabStatusStepper status={activeInstance.status} />
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {(canSaveDraft || canMarkReady || canFinalize) && (
-                    <>
-                      <Button variant="outline" onClick={handleSaveDraft} disabled={saving || !canSaveDraft}>
-                        <Icon name="square.and.arrow.down" size={16} />
-                        {busyAction === 'save' ? 'Сохраняю...' : 'Сохранить черновик'}
-                      </Button>
-                      <Button variant="outline" onClick={handleMarkReady} disabled={saving || !canMarkReady}>
-                        <Icon name="checkmark.circle" size={16} />
-                        {busyAction === 'ready' ? 'Перевожу...' : 'Отметить готовым'}
-                      </Button>
-                      <Button variant="primary" onClick={handleFinalize} disabled={saving || !canFinalize}>
-                        <Icon name="lock.circle" size={16} />
-                        {busyAction === 'finalize' ? 'Финализирую...' : 'Финализировать'}
-                      </Button>
-                    </>
-                  )}
-                  {(canRevise || canPrint) && (
-                    <>
-                      <Button variant="outline" onClick={handleRevise} disabled={saving || !canRevise}>
-                        <Icon name="arrow.triangle.branch" size={16} />
-                        {busyAction === 'revise' ? 'Создаю ревизию...' : 'Создать ревизию'}
-                      </Button>
-                      <Button variant="primary" onClick={handlePrint} disabled={saving || !canPrint}>
-                        <Icon name="printer" size={16} />
-                        {busyAction === 'print' ? 'Отправляю...' : 'Печать результата'}
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
+                <LabReportActionsBar
+                  saving={saving}
+                  busyAction={busyAction}
+                  canSaveDraft={canSaveDraft}
+                  canMarkReady={canMarkReady}
+                  canFinalize={canFinalize}
+                  canRevise={canRevise}
+                  canPrint={canPrint}
+                  onSaveDraft={handleSaveDraft}
+                  onMarkReady={handleMarkReady}
+                  onFinalize={handleFinalize}
+                  onRevise={handleRevise}
+                  onPrint={handlePrint}
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
@@ -894,9 +517,9 @@ export default function LabReportWorkbench({
                         <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
                           {finding.threshold_display || finding.reference_text || '—'}
                         </div>
-                            <Badge variant={flagVariant(finding.resolved_flag, finding.resolved_flag_severity)}>
-                              {formatFlagLabel(finding)}
-                            </Badge>
+                          <Badge variant={flagVariant(finding.resolved_flag, finding.resolved_flag_severity)}>
+                            {formatFlagLabel(finding)}
+                          </Badge>
                       </div>
                     ))}
                   </div>
@@ -992,87 +615,16 @@ export default function LabReportWorkbench({
       </Card>
 
       {(showRecentReportsBrowser || reportHistory.length > 0) && (
-        <Card variant="filled" padding="none">
-          <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
-            <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Icon name="clock.arrow.circlepath" size={20} />
-              {showRecentReportsBrowser ? 'Недавние лабораторные бланки' : 'Доступные бланки пациента'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '12px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {[
-                { id: 'all', label: 'Все' },
-                { id: 'clean', label: 'Без флагов' },
-                { id: 'flagged', label: 'С флагами' },
-                { id: 'critical', label: 'Критические' }
-              ].map((filter) => (
-                <Button
-                  key={filter.id}
-                  variant={historySeverityFilter === filter.id ? 'primary' : 'outline'}
-                  onClick={() => setHistorySeverityFilter(filter.id)}
-                >
-                  {filter.label}
-                </Button>
-              ))}
-            </div>
-
-            {(showRecentReportsBrowser ? filteredRecentReports : filteredHistory).length === 0 ? (
-              <Alert severity="info">
-                {showRecentReportsBrowser
-                  ? 'В лаборатории пока нет сохранённых бланков для повторного открытия.'
-                  : 'Для выбранного фильтра нет лабораторных бланков.'}
-              </Alert>
-            ) : (
-              (showRecentReportsBrowser ? filteredRecentReports : filteredHistory).map((item) => {
-                const severity = historySeverityState(item);
-                const patientLabel = item.patient_snapshot?.full_name || `Пациент #${item.patient_id}`;
-                return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onOpenInstance(item.id)}
-                  style={{
-                  border: '1px solid var(--mac-border)',
-                  borderRadius: '14px',
-                  background: activeInstance?.id === item.id ? 'color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary))' : 'var(--mac-bg-primary)',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  alignItems: 'center',
-                  cursor: 'pointer'
-                }}
-                  >
-                    <div style={{ display: 'grid', gap: '4px', textAlign: 'left' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{item.template?.name || `Бланк #${item.id}`}</div>
-                      <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
-                        {showRecentReportsBrowser
-                          ? `${patientLabel} | ${new Date(item.created_at).toLocaleString()}`
-                          : new Date(item.created_at).toLocaleString()}
-                      </div>
-                      {showRecentReportsBrowser && (
-                        <div style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
-                          Визит: {item.visit_id || 'без визита'}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <Badge variant={getLabStatusVariant(item.status)}>{formatLabStatus(item.status)}</Badge>
-                      <Badge variant={severity.variant}>{formatSeverityLabel(severity.label)}</Badge>
-                      {item.flagged_findings_count > 0 && (
-                        <Badge variant="info">{item.flagged_findings_count} флагов</Badge>
-                      )}
-                      {item.critical_findings_count > 0 && (
-                        <Badge variant="danger">{item.critical_findings_count} критич.</Badge>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
+        // P-04 fix: панель истории вынесена в LabReportHistoryPanel
+        <LabReportHistoryPanel
+          showRecentReportsBrowser={showRecentReportsBrowser}
+          recentReports={recentReports}
+          reportHistory={reportHistory}
+          historySeverityFilter={historySeverityFilter}
+          onSeverityFilterChange={setHistorySeverityFilter}
+          activeInstanceId={activeInstance?.id}
+          onOpenInstance={onOpenInstance}
+        />
       )}
     </div>
   );
