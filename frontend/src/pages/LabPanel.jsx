@@ -181,10 +181,9 @@ export default function LabPanel() {
     setAppointmentsLoading(true);
     try {
       // P-03 fix: используем lab-specific façade endpoint вместо прямого
-      // fetch к /registrar/queues/today. Façade имеет собственный контракт,
+      // fetch к registrar endpoint. Façade имеет собственный контракт,
       // собственную RBAC и нормализует ответ в плоский формат — это убирает
-      // жёсткую связку с registrar endpoint и промежуточную нормализацию
-      // через formatAppointmentEntry.
+      // жёсткую связку с registrar module и промежуточную нормализацию.
       const payload = await labReportingApi.listQueueToday();
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
