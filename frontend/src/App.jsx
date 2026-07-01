@@ -62,7 +62,7 @@ const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired.jsx'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView.jsx'));
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'));
-const ButtonShowcase = lazy(() => import('./components/buttons/ButtonShowcase.jsx'));
+// SW-01 fix: removed ButtonShowcase (dead code, components/buttons/ deleted)
 const TelegramManager = lazy(() => import('./components/TelegramManager.jsx'));
 const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPatientShell.jsx'));
 const TelegramSettings = lazy(() => import('./components/admin/TelegramSettings.jsx'));
@@ -135,7 +135,7 @@ const ROUTE_COMPONENTS = {
   IntegrationDemo,
   PaymentTest,
   CSSTestPage,
-  ButtonShowcase,
+  // SW-01: ButtonShowcase removed (dead code)
   TelegramMiniAppPatientShell,
   TelegramSettings,
   AISettings,

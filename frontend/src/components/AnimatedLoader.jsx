@@ -1,5 +1,17 @@
-import { getColor } from '../design-system';
 import PropTypes from 'prop-types';
+
+// SW-01 fix: removed dependency on design-system/getColor.
+// Replaced with CSS variables that work with macOS theme system.
+const COLORS = {
+  primary: 'var(--mac-accent-blue, #007aff)',
+  secondary: 'var(--mac-text-secondary, #6b7280)',
+  success: 'var(--mac-success, #34c759)',
+  danger: 'var(--mac-error, #ff3b30)',
+  warning: 'var(--mac-warning, #ff9500)',
+  info: 'var(--mac-info, #5ac8fa)',
+};
+
+const SKELETON_BG = 'var(--mac-bg-secondary, rgba(0,0,0,0.05))';
 
 const AnimatedLoader = ({
   size = 'md',
@@ -17,15 +29,7 @@ const AnimatedLoader = ({
   };
 
   const getColorStyles = () => {
-    const colors = {
-      primary: getColor('primary', 500),
-      secondary: getColor('secondary', 500),
-      success: getColor('success', 500),
-      danger: getColor('danger', 500),
-      warning: getColor('warning', 500),
-      info: getColor('info', 500)
-    };
-    return colors[color] || colors.primary;
+    return COLORS[color] || COLORS.primary;
   };
 
   const loaderStyles = {
@@ -44,8 +48,6 @@ const AnimatedLoader = ({
       style={loaderStyles}
       role="status"
       aria-label="Загрузка" />);
-
-
 };
 
 
@@ -57,7 +59,6 @@ AnimatedLoader.propTypes = {
   style: PropTypes.any,
 };
 
-// Компонент для скелетона таблицы
 const AnimatedTableSkeleton = ({
   rows = 5,
   columns = 4,
@@ -65,7 +66,7 @@ const AnimatedTableSkeleton = ({
   style = {}
 }) => {
   const tableStyles = {
-    background: 'white',
+    background: 'var(--mac-bg-primary, white)',
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -80,7 +81,7 @@ const AnimatedTableSkeleton = ({
   };
 
   const skeletonCellStyles = {
-    backgroundColor: getColor('secondary', 200),
+    backgroundColor: SKELETON_BG,
     borderRadius: '8px',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     height: '20px'
@@ -90,8 +91,6 @@ const AnimatedTableSkeleton = ({
     <div
       className={`animated-table-skeleton ${className}`}
       style={tableStyles}>
-      
-      {/* Заголовок таблицы */}
       <div style={skeletonRowStyles}>
         {Array.from({ length: columns }, (_, i) =>
         <div
@@ -101,11 +100,8 @@ const AnimatedTableSkeleton = ({
             width: i === 0 ? '60px' : '120px',
             height: '16px'
           }} />
-
         )}
       </div>
-      
-      {/* Строки таблицы */}
       {Array.from({ length: rows }, (_, rowIndex) =>
       <div key={rowIndex} style={skeletonRowStyles}>
           {Array.from({ length: columns }, (_, colIndex) =>
@@ -115,12 +111,10 @@ const AnimatedTableSkeleton = ({
             ...skeletonCellStyles,
             width: colIndex === 0 ? '60px' : '120px'
           }} />
-
         )}
         </div>
       )}
     </div>);
-
 };
 
 
@@ -132,13 +126,12 @@ AnimatedTableSkeleton.propTypes = {
   style: PropTypes.any,
 };
 
-// Компонент для скелетона карточки
 const AnimatedCardSkeleton = ({
   className = '',
   style = {}
 }) => {
   const cardStyles = {
-    background: 'white',
+    background: 'var(--mac-bg-primary, white)',
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -146,7 +139,7 @@ const AnimatedCardSkeleton = ({
   };
 
   const skeletonStyles = {
-    backgroundColor: getColor('secondary', 200),
+    backgroundColor: SKELETON_BG,
     borderRadius: '8px',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
   };
@@ -155,7 +148,6 @@ const AnimatedCardSkeleton = ({
     <div
       className={`animated-card-skeleton ${className}`}
       style={cardStyles}>
-      
       <div
         style={{
           ...skeletonStyles,
@@ -163,7 +155,6 @@ const AnimatedCardSkeleton = ({
           height: '24px',
           marginBottom: '16px'
         }} />
-      
       <div
         style={{
           ...skeletonStyles,
@@ -171,7 +162,6 @@ const AnimatedCardSkeleton = ({
           height: '16px',
           marginBottom: '8px'
         }} />
-      
       <div
         style={{
           ...skeletonStyles,
@@ -179,7 +169,6 @@ const AnimatedCardSkeleton = ({
           height: '16px',
           marginBottom: '8px'
         }} />
-      
       <div
         style={{
           ...skeletonStyles,
@@ -187,7 +176,6 @@ const AnimatedCardSkeleton = ({
           height: '16px',
           marginBottom: '16px'
         }} />
-      
       <div style={{ display: 'flex', gap: '12px' }}>
         <div
           style={{
@@ -195,17 +183,14 @@ const AnimatedCardSkeleton = ({
             width: '80px',
             height: '32px'
           }} />
-        
         <div
           style={{
             ...skeletonStyles,
             width: '100px',
             height: '32px'
           }} />
-        
       </div>
     </div>);
-
 };
 
 
@@ -215,7 +200,6 @@ AnimatedCardSkeleton.propTypes = {
   style: PropTypes.any,
 };
 
-// Прикрепляем подкомпоненты к AnimatedLoader
 AnimatedLoader.TableSkeleton = AnimatedTableSkeleton;
 AnimatedLoader.CardSkeleton = AnimatedCardSkeleton;
 
