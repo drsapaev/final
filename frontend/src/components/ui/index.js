@@ -15,7 +15,7 @@ export { default as FileUpload } from './FileUpload';
 
 // Компоненты из других папок
 export { default as AnimatedLoader } from '../AnimatedLoader';
-export { default as AnimatedToast } from '../AnimatedToast';
+// SW-01 fix: removed AnimatedToast export (dead code, no consumers)
 
 // Для обратной совместимости - алиасы на нативные компоненты
 export { 
