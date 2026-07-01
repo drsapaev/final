@@ -108,6 +108,7 @@ export default function LabReportWorkbench({
   const serviceContextPresent = (templateResolution?.service_codes || []).length > 0;
   // WF-11 fix: при escape hatch показываем все published templates,
   // даже если service context есть, но resolution не нашёл шаблон.
+  const templateOptions = serviceContextPresent ? resolvedTemplates : publishedTemplates;
   const effectiveTemplateOptions = escapeHatchActive
     ? publishedTemplates
     : templateOptions;
@@ -237,10 +238,10 @@ export default function LabReportWorkbench({
     }
     const defaultTemplateId =
       templateResolution?.default_template?.id
-      || (!serviceContextPresent ? templateOptions[0]?.id : '')
+      || (!serviceContextPresent ? effectiveTemplateOptions[0]?.id : '')
       || '';
     setSelectedTemplateId((current) => {
-      if (current && templateOptions.some((template) => String(template.id) === String(current))) {
+      if (current && effectiveTemplateOptions.some((template) => String(template.id) === String(current))) {
         return current;
       }
       return defaultTemplateId ? String(defaultTemplateId) : '';
@@ -249,7 +250,7 @@ export default function LabReportWorkbench({
     activeInstance,
     selectedAppointment,
     serviceContextPresent,
-    templateOptions,
+    effectiveTemplateOptions,
     templateResolution?.default_template?.id
   ]);
 
