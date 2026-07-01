@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '../../components/ui/macos';
+import {
+  Button,
+} from '../ui/macos';
 import { Brain, Sparkles, Bot } from 'lucide-react';
 import PropTypes from 'prop-types';
 

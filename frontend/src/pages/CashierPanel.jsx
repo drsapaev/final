@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt } from 'lucide-react';
-import { Card, Badge, Button } from '../components/ui/macos';
+import {
+  Card, Badge, Button,
+} from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import Tooltip from '../components/ui/macos/Tooltip';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
@@ -29,8 +31,8 @@ import {
   Typography,
   Box,
   Alert,
-  Skeleton } from
-'../components/ui/macos';
+  Skeleton,
+} from '../components/ui/macos';
 
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';

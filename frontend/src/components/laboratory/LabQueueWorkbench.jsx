@@ -1,5 +1,7 @@
 import PropTypes from 'prop-types';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert } from '../ui/macos';
+import {
+  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
+} from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,

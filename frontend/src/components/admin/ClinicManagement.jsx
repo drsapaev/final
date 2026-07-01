@@ -17,16 +17,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
+  Button,
   SegmentedControl,
-
   MacOSStatCard,
-  MacOSLoadingSkeleton,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert,
-  MacOSBadge,
-  MacOSModal } from
-'../ui/macos';
+  Alert,
+  Badge,
+  Modal,
+} from '../ui/macos';
 import BranchManagement from './BranchManagement';
 import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
@@ -167,7 +166,7 @@ const ClinicManagement = () => {
         }}>
             Состояние системы
           </h3>
-          <MacOSButton
+          <Button
           variant="outline"
           onClick={loadSystemData}
           disabled={loading}
@@ -183,13 +182,13 @@ const ClinicManagement = () => {
             height: '16px',
             animation: loading ? 'spin 1s linear infinite' : 'none'
           }} />
-          </MacOSButton>
+          </Button>
         </div>
         
         {systemHealth ?
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSBadge
+              <Badge
             variant={systemHealth.status === 'healthy' ? 'success' :
             systemHealth.status === 'warning' ? 'warning' : 'error'}
             text={getHealthLabel(systemHealth.status)} />
@@ -302,7 +301,7 @@ const ClinicManagement = () => {
         gap: '16px',
         flexWrap: 'wrap'
       }}>
-          <MacOSButton
+          <Button
           onClick={() => setActiveTab('branches')}
           style={{
             display: 'flex',
@@ -324,9 +323,9 @@ const ClinicManagement = () => {
           
             <Building2 style={{ width: '20px', height: '20px' }} />
             <span>Управление филиалами</span>
-          </MacOSButton>
+          </Button>
           
-          <MacOSButton
+          <Button
           onClick={() => setActiveTab('equipment')}
           variant="outline"
           style={{
@@ -347,9 +346,9 @@ const ClinicManagement = () => {
           
             <Wrench style={{ width: '20px', height: '20px' }} />
             <span>Управление оборудованием</span>
-          </MacOSButton>
+          </Button>
           
-          <MacOSButton
+          <Button
           onClick={() => setActiveTab('licenses')}
           variant="outline"
           style={{
@@ -370,9 +369,9 @@ const ClinicManagement = () => {
           
             <Key style={{ width: '20px', height: '20px' }} />
             <span>Управление лицензиями</span>
-          </MacOSButton>
+          </Button>
           
-          <MacOSButton
+          <Button
           onClick={() => setActiveTab('backups')}
           variant="outline"
           style={{
@@ -393,7 +392,7 @@ const ClinicManagement = () => {
           
             <HardDrive style={{ width: '20px', height: '20px' }} />
             <span>Резервное копирование</span>
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
 
@@ -446,7 +445,7 @@ const ClinicManagement = () => {
             fontSize: 'var(--mac-font-size-sm)'
           }}>
               <span style={{ color: 'var(--mac-text-secondary)' }}>Статус БД:</span>
-              <MacOSBadge variant="success" text="Подключена" />
+              <Badge variant="success" text="Подключена" />
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -482,7 +481,7 @@ const ClinicManagement = () => {
             fontSize: 'var(--mac-font-size-sm)'
           }}>
               <span style={{ color: 'var(--mac-text-secondary)' }}>Безопасность:</span>
-              <MacOSBadge variant="success" text="Активна" />
+              <Badge variant="success" text="Активна" />
             </div>
           </div>
         </div>
@@ -510,7 +509,7 @@ const ClinicManagement = () => {
               Управление клиникой
             </h2>
           </div>
-          <MacOSLoadingSkeleton height="600px" />
+          <Skeleton height="600px" />
         </MacOSCard>
       </div>);
 
@@ -540,10 +539,10 @@ const ClinicManagement = () => {
             title="Не удалось загрузить данные"
             description="Проверьте подключение к серверу и попробуйте обновить страницу"
             action={
-            <MacOSButton onClick={loadSystemData} variant="primary">
+            <Button onClick={loadSystemData} variant="primary">
                 <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Попробовать снова
-              </MacOSButton>
+              </Button>
             } />
           
         </MacOSCard>
@@ -588,7 +587,7 @@ const ClinicManagement = () => {
 
         {/* Сообщения */}
         {message.text &&
-          <MacOSAlert
+          <Alert
             type={message.type === 'success' ? 'success' : 'error'}
             title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
             message={message.text}
@@ -598,7 +597,7 @@ const ClinicManagement = () => {
 
         {/* Некритические ошибки */}
         {error && stats &&
-          <MacOSAlert
+          <Alert
             type="warning"
             title="Предупреждение"
             message={error}
@@ -651,7 +650,7 @@ const ClinicManagement = () => {
       </MacOSCard>
 
       {/* Модальное окно подтверждения */}
-      <MacOSModal
+      <Modal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title="Подтверждение действия"
@@ -674,13 +673,13 @@ const ClinicManagement = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}>
               
               Отмена
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={handleConfirmAction}
               style={{
                 backgroundColor: 'var(--mac-accent-blue)',
@@ -689,10 +688,10 @@ const ClinicManagement = () => {
               
               <CheckCircle style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Подтвердить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
-      </MacOSModal>
+      </Modal>
     </div>);
 
 };

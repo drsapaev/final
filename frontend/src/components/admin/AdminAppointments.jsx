@@ -8,13 +8,12 @@ import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
 import {
-  MacOSBadge,
-  MacOSButton,
+  Badge,
+  Button,
   MacOSCard,
   MacOSEmptyState,
-  MacOSInput,
-  MacOSLoadingSkeleton,
-  Button,
+  Input,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
@@ -356,9 +355,9 @@ const AdminAppointments = () => {
               Административный обзор записей, врачей, кабинетов и статусов.
             </p>
           </div>
-          <MacOSButton onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
+          <Button onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
             Создать запись
-          </MacOSButton>
+          </Button>
         </div>
 
         <div
@@ -369,7 +368,7 @@ const AdminAppointments = () => {
             marginBottom: '24px',
           }}
         >
-          <MacOSInput
+          <Input
             type="text"
             placeholder="Поиск записей..."
             value={searchTerm}
@@ -385,7 +384,7 @@ const AdminAppointments = () => {
             size="large"
             aria-label="Фильтр по статусу записи"
           />
-          <MacOSInput
+          <Input
             type="date"
             value={filterDate}
             onChange={(event) => setFilterDate(event.target.value)}
@@ -402,16 +401,16 @@ const AdminAppointments = () => {
 
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
-            <MacOSLoadingSkeleton type="table" count={5} />
+            <Skeleton type="table" count={5} />
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
               title="Ошибка загрузки записей"
               description="Не удалось загрузить список записей. Проверьте соединение и попробуйте снова."
               action={
-                <MacOSButton onClick={refresh} startIcon={<RefreshCw size={16} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
                   Обновить
-                </MacOSButton>
+                </Button>
               }
             />
           ) : appointments.length === 0 ? (
@@ -424,9 +423,9 @@ const AdminAppointments = () => {
                   : 'В системе пока нет записей.'
               }
               action={
-                <MacOSButton onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
+                <Button onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
                   Создать первую запись
-                </MacOSButton>
+                </Button>
               }
             />
           ) : (
@@ -532,7 +531,7 @@ const AdminAppointments = () => {
                           {doctorSpecialization || '—'}
                         </p>
                         <div style={{ marginTop: '4px' }}>
-                          <MacOSBadge
+                          <Badge
                             variant={
                               appointment.doctor?.active === false || appointment.doctor?.user_active === false
                                 ? 'warning'
@@ -545,7 +544,7 @@ const AdminAppointments = () => {
                               : appointment.doctor?.user_active === false
                                 ? 'Аккаунт врача неактивен'
                                 : 'Связь активна'}
-                          </MacOSBadge>
+                          </Badge>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
@@ -581,14 +580,14 @@ const AdminAppointments = () => {
                         </p>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <MacOSBadge variant={getAppointmentStatusVariant(appointment.status)}>
+                        <Badge variant={getAppointmentStatusVariant(appointment.status)}>
                           {getAppointmentStatusLabel(appointment.status)}
-                        </MacOSBadge>
+                        </Badge>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         {appointment.hasIntegrityWarnings ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <MacOSBadge variant="warning">Требует проверки</MacOSBadge>
+                            <Badge variant="warning">Требует проверки</Badge>
                             <p
                               style={{
                                 fontSize: 'var(--mac-font-size-xs)',
@@ -600,7 +599,7 @@ const AdminAppointments = () => {
                             </p>
                           </div>
                         ) : (
-                          <MacOSBadge variant="success">Связано</MacOSBadge>
+                          <Badge variant="success">Связано</Badge>
                         )}
                       </td>
                       <td style={textCellStyle}>

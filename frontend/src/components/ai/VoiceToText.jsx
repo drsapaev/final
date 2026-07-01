@@ -24,14 +24,11 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-
-  MacOSSelect,
-  MacOSTextarea,
-  MacOSCheckbox } from
-
-
-'../ui/macos';
+  Button,
+  Select,
+  Textarea,
+  Checkbox,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
@@ -320,7 +317,7 @@ const VoiceToText = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
           {!isRecording ?
-        <MacOSButton
+        <Button
           type="button"
           title="Start voice recording"
           aria-label="Start voice recording"
@@ -337,10 +334,10 @@ const VoiceToText = () => {
           }}>
 
               <Mic aria-hidden="true" style={{ width: '32px', height: '32px', color: 'white' }} />
-            </MacOSButton> :
+            </Button> :
 
         <>
-              <MacOSButton
+              <Button
             type="button"
             title={isPaused ? 'Resume voice recording' : 'Pause voice recording'}
             aria-label={isPaused ? 'Resume voice recording' : 'Pause voice recording'}
@@ -361,8 +358,8 @@ const VoiceToText = () => {
 
             <Pause aria-hidden="true" style={{ width: '24px', height: '24px', color: 'white' }} />
             }
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
             type="button"
             title="Stop voice recording"
             aria-label="Stop voice recording"
@@ -379,7 +376,7 @@ const VoiceToText = () => {
             }}>
 
                 <Square aria-hidden="true" style={{ width: '32px', height: '32px', color: 'white' }} />
-              </MacOSButton>
+              </Button>
             </>
         }
         </div>
@@ -422,24 +419,24 @@ const VoiceToText = () => {
           ref={fileInputRef}
           style={{ display: 'none' }} />
         
-          <MacOSButton
+          <Button
           onClick={() => fileInputRef.current?.click()}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             <Upload style={{ width: '16px', height: '16px' }} />
             Загрузить файл
-          </MacOSButton>
+          </Button>
           
           {audioBlob &&
-        <MacOSButton
+        <Button
           onClick={resetRecording}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
               <RefreshCw style={{ width: '16px', height: '16px' }} />
               Сбросить
-            </MacOSButton>
+            </Button>
         }
         </div>
 
@@ -495,7 +492,7 @@ const VoiceToText = () => {
         }}>
             Язык
           </label>
-          <MacOSSelect
+          <Select
           value={settings.language}
           onChange={(e) => setSettings((prev) => ({ ...prev, language: e.target.value }))}
           options={[
@@ -517,7 +514,7 @@ const VoiceToText = () => {
         }}>
             Тип документа
           </label>
-          <MacOSSelect
+          <Select
           value={settings.document_type}
           onChange={(e) => setSettings((prev) => ({ ...prev, document_type: e.target.value }))}
           options={[
@@ -531,7 +528,7 @@ const VoiceToText = () => {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <MacOSCheckbox
+          <Checkbox
           id="medical_context"
           checked={settings.medical_context}
           onChange={(e) => setSettings((prev) => ({ ...prev, medical_context: e.target.checked }))} />
@@ -586,7 +583,7 @@ const VoiceToText = () => {
         }}>
             Введите медицинский текст
           </label>
-          <MacOSTextarea
+          <Textarea
           value={textInput}
           onChange={(e) => setTextInput(e.target.value)}
           style={{
@@ -599,7 +596,7 @@ const VoiceToText = () => {
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Structuring medical text' : 'Structure medical text'}
           aria-label={loading ? 'Structuring medical text' : 'Structure medical text'}
@@ -622,7 +619,7 @@ const VoiceToText = () => {
                 Структурировать
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -666,7 +663,7 @@ const VoiceToText = () => {
         }}>
             Введите текст для анализа
           </label>
-          <MacOSTextarea
+          <Textarea
           value={textInput}
           onChange={(e) => setTextInput(e.target.value)}
           style={{
@@ -679,7 +676,7 @@ const VoiceToText = () => {
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Extracting medical entities' : 'Extract medical entities'}
           aria-label={loading ? 'Extracting medical entities' : 'Extract medical entities'}
@@ -702,7 +699,7 @@ const VoiceToText = () => {
                 Извлечь сущности
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -746,7 +743,7 @@ const VoiceToText = () => {
         }}>
             Введите текст консультации
           </label>
-          <MacOSTextarea
+          <Textarea
           value={textInput}
           onChange={(e) => setTextInput(e.target.value)}
           style={{
@@ -759,7 +756,7 @@ const VoiceToText = () => {
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Creating medical summary' : 'Create medical summary'}
           aria-label={loading ? 'Creating medical summary' : 'Create medical summary'}
@@ -782,7 +779,7 @@ const VoiceToText = () => {
                 Создать резюме
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -826,7 +823,7 @@ const VoiceToText = () => {
         }}>
             Введите JSON данные записи
           </label>
-          <MacOSTextarea
+          <Textarea
           value={textInput}
           onChange={(e) => setTextInput(e.target.value)}
           style={{
@@ -840,7 +837,7 @@ const VoiceToText = () => {
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Validating medical record' : 'Validate medical record'}
           aria-label={loading ? 'Validating medical record' : 'Validate medical record'}
@@ -863,7 +860,7 @@ const VoiceToText = () => {
                 Валидировать
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -919,23 +916,23 @@ const VoiceToText = () => {
           </h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             {result.text &&
-            <MacOSButton
+            <Button
               onClick={() => copyToClipboard(result.text)}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
                 <Copy style={{ width: '16px', height: '16px' }} />
                 Копировать
-              </MacOSButton>
+              </Button>
             }
-            <MacOSButton
+            <Button
               onClick={exportResult}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -956,7 +953,7 @@ const VoiceToText = () => {
                   Транскрибированный текст
                 </h4>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <MacOSButton
+                  <Button
                   type="button"
                   title={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
                   aria-label={isEditing ? 'Close transcription editor' : 'Edit transcribed text'}
@@ -965,9 +962,9 @@ const VoiceToText = () => {
                   style={{ padding: '4px', minWidth: 'auto' }}>
 
                     <Edit3 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                  </MacOSButton>
+                  </Button>
                   {isEditing &&
-                <MacOSButton
+                <Button
                   type="button"
                   title="Save edited transcription"
                   aria-label="Save edited transcription"
@@ -976,13 +973,13 @@ const VoiceToText = () => {
                   style={{ padding: '4px', minWidth: 'auto' }}>
 
                       <Save aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
                 }
                 </div>
               </div>
               
               {isEditing ?
-            <MacOSTextarea
+            <Textarea
               value={editableResult}
               onChange={(e) => setEditableResult(e.target.value)}
               style={{
@@ -1253,7 +1250,7 @@ const VoiceToText = () => {
             
             {activeTab === 'transcription' && audioBlob &&
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
-                <MacOSButton
+                <Button
                 type="button"
                 title={loading ? 'Transcribing audio' : 'Transcribe audio'}
                 aria-label={loading ? 'Transcribing audio' : 'Transcribe audio'}
@@ -1276,7 +1273,7 @@ const VoiceToText = () => {
                       Транскрибировать
                     </>
                 }
-                </MacOSButton>
+                </Button>
               </div>
             }
           </div>

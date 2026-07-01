@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSLoadingSkeleton,
-  MacOSInput,
+  Button,
+  Badge,
+  Skeleton,
+  Input,
   Select,
-  MacOSTextarea } from
-'../ui/macos';
+  Textarea,
+} from '../ui/macos';
 import {
   Phone,
   Shield,
@@ -256,7 +256,7 @@ const PhoneVerificationManager = () => {
                   {purpose === 'registration' && 'Регистрация'}
                 </p>
               </div>
-              <MacOSBadge variant="outline">{count}</MacOSBadge>
+              <Badge variant="outline">{count}</Badge>
             </div>
         )}
         </div>
@@ -302,7 +302,7 @@ const PhoneVerificationManager = () => {
                   {provider}
                 </p>
               </div>
-              <MacOSBadge variant={provider === 'mock' ? 'secondary' : 'success'}>{count}</MacOSBadge>
+              <Badge variant={provider === 'mock' ? 'secondary' : 'success'}>{count}</Badge>
             </div>
         )}
         </div>
@@ -336,7 +336,7 @@ const PhoneVerificationManager = () => {
           }}>
               Номер телефона
             </label>
-            <MacOSInput
+            <Input
             type="tel"
             value={adminForm.phone}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }))}
@@ -403,7 +403,7 @@ const PhoneVerificationManager = () => {
           }}>
               Кастомное сообщение (опционально)
             </label>
-            <MacOSTextarea
+            <Textarea
             value={adminForm.message}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, message: e.target.value }))}
             placeholder="Ваш код подтверждения: {code}. Код действителен 5 минут."
@@ -418,7 +418,7 @@ const PhoneVerificationManager = () => {
             </p>
           </div>
 
-          <MacOSButton
+          <Button
           onClick={sendAdminCode}
           disabled={loading || !adminForm.phone.trim()}
           aria-label="Send admin verification code"
@@ -440,7 +440,7 @@ const PhoneVerificationManager = () => {
                 Отправить код
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -663,7 +663,7 @@ const PhoneVerificationManager = () => {
           </div>
         </div>
         
-        <MacOSButton onClick={loadStatistics} disabled={loading} variant="outline">
+        <Button onClick={loadStatistics} disabled={loading} variant="outline">
           <RefreshCw style={{
             width: '16px',
             height: '16px',
@@ -671,7 +671,7 @@ const PhoneVerificationManager = () => {
             animation: loading ? 'spin 1s linear infinite' : 'none'
           }} />
           Обновить
-        </MacOSButton>
+        </Button>
       </div>
 
       {/* Вкладки */}
@@ -744,8 +744,8 @@ const PhoneVerificationManager = () => {
       {/* Контент вкладок */}
       {loading && !statistics ?
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
-          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
+          <Skeleton height="128px" style={{ width: '100%' }} />
+          <Skeleton height="256px" style={{ width: '100%' }} />
         </div> :
 
       <>

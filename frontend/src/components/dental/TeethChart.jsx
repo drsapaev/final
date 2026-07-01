@@ -10,8 +10,8 @@ import {
   CardContent,
   Typography,
   Button,
-  Badge } from
-'../ui/macos';
+  Badge,
+} from '../ui/macos';
 import {
 
   Hospital,

@@ -18,7 +18,9 @@ import {
   Webhook } from
 
 'lucide-react';
-import { Card, Button, MacOSInput, Select, MacOSCheckbox } from '../ui/macos';
+import {
+  Card, Button, Input, Select, Checkbox,
+} from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -389,7 +391,7 @@ const TelegramSettings = () => {
                 Токен бота
               </label>
               <div style={{ display: 'flex' }}>
-                <MacOSInput
+                <Input
                   type={showToken ? 'text' : 'password'}
                   value={settings.bot_token}
                   onChange={(e) => handleSettingChange('bot_token', e.target.value)}
@@ -457,7 +459,7 @@ const TelegramSettings = () => {
               }}>
                 ID чатов администраторов
               </label>
-              <MacOSInput
+              <Input
                 value={settings.admin_chat_ids?.join(', ') || ''}
                 onChange={(e) => handleSettingChange('admin_chat_ids', e.target.value.split(',').map((id) => id.trim()).filter((id) => id))}
                 placeholder="123456789, 987654321"
@@ -504,7 +506,7 @@ const TelegramSettings = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <label style={{ display: 'flex', alignItems: 'center' }}>
-                <MacOSCheckbox
+                <Checkbox
                   checked={settings.notifications_enabled}
                   onChange={(e) => handleSettingChange('notifications_enabled', e.target.checked)}
                   style={{ marginRight: '12px' }} />
@@ -513,7 +515,7 @@ const TelegramSettings = () => {
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center' }}>
-                <MacOSCheckbox
+                <Checkbox
                   checked={settings.appointment_reminders}
                   onChange={(e) => handleSettingChange('appointment_reminders', e.target.checked)}
                   style={{ marginRight: '12px' }} />
@@ -522,7 +524,7 @@ const TelegramSettings = () => {
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center' }}>
-                <MacOSCheckbox
+                <Checkbox
                   checked={settings.lab_results_notifications}
                   onChange={(e) => handleSettingChange('lab_results_notifications', e.target.checked)}
                   style={{ marginRight: '12px' }} />
@@ -531,7 +533,7 @@ const TelegramSettings = () => {
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center' }}>
-                <MacOSCheckbox
+                <Checkbox
                   checked={settings.payment_notifications}
                   onChange={(e) => handleSettingChange('payment_notifications', e.target.checked)}
                   style={{ marginRight: '12px' }} />
@@ -627,7 +629,7 @@ const TelegramSettings = () => {
             }}>
               Chat ID получателя
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={testChatId}
               onChange={(e) => setTestChatId(e.target.value)}
@@ -654,7 +656,7 @@ const TelegramSettings = () => {
             }}>
               Текст сообщения
             </label>
-            <MacOSInput
+            <Input
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
               placeholder="Введите текст сообщения..."

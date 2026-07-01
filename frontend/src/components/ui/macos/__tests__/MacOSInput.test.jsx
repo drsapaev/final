@@ -3,14 +3,14 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import MacOSInput from '../MacOSInput';
+import Input from '../Input';
 
-describe('MacOSInput', () => {
+describe('Input', () => {
   it('renders a clear button for controlled clearable inputs and calls onClear', () => {
     const onClear = vi.fn();
 
     render(
-      <MacOSInput
+      <Input
         value="hello"
         onChange={() => {}}
         clearable
@@ -27,7 +27,7 @@ describe('MacOSInput', () => {
 
   it('does not render a clear button when there is no value', () => {
     render(
-      <MacOSInput
+      <Input
         value=""
         onChange={() => {}}
         clearable

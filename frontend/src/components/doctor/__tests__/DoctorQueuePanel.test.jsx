@@ -63,11 +63,11 @@ const {
 
 vi.mock('../../ui/macos', () => ({
   MacOSCard: DoctorQueuePanelTestMacOSCard,
-  MacOSButton: DoctorQueuePanelTestMacOSButton,
-  MacOSBadge: DoctorQueuePanelTestMacOSBadge,
-  MacOSLoadingSkeleton: DoctorQueuePanelTestMacOSLoadingSkeleton,
+  Button: DoctorQueuePanelTestMacOSButton,
+  Badge: DoctorQueuePanelTestMacOSBadge,
+  Skeleton: DoctorQueuePanelTestMacOSLoadingSkeleton,
   MacOSEmptyState: DoctorQueuePanelTestMacOSEmptyState,
-  MacOSAlert: DoctorQueuePanelTestMacOSAlert,
+  Alert: DoctorQueuePanelTestMacOSAlert,
 }));
 
 import DoctorQueuePanel from '../DoctorQueuePanel.jsx';

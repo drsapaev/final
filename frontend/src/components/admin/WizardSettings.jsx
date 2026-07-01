@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSCheckbox,
-  MacOSLoadingSkeleton,
+  Button,
+  Checkbox,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert,
-  MacOSBadge,
-  MacOSModal,
-  MacOSStatCard } from
-
-
-
-'../ui/macos';
+  Alert,
+  Badge,
+  Modal,
+  MacOSStatCard,
+} from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings';
@@ -117,7 +114,7 @@ const WizardSettings = () => {
               Настройки мастера регистрации
             </h2>
           </div>
-          <MacOSLoadingSkeleton height="400px" />
+          <Skeleton height="400px" />
       </MacOSCard>);
 
   }
@@ -155,14 +152,14 @@ const WizardSettings = () => {
           title="Не удалось загрузить настройки"
           description="Проверьте подключение к серверу и попробуйте обновить страницу"
           action={
-          <MacOSButton onClick={fetchSettings} variant="primary">
+          <Button onClick={fetchSettings} variant="primary">
                 <RefreshCw style={{
               width: '16px',
               height: '16px',
               marginRight: '4px'
             }} />
                 Попробовать снова
-              </MacOSButton>
+              </Button>
           } />
 
       </MacOSCard>);
@@ -201,7 +198,7 @@ const WizardSettings = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Критическая ошибка */}
           {error &&
-          <MacOSAlert
+          <Alert
             type="error"
             title="Ошибка загрузки"
             message={error}
@@ -243,7 +240,7 @@ const WizardSettings = () => {
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MacOSCheckbox
+                <Checkbox
                   checked={settings.use_new_wizard}
                   onChange={handleToggleWizard} />
 
@@ -310,12 +307,12 @@ const WizardSettings = () => {
                 }}>
                   Классический мастер
                 </h4>
-                <MacOSBadge
+                <Badge
                   variant={!settings.use_new_wizard ? 'primary' : 'secondary'}
                   size="sm">
 
                   {!settings.use_new_wizard ? 'Активен' : 'Неактивен'}
-                </MacOSBadge>
+                </Badge>
               </div>
               <ul style={{
                 fontSize: 'var(--mac-font-size-sm)',
@@ -354,12 +351,12 @@ const WizardSettings = () => {
                 }}>
                   Новый мастер
                 </h4>
-                <MacOSBadge
+                <Badge
                   variant={settings.use_new_wizard ? 'success' : 'secondary'}
                   size="sm">
 
                   {settings.use_new_wizard ? 'Активен' : 'Неактивен'}
-                </MacOSBadge>
+                </Badge>
               </div>
               <ul style={{
                 fontSize: 'var(--mac-font-size-sm)',
@@ -431,7 +428,7 @@ const WizardSettings = () => {
             borderTop: '1px solid var(--mac-border)',
             flexWrap: 'wrap'
           }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={fetchSettings}
               disabled={saving}
@@ -444,9 +441,9 @@ const WizardSettings = () => {
               }}>
 
               Отменить
-            </MacOSButton>
+            </Button>
             
-            <MacOSButton
+            <Button
               type="button"
               title={saving ? 'Saving wizard settings' : 'Save wizard settings'}
               aria-label={saving ? 'Saving wizard settings' : 'Save wizard settings'}
@@ -477,13 +474,13 @@ const WizardSettings = () => {
                   Сохранить
                 </>
               }
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Модальное окно подтверждения */}
-      <MacOSModal
+      <Modal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title="Подтверждение изменений"
@@ -505,14 +502,14 @@ const WizardSettings = () => {
             justifyContent: 'flex-end',
             gap: 'var(--mac-spacing-sm)'
           }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}
               disabled={saving}>
 
               Отмена
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               type="button"
               title={saving ? 'Saving wizard settings' : 'Confirm wizard settings save'}
               aria-label={saving ? 'Saving wizard settings' : 'Confirm wizard settings save'}
@@ -543,10 +540,10 @@ const WizardSettings = () => {
                   Подтвердить
                 </>
               }
-            </MacOSButton>
+            </Button>
           </div>
         </div>
-      </MacOSModal>
+      </Modal>
     </MacOSCard>);
 
 };

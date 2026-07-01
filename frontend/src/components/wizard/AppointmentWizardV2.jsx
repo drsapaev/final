@@ -22,7 +22,9 @@ import {
 'lucide-react';
 import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
-import { MacOSInput, MacOSButton } from '../ui/macos';
+import {
+  Input, Button,
+} from '../ui/macos';
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
@@ -2916,7 +2918,7 @@ const AppointmentWizardV2 = ({
   <div style={wizardHeaderShellStyle}>
       {/* 1. Поиск (Слева) */}
       <div style={{ flex: '0 0 300px', minWidth: 0 }}>
-        <MacOSInput
+        <Input
         placeholder="Поиск услуги (название или код)..."
         value={serviceSearchQuery}
         onChange={(e) => setServiceSearchQuery(e.target.value)}
@@ -3093,13 +3095,13 @@ const AppointmentWizardV2 = ({
             Для создания записей пациентов необходима роль Регистратора
             (включая Receptionist) или Администратора.
           </p>
-          <MacOSButton
+          <Button
             onClick={onClose}
             variant="primary"
             style={{ marginTop: 'var(--mac-spacing-4)' }}>
 
             Закрыть
-          </MacOSButton>
+          </Button>
         </div>
       </ModernDialog>);
 
@@ -3251,7 +3253,7 @@ const PatientStepV2 = ({
             ФИО пациента *
           </label>
           <div style={{ position: 'relative' }}>
-            <MacOSInput
+            <Input
               ref={fioRef}
               type="text"
               value={safeData.fio || ''}
@@ -3423,7 +3425,7 @@ const PatientStepV2 = ({
           }}>
             Телефон <span style={{ color: 'var(--mac-text-tertiary)', fontWeight: 'normal' }}>(необязательно)</span>
           </label>
-          <MacOSInput
+          <Input
             ref={phoneRef}
             type="tel"
             value={data.phone}
@@ -3510,7 +3512,7 @@ const PatientStepV2 = ({
           }}>
             Дата рождения
           </label>
-          <MacOSInput
+          <Input
             type="text"
             value={formattedBirthDate}
             onChange={(e) => onBirthDateChange(e.target.value)}
@@ -3549,7 +3551,7 @@ const PatientStepV2 = ({
           }}>
             Адрес
           </label>
-          <MacOSInput
+          <Input
             type="text"
             value={data.address}
             onChange={(e) => onUpdate('address', e.target.value)}
@@ -4023,12 +4025,12 @@ const CartStepV2 = ({
             }}>
                 Повторная скидка для консультаций
               </span>
-              <MacOSButton
+              <Button
               size="sm"
               onClick={onApplyRepeatSuggestion}
               disabled={Boolean(isRepeatEligibilityLoading)}>
                 Применить повторную скидку
-              </MacOSButton>
+              </Button>
             </div>
 
             {repeatSuggestionSummary?.hasMixed &&

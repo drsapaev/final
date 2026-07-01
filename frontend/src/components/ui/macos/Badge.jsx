@@ -1,5 +1,4 @@
 import React from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 
 /**
@@ -13,8 +12,8 @@ const Badge = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
-  useTheme();
+}, ref) => {
+  // SW-01: removed useTheme() — Badge doesn't use theme values
 
   // Size mapping
   const sizeMap = {

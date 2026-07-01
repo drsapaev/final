@@ -10,7 +10,9 @@ import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
 import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
-import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Button,
+} from '../components/ui/macos';
 
 // Get user role for role-based UI
 const getUserRole = () => {

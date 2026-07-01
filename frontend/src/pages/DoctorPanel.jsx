@@ -8,10 +8,8 @@ import {
   CardHeader,
   CardContent,
   Badge,
-
-
-  Skeleton } from
-'../components/ui/macos';
+  Skeleton,
+} from '../components/ui/macos';
 import AnimatedTransition from '../components/ui/native/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/animations.css';

@@ -16,10 +16,10 @@ import {
 
 import {
   Card as MacOSCard,
-  MacOSBadge,
+  Badge,
   MacOSEmptyState,
-  MacOSButton,
-  MacOSLoadingSkeleton,
+  Button,
+  Skeleton,
   MacOSStatCard,
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
@@ -215,7 +215,7 @@ const AdminDashboard = () => {
 
         {statsLoading ? (
           <div style={adminKpiGridStyle} aria-label="Загрузка ключевых показателей администратора" aria-busy="true">
-            <MacOSLoadingSkeleton type="card" count={6} />
+            <Skeleton type="card" count={6} />
           </div>
         ) : statsError ? (
           <MacOSEmptyState
@@ -223,10 +223,10 @@ const AdminDashboard = () => {
             title="Ошибка загрузки статистики"
             description="Не удалось загрузить данные. Проверьте подключение к серверу."
             action={(
-              <MacOSButton onClick={refreshStats} variant="primary">
+              <Button onClick={refreshStats} variant="primary">
                 <RefreshCw size={16} />
                 Повторить попытку
-              </MacOSButton>
+              </Button>
             )}
           />
         ) : (
@@ -259,10 +259,10 @@ const AdminDashboard = () => {
                 color: 'var(--mac-text-primary)',
                 margin: 0,
               }}>Активность системы</h3>
-              <MacOSButton variant="outline" size="sm">
+              <Button variant="outline" size="sm">
                 <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Экспорт
-              </MacOSButton>
+              </Button>
             </div>
             {activityChartLoading ? (
               <div style={{
@@ -273,7 +273,7 @@ const AdminDashboard = () => {
                 justifyContent: 'center',
                 background: adminSurface,
               }}>
-                <MacOSLoadingSkeleton type="text" count={3} />
+                <Skeleton type="text" count={3} />
               </div>
             ) : activityChartError ? (
               <div style={{
@@ -380,14 +380,14 @@ const AdminDashboard = () => {
                 color: 'var(--mac-text-primary)',
                 margin: 0,
               }}>Последние действия</h3>
-              <MacOSButton variant="outline" size="sm">
+              <Button variant="outline" size="sm">
                 <Eye style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Все
-              </MacOSButton>
+              </Button>
             </div>
             {recentActivitiesLoading ? (
               <div style={{ padding: '16px' }}>
-                <MacOSLoadingSkeleton type="text" count={4} />
+                <Skeleton type="text" count={4} />
               </div>
             ) : recentActivitiesError ? (
               <div style={{ padding: '16px' }}>
@@ -442,11 +442,11 @@ const AdminDashboard = () => {
               color: 'var(--mac-text-primary)',
               margin: 0,
             }}>Системные уведомления</h3>
-            <MacOSBadge variant="warning">{systemAlerts.length}</MacOSBadge>
+            <Badge variant="warning">{systemAlerts.length}</Badge>
           </div>
           {systemAlertsLoading ? (
             <div style={{ padding: '16px' }}>
-              <MacOSLoadingSkeleton type="text" count={3} />
+              <Skeleton type="text" count={3} />
             </div>
           ) : systemAlertsError ? (
             <div style={{ padding: '16px' }}>
@@ -486,9 +486,9 @@ const AdminDashboard = () => {
                       margin: '4px 0 0 0',
                     }}>{alert.time}</p>
                   </div>
-                  <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
+                  <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
                     {alert.priority}
-                  </MacOSBadge>
+                  </Badge>
                 </div>
               ))}
             </div>

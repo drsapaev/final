@@ -23,12 +23,11 @@ import {
 
 'lucide-react';
 import {
-  MacOSInput,
-  MacOSButton,
-  MacOSBadge,
-  MacOSSelect } from
-
-'../ui/macos';
+  Input,
+  Button,
+  Badge,
+  Select,
+} from '../ui/macos';
 import './EnhancedAppointmentsTable.css';
 
 import { QueueActionButtons } from '../queue/QueueManagementCard';
@@ -1230,7 +1229,7 @@ const EnhancedAppointmentsTable = ({
         }}>
           {/* Поиск */}
           <div style={{ position: 'relative', minWidth: '200px', maxWidth: '300px', flex: '1 1 auto' }}>
-            <MacOSInput
+            <Input
               type="text"
               placeholder={t.search}
               value={filterConfig.search}
@@ -1241,7 +1240,7 @@ const EnhancedAppointmentsTable = ({
           </div>
 
           {/* Фильтр по статусу */}
-          <MacOSSelect
+          <Select
             value={filterConfig.status}
             onChange={(e) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
@@ -1259,7 +1258,7 @@ const EnhancedAppointmentsTable = ({
 
 
           {/* Экспорт */}
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={handleExport}
             style={{
@@ -1272,13 +1271,13 @@ const EnhancedAppointmentsTable = ({
 
             <Download size={16} />
             {t.export}
-          </MacOSButton>
+          </Button>
 
           {/* Информация о выбранных */}
           {showCheckboxes && selectedRows.size > 0 &&
-          <MacOSBadge variant="info" style={{ flex: '0 0 auto' }}>
+          <Badge variant="info" style={{ flex: '0 0 auto' }}>
               {t.selected}: {selectedRows.size}
-            </MacOSBadge>
+            </Badge>
           }
         </div>
       </div>

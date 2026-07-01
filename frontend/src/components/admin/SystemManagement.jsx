@@ -26,15 +26,14 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSCheckbox,
-  MacOSTable,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
+  Table,
   MacOSEmptyState,
-  Select } from
-
-'../ui/macos';
+  Select,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -239,14 +238,14 @@ const SystemManagement = () => {
             <Activity style={{ width: '20px', height: '20px' }} />
             Состояние системы
           </h3>
-          <MacOSButton
+          <Button
           onClick={collectMetricsNow}
           variant="outline"
           size="sm">
 
             <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
-          </MacOSButton>
+          </Button>
         </div>
 
         {systemHealth &&
@@ -313,9 +312,9 @@ const SystemManagement = () => {
                 <Cpu style={{ width: '16px', height: '16px' }} />
                 CPU
               </h4>
-              <MacOSBadge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
+              <Badge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
                 {systemMetrics.cpu?.usage_percent?.toFixed(1)}%
-              </MacOSBadge>
+              </Badge>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{
@@ -349,9 +348,9 @@ const SystemManagement = () => {
                 <MemoryStick style={{ width: '16px', height: '16px' }} />
                 Память
               </h4>
-              <MacOSBadge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
+              <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
                 {systemMetrics.memory?.usage_percent?.toFixed(1)}%
-              </MacOSBadge>
+              </Badge>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{
@@ -389,9 +388,9 @@ const SystemManagement = () => {
                 <HardDrive style={{ width: '16px', height: '16px' }} />
                 Диск
               </h4>
-              <MacOSBadge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
+              <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
                 {systemMetrics.disk?.usage_percent?.toFixed(1)}%
-              </MacOSBadge>
+              </Badge>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{
@@ -452,9 +451,9 @@ const SystemManagement = () => {
           border: '1px solid var(--mac-border)'
         }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <MacOSBadge variant={getSeverityColor(alert.severity)}>
+                  <Badge variant={getSeverityColor(alert.severity)}>
                     {alert.severity}
-                  </MacOSBadge>
+                  </Badge>
                   <span style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-primary)'
@@ -526,7 +525,7 @@ const SystemManagement = () => {
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-primary)'
           }}>
-              <MacOSCheckbox
+              <Checkbox
               checked={backupForm.include_files}
               onChange={(checked) => setBackupForm((prev) => ({ ...prev, include_files: checked }))}
               style={{ marginRight: '8px' }} />
@@ -536,7 +535,7 @@ const SystemManagement = () => {
           </div>
 
           <div>
-            <MacOSButton
+            <Button
             onClick={createBackup}
             disabled={loading}
             style={{ width: '100%' }}>
@@ -547,7 +546,7 @@ const SystemManagement = () => {
             <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             }
               Создать бэкап
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
@@ -567,14 +566,14 @@ const SystemManagement = () => {
             <Shield style={{ width: '20px', height: '20px' }} />
             Список бэкапов
           </h3>
-          <MacOSButton
+          <Button
           onClick={loadBackups}
           variant="outline"
           size="sm">
 
             <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
-          </MacOSButton>
+          </Button>
         </div>
 
         {backups.length === 0 ?
@@ -585,7 +584,7 @@ const SystemManagement = () => {
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} /> :
 
 
-      <MacOSTable
+      <Table
         columns={[
         { key: 'name', label: 'Название' },
         { key: 'type', label: 'Тип' },
@@ -601,20 +600,20 @@ const SystemManagement = () => {
                   <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{backup.name}</span>
                       </div>,
 
-          type: <MacOSBadge variant="outline">{backup.type}</MacOSBadge>,
+          type: <Badge variant="outline">{backup.type}</Badge>,
           size: formatBytes(backup.size),
           created_at: new Date(backup.created_at).toLocaleString(),
           actions:
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <MacOSButton
+                  <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     title={`View backup ${backup.name}`}
                     aria-label={`View backup ${backup.name}`}>
                     <Eye aria-hidden="true" style={{ width: '14px', height: '14px' }} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               type="button"
               onClick={() => deleteBackup(backup.name)}
               size="sm"
@@ -624,7 +623,7 @@ const SystemManagement = () => {
               style={{ color: 'var(--mac-error)' }}>
 
                     <Trash2 aria-hidden="true" style={{ width: '14px', height: '14px' }} />
-                  </MacOSButton>
+                  </Button>
                       </div>
 
         }))}
@@ -677,7 +676,7 @@ const SystemManagement = () => {
               }}>
                   CPU (%)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={thresholds.cpu_usage || 80}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, cpu_usage: parseInt(e.target.value) }))}
@@ -696,7 +695,7 @@ const SystemManagement = () => {
               }}>
                   Память (%)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={thresholds.memory_usage || 85}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, memory_usage: parseInt(e.target.value) }))}
@@ -715,7 +714,7 @@ const SystemManagement = () => {
               }}>
                   Диск (%)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={thresholds.disk_usage || 90}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, disk_usage: parseInt(e.target.value) }))}
@@ -759,9 +758,9 @@ const SystemManagement = () => {
                     Ежедневно в 02:00
                   </div>
                 </div>
-                <MacOSButton size="sm" variant="outline">
+                <Button size="sm" variant="outline">
                   Настроить
-                </MacOSButton>
+                </Button>
               </div>
               
               <div style={{
@@ -787,18 +786,18 @@ const SystemManagement = () => {
                     Email при критических алертах
                   </div>
                 </div>
-                <MacOSButton size="sm" variant="outline">
+                <Button size="sm" variant="outline">
                   Настроить
-                </MacOSButton>
+                </Button>
               </div>
             </div>
           </div>
         </div>
         
         <div style={{ marginTop: '24px' }}>
-          <MacOSButton>
+          <Button>
             Сохранить настройки
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -838,9 +837,9 @@ const SystemManagement = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {systemHealth &&
-          <MacOSBadge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
+          <Badge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
               {systemHealth.overall_status}
-            </MacOSBadge>
+            </Badge>
           }
         </div>
       </div>

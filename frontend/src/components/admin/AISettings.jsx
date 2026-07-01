@@ -21,7 +21,9 @@ import {
 
 
 'lucide-react';
-import { Card, Button, Badge, MacOSInput, MacOSCheckbox } from '../ui/macos';
+import {
+  Card, Button, Badge, Input, Checkbox,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -649,7 +651,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             }}>
               Имя провайдера *
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
@@ -669,7 +671,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             }}>
               Отображаемое имя *
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={formData.display_name}
               onChange={(e) => setFormData((prev) => ({ ...prev, display_name: e.target.value }))}
@@ -690,7 +692,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               <Key style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               API ключ
             </label>
-            <MacOSInput
+            <Input
               type="password"
               value={formData.api_key}
               onChange={(e) => setFormData((prev) => ({ ...prev, api_key: e.target.value }))}
@@ -709,7 +711,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             }}>
               Модель
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={formData.model}
               onChange={(e) => setFormData((prev) => ({ ...prev, model: e.target.value }))}
@@ -728,7 +730,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             }}>
               Температура
             </label>
-            <MacOSInput
+            <Input
               type="number"
               min="0"
               max="2"
@@ -749,7 +751,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             }}>
               Макс. токенов
             </label>
-            <MacOSInput
+            <Input
               type="number"
               min="100"
               max="8000"
@@ -762,7 +764,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.active}
               onChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
               style={{ marginRight: '8px' }} />
@@ -771,7 +773,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
           </label>
           
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.is_default}
               onChange={(checked) => setFormData((prev) => ({ ...prev, is_default: checked }))}
               style={{ marginRight: '8px' }} />
@@ -808,7 +810,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
         <div>
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.enabled || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, enabled: checked }))}
               style={{ marginRight: '8px' }} />
@@ -819,7 +821,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
 
         <div>
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.cache_enabled || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, cache_enabled: checked }))}
               style={{ marginRight: '8px' }} />
@@ -830,7 +832,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
 
         <div>
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.require_consent_for_files || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, require_consent_for_files: checked }))}
               style={{ marginRight: '8px' }} />
@@ -841,7 +843,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
 
         <div>
           <label style={{ display: 'flex', alignItems: 'center' }}>
-            <MacOSCheckbox
+            <Checkbox
               checked={formData.anonymize_data || false}
               onChange={(checked) => setFormData((prev) => ({ ...prev, anonymize_data: checked }))}
               style={{ marginRight: '8px' }} />

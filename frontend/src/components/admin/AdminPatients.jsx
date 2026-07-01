@@ -6,13 +6,12 @@ import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
 import {
-  MacOSBadge,
-  MacOSButton,
+  Badge,
+  Button,
   MacOSCard,
   MacOSEmptyState,
-  MacOSInput,
-  MacOSLoadingSkeleton,
-  Button,
+  Input,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
@@ -244,9 +243,9 @@ const AdminPatients = () => {
               Карточки пациентов, контакты и базовые демографические данные.
             </p>
           </div>
-          <MacOSButton onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
+          <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
             Добавить пациента
-          </MacOSButton>
+          </Button>
         </div>
 
         <div
@@ -257,7 +256,7 @@ const AdminPatients = () => {
             marginBottom: '24px',
           }}
         >
-          <MacOSInput
+          <Input
             type="text"
             placeholder="Поиск пациентов..."
             value={searchTerm}
@@ -291,16 +290,16 @@ const AdminPatients = () => {
 
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
-            <MacOSLoadingSkeleton type="table" count={5} />
+            <Skeleton type="table" count={5} />
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
               title="Ошибка загрузки пациентов"
               description="Не удалось загрузить список пациентов. Проверьте соединение и попробуйте снова."
               action={
-                <MacOSButton onClick={refresh} startIcon={<RefreshCw size={16} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
                   Обновить
-                </MacOSButton>
+                </Button>
               }
             />
           ) : patients.length === 0 ? (
@@ -313,9 +312,9 @@ const AdminPatients = () => {
                   : 'В системе пока нет пациентов.'
               }
               action={
-                <MacOSButton onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
+                <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
                   Добавить первого пациента
-                </MacOSButton>
+                </Button>
               }
             />
           ) : (
@@ -410,14 +409,14 @@ const AdminPatients = () => {
                     </td>
                     <td style={textCellStyle}>{formatAge(patient, calculateAge)}</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <MacOSBadge variant={patient.gender === 'male' ? 'info' : 'success'}>
+                      <Badge variant={patient.gender === 'male' ? 'info' : 'success'}>
                         {getGenderLabel(patient.gender)}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={textCellStyle}>{patient.phone || 'Не указан'}</td>
                     <td style={{ padding: '12px 16px' }}>
                       {patient.bloodType ? (
-                        <MacOSBadge variant="warning">{patient.bloodType}</MacOSBadge>
+                        <Badge variant="warning">{patient.bloodType}</Badge>
                       ) : (
                         <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)' }}>
                           Не указано

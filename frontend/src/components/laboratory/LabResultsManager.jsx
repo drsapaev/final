@@ -12,7 +12,6 @@ import {
   Button,
   Input,
   Alert,
-
   Badge,
   Select,
   Option,
@@ -20,8 +19,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Progress } from
-'../ui/macos';
+  Progress,
+} from '../ui/macos';
 import {
   TestTube,
   X,

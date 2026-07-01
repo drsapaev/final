@@ -20,8 +20,8 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  MacOSButton,
-  MacOSInput,
+  Button,
+  Input,
   Switch,
 } from '../ui/macos';
 import { getState as getAuthState } from '../../stores/auth';
@@ -755,13 +755,13 @@ export default function NotificationPreferences() {
           {error || 'Не удалось загрузить настройки уведомлений.'}
         </Alert>
         <div>
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={() => loadSettings({ force: true })}
             startIcon={<RefreshCw size={16} />}
           >
             Повторить загрузку
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     );
@@ -790,23 +790,23 @@ export default function NotificationPreferences() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <MacOSButton
+              <Button
                 variant="outline"
                 onClick={() => loadSettings({ force: true })}
                 disabled={saving}
                 startIcon={<RefreshCw size={16} />}
               >
                 Обновить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 variant="ghost"
                 onClick={handleReset}
                 disabled={!hasChanges || saving}
                 startIcon={<RotateCcw size={16} />}
               >
                 Сбросить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 variant="primary"
                 onClick={handleSave}
                 disabled={!hasChanges}
@@ -814,7 +814,7 @@ export default function NotificationPreferences() {
                 startIcon={<Save size={16} />}
               >
                 Сохранить настройки
-              </MacOSButton>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -900,7 +900,7 @@ export default function NotificationPreferences() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <MacOSInput
+                <Input
                   type={field.type}
                   min={field.min}
                   step={field.step}
@@ -970,7 +970,7 @@ export default function NotificationPreferences() {
               </div>
             </div>
 
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => loadPolicy({ force: true })}
               disabled={saving || policyLoading || !userId}
@@ -981,7 +981,7 @@ export default function NotificationPreferences() {
                 : policyLoaded
                   ? 'Обновить anti-noise policy'
                   : 'Загрузить anti-noise policy'}
-            </MacOSButton>
+            </Button>
           </div>
         </CardHeader>
         <CardContent style={{ display: 'grid', gap: 16 }}>
@@ -1013,7 +1013,7 @@ export default function NotificationPreferences() {
                     `muted_until`: полное подавление realtime-сигналов до указанного времени.
                   </div>
                 </div>
-                <MacOSInput
+                <Input
                   type="datetime-local"
                   value={toDateTimeLocalValue(policyDraft.muted_until)}
                   disabled={saving}
@@ -1045,7 +1045,7 @@ export default function NotificationPreferences() {
                     `snooze_until`: временное подавление без отключения policy.
                   </div>
                 </div>
-                <MacOSInput
+                <Input
                   type="datetime-local"
                   value={toDateTimeLocalValue(policyDraft.snooze_until)}
                   disabled={saving}
@@ -1126,7 +1126,7 @@ export default function NotificationPreferences() {
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <MacOSInput
+                  <Input
                     type="time"
                     value={policyDraft.dnd?.start || '22:00'}
                     disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
@@ -1140,7 +1140,7 @@ export default function NotificationPreferences() {
                       }))
                     }
                   />
-                  <MacOSInput
+                  <Input
                     type="time"
                     value={policyDraft.dnd?.end || '07:00'}
                     disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
@@ -1226,15 +1226,15 @@ export default function NotificationPreferences() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <MacOSButton
+            <Button
               variant="ghost"
               onClick={handleReset}
               disabled={!hasChanges || saving}
               startIcon={<RotateCcw size={16} />}
             >
               Сбросить изменения
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               variant="primary"
               onClick={handleSave}
               disabled={!hasChanges}
@@ -1242,7 +1242,7 @@ export default function NotificationPreferences() {
               startIcon={<Bell size={16} />}
             >
               Применить настройки
-            </MacOSButton>
+            </Button>
           </div>
         </CardContent>
       </Card>

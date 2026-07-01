@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea,
-
-
-  MacOSCheckbox } from
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Textarea,
+  Checkbox,
+} from '../ui/macos';
 import {
   FileCheck,
   AlertTriangle,
@@ -250,19 +248,19 @@ const QualityControl = () => {
             <FileCheck style={{ width: '16px', height: '16px' }} />
             Медицинские записи для анализа
           </h4>
-          <MacOSButton
+          <Button
           onClick={addMedicalRecord}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalRecords.map((record, index) =>
         <div key={record.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSSelect
+              <Select
             value={record.type}
             onChange={(e) => {
               const newRecords = [...medicalRecords];
@@ -277,7 +275,7 @@ const QualityControl = () => {
             }
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={record.diagnosis}
             onChange={(e) => {
@@ -288,7 +286,7 @@ const QualityControl = () => {
             placeholder="Диагноз"
             style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={record.treatment}
             onChange={(e) => {
@@ -299,7 +297,7 @@ const QualityControl = () => {
             placeholder="Лечение"
             style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove medical record"
             aria-label={`Remove medical record ${index + 1}`}
@@ -308,7 +306,7 @@ const QualityControl = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -345,7 +343,7 @@ const QualityControl = () => {
           }}>
               Порог полноты (%)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={qualityStandards.completeness_threshold}
             onChange={(e) => setQualityStandards((prev) => ({ ...prev, completeness_threshold: parseInt(e.target.value) || 90 }))}
@@ -362,7 +360,7 @@ const QualityControl = () => {
           }}>
               Своевременность (часы)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={qualityStandards.documentation_timeliness}
             onChange={(e) => setQualityStandards((prev) => ({ ...prev, documentation_timeliness: parseInt(e.target.value) || 24 }))}
@@ -370,7 +368,7 @@ const QualityControl = () => {
           
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MacOSCheckbox
+            <Checkbox
             id="required_signatures"
             checked={qualityStandards.required_signatures}
             onChange={(e) => setQualityStandards((prev) => ({ ...prev, required_signatures: e.target.checked }))} />
@@ -384,7 +382,7 @@ const QualityControl = () => {
             </label>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MacOSCheckbox
+            <Checkbox
             id="icd_coding_required"
             checked={qualityStandards.icd_coding_required}
             onChange={(e) => setQualityStandards((prev) => ({ ...prev, icd_coding_required: e.target.checked }))} />
@@ -435,7 +433,7 @@ const QualityControl = () => {
           }}>
               ID пациента
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientRecord.patient_id}
             onChange={(e) => setPatientRecord((prev) => ({ ...prev, patient_id: e.target.value }))}
@@ -452,7 +450,7 @@ const QualityControl = () => {
           }}>
               ФИО пациента
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientRecord.name}
             onChange={(e) => setPatientRecord((prev) => ({ ...prev, name: e.target.value }))}
@@ -469,7 +467,7 @@ const QualityControl = () => {
           }}>
               Диагноз
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientRecord.diagnosis}
             onChange={(e) => setPatientRecord((prev) => ({ ...prev, diagnosis: e.target.value }))}
@@ -486,7 +484,7 @@ const QualityControl = () => {
           }}>
               Симптомы
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientRecord.symptoms}
             onChange={(e) => setPatientRecord((prev) => ({ ...prev, symptoms: e.target.value }))}
@@ -513,19 +511,19 @@ const QualityControl = () => {
             <Search style={{ width: '16px', height: '16px' }} />
             Обязательные поля для проверки
           </h4>
-          <MacOSButton
+          <Button
           onClick={addRequiredField}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить поле
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {requiredFields.map((field, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="text"
             value={field}
             onChange={(e) => {
@@ -536,7 +534,7 @@ const QualityControl = () => {
             placeholder="Название поля"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove required field"
             aria-label={`Remove required field ${index + 1}`}
@@ -545,7 +543,7 @@ const QualityControl = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -586,7 +584,7 @@ const QualityControl = () => {
           }}>
               Оценка полноты (%)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={recordAnalysis.completeness_score}
             onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, completeness_score: parseOptionalInteger(e.target.value) }))}
@@ -603,7 +601,7 @@ const QualityControl = () => {
           }}>
               Отсутствующие поля
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={recordAnalysis.missing_fields.join(', ')}
             onChange={(e) => setRecordAnalysis((prev) => ({ ...prev, missing_fields: parseCommaSeparated(e.target.value) }))}
@@ -645,7 +643,7 @@ const QualityControl = () => {
           }}>
               Стандарт документации
             </label>
-            <MacOSSelect
+            <Select
             value={bestPractices.documentation_standards}
             onChange={(e) => setBestPractices((prev) => ({ ...prev, documentation_standards: e.target.value }))}
             placeholder="Выберите стандарт"
@@ -659,7 +657,7 @@ const QualityControl = () => {
           
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MacOSCheckbox
+            <Checkbox
             id="template_usage"
             checked={bestPractices.template_usage}
             onChange={(e) => setBestPractices((prev) => ({ ...prev, template_usage: e.target.checked }))} />
@@ -673,7 +671,7 @@ const QualityControl = () => {
             </label>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MacOSCheckbox
+            <Checkbox
             id="real_time_documentation"
             checked={bestPractices.real_time_documentation}
             onChange={(e) => setBestPractices((prev) => ({ ...prev, real_time_documentation: e.target.checked }))} />
@@ -720,7 +718,7 @@ const QualityControl = () => {
           }}>
               Диагноз
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={diagnosis}
             onChange={(e) => setDiagnosis(e.target.value)}
@@ -738,19 +736,19 @@ const QualityControl = () => {
             }}>
                 Симптомы
               </label>
-              <MacOSButton
+              <Button
               onClick={addSymptom}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
               
                 <Plus style={{ width: '12px', height: '12px' }} />
                 Добавить
-              </MacOSButton>
+              </Button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '96px', overflowY: 'auto' }}>
               {symptoms.map((symptom, index) =>
             <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <MacOSInput
+                  <Input
                 type="text"
                 value={symptom}
                 onChange={(e) => {
@@ -761,7 +759,7 @@ const QualityControl = () => {
                 placeholder="Симптом"
                 style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
               
-                  <MacOSButton
+                  <Button
                 type="button"
                 title="Remove symptom"
                 aria-label={`Remove symptom ${index + 1}`}
@@ -770,7 +768,7 @@ const QualityControl = () => {
                 style={{ padding: '4px', minWidth: 'auto' }}>
                 
                     <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-                  </MacOSButton>
+                  </Button>
                 </div>
             )}
             </div>
@@ -786,7 +784,7 @@ const QualityControl = () => {
           }}>
               Лечение (JSON)
             </label>
-            <MacOSTextarea
+            <Textarea
             value={JSON.stringify(treatment, null, 2)}
             onChange={(e) => {
               try {
@@ -827,19 +825,19 @@ const QualityControl = () => {
             <Shield style={{ width: '16px', height: '16px' }} />
             Назначения для проверки
           </h4>
-          <MacOSButton
+          <Button
           onClick={addPrescription}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить назначение
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {prescriptions.map((prescription, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="text"
             value={prescription.medication}
             onChange={(e) => {
@@ -850,7 +848,7 @@ const QualityControl = () => {
             placeholder="Препарат"
             style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={prescription.dosage}
             onChange={(e) => {
@@ -861,7 +859,7 @@ const QualityControl = () => {
             placeholder="Дозировка"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={prescription.frequency}
             onChange={(e) => {
@@ -872,7 +870,7 @@ const QualityControl = () => {
             placeholder="Частота"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove prescription"
             aria-label={`Remove prescription ${index + 1}`}
@@ -881,7 +879,7 @@ const QualityControl = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
             
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -918,7 +916,7 @@ const QualityControl = () => {
           }}>
               Возраст
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={patientProfile.age}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, age: parseOptionalInteger(e.target.value) }))}
@@ -935,7 +933,7 @@ const QualityControl = () => {
           }}>
               Пол
             </label>
-            <MacOSSelect
+            <Select
             value={patientProfile.gender}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, gender: e.target.value }))}
             placeholder="Выберите пол"
@@ -956,7 +954,7 @@ const QualityControl = () => {
           }}>
               Вес (кг)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={patientProfile.weight}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, weight: parseOptionalInteger(e.target.value) }))}
@@ -973,7 +971,7 @@ const QualityControl = () => {
           }}>
               Аллергии
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientProfile.allergies.join(', ')}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, allergies: parseCommaSeparated(e.target.value) }))}
@@ -991,7 +989,7 @@ const QualityControl = () => {
           }}>
               Сопутствующие заболевания
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientProfile.comorbidities.join(', ')}
             onChange={(e) => setPatientProfile((prev) => ({ ...prev, comorbidities: parseCommaSeparated(e.target.value) }))}
@@ -1053,22 +1051,22 @@ const QualityControl = () => {
             Результат анализа качества
           </h3>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <MacOSButton
+            <Button
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={exportResult}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -1237,7 +1235,7 @@ const QualityControl = () => {
             {activeTab === 'prescription-safety' && renderPrescriptionSafety()}
             
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
-              <MacOSButton
+              <Button
                 type="button"
                 title={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
                 aria-label={loading ? 'Running quality control AI analysis' : 'Run quality control AI analysis'}
@@ -1260,7 +1258,7 @@ const QualityControl = () => {
                     Запустить AI анализ
                   </>
                 }
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 

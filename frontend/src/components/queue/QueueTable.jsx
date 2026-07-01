@@ -1,4 +1,6 @@
-import { Badge, Icon } from '../ui/macos';
+import {
+  Badge, Icon,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../../utils/dateUtils';
 

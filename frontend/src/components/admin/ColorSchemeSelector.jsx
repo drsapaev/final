@@ -4,7 +4,9 @@ import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun, SwatchBook } fr
 import { useTheme } from '../../contexts/ThemeContext';
 import { useMacOSTheme } from '../../theme/macosTheme.jsx';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
-import { MacOSCard, Select } from '../ui/macos';
+import {
+  MacOSCard, Select,
+} from '../ui/macos';
 
 const ICONS = {
   light: Sun,

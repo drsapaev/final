@@ -1,4 +1,6 @@
-import { Card, Badge } from '../ui/macos';
+import {
+  Card, Badge,
+} from '../ui/macos';
 import { Clock, User } from 'lucide-react';
 import PropTypes from 'prop-types';
 

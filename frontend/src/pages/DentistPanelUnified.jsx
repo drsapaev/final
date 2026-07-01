@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
-import { Button, Badge, Card } from '../components/ui/macos';
+import {
+  Button, Badge, Card,
+} from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth.js';
 import { apiClient } from '../api/client';

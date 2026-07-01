@@ -2,7 +2,9 @@ import React, { startTransition, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../hooks/useTranslation';
-import { MacOSButton, MacOSCard } from '../components/ui/macos';
+import {
+  Button, MacOSCard,
+} from '../components/ui/macos';
 import {
   Activity,
   ArrowRight,
@@ -278,7 +280,7 @@ export default function Landing() {
           </nav>
 
           <div className="landing-toolbar">
-            <MacOSButton
+            <Button
               variant="ghost"
               size="sm"
               onClick={toggleTheme}
@@ -287,9 +289,9 @@ export default function Landing() {
               title={isDark ? t('lightTheme') : t('darkTheme')}
             >
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            </MacOSButton>
+            </Button>
 
-            <MacOSButton
+            <Button
               variant="ghost"
               size="sm"
               onClick={handleLanguageCycle}
@@ -299,12 +301,12 @@ export default function Landing() {
             >
               <span className="landing-language-flag">{currentLanguage?.flag || '🌐'}</span>
               <span>{language.toUpperCase()}</span>
-            </MacOSButton>
+            </Button>
 
-            <MacOSButton variant="primary" size="sm" onClick={() => navigate('/login')} className="landing-header-login">
+            <Button variant="primary" size="sm" onClick={() => navigate('/login')} className="landing-header-login">
               <User size={16} />
               {copy.headerLogin}
-            </MacOSButton>
+            </Button>
           </div>
         </header>
 
@@ -320,15 +322,15 @@ export default function Landing() {
             <p className="landing-hero-description">{copy.hero.description}</p>
 
             <div className="landing-cta-row">
-              <MacOSButton variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
+              <Button variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
                 <User size={18} />
                 {copy.hero.primaryCta}
-              </MacOSButton>
+              </Button>
 
-              <MacOSButton variant="outline" size="lg" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
+              <Button variant="outline" size="lg" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
                 <ArrowRight size={18} />
                 {copy.hero.secondaryCta}
-              </MacOSButton>
+              </Button>
             </div>
 
             <div className="landing-role-pills" aria-label="Product highlights">
@@ -570,14 +572,14 @@ export default function Landing() {
                   ))}
                 </ul>
 
-                <MacOSButton
+                <Button
                   variant={plan.featured ? 'primary' : 'outline'}
                   size="lg"
                   onClick={() => navigate('/login')}
                   className="landing-plan-button"
                 >
                   {plan.cta}
-                </MacOSButton>
+                </Button>
               </MacOSCard>
             ))}
           </div>
@@ -619,14 +621,14 @@ export default function Landing() {
             </div>
 
             <div className="landing-final-actions">
-              <MacOSButton variant="primary" size="lg" onClick={() => navigate('/login')}>
+              <Button variant="primary" size="lg" onClick={() => navigate('/login')}>
                 <User size={18} />
                 {copy.finalCta.primaryCta}
-              </MacOSButton>
-              <MacOSButton variant="outline" size="lg" onClick={() => navigate('/login')}>
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => navigate('/login')}>
                 <Key size={18} />
                 {copy.finalCta.secondaryCta}
-              </MacOSButton>
+              </Button>
 
               <div className="landing-contact-list">
                 <ContactRow icon={MapPin} label={copy.contactLabels.address} value={t('address')} />

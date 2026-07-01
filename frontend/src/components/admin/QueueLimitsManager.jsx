@@ -17,11 +17,10 @@ import logger from '../../utils/logger';
 import { apiRequest } from '../../api/client';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSTable } from
-
-'../ui/macos';
+  Button,
+  Input,
+  Table,
+} from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -220,7 +219,7 @@ const QueueLimitsManager = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <MacOSButton
+              <Button
                 onClick={() => loadData()}
                 variant="outline"
                 style={{
@@ -232,8 +231,8 @@ const QueueLimitsManager = () => {
                 
                 <RefreshCw style={{ width: '16px', height: '16px' }} />
                 Обновить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 onClick={() => resetLimits()}
                 style={{
                   display: 'flex',
@@ -245,7 +244,7 @@ const QueueLimitsManager = () => {
                 }}>
                 
                 Сбросить все
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -369,7 +368,7 @@ const QueueLimitsManager = () => {
                         Максимум в день:
                       </label>
                       {isEditing ?
-                      <MacOSInput
+                      <Input
                         type="number"
                         min="1"
                         max="100"
@@ -405,7 +404,7 @@ const QueueLimitsManager = () => {
                         Начальный номер:
                       </label>
                       {isEditing ?
-                      <MacOSInput
+                      <Input
                         type="number"
                         min="1"
                         max="999"
@@ -436,7 +435,7 @@ const QueueLimitsManager = () => {
                   }}>
                     {isEditing ?
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <MacOSButton
+                        <Button
                         onClick={() => saveChanges(limit.specialty)}
                         disabled={saving}
                         style={{
@@ -452,8 +451,8 @@ const QueueLimitsManager = () => {
                         
                           <Save style={{ width: '16px', height: '16px' }} />
                           {saving ? 'Сохранение...' : 'Сохранить'}
-                        </MacOSButton>
-                        <MacOSButton
+                        </Button>
+                        <Button
                         onClick={cancelEditing}
                         disabled={saving}
                         variant="outline"
@@ -465,11 +464,11 @@ const QueueLimitsManager = () => {
                         }}>
                         
                           <X style={{ width: '16px', height: '16px' }} />
-                        </MacOSButton>
+                        </Button>
                       </div> :
 
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <MacOSButton
+                        <Button
                         onClick={() => startEditing(limit.specialty, limit)}
                         style={{
                           flex: 1,
@@ -484,8 +483,8 @@ const QueueLimitsManager = () => {
                         
                           <Edit style={{ width: '16px', height: '16px' }} />
                           Изменить
-                        </MacOSButton>
-                        <MacOSButton
+                        </Button>
+                        <Button
                         onClick={() => resetLimits(limit.specialty)}
                         variant="outline"
                         style={{
@@ -494,7 +493,7 @@ const QueueLimitsManager = () => {
                         }}>
                         
                           Сброс
-                        </MacOSButton>
+                        </Button>
                       </div>
                     }
                   </div>
@@ -519,7 +518,7 @@ const QueueLimitsManager = () => {
                 Статус очередей по врачам
               </h3>
 
-              <MacOSTable
+              <Table
               columns={[
               { key: 'doctor', label: 'Врач', width: '25%' },
               { key: 'specialty', label: 'Специальность', width: '20%' },

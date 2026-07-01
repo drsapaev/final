@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-
-  MacOSCheckbox } from
-
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Checkbox,
+} from '../ui/macos';
 import {
   Calendar,
   Clock,
@@ -291,7 +288,7 @@ const SmartScheduling = () => {
           }}>
               Имя врача
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={scheduleData.doctor.name}
             onChange={(e) => setScheduleData((prev) => ({
@@ -312,7 +309,7 @@ const SmartScheduling = () => {
           }}>
               Специальность
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={scheduleData.doctor.specialty}
             onChange={(e) => setScheduleData((prev) => ({
@@ -333,7 +330,7 @@ const SmartScheduling = () => {
           }}>
               Опыт работы (лет)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={scheduleData.doctor.experience_years}
             onChange={(e) => setScheduleData((prev) => ({
@@ -378,7 +375,7 @@ const SmartScheduling = () => {
           }}>
               Начало рабочего дня
             </label>
-            <MacOSInput
+            <Input
             type="time"
             value={constraints.working_hours.start}
             onChange={(e) => setConstraints((prev) => ({
@@ -398,7 +395,7 @@ const SmartScheduling = () => {
           }}>
               Конец рабочего дня
             </label>
-            <MacOSInput
+            <Input
             type="time"
             value={constraints.working_hours.end}
             onChange={(e) => setConstraints((prev) => ({
@@ -418,7 +415,7 @@ const SmartScheduling = () => {
           }}>
               Максимум пациентов в день
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={constraints.max_patients_per_day}
             onChange={(e) => setConstraints((prev) => ({
@@ -438,7 +435,7 @@ const SmartScheduling = () => {
           }}>
               Обеденный перерыв (мин)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={constraints.break_requirements.lunch_break}
             onChange={(e) => setConstraints((prev) => ({
@@ -468,19 +465,19 @@ const SmartScheduling = () => {
             <ClipboardList style={{ width: '16px', height: '16px' }} />
             Текущее расписание
           </h4>
-          <MacOSButton
+          <Button
           onClick={addScheduleSlot}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить слот
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {scheduleData.current_schedule.map((slot, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="time"
             value={slot.time}
             onChange={(e) => {
@@ -490,7 +487,7 @@ const SmartScheduling = () => {
             }}
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={slot.type}
             onChange={(e) => {
               const newSchedule = [...scheduleData.current_schedule];
@@ -506,7 +503,7 @@ const SmartScheduling = () => {
             }
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={slot.duration}
             onChange={(e) => {
@@ -557,7 +554,7 @@ const SmartScheduling = () => {
           }}>
               Тип приема
             </label>
-            <MacOSSelect
+            <Select
             value={appointmentData.type}
             onChange={(e) => setAppointmentData((prev) => ({ ...prev, type: e.target.value }))}
             placeholder="Выберите тип"
@@ -580,7 +577,7 @@ const SmartScheduling = () => {
           }}>
               Специальность врача
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={appointmentData.doctor_specialty}
             onChange={(e) => setAppointmentData((prev) => ({ ...prev, doctor_specialty: e.target.value }))}
@@ -598,7 +595,7 @@ const SmartScheduling = () => {
           }}>
               Жалоба пациента
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={appointmentData.complaint}
             onChange={(e) => setAppointmentData((prev) => ({ ...prev, complaint: e.target.value }))}
@@ -607,7 +604,7 @@ const SmartScheduling = () => {
           
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MacOSCheckbox
+            <Checkbox
             id="first_visit"
             checked={appointmentData.is_first_visit}
             onChange={(e) => setAppointmentData((prev) => ({ ...prev, is_first_visit: e.target.checked }))} />
@@ -640,19 +637,19 @@ const SmartScheduling = () => {
             <BarChart3 style={{ width: '16px', height: '16px' }} />
             Исторические данные
           </h4>
-          <MacOSButton
+          <Button
           onClick={addHistoricalRecord}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {historicalData.map((record, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <MacOSSelect
+            <Select
             value={record.type}
             onChange={(e) => {
               const newData = [...historicalData];
@@ -667,7 +664,7 @@ const SmartScheduling = () => {
             }
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={record.actual_duration}
             onChange={(e) => {
@@ -678,7 +675,7 @@ const SmartScheduling = () => {
             placeholder="мин"
             style={{ width: '80px', fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={record.complaint}
             onChange={(e) => {
@@ -729,7 +726,7 @@ const SmartScheduling = () => {
           }}>
               Имя врача
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={doctorProfile.name}
             onChange={(e) => setDoctorProfile((prev) => ({ ...prev, name: e.target.value }))}
@@ -747,7 +744,7 @@ const SmartScheduling = () => {
           }}>
               Специальность
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={doctorProfile.specialty}
             onChange={(e) => setDoctorProfile((prev) => ({ ...prev, specialty: e.target.value }))}
@@ -789,7 +786,7 @@ const SmartScheduling = () => {
           }}>
               Срочность
             </label>
-            <MacOSSelect
+            <Select
             value={patientRequirements.urgency}
             onChange={(e) => setPatientRequirements((prev) => ({ ...prev, urgency: e.target.value }))}
             placeholder="Выберите срочность"
@@ -811,7 +808,7 @@ const SmartScheduling = () => {
           }}>
               Тип приема
             </label>
-            <MacOSSelect
+            <Select
             value={patientRequirements.type}
             onChange={(e) => setPatientRequirements((prev) => ({ ...prev, type: e.target.value }))}
             placeholder="Выберите тип"
@@ -833,7 +830,7 @@ const SmartScheduling = () => {
           }}>
               Ожидаемая длительность (мин)
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={patientRequirements.estimated_duration}
             onChange={(e) => setPatientRequirements((prev) => ({ ...prev, estimated_duration: parseOptionalInteger(e.target.value) }))}
@@ -860,19 +857,19 @@ const SmartScheduling = () => {
             <Clock style={{ width: '16px', height: '16px' }} />
             Доступные слоты
           </h4>
-          <MacOSButton
+          <Button
           onClick={addAvailableSlot}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить слот
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {availableSlots.map((slot, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="date"
             value={slot.date}
             onChange={(e) => {
@@ -882,7 +879,7 @@ const SmartScheduling = () => {
             }}
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="time"
             value={slot.time}
             onChange={(e) => {
@@ -892,7 +889,7 @@ const SmartScheduling = () => {
             }}
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={slot.duration}
             onChange={(e) => {
@@ -903,7 +900,7 @@ const SmartScheduling = () => {
             placeholder="мин"
             style={{ width: '80px', fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={slot.current_load}
             onChange={(e) => {
@@ -954,7 +951,7 @@ const SmartScheduling = () => {
           }}>
               Временной период
             </label>
-            <MacOSSelect
+            <Select
             value={timePeriod}
             onChange={(e) => setTimePeriod(e.target.value)}
             options={[
@@ -986,19 +983,19 @@ const SmartScheduling = () => {
             <Users style={{ width: '16px', height: '16px' }} />
             Данные врачей
           </h4>
-          <MacOSButton
+          <Button
           onClick={addDoctor}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить врача
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto' }}>
           {doctorsData.map((doctor, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="text"
             value={doctor.name}
             onChange={(e) => {
@@ -1009,7 +1006,7 @@ const SmartScheduling = () => {
             placeholder="Имя врача"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={doctor.specialty}
             onChange={(e) => {
@@ -1020,7 +1017,7 @@ const SmartScheduling = () => {
             placeholder="Специальность"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={doctor.total_working_hours}
             onChange={(e) => {
@@ -1031,7 +1028,7 @@ const SmartScheduling = () => {
             placeholder="Часы"
             style={{ width: '80px', fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={doctor.patient_load}
             onChange={(e) => {
@@ -1082,7 +1079,7 @@ const SmartScheduling = () => {
           }}>
               Название отделения
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={departmentData.name}
             onChange={(e) => setDepartmentData((prev) => ({ ...prev, name: e.target.value }))}
@@ -1110,19 +1107,19 @@ const SmartScheduling = () => {
             <UserCheck style={{ width: '16px', height: '16px' }} />
             Персонал отделения
           </h4>
-          <MacOSButton
+          <Button
           onClick={addStaffMember}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить сотрудника
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {departmentData.staff.map((staff, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="text"
             value={staff.name}
             onChange={(e) => {
@@ -1133,7 +1130,7 @@ const SmartScheduling = () => {
             placeholder="Имя сотрудника"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={staff.role}
             onChange={(e) => {
@@ -1144,7 +1141,7 @@ const SmartScheduling = () => {
             placeholder="Должность"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={staff.experience}
             onChange={(e) => {
@@ -1191,7 +1188,7 @@ const SmartScheduling = () => {
           }}>
               Минимум сотрудников на смену
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={staffingRequirements.min_staff_per_shift}
             onChange={(e) => setStaffingRequirements((prev) => ({ ...prev, min_staff_per_shift: parseOptionalInteger(e.target.value) }))}
@@ -1208,7 +1205,7 @@ const SmartScheduling = () => {
           }}>
               Часы покрытия
             </label>
-            <MacOSSelect
+            <Select
             value={staffingRequirements.coverage_hours}
             onChange={(e) => setStaffingRequirements((prev) => ({ ...prev, coverage_hours: e.target.value }))}
             placeholder="Выберите покрытие"
@@ -1274,22 +1271,22 @@ const SmartScheduling = () => {
             Результат AI анализа
           </h3>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <MacOSButton
+            <Button
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={exportResult}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -1459,7 +1456,7 @@ const SmartScheduling = () => {
             {activeTab === 'shift-recommendations' && renderShiftRecommendations()}
             
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
-              <MacOSButton
+              <Button
                 onClick={handleSubmit}
                 disabled={loading}
                 aria-label="Run AI scheduling analysis"
@@ -1480,7 +1477,7 @@ const SmartScheduling = () => {
                     Запустить AI анализ
                   </>
                 }
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 

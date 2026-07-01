@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FolderTree, Package } from 'lucide-react';
 
-import { MacOSLoadingSkeleton } from '../ui/macos';
+import {
+  Skeleton,
+} from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const LazyQueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
@@ -90,12 +92,12 @@ const AdminServices = () => {
       </div>
 
       {servicesTab === 'catalog' && (
-        <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+        <React.Suspense fallback={<Skeleton style={{ height: '384px' }} />}>
           <LazyServiceCatalog />
         </React.Suspense>
       )}
       {servicesTab === 'queue-profiles' && (
-        <React.Suspense fallback={<MacOSLoadingSkeleton style={{ height: '384px' }} />}>
+        <React.Suspense fallback={<Skeleton style={{ height: '384px' }} />}>
           <LazyQueueProfilesManager theme={isDark ? 'dark' : 'light'} />
         </React.Suspense>
       )}

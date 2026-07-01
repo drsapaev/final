@@ -18,7 +18,9 @@ import {
   Sparkles,
   DollarSign } from
 'lucide-react';
-import { MacOSButton, MacOSCard, MacOSBadge, MacOSInput, MacOSTextarea, MacOSSelect, MacOSEmptyState } from '../components/ui/macos';
+import {
+  Button, MacOSCard, Badge, Input, Textarea, Select, MacOSEmptyState,
+} from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
@@ -1442,7 +1444,7 @@ const DermatologistPanelUnified = () => {
                     <User size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Дерматологические пациенты
                   </h3>
-                  <MacOSBadge variant="info">Всего: {patients.length} пациентов</MacOSBadge>
+                  <Badge variant="info">Всего: {patients.length} пациентов</Badge>
                 </div>
 
                 {loading ?
@@ -1472,7 +1474,7 @@ const DermatologistPanelUnified = () => {
                         }}>
                                 {patient.last_name} {patient.first_name} {patient.middle_name}
                               </h4>
-                              <MacOSBadge variant="success" style={{ marginLeft: '12px' }}>Дерматология</MacOSBadge>
+                              <Badge variant="success" style={{ marginLeft: '12px' }}>Дерматология</Badge>
                             </div>
                             <div style={{
                         fontSize: '13px',
@@ -1497,7 +1499,7 @@ const DermatologistPanelUnified = () => {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '16px' }}>
-                            <MacOSButton
+                            <Button
                         variant="outline"
                         onClick={() => {
                           setSelectedPatient(patient);
@@ -1512,8 +1514,8 @@ const DermatologistPanelUnified = () => {
 
                               <Activity size={16} />
                               Осмотр
-                            </MacOSButton>
-                            <MacOSButton
+                            </Button>
+                            <Button
                         variant="outline"
                         onClick={() => {
                           setSelectedPatient(patient);
@@ -1528,15 +1530,15 @@ const DermatologistPanelUnified = () => {
 
                               <Sparkles size={16} />
                               Процедура
-                            </MacOSButton>
-                            <MacOSButton
+                            </Button>
+                            <Button
                         variant="outline"
                         onClick={() => setSelectedPatient(patient)}
                         style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
 
                               <User size={16} />
                               Просмотр
-                            </MacOSButton>
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -1568,9 +1570,9 @@ const DermatologistPanelUnified = () => {
                     <Stethoscope size={20} style={{ marginRight: '8px', color: 'var(--mac-orange-500)' }} />
                     Прием пациента: {currentAppointment.patient_name || 'Не указано'}
                   </h3>
-                  <MacOSBadge variant="info">
+                  <Badge variant="info">
                     Статус: {currentAppointment.status}
-                  </MacOSBadge>
+                  </Badge>
                 </div>
 
                 {/* Временная шкала приема */}
@@ -1630,7 +1632,7 @@ const DermatologistPanelUnified = () => {
                 {/* Кнопка завершения приема */}
                 {emr && !emr.is_draft &&
               <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <MacOSButton
+                    <Button
                   onClick={handleSaveVisit}
                   disabled={loading}
                   style={{
@@ -1650,7 +1652,7 @@ const DermatologistPanelUnified = () => {
                   <CheckCircle size={20} />
                   }
                       {loading ? 'Завершение...' : 'Завершить прием'}
-                    </MacOSButton>
+                    </Button>
                   </div>
               }
               </MacOSCard>
@@ -1743,7 +1745,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                       Жалобы пациента
                     </label>
-                    <MacOSTextarea
+                    <Textarea
                     value={visitData.complaint}
                     onChange={(e) => setVisitData({ ...visitData, complaint: e.target.value })}
                     rows={4}
@@ -1763,7 +1765,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                         Диагноз
                       </label>
-                      <MacOSInput
+                      <Input
                       type="text"
                       value={visitData.diagnosis}
                       onChange={(e) => setVisitData({ ...visitData, diagnosis: e.target.value })}
@@ -1782,7 +1784,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                         МКБ-10
                       </label>
-                      <MacOSInput
+                      <Input
                       type="text"
                       value={visitData.icd10}
                       onChange={(e) => setVisitData({ ...visitData, icd10: e.target.value })}
@@ -1802,7 +1804,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                       Примечания
                     </label>
-                    <MacOSTextarea
+                    <Textarea
                     value={visitData.notes}
                     onChange={(e) => setVisitData({ ...visitData, notes: e.target.value })}
                     rows={3}
@@ -1863,7 +1865,7 @@ const DermatologistPanelUnified = () => {
               {/* Действия */}
               <MacOSCard style={{ padding: '24px' }}>
                 <div className="flex justify-end space-x-3">
-                  <MacOSButton
+                  <Button
                   variant="outline"
                   onClick={() => {
                     setSelectedPatient(null);
@@ -1871,8 +1873,8 @@ const DermatologistPanelUnified = () => {
                   }}>
 
                     Отменить
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
                   onClick={handleSaveVisit}
                   disabled={loading || !visitData.complaint && !emr}>
 
@@ -1882,7 +1884,7 @@ const DermatologistPanelUnified = () => {
                   <Save size={16} className="mr-2" />
                   }
                     {loading ? 'Завершение...' : 'Завершить прием'}
-                  </MacOSButton>
+                  </Button>
                 </div>
               </MacOSCard>
             </div>
@@ -1896,9 +1898,9 @@ const DermatologistPanelUnified = () => {
               title="Выберите визит"
               description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
               action={
-              <MacOSButton variant="outline" onClick={() => handleTabChange('appointments')} style={{ marginTop: '16px' }}>
+              <Button variant="outline" onClick={() => handleTabChange('appointments')} style={{ marginTop: '16px' }}>
                     Перейти к записям
-                  </MacOSButton>
+                  </Button>
               } />
             </MacOSCard>
           }
@@ -1977,9 +1979,9 @@ const DermatologistPanelUnified = () => {
               title="Выберите пациента"
               description="Перейдите на вкладку 'Очередь' и выберите пациента для просмотра фото"
               action={
-              <MacOSButton variant="outline" onClick={() => handleTabChange('queue')} style={{ marginTop: '16px' }}>
+              <Button variant="outline" onClick={() => handleTabChange('queue')} style={{ marginTop: '16px' }}>
                     Перейти к очереди
-                  </MacOSButton>
+                  </Button>
               } />
 
             </MacOSCard>
@@ -2001,10 +2003,10 @@ const DermatologistPanelUnified = () => {
                     <Activity size={20} style={{ marginRight: '8px', color: 'var(--mac-green-500)' }} />
                     Осмотры кожи
                   </h3>
-                  <MacOSButton onClick={openSkinExaminationForm}>
+                  <Button onClick={openSkinExaminationForm}>
                     <Plus size={16} style={{ marginRight: '6px' }} />
                     Новый осмотр
-                  </MacOSButton>
+                  </Button>
                 </div>
 
                 {skinExaminations.length > 0 ?
@@ -2023,7 +2025,7 @@ const DermatologistPanelUnified = () => {
                       color: 'var(--mac-text-primary)',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                     }}>Осмотр #{exam.id}</h4>
-                          <MacOSBadge variant="info">{exam.examination_date}</MacOSBadge>
+                          <Badge variant="info">{exam.examination_date}</Badge>
                         </div>
                         <div style={{
                     display: 'grid',
@@ -2083,7 +2085,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Дата осмотра *
                         </label>
-                        <MacOSInput
+                        <Input
                       type="date"
                       value={skinExamination.examination_date}
                       onChange={(e) => setSkinExamination({ ...skinExamination, examination_date: e.target.value })}
@@ -2101,7 +2103,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Тип кожи *
                         </label>
-                        <MacOSSelect
+                        <Select
                       value={skinExamination.skin_type}
                       onChange={(e) => setSkinExamination({ ...skinExamination, skin_type: e.target.value })}
                       required>
@@ -2112,7 +2114,7 @@ const DermatologistPanelUnified = () => {
                           <option value="oily">Жирная</option>
                           <option value="combination">Комбинированная</option>
                           <option value="sensitive">Чувствительная</option>
-                        </MacOSSelect>
+                        </Select>
                       </div>
                     </div>
 
@@ -2128,7 +2130,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Состояние кожи
                         </label>
-                        <MacOSInput
+                        <Input
                       type="text"
                       value={skinExamination.skin_condition}
                       onChange={(e) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })}
@@ -2146,7 +2148,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Поражения
                         </label>
-                        <MacOSInput
+                        <Input
                       type="text"
                       value={skinExamination.lesions}
                       onChange={(e) => setSkinExamination({ ...skinExamination, lesions: e.target.value })}
@@ -2166,7 +2168,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                         Диагноз
                       </label>
-                      <MacOSInput
+                      <Input
                     type="text"
                     value={skinExamination.diagnosis}
                     onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })}
@@ -2185,7 +2187,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                         План лечения
                       </label>
-                      <MacOSTextarea
+                      <Textarea
                     value={skinExamination.treatment_plan}
                     onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })}
                     rows={4}
@@ -2194,17 +2196,17 @@ const DermatologistPanelUnified = () => {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                      <MacOSButton
+                      <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowSkinForm(false)}>
 
                         Отмена
-                      </MacOSButton>
-                      <MacOSButton type="submit">
+                      </Button>
+                      <Button type="submit">
                         <Save size={16} style={{ marginRight: '6px' }} />
                         Сохранить осмотр
-                      </MacOSButton>
+                      </Button>
                     </div>
                   </form>
                 </MacOSCard>
@@ -2228,10 +2230,10 @@ const DermatologistPanelUnified = () => {
                     <Sparkles size={20} style={{ marginRight: '8px', color: 'var(--mac-pink-500)' }} />
                     Косметические процедуры
                   </h3>
-                  <MacOSButton onClick={openCosmeticProcedureForm}>
+                  <Button onClick={openCosmeticProcedureForm}>
                     <Plus size={16} style={{ marginRight: '6px' }} />
                     Новая процедура
-                  </MacOSButton>
+                  </Button>
                 </div>
 
                 {cosmeticProcedures.length > 0 ?
@@ -2250,7 +2252,7 @@ const DermatologistPanelUnified = () => {
                       color: 'var(--mac-text-primary)',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                     }}>Процедура #{procedure.id}</h4>
-                          <MacOSBadge variant="info">{procedure.procedure_date}</MacOSBadge>
+                          <Badge variant="info">{procedure.procedure_date}</Badge>
                         </div>
                         <div style={{
                     display: 'grid',
@@ -2309,7 +2311,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Дата процедуры *
                         </label>
-                        <MacOSInput
+                        <Input
                       type="date"
                       value={cosmeticProcedure.procedure_date}
                       onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })}
@@ -2327,7 +2329,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Тип процедуры *
                         </label>
-                        <MacOSSelect
+                        <Select
                       value={cosmeticProcedure.procedure_type}
                       onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })}
                       required>
@@ -2339,7 +2341,7 @@ const DermatologistPanelUnified = () => {
                           <option value="filler">Филлеры</option>
                           <option value="laser">Лазерная терапия</option>
                           <option value="mesotherapy">Мезотерапия</option>
-                        </MacOSSelect>
+                        </Select>
                       </div>
                     </div>
 
@@ -2355,7 +2357,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Область обработки
                         </label>
-                        <MacOSInput
+                        <Input
                       type="text"
                       value={cosmeticProcedure.area_treated}
                       onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })}
@@ -2373,7 +2375,7 @@ const DermatologistPanelUnified = () => {
                     }}>
                           Использованные продукты
                         </label>
-                        <MacOSInput
+                        <Input
                       type="text"
                       value={cosmeticProcedure.products_used}
                       onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })}
@@ -2393,7 +2395,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                         Результаты
                       </label>
-                      <MacOSTextarea
+                      <Textarea
                     value={cosmeticProcedure.results}
                     onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })}
                     rows={4}
@@ -2412,7 +2414,7 @@ const DermatologistPanelUnified = () => {
                   }}>
                         Рекомендации по уходу
                       </label>
-                      <MacOSTextarea
+                      <Textarea
                     value={cosmeticProcedure.follow_up}
                     onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, follow_up: e.target.value })}
                     rows={3}
@@ -2421,17 +2423,17 @@ const DermatologistPanelUnified = () => {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                      <MacOSButton
+                      <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowCosmeticForm(false)}>
 
                         Отмена
-                      </MacOSButton>
-                      <MacOSButton type="submit">
+                      </Button>
+                      <Button type="submit">
                         <Save size={16} style={{ marginRight: '6px' }} />
                         Сохранить процедуру
-                      </MacOSButton>
+                      </Button>
                     </div>
                   </form>
                 </MacOSCard>
@@ -2522,7 +2524,7 @@ const DermatologistPanelUnified = () => {
                           transform: 'translateY(-50%)',
                           color: 'var(--mac-text-secondary)'
                         }} />
-                          <MacOSInput
+                          <Input
                           type="text"
                           value={doctorPrice}
                           onChange={(e) => setDoctorPrice(e.target.value)}
@@ -2531,7 +2533,7 @@ const DermatologistPanelUnified = () => {
                           style={{ paddingLeft: '40px' }} />
 
                         </div>
-                        <MacOSButton
+                        <Button
                         onClick={() => {
                           if (selectedServices.length > 0) {
                             setSelectedServiceForPriceOverride({
@@ -2549,7 +2551,7 @@ const DermatologistPanelUnified = () => {
                         title="Изменить цену процедуры">
 
                           <DollarSign size={16} />
-                        </MacOSButton>
+                        </Button>
                       </div>
                     </div>
 
@@ -2678,7 +2680,7 @@ const DermatologistPanelUnified = () => {
                           color: 'var(--mac-text-primary)',
                           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                         }}>#{exam.id}</span>
-                            <MacOSBadge variant="info">{exam.examination_date}</MacOSBadge>
+                            <Badge variant="info">{exam.examination_date}</Badge>
                           </div>
                           <div style={{
                         display: 'flex',
@@ -2727,7 +2729,7 @@ const DermatologistPanelUnified = () => {
                           color: 'var(--mac-text-primary)',
                           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
                         }}>#{procedure.id}</span>
-                            <MacOSBadge variant="info">{procedure.procedure_date}</MacOSBadge>
+                            <Badge variant="info">{procedure.procedure_date}</Badge>
                           </div>
                           <div style={{
                         display: 'flex',

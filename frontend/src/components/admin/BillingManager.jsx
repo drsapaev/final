@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSTextarea,
-  MacOSLoadingSkeleton,
+  Button,
+  Badge,
+  Input,
+  Textarea,
+  Skeleton,
   MacOSEmptyState,
-  Select } from
-
-'../ui/macos';
+  Select,
+} from '../ui/macos';
 import {
   Plus,
 
@@ -258,10 +257,10 @@ const BillingManager = () => {
     const Icon = config.icon;
 
     return (
-      <MacOSBadge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className="flex items-center gap-1">
         <Icon className="w-3 h-3" />
         {config.label}
-      </MacOSBadge>);
+      </Badge>);
 
   };
 
@@ -290,7 +289,7 @@ const BillingManager = () => {
             Управление счетами и выставлением
           </p>
         </div>
-        <MacOSButton
+        <Button
         onClick={() => setShowCreateInvoice(true)}
         style={{
           display: 'flex',
@@ -300,7 +299,7 @@ const BillingManager = () => {
         
           <Plus size={16} />
           Создать счет
-        </MacOSButton>
+        </Button>
       </div>
 
       {/* Список счетов */}
@@ -311,10 +310,10 @@ const BillingManager = () => {
         title="Счета не найдены"
         description="В системе пока нет созданных счетов"
         action={
-        <MacOSButton onClick={() => setShowCreateInvoice(true)}>
+        <Button onClick={() => setShowCreateInvoice(true)}>
                 <Plus size={16} style={{ marginRight: '8px' }} />
                 Создать первый счет
-              </MacOSButton>
+              </Button>
         } /> :
 
 
@@ -341,9 +340,9 @@ const BillingManager = () => {
                       Счет № {invoice.invoice_number}
                     </h4>
                     {getStatusBadge(invoice.status)}
-                    <MacOSBadge variant="outline">
+                    <Badge variant="outline">
                       {INVOICE_TYPE_LABELS[invoice.invoice_type] || invoice.invoice_type}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
 
                   <div style={{
@@ -371,7 +370,7 @@ const BillingManager = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <MacOSButton
+                  <Button
               variant="outline"
               onClick={() => handleViewInvoiceHTML(invoice.id)}
               style={{
@@ -388,8 +387,8 @@ const BillingManager = () => {
               aria-label={`Просмотреть счет ${invoice.invoice_number || invoice.id}`}>
 
                     <Eye aria-hidden="true" size={16} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               variant="outline"
               onClick={() => handleSendInvoice(invoice.id)}
               style={{
@@ -406,8 +405,8 @@ const BillingManager = () => {
               aria-label={`Отправить счет ${invoice.invoice_number || invoice.id}`}>
 
                     <Send aria-hidden="true" size={16} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               variant="outline"
               onClick={() => {
                 setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
@@ -427,7 +426,7 @@ const BillingManager = () => {
               aria-label={`Записать платеж по счету ${invoice.invoice_number || invoice.id}`}>
 
                     <CreditCard aria-hidden="true" size={16} />
-                  </MacOSButton>
+                  </Button>
                 </div>
               </div>
             </MacOSCard>
@@ -452,7 +451,7 @@ const BillingManager = () => {
         }}>
               Создать счет
             </h4>
-            <MacOSButton
+            <Button
           variant="outline"
           onClick={() => setShowCreateInvoice(false)}
           type="button"
@@ -469,7 +468,7 @@ const BillingManager = () => {
           }}>
           
               <X aria-hidden="true" size={16} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
@@ -483,7 +482,7 @@ const BillingManager = () => {
           }}>
                 ID пациента
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={invoiceForm.patient_id}
             onChange={(e) => setInvoiceForm({ ...invoiceForm, patient_id: e.target.value })}
@@ -519,7 +518,7 @@ const BillingManager = () => {
           }}>
                 Срок оплаты (дней)
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={invoiceForm.due_days}
             onChange={(e) => setInvoiceForm({ ...invoiceForm, due_days: parseInt(e.target.value) })}
@@ -566,7 +565,7 @@ const BillingManager = () => {
           }}>
                 Позиции счета
               </label>
-              <MacOSButton
+              <Button
             onClick={addInvoiceItem}
             style={{
               display: 'flex',
@@ -578,7 +577,7 @@ const BillingManager = () => {
             
                 <Plus size={14} />
                 Добавить
-              </MacOSButton>
+              </Button>
             </div>
 
             {invoiceForm.items.map((item, index) =>
@@ -592,24 +591,24 @@ const BillingManager = () => {
           borderRadius: 'var(--mac-radius-md)',
           backgroundColor: 'var(--mac-bg-secondary)'
         }}>
-                <MacOSInput
+                <Input
             placeholder="Описание"
             value={item.description}
             onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)} />
           
-                <MacOSInput
+                <Input
             type="number"
             placeholder="Количество"
             value={item.quantity}
             onChange={(e) => updateInvoiceItem(index, 'quantity', parseFloat(e.target.value))} />
           
-                <MacOSInput
+                <Input
             type="number"
             placeholder="Цена"
             value={item.unit_price}
             onChange={(e) => updateInvoiceItem(index, 'unit_price', parseFloat(e.target.value))} />
           
-                <MacOSButton
+                <Button
             variant="outline"
             onClick={() => removeInvoiceItem(index)}
             type="button"
@@ -627,7 +626,7 @@ const BillingManager = () => {
             }}>
             
                   <Trash2 aria-hidden="true" size={16} />
-                </MacOSButton>
+                </Button>
               </div>
         )}
           </div>
@@ -643,7 +642,7 @@ const BillingManager = () => {
           }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
             value={invoiceForm.description}
             onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
             placeholder="Описание счета"
@@ -653,13 +652,13 @@ const BillingManager = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <MacOSButton
+            <Button
           variant="outline"
           onClick={() => setShowCreateInvoice(false)}>
           
               Отмена
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
           onClick={handleCreateInvoice}
           style={{
             display: 'flex',
@@ -669,7 +668,7 @@ const BillingManager = () => {
           
               <Save size={16} />
               Создать
-            </MacOSButton>
+            </Button>
           </div>
         </MacOSCard>
     }
@@ -691,7 +690,7 @@ const BillingManager = () => {
         }}>
               Записать платеж
             </h4>
-            <MacOSButton
+            <Button
           variant="outline"
           onClick={() => setShowRecordPayment(false)}
           type="button"
@@ -708,7 +707,7 @@ const BillingManager = () => {
           }}>
           
               <X aria-hidden="true" size={16} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
@@ -722,7 +721,7 @@ const BillingManager = () => {
           }}>
                 ID счета
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={paymentForm.invoice_id}
             onChange={(e) => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })}
@@ -740,7 +739,7 @@ const BillingManager = () => {
           }}>
                 Сумма платежа
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={paymentForm.amount}
             onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
@@ -776,7 +775,7 @@ const BillingManager = () => {
           }}>
                 Номер ссылки
               </label>
-              <MacOSInput
+              <Input
             value={paymentForm.reference_number}
             onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
             placeholder="Номер транзакции" />
@@ -793,7 +792,7 @@ const BillingManager = () => {
           }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
             value={paymentForm.description}
             onChange={(e) => setPaymentForm({ ...paymentForm, description: e.target.value })}
             placeholder="Описание платежа"
@@ -803,13 +802,13 @@ const BillingManager = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <MacOSButton
+            <Button
           variant="outline"
           onClick={() => setShowRecordPayment(false)}>
           
               Отмена
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
           onClick={handleRecordPayment}
           style={{
             display: 'flex',
@@ -819,7 +818,7 @@ const BillingManager = () => {
           
               <Save size={16} />
               Записать
-            </MacOSButton>
+            </Button>
           </div>
         </MacOSCard>
     }
@@ -840,9 +839,9 @@ const BillingManager = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h4 className="font-medium">Платеж № {payment.payment_number}</h4>
-                  <MacOSBadge variant={payment.is_confirmed ? 'success' : 'warning'}>
+                  <Badge variant={payment.is_confirmed ? 'success' : 'warning'}>
                     {payment.is_confirmed ? 'Подтвержден' : 'Ожидает подтверждения'}
-                  </MacOSBadge>
+                  </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
@@ -1004,7 +1003,7 @@ const BillingManager = () => {
 
       {/* Контент */}
       {loading ?
-      <MacOSLoadingSkeleton type="card" count={3} /> :
+      <Skeleton type="card" count={3} /> :
 
       <>
           {activeTab === 'invoices' && renderInvoicesTab()}

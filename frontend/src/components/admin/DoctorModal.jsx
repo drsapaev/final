@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import {
   Label,
-  MacOSAlert,
-  MacOSButton,
-  MacOSCheckbox,
-  MacOSBadge,
-  MacOSInput,
-  MacOSModal,
+  Alert,
+  Button,
+  Checkbox,
+  Badge,
+  Input,
+  Modal,
   Select,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
@@ -160,7 +160,7 @@ const DoctorModal = ({
     ) : null;
 
   return (
-    <MacOSModal
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={doctor ? 'Редактировать врача' : 'Добавить врача'}
@@ -171,9 +171,9 @@ const DoctorModal = ({
         style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
       >
         {submitError ? (
-          <MacOSAlert type="error" style={{ marginBottom: '12px' }}>
+          <Alert type="error" style={{ marginBottom: '12px' }}>
             {submitError}
-          </MacOSAlert>
+          </Alert>
         ) : null}
 
         <div>
@@ -199,29 +199,29 @@ const DoctorModal = ({
         >
           <div>
             <Label style={{ display: 'block', marginBottom: '8px' }}>ФИО</Label>
-            <MacOSInput value={selectedUser?.full_name || ''} readOnly icon={User} />
+            <Input value={selectedUser?.full_name || ''} readOnly icon={User} />
           </div>
           <div>
             <Label style={{ display: 'block', marginBottom: '8px' }}>Email</Label>
-            <MacOSInput value={selectedUser?.email || ''} readOnly icon={Mail} />
+            <Input value={selectedUser?.email || ''} readOnly icon={Mail} />
           </div>
           <div>
             <Label style={{ display: 'block', marginBottom: '8px' }}>Телефон</Label>
-            <MacOSInput value={selectedUser?.phone || ''} readOnly icon={Phone} />
+            <Input value={selectedUser?.phone || ''} readOnly icon={Phone} />
           </div>
           <div>
             <Label style={{ display: 'block', marginBottom: '8px' }}>Роль</Label>
-            <MacOSInput value={selectedUser?.role || ''} readOnly />
+            <Input value={selectedUser?.role || ''} readOnly />
           </div>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          <MacOSBadge variant={selectedUserStatus.variant}>
+          <Badge variant={selectedUserStatus.variant}>
             {selectedUserStatus.label}
-          </MacOSBadge>
-          <MacOSBadge variant={formData.cabinet ? 'info' : 'warning'}>
+          </Badge>
+          <Badge variant={formData.cabinet ? 'info' : 'warning'}>
             {formData.cabinet ? `Кабинет ${formData.cabinet}` : 'Кабинет не задан'}
-          </MacOSBadge>
+          </Badge>
         </div>
 
         <div
@@ -235,7 +235,7 @@ const DoctorModal = ({
             <Label required style={{ display: 'block', marginBottom: '8px' }}>
               Специальность
             </Label>
-            <MacOSInput
+            <Input
               value={formData.specialty}
               onChange={(event) => handleChange('specialty', event.target.value)}
               placeholder="cardiology, dermatology, dentistry..."
@@ -245,7 +245,7 @@ const DoctorModal = ({
 
           <div>
             <Label style={{ display: 'block', marginBottom: '8px' }}>Кабинет</Label>
-            <MacOSInput
+            <Input
               value={formData.cabinet}
               onChange={(event) => handleChange('cabinet', event.target.value)}
               placeholder="101"
@@ -257,7 +257,7 @@ const DoctorModal = ({
             <Label style={{ display: 'block', marginBottom: '8px' }}>
               Цена по умолчанию
             </Label>
-            <MacOSInput
+            <Input
               type="number"
               value={formData.priceDefault}
               onChange={(event) => handleChange('priceDefault', event.target.value)}
@@ -270,7 +270,7 @@ const DoctorModal = ({
             <Label style={{ display: 'block', marginBottom: '8px' }}>
               Стартовый номер онлайн
             </Label>
-            <MacOSInput
+            <Input
               type="number"
               min="1"
               value={formData.startNumberOnline}
@@ -283,7 +283,7 @@ const DoctorModal = ({
             <Label style={{ display: 'block', marginBottom: '8px' }}>
               Онлайн записей в день
             </Label>
-            <MacOSInput
+            <Input
               type="number"
               min="1"
               value={formData.maxOnlinePerDay}
@@ -294,7 +294,7 @@ const DoctorModal = ({
         </div>
 
         <div>
-          <MacOSCheckbox
+          <Checkbox
             checked={formData.active}
             onChange={(checked) => handleChange('active', checked)}
             label="Врач активен"
@@ -311,15 +311,15 @@ const DoctorModal = ({
             borderTop: '1px solid var(--mac-separator)',
           }}
         >
-          <MacOSButton type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Отмена
-          </MacOSButton>
-          <MacOSButton type="submit" disabled={loading} icon={<Save size={16} />}>
+          </Button>
+          <Button type="submit" disabled={loading} icon={<Save size={16} />}>
             {doctor ? 'Сохранить изменения' : 'Добавить врача'}
-          </MacOSButton>
+          </Button>
         </div>
       </form>
-    </MacOSModal>
+    </Modal>
   );
 };
 

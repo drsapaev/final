@@ -17,9 +17,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Select } from
-
-'../ui/macos';
+  Select,
+} from '../ui/macos';
 
 import {
   CreditCard,

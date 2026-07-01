@@ -1,10 +1,9 @@
 import {
   Box,
   Typography,
-
   Alert,
-  Paper } from
-'../ui/macos';
+  Paper,
+} from '../ui/macos';
 import { Divider } from '../ui/macos/List';
 import {
   Hospital,

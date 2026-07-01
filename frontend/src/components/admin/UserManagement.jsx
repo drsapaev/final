@@ -3,17 +3,16 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
+  Button,
+  Input,
   Select,
-  MacOSTable,
-  MacOSBadge,
-  MacOSModal,
-  MacOSAlert,
-
+  Table,
+  Badge,
+  Modal,
+  Alert,
   Box,
-  Typography } from
-'../ui/macos';
+  Typography,
+} from '../ui/macos';
 import {
   Plus,
   Edit,
@@ -395,9 +394,9 @@ const UserManagement = () => {
     key: 'role',
     title: 'Роль',
     render: (role) =>
-    <MacOSBadge variant={getRoleBadgeVariant(role)}>
+    <Badge variant={getRoleBadgeVariant(role)}>
           {getRoleLabel(role)}
-        </MacOSBadge>
+        </Badge>
 
   },
   {
@@ -414,9 +413,9 @@ const UserManagement = () => {
     key: 'status',
     title: 'Статус',
     render: (_, user) =>
-    <MacOSBadge variant={user.is_active ? 'success' : 'default'} outline>
+    <Badge variant={user.is_active ? 'success' : 'default'} outline>
           {user.is_active ? 'Активен' : 'Неактивен'}
-        </MacOSBadge>
+        </Badge>
 
   },
   {
@@ -433,7 +432,7 @@ const UserManagement = () => {
     title: '',
     render: (_, user) =>
     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <MacOSButton
+          <Button
         data-user-actions-trigger="true"
         aria-label={`Действия: ${user.full_name || user.username}`}
         aria-haspopup="menu"
@@ -447,7 +446,7 @@ const UserManagement = () => {
         style={{ width: '32px', height: '32px', padding: 0 }}>
         
             <MoreVertical size={16} />
-          </MacOSButton>
+          </Button>
         </div>
 
   }];
@@ -460,25 +459,25 @@ const UserManagement = () => {
         <Typography variant="h1" style={{ fontSize: '24px', fontWeight: 600 }}>
           Управление пользователями
         </Typography>
-        <MacOSButton
+        <Button
           variant="primary"
           onClick={() => openUserDialog()}
           startIcon={<Plus size={16} />}>
           
           Добавить пользователя
-        </MacOSButton>
+        </Button>
       </Box>
 
       {/* Alerts */}
       {error &&
-      <MacOSAlert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
+      <Alert variant="error" title="Ошибка" onClose={() => setError('')} style={{ marginBottom: '16px' }}>
           {error}
-        </MacOSAlert>
+        </Alert>
       }
       {success &&
-      <MacOSAlert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
+      <Alert variant="success" title="Успешно" onClose={() => setSuccess('')} style={{ marginBottom: '16px' }}>
           {success}
-        </MacOSAlert>
+        </Alert>
       }
 
       {/* Filters */}
@@ -490,7 +489,7 @@ const UserManagement = () => {
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500 }}>Поиск</label>
             <div style={{ position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
-              <MacOSInput
+              <Input
                 placeholder="Поиск пользователей..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -528,21 +527,21 @@ const UserManagement = () => {
           {/* Refresh Button */}
           <div>
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, visibility: 'hidden' }}>Действие</label>
-            <MacOSButton
+            <Button
               variant="secondary"
               onClick={loadUsers}
               startIcon={<RefreshCw size={16} />}
               style={{ width: '100%', justifyContent: 'center' }}
               disabled={loading}>
               Обновить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
 
       {/* Table */}
       <MacOSCard>
-        <MacOSTable
+        <Table
           columns={columns}
           data={filteredUsers}
           loading={loading}
@@ -571,7 +570,7 @@ const UserManagement = () => {
           gap: '2px'
         }}>
 
-        <MacOSButton
+        <Button
           type="button"
           role="menuitem"
           variant="ghost"
@@ -580,8 +579,8 @@ const UserManagement = () => {
           startIcon={<Edit size={16} />}
           onClick={handleEditFromActionsMenu}>
           Редактировать
-        </MacOSButton>
-        <MacOSButton
+        </Button>
+        <Button
           type="button"
           role="menuitem"
           variant="ghost"
@@ -590,9 +589,9 @@ const UserManagement = () => {
           startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           onClick={handleToggleStatusFromActionsMenu}>
           {actionsMenuUser.is_active ? 'Деактивировать' : 'Активировать'}
-        </MacOSButton>
+        </Button>
         <div role="separator" style={{ height: '1px', background: 'var(--mac-border)', margin: '4px 0' }} />
-        <MacOSButton
+        <Button
           type="button"
           role="menuitem"
           variant="ghost"
@@ -601,7 +600,7 @@ const UserManagement = () => {
           style={{ ...actionMenuItemStyle, color: 'var(--mac-error)' }}
           onClick={handleDeleteFromActionsMenu}>
           Удалить
-        </MacOSButton>
+        </Button>
       </div>
       }
 
@@ -614,8 +613,8 @@ const UserManagement = () => {
         loading={loading && showUserModal} />
       
 
-      {/* Delete Confirmation Dialog (Using MacOSModal) */}
-      <MacOSModal
+      {/* Delete Confirmation Dialog (Using Modal) */}
+      <Modal
         isOpen={showDeleteDialog}
         onClose={closeDeleteDialog}
         title={
@@ -646,29 +645,29 @@ const UserManagement = () => {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           {deleteDialogMode === 'confirm' ? (
             <>
-              <MacOSButton variant="secondary" onClick={closeDeleteDialog}>
+              <Button variant="secondary" onClick={closeDeleteDialog}>
                 Отмена
-              </MacOSButton>
-              <MacOSButton variant="danger" onClick={handleDeleteUser}>
+              </Button>
+              <Button variant="danger" onClick={handleDeleteUser}>
                 Удалить
-              </MacOSButton>
+              </Button>
             </>
           ) : deleteDialogMode === 'deactivate' ? (
             <>
-              <MacOSButton variant="secondary" onClick={closeDeleteDialog}>
+              <Button variant="secondary" onClick={closeDeleteDialog}>
                 Отмена
-              </MacOSButton>
-              <MacOSButton variant="primary" onClick={handleDeactivateInstead}>
+              </Button>
+              <Button variant="primary" onClick={handleDeactivateInstead}>
                 Деактивировать
-              </MacOSButton>
+              </Button>
             </>
           ) : (
-            <MacOSButton variant="primary" onClick={closeDeleteDialog}>
+            <Button variant="primary" onClick={closeDeleteDialog}>
               Понятно
-            </MacOSButton>
+            </Button>
           )}
         </div>
-      </MacOSModal>
+      </Modal>
 
     </Box>);
 

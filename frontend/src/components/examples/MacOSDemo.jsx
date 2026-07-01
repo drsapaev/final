@@ -7,9 +7,7 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-
   Modal,
-
   Icon,
   Badge,
   Progress,
@@ -21,9 +19,8 @@ import {
   Select,
   SegmentedControl,
   Textarea,
-  Toast } from
-
-'../ui/macos';
+  Toast,
+} from '../ui/macos';
 import AccentPicker from '../ui/macos/AccentPicker.jsx';
 
 /**

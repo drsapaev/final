@@ -21,9 +21,8 @@ import {
   DialogActions,
   Select,
   Option,
-
-  Textarea } from
-'../ui/macos';
+  Textarea,
+} from '../ui/macos';
 import {
   Hospital,
   Plus,

@@ -1,6 +1,8 @@
 import { useId, useState } from 'react';
 import { Card, Button, Badge } from '../ui/native';
-import { Select } from '../ui/macos';
+import {
+  Select,
+} from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { validateComponentDesign } from '../../utils/designValidator';
 

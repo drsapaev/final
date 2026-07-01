@@ -16,7 +16,9 @@ import {
   FileText as FilePdf,
   File } from
 'lucide-react';
-import { Card, Button, MacOSInput, Select, MacOSCheckbox, SegmentedControl, Skeleton } from '../ui/macos';
+import {
+  Card, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -301,7 +303,7 @@ const UserExportManager = () => {
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-primary)'
           }}>
-                <MacOSCheckbox
+                <Checkbox
               checked={exportForm.fields.includes(field.value)}
               onChange={(checked) => {
                 if (checked) {
@@ -338,7 +340,7 @@ const UserExportManager = () => {
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-primary)'
           }}>
-              <MacOSCheckbox
+              <Checkbox
               checked={exportForm.include_profile}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_profile: checked }))}
               style={{ marginRight: '8px' }} />
@@ -353,7 +355,7 @@ const UserExportManager = () => {
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-primary)'
           }}>
-              <MacOSCheckbox
+              <Checkbox
               checked={exportForm.include_preferences}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_preferences: checked }))}
               style={{ marginRight: '8px' }} />
@@ -368,7 +370,7 @@ const UserExportManager = () => {
             fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-text-primary)'
           }}>
-              <MacOSCheckbox
+              <Checkbox
               checked={exportForm.include_audit_logs}
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_audit_logs: checked }))}
               style={{ marginRight: '8px' }} />
@@ -405,7 +407,7 @@ const UserExportManager = () => {
           }}>
               Имя пользователя:
             </label>
-            <MacOSInput
+            <Input
             placeholder="Поиск по имени пользователя"
             value={exportForm.filters.username}
             onChange={(e) => setExportForm((prev) => ({
@@ -426,7 +428,7 @@ const UserExportManager = () => {
           }}>
               Email:
             </label>
-            <MacOSInput
+            <Input
             placeholder="Поиск по email"
             value={exportForm.filters.email}
             onChange={(e) => setExportForm((prev) => ({
@@ -498,7 +500,7 @@ const UserExportManager = () => {
           }}>
               Дата создания (от):
             </label>
-            <MacOSInput
+            <Input
             type="date"
             value={exportForm.filters.created_from}
             onChange={(e) => setExportForm((prev) => ({
@@ -519,7 +521,7 @@ const UserExportManager = () => {
           }}>
               Дата создания (до):
             </label>
-            <MacOSInput
+            <Input
             type="date"
             value={exportForm.filters.created_to}
             onChange={(e) => setExportForm((prev) => ({

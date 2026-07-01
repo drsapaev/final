@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSLoadingSkeleton,
-  MacOSTextarea,
-  MacOSCheckbox } from
-'../ui/macos';
+  Button,
+  Badge,
+  Skeleton,
+  Textarea,
+  Checkbox,
+} from '../ui/macos';
 import {
   Bot,
   Send,
@@ -305,16 +305,16 @@ const TelegramBotManager = () => {
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '16px'
       }}>
-          <MacOSButton
+          <Button
           onClick={testBot}
           disabled={loading}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
             <TestTube style={{ width: '16px', height: '16px' }} />
               Тест бота
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={sendAdminAlert}
           disabled={loading}
           variant="outline"
@@ -322,9 +322,9 @@ const TelegramBotManager = () => {
 
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
               Срочное уведомление
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={broadcastSystemMessage}
           disabled={loading}
           variant="outline"
@@ -332,9 +332,9 @@ const TelegramBotManager = () => {
 
             <Bell style={{ width: '16px', height: '16px' }} />
               Системное сообщение
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={loadData}
           disabled={loading}
           variant="outline"
@@ -342,7 +342,7 @@ const TelegramBotManager = () => {
 
             <RefreshCw style={{ width: '16px', height: '16px' }} />
               Обновить данные
-          </MacOSButton>
+          </Button>
           </div>
       </MacOSCard>
     </div>;
@@ -374,7 +374,7 @@ const TelegramBotManager = () => {
           }}>
               Текст сообщения
             </label>
-            <MacOSTextarea
+            <Textarea
             value={notificationForm.message}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, message: e.target.value }))}
             placeholder="Введите текст уведомления..."
@@ -400,7 +400,7 @@ const TelegramBotManager = () => {
               gap: '8px',
               cursor: 'pointer'
             }}>
-                <MacOSCheckbox
+                <Checkbox
                 checked={notificationForm.send_to_all_admins}
                 onChange={(checked) => setNotificationForm((prev) => ({
                   ...prev,
@@ -422,7 +422,7 @@ const TelegramBotManager = () => {
               gap: '8px',
               cursor: 'pointer'
             }}>
-                <MacOSCheckbox
+                <Checkbox
                 checked={notificationForm.send_to_all_users}
                 onChange={(checked) => setNotificationForm((prev) => ({
                   ...prev,
@@ -440,13 +440,13 @@ const TelegramBotManager = () => {
             </div>
           </div>
 
-          <MacOSButton
+          <Button
           onClick={sendNotification}
           disabled={loading || !notificationForm.message.trim()}
           style={{ width: '100%' }}>
 
             {loading ? 'Отправка...' : 'Отправить уведомление'}
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -507,13 +507,13 @@ const TelegramBotManager = () => {
                 </div>
                 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MacOSBadge variant={user.is_active ? 'success' : 'secondary'}>
+                <Badge variant={user.is_active ? 'success' : 'secondary'}>
                     {user.is_active ? 'Активен' : 'Неактивен'}
-                </MacOSBadge>
+                </Badge>
                   
-                <MacOSBadge variant={user.role === 'Admin' || user.role === 'SuperAdmin' ? 'primary' : 'outline'}>
+                <Badge variant={user.role === 'Admin' || user.role === 'SuperAdmin' ? 'primary' : 'outline'}>
                     {user.role}
-                </MacOSBadge>
+                </Badge>
                 </div>
               </div>
         )}
@@ -668,10 +668,10 @@ const TelegramBotManager = () => {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Badge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <CheckCircle style={{ width: '12px', height: '12px' }} />
             Активен
-          </MacOSBadge>
+          </Badge>
         </div>
       </div>
 
@@ -745,8 +745,8 @@ const TelegramBotManager = () => {
       {/* Контент вкладок */}
       {loading && !stats ?
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
-          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
+          <Skeleton height="128px" style={{ width: '100%' }} />
+          <Skeleton height="256px" style={{ width: '100%' }} />
         </div> :
 
       <>

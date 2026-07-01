@@ -3,7 +3,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
-import { Button, CardContent, Badge, Icon, Select } from '../ui/macos';
+import {
+  Button, CardContent, Badge, Icon, Select,
+} from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import QueueTable from './QueueTable';

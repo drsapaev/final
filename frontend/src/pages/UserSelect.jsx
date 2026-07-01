@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import tokenManager from '../utils/tokenManager';
 import { roleToRoute } from '../constants/routes';
-import { AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader,
+} from '../components/ui/macos';
 
 export default function UserSelect() {
   const [items, setItems] = useState([]);

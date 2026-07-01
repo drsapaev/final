@@ -18,7 +18,7 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '../ui/macos';
 import { usePWA } from '../../hooks/usePWA';
 import logger from '../../utils/logger';

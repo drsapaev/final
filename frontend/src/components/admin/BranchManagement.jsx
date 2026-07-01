@@ -15,15 +15,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSCheckbox,
-  MacOSLoadingSkeleton,
+  Checkbox,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert } from
-'../ui/macos';
+  Alert,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -313,7 +313,7 @@ const BranchManagement = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
         message={message.text} />
@@ -329,7 +329,7 @@ const BranchManagement = () => {
           flexWrap: 'wrap'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
-            <MacOSInput
+            <Input
               type="text"
               aria-label="Поиск филиалов по названию, адресу или коду"
               placeholder="Поиск по названию, адресу или коду..."
@@ -358,7 +358,7 @@ const BranchManagement = () => {
               ]}
               size="large"
               style={{ minWidth: '150px' }} />
-            <MacOSButton
+            <Button
               onClick={() => setShowAddForm(true)}
               style={{
                 display: 'flex',
@@ -371,7 +371,7 @@ const BranchManagement = () => {
               
               <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить филиал</span>
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
@@ -393,7 +393,7 @@ const BranchManagement = () => {
           }}>
               {editingBranch ? 'Редактировать филиал' : 'Добавить филиал'}
             </h3>
-            <MacOSButton
+            <Button
             variant="outline"
             type="button"
             aria-label={editingBranch ? 'Закрыть форму редактирования филиала' : 'Закрыть форму добавления филиала'}
@@ -405,7 +405,7 @@ const BranchManagement = () => {
             style={{ padding: '8px' }}>
 
               <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -424,7 +424,7 @@ const BranchManagement = () => {
               }}>
                   Название филиала *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.name}
@@ -442,7 +442,7 @@ const BranchManagement = () => {
               }}>
                   Код филиала *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.code}
@@ -460,7 +460,7 @@ const BranchManagement = () => {
               }}>
                   Адрес
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -477,7 +477,7 @@ const BranchManagement = () => {
               }}>
                   Телефон
                 </label>
-                <MacOSInput
+                <Input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => {
@@ -507,7 +507,7 @@ const BranchManagement = () => {
               }}>
                   Email
                 </label>
-                <MacOSInput
+                <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -541,7 +541,7 @@ const BranchManagement = () => {
               }}>
                   Вместимость
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.capacity}
                 onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
@@ -573,7 +573,7 @@ const BranchManagement = () => {
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-primary)'
               }}>
-                    <MacOSCheckbox
+                    <Checkbox
                   checked={formData.services_available.includes(specialty.value)}
                   onChange={(checked) => {
                     if (checked) {
@@ -600,7 +600,7 @@ const BranchManagement = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-              <MacOSButton
+              <Button
               type="button"
               variant="outline"
               onClick={() => {
@@ -611,8 +611,8 @@ const BranchManagement = () => {
               disabled={saving}>
               
                 Отмена
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               type="submit"
               disabled={saving}
               aria-label={editingBranch ? 'Update branch' : 'Create branch'}
@@ -639,7 +639,7 @@ const BranchManagement = () => {
                     {editingBranch ? 'Обновить' : 'Создать'}
                   </>
               }
-              </MacOSButton>
+              </Button>
             </div>
           </form>
         </MacOSCard>
@@ -655,7 +655,7 @@ const BranchManagement = () => {
       }}>
           {[1, 2, 3].map((i) =>
         <MacOSCard key={i} style={{ padding: '24px' }}>
-              <MacOSLoadingSkeleton height="200px" />
+              <Skeleton height="200px" />
             </MacOSCard>
         )}
         </div> :
@@ -665,10 +665,10 @@ const BranchManagement = () => {
         title={branchEmptyTitle}
         description={branchEmptyDescription}
         action={
-        <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
+        <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить филиал
-            </MacOSButton>
+            </Button>
         } /> :
 
 
@@ -703,7 +703,7 @@ const BranchManagement = () => {
                     {branch.code}
                   </p>
                 </div>
-                <MacOSBadge
+                <Badge
               variant={getStatusColor(branch.status)}
               text={getStatusLabel(branch.status)} />
             
@@ -772,7 +772,7 @@ const BranchManagement = () => {
                     {branch.services_available.map((service) => {
                 const specialty = specialtyOptions.find((s) => s.value === service);
                 return specialty ?
-                <MacOSBadge
+                <Badge
                   key={service}
                   variant="outline"
                   text={specialty.label}
@@ -789,7 +789,7 @@ const BranchManagement = () => {
             justifyContent: 'flex-end',
             gap: '8px'
           }}>
-                <MacOSButton
+                <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать филиал ${branch.name}`}
@@ -797,8 +797,8 @@ const BranchManagement = () => {
               style={{ padding: '6px 12px' }}>
 
                   <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
               type="button"
               variant="outline"
               aria-label={`Удалить филиал ${branch.name}`}
@@ -810,7 +810,7 @@ const BranchManagement = () => {
               }}>
               
                   <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
+                </Button>
               </div>
             </MacOSCard>
         )}

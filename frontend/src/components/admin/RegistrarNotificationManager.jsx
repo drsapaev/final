@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Badge, MacOSInput, Select, MacOSTextarea } from '../ui/macos';
+import {
+  Card, Button, Badge, Input, Select, Textarea,
+} from '../ui/macos';
 import {
   Bell,
   Users,
@@ -218,7 +220,7 @@ const RegistrarNotificationManager = () => {
         }}>
             Отделение (опционально)
           </label>
-          <MacOSInput
+          <Input
           placeholder="Например: Кардиология, Стоматология"
           value={notificationForm.department}
           onChange={(e) => setNotificationForm({ ...notificationForm, department: e.target.value })}
@@ -236,7 +238,7 @@ const RegistrarNotificationManager = () => {
         }}>
             Текст уведомления
           </label>
-          <MacOSTextarea
+          <Textarea
           placeholder="Введите текст уведомления для регистраторов..."
           value={notificationForm.message}
           onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
@@ -289,7 +291,7 @@ const RegistrarNotificationManager = () => {
           </Button>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <MacOSInput
+            <Input
             placeholder="Текст тестового уведомления"
             value={testMessage}
             onChange={(e) => setTestMessage(e.target.value)}

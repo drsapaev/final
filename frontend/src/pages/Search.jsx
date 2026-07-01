@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getVisit } from '../api/visits';
-import { AppEmpty, AppError, Button } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, Button,
+} from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');

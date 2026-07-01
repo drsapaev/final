@@ -22,13 +22,12 @@ import {
 import { Card, Button, Badge } from '../ui/native';
 import {
   MacOSStatCard,
-  MacOSTable,
-  MacOSInput,
+  Table,
+  Input,
   MacOSEmptyState,
   Select,
-  SegmentedControl } from
-
-'../ui/macos';
+  SegmentedControl,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
@@ -305,7 +304,7 @@ const ReportsManager = () => {
             marginBottom: '8px',
             color: 'var(--mac-text-secondary)'
           }}>Дата начала</label>
-            <MacOSInput
+            <Input
             type="date"
             value={reportForm.start_date}
             onChange={(e) => setReportForm((prev) => ({ ...prev, start_date: e.target.value }))} />
@@ -320,7 +319,7 @@ const ReportsManager = () => {
             marginBottom: '8px',
             color: 'var(--mac-text-secondary)'
           }}>Дата окончания</label>
-            <MacOSInput
+            <Input
             type="date"
             value={reportForm.end_date}
             onChange={(e) => setReportForm((prev) => ({ ...prev, end_date: e.target.value }))} />
@@ -432,7 +431,7 @@ const ReportsManager = () => {
         color: 'var(--mac-text-primary)',
         margin: 0
       }}>Последние отчеты</h3>
-          <MacOSTable
+          <Table
         columns={[
         {
           key: 'type',
@@ -530,7 +529,7 @@ const ReportsManager = () => {
 
           </div> :
 
-      <MacOSTable
+      <Table
         columns={[
         {
           key: 'filename',

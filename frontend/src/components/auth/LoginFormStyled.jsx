@@ -12,7 +12,9 @@ import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
-import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
+import {
+  Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert,
+} from '../ui/macos';
 import logger from '../../utils/logger';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';

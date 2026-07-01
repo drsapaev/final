@@ -5,7 +5,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
-import { Button, Icon } from '../ui/macos';
+import {
+  Button, Icon,
+} from '../ui/macos';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';

@@ -3,9 +3,9 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import MacOSTable from '../MacOSTable';
+import Table from '../Table';
 
-describe('MacOSTable Accessibility', () => {
+describe('Table Accessibility', () => {
   const columns = [
     { key: 'name', title: 'Name', sortable: true },
     { key: 'age', title: 'Age', sortable: false }
@@ -16,7 +16,7 @@ describe('MacOSTable Accessibility', () => {
   ];
 
   it('adds tabIndex and aria-sort to sortable headers', () => {
-    render(<MacOSTable columns={columns} data={data} />);
+    render(<Table columns={columns} data={data} />);
 
     const nameHeader = screen.getByText('Name').closest('th');
     const ageHeader = screen.getByText('Age').closest('th');
@@ -29,7 +29,7 @@ describe('MacOSTable Accessibility', () => {
   });
 
   it('updates aria-sort when column is sorted', () => {
-    render(<MacOSTable columns={columns} data={data} />);
+    render(<Table columns={columns} data={data} />);
 
     const nameHeader = screen.getByText('Name').closest('th');
 
@@ -42,7 +42,7 @@ describe('MacOSTable Accessibility', () => {
 
   it('triggers sort on Enter and Space keys', () => {
     const onSort = vi.fn();
-    render(<MacOSTable columns={columns} data={data} onSort={onSort} />);
+    render(<Table columns={columns} data={data} onSort={onSort} />);
 
     const nameHeader = screen.getByText('Name').closest('th');
 
@@ -54,7 +54,7 @@ describe('MacOSTable Accessibility', () => {
   });
 
   it('adds role="status" and aria-live="polite" to loading state', () => {
-    render(<MacOSTable columns={columns} loading={true} />);
+    render(<Table columns={columns} loading={true} />);
 
     const loadingStatus = screen.getByRole('status');
     expect(loadingStatus).toHaveAttribute('aria-live', 'polite');
@@ -62,7 +62,7 @@ describe('MacOSTable Accessibility', () => {
   });
 
   it('adds role="status" and aria-live="polite" to empty state', () => {
-    render(<MacOSTable columns={columns} data={[]} />);
+    render(<Table columns={columns} data={[]} />);
 
     const emptyStatus = screen.getByRole('status');
     expect(emptyStatus).toHaveAttribute('aria-live', 'polite');
@@ -73,7 +73,7 @@ describe('MacOSTable Accessibility', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
-      <MacOSTable
+      <Table
         columns={columns}
         data={[]}
         emptyState={<div data-testid="empty-state-content">No rows yet</div>}

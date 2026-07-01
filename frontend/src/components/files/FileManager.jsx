@@ -40,10 +40,10 @@ import {
   DialogContent,
   DialogTitle,
   Input,
-  MacOSTable,
+  Table,
   Progress,
   SegmentedControl,
-  Select
+  Select,
 } from '../ui/macos';
 
 const pageStyles = {
@@ -587,7 +587,7 @@ const FileManager = () => {
   ];
 
   const renderFileList = () => (
-    <MacOSTable
+    <Table
       columns={tableColumns}
       data={files}
       sortable={false}

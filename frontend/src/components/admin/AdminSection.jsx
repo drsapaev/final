@@ -1,5 +1,7 @@
 import { Card } from '../ui/native';
-import { AppError, AppLoading, Button } from '../ui/macos';
+import {
+  AppError, AppLoading, Button,
+} from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 

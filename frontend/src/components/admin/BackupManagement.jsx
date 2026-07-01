@@ -13,17 +13,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSTextarea,
-  MacOSCheckbox,
-  MacOSLoadingSkeleton,
+  Textarea,
+  Checkbox,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert } from
-
-'../ui/macos';
+  Alert,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -312,7 +311,7 @@ const BackupManagement = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
         message={message.text} />
@@ -328,7 +327,7 @@ const BackupManagement = () => {
           flexWrap: 'wrap'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
-            <MacOSInput
+            <Input
               type="text"
               aria-label="Поиск резервных копий по названию или описанию"
               placeholder="Поиск по названию или описанию..."
@@ -367,7 +366,7 @@ const BackupManagement = () => {
               ]}
               size="large"
               style={{ minWidth: '150px' }} />
-            <MacOSButton
+            <Button
               onClick={() => setShowAddForm(true)}
               style={{
                 display: 'flex',
@@ -380,8 +379,8 @@ const BackupManagement = () => {
               
               <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Создать копию</span>
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               type="button"
               aria-label="Очистить просроченные резервные копии"
               onClick={handleCleanupExpired}
@@ -393,7 +392,7 @@ const BackupManagement = () => {
               }}>
               <RefreshCw aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Очистить просроченные</span>
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
@@ -415,7 +414,7 @@ const BackupManagement = () => {
           }}>
               {editingBackup ? 'Редактировать резервную копию' : 'Создать резервную копию'}
             </h3>
-            <MacOSButton
+            <Button
             variant="outline"
             type="button"
             aria-label={editingBackup ? 'Закрыть форму редактирования резервной копии' : 'Закрыть форму создания резервной копии'}
@@ -427,7 +426,7 @@ const BackupManagement = () => {
             style={{ padding: '8px' }}>
             
               <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -446,7 +445,7 @@ const BackupManagement = () => {
               }}>
                   Название *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.name}
@@ -498,7 +497,7 @@ const BackupManagement = () => {
               }}>
                   Хранение (дни)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 min="1"
                 value={formData.retention_days}
@@ -518,7 +517,7 @@ const BackupManagement = () => {
             }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Введите описание резервной копии"
@@ -536,7 +535,7 @@ const BackupManagement = () => {
               alignItems: 'center',
               gap: '12px'
             }}>
-                <MacOSCheckbox
+                <Checkbox
                 checked={formData.compression}
                 onChange={(checked) => setFormData({ ...formData, compression: checked })} />
               
@@ -552,7 +551,7 @@ const BackupManagement = () => {
               alignItems: 'center',
               gap: '12px'
             }}>
-                <MacOSCheckbox
+                <Checkbox
                 checked={formData.encryption}
                 onChange={(checked) => setFormData({ ...formData, encryption: checked })} />
               
@@ -570,7 +569,7 @@ const BackupManagement = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-              <MacOSButton
+              <Button
               type="button"
               variant="outline"
               onClick={() => {
@@ -581,8 +580,8 @@ const BackupManagement = () => {
               disabled={saving}>
               
                 Отмена
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               type="submit"
               disabled={saving}
               aria-label={editingBackup ? 'Update backup configuration' : 'Create backup configuration'}
@@ -609,7 +608,7 @@ const BackupManagement = () => {
                     {editingBackup ? 'Обновить' : 'Создать'}
                   </>
               }
-              </MacOSButton>
+              </Button>
             </div>
           </form>
         </MacOSCard>
@@ -625,7 +624,7 @@ const BackupManagement = () => {
       }}>
           {[1, 2, 3].map((i) =>
         <MacOSCard key={i} style={{ padding: '24px' }}>
-              <MacOSLoadingSkeleton height="200px" />
+              <Skeleton height="200px" />
             </MacOSCard>
         )}
         </div> :
@@ -635,10 +634,10 @@ const BackupManagement = () => {
         title={backupEmptyTitle}
         description={backupEmptyDescription}
         action={
-        <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
+        <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать копию
-            </MacOSButton>
+            </Button>
         } /> :
 
 
@@ -673,7 +672,7 @@ const BackupManagement = () => {
                     {getTypeLabel(backup.backup_type)} • Хранение {backup.retention_days} дней
                   </p>
                 </div>
-                <MacOSBadge
+                <Badge
               variant={getStatusColor(backup.status)}
               text={getStatusLabel(backup.status)} />
             
@@ -741,7 +740,7 @@ const BackupManagement = () => {
             justifyContent: 'flex-end',
             gap: '8px'
           }}>
-                <MacOSButton
+                <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать резервную копию ${backup.name}`}
@@ -749,8 +748,8 @@ const BackupManagement = () => {
               style={{ padding: '6px 12px' }}>
               
                   <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
               type="button"
               variant="outline"
               aria-label={`Удалить резервную копию ${backup.name}`}
@@ -762,7 +761,7 @@ const BackupManagement = () => {
               }}>
               
                   <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
+                </Button>
               </div>
             </MacOSCard>
         )}

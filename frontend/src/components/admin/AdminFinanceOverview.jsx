@@ -12,11 +12,11 @@ import {
 
 import {
   Card as MacOSCard,
-  MacOSBadge,
-  MacOSButton,
+  Badge,
+  Button,
   MacOSEmptyState,
-  MacOSInput,
-  MacOSLoadingSkeleton,
+  Input,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import useDoctors from '../../hooks/useDoctors';
@@ -263,15 +263,15 @@ const AdminFinanceOverview = () => {
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--mac-text-primary)', margin: 0 }}>
             Финансовый учет
           </h2>
-          <MacOSButton onClick={handleCreateTransaction}>
+          <Button onClick={handleCreateTransaction}>
             <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Добавить транзакцию
-          </MacOSButton>
+          </Button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 260px' }}>
-            <MacOSInput
+            <Input
               type="text"
               placeholder="Поиск транзакций..."
               value={financeSearchTerm}
@@ -320,17 +320,17 @@ const AdminFinanceOverview = () => {
 
         <div style={{ overflowX: 'auto' }}>
           {financeLoading ? (
-            <MacOSLoadingSkeleton type="table" count={5} />
+            <Skeleton type="table" count={5} />
           ) : financeError ? (
             <MacOSEmptyState
               icon={CreditCard}
               title="Ошибка загрузки транзакций"
               description="Не удалось загрузить список транзакций"
               action={(
-                <MacOSButton onClick={() => window.location.reload()}>
+                <Button onClick={() => window.location.reload()}>
                   <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Обновить
-                </MacOSButton>
+                </Button>
               )}
             />
           ) : transactions.length === 0 ? (
@@ -341,10 +341,10 @@ const AdminFinanceOverview = () => {
                 ? 'Попробуйте изменить параметры поиска'
                 : 'В системе пока нет транзакций'}
               action={(
-                <MacOSButton onClick={handleCreateTransaction}>
+                <Button onClick={handleCreateTransaction}>
                   <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Добавить первую транзакцию
-                </MacOSButton>
+                </Button>
               )}
             />
           ) : (
@@ -375,9 +375,9 @@ const AdminFinanceOverview = () => {
                     }}
                   >
                     <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                      <MacOSBadge variant={transaction.type === 'income' ? 'success' : 'error'}>
+                      <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
                         {getTransactionTypeLabel(transaction.type)}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                       <div>
@@ -413,9 +413,9 @@ const AdminFinanceOverview = () => {
                       {formatTransactionDate(transaction.transactionDate)}
                     </td>
                     <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                      <MacOSBadge variant={getTransactionStatusVariant(transaction.status)}>
+                      <Badge variant={getTransactionStatusVariant(transaction.status)}>
                         {getTransactionStatusLabel(transaction.status)}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>

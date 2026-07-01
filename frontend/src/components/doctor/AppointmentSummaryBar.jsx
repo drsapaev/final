@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import { RefreshCw } from 'lucide-react';
-import { MacOSBadge, MacOSButton } from '../ui/macos';
+import {
+  Badge, Button,
+} from '../ui/macos';
 
 const summaryBarStyle = {
   display: 'flex',
@@ -24,8 +26,8 @@ export default function AppointmentSummaryBar({
   onRefresh,
   refreshDisabled = false,
   refreshLabel = 'Обновить',
-  BadgeComponent = MacOSBadge,
-  ButtonComponent = MacOSButton,
+  BadgeComponent = Badge,
+  ButtonComponent = Button,
   buttonProps = {}
 }) {
   return (

@@ -21,7 +21,9 @@ import {
 
 
 'lucide-react';
-import { AppError, AppLoading, Card, Button, Badge, MacOSInput, MacOSTable, MacOSCheckbox, Select } from '../ui/macos';
+import {
+  AppError, AppLoading, Card, Button, Badge, Input, Table, Checkbox, Select,
+} from '../ui/macos';
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
@@ -370,7 +372,7 @@ const ActivationSystem = () => {
               <Search style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Поиск
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -411,7 +413,7 @@ const ActivationSystem = () => {
       {/* Таблица активаций */}
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px' }}>
-          <MacOSTable
+          <Table
             columns={[
             {
               key: 'key',
@@ -692,7 +694,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             }}>
               Срок действия (дни)
             </label>
-            <MacOSInput
+            <Input
               type="number"
               min="1"
               max="3650"
@@ -712,7 +714,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             }}>
               Максимум устройств
             </label>
-            <MacOSInput
+            <Input
               type="number"
               min="1"
               max="100"
@@ -732,7 +734,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             }}>
               Описание
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
@@ -755,7 +757,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
             <label style={{ display: 'flex', alignItems: 'center' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={formData.features.full_access}
                 onChange={(e) => handleFeatureChange('full_access', e.target.checked)}
                 style={{ marginRight: '8px' }} />
@@ -764,7 +766,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={formData.features.ai_features}
                 onChange={(e) => handleFeatureChange('ai_features', e.target.checked)}
                 style={{ marginRight: '8px' }} />
@@ -773,7 +775,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={formData.features.telegram_integration}
                 onChange={(e) => handleFeatureChange('telegram_integration', e.target.checked)}
                 style={{ marginRight: '8px' }} />
@@ -782,7 +784,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={formData.features.print_system}
                 onChange={(e) => handleFeatureChange('print_system', e.target.checked)}
                 style={{ marginRight: '8px' }} />

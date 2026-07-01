@@ -26,11 +26,10 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  Select } from
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+} from '../ui/macos';
 
 const ICON_MAP = {
   'Heart': Heart,
@@ -312,7 +311,7 @@ const QueueSettings = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
@@ -325,8 +324,8 @@ const QueueSettings = () => {
               
               <RefreshCw style={{ width: '16px', height: '16px' }} />
               Обновить
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={saveSettings}
               disabled={saving}
               style={{
@@ -348,7 +347,7 @@ const QueueSettings = () => {
               <Save style={{ width: '16px', height: '16px' }} />
               }
               Сохранить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -507,7 +506,7 @@ const QueueSettings = () => {
                 }}>
                   Время автозакрытия
                 </label>
-                <MacOSInput
+                <Input
                   type="time"
                   value={settings.auto_close_time}
                   onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
@@ -595,7 +594,7 @@ const QueueSettings = () => {
                       </div>
                     </div>
                   </div>
-                  <MacOSButton
+                  <Button
                   variant="outline"
                   onClick={() => testQueueGeneration(specialty.key)}
                   disabled={testing}
@@ -615,7 +614,7 @@ const QueueSettings = () => {
 
                   <Play style={{ width: '14px', height: '14px' }} />
                   }
-                  </MacOSButton>
+                  </Button>
                 </div>
               )}
 
@@ -703,7 +702,7 @@ const QueueSettings = () => {
                     <Hash style={{ width: '16px', height: '16px' }} />
                     Стартовый номер
                 </label>
-                  <MacOSInput
+                  <Input
                   type="number"
                   min="1"
                   max="100"
@@ -734,7 +733,7 @@ const QueueSettings = () => {
                     <Users style={{ width: '16px', height: '16px' }} />
                     Лимит в день
                 </label>
-                  <MacOSInput
+                  <Input
                   type="number"
                   min="1"
                   max="100"

@@ -28,17 +28,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSTable,
+  Table,
   MacOSEmptyState,
-
-  MacOSAlert,
-
-  MacOSCheckbox } from
-'../ui/macos';
+  Alert,
+  Checkbox,
+} from '../ui/macos';
 import {
   normalizeServiceCode,
 
@@ -396,29 +394,29 @@ const ServiceCatalog = () => {
 
         <div style={{ display: 'flex', gap: '12px' }}>
           {selectedServiceIds.size > 0 && (
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowBatchEdit(true)}
               style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--mac-accent)' }}
             >
               <CheckSquare size={16} style={{ marginRight: '8px' }} />
               Редактировать ({selectedServiceIds.size})
-            </MacOSButton>
+            </Button>
           )}
-          <MacOSButton variant="outline" onClick={loadData} disabled={loading}>
+          <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw size={16} style={{ marginRight: '8px' }} />
             Обновить
-          </MacOSButton>
-          <MacOSButton onClick={() => setShowAddForm(true)}>
+          </Button>
+          <Button onClick={() => setShowAddForm(true)}>
             <Plus size={16} style={{ marginRight: '8px' }} />
             Добавить услугу
-          </MacOSButton>
+          </Button>
         </div>
       </div>
 
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.text}
         onClose={() => setMessage({ type: '', text: '' })} />
@@ -445,7 +443,7 @@ const ServiceCatalog = () => {
             }}>
               Поиск по названию
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -628,7 +626,7 @@ const ServiceCatalog = () => {
         variant="default"
         style={{ padding: '0' }}>
 
-        <MacOSTable
+        <Table
           columns={[
           {
             key: 'select',
@@ -711,9 +709,9 @@ const ServiceCatalog = () => {
                 </div>,
 
               category:
-              <MacOSBadge variant="outline">
+              <Badge variant="outline">
                   {getCategoryName(service.category_id)}
-                </MacOSBadge>,
+                </Badge>,
 
               price:
               <div style={{
@@ -744,13 +742,13 @@ const ServiceCatalog = () => {
                 </div>,
 
               status:
-              <MacOSBadge variant={service.active ? 'success' : 'error'}>
+              <Badge variant={service.active ? 'success' : 'error'}>
                   {service.active ? 'Активна' : 'Неактивна'}
-                </MacOSBadge>,
+                </Badge>,
 
               actions:
               <div style={{ display: 'flex', gap: '8px' }}>
-                  <MacOSButton
+                  <Button
                   type="button"
                   size="sm"
                   variant="outline"
@@ -768,8 +766,8 @@ const ServiceCatalog = () => {
                   title="История изменений">
 
                     <History aria-hidden="true" size={14} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
                   type="button"
                   size="sm"
                   variant="outline"
@@ -787,8 +785,8 @@ const ServiceCatalog = () => {
                   title="Редактировать">
 
                     <Edit aria-hidden="true" size={14} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
                   type="button"
                   size="sm"
                   variant="outline"
@@ -808,7 +806,7 @@ const ServiceCatalog = () => {
                   title="Удалить">
 
                     <Trash2 aria-hidden="true" size={14} />
-                  </MacOSButton>
+                  </Button>
                 </div>
 
             };
@@ -821,10 +819,10 @@ const ServiceCatalog = () => {
                 'Попробуйте изменить критерии поиска' :
                 'Добавьте первую услугу в справочник'}
                 action={
-                <MacOSButton onClick={() => setShowAddForm(true)}>
+                <Button onClick={() => setShowAddForm(true)}>
                       <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                       Добавить услугу
-                    </MacOSButton>
+                    </Button>
                 } />
           } />
 
@@ -869,7 +867,7 @@ const ServiceCatalog = () => {
             overflow: 'auto',
             position: 'relative'
           }}>
-            <MacOSButton
+            <Button
               type="button"
               variant="outline"
               title="Close service history"
@@ -884,7 +882,7 @@ const ServiceCatalog = () => {
               }}
             >
               <X aria-hidden="true" size={16} />
-            </MacOSButton>
+            </Button>
             <ServiceAuditHistory
               serviceId={showHistory.serviceId}
               serviceName={showHistory.serviceName}
@@ -1172,7 +1170,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Название услуги *
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
@@ -1190,7 +1188,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Код услуги (K01, D02...)
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={formData.code}
               onChange={(e) => handleChange('code', e.target.value)}
@@ -1267,7 +1265,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 Цена
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.price}
                 onChange={(e) => handleChange('price', parseFloat(e.target.value) || '')}
@@ -1297,7 +1295,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }}>
                 Длительность (мин)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={formData.duration_minutes}
               onChange={(e) => handleChange('duration_minutes', parseInt(e.target.value) || 30)}
@@ -1393,28 +1391,28 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '16px'
           }}>
-              <MacOSCheckbox
+              <Checkbox
               id="active"
               checked={formData.active}
               onChange={(checked) => handleChange('active', checked)}
               label="Услуга активна" />
 
 
-              <MacOSCheckbox
+              <Checkbox
               id="requires_doctor"
               checked={formData.requires_doctor}
               onChange={(checked) => handleChange('requires_doctor', checked)}
               label="Требует врача" />
 
 
-              <MacOSCheckbox
+              <Checkbox
               id="is_consultation"
               checked={formData.is_consultation}
               onChange={(checked) => handleChange('is_consultation', checked)}
               label="Это консультация" />
 
 
-              <MacOSCheckbox
+              <Checkbox
               id="allow_doctor_price_override"
               checked={formData.allow_doctor_price_override}
               onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
@@ -1455,14 +1453,14 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             {activeTab === 'options' && '3 / 3'}
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <MacOSButton type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel}>
               <X size={16} style={{ marginRight: '8px' }} />
               Отменить
-            </MacOSButton>
-            <MacOSButton type="submit">
+            </Button>
+            <Button type="submit">
               <Save size={16} style={{ marginRight: '8px' }} />
               Сохранить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </form>

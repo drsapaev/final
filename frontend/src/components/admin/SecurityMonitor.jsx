@@ -20,7 +20,9 @@ import {
 
 
 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, Select } from '../ui/macos';
+import {
+  MacOSCard, Button, Badge, Input, Select,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const SecurityMonitor = ({
@@ -582,9 +584,9 @@ const SecurityMonitor = ({
                         </p>
                       </div>
                     </div>
-                    <MacOSBadge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
+                    <Badge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
                       {getSeverityLabel(threat.severity)}
-                    </MacOSBadge>
+                    </Badge>
                   </div>);
 
             })}
@@ -606,10 +608,10 @@ const SecurityMonitor = ({
             }}>
                 Угрозы безопасности
               </h3>
-              <MacOSButton onClick={onRefresh}>
+              <Button onClick={onRefresh}>
                 <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Обновить
-              </MacOSButton>
+              </Button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -634,12 +636,12 @@ const SecurityMonitor = ({
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                             <h4 style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>{threat.type}</h4>
-                            <MacOSBadge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
+                            <Badge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
                               {getSeverityLabel(threat.severity)}
-                            </MacOSBadge>
-                            <MacOSBadge variant={threat.status === 'blocked' ? 'success' : 'warning'}>
+                            </Badge>
+                            <Badge variant={threat.status === 'blocked' ? 'success' : 'warning'}>
                               {getStatusLabel(threat.status)}
-                            </MacOSBadge>
+                            </Badge>
                           </div>
                           <p style={{ fontSize: 'var(--mac-font-size-sm)', marginBottom: '8px', color: 'var(--mac-text-secondary)', margin: '0 0 8px 0' }}>{threat.description}</p>
                           <div style={{ fontSize: 'var(--mac-font-size-xs)', display: 'flex', flexDirection: 'column', gap: '4px', color: 'var(--mac-text-tertiary)' }}>
@@ -652,9 +654,9 @@ const SecurityMonitor = ({
                               <p style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-medium)', marginBottom: '4px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0' }}>Действия:</p>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {threat.actions.map((action, index) =>
-                            <MacOSBadge key={index} variant="secondary" style={{ fontSize: '12px' }}>
+                            <Badge key={index} variant="secondary" style={{ fontSize: '12px' }}>
                                     {action}
-                                  </MacOSBadge>
+                                  </Badge>
                             )}
                               </div>
                             </div>
@@ -694,7 +696,7 @@ const SecurityMonitor = ({
                   height: '16px',
                   color: 'var(--mac-text-tertiary)'
                 }} />
-                  <MacOSInput
+                  <Input
                   type="text"
                   placeholder="Поиск в логах..."
                   value={searchTerm}
@@ -751,9 +753,9 @@ const SecurityMonitor = ({
                         </p>
                       </div>
                     </div>
-                    <MacOSBadge variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}>
+                    <Badge variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}>
                       {getStatusLabel(log.status)}
-                    </MacOSBadge>
+                    </Badge>
                   </div>);
 
             })}
@@ -805,7 +807,7 @@ const SecurityMonitor = ({
                         <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>
                           {session.user}
                           {session.isCurrent &&
-                        <MacOSBadge variant="success" style={{ marginLeft: '8px' }}>Текущая</MacOSBadge>
+                        <Badge variant="success" style={{ marginLeft: '8px' }}>Текущая</Badge>
                         }
                         </p>
                         <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>
@@ -818,14 +820,14 @@ const SecurityMonitor = ({
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MacOSBadge variant={session.status === 'active' ? 'success' : session.status === 'idle' ? 'warning' : 'secondary'}>
+                      <Badge variant={session.status === 'active' ? 'success' : session.status === 'idle' ? 'warning' : 'secondary'}>
                         {getStatusLabel(session.status)}
-                      </MacOSBadge>
+                      </Badge>
                       {!session.isCurrent &&
-                    <MacOSButton variant="outline" size="sm">
+                    <Button variant="outline" size="sm">
                           <XCircle style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                           Завершить
-                        </MacOSButton>
+                        </Button>
                     }
                     </div>
                   </div>);
@@ -875,13 +877,13 @@ const SecurityMonitor = ({
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MacOSBadge variant={blocked.status === 'active' ? 'error' : 'secondary'}>
+                    <Badge variant={blocked.status === 'active' ? 'error' : 'secondary'}>
                       {blocked.status === 'active' ? 'Активен' : 'Истек'}
-                    </MacOSBadge>
-                    <MacOSButton variant="outline" size="sm">
+                    </Badge>
+                    <Button variant="outline" size="sm">
                       <Eye style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                       Подробнее
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </div>
             )}
