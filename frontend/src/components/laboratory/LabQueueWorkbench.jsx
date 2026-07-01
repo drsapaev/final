@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useState } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
 } from '../ui/macos';
@@ -9,6 +10,62 @@ import {
   formatSpecialtyLabel,
   getLabStatusVariant
 } from './labUiLabels';
+
+// P-05 fix: маскирование PII (номера телефона) в карточках очереди.
+// Лабораторное помещение — публичное пространство, экран видят другие
+// пациенты и сотрудники. Раскрытие — по клику, с обратной маской.
+// Маска сохраняет последние 2 цифры (для опознания пациента) и страну.
+function maskPhone(phone) {
+  if (!phone || typeof phone !== 'string') return '';
+  const trimmed = phone.trim();
+  if (!trimmed) return '';
+  // Сохраняем +country code (до первого пробела) и последние 2 цифры
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 4) return '***';
+  const lastTwo = digits.slice(-2);
+  // Если есть +country — сохраняем её
+  const countryMatch = trimmed.match(/^\+\d{1,3}/);
+  const country = countryMatch ? countryMatch[0] : '+';
+  return `${country} ***-**-${lastTwo}`;
+}
+
+// P-05 fix: компонент-обёртка для переключения маска/открыто.
+// Раскрытие может быть ограничено ролью через prop canReveal.
+function MaskedPhone({ phone, canReveal = true }) {
+  const [revealed, setRevealed] = useState(false);
+  if (!phone) return <span style={{ color: 'var(--mac-text-secondary)' }}>не указан</span>;
+  if (!canReveal) {
+    return <span>{maskPhone(phone)}</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setRevealed((v) => !v);
+      }}
+      title={revealed ? 'Скрыть номер' : 'Показать номер (доступ ограничен)'}
+      aria-label={revealed ? 'Скрыть номер телефона' : 'Показать номер телефона'}
+      style={{
+        background: 'none',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        color: 'inherit',
+        font: 'inherit',
+        textDecoration: 'underline dotted',
+        textUnderlineOffset: '2px',
+      }}
+    >
+      {revealed ? phone : maskPhone(phone)}
+    </button>
+  );
+}
+
+MaskedPhone.propTypes = {
+  phone: PropTypes.string,
+  canReveal: PropTypes.bool,
+};
 
 const cardGridStyle = {
   display: 'grid',
@@ -77,6 +134,35 @@ export default function LabQueueWorkbench({
   selectedAppointment = null,
   reportHistory = []
 }) {
+  // QW-8 fix: локальный state поиска и фильтра статусов.
+  // Раньше при 30+ записях в очереди лаборант вынужден был скроллить
+  // и визуально искать нужного пациента. Теперь — мгновенный поиск
+  // по ФИО + фильтр по статусу (waiting/in_progress/completed).
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredAppointments = appointments.filter((appointment) => {
+    // Фильтр по статусу
+    if (statusFilter === 'active' && !activeQueueStatuses.has(appointment.status)) {
+      return false;
+    }
+    if (statusFilter === 'completed' && !['completed', 'done'].includes(appointment.status)) {
+      return false;
+    }
+    // Фильтр по поиску (ФИО, телефон, ID)
+    if (normalizedSearch) {
+      const haystack = [
+        appointment.patient_fio,
+        appointment.patient_phone,
+        String(appointment.patient_id || ''),
+        String(appointment.visit_id || ''),
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(normalizedSearch)) return false;
+    }
+    return true;
+  });
+
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <Card variant="filled" padding="none">
@@ -108,17 +194,204 @@ export default function LabQueueWorkbench({
               Обновить
             </Button>
           </div>
+          {/* QW-8 fix: панель поиска и фильтра статусов. */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              flexWrap: 'wrap',
+              marginTop: '12px',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                flex: '1 1 240px',
+                minWidth: '200px',
+              }}
+            >
+              <Icon
+                name="magnifyingglass"
+                size={14}
+                styleAttr={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--mac-text-muted)',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по ФИО, телефону, ID…"
+                aria-label="Поиск по очереди лаборатории"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 32px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--mac-border)',
+                  background: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Очистить поиск"
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--mac-text-muted)',
+                    padding: '4px',
+                    fontSize: '16px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div
+              role="group"
+              aria-label="Фильтр по статусу"
+              style={{ display: 'flex', gap: '4px' }}
+            >
+              {[
+                { key: 'all',        label: 'Все' },
+                { key: 'active',     label: 'В работе' },
+                { key: 'completed',  label: 'Завершены' },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setStatusFilter(opt.key)}
+                  aria-pressed={statusFilter === opt.key}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: `1px solid ${statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-border)'}`,
+                    background: statusFilter === opt.key ? 'var(--mac-accent)' : 'var(--mac-bg-primary)',
+                    color: statusFilter === opt.key ? 'white' : 'var(--mac-text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: statusFilter === opt.key ? 600 : 400,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* QW-8 fix: индикатор количества отфильтрованных записей. */}
+          {(searchQuery || statusFilter !== 'all') && (
+            <div
+              style={{
+                marginTop: '8px',
+                fontSize: '12px',
+                color: 'var(--mac-text-muted)',
+              }}
+            >
+              Показано: {filteredAppointments.length} из {appointments.length}
+              {searchQuery && ` · поиск: «${searchQuery}»`}
+              {statusFilter !== 'all' && ` · фильтр: ${
+                { active: 'в работе', completed: 'завершены' }[statusFilter]
+              }`}
+            </div>
+          )}
         </CardHeader>
         <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}>
           {loading ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mac-text-secondary)' }}>
-              Загрузка лабораторной очереди...
+            // QW-3 fix: skeleton-загрузка вместо текста «Загрузка…».
+            // Skeleton показывает структуру будущих карточек и снижает
+            // ощущение медлительности. 3 карточки-заглушки с shimmer-анимацией.
+            <div style={cardGridStyle} aria-busy="true" aria-live="polite">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    ...queueCardStyle,
+                    background: 'var(--mac-bg-tertiary)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ display: 'grid', gap: '8px', flex: 1 }}>
+                      <div
+                        style={{
+                          height: '18px',
+                          width: '60%',
+                          borderRadius: '4px',
+                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
+                          backgroundSize: '200% 100%',
+                          animation: 'lab-skeleton-shimmer 1.5s infinite',
+                        }}
+                      />
+                      <div
+                        style={{
+                          height: '14px',
+                          width: '80%',
+                          borderRadius: '4px',
+                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
+                          backgroundSize: '200% 100%',
+                          animation: 'lab-skeleton-shimmer 1.5s infinite',
+                        }}
+                      />
+                      <div
+                        style={{
+                          height: '14px',
+                          width: '50%',
+                          borderRadius: '4px',
+                          background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
+                          backgroundSize: '200% 100%',
+                          animation: 'lab-skeleton-shimmer 1.5s infinite',
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        height: '22px',
+                        width: '80px',
+                        borderRadius: '11px',
+                        background: 'linear-gradient(90deg, var(--mac-border) 25%, var(--mac-bg-secondary) 50%, var(--mac-border) 75%)',
+                        backgroundSize: '200% 100%',
+                        animation: 'lab-skeleton-shimmer 1.5s infinite',
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <style>{`
+                @keyframes lab-skeleton-shimmer {
+                  0% { background-position: 200% 0; }
+                  100% { background-position: -200% 0; }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                  [style*="lab-skeleton-shimmer"] {
+                    animation: none !important;
+                  }
+                }
+              `}</style>
             </div>
-          ) : appointments.length === 0 ? (
-            <Alert severity="info">На сегодня не найдено лабораторных записей.</Alert>
+          ) : filteredAppointments.length === 0 ? (
+            <Alert severity="info">
+              {appointments.length === 0
+                ? 'На сегодня не найдено лабораторных записей.'
+                : 'Ничего не найдено. Измените поисковый запрос или фильтр.'}
+            </Alert>
           ) : (
             <div style={cardGridStyle}>
-              {appointments.map((appointment) => {
+              {filteredAppointments.map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
                 return (
                   <div
@@ -135,7 +408,10 @@ export default function LabQueueWorkbench({
                           {appointment.patient_fio || 'Пациент без имени'}
                         </div>
                       <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
-                        Визит: {appointment.visit_id || 'не привязан'} | Телефон: {appointment.patient_phone || 'не указан'}
+                        Визит: {appointment.visit_id || 'не привязан'} | Телефон:{' '}
+                        {/* P-05 fix: маскирование номера телефона в публичном
+                            пространстве лаборатории. Раскрытие — по клику. */}
+                        <MaskedPhone phone={appointment.patient_phone} />
                       </div>
                     </div>
                       <Badge variant={getLabStatusVariant(appointment.status)}>
@@ -156,7 +432,25 @@ export default function LabQueueWorkbench({
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
                       <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
-                        Пациент ID: {appointment.patient_id}
+                        {/* P-05 fix: patient_id — внутренний идентификатор, не нужен
+                            лаборанту для работы. Скрываем по умолчанию, раскрытие —
+                            по клику. Снижает риск утечки PII через скриншоты. */}
+                        <details style={{ display: 'inline' }}>
+                          <summary
+                            style={{
+                              display: 'inline-block',
+                              cursor: 'pointer',
+                              color: 'var(--mac-text-muted)',
+                              listStyle: 'none',
+                            }}
+                            aria-label="Показать внутренний ID пациента"
+                          >
+                            ID пациента ▸
+                          </summary>
+                          <span style={{ marginLeft: 6, fontFamily: 'monospace' }}>
+                            {appointment.patient_id}
+                          </span>
+                        </details>
                       </div>
                       <Button variant="primary" onClick={() => onOpenAppointment(appointment)}>
                         <Icon name="doc.text" size={16} />

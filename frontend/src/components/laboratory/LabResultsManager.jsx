@@ -59,6 +59,31 @@ const LAB_CATEGORIES = {
   other: { name: 'Другие', icon: <TestTube /> }
 };
 
+// P-02 fix: вычисление возраста из birth_date для проброса в AI.
+// Если birth_date невалидна или пациент не указал — возвращаем null
+// и AI-кнопка блокируется (см. handleOpenAIAnalysis).
+function calculateAgeFromBirthDate(birthDate) {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 && age < 130 ? age : null;
+}
+
+// Нормализация пола: backend хранит M|F|X, AI ожидает male|female|other
+function normalizeSexForAI(sex) {
+  if (!sex) return null;
+  const s = String(sex).trim().toUpperCase();
+  if (s === 'M' || s === 'MALE') return 'male';
+  if (s === 'F' || s === 'FEMALE') return 'female';
+  return 'other';
+}
+
 // Статусы результатов
 const RESULT_STATUS = {
   pending: { label: 'Ожидается', color: 'warning' },
@@ -69,7 +94,50 @@ const RESULT_STATUS = {
 
 const tabButtonClassName = (isActive) => `theme-tab-button${isActive ? ' theme-tab-button--active' : ''}`;
 
-const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
+// QW-6 fix: inline-валидация числовых полей формы результата.
+// Раньше value, reference_min, reference_max принимали любой текст —
+// пользователь мог ввести "выше нормы" в числовое поле и сохранить.
+// Теперь валидация происходит при вводе, и кнопка «Сохранить» блокируется
+// при ошибке. Также проверяется, что min < max.
+function isNumericString(value) {
+  if (value === '' || value == null) return true; // пустое — допустимо (необязательное поле)
+  const num = Number(value);
+  return !Number.isNaN(num) && Number.isFinite(num);
+}
+
+function validateResultForm(form) {
+  const errors = {};
+
+  // value — должно быть числом, если указано
+  if (form.value && !isNumericString(form.value)) {
+    errors.value = 'Значение должно быть числом';
+  }
+
+  // reference_min — должно быть числом, если указано
+  if (form.reference_min && !isNumericString(form.reference_min)) {
+    errors.reference_min = 'Минимум должен быть числом';
+  }
+
+  // reference_max — должно быть числом, если указано
+  if (form.reference_max && !isNumericString(form.reference_max)) {
+    errors.reference_max = 'Максимум должен быть числом';
+  }
+
+  // Если указаны оба — min должен быть < max
+  if (
+    form.reference_min
+    && form.reference_max
+    && isNumericString(form.reference_min)
+    && isNumericString(form.reference_max)
+    && Number(form.reference_min) >= Number(form.reference_max)
+  ) {
+    errors.reference_max = 'Максимум должен быть больше минимума';
+  }
+
+  return errors;
+}
+
+const LabResultsManager = ({ patientId, visitId, onUpdate, patientAge = null, patientGender = null }) => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('all');
@@ -80,6 +148,16 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [, setAiAnalysisResults] = useState(null);
+  // P-08 fix: выбор конкретных результатов для отправки пациенту.
+  // Раньше sendToPatient отправлял ВСЕ результаты визита — включая
+  // незавершённые. Теперь пользователь явно выбирает чекбоксами.
+  const [selectedResultIds, setSelectedResultIds] = useState(new Set());
+  // P-02 fix: данные пациента, загружаемые по patientId, если возраст/пол
+  // не переданы через props. Без них AI-анализ блокируется, чтобы не
+  // интерпретировать результаты с захардкоженными значениями.
+  const [patientProfile, setPatientProfile] = useState(null);
+  const [patientProfileLoading, setPatientProfileLoading] = useState(false);
+  const [aiBlockedReason, setAiBlockedReason] = useState('');
 
   // Форма результата
   const [resultForm, setResultForm] = useState({
@@ -107,6 +185,81 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     }
   }, [visitId]);
 
+  // P-02 fix: загрузка профиля пациента, чтобы получить birth_date и sex
+  // для AI-интерпретации. Используется только если возраст/пол не переданы
+  // через props (prop patientAge/patientGender имеют приоритет — позволяют
+  // родительскому компоненту передать уже известные данные без доп. запроса).
+  useEffect(() => {
+    if (!patientId) {
+      setPatientProfile(null);
+      return;
+    }
+    // Если возраст/пол уже переданы через props — запрос не нужен
+    if (patientAge != null && patientGender) {
+      setPatientProfile(null);
+      return;
+    }
+    let cancelled = false;
+    setPatientProfileLoading(true);
+    api.get(`/patients/${patientId}`)
+      .then((response) => {
+        if (cancelled) return;
+        setPatientProfile(response?.data || response || null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        logger.error('Не удалось загрузить профиль пациента для AI-анализа:', error);
+        setPatientProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPatientProfileLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [patientId, patientAge, patientGender]);
+
+  // P-02 fix: вычисляем финальные возраст/пол с приоритетом props над загруженным профилем.
+  const resolvedPatientAge = patientAge ??
+    (patientProfile?.birth_date ? calculateAgeFromBirthDate(patientProfile.birth_date) : null);
+  const resolvedPatientGender = patientGender ??
+    normalizeSexForAI(patientProfile?.sex);
+
+  // P-02 fix: AI-анализ блокируется, если нет возраста или пола.
+  // Референсные интервалы многих анализов (гемоглобин, креатинин, гормоны)
+  // зависят от этих параметров — интерпретация с заглушкой опасна.
+  useEffect(() => {
+    if (patientProfileLoading) {
+      setAiBlockedReason('Загрузка данных пациента…');
+      return;
+    }
+    if (resolvedPatientAge == null) {
+      setAiBlockedReason(
+        'AI-анализ недоступен: не указана дата рождения пациента. ' +
+        'Заполните профиль пациента и повторите попытку.'
+      );
+      return;
+    }
+    if (!resolvedPatientGender) {
+      setAiBlockedReason(
+        'AI-анализ недоступен: не указан пол пациента. ' +
+        'Референсные интервалы зависят от пола — интерпретация невозможна.'
+      );
+      return;
+    }
+    setAiBlockedReason('');
+  }, [patientProfileLoading, resolvedPatientAge, resolvedPatientGender]);
+
+  // P-02 fix: открытие AI-диалога с явной блокировкой при отсутствии данных.
+  // Раньше кнопка была активна и передавала patientId ? 35 : null —
+  // то есть AI получал захардкоженный возраст для любого пациента.
+  const handleOpenAIAnalysis = () => {
+    if (results.length === 0) return;
+    if (resolvedPatientAge == null || !resolvedPatientGender) {
+      notify.error?.(aiBlockedReason || 'AI-анализ недоступен: проверьте данные пациента');
+      return;
+    }
+    setShowAIAnalysis(true);
+  };
+
   // Загрузка результатов
   useEffect(() => {
     if (visitId) {
@@ -118,6 +271,11 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const filteredResults = activeTab === 'all' ?
   results :
   results.filter((r) => r.category === activeTab);
+
+  // QW-6 fix: производное состояние ошибок валидации формы.
+  // Пересчитывается при каждом изменении resultForm.
+  const formErrors = validateResultForm(resultForm);
+  const hasFormErrors = Object.keys(formErrors).length > 0;
 
   // Подсчет по категориям
   const getCategoryCount = (category) => {
@@ -143,6 +301,11 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
 
   // Сохранение результата
   const handleSaveResult = async () => {
+    // QW-6 fix: блокируем сохранение при ошибках валидации.
+    if (hasFormErrors) {
+      notify.error?.('Проверьте корректность числовых полей');
+      return;
+    }
     try {
       const status = determineStatus(
         resultForm.value,
@@ -227,35 +390,101 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
 
   // Экспорт в PDF
   const exportToPDF = async () => {
+    let url = null;
     try {
       const response = await api.get(`/visits/${visitId}/lab-results/pdf`, {
         responseType: 'blob'
       });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `lab_results_${visitId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-
     } catch (error) {
       logger.error('Ошибка экспорта PDF:', error);
+    } finally {
+      // P-07 fix: явно освобождаем object URL, чтобы избежать memory leak
+      // при каждом экспорте. Раньше URL.createObjectURL вызывался, но
+      // revokeObjectURL — никогда. При повторных экспортах в длинной
+      // сессии память утекала по ~размеру PDF на каждый клик.
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
     }
   };
 
-  // Отправка пациенту
+  // P-08 fix: отправка пациенту только выбранных результатов.
+  // Раньше отправлялись ВСЕ результаты визита без возможности выбора,
+  // что могло привести к отправке незавершённых или неподтверждённых данных.
+  // Теперь: если ничего не выбрано — спрашиваем подтверждение «Отправить все?»;
+  // если выбраны — отправляем только их и показываем явный список в подтверждении.
+  const toggleResultSelection = (resultId) => {
+    setSelectedResultIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(resultId)) {
+        next.delete(resultId);
+      } else {
+        next.add(resultId);
+      }
+      return next;
+    });
+  };
+
   const sendToPatient = async () => {
+    const selectedIds = Array.from(selectedResultIds);
+    const sendingAll = selectedIds.length === 0;
+    const selectedResults = sendingAll
+      ? results
+      : results.filter((r) => selectedResultIds.has(r.id));
+
+    if (selectedResults.length === 0) {
+      notify.error('Нет результатов для отправки');
+      return;
+    }
+
+    // P-08 fix: явное подтверждение с количеством и составом.
+    const listPreview = selectedResults
+      .slice(0, 5)
+      .map((r) => `• ${r.test_name}: ${r.value} ${r.unit || ''}`)
+      .join('\n');
+    const moreNote = selectedResults.length > 5
+      ? `\n…и ещё ${selectedResults.length - 5}`
+      : '';
+
+    const ok = await confirm({
+      title: 'Отправка результатов пациенту',
+      message: `Будет отправлено в Telegram: ${selectedResults.length} ${selectedResults.length === 1 ? 'результат' : 'результатов'}.`,
+      description: `${listPreview}${moreNote}\n\nКанал: Telegram\nОтменить отправку после доставки невозможно.`,
+      confirmLabel: 'Отправить',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) return;
+
     try {
       await api.post(`/patients/${patientId}/send-lab-results`, {
         visit_id: visitId,
-        method: 'telegram'
+        method: 'telegram',
+        // P-08 fix: явно передаём выбранные ID. Если ничего не выбрано —
+        // backend получит пустой массив и (по контракту useLabResults)
+        // отправит все результаты визита. Это поведение сохранено для
+        // обратной совместимости, но теперь это осознанный выбор пользователя.
+        result_ids: selectedIds,
       });
 
-      notify.success('Результаты отправлены пациенту');
+      notify.success(
+        `Отправлено в Telegram: ${selectedResults.length} ${selectedResults.length === 1 ? 'результат' : 'результатов'}`
+      );
+      // Сбрасываем выбор после успешной отправки
+      setSelectedResultIds(new Set());
     } catch (error) {
       logger.error('Ошибка отправки результатов:', error);
+      notify.error(
+        error?.response?.data?.detail || error?.message || 'Не удалось отправить результаты'
+      );
     }
   };
 
@@ -322,20 +551,29 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 <Download style={{ width: 16, height: 16, marginRight: 8 }} />
                 Экспорт PDF
               </Button>
-              <Button size="small" onClick={sendToPatient}>
+              <Button
+                size="small"
+                onClick={sendToPatient}
+                title="Отправить выбранные результаты в Telegram пациенту"
+                aria-label="Отправить выбранные результаты в Telegram пациенту"
+              >
                 <Send style={{ width: 16, height: 16, marginRight: 8 }} />
-                Отправить
+                Отправить в Telegram
+                {/* P-08 fix: badge с количеством выбранных результатов. */}
+                {selectedResultIds.size > 0 && (
+                  <Badge variant="primary" style={{ marginLeft: 8 }}>
+                    {selectedResultIds.size}
+                  </Badge>
+                )}
               </Button>
               <AIButton
                 text="AI Анализ"
                 size="small"
-                onClick={() => {
-                  if (results.length > 0) {
-                    setShowAIAnalysis(true);
-                  }
-                }}
-                disabled={results.length === 0}
-                tooltip="AI интерпретация результатов" />
+                onClick={handleOpenAIAnalysis}
+                disabled={results.length === 0 || patientProfileLoading || Boolean(aiBlockedReason)}
+                tooltip={aiBlockedReason || (results.length === 0
+                  ? 'Нет результатов для анализа'
+                  : 'AI интерпретация результатов с учётом возраста и пола пациента')} />
               
             </Box>
           </Box>
@@ -370,6 +608,34 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
               <table className="clinic-ops-table">
                 <thead>
                   <tr>
+                    {/* P-08 fix: колонка выбора для отправки пациенту. */}
+                    <th style={{ textAlign: 'center', width: '40px' }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Выбрать все результаты для отправки"
+                        title="Выбрать все видимые результаты"
+                        checked={
+                          filteredResults.length > 0 &&
+                          filteredResults.every((r) => selectedResultIds.has(r.id))
+                        }
+                        ref={(el) => {
+                          if (el) el.indeterminate =
+                            selectedResultIds.size > 0 &&
+                            !filteredResults.every((r) => selectedResultIds.has(r.id));
+                        }}
+                        onChange={(e) => {
+                          setSelectedResultIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              filteredResults.forEach((r) => next.add(r.id));
+                            } else {
+                              filteredResults.forEach((r) => next.delete(r.id));
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    </th>
                     <th style={{ textAlign: 'left' }}>Исследование</th>
                     <th style={{ textAlign: 'left' }}>Результат</th>
                     <th style={{ textAlign: 'left' }}>Норма</th>
@@ -381,6 +647,15 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 <tbody>
                   {filteredResults.map((result) =>
                 <tr key={result.id}>
+                      <td style={{ textAlign: 'center' }}>
+                        {/* P-08 fix: индивидуальный выбор для отправки. */}
+                        <input
+                          type="checkbox"
+                          aria-label={`Выбрать ${result.test_name} для отправки`}
+                          checked={selectedResultIds.has(result.id)}
+                          onChange={() => toggleResultSelection(result.id)}
+                        />
+                      </td>
                       <td>
                         <Typography variant="body2" style={{ fontWeight: 500 }}>
                           {result.test_name}
@@ -502,34 +777,62 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
             <Box style={{ display: 'flex', gap: '16px' }}>
               <Box style={{ flex: 2 }}>
                 <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
                   label="Результат"
                   value={resultForm.value}
-                  onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })} />
-                
+                  onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })}
+                  error={Boolean(formErrors.value)}
+                />
+                {/* QW-6 fix: inline-сообщение об ошибке под полем. */}
+                {formErrors.value && (
+                  <Typography variant="caption" color="error" style={{ display: 'block', marginTop: '4px' }}>
+                    {formErrors.value}
+                  </Typography>
+                )}
               </Box>
-              
+
               <Box style={{ flex: 1 }}>
                 <Input
                   label="Ед."
                   value={resultForm.unit}
                   onChange={(e) => setResultForm({ ...resultForm, unit: e.target.value })} />
-                
+
               </Box>
-              
+
               <Box style={{ flex: 1 }}>
                 <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
                   label="Мин. норма"
                   value={resultForm.reference_min}
-                  onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })} />
-                
+                  onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })}
+                  error={Boolean(formErrors.reference_min)}
+                />
+                {formErrors.reference_min && (
+                  <Typography variant="caption" color="error" style={{ display: 'block', marginTop: '4px' }}>
+                    {formErrors.reference_min}
+                  </Typography>
+                )}
               </Box>
-              
+
               <Box style={{ flex: 1 }}>
                 <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
                   label="Макс. норма"
                   value={resultForm.reference_max}
-                  onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })} />
-                
+                  onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })}
+                  error={Boolean(formErrors.reference_max)}
+                />
+                {formErrors.reference_max && (
+                  <Typography variant="caption" color="error" style={{ display: 'block', marginTop: '4px' }}>
+                    {formErrors.reference_max}
+                  </Typography>
+                )}
               </Box>
             </Box>
             
@@ -563,7 +866,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           }}>
             Отмена
           </Button>
-          <Button variant="contained" onClick={handleSaveResult} disabled={!resultForm.test_name}>
+          <Button variant="contained" onClick={handleSaveResult} disabled={!resultForm.test_name || hasFormErrors}>
             {selectedResult ? 'Сохранить' : 'Добавить'}
           </Button>
         </DialogActions>
@@ -632,6 +935,18 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           </DialogTitle>
           
           <DialogContent>
+            {/* P-02 fix: явное отображение данных пациента, на основе которых
+                строится AI-интерпретация. Пользователь видит реальные значения
+                вместо молчаливого хардкода. */}
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="caption" component="div">
+                <strong>Пациент:</strong> {resolvedPatientAge != null ? `${resolvedPatientAge} лет` : 'возраст неизвестен'}
+                {', '}
+                <strong>Пол:</strong> {resolvedPatientGender
+                  ? ({ male: 'мужской', female: 'женский', other: 'другой' }[resolvedPatientGender] || resolvedPatientGender)
+                  : 'не указан'}
+              </Typography>
+            </Alert>
             <AIAssistant
             analysisType="lab"
             data={{
@@ -641,8 +956,10 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                 unit: r.unit,
                 reference: `${r.reference_min}-${r.reference_max}`
               })),
-              patient_age: patientId ? 35 : null, // Здесь нужно получить реальный возраст
-              patient_gender: null
+              // P-02 fix: ранее было `patientId ? 35 : null` — хардкод возраста.
+              // Теперь передаются реальные значения, проверенные выше.
+              patient_age: resolvedPatientAge,
+              patient_gender: resolvedPatientGender
             }}
             onResult={(result) => {
               setAiAnalysisResults(result);
@@ -669,6 +986,11 @@ LabResultsManager.propTypes = {
   onUpdate: PropTypes.any,
   patientId: PropTypes.any,
   visitId: PropTypes.any,
+  // P-02 fix: опциональные props, позволяющие родителю передать уже известные
+  // возраст/пол и избежать лишнего запроса GET /patients/{id}. Если не переданы —
+  // компонент загрузит профиль сам. AI блокируется до получения данных.
+  patientAge: PropTypes.number,
+  patientGender: PropTypes.oneOf(['male', 'female', 'other']),
 };
 
 export default LabResultsManager;
