@@ -13,6 +13,9 @@ import {
   signerFieldLabels
 } from './labUiLabels';
 
+// WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
+import { useConfirm } from '../common/ConfirmDialog';
+
 // P-04 fix: декомпозиция монолитного компонента (969 → ~530 строк).
 // Helper-функции и подкомпоненты вынесены в отдельные модули:
 import {
@@ -47,6 +50,11 @@ export default function LabReportWorkbench({
   onQueueChanged = undefined,
   notify
 }) {
+  // WF-08 fix: confirmation dialog для irreversible actions.
+  // Finalize делает бланк immutable (можно только revise). Revise создаёт
+  // новый instance. Оба действия необратимы без объяснения последствий.
+  const [confirm, confirmDialog] = useConfirm();
+
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [draftValues, setDraftValues] = useState({});
   const [signerSnapshot, setSignerSnapshot] = useState({});
@@ -77,6 +85,31 @@ export default function LabReportWorkbench({
   const canFinalize = hasLabReportAction(activeInstance, 'finalize');
   const canRevise = hasLabReportAction(activeInstance, 'revise');
   const canPrint = hasLabReportAction(activeInstance, 'print');
+
+  // WF-10 fix: inline-валидация required fields. Раньше валидация происходила
+  // только на backend при finalize → late feedback (error toast со списком).
+  // Теперь вычисляем missing required fields на frontend и:
+  //   - disable кнопку Finalize пока есть незаполненные обязательные поля
+  //   - показываем tooltip со списком missing полей
+  const missingRequiredFields = useMemo(() => {
+    if (!activeInstance?.sections) return [];
+    const missing = [];
+    activeInstance.sections.forEach((section) => {
+      (section.fields || []).forEach((field) => {
+        if (field.required) {
+          const value = draftValues[field.field_key];
+          if (value === undefined || value === '' || value === null) {
+            missing.push(field.label || field.field_key);
+          }
+        }
+      });
+    });
+    return missing;
+  }, [activeInstance, draftValues]);
+  const hasMissingRequired = missingRequiredFields.length > 0;
+  // Finalize disabled если есть missing required fields (даже если backend
+  // разрешает action — лучше предотвратить, чем получить 400 error).
+  const canFinalizeWithValidation = canFinalize && !hasMissingRequired;
 
   const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
@@ -133,6 +166,11 @@ export default function LabReportWorkbench({
       setPrintFeedback(null);
       return;
     }
+    // WF-12 fix: сбрасываем printFeedback при смене activeInstance,
+    // иначе лаборант видит stale success-сообщение от печати предыдущего
+    // бланка. useEffect зависит от activeInstance.id, не от объекта —
+    // поэтому сработает именно при смене instance, а не при любом re-render.
+    setPrintFeedback(null);
     const values = {};
     activeInstance.sections.forEach((section) => {
       section.fields.forEach((field) => {
@@ -245,6 +283,20 @@ export default function LabReportWorkbench({
 
   async function handleFinalize() {
     if (!activeInstance) return;
+    // WF-08 fix: Finalize — необратимое действие. Бланк становится immutable,
+    // единственный путь правки — revise (создание нового instance).
+    // Показываем confirmation dialog с объяснением последствий.
+    const ok = await confirm({
+      title: 'Финализация бланка',
+      message: 'После финализации бланк становится неизменяемым.',
+      description: 'Редактирование полей и подписей будет заблокировано. ' +
+        'Для исправления потребуется создать новую ревизию (копию бланка). ' +
+        'Действие нельзя отменить.',
+      confirmLabel: 'Финализировать',
+      cancelLabel: 'Отмена',
+      intent: 'primary',
+    });
+    if (!ok) return;
     setSaving(true);
     setBusyAction('finalize');
     try {
@@ -322,23 +374,33 @@ export default function LabReportWorkbench({
       const blob = await labReportingApi.downloadPdf(activeInstance.id);
       const url = URL.createObjectURL(blob);
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      const printed = await labReportingApi.markPrinted(activeInstance.id);
-      onInstanceChange(printed);
-      await onRefreshHistory(printed.patient_id);
-      await onRefreshRecentReports?.();
-      await onQueueChanged?.();
-      setPrintFeedback({
-        severity: popup ? 'success' : 'warning',
-        text: popup
-          ? 'PDF открыт в новой вкладке. Статус печати обновлён.'
-          : 'PDF сформирован. Если новая вкладка не открылась, проверьте блокировку pop-up.'
-      });
-      notify(
-        popup ? 'success' : 'info',
-        popup
-          ? 'PDF открыт в новой вкладке и статус печати обновлён.'
-          : 'PDF сформирован. Если вкладка не открылась, проверьте блокировку pop-up.'
-      );
+      // WF-05 fix: не помечаем как PRINTED при неудаче popup.
+      // Раньше markPrinted вызывался безусловно → false audit trail:
+      // статус PRINTED, но PDF не открыт. Теперь:
+      //   - popup OK → markPrinted + success feedback
+      //   - popup blocked → НЕ markPrinted, warning feedback,
+      //     лаборант может retry после разрешения pop-up
+      if (popup) {
+        const printed = await labReportingApi.markPrinted(activeInstance.id);
+        onInstanceChange(printed);
+        await onRefreshHistory(printed.patient_id);
+        await onRefreshRecentReports?.();
+        await onQueueChanged?.();
+        setPrintFeedback({
+          severity: 'success',
+          text: 'PDF открыт в новой вкладке. Статус печати обновлён.'
+        });
+        notify('success', 'PDF открыт в новой вкладке и статус печати обновлён.');
+      } else {
+        // PDF сформирован, но не открыт. Статус НЕ меняем.
+        setPrintFeedback({
+          severity: 'warning',
+          text: 'PDF сформирован, но новая вкладка заблокирована. ' +
+            'Разрешите pop-up для этого сайта и нажмите «Печать» снова, ' +
+            'чтобы обновить статус бланка.'
+        });
+        notify('warning', 'PDF сформирован, но вкладка заблокирована. Статус печати не обновлён.');
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       setPrintFeedback({
@@ -451,6 +513,14 @@ export default function LabReportWorkbench({
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
                     Визит: {activeInstance.visit_id || 'без визита'} | Бланк #{activeInstance.id}
+                    {/* WF-04 fix: показываем supersedes relationship для audit trail.
+                        Если этот бланк — ревизия другого, лаборант видит связь.
+                        Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
+                    {activeInstance.supersedes_instance_id && (
+                      <span style={{ marginLeft: '8px', color: 'var(--mac-accent)' }}>
+                        ← ревизия бланка #{activeInstance.supersedes_instance_id}
+                      </span>
+                    )}
                   </div>
                   {/* P-20 fix: визуальный stepper жизненного цикла бланка.
                       Показывает текущую фазу и будущие шаги. */}
@@ -464,7 +534,8 @@ export default function LabReportWorkbench({
                     busyAction={busyAction}
                     canSaveDraft={canSaveDraft}
                     canMarkReady={canMarkReady}
-                    canFinalize={canFinalize}
+                    // WF-10 fix: Finalize disabled пока есть missing required fields.
+                    canFinalize={canFinalizeWithValidation}
                     canRevise={canRevise}
                     canPrint={canPrint}
                     onSaveDraft={handleSaveDraft}
@@ -473,6 +544,18 @@ export default function LabReportWorkbench({
                     onRevise={handleRevise}
                     onPrint={handlePrint}
                   />
+                  {/* WF-10 fix: inline-индикатор missing required fields.
+                      Показываем сколько обязательных полей ещё не заполнено,
+                      чтобы лаборант понимал, почему Finalize disabled. */}
+                  {canFinalize && hasMissingRequired && (
+                    <span style={{
+                      fontSize: '12px',
+                      color: 'var(--mac-accent-orange, #c2410c)',
+                      marginLeft: '8px',
+                    }}>
+                      Не заполнено обязательных полей: {missingRequiredFields.length}
+                    </span>
+                  )}
                   {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager
                       с сохранением P-02 fix (блокировка при отсутствии возраста/пола).
                       Использует patient_snapshot из activeInstance — отдельный
@@ -493,6 +576,9 @@ export default function LabReportWorkbench({
                       aria-label={signerFieldLabels[key] || key}
                       value={signerSnapshot?.[key] || ''}
                       onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
+                      // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
+                      // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
+                      disabled={!canEditActiveInstance}
                     />
                   </label>
                 ))}
@@ -638,6 +724,8 @@ export default function LabReportWorkbench({
           onOpenInstance={onOpenInstance}
         />
       )}
+      {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
+      {confirmDialog}
     </div>
   );
 }
