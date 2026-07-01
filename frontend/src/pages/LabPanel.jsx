@@ -541,8 +541,16 @@ export default function LabPanel() {
             onRefresh={loadLabAppointments}
             onOpenAppointment={(appointment) => {
               setSelectedAppointment(appointment);
-              setActiveInstance(null);
               setTemplateResolution(null);
+              // WF-03 fix: если у пациента уже есть report_instance_id —
+              // сразу открываем существующий бланк, а не сбрасываем в режим
+              // создания. Раньше setActiveInstance(null) безусловно сбрасывал,
+              // и кнопка «Открыть бланк» misleading'ила: вела в режим создания.
+              if (appointment.report_instance_id) {
+                loadInstance(appointment.report_instance_id);
+              } else {
+                setActiveInstance(null);
+              }
               switchTab('reports');
             }}
             selectedAppointment={selectedAppointment}
