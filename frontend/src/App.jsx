@@ -16,6 +16,8 @@ import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
 import { Sidebar } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew.jsx';
+// SW-05 fix: global command palette (Cmd+K)
+import { CommandPalette } from './components/common/CommandPalette';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
@@ -323,6 +325,8 @@ function AppShell({ children }) {
           {children}
         </main>
       </div>
+      {/* SW-05 fix: global command palette — Cmd+K / Ctrl+K to open */}
+      <CommandPalette profile={authState.profile} navigate={navigate} />
     </div>
   );
 }
