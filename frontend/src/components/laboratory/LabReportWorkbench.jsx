@@ -90,9 +90,10 @@ export default function LabReportWorkbench({
   }, [activeInstance, draftValues, signerSnapshot]);
 
   // Navigation guard: предотвращает потерю данных при refresh/close/switch.
+  // isDirty уже возвращает false если нет activeInstance — отдельная
+  // проверка canEditActiveInstance не нужна (она определяется ниже).
   useNavigationGuard({
     isDirty,
-    enabled: canEditActiveInstance,
     message: 'В бланке есть несохранённые изменения. Уйти со страницы?',
   });
 
