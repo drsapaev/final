@@ -1,0 +1,161 @@
+import PropTypes from 'prop-types';
+import {
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+} from '../ui/macos';
+import {
+  formatLabStatus,
+  formatSeverityLabel,
+  getLabStatusVariant,
+} from './labUiLabels';
+import { historySeverityState, matchesHistoryFilter } from './utils/labReportNormalize';
+
+/**
+ * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.
+ *
+ * Отвечает за отображение двух списков (взаимоисключающих):
+ *   - showRecentReportsBrowser=true: недавние бланки (когда нет выбранного пациента)
+ *   - showRecentReportsBrowser=false: история бланков выбранного пациента
+ *
+ * Включает фильтр по severity (Все / Без флагов / С флагами / Критические)
+ * и кнопки-карточки для открытия бланка.
+ */
+const SEVERITY_FILTERS = [
+  { id: 'all',      label: 'Все' },
+  { id: 'clean',    label: 'Без флагов' },
+  { id: 'flagged',  label: 'С флагами' },
+  { id: 'critical', label: 'Критические' },
+];
+
+function sortHistoryItems(items) {
+  return [...items].sort((left, right) => {
+    const leftSeverity = historySeverityState(left);
+    const rightSeverity = historySeverityState(right);
+    if (rightSeverity.order !== leftSeverity.order) {
+      return rightSeverity.order - leftSeverity.order;
+    }
+    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+  });
+}
+
+export default function LabReportHistoryPanel({
+  showRecentReportsBrowser = false,
+  recentReports = [],
+  reportHistory = [],
+  historySeverityFilter = 'all',
+  onSeverityFilterChange,
+  activeInstanceId = null,
+  onOpenInstance,
+}) {
+  const sourceItems = showRecentReportsBrowser ? recentReports : reportHistory;
+  const filteredItems = sortHistoryItems(
+    sourceItems.filter((item) => matchesHistoryFilter(item, historySeverityFilter))
+  );
+
+  const title = showRecentReportsBrowser
+    ? 'Недавние лабораторные бланки'
+    : 'Доступные бланки пациента';
+
+  const emptyText = showRecentReportsBrowser
+    ? 'В лаборатории пока нет сохранённых бланков для повторного открытия.'
+    : 'Для выбранного фильтра нет лабораторных бланков.';
+
+  return (
+    <Card variant="filled" padding="none">
+      <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
+        <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Icon name="clock.arrow.circlepath" size={20} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '12px' }}>
+        {/* Фильтр по severity */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {SEVERITY_FILTERS.map((filter) => (
+            <Button
+              key={filter.id}
+              variant={historySeverityFilter === filter.id ? 'primary' : 'outline'}
+              onClick={() => onSeverityFilterChange(filter.id)}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </div>
+
+        {filteredItems.length === 0 ? (
+          <Alert severity="info">{emptyText}</Alert>
+        ) : (
+          filteredItems.map((item) => {
+            const severity = historySeverityState(item);
+            const patientLabel = item.patient_snapshot?.full_name || `Пациент #${item.patient_id}`;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onOpenInstance(item.id)}
+                style={{
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: '14px',
+                  background: activeInstanceId === item.id
+                    ? 'color-mix(in oklab, var(--mac-accent) 10%, var(--mac-bg-primary))'
+                    : 'var(--mac-bg-primary)',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'grid', gap: '4px', textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {item.template?.name || `Бланк #${item.id}`}
+                  </div>
+                  <div style={{ color: 'var(--mac-text-secondary)', fontSize: '13px' }}>
+                    {showRecentReportsBrowser
+                      ? `${patientLabel} | ${new Date(item.created_at).toLocaleString()}`
+                      : new Date(item.created_at).toLocaleString()}
+                  </div>
+                  {showRecentReportsBrowser && (
+                    <div style={{ color: 'var(--mac-text-secondary)', fontSize: '12px' }}>
+                      Визит: {item.visit_id || 'без визита'}
+                    </div>
+                  )}
+                </div>
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end',
+                }}>
+                  <Badge variant={getLabStatusVariant(item.status)}>
+                    {formatLabStatus(item.status)}
+                  </Badge>
+                  <Badge variant={severity.variant}>
+                    {formatSeverityLabel(severity.label)}
+                  </Badge>
+                  {item.flagged_findings_count > 0 && (
+                    <Badge variant="info">{item.flagged_findings_count} флагов</Badge>
+                  )}
+                  {item.critical_findings_count > 0 && (
+                    <Badge variant="danger">{item.critical_findings_count} критич.</Badge>
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+LabReportHistoryPanel.propTypes = {
+  showRecentReportsBrowser: PropTypes.bool,
+  recentReports: PropTypes.array,
+  reportHistory: PropTypes.array,
+  historySeverityFilter: PropTypes.string,
+  onSeverityFilterChange: PropTypes.func.isRequired,
+  activeInstanceId: PropTypes.number,
+  onOpenInstance: PropTypes.func.isRequired,
+};

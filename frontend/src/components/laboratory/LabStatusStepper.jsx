@@ -1,0 +1,131 @@
+import PropTypes from 'prop-types';
+import { Icon } from '../ui/macos';
+
+/**
+ * P-04 fix: LabStatusStepper выделен в отдельный файл.
+ *
+ * P-20 fix (визуальный stepper жизненного цикла лабораторного бланка):
+ * State machine: DRAFT → IN_PROGRESS → READY → FINALIZED → PRINTED
+ * (с возможностью revise() — возвратом на DRAFT из FINALIZED).
+ *
+ * Раньше статус отображался одним Badge без контекста «куда двигаться
+ * дальше». Stepper показывает пройденные шаги, текущий и будущие.
+ */
+const LAB_REPORT_STEPS = [
+  { key: 'DRAFT',       label: 'Черновик' },
+  { key: 'IN_PROGRESS', label: 'Заполняется' },
+  { key: 'READY',       label: 'Готов' },
+  { key: 'FINALIZED',   label: 'Финализирован' },
+  { key: 'PRINTED',     label: 'Напечатан' },
+];
+
+function getLabReportStepIndex(status) {
+  if (!status) return -1;
+  const idx = LAB_REPORT_STEPS.findIndex((s) => s.key === status);
+  return idx;
+}
+
+export default function LabStatusStepper({ status }) {
+  const currentIndex = getLabReportStepIndex(status);
+  if (currentIndex < 0) {
+    // Неизвестный статус — fallback на Badge в родительском компоненте
+    return null;
+  }
+
+  return (
+    <div
+      role="navigation"
+      aria-label="Прогресс бланка"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexWrap: 'wrap',
+        marginTop: '8px',
+      }}
+    >
+      {LAB_REPORT_STEPS.map((step, index) => {
+        const isCompleted = index < currentIndex;
+        const isCurrent = index === currentIndex;
+        const isFuture = index > currentIndex;
+        const isLast = index === LAB_REPORT_STEPS.length - 1;
+
+        return (
+          <div
+            key={step.key}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: isCurrent ? 600 : 400,
+                background: isCurrent
+                  ? 'var(--mac-accent)'
+                  : isCompleted
+                    ? 'color-mix(in oklab, var(--mac-accent) 15%, var(--mac-bg-primary))'
+                    : 'var(--mac-bg-tertiary)',
+                color: isCurrent
+                  ? 'white'
+                  : isCompleted
+                    ? 'var(--mac-accent)'
+                    : 'var(--mac-text-muted)',
+                border: `1px solid ${
+                  isCurrent
+                    ? 'var(--mac-accent)'
+                    : isCompleted
+                      ? 'color-mix(in oklab, var(--mac-accent) 30%, transparent)'
+                      : 'var(--mac-border)'
+                }`,
+              }}
+              aria-current={isCurrent ? 'step' : undefined}
+              title={
+                isCompleted
+                  ? `${step.label} — пройден`
+                  : isCurrent
+                    ? `${step.label} — текущий шаг`
+                    : `${step.label} — предстоит`
+              }
+            >
+              {isCompleted && (
+                <Icon name="checkmark.circle.fill" size={12} />
+              )}
+              {isCurrent && (
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    display: 'inline-block',
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {step.label}
+            </div>
+            {!isLast && (
+              <div
+                style={{
+                  width: '12px',
+                  height: '1px',
+                  background: isFuture ? 'var(--mac-border)' : 'var(--mac-accent)',
+                  opacity: isFuture ? 0.5 : 0.8,
+                }}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+LabStatusStepper.propTypes = {
+  status: PropTypes.string,
+};

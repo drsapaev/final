@@ -97,7 +97,10 @@ describe('LabReportWorkbench', () => {
   it('uses backend-provided action availability instead of local finalized status rules', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
-    expect(source).toContain('function hasLabReportAction(instance, action)');
+    // P-04 fix: hasLabReportAction вынесена в utils/labReportActions.js.
+    // Проверяем, что основной файл импортирует её оттуда и использует.
+    expect(source).toContain("hasLabReportAction");
+    expect(source).toContain("from './utils/labReportActions'");
     expect(source).toContain("const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit')");
     expect(source).toContain("const canFinalize = hasLabReportAction(activeInstance, 'finalize')");
     expect(source).toContain("const canRevise = hasLabReportAction(activeInstance, 'revise')");
@@ -106,7 +109,10 @@ describe('LabReportWorkbench', () => {
   });
 
   it('does not invent draft status in the print payload when backend status is missing', () => {
-    const source = fs.readFileSync(workbenchPath, 'utf8');
+    // P-04 fix: buildLabPrintPayload вынесена в utils/labReportNormalize.js.
+    // Проверяем там, что status берётся как есть, без fallback на 'DRAFT'.
+    const normalizePath = path.resolve(__dirname, '../utils/labReportNormalize.js');
+    const source = fs.readFileSync(normalizePath, 'utf8');
 
     expect(source).toContain('status: instance?.status || null');
     expect(source).not.toContain("status: instance?.status || 'DRAFT'");
