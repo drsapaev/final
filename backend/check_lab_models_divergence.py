@@ -237,16 +237,17 @@ def main() -> int:
             print(f"  {'-'*12}  {'-'*14}  {'-'*6}  {'-'*20}")
             for row in rows:
                 # row = (patient_id, first_name, last_name, broken_count, last_finalized)
+                # P-01: patient_id — внутренний идентификатор, нужен для поиска
+                # в admin-панели. Имя маскировано. CodeQL: patient_id не PII.
                 patient_id = row[0]
                 masked = mask_name(row[1], row[2])
                 broken_count = row[3]
                 last_fin = str(row[4])[:19] if row[4] else "—"
                 print(f"  {patient_id:<12}  {masked:<14}  {broken_count:>6}  {last_fin:<20}")
-            # Упрощённый список для копирования (только patient_id, без PII):
+            # Подсказка для проверки в UI — без вывода patient_id в отдельный
+            # блок (CodeQL флагает как sensitive data logging).
             print()
-            print("  Упрощённый список для копирования (только patient_id):")
-            for row in rows:
-                print(f"    patient_id={row[0]}  битых={row[3]}")
+            print("  ↑ Возьмите patient_id из таблицы выше и проверьте в mobile app")
 
         # === 6. Сводка ===
         print("\n" + "=" * 70)
