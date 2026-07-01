@@ -6,14 +6,13 @@ import {
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
-import { getApiBaseUrl } from '../api/runtime';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
-const API_V1_BASE = getApiBaseUrl();
+// P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
+// использует labReportingApi.listQueueToday() с собственным auth-токеном.
 
 const tabs = [
   { id: 'queue', label: 'Очередь', icon: 'testtube.2' },
@@ -30,41 +29,6 @@ function getLabPanelTabId(tabId) {
 
 function getLabPanelTabPanelId(tabId) {
   return `lab-panel-tabpanel-${tabId}`;
-}
-
-function formatAppointmentEntry(queue, entry) {
-  const latestLabReport = entry.latest_lab_report || null;
-  return {
-    id: entry.id,
-    appointment_id: entry.appointment_id || null,
-    visit_id: entry.visit_id || null,
-    patient_id: entry.patient_id,
-    patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-    patient_phone: entry.phone || '',
-    patient_birth_year: entry.patient_birth_year || '',
-    address: entry.address || '',
-    services: entry.services || [],
-    all_patient_services: entry.services || [],
-    service_codes: entry.service_codes || [],
-    service_details: entry.service_details || [],
-    service_name: entry.service_name || '',
-    service_id: entry.service_id || null,
-    payment_status: entry.payment_status || null,
-    queue_status: entry.status || null,
-    specialty: queue.specialty,
-    created_at: entry.created_at,
-    appointment_time: entry.visit_time || '',
-    status: entry.status || null,
-    status_source: 'queue',
-    latest_lab_report: latestLabReport,
-    lab_report_status: latestLabReport?.status || null,
-    report_status_source: latestLabReport ? 'lab-report' : null,
-    report_instance_id: latestLabReport?.id || null,
-    report_template_name: latestLabReport?.template_name || '',
-    flagged_findings_count: latestLabReport?.flagged_findings_count || 0,
-    critical_findings_count: latestLabReport?.critical_findings_count || 0,
-    max_flag_severity: latestLabReport?.max_flag_severity ?? null
-  };
 }
 
 function normalizeListPayload(payload) {
@@ -216,24 +180,12 @@ export default function LabPanel() {
   const loadLabAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        throw new Error('Требуется авторизация для загрузки лабораторной очереди.');
-      }
-      const queueParams = new URLSearchParams({ department: 'lab' });
-      const queueUrl = `${API_V1_BASE}/registrar/queues/today?${queueParams.toString()}`;
-      const response = await fetch(queueUrl, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`Ошибка загрузки очереди: ${response.status}`);
-      }
-      const payload = await response.json();
-      const queueEntries = (payload?.queues || [])
-        .flatMap((queue) => (queue.entries || []).map((entry) => formatAppointmentEntry(queue, entry)));
+      // P-03 fix: используем lab-specific façade endpoint вместо прямого
+      // fetch к registrar endpoint. Façade имеет собственный контракт,
+      // собственную RBAC и нормализует ответ в плоский формат — это убирает
+      // жёсткую связку с registrar module и промежуточную нормализацию.
+      const payload = await labReportingApi.listQueueToday();
+      const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
       setSelectedAppointment((current) => {
         if (!current) {

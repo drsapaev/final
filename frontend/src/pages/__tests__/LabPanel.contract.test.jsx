@@ -17,49 +17,21 @@ const extractBlock = (source, startMarker, endMarker) => {
   return source.slice(start, end);
 };
 
+// P-03 fix: контракт-тесты обновлены под lab/queue/today façade.
+// Раньше тесты проверяли, что LabPanel делает прямой fetch к
+// /registrar/queues/today и нормализует ответ через formatAppointmentEntry.
+// Теперь эти обязанности перенесены на backend (GET /lab/queue/today),
+// а LabPanel использует labReportingApi.listQueueToday().
 describe('LabPanel queue/report status contract', () => {
-  it('keeps queue status separate from backend-provided lab report summary', () => {
+  it('does not duplicate formatAppointmentEntry — normalization moved to backend façade', () => {
+    // P-03 fix: formatAppointmentEntry удалена, нормализация на backend.
+    // Если кто-то вернёт эту функцию — контракт нарушен.
     const source = readLabPanelSource();
-    const formatBlock = extractBlock(
-      source,
-      'function formatAppointmentEntry(queue, entry) {',
-      'function normalizeListPayload(payload) {',
-    );
-
-    expect(formatBlock).toContain('const latestLabReport = entry.latest_lab_report || null');
-    expect(formatBlock).toContain("status_source: 'queue'");
-    expect(formatBlock).toContain('queue_status: entry.status || null');
-    expect(formatBlock).toContain('lab_report_status: latestLabReport?.status || null');
-    expect(formatBlock).toContain("report_status_source: latestLabReport ? 'lab-report' : null");
-    const lines = formatBlock.split('\n').map((line) => line.trim());
-    expect(lines).not.toContain('status: latestLabReport?.status || entry.status,');
-    expect(lines).not.toContain('status: latestLabReport?.status || null,');
+    expect(source).not.toContain('function formatAppointmentEntry(');
+    expect(source).not.toContain('formatAppointmentEntry(queue, entry)');
   });
 
-  it('does not invent queue or payment status when backend omits canonical state', () => {
-    const source = readLabPanelSource();
-    const formatBlock = extractBlock(
-      source,
-      'function formatAppointmentEntry(queue, entry) {',
-      'function normalizeListPayload(payload) {',
-    );
-
-    expect(formatBlock).toContain('payment_status: entry.payment_status || null');
-    expect(formatBlock).toContain('queue_status: entry.status || null');
-    expect(formatBlock).toContain('status: entry.status || null');
-    expect(formatBlock).not.toContain("payment_status: entry.payment_status || 'pending'");
-    expect(formatBlock).not.toContain("queue_status: entry.status || 'waiting'");
-    expect(formatBlock).not.toContain("status: entry.status || 'waiting'");
-  });
-
-  it('does not add BFF-lite endpoints for the lab queue contract repair', () => {
-    const source = readLabPanelSource();
-
-    expect(source).not.toContain('/api/v1/ui/');
-    expect(source).not.toContain('/ui/lab');
-  });
-
-  it('uses the backend registrar department contract for lab queue rows', () => {
+  it('uses labReportingApi.listQueueToday façade instead of direct registrar fetch', () => {
     const source = readLabPanelSource();
     const loadBlock = extractBlock(
       source,
@@ -67,9 +39,41 @@ describe('LabPanel queue/report status contract', () => {
       'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
     );
 
-    expect(loadBlock).toContain("new URLSearchParams({ department: 'lab' })");
-    expect(loadBlock).toContain('/registrar/queues/today?${queueParams.toString()}');
-    expect(loadBlock).not.toContain(".filter((queue) => ['lab', 'laboratory'].includes(queue.specialty))");
+    // P-03 fix: должен использовать façade метод.
+    expect(loadBlock).toContain('labReportingApi.listQueueToday()');
+    // Не должен делать прямой fetch к registrar endpoint.
+    expect(loadBlock).not.toContain('/registrar/queues/today');
+    expect(loadBlock).not.toContain("new URLSearchParams({ department: 'lab' })");
+    // Не должен вручную нормализовать nested queues[] → плоский массив
+    // (теперь backend возвращает плоский entries[] напрямую).
+    expect(loadBlock).not.toContain('payload?.queues || []');
+    expect(loadBlock).not.toContain('.flatMap((queue) =>');
+  });
+
+  it('relies on backend-provided lab report summary fields without re-inventing status', () => {
+    // P-03 fix: backend /lab/queue/today уже возвращает latest_lab_report
+    // и связанные поля (lab_report_status, report_instance_id, etc.).
+    // Frontend не должен переопределять эти поля вручную.
+    const source = readLabPanelSource();
+
+    // Façade возвращает entries[] — frontend использует их как есть.
+    const loadBlock = extractBlock(
+      source,
+      'const loadLabAppointments = useCallback(async () => {',
+      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+    );
+    expect(loadBlock).toContain('normalizeListPayload(payload?.entries ?? [])');
+    // Frontend не долженfabricировать статусы — они приходят готовые с backend.
+    expect(source).not.toContain("status: latestLabReport?.status || entry.status,");
+    expect(source).not.toContain("payment_status: entry.payment_status || 'pending'");
+    expect(source).not.toContain("queue_status: entry.status || 'waiting'");
+  });
+
+  it('does not add BFF-lite endpoints for the lab queue contract repair', () => {
+    const source = readLabPanelSource();
+
+    expect(source).not.toContain('/api/v1/ui/');
+    expect(source).not.toContain('/ui/lab');
   });
 
   it('does not fetch report instances by visit_ids to enrich normal queue rows', () => {
@@ -83,5 +87,15 @@ describe('LabPanel queue/report status contract', () => {
     expect(loadBlock).not.toContain('visit_ids');
     expect(loadBlock).not.toContain('mergeQueueEntriesWithLabInstances');
     expect(source).not.toContain('function mergeQueueEntriesWithLabInstances');
+  });
+
+  it('does not import unused tokenManager or getApiBaseUrl after façade migration', () => {
+    // P-03 fix: после миграции на façade эти импорты больше не нужны.
+    // Если кто-то их вернёт — это сигнал, что LabPanel снова делает
+    // прямые fetch-запросы в обход labReportingApi.
+    const source = readLabPanelSource();
+    expect(source).not.toContain("from '../utils/tokenManager'");
+    expect(source).not.toContain("from '../api/runtime'");
+    expect(source).not.toContain('const API_V1_BASE');
   });
 });
