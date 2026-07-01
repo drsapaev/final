@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getApiBase } from '../api/client.js';
 import { getHealth, getActivationStatus } from '../api/index.js';
-import { AppEmpty, AppError, AppLoading, Button } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Button,
+} from '../components/ui/macos';
 import auth from '../stores/auth.js';
 
 export default function Health() {

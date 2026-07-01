@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSSelect,
+  Button,
+  Badge,
+  Input,
+  Select,
   MacOSTab,
-  MacOSTable,
-  MacOSEmptyState } from
-
-
-'../ui/macos';
+  Table,
+  MacOSEmptyState,
+} from '../ui/macos';
 import {
   Brain,
   TrendingUp,
@@ -363,7 +361,7 @@ const AIAnalytics = () => {
         </h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-          <MacOSButton
+          <Button
           onClick={optimizeModels}
           disabled={loading}
           variant="primary"
@@ -376,9 +374,9 @@ const AIAnalytics = () => {
           
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Target style={{ width: '16px', height: '16px' }} />}
             Оптимизировать модели
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={() => generateTrainingDataset('diagnostic_patterns')}
           disabled={loading}
           variant="success"
@@ -391,9 +389,9 @@ const AIAnalytics = () => {
           
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет диагностики
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={() => generateTrainingDataset('treatment_outcomes')}
           disabled={loading}
           variant="secondary"
@@ -406,9 +404,9 @@ const AIAnalytics = () => {
           
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет лечения
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={loadModelComparison}
           disabled={loading}
           variant="warning"
@@ -421,7 +419,7 @@ const AIAnalytics = () => {
           
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
             Сравнить модели
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -577,7 +575,7 @@ const AIAnalytics = () => {
       }}>
           Инсайты для обучения AI
         </h3>
-        <MacOSButton
+        <Button
         onClick={loadLearningInsights}
         disabled={loading}
         variant="outline"
@@ -589,7 +587,7 @@ const AIAnalytics = () => {
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Brain style={{ width: '16px', height: '16px' }} />}
           Обновить
-        </MacOSButton>
+        </Button>
       </div>
 
       {learningInsights &&
@@ -618,7 +616,7 @@ const AIAnalytics = () => {
                   </h5>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {learningInsights.medical_patterns.common_symptoms.map((symptom, index) =>
-            <MacOSBadge
+            <Badge
               key={index}
               variant="secondary"
               style={{
@@ -626,7 +624,7 @@ const AIAnalytics = () => {
               }}>
               
                         {symptom}
-                      </MacOSBadge>
+                      </Badge>
             )}
                   </div>
                 </div>
@@ -751,7 +749,7 @@ const AIAnalytics = () => {
       }}>
           Анализ затрат на AI
         </h3>
-        <MacOSButton
+        <Button
         onClick={loadCostAnalysis}
         disabled={loading}
         variant="outline"
@@ -763,7 +761,7 @@ const AIAnalytics = () => {
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <DollarSign style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </MacOSButton>
+        </Button>
       </div>
 
       {costAnalysis &&
@@ -913,7 +911,7 @@ const AIAnalytics = () => {
       }}>
           Сравнение AI моделей
         </h3>
-        <MacOSButton
+        <Button
         onClick={loadModelComparison}
         disabled={loading}
         variant="outline"
@@ -925,7 +923,7 @@ const AIAnalytics = () => {
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Cpu style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </MacOSButton>
+        </Button>
       </div>
 
       {modelComparison &&
@@ -941,7 +939,7 @@ const AIAnalytics = () => {
               Сравнение моделей для функции: {modelComparison.function}
             </h4>
             
-            <MacOSTable
+            <Table
           columns={[
           { key: 'model', label: 'Модель', width: '20%' },
           { key: 'accuracy', label: 'Точность', width: '15%', align: 'center' },
@@ -1069,7 +1067,7 @@ const AIAnalytics = () => {
             }}>
               Начальная дата
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })} />
@@ -1085,7 +1083,7 @@ const AIAnalytics = () => {
             }}>
               Конечная дата
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })} />
@@ -1101,7 +1099,7 @@ const AIAnalytics = () => {
             }}>
               AI функция
             </label>
-            <MacOSSelect
+            <Select
               value={filters.aiFunction}
               onChange={(e) => setFilters({ ...filters, aiFunction: e.target.value })}
               options={[
@@ -1115,7 +1113,7 @@ const AIAnalytics = () => {
             
           </div>
           <div style={{ display: 'flex', alignItems: 'end' }}>
-            <MacOSButton
+            <Button
               onClick={loadUsageAnalytics}
               disabled={loading}
               variant="primary"
@@ -1128,7 +1126,7 @@ const AIAnalytics = () => {
               
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
               Применить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>

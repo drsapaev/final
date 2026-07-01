@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
-import { SegmentedControl } from '../ui/macos';
+import {
+  SegmentedControl,
+} from '../ui/macos';
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';

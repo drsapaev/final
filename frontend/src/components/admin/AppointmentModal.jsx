@@ -2,14 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Clock, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSTextarea,
-  MacOSModal } from
-'../ui/macos';
+  Textarea,
+  Modal,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const AppointmentModal = ({
@@ -180,7 +179,7 @@ const AppointmentModal = ({
   if (!isOpen) return null;
 
   return (
-    <MacOSModal
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={appointment ? 'Редактировать запись' : 'Создать запись на прием'}
@@ -290,7 +289,7 @@ const AppointmentModal = ({
               }}>
                     Дата записи *
                   </label>
-                  <MacOSInput
+                  <Input
                 type="date"
                 value={formData.appointmentDate}
                 onChange={(e) => handleChange('appointmentDate', e.target.value)}
@@ -323,7 +322,7 @@ const AppointmentModal = ({
               }}>
                     Время записи *
                   </label>
-                  <MacOSInput
+                  <Input
                 type="time"
                 value={formData.appointmentTime}
                 onChange={(e) => handleChange('appointmentTime', e.target.value)}
@@ -356,7 +355,7 @@ const AppointmentModal = ({
               }}>
                     Длительность (мин)
                   </label>
-                  <MacOSInput
+                  <Input
                 type="number"
                 value={formData.duration}
                 onChange={(e) => handleChange('duration', e.target.value)}
@@ -430,7 +429,7 @@ const AppointmentModal = ({
             }}>
                   Причина обращения *
                 </label>
-                <MacOSTextarea
+                <Textarea
               value={formData.reason}
               onChange={(e) => handleChange('reason', e.target.value)}
               error={errors.reason}
@@ -462,7 +461,7 @@ const AppointmentModal = ({
             }}>
                   Дополнительные заметки
                 </label>
-                <MacOSTextarea
+                <Textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={2}
@@ -492,7 +491,7 @@ const AppointmentModal = ({
               }}>
                     Телефон для связи
                   </label>
-                  <MacOSInput
+                  <Input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleChange('phone', e.target.value)}
@@ -510,7 +509,7 @@ const AppointmentModal = ({
               }}>
                     Email для уведомлений
                   </label>
-                  <MacOSInput
+                  <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
@@ -556,7 +555,7 @@ const AppointmentModal = ({
                     <strong style={{ color: 'var(--mac-text-primary)' }}>Врач:</strong> {getDoctorName(formData.doctorId)}
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                    <MacOSBadge
+                    <Badge
                       variant={
                         selectedDoctor?.active === false || selectedDoctor?.user?.is_active === false
                           ? 'warning'
@@ -568,10 +567,10 @@ const AppointmentModal = ({
                         : selectedDoctor?.user?.is_active === false
                           ? 'Аккаунт врача неактивен'
                           : 'Связь активна'}
-                    </MacOSBadge>
-                    <MacOSBadge variant={selectedDoctor?.cabinet ? 'info' : 'warning'}>
+                    </Badge>
+                    <Badge variant={selectedDoctor?.cabinet ? 'info' : 'warning'}>
                       {selectedDoctor?.cabinet ? `Кабинет ${selectedDoctor.cabinet}` : 'Кабинет не задан'}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
                   <p style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -605,7 +604,7 @@ const AppointmentModal = ({
 
             {/* Кнопки */}
             <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
-              <MacOSButton
+              <Button
             type="submit"
             disabled={isSubmitting || loading}
             aria-label={appointment ? 'Save appointment changes' : 'Create appointment'}
@@ -626,18 +625,18 @@ const AppointmentModal = ({
                     {appointment ? 'Сохранить изменения' : 'Создать запись'}
                   </>
             }
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
             type="button"
             variant="outline"
             onClick={onClose}
             disabled={isSubmitting}>
             
                 Отмена
-              </MacOSButton>
+              </Button>
             </div>
           </form>
-    </MacOSModal>);
+    </Modal>);
 
 };
 

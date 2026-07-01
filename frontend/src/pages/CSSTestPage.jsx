@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Card, Button, Badge } from '../components/ui/macos';
+import {
+  Card, Button, Badge,
+} from '../components/ui/macos';
 import ModernTabs from '../components/navigation/ModernTabs';
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 

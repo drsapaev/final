@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Cloud, RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
 
-import { Alert, Badge, Button } from '../ui/macos';
+import {
+  Alert, Badge, Button,
+} from '../ui/macos';
 import { usePWA } from '../../hooks/usePWA';
 
 const toneConfig = {

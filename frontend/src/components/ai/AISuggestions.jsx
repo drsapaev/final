@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Card, CardContent, Typography, Alert, Badge, Button } from '../../components/ui/macos';
+import {
+  Card, CardContent, Typography, Alert, Badge, Button,
+} from '../ui/macos';
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import AIClinicalText from './AIClinicalText';

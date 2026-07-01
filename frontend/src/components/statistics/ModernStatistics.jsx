@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Button, Card, Icon } from '../ui/macos';
+import {
+  Button, Card, Icon,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;

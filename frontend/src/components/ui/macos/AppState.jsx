@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import MacOSAlert from './MacOSAlert';
+import Alert from './Alert';
 import MacOSEmptyState from './MacOSEmptyState';
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif';
@@ -172,7 +172,7 @@ export const AppError = React.forwardRef(({
     className={`mac-app-error ${className}`.trim()}
     style={style}
   >
-    <MacOSAlert
+    <Alert
       type={severity}
       title={title}
       description={description}

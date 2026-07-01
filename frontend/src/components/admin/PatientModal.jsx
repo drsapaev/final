@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-
-  MacOSButton,
-  MacOSInput,
+  Button,
+  Input,
   Select,
-  MacOSTextarea,
-  MacOSModal } from
-'../ui/macos';
+  Textarea,
+  Modal,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
@@ -218,7 +217,7 @@ const PatientModal = ({
   if (!isOpen) return null;
 
   return (
-    <MacOSModal
+    <Modal
       isOpen={isOpen}
       onClose={handleClose}
       title={patient ? 'Редактировать пациента' : 'Добавить пациента'}
@@ -244,7 +243,7 @@ const PatientModal = ({
               }}>
                 Фамилия *
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => handleChange('lastName', e.target.value)}
@@ -278,7 +277,7 @@ const PatientModal = ({
               }}>
                 Имя *
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => handleChange('firstName', e.target.value)}
@@ -311,7 +310,7 @@ const PatientModal = ({
               }}>
                 Отчество
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.middleName}
                 onChange={(e) => handleChange('middleName', e.target.value)}
@@ -332,7 +331,7 @@ const PatientModal = ({
               }}>
                 Дата рождения *
               </label>
-              <MacOSInput
+              <Input
                 type="date"
                 value={formData.birthDate}
                 onChange={(e) => handleChange('birthDate', e.target.value)}
@@ -420,7 +419,7 @@ const PatientModal = ({
               }}>
                 Телефон *
               </label>
-              <MacOSInput
+              <Input
                 type="tel"
                 value={formData.phone}
                 onChange={handlePhoneChange}
@@ -454,7 +453,7 @@ const PatientModal = ({
               }}>
                 Email
               </label>
-              <MacOSInput
+              <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
@@ -489,7 +488,7 @@ const PatientModal = ({
             }}>
               Адрес
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={formData.address}
               onChange={(e) => handleChange('address', e.target.value)}
@@ -516,7 +515,7 @@ const PatientModal = ({
               }}>
                 Номер паспорта
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.passport}
                 onChange={(e) => handleChange('passport', e.target.value)}
@@ -559,7 +558,7 @@ const PatientModal = ({
               }}>
                 Страховой номер
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.insuranceNumber}
                 onChange={(e) => handleChange('insuranceNumber', e.target.value)}
@@ -585,7 +584,7 @@ const PatientModal = ({
               }}>
                 Контактное лицо
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.emergencyContact}
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
@@ -602,7 +601,7 @@ const PatientModal = ({
               }}>
                 Телефон экстренного контакта
               </label>
-              <MacOSInput
+              <Input
                 type="tel"
                 value={formData.emergencyPhone}
                 onChange={(e) => handleChange('emergencyPhone', e.target.value)}
@@ -656,7 +655,7 @@ const PatientModal = ({
               }}>
                 Аллергии
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={formData.allergies}
                 onChange={(e) => handleChange('allergies', e.target.value)}
@@ -674,7 +673,7 @@ const PatientModal = ({
             }}>
               Хронические заболевания
             </label>
-            <MacOSTextarea
+            <Textarea
               value={formData.chronicDiseases}
               onChange={(e) => handleChange('chronicDiseases', e.target.value)}
               placeholder="Гипертония, диабет"
@@ -698,7 +697,7 @@ const PatientModal = ({
             }}>
               Заметки
             </label>
-            <MacOSTextarea
+            <Textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder="Дополнительная информация о пациенте..."
@@ -709,7 +708,7 @@ const PatientModal = ({
 
         {/* Кнопки */}
         <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
-          <MacOSButton
+          <Button
             type="submit"
             disabled={isSubmitting || loading}
             aria-label={patient ? 'Save patient changes' : 'Add patient'}
@@ -734,8 +733,8 @@ const PatientModal = ({
                 {patient ? 'Сохранить изменения' : 'Добавить пациента'}
               </>
             }
-          </MacOSButton>
-          <MacOSButton
+          </Button>
+          <Button
             type="button"
             variant="outline"
 
@@ -744,12 +743,12 @@ const PatientModal = ({
             style={{ flex: 1 }}>
 
             Отмена
-          </MacOSButton>
+          </Button>
         </div>
       </form>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
-    </MacOSModal>);
+    </Modal>);
 
 };
 

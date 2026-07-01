@@ -23,14 +23,10 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect } from
-
-
-
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
@@ -284,7 +280,7 @@ const RiskAssessment = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={patientRiskData.patient_data.age}
               onChange={(e) => setPatientRiskData((prev) => ({
@@ -304,7 +300,7 @@ const RiskAssessment = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={patientRiskData.patient_data.gender}
               onChange={(e) => setPatientRiskData((prev) => ({
                 ...prev,
@@ -328,7 +324,7 @@ const RiskAssessment = () => {
             }}>
                 Вес (кг)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={patientRiskData.patient_data.weight}
               onChange={(e) => setPatientRiskData((prev) => ({
@@ -372,7 +368,7 @@ const RiskAssessment = () => {
             }}>
                 Курение
               </label>
-              <MacOSSelect
+              <Select
               value={patientRiskData.patient_data.smoking_status}
               onChange={(e) => setPatientRiskData((prev) => ({
                 ...prev,
@@ -397,7 +393,7 @@ const RiskAssessment = () => {
             }}>
                 Употребление алкоголя
               </label>
-              <MacOSSelect
+              <Select
               value={patientRiskData.patient_data.alcohol_consumption}
               onChange={(e) => setPatientRiskData((prev) => ({
                 ...prev,
@@ -442,7 +438,7 @@ const RiskAssessment = () => {
             }}>
                 Состояние/Заболевание
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={patientRiskData.condition}
               onChange={(e) => setPatientRiskData((prev) => ({ ...prev, condition: e.target.value }))}
@@ -461,26 +457,26 @@ const RiskAssessment = () => {
               }}>
                   Сопутствующие заболевания
                 </label>
-                <MacOSButton
+                <Button
                 onClick={() => addArrayItem(setPatientRiskData, 'patient_data.comorbidities')}
                 variant="outline"
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
                 
                   <Plus style={{ width: '12px', height: '12px' }} />
                   Добавить
-                </MacOSButton>
+                </Button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
                 {patientRiskData.patient_data.comorbidities.map((item, index) =>
               <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <MacOSInput
+                    <Input
                   type="text"
                   value={item}
                   onChange={(e) => updateArrayItem(setPatientRiskData, 'patient_data.comorbidities', index, e.target.value)}
                   placeholder="Заболевание"
                   style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
                 
-                    <MacOSButton
+                    <Button
                   type="button"
                   title="Remove comorbidity"
                   aria-label={`Remove comorbidity ${index + 1}`}
@@ -489,7 +485,7 @@ const RiskAssessment = () => {
                   style={{ padding: '4px', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-                    </MacOSButton>
+                    </Button>
                   </div>
               )}
               </div>
@@ -505,26 +501,26 @@ const RiskAssessment = () => {
               }}>
                   Факторы риска
                 </label>
-                <MacOSButton
+                <Button
                 onClick={() => addArrayItem(setPatientRiskData, 'risk_factors')}
                 variant="outline"
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
                 
                   <Plus style={{ width: '12px', height: '12px' }} />
                   Добавить
-                </MacOSButton>
+                </Button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
                 {patientRiskData.risk_factors.map((item, index) =>
               <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <MacOSInput
+                    <Input
                   type="text"
                   value={item}
                   onChange={(e) => updateArrayItem(setPatientRiskData, 'risk_factors', index, e.target.value)}
                   placeholder="Фактор риска"
                   style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
                 
-                    <MacOSButton
+                    <Button
                   type="button"
                   title="Remove risk factor"
                   aria-label={`Remove risk factor ${index + 1}`}
@@ -533,7 +529,7 @@ const RiskAssessment = () => {
                   style={{ padding: '4px', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-                    </MacOSButton>
+                    </Button>
                   </div>
               )}
               </div>
@@ -542,7 +538,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Assessing patient risks' : 'Assess patient risks'}
           aria-label={loading ? 'Assessing patient risks' : 'Assess patient risks'}
@@ -571,7 +567,7 @@ const RiskAssessment = () => {
                 Оценить риски
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -611,7 +607,7 @@ const RiskAssessment = () => {
             }}>
                 Процедура/Состояние
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={complicationData.procedure_or_condition}
               onChange={(e) => setComplicationData((prev) => ({ ...prev, procedure_or_condition: e.target.value }))}
@@ -629,7 +625,7 @@ const RiskAssessment = () => {
             }}>
                 Временные рамки
               </label>
-              <MacOSSelect
+              <Select
               value={complicationData.timeline}
               onChange={(e) => setComplicationData((prev) => ({ ...prev, timeline: e.target.value }))}
               options={[
@@ -677,7 +673,7 @@ const RiskAssessment = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={complicationData.patient_profile.age}
               onChange={(e) => setComplicationData((prev) => ({
@@ -697,7 +693,7 @@ const RiskAssessment = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={complicationData.patient_profile.gender}
               onChange={(e) => setComplicationData((prev) => ({
                 ...prev,
@@ -715,7 +711,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Predicting complications' : 'Predict complications'}
           aria-label={loading ? 'Predicting complications' : 'Predict complications'}
@@ -744,7 +740,7 @@ const RiskAssessment = () => {
                 Спрогнозировать осложнения
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -784,7 +780,7 @@ const RiskAssessment = () => {
             }}>
                 Состояние
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={mortalityData.condition}
               onChange={(e) => setMortalityData((prev) => ({ ...prev, condition: e.target.value }))}
@@ -802,7 +798,7 @@ const RiskAssessment = () => {
             }}>
                 Система оценки
               </label>
-              <MacOSSelect
+              <Select
               value={mortalityData.scoring_system}
               onChange={(e) => setMortalityData((prev) => ({ ...prev, scoring_system: e.target.value }))}
               options={[
@@ -850,7 +846,7 @@ const RiskAssessment = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={mortalityData.patient_data.age}
               onChange={(e) => setMortalityData((prev) => ({
@@ -870,7 +866,7 @@ const RiskAssessment = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={mortalityData.patient_data.gender}
               onChange={(e) => setMortalityData((prev) => ({
                 ...prev,
@@ -888,7 +884,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Calculating mortality risk' : 'Calculate mortality risk'}
           aria-label={loading ? 'Calculating mortality risk' : 'Calculate mortality risk'}
@@ -917,7 +913,7 @@ const RiskAssessment = () => {
                 Рассчитать риск смертности
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -957,7 +953,7 @@ const RiskAssessment = () => {
             }}>
                 Тип операции
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={surgicalData.surgery_type}
               onChange={(e) => setSurgicalData((prev) => ({ ...prev, surgery_type: e.target.value }))}
@@ -975,7 +971,7 @@ const RiskAssessment = () => {
             }}>
                 Тип анестезии
               </label>
-              <MacOSSelect
+              <Select
               value={surgicalData.anesthesia_type}
               onChange={(e) => setSurgicalData((prev) => ({ ...prev, anesthesia_type: e.target.value }))}
               options={[
@@ -1023,7 +1019,7 @@ const RiskAssessment = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={surgicalData.patient_profile.age}
               onChange={(e) => setSurgicalData((prev) => ({
@@ -1043,7 +1039,7 @@ const RiskAssessment = () => {
             }}>
                 Класс ASA
               </label>
-              <MacOSSelect
+              <Select
               value={surgicalData.patient_profile.asa_class}
               onChange={(e) => setSurgicalData((prev) => ({
                 ...prev,
@@ -1070,7 +1066,7 @@ const RiskAssessment = () => {
             }}>
                 Функциональный статус
               </label>
-              <MacOSSelect
+              <Select
               value={surgicalData.patient_profile.functional_status}
               onChange={(e) => setSurgicalData((prev) => ({
                 ...prev,
@@ -1089,7 +1085,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Assessing surgical risks' : 'Assess surgical risks'}
           aria-label={loading ? 'Assessing surgical risks' : 'Assess surgical risks'}
@@ -1118,7 +1114,7 @@ const RiskAssessment = () => {
                 Оценить хирургические риски
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -1158,7 +1154,7 @@ const RiskAssessment = () => {
             }}>
                 Основной диагноз
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={readmissionData.patient_data.primary_diagnosis}
               onChange={(e) => setReadmissionData((prev) => ({
@@ -1179,7 +1175,7 @@ const RiskAssessment = () => {
             }}>
                 Состояние при выписке
               </label>
-              <MacOSSelect
+              <Select
               value={readmissionData.discharge_condition}
               onChange={(e) => setReadmissionData((prev) => ({ ...prev, discharge_condition: e.target.value }))}
               options={[
@@ -1226,7 +1222,7 @@ const RiskAssessment = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={readmissionData.patient_data.age}
               onChange={(e) => setReadmissionData((prev) => ({
@@ -1246,7 +1242,7 @@ const RiskAssessment = () => {
             }}>
                 Длительность госпитализации
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={readmissionData.patient_data.length_of_stay}
               onChange={(e) => setReadmissionData((prev) => ({
@@ -1267,7 +1263,7 @@ const RiskAssessment = () => {
             }}>
                 Социальная поддержка
               </label>
-              <MacOSSelect
+              <Select
               value={readmissionData.social_factors.social_support}
               onChange={(e) => setReadmissionData((prev) => ({
                 ...prev,
@@ -1287,7 +1283,7 @@ const RiskAssessment = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Predicting readmission risk' : 'Predict readmission risk'}
           aria-label={loading ? 'Predicting readmission risk' : 'Predict readmission risk'}
@@ -1316,7 +1312,7 @@ const RiskAssessment = () => {
                 Спрогнозировать риск реадмиссии
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -1370,14 +1366,14 @@ const RiskAssessment = () => {
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа рисков
           </h3>
-          <MacOSButton
+          <Button
             onClick={exportResult}
             variant="outline"
             style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
-          </MacOSButton>
+          </Button>
         </div>
 
         {/* Специальное отображение для оценки рисков пациента */}

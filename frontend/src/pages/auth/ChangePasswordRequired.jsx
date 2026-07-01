@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSInput } from '../../components/ui/macos';
+import {
+  MacOSCard, Button, Input,
+} from '../../components/ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
@@ -202,7 +204,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                 <form onSubmit={handleSubmit}>
                     {/* Current Password */}
                     <div style={inputContainerStyle}>
-                        <MacOSInput
+                        <Input
                             type={showCurrentPassword ? 'text' : 'password'}
                             placeholder="Текущий пароль"
                             value={formData.currentPassword}
@@ -222,7 +224,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
 
                     {/* New Password */}
                     <div style={inputContainerStyle}>
-                        <MacOSInput
+                        <Input
                             type={showNewPassword ? 'text' : 'password'}
                             placeholder="Новый пароль"
                             value={formData.newPassword}
@@ -255,7 +257,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
 
                     {/* Confirm Password */}
                     <div style={inputContainerStyle}>
-                        <MacOSInput
+                        <Input
                             type={showConfirmPassword ? 'text' : 'password'}
                             placeholder="Подтвердите новый пароль"
                             value={formData.confirmPassword}
@@ -288,14 +290,14 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         </div>
                     )}
 
-                    <MacOSButton
+                    <Button
                         type="submit"
                         variant="primary"
                         disabled={loading || !isPasswordValid || !doPasswordsMatch}
                         style={{ width: '100%', marginTop: '8px' }}
                     >
                         {loading ? 'Сохранение...' : 'Сменить пароль'}
-                    </MacOSButton>
+                    </Button>
                 </form>
             </MacOSCard>
         </div>

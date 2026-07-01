@@ -21,17 +21,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSTextarea,
-
-  MacOSLoadingSkeleton,
+  Textarea,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert } from
-
-'../ui/macos';
+  Alert,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -298,7 +296,7 @@ const LicenseManagement = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
         message={message.text} />
@@ -314,7 +312,7 @@ const LicenseManagement = () => {
           flexWrap: 'wrap'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
-            <MacOSInput
+            <Input
               type="text"
               aria-label="Поиск лицензий по названию, поставщику или ключу"
               placeholder="Поиск по названию, поставщику или ключу..."
@@ -353,7 +351,7 @@ const LicenseManagement = () => {
               ]}
               size="large"
               style={{ minWidth: '150px' }} />
-            <MacOSButton
+            <Button
               onClick={() => setShowAddForm(true)}
               style={{
                 display: 'flex',
@@ -366,7 +364,7 @@ const LicenseManagement = () => {
               
               <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить лицензию</span>
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
@@ -388,7 +386,7 @@ const LicenseManagement = () => {
           }}>
               {editingLicense ? 'Редактировать лицензию' : 'Добавить лицензию'}
             </h3>
-            <MacOSButton
+            <Button
             variant="outline"
             type="button"
             aria-label={editingLicense ? 'Закрыть форму редактирования лицензии' : 'Закрыть форму добавления лицензии'}
@@ -400,7 +398,7 @@ const LicenseManagement = () => {
             style={{ padding: '8px' }}>
             
               <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -419,7 +417,7 @@ const LicenseManagement = () => {
               }}>
                   Название *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.name}
@@ -457,7 +455,7 @@ const LicenseManagement = () => {
               }}>
                   Лицензионный ключ *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.license_key}
@@ -475,7 +473,7 @@ const LicenseManagement = () => {
               }}>
                   Поставщик
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 value={formData.vendor}
                 onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
@@ -509,7 +507,7 @@ const LicenseManagement = () => {
               }}>
                   Дата покупки
                 </label>
-                <MacOSInput
+                <Input
                 type="date"
                 value={formData.purchase_date}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
@@ -525,7 +523,7 @@ const LicenseManagement = () => {
               }}>
                   Дата истечения
                 </label>
-                <MacOSInput
+                <Input
                 type="date"
                 value={formData.expiry_date}
                 onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} />
@@ -541,7 +539,7 @@ const LicenseManagement = () => {
               }}>
                   Стоимость (сум)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
@@ -558,7 +556,7 @@ const LicenseManagement = () => {
               }}>
                   Количество мест
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 min="1"
                 value={formData.seats}
@@ -578,7 +576,7 @@ const LicenseManagement = () => {
             }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Введите описание лицензии"
@@ -591,7 +589,7 @@ const LicenseManagement = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-              <MacOSButton
+              <Button
               type="button"
               variant="outline"
               onClick={() => {
@@ -602,8 +600,8 @@ const LicenseManagement = () => {
               disabled={saving}>
               
                 Отмена
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               type="submit"
               disabled={saving}
               aria-label={editingLicense ? 'Update license' : 'Add license'}
@@ -630,7 +628,7 @@ const LicenseManagement = () => {
                     {editingLicense ? 'Обновить' : 'Добавить'}
                   </>
               }
-              </MacOSButton>
+              </Button>
             </div>
           </form>
         </MacOSCard>
@@ -646,7 +644,7 @@ const LicenseManagement = () => {
       }}>
           {[1, 2, 3].map((i) =>
         <MacOSCard key={i} style={{ padding: '24px' }}>
-              <MacOSLoadingSkeleton height="200px" />
+              <Skeleton height="200px" />
             </MacOSCard>
         )}
         </div> :
@@ -656,10 +654,10 @@ const LicenseManagement = () => {
         title={licenseEmptyTitle}
         description={licenseEmptyDescription}
         action={
-        <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
+        <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить лицензию
-            </MacOSButton>
+            </Button>
         } /> :
 
 
@@ -694,7 +692,7 @@ const LicenseManagement = () => {
                     {license.vendor} • {getTypeLabel(license.type)}
                   </p>
                 </div>
-                <MacOSBadge
+                <Badge
               variant={getStatusColor(license.status)}
               text={getStatusLabel(license.status)} />
             
@@ -718,7 +716,7 @@ const LicenseManagement = () => {
               }}>
                     {showKeys[license.id] ? license.license_key : '••••••••••••••••'}
                   </span>
-                  <MacOSButton
+                  <Button
                 type="button"
                 variant="outline"
                 aria-label={showKeys[license.id] ? `Скрыть ключ лицензии ${license.name}` : `Показать ключ лицензии ${license.name}`}
@@ -730,8 +728,8 @@ const LicenseManagement = () => {
 
                 <Eye aria-hidden="true" style={{ width: '12px', height: '12px' }} />
                 }
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
                 type="button"
                 variant="outline"
                 aria-label={`Скопировать ключ лицензии ${license.name}`}
@@ -739,7 +737,7 @@ const LicenseManagement = () => {
                 style={{ padding: '2px 6px', minWidth: 'auto' }}>
                 
                     <Copy aria-hidden="true" style={{ width: '12px', height: '12px' }} />
-                  </MacOSButton>
+                  </Button>
                 </div>
                 {license.cost > 0 &&
             <div style={{
@@ -798,7 +796,7 @@ const LicenseManagement = () => {
             justifyContent: 'flex-end',
             gap: '8px'
           }}>
-                <MacOSButton
+                <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать лицензию ${license.name}`}
@@ -806,8 +804,8 @@ const LicenseManagement = () => {
               style={{ padding: '6px 12px' }}>
               
                   <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
               type="button"
               variant="outline"
               aria-label={`Удалить лицензию ${license.name}`}
@@ -819,7 +817,7 @@ const LicenseManagement = () => {
               }}>
               
                   <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
+                </Button>
               </div>
             </MacOSCard>
         )}

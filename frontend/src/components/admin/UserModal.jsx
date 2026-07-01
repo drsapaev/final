@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
-import MacOSModal from '../ui/macos/MacOSModal';
-import MacOSInput from '../ui/macos/MacOSInput';
-import MacOSButton from '../ui/macos/MacOSButton';
-import MacOSCheckbox from '../ui/macos/MacOSCheckbox';
-import { Select } from '../ui/macos';
+import Modal from '../ui/macos/Modal';
+import Input from '../ui/macos/Input';
+import Button from '../ui/macos/Button';
+import Checkbox from '../ui/macos/Checkbox';
+import {
+  Select,
+} from '../ui/macos';
 import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
@@ -205,7 +207,7 @@ const UserModal = ({
   };
 
   return (
-    <MacOSModal
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={user ? 'Редактировать пользователя' : 'Добавить пользователя'}
@@ -220,7 +222,7 @@ const UserModal = ({
           icon={User}
           error={errors.username}
         >
-          <MacOSInput
+          <Input
             type="text"
             value={formData.username}
             onChange={(e) => handleChange('username', e.target.value)}
@@ -232,7 +234,7 @@ const UserModal = ({
 
         {/* Full Name */}
         <FormField label="Полное имя">
-          <MacOSInput
+          <Input
             type="text"
             value={formData.full_name}
             onChange={(e) => handleChange('full_name', e.target.value)}
@@ -247,7 +249,7 @@ const UserModal = ({
           icon={Mail}
           error={errors.email}
         >
-          <MacOSInput
+          <Input
             type="email"
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
@@ -279,7 +281,7 @@ const UserModal = ({
           }}>
             Статус
           </label>
-          <MacOSCheckbox
+          <Checkbox
             checked={formData.is_active}
             onChange={(checked) => handleChange('is_active', checked)}
             label="Активный пользователь"
@@ -293,7 +295,7 @@ const UserModal = ({
           icon={Lock}
           error={errors.password}
         >
-          <MacOSInput
+          <Input
             type="password"
             value={formData.password}
             onChange={(e) => handleChange('password', e.target.value)}
@@ -311,7 +313,7 @@ const UserModal = ({
             icon={Lock}
             error={errors.confirmPassword}
           >
-            <MacOSInput
+            <Input
               type="password"
               value={formData.confirmPassword}
               onChange={(e) => handleChange('confirmPassword', e.target.value)}
@@ -331,15 +333,15 @@ const UserModal = ({
           paddingTop: '16px',
           borderTop: '1px solid var(--mac-border, rgba(0, 0, 0, 0.1))'
         }}>
-          <MacOSButton
+          <Button
             type="button"
             variant="secondary"
             onClick={onClose}
             disabled={isSubmitting}
           >
             Отмена
-          </MacOSButton>
-          <MacOSButton
+          </Button>
+          <Button
             type="submit"
             variant="primary"
             aria-label={user ? 'Save user changes' : 'Create user'}
@@ -364,7 +366,7 @@ const UserModal = ({
                 {user ? 'Сохранить изменения' : 'Создать пользователя'}
               </>
             )}
-          </MacOSButton>
+          </Button>
         </div>
       </form>
 
@@ -373,7 +375,7 @@ const UserModal = ({
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </MacOSModal>
+    </Modal>
   );
 };
 

@@ -27,10 +27,10 @@ import {
   CardHeader,
   CardTitle,
   Input,
-  MacOSTable,
+  Table,
   SegmentedControl,
   Select,
-  Textarea
+  Textarea,
 } from '../ui/macos';
 
 const pageStyles = {
@@ -821,7 +821,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
         {templates.length === 0 ? (
           <AppEmpty title="Шаблоны не найдены" description="Список появится после загрузки шаблонов." />
         ) : (
-          <MacOSTable columns={columns} data={templates} sortable={false} />
+          <Table columns={columns} data={templates} sortable={false} />
         )}
       </CardContent>
     </Card>

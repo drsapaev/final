@@ -39,7 +39,9 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import logger from '../../utils/logger';
-import { Select } from '../ui/macos';
+import {
+  Select,
+} from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 

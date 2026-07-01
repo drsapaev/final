@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { Card, Button, Badge, Icon, Input, Textarea, Checkbox } from '../components/ui/macos';
+import {
+  Card, Button, Badge, Icon, Input, Textarea, Checkbox,
+} from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Calendar, Heart, FileText, ClipboardList, Save, Send } from 'lucide-react';
 import PropTypes from 'prop-types';

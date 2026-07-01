@@ -23,7 +23,9 @@ import {
   Plus,
   Edit } from
 'lucide-react';
-import { Card, Button, Select } from '../ui/macos';
+import {
+  Card, Button, Select,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';

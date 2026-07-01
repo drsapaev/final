@@ -25,11 +25,11 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
+  Button,
+  Input,
   Select,
-  MacOSTextarea,
-  MacOSCheckbox
+  Textarea,
+  Checkbox,
 } from '../ui/macos';
 
 const ClinicSettings = () => {
@@ -276,7 +276,7 @@ const ClinicSettings = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
@@ -289,8 +289,8 @@ const ClinicSettings = () => {
             >
               <RefreshCw style={{ width: '16px', height: '16px' }} />
               Обновить
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={saveSettings}
               disabled={saving}
               style={{
@@ -312,7 +312,7 @@ const ClinicSettings = () => {
                 <Save style={{ width: '16px', height: '16px' }} />
               )}
               Сохранить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -373,7 +373,7 @@ const ClinicSettings = () => {
                 }}>
                   Название клиники
                 </label>
-                <MacOSInput
+                <Input
                   type="text"
                   value={settings.clinic_name || ''}
                   onChange={(e) => handleInputChange('clinic_name', e.target.value)}
@@ -395,7 +395,7 @@ const ClinicSettings = () => {
                   <MapPin style={{ width: '16px', height: '16px' }} />
                   Адрес
                 </label>
-                <MacOSTextarea
+                <Textarea
                   value={settings.address || ''}
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   rows={2}
@@ -417,7 +417,7 @@ const ClinicSettings = () => {
                   <Phone style={{ width: '16px', height: '16px' }} />
                   Телефон
                 </label>
-                <MacOSInput
+                <Input
                   type="tel"
                   value={settings.phone || ''}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
@@ -439,7 +439,7 @@ const ClinicSettings = () => {
                   <Mail style={{ width: '16px', height: '16px' }} />
                   Email
                 </label>
-                <MacOSInput
+                <Input
                   type="email"
                   value={settings.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
@@ -537,7 +537,7 @@ const ClinicSettings = () => {
                       />
                     </div>
                     {logoPreview && (
-                      <MacOSButton
+                      <Button
                         variant="outline"
                         onClick={resetLogo}
                         style={{
@@ -547,7 +547,7 @@ const ClinicSettings = () => {
                         }}
                       >
                         Отменить
-                      </MacOSButton>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -645,7 +645,7 @@ const ClinicSettings = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <MacOSButton
+              <Button
                 variant="outline"
                 onClick={loadTicketPrintSettings}
                 disabled={ticketPrintLoading}
@@ -658,8 +658,8 @@ const ClinicSettings = () => {
               >
                 <RefreshCw style={{ width: '16px', height: '16px' }} />
                 Обновить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 onClick={saveTicketPrintSettingsHandler}
                 disabled={ticketPrintSaving || ticketPrintLoading}
                 style={{
@@ -681,7 +681,7 @@ const ClinicSettings = () => {
                   <Save style={{ width: '16px', height: '16px' }} />
                 )}
                 Сохранить
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -741,7 +741,7 @@ const ClinicSettings = () => {
                     backgroundColor: 'var(--mac-bg-secondary)'
                   }}
                 >
-                  <MacOSCheckbox
+                  <Checkbox
                     checked={Boolean(ticketPrintSettings[item.key])}
                     onChange={(checked) => handleTicketPrintChange(item.key, checked)}
                     label={item.label}

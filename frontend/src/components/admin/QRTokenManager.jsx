@@ -15,7 +15,9 @@ import {
 'lucide-react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
-import { Select } from '../ui/macos';
+import {
+  Select,
+} from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 

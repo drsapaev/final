@@ -23,10 +23,10 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea,
+  Button,
+  Input,
+  Select,
+  Textarea,
 } from '../components/ui/macos';
 import NotificationPreferences from '../components/settings/NotificationPreferences.jsx';
 import TwoFactorManager from '../components/security/TwoFactorManager';
@@ -428,9 +428,9 @@ export default function UserProfile() {
         <Alert severity="error" style={{ marginBottom: 16 }}>
           {error || 'Профиль не удалось загрузить.'}
         </Alert>
-        <MacOSButton onClick={() => loadProfile({ force: true })} startIcon={<RefreshCw size={16} />}>
+        <Button onClick={() => loadProfile({ force: true })} startIcon={<RefreshCw size={16} />}>
           Повторить загрузку
-        </MacOSButton>
+        </Button>
       </div>
     );
   }
@@ -503,15 +503,15 @@ export default function UserProfile() {
             </div>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <MacOSButton
+              <Button
                 variant="outline"
                 onClick={() => loadProfile({ force: true })}
                 disabled={saving}
                 startIcon={<RefreshCw size={16} />}
               >
                 Обновить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 variant="primary"
                 onClick={handleSaveProfile}
                 disabled={!hasChanges}
@@ -519,7 +519,7 @@ export default function UserProfile() {
                 startIcon={<Save size={16} />}
               >
                 Сохранить профиль
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -643,7 +643,7 @@ export default function UserProfile() {
                 }}
               >
                 <ProfileField label="Полное имя">
-                  <MacOSInput
+                  <Input
                     value={draft.full_name}
                     onChange={(event) => updateDraft('full_name', event.target.value)}
                     icon={UserRound}
@@ -651,7 +651,7 @@ export default function UserProfile() {
                   />
                 </ProfileField>
                 <ProfileField label="Email">
-                  <MacOSInput
+                  <Input
                     type="email"
                     value={draft.email}
                     onChange={(event) => updateDraft('email', event.target.value)}
@@ -660,7 +660,7 @@ export default function UserProfile() {
                   />
                 </ProfileField>
                 <ProfileField label="Телефон">
-                  <MacOSInput
+                  <Input
                     value={draft.phone}
                     onChange={(event) => updateDraft('phone', event.target.value)}
                     icon={Phone}
@@ -668,7 +668,7 @@ export default function UserProfile() {
                   />
                 </ProfileField>
                 <ProfileField label="Дата рождения">
-                  <MacOSInput
+                  <Input
                     type="date"
                     value={draft.date_of_birth}
                     onChange={(event) => updateDraft('date_of_birth', event.target.value)}
@@ -698,49 +698,49 @@ export default function UserProfile() {
                 }}
               >
                 <ProfileField label="Имя">
-                  <MacOSInput
+                  <Input
                     value={draft.first_name}
                     onChange={(event) => updateDraft('first_name', event.target.value)}
                     placeholder="Имя"
                   />
                 </ProfileField>
                 <ProfileField label="Фамилия">
-                  <MacOSInput
+                  <Input
                     value={draft.last_name}
                     onChange={(event) => updateDraft('last_name', event.target.value)}
                     placeholder="Фамилия"
                   />
                 </ProfileField>
                 <ProfileField label="Отчество">
-                  <MacOSInput
+                  <Input
                     value={draft.middle_name}
                     onChange={(event) => updateDraft('middle_name', event.target.value)}
                     placeholder="Отчество"
                   />
                 </ProfileField>
                 <ProfileField label="Пол">
-                  <MacOSSelect
+                  <Select
                     value={draft.gender}
                     onChange={(event) => updateDraft('gender', event.target.value)}
                     options={genderOptions}
                   />
                 </ProfileField>
                 <ProfileField label="Язык интерфейса">
-                  <MacOSSelect
+                  <Select
                     value={draft.language}
                     onChange={(event) => updateDraft('language', event.target.value)}
                     options={languageOptions}
                   />
                 </ProfileField>
                 <ProfileField label="Часовой пояс">
-                  <MacOSSelect
+                  <Select
                     value={draft.timezone}
                     onChange={(event) => updateDraft('timezone', event.target.value)}
                     options={timezoneOptions}
                   />
                 </ProfileField>
                 <ProfileField label="Национальность">
-                  <MacOSInput
+                  <Input
                     value={draft.nationality}
                     onChange={(event) => updateDraft('nationality', event.target.value)}
                     icon={Languages}
@@ -748,7 +748,7 @@ export default function UserProfile() {
                   />
                 </ProfileField>
                 <ProfileField label="Сайт">
-                  <MacOSInput
+                  <Input
                     value={draft.website}
                     onChange={(event) => updateDraft('website', event.target.value)}
                     icon={Globe}
@@ -759,7 +759,7 @@ export default function UserProfile() {
 
               <div style={{ display: 'grid', gap: 16 }}>
                 <ProfileField label="URL аватара">
-                  <MacOSInput
+                  <Input
                     value={draft.avatar_url}
                     onChange={(event) => updateDraft('avatar_url', event.target.value)}
                     icon={Globe}
@@ -767,7 +767,7 @@ export default function UserProfile() {
                   />
                 </ProfileField>
                 <ProfileField label="О себе">
-                  <MacOSTextarea
+                  <Textarea
                     value={draft.bio}
                     onChange={(event) => updateDraft('bio', event.target.value)}
                     placeholder="Краткая информация о пользователе"
@@ -798,14 +798,14 @@ export default function UserProfile() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <MacOSButton
+                <Button
                   variant="ghost"
                   onClick={() => setDraft(normalizeProfileForDraft(profile))}
                   disabled={!hasChanges || saving}
                 >
                   Вернуть исходные данные
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
                   variant="primary"
                   onClick={handleSaveProfile}
                   disabled={!hasChanges || saving}
@@ -813,7 +813,7 @@ export default function UserProfile() {
                   startIcon={<Save size={16} />}
                 >
                   Сохранить изменения
-                </MacOSButton>
+                </Button>
               </div>
             </CardContent>
           </Card>

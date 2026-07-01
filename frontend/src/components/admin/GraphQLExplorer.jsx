@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-
-
-  MacOSTextarea,
-
-  MacOSAlert,
-  MacOSLoadingSkeleton } from
-'../ui/macos';
+  Button,
+  Textarea,
+  Alert,
+  Skeleton,
+} from '../ui/macos';
 import {
   Database,
   Play,
@@ -429,7 +426,7 @@ const GraphQLExplorer = () => {
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Отображение ошибок */}
       {error &&
-    <MacOSAlert
+    <Alert
       type="error"
       title="Ошибка"
       description={error}
@@ -454,7 +451,7 @@ const GraphQLExplorer = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
           {Object.entries(queryExamples).map(([key, example]) =>
-        <MacOSButton
+        <Button
           key={key}
           onClick={() => loadExample(key)}
           variant={selectedExample === key ? 'primary' : 'outline'}
@@ -464,7 +461,7 @@ const GraphQLExplorer = () => {
           }}>
           
               {example.name}
-            </MacOSButton>
+            </Button>
         )}
         </div>
       </MacOSCard>
@@ -493,7 +490,7 @@ const GraphQLExplorer = () => {
               GraphQL Запрос
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <MacOSButton
+              <Button
               onClick={copyQuery}
               variant="outline"
               style={{
@@ -506,8 +503,8 @@ const GraphQLExplorer = () => {
               
                 <Copy size={14} />
                 Копировать
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               onClick={executeQuery}
               disabled={loading}
               variant="primary"
@@ -521,11 +518,11 @@ const GraphQLExplorer = () => {
               
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
                 {loading ? 'Выполняется...' : 'Выполнить'}
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
-          <MacOSTextarea
+          <Textarea
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Введите GraphQL запрос..."
@@ -549,7 +546,7 @@ const GraphQLExplorer = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '8px'
           }}>Переменные (JSON)</label>
-            <MacOSTextarea
+            <Textarea
             value={variables}
             onChange={(e) => setVariables(e.target.value)}
             placeholder='{"key": "value"}'
@@ -589,7 +586,7 @@ const GraphQLExplorer = () => {
               Результат
             </h3>
             {result &&
-          <MacOSButton
+          <Button
             onClick={downloadResult}
             variant="outline"
             style={{
@@ -602,7 +599,7 @@ const GraphQLExplorer = () => {
             
                 <Download size={14} />
                 Скачать
-              </MacOSButton>
+              </Button>
           }
           </div>
 
@@ -617,7 +614,7 @@ const GraphQLExplorer = () => {
           lineHeight: '1.5'
         }}>
             {loading ?
-          <MacOSLoadingSkeleton
+          <Skeleton
             type="text"
             count={8}
             style={{ height: '100%' }} /> :
@@ -729,7 +726,7 @@ const GraphQLExplorer = () => {
         )}
           </div> :
 
-      <MacOSLoadingSkeleton
+      <Skeleton
         type="card"
         count={3}
         style={{ height: '200px' }} />

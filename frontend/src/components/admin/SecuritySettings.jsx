@@ -18,14 +18,14 @@ import {
   Ban } from
 'lucide-react';
 import {
-  MacOSInput,
+  Input,
   Select,
-  MacOSButton,
-  MacOSCheckbox,
-  MacOSBadge,
+  Button,
+  Checkbox,
+  Badge,
   SegmentedControl,
-  MacOSCard } from
-'../ui/macos';
+  MacOSCard,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 
 const SecuritySettings = ({
@@ -243,7 +243,7 @@ const SecuritySettings = ({
                   Текущий пароль *
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <MacOSInput
+                  <Input
                   type={showPasswords.current ? 'text' : 'password'}
                   value={formData.currentPassword}
                   onChange={(e) => handleChange('currentPassword', e.target.value)}
@@ -304,7 +304,7 @@ const SecuritySettings = ({
                   Новый пароль *
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <MacOSInput
+                  <Input
                   type={showPasswords.new ? 'text' : 'password'}
                   value={formData.newPassword}
                   onChange={(e) => handleChange('newPassword', e.target.value)}
@@ -365,7 +365,7 @@ const SecuritySettings = ({
                   Подтвердите новый пароль *
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <MacOSInput
+                  <Input
                   type={showPasswords.confirm ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
@@ -456,7 +456,7 @@ const SecuritySettings = ({
                     Дополнительная защита вашего аккаунта
                   </p>
                 </div>
-                <MacOSCheckbox
+                <Checkbox
                 checked={formData.twoFactorEnabled}
                 onChange={(checked) => handleChange('twoFactorEnabled', checked)} />
               
@@ -501,7 +501,7 @@ const SecuritySettings = ({
             }}>
                 Активные сессии
               </h3>
-              <MacOSButton
+              <Button
               variant="outline"
               onClick={terminateAllOtherSessions}
               disabled={activeSessions.length === 0}
@@ -509,7 +509,7 @@ const SecuritySettings = ({
               
                 <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Завершить все остальные
-              </MacOSButton>
+              </Button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -556,7 +556,7 @@ const SecuritySettings = ({
                   }}>
                         {session.device}
                         {session.current &&
-                    <MacOSBadge variant="success" size="sm">Текущая</MacOSBadge>
+                    <Badge variant="success" size="sm">Текущая</Badge>
                     }
                       </p>
                       <p style={{
@@ -577,7 +577,7 @@ const SecuritySettings = ({
                   </div>
 
                   {!session.current &&
-              <MacOSButton
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => terminateSession(session.id)}
@@ -586,7 +586,7 @@ const SecuritySettings = ({
                 style={{ color: 'var(--mac-danger)', borderColor: 'var(--mac-danger)' }}>
                 
                       <Trash2 style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
               }
                 </div>
             )}
@@ -621,7 +621,7 @@ const SecuritySettings = ({
               }}>
                   Минимальная длина пароля
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.passwordMinLength}
                 onChange={(e) => handleChange('passwordMinLength', parseInt(e.target.value))}
@@ -640,7 +640,7 @@ const SecuritySettings = ({
               }}>
                   Срок действия пароля (дни)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.passwordExpiryDays}
                 onChange={(e) => handleChange('passwordExpiryDays', parseInt(e.target.value))}
@@ -659,7 +659,7 @@ const SecuritySettings = ({
               }}>
                   Максимум попыток входа
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.maxLoginAttempts}
                 onChange={(e) => handleChange('maxLoginAttempts', parseInt(e.target.value))}
@@ -678,7 +678,7 @@ const SecuritySettings = ({
               }}>
                   Время блокировки (минуты)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.lockoutDuration}
                 onChange={(e) => handleChange('lockoutDuration', parseInt(e.target.value))}
@@ -689,25 +689,25 @@ const SecuritySettings = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <MacOSCheckbox
+              <Checkbox
               checked={formData.passwordRequireUppercase}
               onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
               label="Требовать заглавные буквы в пароле" />
             
 
-              <MacOSCheckbox
+              <Checkbox
               checked={formData.passwordRequireNumbers}
               onChange={(checked) => handleChange('passwordRequireNumbers', checked)}
               label="Требовать цифры в пароле" />
             
 
-              <MacOSCheckbox
+              <Checkbox
               checked={formData.passwordRequireSymbols}
               onChange={(checked) => handleChange('passwordRequireSymbols', checked)}
               label="Требовать специальные символы в пароле" />
             
 
-              <MacOSCheckbox
+              <Checkbox
               checked={formData.blockSuspiciousIPs}
               onChange={(checked) => handleChange('blockSuspiciousIPs', checked)}
               label="Блокировать подозрительные IP адреса" />
@@ -779,12 +779,12 @@ const SecuritySettings = ({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MacOSBadge
+                      <Badge
                       variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
                       size="sm">
                       
                         {getStatusLabel(log.status)}
-                      </MacOSBadge>
+                      </Badge>
                       <span style={{
                       fontSize: 'var(--mac-font-size-xs)',
                       color: 'var(--mac-text-tertiary)'
@@ -815,23 +815,23 @@ const SecuritySettings = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => window.location.reload()}
               disabled={isSubmitting}>
               
               <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Сбросить
-            </MacOSButton>
+            </Button>
 
-            <MacOSButton
+            <Button
               type="submit"
               disabled={isSubmitting || loading}
               loading={isSubmitting}>
               
               <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Сохранить настройки
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </form>

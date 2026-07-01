@@ -20,7 +20,9 @@ import {
   Clock,
   User } from
 'lucide-react';
-import { Card, Button, Badge, MacOSInput, Select, SegmentedControl, Skeleton } from '../ui/macos';
+import {
+  Card, Button, Badge, Input, Select, SegmentedControl, Skeleton,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -309,7 +311,7 @@ const GroupPermissionsManager = () => {
           Пользователи
         </h3>
         
-        <MacOSInput
+        <Input
         placeholder="Поиск пользователей..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
@@ -576,7 +578,7 @@ const GroupPermissionsManager = () => {
           Группы
         </h3>
         
-        <MacOSInput
+        <Input
         placeholder="Поиск групп..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}

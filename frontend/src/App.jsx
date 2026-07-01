@@ -14,7 +14,9 @@ import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
-import { Sidebar } from './components/ui/macos';
+import {
+  Sidebar,
+} from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew.jsx';
 // SW-05 fix: global command palette (Cmd+K)
 import { CommandPalette } from './components/common/CommandPalette';

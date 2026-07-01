@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Badge, Button, Card, CardContent, CardHeader, Icon } from '../components/ui/macos';
+import {
+  Alert, Badge, Button, Card, CardContent, CardHeader, Icon,
+} from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';

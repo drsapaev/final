@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSLoadingSkeleton,
-  MacOSInput,
+  Button,
+  Badge,
+  Skeleton,
+  Input,
   Select,
-  MacOSTextarea,
-  MacOSCheckbox } from
-'../ui/macos';
+  Textarea,
+  Checkbox,
+} from '../ui/macos';
 import {
   Bell,
   Send,
@@ -199,15 +199,15 @@ const FCMManager = () => {
               margin: 0
             }}>
                 {fcmStatus?.active ?
-              <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Badge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <CheckCircle style={{ width: '12px', height: '12px' }} />
                     Активен
-                  </MacOSBadge> :
+                  </Badge> :
 
-              <MacOSBadge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Badge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertTriangle style={{ width: '12px', height: '12px' }} />
                     Неактивен
-                  </MacOSBadge>
+                  </Badge>
               }
               </p>
             </div>
@@ -235,9 +235,9 @@ const FCMManager = () => {
               margin: 0
             }}>
                 {fcmStatus?.server_key_configured ?
-              <MacOSBadge variant="success">Настроен</MacOSBadge> :
+              <Badge variant="success">Настроен</Badge> :
 
-              <MacOSBadge variant="secondary">Не настроен</MacOSBadge>
+              <Badge variant="secondary">Не настроен</Badge>
               }
               </p>
             </div>
@@ -293,16 +293,16 @@ const FCMManager = () => {
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '16px'
       }}>
-          <MacOSButton
+          <Button
           onClick={testFCMNotification}
           disabled={loading || !fcmStatus?.active}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             <TestTube style={{ width: '16px', height: '16px' }} />
             Тест FCM
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={loadData}
           disabled={loading}
           variant="outline"
@@ -310,16 +310,16 @@ const FCMManager = () => {
           
             <RefreshCw style={{ width: '16px', height: '16px' }} />
             Обновить данные
-          </MacOSButton>
+          </Button>
 
-          <MacOSButton
+          <Button
           onClick={() => setActiveTab('notifications')}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           
             <Send style={{ width: '16px', height: '16px' }} />
             Отправить уведомление
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -351,7 +351,7 @@ const FCMManager = () => {
           }}>
               Заголовок
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={notificationForm.title}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, title: e.target.value }))}
@@ -370,7 +370,7 @@ const FCMManager = () => {
           }}>
               Текст сообщения
             </label>
-            <MacOSTextarea
+            <Textarea
             value={notificationForm.body}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, body: e.target.value }))}
             placeholder="Текст уведомления..."
@@ -388,7 +388,7 @@ const FCMManager = () => {
           }}>
               Изображение (URL)
             </label>
-            <MacOSInput
+            <Input
             type="url"
             value={notificationForm.image}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, image: e.target.value }))}
@@ -461,7 +461,7 @@ const FCMManager = () => {
               onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
               onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
                 
-                    <MacOSCheckbox
+                    <Checkbox
                   checked={notificationForm.user_ids.includes(user.user_id)}
                   onChange={(checked) => {
                     if (checked) {
@@ -483,22 +483,22 @@ const FCMManager = () => {
                 }}>
                       {user.full_name || user.username}
                     </span>
-                    <MacOSBadge variant={user.push_enabled ? 'success' : 'secondary'} style={{ marginLeft: 'auto' }}>
+                    <Badge variant={user.push_enabled ? 'success' : 'secondary'} style={{ marginLeft: 'auto' }}>
                       {user.device_type}
-                    </MacOSBadge>
+                    </Badge>
                   </label>
               )}
               </div>
             </div>
           </div>
 
-          <MacOSButton
+          <Button
           onClick={sendNotification}
           disabled={loading || !fcmStatus?.active || !notificationForm.title.trim() || !notificationForm.body.trim()}
           style={{ width: '100%' }}>
           
             {loading ? 'Отправка...' : 'Отправить FCM уведомление'}
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     </div>;
@@ -569,13 +569,13 @@ const FCMManager = () => {
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MacOSBadge variant={user.push_enabled ? 'success' : 'secondary'}>
+                <Badge variant={user.push_enabled ? 'success' : 'secondary'}>
                   {user.push_enabled ? 'Push включен' : 'Push отключен'}
-                </MacOSBadge>
+                </Badge>
                 
-                <MacOSBadge variant="outline">
+                <Badge variant="outline">
                   {user.device_type || 'web'}
-                </MacOSBadge>
+                </Badge>
               </div>
             </div>
         )}
@@ -632,15 +632,15 @@ const FCMManager = () => {
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {fcmStatus?.active ?
-          <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Badge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <CheckCircle style={{ width: '12px', height: '12px' }} />
               FCM активен
-            </MacOSBadge> :
+            </Badge> :
 
-          <MacOSBadge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Badge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <AlertTriangle style={{ width: '12px', height: '12px' }} />
               FCM неактивен
-            </MacOSBadge>
+            </Badge>
           }
         </div>
       </div>
@@ -715,8 +715,8 @@ const FCMManager = () => {
       {/* Контент вкладок */}
       {loading && !fcmStatus ?
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
-          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
+          <Skeleton height="128px" style={{ width: '100%' }} />
+          <Skeleton height="256px" style={{ width: '100%' }} />
         </div> :
 
       <>

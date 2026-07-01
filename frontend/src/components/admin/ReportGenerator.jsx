@@ -16,12 +16,11 @@ import {
 'lucide-react';
 import {
   Card as MacOSCard,
-  Button as MacOSButton,
-
-  MacOSInput,
+  Button as Button,
+  Input,
   Select,
-  MacOSCheckbox } from
-'../ui/macos';
+  Checkbox,
+} from '../ui/macos';
 import { api } from '../../api/client';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
@@ -319,7 +318,7 @@ const ReportGenerator = ({
             const isSelected = effectiveSelectedReportType === typeValue;
 
             return (
-              <MacOSButton
+              <Button
                 key={typeValue}
                 onClick={() => updateSelectedReportType(typeValue)}
                 variant={isSelected ? 'primary' : 'outline'}
@@ -351,7 +350,7 @@ const ReportGenerator = ({
                     </p>
                   </div>
                 </div>
-              </MacOSButton>);
+              </Button>);
 
           }) : (
             <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
@@ -387,7 +386,7 @@ const ReportGenerator = ({
             }}>
               Дата начала
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={effectiveDateRange.start}
               onChange={(e) => updateDateRange({ ...effectiveDateRange, start: e.target.value })}
@@ -418,7 +417,7 @@ const ReportGenerator = ({
             }}>
               Дата окончания
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={effectiveDateRange.end}
               onChange={(e) => updateDateRange({ ...effectiveDateRange, end: e.target.value })}
@@ -464,7 +463,7 @@ const ReportGenerator = ({
               const endDate = days === 0 ? today : today;
 
               return (
-                <MacOSButton
+                <Button
                   key={label}
                   onClick={() => updateDateRange({
                     start: startDate.toISOString().split('T')[0],
@@ -483,7 +482,7 @@ const ReportGenerator = ({
                   }}>
                   
                   {label}
-                </MacOSButton>);
+                </Button>);
 
             })}
           </div>
@@ -615,7 +614,7 @@ const ReportGenerator = ({
               { value: 'excel', label: 'Excel', icon: BarChart3 },
               { value: 'csv', label: 'CSV', icon: FileText }].
               map(({ value, label, icon: Icon }) =>
-              <MacOSButton
+              <Button
                 key={value}
                 onClick={() => setReportFormat(value)}
                 variant={reportFormat === value ? 'primary' : 'outline'}
@@ -633,14 +632,14 @@ const ReportGenerator = ({
                 
                   <Icon style={{ width: '16px', height: '16px' }} />
                   {label}
-                </MacOSButton>
+                </Button>
               )}
             </div>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSCheckbox
+              <Checkbox
                 id="includeCharts"
                 checked={includeCharts}
                 onChange={(e) => setIncludeCharts(e.target.checked)}
@@ -659,7 +658,7 @@ const ReportGenerator = ({
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSCheckbox
+              <Checkbox
                 id="includeDetails"
                 checked={includeDetails}
                 onChange={(e) => setIncludeDetails(e.target.checked)}
@@ -683,7 +682,7 @@ const ReportGenerator = ({
       {/* Кнопки действий */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <MacOSButton
+          <Button
             onClick={() => handleGenerate(reportFormat)}
             disabled={!effectiveSelectedReportType || effectiveLoading}
             variant="primary"
@@ -707,9 +706,9 @@ const ReportGenerator = ({
                 <span>Сгенерировать отчет</span>
               </>
             }
-          </MacOSButton>
+          </Button>
           
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={() => handleGenerate('pdf')}
             disabled={!effectiveSelectedReportType || effectiveLoading}
@@ -721,7 +720,7 @@ const ReportGenerator = ({
             
             <Printer style={{ width: '16px', height: '16px' }} />
             <span>Печать</span>
-          </MacOSButton>
+          </Button>
         </div>
         
         <div style={{

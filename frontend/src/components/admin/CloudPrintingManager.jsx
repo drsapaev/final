@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
   SegmentedControl,
-  MacOSTextarea,
+  Textarea,
   AppEmpty,
-
-  MacOSModal } from
-'../ui/macos';
+  Modal,
+} from '../ui/macos';
 import {
   Printer,
   RefreshCw,
@@ -283,9 +282,9 @@ const CloudPrintingManager = () => {
                   color: 'var(--mac-text-secondary)'
                 }}>{printer.description}</p>
               </div>
-              <MacOSBadge variant={getStatusBadgeVariant(printer.status)}>
+              <Badge variant={getStatusBadgeVariant(printer.status)}>
                 {getStatusText(printer.status)}
-              </MacOSBadge>
+              </Badge>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)' }}>
@@ -298,22 +297,22 @@ const CloudPrintingManager = () => {
             </div>
 
             <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-              <MacOSButton
+              <Button
                 size="sm"
                 onClick={() => testPrinter(printer.provider, printer.id)}
                 disabled={printer.status !== 'online'}>
 
                 <TestTube size={16} style={{ marginRight: '4px' }} />
                 Тест
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setSelectedPrinter(printer)}>
 
                 <Eye size={16} style={{ marginRight: '4px' }} />
                 Подробнее
-              </MacOSButton>
+              </Button>
             </div>
           </MacOSCard>
         )}
@@ -336,10 +335,10 @@ const CloudPrintingManager = () => {
         fontSize: 'var(--mac-font-size-lg)',
         fontWeight: 'var(--mac-font-weight-semibold)'
       }}>Принтеры</h3>
-        <MacOSButton onClick={loadPrinters} disabled={loading}>
+        <Button onClick={loadPrinters} disabled={loading}>
           <RefreshCw size={16} style={{ marginRight: '8px' }} />
           {loading ? 'Загрузка...' : 'Обновить'}
-        </MacOSButton>
+        </Button>
       </div>
 
         {statistics &&
@@ -505,7 +504,7 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }} htmlFor="title">Название документа</label>
-              <MacOSInput
+              <Input
               id="title"
               value={printForm.title}
               onChange={(e) => setPrintForm({ ...printForm, title: e.target.value })}
@@ -543,7 +542,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }} htmlFor="copies">Копии</label>
-                <MacOSInput
+                <Input
                 id="copies"
                 type="number"
                 min="1"
@@ -593,7 +592,7 @@ const CloudPrintingManager = () => {
           color: 'var(--mac-text-primary)'
         }}>Содержимое документа</h4>
           
-          <MacOSTextarea
+          <Textarea
           value={printForm.content}
           onChange={(e) => setPrintForm({ ...printForm, content: e.target.value })}
           placeholder="Введите содержимое документа (HTML, текст или base64 для PDF)"
@@ -601,14 +600,14 @@ const CloudPrintingManager = () => {
           style={{ width: '100%' }} />
         
           
-          <MacOSButton
+          <Button
           onClick={printDocument}
           style={{ width: '100%', marginTop: '16px' }}
           disabled={!printForm.printer_id || !printForm.title || !printForm.content}>
           
             <Printer size={16} style={{ marginRight: '8px' }} />
             Печать
-          </MacOSButton>
+          </Button>
         </MacOSCard>
       </div>
     </div>;
@@ -715,7 +714,7 @@ const CloudPrintingManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>ФИО пациента *</label>
-              <MacOSInput
+              <Input
               id="patient-name"
               value={medicalForm.patient_data.patient_name}
               onChange={(e) => setMedicalForm({
@@ -735,7 +734,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Возраст</label>
-                <MacOSInput
+                <Input
                 id="patient-age"
                 value={medicalForm.patient_data.age}
                 onChange={(e) => setMedicalForm({
@@ -753,7 +752,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Телефон</label>
-                <MacOSInput
+                <Input
                 id="patient-phone"
                 value={medicalForm.patient_data.phone}
                 onChange={(e) => setMedicalForm({
@@ -786,7 +785,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Диагноз</label>
-                  <MacOSInput
+                  <Input
                 id="diagnosis"
                 value={medicalForm.template_data.diagnosis}
                 onChange={(e) => setMedicalForm({
@@ -804,7 +803,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Назначение</label>
-                  <MacOSTextarea
+                  <Textarea
                 id="prescription"
                 value={medicalForm.template_data.prescription_text}
                 onChange={(e) => setMedicalForm({
@@ -823,7 +822,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Врач</label>
-                  <MacOSInput
+                  <Input
                 id="doctor"
                 value={medicalForm.template_data.doctor_name}
                 onChange={(e) => setMedicalForm({
@@ -846,7 +845,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Номер очереди</label>
-                  <MacOSInput
+                  <Input
                 id="queue-number"
                 value={medicalForm.template_data.queue_number}
                 onChange={(e) => setMedicalForm({
@@ -864,7 +863,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Врач</label>
-                  <MacOSInput
+                  <Input
                 id="ticket-doctor"
                 value={medicalForm.template_data.doctor_name}
                 onChange={(e) => setMedicalForm({
@@ -882,7 +881,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Кабинет</label>
-                  <MacOSInput
+                  <Input
                 id="cabinet"
                 value={medicalForm.template_data.cabinet}
                 onChange={(e) => setMedicalForm({
@@ -905,7 +904,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Результаты обследования</label>
-                  <MacOSTextarea
+                  <Textarea
                 id="examination"
                 value={medicalForm.template_data.examination_results}
                 onChange={(e) => setMedicalForm({
@@ -924,7 +923,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Заключение</label>
-                  <MacOSTextarea
+                  <Textarea
                 id="conclusion"
                 value={medicalForm.template_data.conclusion}
                 onChange={(e) => setMedicalForm({
@@ -943,7 +942,7 @@ const CloudPrintingManager = () => {
                 color: 'var(--mac-text-primary)',
                 marginBottom: '8px'
               }}>Врач</label>
-                  <MacOSInput
+                  <Input
                 id="report-doctor"
                 value={medicalForm.template_data.doctor_name}
                 onChange={(e) => setMedicalForm({
@@ -957,7 +956,7 @@ const CloudPrintingManager = () => {
           }
           </div>
 
-          <MacOSButton
+          <Button
           onClick={printMedicalDocument}
           style={{ width: '100%', marginTop: '24px' }}
           disabled={!medicalForm.printer_id || !medicalForm.patient_data.patient_name}>
@@ -965,7 +964,7 @@ const CloudPrintingManager = () => {
             Печать {medicalForm.document_type === 'prescription' ? 'рецепта' :
           medicalForm.document_type === 'receipt' ? 'чека' :
           medicalForm.document_type === 'ticket' ? 'талона' : 'отчета'}
-          </MacOSButton>
+          </Button>
         </MacOSCard>
       </div>
     </div>;
@@ -1056,7 +1055,7 @@ const CloudPrintingManager = () => {
 
       {/* Модальное окно с подробностями принтера */}
       {selectedPrinter &&
-      <MacOSModal
+      <Modal
         isOpen={!!selectedPrinter}
         onClose={() => setSelectedPrinter(null)}
         title="Подробности принтера">
@@ -1067,9 +1066,9 @@ const CloudPrintingManager = () => {
             <div><strong>Провайдер:</strong> {selectedPrinter.provider}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <strong>Статус:</strong> 
-              <MacOSBadge variant={getStatusBadgeVariant(selectedPrinter.status)}>
+              <Badge variant={getStatusBadgeVariant(selectedPrinter.status)}>
                 {getStatusText(selectedPrinter.status)}
-              </MacOSBadge>
+              </Badge>
             </div>
             <div><strong>Местоположение:</strong> {selectedPrinter.location || 'Не указано'}</div>
             <div><strong>ID:</strong> {selectedPrinter.id}</div>
@@ -1093,22 +1092,22 @@ const CloudPrintingManager = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '24px' }}>
-            <MacOSButton
+            <Button
             onClick={() => testPrinter(selectedPrinter.provider, selectedPrinter.id)}
             disabled={selectedPrinter.status !== 'online'}>
             
               <TestTube size={16} style={{ marginRight: '8px' }} />
               Тестовая печать
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
             variant="outline"
             onClick={() => setSelectedPrinter(null)}>
             
               <X size={16} style={{ marginRight: '8px' }} />
               Закрыть
-            </MacOSButton>
+            </Button>
           </div>
-        </MacOSModal>
+        </Modal>
       }
     </div>);
 

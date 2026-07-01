@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
-import { AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,
+} from '../components/ui/macos';
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';

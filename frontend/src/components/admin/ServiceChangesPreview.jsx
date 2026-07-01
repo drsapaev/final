@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSBadge, AppEmpty } from '../ui/macos';
+import {
+  MacOSCard, Button, Badge, AppEmpty,
+} from '../ui/macos';
 
 const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) => {
   const formatFieldName = (field) => {
@@ -95,13 +97,13 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
           title="Нет изменений"
           description="Вы не внесли изменений в услугу. Можно закрыть просмотр и вернуться к форме."
           action={
-            <MacOSButton
+            <Button
               type="button"
               aria-label="Закрыть просмотр изменений услуги"
               onClick={onCancel}
             >
               Закрыть
-            </MacOSButton>
+            </Button>
           }
         />
       </MacOSCard>
@@ -196,9 +198,9 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
                 {formatFieldName(change.field)}
               </span>
               {change.isImportant && (
-                <MacOSBadge variant="warning" size="sm">
+                <Badge variant="warning" size="sm">
                   Важное
-                </MacOSBadge>
+                </Badge>
               )}
             </div>
 
@@ -287,7 +289,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
           )}
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <MacOSButton
+          <Button
             type="button"
             variant="outline"
             aria-label="Отменить и вернуться к редактированию услуги"
@@ -295,15 +297,15 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
           >
             <X aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
             Отменить
-          </MacOSButton>
-          <MacOSButton
+          </Button>
+          <Button
             type="button"
             aria-label={`Подтвердить ${changes.length} изменений услуги`}
             onClick={onConfirm}
           >
             <Check aria-hidden="true" focusable="false" size={16} style={{ marginRight: '8px' }} />
             Подтвердить изменения
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>

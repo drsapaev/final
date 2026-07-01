@@ -4,7 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
-import { Button, Card, CardHeader, CardContent, Badge, Icon, Input } from '../components/ui/macos';
+import {
+  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
+} from '../components/ui/macos';
 import { AnimatedTransition, AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';

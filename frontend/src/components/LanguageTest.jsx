@@ -1,6 +1,8 @@
 import { useTranslation } from '../hooks/useTranslation';
 import { useTheme } from '../contexts/ThemeContext';
-import { MacOSSelect, MacOSButton } from './ui/macos';
+import {
+  Select, Button,
+} from './ui/macos';
 
 /**
  * Тестовый компонент для проверки работы селектора языка
@@ -35,7 +37,7 @@ const LanguageTest = () => {
 
       <div style={{ marginBottom: '20px' }}>
         <h2>Селектор языка:</h2>
-        <MacOSSelect
+        <Select
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           style={{ width: '200px' }}
@@ -49,14 +51,14 @@ const LanguageTest = () => {
           ) : (
             <option disabled>Загрузка языков...</option>
           )}
-        </MacOSSelect>
+        </Select>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
         <h2>Кнопка переключения темы:</h2>
-        <MacOSButton onClick={toggleTheme}>
+        <Button onClick={toggleTheme}>
           Переключить на {isDark ? 'светлую' : 'темную'} тему
-        </MacOSButton>
+        </Button>
       </div>
 
       <div>

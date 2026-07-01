@@ -18,8 +18,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions } from
-'../ui/macos';
+  DialogActions,
+} from '../ui/macos';
 import {
   Camera,
   Upload,

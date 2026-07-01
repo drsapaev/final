@@ -5,16 +5,14 @@
  */
 import { useState, useEffect } from 'react';
 import {
-
   Card,
   CardContent,
   Typography,
   Button,
   Alert,
-
   Input,
-  Textarea } from
-'../ui/macos';
+  Textarea,
+} from '../ui/macos';
 import {
   Heart,
 

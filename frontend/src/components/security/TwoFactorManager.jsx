@@ -23,8 +23,8 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  MacOSButton,
-  MacOSInput,
+  Button,
+  Input,
 } from '../ui/macos';
 
 const accentGradients = {
@@ -212,9 +212,9 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
                 {badgeLabel}
               </span>
             )}
-            <MacOSButton variant="ghost" onClick={onToggle} startIcon={<Trash2 size={16} />}>
+            <Button variant="ghost" onClick={onToggle} startIcon={<Trash2 size={16} />}>
               Отозвать доступ
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -223,12 +223,12 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
             <div style={{ display: 'grid', gap: 12 }}>
               <div>После отзыва доступа при следующем входе снова потребуется подтверждение 2FA.</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <MacOSButton variant="danger" onClick={onConfirm} startIcon={<Trash2 size={16} />}>
+                <Button variant="danger" onClick={onConfirm} startIcon={<Trash2 size={16} />}>
                   Подтвердить отзыв
-                </MacOSButton>
-                <MacOSButton variant="ghost" onClick={onCancel}>
+                </Button>
+                <Button variant="ghost" onClick={onCancel}>
                   Отмена
-                </MacOSButton>
+                </Button>
               </div>
             </div>
           </Alert>
@@ -496,14 +496,14 @@ export default function TwoFactorManager() {
         title="Защита входа"
         description="Управляйте двухфакторной аутентификацией без вложенных экранов и всплывающих системных prompt."
         action={(
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={loadAll}
             disabled={loading}
             startIcon={<RefreshCw size={16} />}
           >
             Обновить данные
-          </MacOSButton>
+          </Button>
         )}
       >
         <div
@@ -546,30 +546,30 @@ export default function TwoFactorManager() {
             </Alert>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <MacOSButton
+              <Button
                 variant="outline"
                 onClick={loadBackupCodes}
                 disabled={loading}
                 startIcon={<Key size={16} />}
               >
                 Показать резервные коды
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 variant="ghost"
                 onClick={() => setConfirmRegenerate(true)}
                 disabled={loading}
                 startIcon={<RefreshCw size={16} />}
               >
                 Создать новый комплект кодов
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 variant="danger"
                 onClick={() => setShowDisableForm((prev) => !prev)}
                 disabled={loading}
                 startIcon={<Trash2 size={16} />}
               >
                 {showDisableForm ? 'Скрыть форму отключения' : 'Отключить 2FA'}
-              </MacOSButton>
+              </Button>
             </div>
 
             {confirmRegenerate && (
@@ -579,17 +579,17 @@ export default function TwoFactorManager() {
                     Новый комплект резервных кодов немедленно сделает старый недействительным. Сначала сохраните действующие коды, если они ещё нужны.
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <MacOSButton
+                    <Button
                       variant="primary"
                       onClick={handleRegenerateBackupCodes}
                       disabled={loading}
                       startIcon={<RefreshCw size={16} />}
                     >
                       Подтвердить обновление кодов
-                    </MacOSButton>
-                    <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(false)}>
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirmRegenerate(false)}>
                       Отмена
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </div>
               </Alert>
@@ -604,28 +604,28 @@ export default function TwoFactorManager() {
                   <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
                     Для отключения нужен текущий пароль и 6-значный код из приложения-аутентификатора.
                   </div>
-                  <MacOSInput
+                  <Input
                     type="password"
                     value={disablePassword}
                     onChange={(event) => setDisablePassword(event.target.value)}
                     placeholder="Текущий пароль"
                   />
-                  <MacOSInput
+                  <Input
                     type="text"
                     value={disableCode}
                     onChange={(event) => setDisableCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="Код из приложения"
                   />
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <MacOSButton
+                    <Button
                       variant="danger"
                       onClick={handleDisable2FA}
                       disabled={loading}
                       startIcon={<Trash2 size={16} />}
                     >
                       Подтвердить отключение
-                    </MacOSButton>
-                    <MacOSButton
+                    </Button>
+                    <Button
                       variant="ghost"
                       onClick={() => {
                         setShowDisableForm(false);
@@ -634,7 +634,7 @@ export default function TwoFactorManager() {
                       }}
                     >
                       Отмена
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -647,14 +647,14 @@ export default function TwoFactorManager() {
               title="2FA ещё не активирована"
               description="Сначала создайте QR-код и секрет, затем подтвердите код из приложения-аутентификатора."
               action={(
-                <MacOSButton
+                <Button
                   variant="primary"
                   onClick={handleEnable2FA}
                   disabled={loading}
                   startIcon={<ShieldCheck size={16} />}
                 >
                   Включить 2FA
-                </MacOSButton>
+                </Button>
               )}
             />
 
@@ -709,30 +709,30 @@ export default function TwoFactorManager() {
                         }}
                       >
                         <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{setupData.secret_key}</code>
-                        <MacOSButton
+                        <Button
                           variant="ghost"
                           onClick={() => copyToClipboard(setupData.secret_key)}
                           startIcon={<Copy size={16} />}
                         >
                           Копировать
-                        </MacOSButton>
+                        </Button>
                       </div>
-                      <MacOSInput
+                      <Input
                         type="text"
                         value={verificationCode}
                         onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="Введите 6-значный код"
                       />
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <MacOSButton
+                        <Button
                           variant="primary"
                           onClick={handleVerify2FASetup}
                           disabled={loading || verificationCode.length !== 6}
                           startIcon={<CheckCircle size={16} />}
                         >
                           Подтвердить и включить 2FA
-                        </MacOSButton>
-                        <MacOSButton
+                        </Button>
+                        <Button
                           variant="ghost"
                           onClick={() => {
                             setSetupData(null);
@@ -740,7 +740,7 @@ export default function TwoFactorManager() {
                           }}
                         >
                           Отменить настройку
-                        </MacOSButton>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -849,14 +849,14 @@ export default function TwoFactorManager() {
         title="Резервные коды"
         description="Аварийный способ входа, если доступ к приложению-аутентификатору временно потерян."
         action={status?.enabled ? (
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={loadBackupCodes}
             disabled={loading}
             startIcon={<Download size={16} />}
           >
             Загрузить текущие коды
-          </MacOSButton>
+          </Button>
         ) : null}
       >
         {!status?.enabled ? (
@@ -890,22 +890,22 @@ export default function TwoFactorManager() {
                   }}
                 >
                   <code style={{ fontSize: 13 }}>{code}</code>
-                  <MacOSButton variant="ghost" onClick={() => copyToClipboard(code)} startIcon={<Copy size={16} />}>
+                  <Button variant="ghost" onClick={() => copyToClipboard(code)} startIcon={<Copy size={16} />}>
                     Копия
-                  </MacOSButton>
+                  </Button>
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <MacOSButton variant="outline" onClick={() => copyToClipboard(backupCodes.join('\n'))} startIcon={<Copy size={16} />}>
+              <Button variant="outline" onClick={() => copyToClipboard(backupCodes.join('\n'))} startIcon={<Copy size={16} />}>
                 Копировать все
-              </MacOSButton>
-              <MacOSButton variant="outline" onClick={downloadBackupCodes} startIcon={<Download size={16} />}>
+              </Button>
+              <Button variant="outline" onClick={downloadBackupCodes} startIcon={<Download size={16} />}>
                 Скачать TXT
-              </MacOSButton>
-              <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
                 Создать новый комплект
-              </MacOSButton>
+              </Button>
             </div>
           </div>
         ) : (
@@ -915,12 +915,12 @@ export default function TwoFactorManager() {
             description="Можно загрузить текущий набор или создать новый комплект кодов."
             action={(
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <MacOSButton variant="outline" onClick={loadBackupCodes} disabled={loading} startIcon={<Download size={16} />}>
+                <Button variant="outline" onClick={loadBackupCodes} disabled={loading} startIcon={<Download size={16} />}>
                   Загрузить текущие коды
-                </MacOSButton>
-                <MacOSButton variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
                   Создать новый комплект
-                </MacOSButton>
+                </Button>
               </div>
             )}
           />

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 
 /**
@@ -17,8 +16,7 @@ const Button = React.forwardRef(({
   style = {},
   onClick,
   ...props
-}, ref) => {void
-  useTheme();
+}, ref) => {
 
   // macOS button styles based on variant
   const getButtonStyles = () => {

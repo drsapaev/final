@@ -1,4 +1,6 @@
-import { Box, Typography, Progress, CircularProgress } from '../../components/ui/macos';
+import {
+  Box, Typography, Progress, CircularProgress,
+} from '../ui/macos';
 import { Brain, Sparkles } from 'lucide-react';
 import PropTypes from 'prop-types';
 

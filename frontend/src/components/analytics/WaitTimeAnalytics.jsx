@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-
+  Button,
+  Badge,
+  Input,
   MacOSTab,
   MacOSStatCard,
   MacOSEmptyState,
-  MacOSLoadingSkeleton } from
-'../ui/macos';
+  Skeleton,
+} from '../ui/macos';
 import {
   Clock,
   TrendingUp,
@@ -206,7 +205,7 @@ const WaitTimeAnalytics = () => {
               <Activity style={{ width: '20px', height: '20px' }} />
               Сводка за последние {summary.period_days} дней
             </h3>
-            <MacOSBadge
+            <Badge
           variant="secondary"
           style={{
             backgroundColor: getPerformanceColor(summary.performance_rating),
@@ -214,7 +213,7 @@ const WaitTimeAnalytics = () => {
           }}>
           
               {summary.performance_rating}
-            </MacOSBadge>
+            </Badge>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -398,7 +397,7 @@ const WaitTimeAnalytics = () => {
   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {loading ?
     <MacOSCard style={{ padding: '24px' }}>
-          <MacOSLoadingSkeleton height="200px" />
+          <Skeleton height="200px" />
         </MacOSCard> :
     analytics ?
     <>
@@ -558,7 +557,7 @@ const WaitTimeAnalytics = () => {
       }}>
           Аналитика по услугам
         </h3>
-        <MacOSButton
+        <Button
         onClick={loadServiceAnalytics}
         disabled={loading}
         variant="outline"
@@ -570,12 +569,12 @@ const WaitTimeAnalytics = () => {
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </MacOSButton>
+        </Button>
       </div>
 
       {loading ?
     <MacOSCard style={{ padding: '24px' }}>
-          <MacOSLoadingSkeleton height="300px" />
+          <Skeleton height="300px" />
         </MacOSCard> :
     serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ?
     <MacOSCard style={{ padding: '24px' }}>
@@ -605,11 +604,11 @@ const WaitTimeAnalytics = () => {
                     </div>
                   </div>
                   {data.service_efficiency &&
-            <MacOSBadge
+            <Badge
               variant={data.service_efficiency.efficiency_score > 80 ? 'success' : 'warning'}>
               
                       {data.service_efficiency.efficiency_score}% эффективность
-                    </MacOSBadge>
+                    </Badge>
             }
                 </div>
                 
@@ -665,7 +664,7 @@ const WaitTimeAnalytics = () => {
       }}>
           Тепловая карта времени ожидания
         </h3>
-        <MacOSButton
+        <Button
         onClick={loadHeatmap}
         disabled={loading}
         variant="outline"
@@ -677,12 +676,12 @@ const WaitTimeAnalytics = () => {
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </MacOSButton>
+        </Button>
       </div>
 
       {loading ?
     <MacOSCard style={{ padding: '24px' }}>
-          <MacOSLoadingSkeleton height="400px" />
+          <Skeleton height="400px" />
         </MacOSCard> :
     heatmapData ?
     <MacOSCard style={{ padding: '24px' }}>
@@ -805,7 +804,7 @@ const WaitTimeAnalytics = () => {
             }}>
               Начальная дата
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })} />
@@ -821,7 +820,7 @@ const WaitTimeAnalytics = () => {
             }}>
               Конечная дата
             </label>
-            <MacOSInput
+            <Input
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })} />
@@ -837,14 +836,14 @@ const WaitTimeAnalytics = () => {
             }}>
               Отделение
             </label>
-            <MacOSInput
+            <Input
               placeholder="Фильтр по отделению"
               value={filters.department}
               onChange={(e) => setFilters({ ...filters, department: e.target.value })} />
             
           </div>
           <div style={{ display: 'flex', alignItems: 'end' }}>
-            <MacOSButton
+            <Button
               onClick={loadAnalytics}
               disabled={loading}
               variant="primary"
@@ -856,7 +855,7 @@ const WaitTimeAnalytics = () => {
               
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
               Применить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>

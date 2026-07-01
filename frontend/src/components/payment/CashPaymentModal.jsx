@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { Button } from '../ui/macos';
+import {
+  Button,
+} from '../ui/macos';
 import notify from '../../services/notify';
 
 /**

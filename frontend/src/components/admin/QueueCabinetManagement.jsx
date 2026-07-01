@@ -14,13 +14,13 @@ import { toast } from 'react-toastify';
 import { apiRequest } from '../../api/client';
 import logger from '../../utils/logger';
 import {
-  MacOSBadge,
-  MacOSButton,
+  Badge,
+  Button,
   MacOSCard,
   MacOSEmptyState,
-  MacOSInput,
+  Input,
   MacOSStatCard,
-  MacOSTable,
+  Table,
 } from '../ui/macos';
 
 const INITIAL_FILTERS = {
@@ -236,18 +236,18 @@ const QueueCabinetManagement = () => {
             </span>
           ),
           active: (
-            <MacOSBadge
+            <Badge
               variant={queue.active ? 'success' : 'secondary'}
               style={{
                 fontSize: 'var(--mac-font-size-xs)',
                 padding: '4px 10px',
               }}>
               {queue.active ? 'Активна' : 'Неактивна'}
-            </MacOSBadge>
+            </Badge>
           ),
           sync_state: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <MacOSBadge
+              <Badge
                 variant={
                   queue.sync_status === 'synced'
                     ? 'success'
@@ -263,20 +263,20 @@ const QueueCabinetManagement = () => {
                     : queue.sync_status === 'missing_doctor'
                       ? 'Нет врача'
                       : 'Нет кабинета врача'}
-              </MacOSBadge>
+              </Badge>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                <MacOSBadge
+                <Badge
                   variant={queue.linked_doctor_found ? 'success' : 'warning'}
                   style={{ fontSize: 'var(--mac-font-size-xs)' }}
                 >
                   {queue.linked_doctor_found ? 'Врач найден' : 'Врач не найден'}
-                </MacOSBadge>
-                <MacOSBadge
+                </Badge>
+                <Badge
                   variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
                   style={{ fontSize: 'var(--mac-font-size-xs)' }}
                 >
                   {queue.doctor_has_cabinet ? 'Кабинет врача задан' : 'Кабинет врача пуст'}
-                </MacOSBadge>
+                </Badge>
               </div>
               <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                 Канонический кабинет берётся из карточки врача. Здесь можно только проверить и
@@ -334,7 +334,7 @@ const QueueCabinetManagement = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <MacOSButton
+              <Button
                 onClick={() => loadData(appliedFilters)}
                 variant="outline"
                 style={{
@@ -344,8 +344,8 @@ const QueueCabinetManagement = () => {
                 }}>
                 <RefreshCw style={{ width: '16px', height: '16px' }} />
                 Обновить
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
                 onClick={syncFromDoctors}
                 disabled={syncing}
                 style={{
@@ -357,7 +357,7 @@ const QueueCabinetManagement = () => {
                 }}>
                 <Sparkles style={{ width: '16px', height: '16px' }} />
                 {syncing ? 'Синхронизация...' : 'Синхронизировать из врачей'}
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -423,7 +423,7 @@ const QueueCabinetManagement = () => {
                   }}>
                   Дата
                 </label>
-                <MacOSInput
+                <Input
                   id="queue-cabinet-day"
                   type="date"
                   value={filters.day}
@@ -445,7 +445,7 @@ const QueueCabinetManagement = () => {
                   }}>
                   Specialist ID
                 </label>
-                <MacOSInput
+                <Input
                   id="queue-cabinet-specialist"
                   type="number"
                   placeholder="Например, 12"
@@ -468,7 +468,7 @@ const QueueCabinetManagement = () => {
                   }}>
                   Номер кабинета
                 </label>
-                <MacOSInput
+                <Input
                   id="queue-cabinet-number"
                   placeholder="101"
                   value={filters.cabinetNumber}
@@ -479,7 +479,7 @@ const QueueCabinetManagement = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <MacOSButton
+                <Button
                   onClick={applyFilters}
                   style={{
                     display: 'inline-flex',
@@ -490,14 +490,14 @@ const QueueCabinetManagement = () => {
                   }}>
                   <Search style={{ width: '16px', height: '16px' }} />
                   Применить
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
                   onClick={resetFilters}
                   variant="outline"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                   <X style={{ width: '16px', height: '16px' }} />
                   Сбросить
-                </MacOSButton>
+                </Button>
               </div>
             </div>
           </MacOSCard>
@@ -508,16 +508,16 @@ const QueueCabinetManagement = () => {
               title="Нет данных о кабинетах"
               description="Измените фильтры или нажмите синхронизацию, чтобы подтянуть кабинеты из таблицы врачей."
               action={
-                <MacOSButton
+                <Button
                   onClick={() => loadData(appliedFilters)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                   <RefreshCw style={{ width: '16px', height: '16px' }} />
                   Повторить загрузку
-                </MacOSButton>
+                </Button>
               }
             />
           ) : (
-            <MacOSTable
+            <Table
               columns={[
                 { key: 'day', title: 'Дата', sortable: false },
                 { key: 'specialist_name', title: 'Специалист', sortable: false },

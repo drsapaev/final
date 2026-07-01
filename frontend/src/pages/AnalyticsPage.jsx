@@ -6,7 +6,9 @@ import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
-import { Input, MacOSButton, Select, SegmentedControl } from '../components/ui/macos';
+import {
+  Input, Button, Select, SegmentedControl,
+} from '../components/ui/macos';
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -856,7 +858,7 @@ export default function AnalyticsPage() {
               Быстрый обзор вынесен отдельно, а здесь собраны подробные разрезы по записям, выручке, провайдерам и прогнозам.
             </p>
           </div>
-          <MacOSButton
+          <Button
             variant="primary"
             size="lg"
             startIcon={<Download size={16} />}
@@ -868,7 +870,7 @@ export default function AnalyticsPage() {
               justifyContent: 'center'
             }}>
             Экспорт JSON
-          </MacOSButton>
+          </Button>
         </div>
       </section>
 
@@ -985,7 +987,7 @@ export default function AnalyticsPage() {
               }} />
           </div>
 
-          <MacOSButton
+          <Button
             variant="primary"
             size="lg"
             onClick={() => loadAnalytics()}
@@ -998,7 +1000,7 @@ export default function AnalyticsPage() {
               width: isCompactLayout ? '100%' : 'auto'
             }}>
             {loading ? 'Обновляем...' : 'Обновить'}
-          </MacOSButton>
+          </Button>
         </div>
       </section>
 
@@ -1021,7 +1023,7 @@ export default function AnalyticsPage() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <MacOSButton
+              <Button
                 key={tab.id}
                 type="button"
                 variant={isActive ? 'primary' : 'secondary'}
@@ -1035,7 +1037,7 @@ export default function AnalyticsPage() {
                   flex: isCompactLayout ? '0 0 auto' : 'none'
                 }}>
                 {tab.label}
-              </MacOSButton>);
+              </Button>);
           })}
         </div>
       </section>

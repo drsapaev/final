@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea } from
-
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Textarea,
+} from '../ui/macos';
 import {
   TrendingUp,
   AlertTriangle,
@@ -281,14 +279,14 @@ const AnalyticsInsights = () => {
             <BarChart3 style={{ width: '16px', height: '16px' }} />
             Медицинские данные для анализа
           </h4>
-          <MacOSButton
+          <Button
           onClick={addMedicalRecord}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalData.map((record, index) =>
@@ -298,7 +296,7 @@ const AnalyticsInsights = () => {
           gap: '8px',
           alignItems: 'center'
         }}>
-              <MacOSInput
+              <Input
             type="date"
             value={record.date}
             onChange={(e) => {
@@ -308,7 +306,7 @@ const AnalyticsInsights = () => {
             }}
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={record.type}
             onChange={(e) => {
               const newData = [...medicalData];
@@ -324,7 +322,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={record.diagnosis}
             onChange={(e) => {
@@ -335,7 +333,7 @@ const AnalyticsInsights = () => {
             placeholder="Диагноз"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={record.patient_age}
             onChange={(e) => {
@@ -346,7 +344,7 @@ const AnalyticsInsights = () => {
             placeholder="Возраст"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={record.department}
             onChange={(e) => {
               const newData = [...medicalData];
@@ -363,7 +361,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove medical record"
             aria-label={`Remove medical record ${index + 1}`}
@@ -372,7 +370,7 @@ const AnalyticsInsights = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -410,7 +408,7 @@ const AnalyticsInsights = () => {
             }}>
                 Временной период
               </label>
-              <MacOSSelect
+              <Select
               value={timePeriod}
               onChange={(e) => setTimePeriod(e.target.value)}
               options={[
@@ -433,7 +431,7 @@ const AnalyticsInsights = () => {
             }}>
                 Тип анализа
               </label>
-              <MacOSSelect
+              <Select
               value={analysisType}
               onChange={(e) => setAnalysisType(e.target.value)}
               options={[
@@ -471,7 +469,7 @@ const AnalyticsInsights = () => {
             <Activity style={{ width: '16px', height: '16px' }} />
             Данные для анализа аномалий
           </h4>
-          <MacOSButton
+          <Button
           type="button"
           title="Add anomaly dataset entry"
           aria-label="Add anomaly dataset entry"
@@ -481,7 +479,7 @@ const AnalyticsInsights = () => {
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить запись
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {dataset.map((entry, index) =>
@@ -491,7 +489,7 @@ const AnalyticsInsights = () => {
           gap: '8px',
           alignItems: 'center'
         }}>
-              <MacOSInput
+              <Input
             type="number"
             value={entry.value}
             onChange={(e) => {
@@ -502,7 +500,7 @@ const AnalyticsInsights = () => {
             placeholder="Значение"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="datetime-local"
             value={entry.timestamp.slice(0, 16)}
             onChange={(e) => {
@@ -512,7 +510,7 @@ const AnalyticsInsights = () => {
             }}
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={entry.type}
             onChange={(e) => {
               const newDataset = [...dataset];
@@ -529,7 +527,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={entry.patient_id}
             onChange={(e) => {
@@ -540,7 +538,7 @@ const AnalyticsInsights = () => {
             placeholder="ID пациента"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove anomaly dataset entry"
             aria-label={`Remove anomaly dataset entry ${index + 1}`}
@@ -549,7 +547,7 @@ const AnalyticsInsights = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -572,7 +570,7 @@ const AnalyticsInsights = () => {
           Базовые показатели
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <MacOSTextarea
+          <Textarea
           value={JSON.stringify(baselineData, null, 2)}
           onChange={(e) => {
             try {
@@ -627,7 +625,7 @@ const AnalyticsInsights = () => {
           }}>
               Возраст
             </label>
-            <MacOSInput
+            <Input
             type="number"
             value={patientData.age}
             onChange={(e) => setPatientData((prev) => ({ ...prev, age: parseOptionalInteger(e.target.value) }))}
@@ -644,7 +642,7 @@ const AnalyticsInsights = () => {
           }}>
               Пол
             </label>
-            <MacOSSelect
+            <Select
             value={patientData.gender}
             onChange={(e) => setPatientData((prev) => ({ ...prev, gender: e.target.value }))}
             placeholder="Выберите пол"
@@ -665,7 +663,7 @@ const AnalyticsInsights = () => {
           }}>
               Диагноз
             </label>
-            <MacOSInput
+            <Input
             type="text"
             value={patientData.diagnosis}
             onChange={(e) => setPatientData((prev) => ({ ...prev, diagnosis: e.target.value }))}
@@ -682,7 +680,7 @@ const AnalyticsInsights = () => {
           }}>
               Дата начала лечения
             </label>
-            <MacOSInput
+            <Input
             type="date"
             value={patientData.treatment_start_date}
             onChange={(e) => setPatientData((prev) => ({ ...prev, treatment_start_date: e.target.value }))}
@@ -709,14 +707,14 @@ const AnalyticsInsights = () => {
             <BarChart3 style={{ width: '16px', height: '16px' }} />
             Исторические исходы
           </h4>
-          <MacOSButton
+          <Button
           onClick={addHistoricalOutcome}
           variant="outline"
           style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           
             <Plus style={{ width: '16px', height: '16px' }} />
             Добавить исход
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {historicalOutcomes.map((outcome, index) =>
@@ -726,7 +724,7 @@ const AnalyticsInsights = () => {
           gap: '8px',
           alignItems: 'center'
         }}>
-              <MacOSInput
+              <Input
             type="text"
             value={outcome.condition}
             onChange={(e) => {
@@ -737,7 +735,7 @@ const AnalyticsInsights = () => {
             placeholder="Состояние"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={outcome.treatment}
             onChange={(e) => {
@@ -748,7 +746,7 @@ const AnalyticsInsights = () => {
             placeholder="Лечение"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={outcome.result}
             onChange={(e) => {
               const newOutcomes = [...historicalOutcomes];
@@ -764,7 +762,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={outcome.duration}
             onChange={(e) => {
@@ -775,7 +773,7 @@ const AnalyticsInsights = () => {
             placeholder="Длительность"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={outcome.patient_age}
             onChange={(e) => {
@@ -786,7 +784,7 @@ const AnalyticsInsights = () => {
             placeholder="Возраст"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove historical outcome"
             aria-label={`Remove historical outcome ${index + 1}`}
@@ -795,7 +793,7 @@ const AnalyticsInsights = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -836,7 +834,7 @@ const AnalyticsInsights = () => {
           }}>
               Тип отчета
             </label>
-            <MacOSSelect
+            <Select
             value={reportType}
             onChange={(e) => setReportType(e.target.value)}
             options={[
@@ -870,7 +868,7 @@ const AnalyticsInsights = () => {
           Аналитические данные
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <MacOSTextarea
+          <Textarea
           value={JSON.stringify(analyticsData, null, 2)}
           onChange={(e) => {
             try {
@@ -911,7 +909,7 @@ const AnalyticsInsights = () => {
             <Users style={{ width: '16px', height: '16px' }} />
             Популяционные данные
           </h4>
-          <MacOSButton
+          <Button
           type="button"
           title="Add population patient"
           aria-label="Add population patient"
@@ -921,7 +919,7 @@ const AnalyticsInsights = () => {
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить пациента
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {populationData.map((patient, index) =>
@@ -931,7 +929,7 @@ const AnalyticsInsights = () => {
           gap: '8px',
           alignItems: 'center'
         }}>
-              <MacOSInput
+              <Input
             type="text"
             value={patient.id}
             onChange={(e) => {
@@ -942,7 +940,7 @@ const AnalyticsInsights = () => {
             placeholder="ID"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="number"
             value={patient.age}
             onChange={(e) => {
@@ -953,7 +951,7 @@ const AnalyticsInsights = () => {
             placeholder="Возраст"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={patient.gender}
             onChange={(e) => {
               const newData = [...populationData];
@@ -967,7 +965,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSInput
+              <Input
             type="text"
             value={patient.conditions.join(', ')}
             onChange={(e) => {
@@ -978,7 +976,7 @@ const AnalyticsInsights = () => {
             placeholder="Заболевания"
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-            <MacOSSelect
+            <Select
             value={patient.lifestyle}
             onChange={(e) => {
               const newData = [...populationData];
@@ -993,7 +991,7 @@ const AnalyticsInsights = () => {
             }
             style={{ fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove population patient"
             aria-label={`Remove population patient ${index + 1}`}
@@ -1002,7 +1000,7 @@ const AnalyticsInsights = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -1025,7 +1023,7 @@ const AnalyticsInsights = () => {
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Факторы риска
           </h4>
-          <MacOSButton
+          <Button
           type="button"
           title="Add risk factor"
           aria-label="Add risk factor"
@@ -1035,12 +1033,12 @@ const AnalyticsInsights = () => {
 
             <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             Добавить фактор
-          </MacOSButton>
+          </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {riskFactors.map((factor, index) =>
         <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <MacOSInput
+              <Input
             type="text"
             value={factor}
             onChange={(e) => {
@@ -1051,7 +1049,7 @@ const AnalyticsInsights = () => {
             placeholder="Фактор риска"
             style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }} />
           
-              <MacOSButton
+              <Button
             type="button"
             title="Remove risk factor"
             aria-label={`Remove risk factor ${index + 1}`}
@@ -1060,7 +1058,7 @@ const AnalyticsInsights = () => {
             style={{ padding: '4px', minWidth: 'auto' }}>
 
                 <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-              </MacOSButton>
+              </Button>
             </div>
         )}
         </div>
@@ -1117,22 +1115,22 @@ const AnalyticsInsights = () => {
             Результаты аналитики
           </h3>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <MacOSButton
+            <Button
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={exportResult}
               variant="outline"
               style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               
               <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -1302,7 +1300,7 @@ const AnalyticsInsights = () => {
             {activeTab === 'risk-patterns' && renderRiskPatterns()}
             
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
-              <MacOSButton
+              <Button
                 type="button"
                 title={loading ? 'Running AI analytics' : 'Run AI analytics'}
                 aria-label={loading ? 'Running AI analytics' : 'Run AI analytics'}
@@ -1325,7 +1323,7 @@ const AnalyticsInsights = () => {
                     Запустить AI анализ
                   </>
                 }
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 

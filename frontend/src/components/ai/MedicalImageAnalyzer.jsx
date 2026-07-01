@@ -18,11 +18,11 @@ import { api } from '../../utils/api';
 import logger from '../../utils/logger';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea } from
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Textarea,
+} from '../ui/macos';
 
 const MedicalImageAnalyzer = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -161,7 +161,7 @@ const MedicalImageAnalyzer = () => {
             }}>
               Область исследования
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={metadata.body_part}
               onChange={(e) => handleMetadataChange('body_part', e.target.value)}
@@ -182,7 +182,7 @@ const MedicalImageAnalyzer = () => {
             }}>
               Исследуемый орган
             </label>
-            <MacOSInput
+            <Input
               type="text"
               value={metadata.organ}
               onChange={(e) => handleMetadataChange('organ', e.target.value)}
@@ -204,7 +204,7 @@ const MedicalImageAnalyzer = () => {
               }}>
                 Локализация образования
               </label>
-              <MacOSInput
+              <Input
                 type="text"
                 value={metadata.lesion_location}
                 onChange={(e) => handleMetadataChange('lesion_location', e.target.value)}
@@ -222,7 +222,7 @@ const MedicalImageAnalyzer = () => {
               }}>
                 Анамнез образования
               </label>
-              <MacOSTextarea
+              <Textarea
                 value={metadata.lesion_history}
                 onChange={(e) => handleMetadataChange('lesion_history', e.target.value)}
                 placeholder="История появления и изменения образования"
@@ -285,14 +285,14 @@ const MedicalImageAnalyzer = () => {
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
           </h3>
-          <MacOSButton
+          <Button
             onClick={exportResult}
             variant="outline"
             style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
-          </MacOSButton>
+          </Button>
         </div>
 
         {/* Заключение */}
@@ -542,7 +542,7 @@ const MedicalImageAnalyzer = () => {
                 gap: '12px'
               }}>
                   {imageTypes.map((type) =>
-                <MacOSButton
+                <Button
                   key={type.value}
                   onClick={() => setImageType(type.value)}
                   variant={imageType === type.value ? 'primary' : 'outline'}
@@ -576,7 +576,7 @@ const MedicalImageAnalyzer = () => {
                   }}>
                         {type.label}
                       </span>
-                    </MacOSButton>
+                    </Button>
                 )}
                 </div>
               </MacOSCard>
@@ -679,7 +679,7 @@ const MedicalImageAnalyzer = () => {
                   }}>
                       Возраст пациента
                     </label>
-                    <MacOSInput
+                    <Input
                     type="text"
                     value={metadata.patient_age}
                     onChange={(e) => handleMetadataChange('patient_age', e.target.value)}
@@ -697,7 +697,7 @@ const MedicalImageAnalyzer = () => {
                   }}>
                       Пол
                     </label>
-                    <MacOSSelect
+                    <Select
                     value={metadata.patient_gender}
                     onChange={(e) => handleMetadataChange('patient_gender', e.target.value)}
                     options={[
@@ -724,7 +724,7 @@ const MedicalImageAnalyzer = () => {
                 }}>
                     Клиническая информация
                   </label>
-                  <MacOSTextarea
+                  <Textarea
                   value={metadata.clinical_info}
                   onChange={(e) => handleMetadataChange('clinical_info', e.target.value)}
                   placeholder="Жалобы, анамнез, предварительный диагноз"
@@ -735,7 +735,7 @@ const MedicalImageAnalyzer = () => {
               </MacOSCard>
 
               {/* Кнопка анализа */}
-              <MacOSButton
+              <Button
               onClick={analyzeImage}
               disabled={!selectedFile || analyzing}
               aria-label="Analyze medical image"
@@ -765,7 +765,7 @@ const MedicalImageAnalyzer = () => {
                     Анализировать изображение
                   </>
               }
-              </MacOSButton>
+              </Button>
             </div>
 
             {/* Правая панель - превью и результат */}

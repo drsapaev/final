@@ -19,17 +19,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
-  MacOSTextarea,
-
-  MacOSLoadingSkeleton,
+  Textarea,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert } from
-
-'../ui/macos';
+  Alert,
+} from '../ui/macos';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -301,7 +299,7 @@ const EquipmentManagement = () => {
 
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
         message={message.text} />
@@ -317,7 +315,7 @@ const EquipmentManagement = () => {
           flexWrap: 'wrap'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
-            <MacOSInput
+            <Input
               type="text"
               aria-label="Поиск оборудования по названию, модели или серийному номеру"
               placeholder="Поиск по названию, модели или серийному номеру..."
@@ -366,7 +364,7 @@ const EquipmentManagement = () => {
               ]}
               size="large"
               style={{ minWidth: '150px' }} />
-            <MacOSButton
+            <Button
               onClick={() => setShowAddForm(true)}
               style={{
                 display: 'flex',
@@ -379,7 +377,7 @@ const EquipmentManagement = () => {
               
               <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
               <span>Добавить оборудование</span>
-            </MacOSButton>
+            </Button>
           </div>
         </div>
       </MacOSCard>
@@ -401,7 +399,7 @@ const EquipmentManagement = () => {
           }}>
               {editingEquipment ? 'Редактировать оборудование' : 'Добавить оборудование'}
             </h3>
-            <MacOSButton
+            <Button
             variant="outline"
             type="button"
             aria-label={editingEquipment ? 'Закрыть форму редактирования оборудования' : 'Закрыть форму добавления оборудования'}
@@ -413,7 +411,7 @@ const EquipmentManagement = () => {
             style={{ padding: '8px' }}>
             
               <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -432,7 +430,7 @@ const EquipmentManagement = () => {
               }}>
                   Название *
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 required
                 value={formData.name}
@@ -470,7 +468,7 @@ const EquipmentManagement = () => {
               }}>
                   Модель
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
@@ -487,7 +485,7 @@ const EquipmentManagement = () => {
               }}>
                   Серийный номер
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 value={formData.serial_number}
                 onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
@@ -541,7 +539,7 @@ const EquipmentManagement = () => {
               }}>
                   Дата покупки
                 </label>
-                <MacOSInput
+                <Input
                 type="date"
                 value={formData.purchase_date}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
@@ -557,7 +555,7 @@ const EquipmentManagement = () => {
               }}>
                   Окончание гарантии
                 </label>
-                <MacOSInput
+                <Input
                 type="date"
                 value={formData.warranty_expiry}
                 onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} />
@@ -573,7 +571,7 @@ const EquipmentManagement = () => {
               }}>
                   Последнее обслуживание
                 </label>
-                <MacOSInput
+                <Input
                 type="date"
                 value={formData.maintenance_date}
                 onChange={(e) => setFormData({ ...formData, maintenance_date: e.target.value })} />
@@ -589,7 +587,7 @@ const EquipmentManagement = () => {
               }}>
                   Стоимость (сум)
                 </label>
-                <MacOSInput
+                <Input
                 type="number"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
@@ -608,7 +606,7 @@ const EquipmentManagement = () => {
             }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Введите описание оборудования"
@@ -621,7 +619,7 @@ const EquipmentManagement = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-              <MacOSButton
+              <Button
               type="button"
               variant="outline"
               onClick={() => {
@@ -632,8 +630,8 @@ const EquipmentManagement = () => {
               disabled={saving}>
               
                 Отмена
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               type="submit"
               disabled={saving}
               aria-label={editingEquipment ? 'Update equipment' : 'Add equipment'}
@@ -660,7 +658,7 @@ const EquipmentManagement = () => {
                     {editingEquipment ? 'Обновить' : 'Добавить'}
                   </>
               }
-              </MacOSButton>
+              </Button>
             </div>
           </form>
         </MacOSCard>
@@ -676,7 +674,7 @@ const EquipmentManagement = () => {
       }}>
           {[1, 2, 3].map((i) =>
         <MacOSCard key={i} style={{ padding: '24px' }}>
-              <MacOSLoadingSkeleton height="200px" />
+              <Skeleton height="200px" />
             </MacOSCard>
         )}
         </div> :
@@ -686,10 +684,10 @@ const EquipmentManagement = () => {
         title={equipmentEmptyTitle}
         description={equipmentEmptyDescription}
         action={
-        <MacOSButton onClick={() => setShowAddForm(true)} variant="primary">
+        <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить оборудование
-            </MacOSButton>
+            </Button>
         } /> :
 
 
@@ -724,7 +722,7 @@ const EquipmentManagement = () => {
                     {item.model} • {item.serial_number}
                   </p>
                 </div>
-                <MacOSBadge
+                <Badge
               variant={getStatusColor(item.status)}
               text={getStatusLabel(item.status)} />
             
@@ -795,7 +793,7 @@ const EquipmentManagement = () => {
             justifyContent: 'flex-end',
             gap: '8px'
           }}>
-                <MacOSButton
+                <Button
               type="button"
               variant="outline"
               aria-label={`Редактировать оборудование ${item.name}`}
@@ -803,8 +801,8 @@ const EquipmentManagement = () => {
               style={{ padding: '6px 12px' }}>
               
                   <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
-                <MacOSButton
+                </Button>
+                <Button
               type="button"
               variant="outline"
               aria-label={`Удалить оборудование ${item.name}`}
@@ -816,7 +814,7 @@ const EquipmentManagement = () => {
               }}>
               
                   <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                </MacOSButton>
+                </Button>
               </div>
             </MacOSCard>
         )}

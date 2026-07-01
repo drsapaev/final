@@ -2,16 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSCheckbox,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
   Select,
-  MacOSTextarea,
-  MacOSLoadingSkeleton,
-  MacOSEmptyState } from
-
-'../ui/macos';
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
+} from '../ui/macos';
 import {
   Plus,
   Edit,
@@ -148,7 +147,7 @@ const ServiceChecklist = ({ services = [], value = [], onChange }) => {
               background: checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)'
             }}
           >
-            <MacOSCheckbox
+            <Checkbox
               checked={checked}
               onChange={() => onChange(toggleServiceId(selectedIds, service.id))}
               label={
@@ -443,7 +442,7 @@ const DynamicPricingManager = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <MacOSButton
+          <Button
           onClick={handleUpdateDynamicPrices}
           variant="outline"
           style={{
@@ -454,8 +453,8 @@ const DynamicPricingManager = () => {
           
             <TrendingUp size={16} />
             Обновить цены
-          </MacOSButton>
-          <MacOSButton
+          </Button>
+          <Button
           onClick={() => setShowCreateRule(true)}
           style={{
             display: 'flex',
@@ -465,7 +464,7 @@ const DynamicPricingManager = () => {
           
             <Plus size={16} />
             Создать правило
-          </MacOSButton>
+          </Button>
         </div>
       </div>
 
@@ -477,10 +476,10 @@ const DynamicPricingManager = () => {
         title="Правила не найдены"
         description="В системе пока нет созданных правил ценообразования"
         action={
-        <MacOSButton onClick={() => setShowCreateRule(true)}>
+        <Button onClick={() => setShowCreateRule(true)}>
                 <Plus size={16} style={{ marginRight: '8px' }} />
                 Создать первое правило
-              </MacOSButton>
+              </Button>
         } /> :
 
 
@@ -506,12 +505,12 @@ const DynamicPricingManager = () => {
               }}>
                       {rule.name}
                     </h4>
-                    <MacOSBadge variant={rule.is_active ? 'success' : 'secondary'}>
+                    <Badge variant={rule.is_active ? 'success' : 'secondary'}>
                       {rule.is_active ? 'Активно' : 'Неактивно'}
-                    </MacOSBadge>
-                  <MacOSBadge variant="outline">
+                    </Badge>
+                  <Badge variant="outline">
                       {PRICING_RULE_TYPE_LABELS[normalizePricingEnumValue(rule.rule_type)] || rule.rule_type}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
 
                   <p style={{
@@ -560,7 +559,7 @@ const DynamicPricingManager = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <MacOSButton
+                  <Button
               variant="outline"
               onClick={() => handleToggleRule(rule.id, rule.is_active)}
               style={{
@@ -577,8 +576,8 @@ const DynamicPricingManager = () => {
               aria-label={`${rule.is_active ? 'Приостановить' : 'Активировать'} правило ${rule.name || rule.id}`}>
 
                     {rule.is_active ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               variant="outline"
               onClick={() => setEditingRule(rule)}
               style={{
@@ -595,8 +594,8 @@ const DynamicPricingManager = () => {
               aria-label={`Редактировать правило ${rule.name || rule.id}`}>
 
                     <Edit aria-hidden="true" size={16} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               variant="outline"
               onClick={() => handleDeleteRule(rule.id)}
               style={{
@@ -613,7 +612,7 @@ const DynamicPricingManager = () => {
               aria-label={`Удалить правило ${rule.name || rule.id}`}>
 
                     <Trash2 aria-hidden="true" size={16} />
-                  </MacOSButton>
+                  </Button>
                 </div>
               </div>
             </MacOSCard>
@@ -638,14 +637,14 @@ const DynamicPricingManager = () => {
         }}>
               Создать правило ценообразования
             </h4>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowCreateRule(false)}
               type="button"
               title="Закрыть форму создания правила"
               aria-label="Закрыть форму создания правила">
               <X aria-hidden="true" size={16} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{
@@ -663,7 +662,7 @@ const DynamicPricingManager = () => {
           }}>
                 Название
               </label>
-              <MacOSInput
+              <Input
             value={ruleForm.name}
             onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
             placeholder="Название правила" />
@@ -714,7 +713,7 @@ const DynamicPricingManager = () => {
           }}>
                 Размер скидки
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={ruleForm.discount_value}
             onChange={(e) => setRuleForm({ ...ruleForm, discount_value: parseFloat(e.target.value) })}
@@ -732,7 +731,7 @@ const DynamicPricingManager = () => {
           }}>
                 Время начала
               </label>
-              <MacOSInput
+              <Input
             type="time"
             value={ruleForm.start_time}
             onChange={(e) => setRuleForm({ ...ruleForm, start_time: e.target.value + ':00' })} />
@@ -749,7 +748,7 @@ const DynamicPricingManager = () => {
           }}>
                 Время окончания
               </label>
-              <MacOSInput
+              <Input
             type="time"
             value={ruleForm.end_time}
             onChange={(e) => setRuleForm({ ...ruleForm, end_time: e.target.value + ':00' })} />
@@ -766,7 +765,7 @@ const DynamicPricingManager = () => {
           }}>
                 Минимальное количество
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={ruleForm.min_quantity}
             onChange={(e) => setRuleForm({ ...ruleForm, min_quantity: parseInt(e.target.value) })}
@@ -784,7 +783,7 @@ const DynamicPricingManager = () => {
           }}>
                 Приоритет
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={ruleForm.priority}
             onChange={(e) => setRuleForm({ ...ruleForm, priority: parseInt(e.target.value) })}
@@ -802,7 +801,7 @@ const DynamicPricingManager = () => {
           }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
             value={ruleForm.description}
             onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
             placeholder="Описание правила" />
@@ -833,13 +832,13 @@ const DynamicPricingManager = () => {
         gap: '8px',
         marginTop: '16px'
       }}>
-            <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
+            <Button variant="outline" onClick={() => setShowCreateRule(false)}>
               Отмена
-            </MacOSButton>
-            <MacOSButton onClick={handleCreateRule}>
+            </Button>
+            <Button onClick={handleCreateRule}>
               <Save size={16} style={{ marginRight: '8px' }} />
               Создать
-            </MacOSButton>
+            </Button>
           </div>
         </MacOSCard>
     }
@@ -871,7 +870,7 @@ const DynamicPricingManager = () => {
             Управление комплексными предложениями
           </p>
         </div>
-        <MacOSButton
+        <Button
         onClick={() => setShowCreatePackage(true)}
         style={{
           display: 'flex',
@@ -881,7 +880,7 @@ const DynamicPricingManager = () => {
         
           <Plus size={16} />
           Создать пакет
-        </MacOSButton>
+        </Button>
       </div>
 
       {/* Список пакетов */}
@@ -892,10 +891,10 @@ const DynamicPricingManager = () => {
         title="Пакеты не найдены"
         description="В системе пока нет созданных пакетов услуг"
         action={
-        <MacOSButton onClick={() => setShowCreatePackage(true)}>
+        <Button onClick={() => setShowCreatePackage(true)}>
                 <Plus size={16} style={{ marginRight: '8px' }} />
                 Создать первый пакет
-              </MacOSButton>
+              </Button>
         } /> :
 
 
@@ -921,9 +920,9 @@ const DynamicPricingManager = () => {
               }}>
                       {pkg.name}
                     </h4>
-                    <MacOSBadge variant={pkg.is_active ? 'success' : 'secondary'}>
+                    <Badge variant={pkg.is_active ? 'success' : 'secondary'}>
                       {pkg.is_active ? 'Активен' : 'Неактивен'}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
 
                   <p style={{
@@ -959,9 +958,9 @@ const DynamicPricingManager = () => {
                       </span>
               }
                     {pkg.savings_percentage &&
-              <MacOSBadge variant="success">
+              <Badge variant="success">
                         Экономия {pkg.savings_percentage.toFixed(0)}%
-                      </MacOSBadge>
+                      </Badge>
               }
                     <span style={{ color: 'var(--mac-text-secondary)' }}>
                       Покупок: {pkg.current_purchases || 0}
@@ -986,7 +985,7 @@ const DynamicPricingManager = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <MacOSButton
+                  <Button
               variant="outline"
               onClick={() => setEditingPackage(pkg)}
               style={{
@@ -1003,8 +1002,8 @@ const DynamicPricingManager = () => {
               aria-label={`Редактировать пакет ${pkg.name || pkg.id}`}>
 
                     <Edit aria-hidden="true" size={16} />
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
               variant="outline"
               onClick={() => handleDeletePackage(pkg.id)}
               style={{
@@ -1021,7 +1020,7 @@ const DynamicPricingManager = () => {
               aria-label={`Удалить пакет ${pkg.name || pkg.id}`}>
 
                     <Trash2 aria-hidden="true" size={16} />
-                  </MacOSButton>
+                  </Button>
                 </div>
               </div>
             </MacOSCard>
@@ -1046,14 +1045,14 @@ const DynamicPricingManager = () => {
         }}>
               Создать пакет услуг
             </h4>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowCreatePackage(false)}
               type="button"
               title="Закрыть форму создания пакета"
               aria-label="Закрыть форму создания пакета">
               <X aria-hidden="true" size={16} />
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{
@@ -1071,7 +1070,7 @@ const DynamicPricingManager = () => {
           }}>
                 Название
               </label>
-              <MacOSInput
+              <Input
             value={packageForm.name}
             onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
             placeholder="Название пакета" />
@@ -1088,7 +1087,7 @@ const DynamicPricingManager = () => {
           }}>
                 Цена пакета
               </label>
-              <MacOSInput
+              <Input
             type="number"
             value={packageForm.package_price}
             onChange={(e) => setPackageForm({ ...packageForm, package_price: parseFloat(e.target.value) })}
@@ -1106,7 +1105,7 @@ const DynamicPricingManager = () => {
           }}>
                 Действует с
               </label>
-              <MacOSInput
+              <Input
             type="datetime-local"
             value={packageForm.valid_from}
             onChange={(e) => setPackageForm({ ...packageForm, valid_from: e.target.value })} />
@@ -1123,7 +1122,7 @@ const DynamicPricingManager = () => {
           }}>
                 Действует до
               </label>
-              <MacOSInput
+              <Input
             type="datetime-local"
             value={packageForm.valid_to}
             onChange={(e) => setPackageForm({ ...packageForm, valid_to: e.target.value })} />
@@ -1140,7 +1139,7 @@ const DynamicPricingManager = () => {
           }}>
                 Описание
               </label>
-              <MacOSTextarea
+              <Textarea
             value={packageForm.description}
             onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
             placeholder="Описание пакета" />
@@ -1171,13 +1170,13 @@ const DynamicPricingManager = () => {
         gap: '8px',
         marginTop: '16px'
       }}>
-            <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
+            <Button variant="outline" onClick={() => setShowCreatePackage(false)}>
               Отмена
-            </MacOSButton>
-            <MacOSButton onClick={handleCreatePackage}>
+            </Button>
+            <Button onClick={handleCreatePackage}>
               <Save size={16} style={{ marginRight: '8px' }} />
               Создать
-            </MacOSButton>
+            </Button>
           </div>
         </MacOSCard>
     }
@@ -1469,7 +1468,7 @@ const DynamicPricingManager = () => {
 
       {/* Контент */}
       {loading ?
-      <MacOSLoadingSkeleton type="card" count={3} /> :
+      <Skeleton type="card" count={3} /> :
 
       <>
           {activeTab === 'rules' && renderRulesTab()}

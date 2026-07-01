@@ -33,8 +33,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
-import MacOSModal from '../ui/macos/MacOSModal.jsx';
-import MacOSButton from '../ui/macos/MacOSButton.jsx';
+import Modal from '../ui/macos/Modal.jsx';
+import Button from '../ui/macos/Button.jsx';
 
 const INTENT_CONFIG = {
   danger: {
@@ -98,7 +98,7 @@ export function ConfirmDialog({
   };
 
   return (
-    <MacOSModal
+    <Modal
       isOpen={isOpen}
       onClose={handleCancel}
       title={title}
@@ -200,23 +200,23 @@ export function ConfirmDialog({
         gap: '8px',
         marginTop: '20px',
       }}>
-        <MacOSButton
+        <Button
           variant="outline"
           size="md"
           onClick={handleCancel}
         >
           {cancelLabel}
-        </MacOSButton>
-        <MacOSButton
+        </Button>
+        <Button
           variant={config.confirmVariant}
           size="md"
           onClick={handleConfirm}
           disabled={isConfirmDisabled}
         >
           {confirmLabel}
-        </MacOSButton>
+        </Button>
       </div>
-    </MacOSModal>
+    </Modal>
   );
 }
 

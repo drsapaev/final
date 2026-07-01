@@ -14,10 +14,10 @@ import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSCheckbox,
-  Select
+  Button,
+  Input,
+  Checkbox,
+  Select,
 } from '../ui/macos';
 import {
   fetchPaymentProviderSettings,
@@ -184,7 +184,7 @@ const PaymentProviderSettings = () => {
               {providerName.toUpperCase()}
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={providerConfig.enabled}
                 onChange={() => toggleProviderEnabled(providerName)}
               />
@@ -197,7 +197,7 @@ const PaymentProviderSettings = () => {
             </div>
           </div>
 
-          <MacOSButton
+          <Button
             variant="outline"
             onClick={() => testProvider(providerName)}
             disabled={!providerConfig.enabled || loading}
@@ -210,7 +210,7 @@ const PaymentProviderSettings = () => {
           >
             <RefreshCw style={{ width: '16px', height: '16px' }} />
             Тест
-          </MacOSButton>
+          </Button>
         </div>
 
         {testResult && (
@@ -247,7 +247,7 @@ const PaymentProviderSettings = () => {
         {providerConfig.enabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MacOSCheckbox
+              <Checkbox
                 checked={providerConfig.test_mode}
                 onChange={(checked) => updateProviderSetting(providerName, 'test_mode', checked)}
               />
@@ -271,7 +271,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     Service ID
                   </label>
-                  <MacOSInput
+                  <Input
                     type="text"
                     value={providerConfig.service_id}
                     onChange={(e) => updateProviderSetting(providerName, 'service_id', e.target.value)}
@@ -290,7 +290,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     Merchant ID
                   </label>
-                  <MacOSInput
+                  <Input
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
@@ -310,14 +310,14 @@ const PaymentProviderSettings = () => {
                     Secret Key
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <MacOSInput
+                    <Input
                       type={showSecrets.click ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
                       style={{ width: '100%', paddingRight: '40px' }}
                     />
-                    <MacOSButton
+                    <Button
                       type="button"
                       variant="outline"
                       title={showSecrets.click ? 'Hide Click secret key' : 'Show Click secret key'}
@@ -339,7 +339,7 @@ const PaymentProviderSettings = () => {
                       ) : (
                         <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       )}
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </div>
 
@@ -353,7 +353,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     Base URL
                   </label>
-                  <MacOSInput
+                  <Input
                     type="url"
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
@@ -376,7 +376,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     Merchant ID
                   </label>
-                  <MacOSInput
+                  <Input
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
@@ -396,14 +396,14 @@ const PaymentProviderSettings = () => {
                     Secret Key
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <MacOSInput
+                    <Input
                       type={showSecrets.payme ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
                       style={{ width: '100%', paddingRight: '40px' }}
                     />
-                    <MacOSButton
+                    <Button
                       type="button"
                       variant="outline"
                       title={showSecrets.payme ? 'Hide Payme secret key' : 'Show Payme secret key'}
@@ -425,7 +425,7 @@ const PaymentProviderSettings = () => {
                       ) : (
                         <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                       )}
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </div>
 
@@ -439,7 +439,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     Base URL
                   </label>
-                  <MacOSInput
+                  <Input
                     type="url"
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
@@ -458,7 +458,7 @@ const PaymentProviderSettings = () => {
                   }}>
                     API URL
                   </label>
-                  <MacOSInput
+                  <Input
                     type="url"
                     value={providerConfig.api_url}
                     onChange={(e) => updateProviderSetting(providerName, 'api_url', e.target.value)}
@@ -502,7 +502,7 @@ const PaymentProviderSettings = () => {
             </h2>
           </div>
 
-          <MacOSButton
+          <Button
             onClick={saveSettings}
             disabled={loading}
             style={{
@@ -516,7 +516,7 @@ const PaymentProviderSettings = () => {
           >
             <Save style={{ width: '16px', height: '16px' }} />
             Сохранить
-          </MacOSButton>
+          </Button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

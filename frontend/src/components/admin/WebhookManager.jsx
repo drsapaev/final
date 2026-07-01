@@ -26,18 +26,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
+  Button,
+  Badge,
   SegmentedControl,
   MacOSStatCard,
-
-  MacOSInput,
+  Input,
   Select,
   MacOSEmptyState,
-  MacOSLoadingSkeleton,
-
-  MacOSModal } from
-'../ui/macos';
+  Skeleton,
+  Modal,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -182,50 +180,50 @@ const WebhookManager = () => {
   // Получение статуса badge
   const getStatusBadge = (status, isActive) => {
     if (!isActive) {
-      return <MacOSBadge variant="secondary">Неактивен</MacOSBadge>;
+      return <Badge variant="secondary">Неактивен</Badge>;
     }
 
     switch (status) {
       case 'active':
-        return <MacOSBadge variant="success">Активен</MacOSBadge>;
+        return <Badge variant="success">Активен</Badge>;
       case 'suspended':
-        return <MacOSBadge variant="warning">Приостановлен</MacOSBadge>;
+        return <Badge variant="warning">Приостановлен</Badge>;
       case 'failed':
-        return <MacOSBadge variant="error">Ошибка</MacOSBadge>;
+        return <Badge variant="error">Ошибка</Badge>;
       default:
-        return <MacOSBadge variant="secondary">{status}</MacOSBadge>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
   const getCallStatusBadge = (status) => {
     switch (status) {
       case 'success':
-        return <MacOSBadge variant="success">Успех</MacOSBadge>;
+        return <Badge variant="success">Успех</Badge>;
       case 'failed':
-        return <MacOSBadge variant="error">Ошибка</MacOSBadge>;
+        return <Badge variant="error">Ошибка</Badge>;
       case 'pending':
-        return <MacOSBadge variant="secondary">Ожидание</MacOSBadge>;
+        return <Badge variant="secondary">Ожидание</Badge>;
       case 'retrying':
-        return <MacOSBadge variant="warning">Повтор</MacOSBadge>;
+        return <Badge variant="warning">Повтор</Badge>;
       default:
-        return <MacOSBadge variant="secondary">{status}</MacOSBadge>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <MacOSLoadingSkeleton style={{ height: '32px', width: '256px' }} />
+        <Skeleton style={{ height: '32px', width: '256px' }} />
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '16px'
         }}>
-          <MacOSLoadingSkeleton style={{ height: '128px' }} />
-          <MacOSLoadingSkeleton style={{ height: '128px' }} />
-          <MacOSLoadingSkeleton style={{ height: '128px' }} />
+          <Skeleton style={{ height: '128px' }} />
+          <Skeleton style={{ height: '128px' }} />
+          <Skeleton style={{ height: '128px' }} />
         </div>
-        <MacOSLoadingSkeleton style={{ height: '384px' }} />
+        <Skeleton style={{ height: '384px' }} />
       </div>);
 
   }
@@ -247,10 +245,10 @@ const WebhookManager = () => {
             margin: '4px 0 0 0'
           }}>Настройка и мониторинг внешних интеграций</p>
         </div>
-        <MacOSButton onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Button onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Plus style={{ width: '16px', height: '16px' }} />
           Создать Webhook
-        </MacOSButton>
+        </Button>
       </div>
 
       {/* Статистика */}
@@ -323,7 +321,7 @@ const WebhookManager = () => {
               }}>
                   Поиск
                 </label>
-                <MacOSInput
+                <Input
                 type="text"
                 placeholder="Название или URL..."
                 value={filters.search}
@@ -380,13 +378,13 @@ const WebhookManager = () => {
               </div>
               
               <div style={{ display: 'flex', alignItems: 'end' }}>
-                <MacOSButton
+                <Button
                 onClick={() => setFilters({ status: '', event_type: '', search: '' })}
                 variant="outline"
                 style={{ width: '100%' }}>
 
                   Сбросить
-                </MacOSButton>
+                </Button>
               </div>
             </div>
           </MacOSCard>
@@ -436,15 +434,15 @@ const WebhookManager = () => {
                     
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                       {webhook.events.map((event, index) =>
-                  <MacOSBadge key={index} variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                  <Badge key={index} variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                           {event}
-                        </MacOSBadge>
+                        </Badge>
                   )}
                     </div>
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
-                    <MacOSButton
+                    <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -456,9 +454,9 @@ const WebhookManager = () => {
                   }}>
 
                       <Eye aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
                     
-                    <MacOSButton
+                    <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -470,9 +468,9 @@ const WebhookManager = () => {
                   }}>
 
                       <TestTube aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
                     
-                    <MacOSButton
+                    <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -484,10 +482,10 @@ const WebhookManager = () => {
                   }}>
 
                       <Edit aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
                     
                     {webhook.is_active ?
-                <MacOSButton
+                <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -496,9 +494,9 @@ const WebhookManager = () => {
                   onClick={() => handleDeactivateWebhook(webhook.id)}>
 
                         <Pause aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                      </MacOSButton> :
+                      </Button> :
 
-                <MacOSButton
+                <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -507,10 +505,10 @@ const WebhookManager = () => {
                   onClick={() => handleActivateWebhook(webhook.id)}>
 
                         <Play aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                      </MacOSButton>
+                      </Button>
                 }
                     
-                    <MacOSButton
+                    <Button
                   size="sm"
                   variant="outline"
                   type="button"
@@ -520,7 +518,7 @@ const WebhookManager = () => {
                   style={{ color: 'var(--mac-error)' }}>
 
                       <Trash2 aria-hidden="true" style={{ width: '16px', height: '16px' }} />
-                    </MacOSButton>
+                    </Button>
                   </div>
                 </div>
               </MacOSCard>
@@ -538,9 +536,9 @@ const WebhookManager = () => {
           }
           action={
           webhooks.length === 0 ?
-          <MacOSButton onClick={() => setShowCreateModal(true)}>
+          <Button onClick={() => setShowCreateModal(true)}>
                   Создать Webhook
-                  </MacOSButton> :
+                  </Button> :
           null
           }
           iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
@@ -560,7 +558,7 @@ const WebhookManager = () => {
           }}>
               Все вызовы webhook-ов
             </h2>
-            <MacOSButton
+            <Button
             onClick={() => {
               // Загружаем вызовы для всех webhook'ов
               Promise.all(webhooks.map((webhook) => loadWebhookCalls(webhook.id)));
@@ -570,7 +568,7 @@ const WebhookManager = () => {
 
               <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить
-            </MacOSButton>
+            </Button>
           </div>
 
           {/* Фильтры для вызовов */}
@@ -644,14 +642,14 @@ const WebhookManager = () => {
                       </span>
                       {getCallStatusBadge(call.status)}
                       {call.response_status_code &&
-                  <MacOSBadge variant="outline">
+                  <Badge variant="outline">
                           HTTP {call.response_status_code}
-                        </MacOSBadge>
+                        </Badge>
                   }
                       {selectedWebhook &&
-                  <MacOSBadge variant="secondary" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                  <Badge variant="secondary" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                           {selectedWebhook.name}
-                        </MacOSBadge>
+                        </Badge>
                   }
                     </div>
                     
@@ -707,7 +705,7 @@ const WebhookManager = () => {
           }}>
               Типы событий
             </h2>
-            <MacOSButton
+            <Button
             onClick={() => {
               // Обновляем список событий
               loadWebhooks();
@@ -717,7 +715,7 @@ const WebhookManager = () => {
 
               <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить
-            </MacOSButton>
+            </Button>
           </div>
 
           {/* Статистика событий */}
@@ -845,9 +843,9 @@ const WebhookManager = () => {
                     }}>
                         {event.name}
                       </h4>
-                      <MacOSBadge variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                      <Badge variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                         {event.type}
-                      </MacOSBadge>
+                      </Badge>
                     </div>
                     
                     <p style={{
@@ -866,9 +864,9 @@ const WebhookManager = () => {
                         {webhookCount} webhook{webhookCount === 1 ? '' : webhookCount < 5 ? 'а' : 'ов'} используют это событие
                       </span>
                       {webhookCount > 0 &&
-                    <MacOSBadge variant="success" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                    <Badge variant="success" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                           Активно
-                        </MacOSBadge>
+                        </Badge>
                     }
                     </div>
                   </div>);
@@ -881,7 +879,7 @@ const WebhookManager = () => {
 
       {/* Модальные окна */}
       {showCreateModal &&
-      <MacOSModal
+      <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Создать Webhook"
@@ -896,12 +894,12 @@ const WebhookManager = () => {
               Функционал создания webhook-а будет добавлен в следующей итерации
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <MacOSButton onClick={() => setShowCreateModal(false)}>
+              <Button onClick={() => setShowCreateModal(false)}>
               Закрыть
-              </MacOSButton>
+              </Button>
             </div>
           </div>
-        </MacOSModal>
+        </Modal>
       }
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}

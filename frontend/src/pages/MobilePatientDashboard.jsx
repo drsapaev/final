@@ -13,7 +13,9 @@ import {
 
   Settings } from
 'lucide-react';
-import { Card, Button, Badge } from '../components/ui/macos';
+import {
+  Card, Button, Badge,
+} from '../components/ui/macos';
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';

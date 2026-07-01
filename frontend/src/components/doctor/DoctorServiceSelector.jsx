@@ -15,7 +15,9 @@ import {
 
   AlertCircle } from
 'lucide-react';
-import { MacOSCard, MacOSButton, MacOSLoadingSkeleton } from '../ui/macos';
+import {
+  MacOSCard, Button, Skeleton,
+} from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -180,7 +182,7 @@ const DoctorServiceSelector = ({
   if (loading) {
     return (
       <MacOSCard style={{ padding: '24px' }}>
-        <MacOSLoadingSkeleton />
+        <Skeleton />
       </MacOSCard>);
 
   }
@@ -298,7 +300,7 @@ const DoctorServiceSelector = ({
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                    <MacOSButton
+                    <Button
                   type="button"
                   size="sm"
                   variant="ghost"
@@ -308,14 +310,14 @@ const DoctorServiceSelector = ({
                   disabled={service.quantity <= 1}>
 
                       <Minus aria-hidden="true" size={14} />
-                    </MacOSButton>
+                    </Button>
                     <span style={{
                   width: '32px',
                   textAlign: 'center',
                   fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)'
                 }}>{service.quantity}</span>
-                    <MacOSButton
+                    <Button
                   type="button"
                   size="sm"
                   variant="ghost"
@@ -324,7 +326,7 @@ const DoctorServiceSelector = ({
                   onClick={() => handleQuantityChange(service.id, service.quantity + 1)}>
 
                       <Plus aria-hidden="true" size={14} />
-                    </MacOSButton>
+                    </Button>
                   </div>
 
                   {/* Цена */}
@@ -370,7 +372,7 @@ const DoctorServiceSelector = ({
               }}>{service.currency}</span>
 
                   {/* Убрать услугу */}
-                  <MacOSButton
+                  <Button
                 type="button"
                 size="sm"
                 variant="ghost"
@@ -379,7 +381,7 @@ const DoctorServiceSelector = ({
                 onClick={() => handleServiceToggle(service)}>
 
                     <Minus aria-hidden="true" size={14} />
-                  </MacOSButton>
+                  </Button>
                 </div>
               </div>
           )}

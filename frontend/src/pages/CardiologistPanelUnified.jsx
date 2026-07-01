@@ -15,13 +15,13 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSLoadingSkeleton,
+  Button,
+  Badge,
+  Skeleton,
   MacOSEmptyState,
-  MacOSTextarea,
-  MacOSCheckbox } from
-'../components/ui/macos';
+  Textarea,
+  Checkbox,
+} from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
@@ -1496,7 +1496,7 @@ const MacOSCardiologistPanelUnified = () => {
                 </div>
 
                 {appointmentsLoading ?
-              <MacOSLoadingSkeleton type="table" count={5} /> :
+              <Skeleton type="table" count={5} /> :
               appointments.length === 0 ?
               <MacOSEmptyState
                 type="calendar"
@@ -1635,7 +1635,7 @@ const MacOSCardiologistPanelUnified = () => {
               {/* Действия */}
               <MacOSCard style={{ padding: '24px' }}>
                 <div className="flex justify-end" style={{ gap: '12px' }}>
-                  <MacOSButton
+                  <Button
                   variant="outline"
                   onClick={() => {
                     setSelectedPatient(null);
@@ -1643,8 +1643,8 @@ const MacOSCardiologistPanelUnified = () => {
                   }}>
 
                     Отменить
-                  </MacOSButton>
-                  <MacOSButton
+                  </Button>
+                  <Button
                   onClick={handleCompleteVisitFromEMR}
                   disabled={loading}>
 
@@ -1654,7 +1654,7 @@ const MacOSCardiologistPanelUnified = () => {
                   <Save size={16} style={{ marginRight: '8px' }} />
                   }
                     Завершить прием
-                  </MacOSButton>
+                  </Button>
                 </div>
               </MacOSCard>
             </div>
@@ -1668,9 +1668,9 @@ const MacOSCardiologistPanelUnified = () => {
               title="Выберите визит"
               description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
               action={
-              <MacOSButton variant="outline" onClick={() => goToTab('appointments')} style={{ marginTop: '16px' }}>
+              <Button variant="outline" onClick={() => goToTab('appointments')} style={{ marginTop: '16px' }}>
                     Перейти к записям
-                  </MacOSButton>
+                  </Button>
               } />
             </MacOSCard>
           }
@@ -1685,9 +1685,9 @@ const MacOSCardiologistPanelUnified = () => {
             gap: getSpacing('xl')
           }}>
               <div className="flex justify-end">
-                <MacOSButton onClick={() => setShowForm({ open: true, type: 'ecg' })}>
+                <Button onClick={() => setShowForm({ open: true, type: 'ecg' })}>
                   <Plus size={16} style={{ marginRight: '8px' }} /> Добавить ЭКГ
-                </MacOSButton>
+                </Button>
               </div>
               {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
               <ECGViewer
@@ -1738,10 +1738,10 @@ const MacOSCardiologistPanelUnified = () => {
                   }} />
                     Анализы крови
                   </h3>
-                  <MacOSButton onClick={openBloodTestForm}>
+                  <Button onClick={openBloodTestForm}>
                     <Plus size={16} style={{ marginRight: '8px' }} />
                     Новый анализ
-                  </MacOSButton>
+                  </Button>
                 </div>
 
                 {/* Небольшая аналитика по имеющимся анализам */}
@@ -1810,7 +1810,7 @@ const MacOSCardiologistPanelUnified = () => {
                       fontWeight: '500',
                       color: getColor('text')
                     }}>Анализ #{test.id}</h4>
-                          <MacOSBadge variant="info">{test.test_date}</MacOSBadge>
+                          <Badge variant="info">{test.test_date}</Badge>
                         </div>
                         <div style={{
                     display: 'grid',
@@ -2103,7 +2103,7 @@ const MacOSCardiologistPanelUnified = () => {
                   }}>
                         Интерпретация
                       </label>
-                      <MacOSTextarea
+                      <Textarea
                     value={bloodTestForm.interpretation}
                     onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
                     placeholder="Интерпретация результатов анализов"
@@ -2112,7 +2112,7 @@ const MacOSCardiologistPanelUnified = () => {
                     </div>
 
                     <div className="flex justify-end" style={{ gap: getSpacing('md') }}>
-                      <MacOSButton
+                      <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
@@ -2121,11 +2121,11 @@ const MacOSCardiologistPanelUnified = () => {
                     }}>
 
                         Отмена
-                      </MacOSButton>
-                      <MacOSButton type="submit">
+                      </Button>
+                      <Button type="submit">
                         <Save size={16} style={{ marginRight: '8px' }} />
                         Сохранить анализ
-                      </MacOSButton>
+                      </Button>
                     </div>
                   </form>
                 </MacOSCard>
@@ -2211,13 +2211,13 @@ const MacOSCardiologistPanelUnified = () => {
                           {selectedPatientLabel}
                         </p>
                       </div>
-                      <MacOSButton
+                      <Button
                         variant="outline"
                         onClick={loadPatientData}
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <RefreshCw size={16} />
                         Обновить
-                      </MacOSButton>
+                      </Button>
                     </div>
 
                     <div style={{
@@ -2227,14 +2227,14 @@ const MacOSCardiologistPanelUnified = () => {
                   marginBottom: getSpacing('lg')
                 }}>
                       {historyFilterOptions.map((option) => (
-                        <MacOSButton
+                        <Button
                           key={option.value}
                           variant={historyFilter === option.value ? 'primary' : 'outline'}
                           onClick={() => setHistoryFilter(option.value)}
                           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {option.label}
-                          <MacOSBadge variant="info">{option.count}</MacOSBadge>
-                        </MacOSButton>
+                          <Badge variant="info">{option.count}</Badge>
+                        </Button>
                       ))}
                     </div>
 
@@ -2282,13 +2282,13 @@ const MacOSCardiologistPanelUnified = () => {
                                 fontWeight: '500',
                                 color: getColor('text')
                               }}>{entry.title}</div>
-                              <MacOSBadge variant={entry.badgeVariant}>
+                              <Badge variant={entry.badgeVariant}>
                                 {entry.kind === 'attachments'
                                   ? 'Вложение'
                                   : entry.kind === 'ecg'
                                     ? 'ЭКГ'
                                     : 'Анализ'}
-                              </MacOSBadge>
+                              </Badge>
                             </div>
                             <div style={{
                               fontSize: getFontSize('sm'),
@@ -2317,17 +2317,17 @@ const MacOSCardiologistPanelUnified = () => {
                                 flexWrap: 'wrap'
                               }}>
                                 {canPreviewAttachment(entry.file) && (
-                                  <MacOSButton
+                                  <Button
                                     variant="outline"
                                     onClick={() => previewPatientFile(entry.file)}>
                                     Просмотр
-                                  </MacOSButton>
+                                  </Button>
                                 )}
-                                <MacOSButton
+                                <Button
                                   variant="outline"
                                   onClick={() => downloadPatientFile(entry.file)}>
                                   Скачать
-                                </MacOSButton>
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -2490,7 +2490,7 @@ const MacOSCardiologistPanelUnified = () => {
               color: 'var(--mac-text-primary)',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
             }}>
-                <MacOSCheckbox
+                <Checkbox
                 checked={settings.showEcgEchoTogether}
                 onChange={(e) => setSettings({ ...settings, showEcgEchoTogether: e.target.checked })} />
 
@@ -2523,8 +2523,8 @@ const MacOSCardiologistPanelUnified = () => {
             gap: getSpacing('sm'),
             marginTop: getSpacing('lg')
           }}>
-              <MacOSButton variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</MacOSButton>
-              <MacOSButton onClick={() => setSettingsOpen(false)}><Save size={16} style={{ marginRight: '8px' }} />Сохранить</MacOSButton>
+              <Button variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</Button>
+              <Button onClick={() => setSettingsOpen(false)}><Save size={16} style={{ marginRight: '8px' }} />Сохранить</Button>
             </div>
           </MacOSCard>
         }

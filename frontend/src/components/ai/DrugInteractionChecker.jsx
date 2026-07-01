@@ -21,14 +21,11 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-
-
-  MacOSBadge } from
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Badge,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
@@ -216,14 +213,14 @@ const DrugInteractionChecker = () => {
               <Pill style={{ width: '16px', height: '16px' }} />
               Препараты
             </h4>
-            <MacOSButton
+            <Button
             onClick={addMedication}
             variant="outline"
             style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
             
               <Plus style={{ width: '12px', height: '12px' }} />
               Добавить препарат
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -239,21 +236,21 @@ const DrugInteractionChecker = () => {
               gap: '12px',
               alignItems: 'center'
             }}>
-                  <MacOSInput
+                  <Input
                 type="text"
                 placeholder="Название препарата"
                 value={medication.name}
                 onChange={(e) => updateMedication(index, 'name', e.target.value)}
                 style={{ fontSize: 'var(--mac-font-size-xs)' }} />
               
-                  <MacOSInput
+                  <Input
                 type="text"
                 placeholder="Дозировка"
                 value={medication.dosage}
                 onChange={(e) => updateMedication(index, 'dosage', e.target.value)}
                 style={{ fontSize: 'var(--mac-font-size-xs)' }} />
               
-                  <MacOSInput
+                  <Input
                 type="text"
                 placeholder="Частота приема"
                 value={medication.frequency}
@@ -261,7 +258,7 @@ const DrugInteractionChecker = () => {
                 style={{ fontSize: 'var(--mac-font-size-xs)' }} />
               
                   {interactionData.medications.length > 1 &&
-              <MacOSButton
+              <Button
                 type="button"
                 title="Remove medication"
                 aria-label={`Remove medication ${index + 1}`}
@@ -270,7 +267,7 @@ const DrugInteractionChecker = () => {
                 style={{ padding: '4px', minWidth: 'auto' }}>
 
                       <Minus aria-hidden="true" style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
-                    </MacOSButton>
+                    </Button>
               }
                 </div>
               </MacOSCard>
@@ -309,7 +306,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={interactionData.patient_profile.age}
               onChange={(e) => setInteractionData((prev) => ({
@@ -329,7 +326,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={interactionData.patient_profile.gender}
               onChange={(e) => setInteractionData((prev) => ({
                 ...prev,
@@ -353,7 +350,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Вес (кг)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={interactionData.patient_profile.weight}
               onChange={(e) => setInteractionData((prev) => ({
@@ -373,7 +370,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Функция почек
               </label>
-              <MacOSSelect
+              <Select
               value={interactionData.patient_profile.kidney_function}
               onChange={(e) => setInteractionData((prev) => ({
                 ...prev,
@@ -408,7 +405,7 @@ const DrugInteractionChecker = () => {
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Аллергии
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={interactionData.patient_profile.allergies.join(', ')}
           onChange={(e) => setInteractionData((prev) => ({
@@ -424,7 +421,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Checking drug interactions' : 'Check drug interactions'}
           aria-label={loading ? 'Checking drug interactions' : 'Check drug interactions'}
@@ -453,7 +450,7 @@ const DrugInteractionChecker = () => {
                 Проверить взаимодействия
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -493,7 +490,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Препарат
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={safetyData.medication.name}
               onChange={(e) => setSafetyData((prev) => ({
@@ -514,7 +511,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Дозировка
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={safetyData.medication.dosage}
               onChange={(e) => setSafetyData((prev) => ({
@@ -535,7 +532,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Частота
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={safetyData.medication.frequency}
               onChange={(e) => setSafetyData((prev) => ({
@@ -580,7 +577,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={safetyData.patient_profile.age}
               onChange={(e) => setSafetyData((prev) => ({
@@ -600,7 +597,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={safetyData.patient_profile.gender}
               onChange={(e) => setSafetyData((prev) => ({
                 ...prev,
@@ -624,7 +621,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Беременность
               </label>
-              <MacOSSelect
+              <Select
               value={safetyData.patient_profile.pregnancy_status}
               onChange={(e) => setSafetyData((prev) => ({
                 ...prev,
@@ -649,7 +646,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Грудное вскармливание
               </label>
-              <MacOSSelect
+              <Select
               value={safetyData.patient_profile.breastfeeding}
               onChange={(e) => setSafetyData((prev) => ({
                 ...prev,
@@ -682,7 +679,7 @@ const DrugInteractionChecker = () => {
             <AlertTriangle style={{ width: '16px', height: '16px' }} />
             Заболевания
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={safetyData.conditions.join(', ')}
           onChange={(e) => setSafetyData((prev) => ({
@@ -695,7 +692,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Analyzing drug safety' : 'Analyze drug safety'}
           aria-label={loading ? 'Analyzing drug safety' : 'Analyze drug safety'}
@@ -724,7 +721,7 @@ const DrugInteractionChecker = () => {
                 Проверить безопасность
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -764,7 +761,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Препарат для замены
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={alternativesData.medication}
               onChange={(e) => setAlternativesData((prev) => ({
@@ -785,7 +782,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Причина замены
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={alternativesData.reason}
               onChange={(e) => setAlternativesData((prev) => ({
@@ -830,7 +827,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={alternativesData.patient_profile.age}
               onChange={(e) => setAlternativesData((prev) => ({
@@ -850,7 +847,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={alternativesData.patient_profile.gender}
               onChange={(e) => setAlternativesData((prev) => ({
                 ...prev,
@@ -868,7 +865,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Finding drug alternatives' : 'Find drug alternatives'}
           aria-label={loading ? 'Finding drug alternatives' : 'Find drug alternatives'}
@@ -897,7 +894,7 @@ const DrugInteractionChecker = () => {
                 Найти альтернативы
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -937,7 +934,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Препарат
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={dosageData.medication}
               onChange={(e) => setDosageData((prev) => ({
@@ -958,7 +955,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Показание
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={dosageData.indication}
               onChange={(e) => setDosageData((prev) => ({
@@ -1003,7 +1000,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={dosageData.patient_profile.age}
               onChange={(e) => setDosageData((prev) => ({
@@ -1023,7 +1020,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Вес (кг)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={dosageData.patient_profile.weight}
               onChange={(e) => setDosageData((prev) => ({
@@ -1043,7 +1040,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Рост (см)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={dosageData.patient_profile.height}
               onChange={(e) => setDosageData((prev) => ({
@@ -1087,7 +1084,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Креатинин (мкмоль/л)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={dosageData.patient_profile.creatinine}
               onChange={(e) => setDosageData((prev) => ({
@@ -1107,7 +1104,7 @@ const DrugInteractionChecker = () => {
             }}>
                 Клиренс креатинина (мл/мин)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={dosageData.patient_profile.creatinine_clearance}
               onChange={(e) => setDosageData((prev) => ({
@@ -1121,7 +1118,7 @@ const DrugInteractionChecker = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Calculating drug dosage' : 'Calculate drug dosage'}
           aria-label={loading ? 'Calculating drug dosage' : 'Calculate drug dosage'}
@@ -1150,7 +1147,7 @@ const DrugInteractionChecker = () => {
                 Рассчитать дозировку
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -1204,14 +1201,14 @@ const DrugInteractionChecker = () => {
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
           </h3>
-          <MacOSButton
+          <Button
             onClick={exportResult}
             variant="outline"
             style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
-          </MacOSButton>
+          </Button>
         </div>
 
         {/* Специальное отображение для взаимодействий */}
@@ -1276,13 +1273,13 @@ const DrugInteractionChecker = () => {
               }}>
                     {interaction.drug_1} ↔ {interaction.drug_2}
                   </h5>
-                  <MacOSBadge style={{
+                  <Badge style={{
                 backgroundColor: getSeverityColor(interaction.severity).textColor,
                 color: 'white',
                 fontSize: 'var(--mac-font-size-xs)'
               }}>
                     {interaction.severity}
-                  </MacOSBadge>
+                  </Badge>
                 </div>
                 <p style={{
               fontSize: 'var(--mac-font-size-sm)',

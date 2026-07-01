@@ -5,7 +5,6 @@ import {
   CardContent,
   Typography,
   Button,
-
   Badge,
   Dialog,
   DialogTitle,
@@ -15,14 +14,12 @@ import {
   CircularProgress,
   Input,
   Select,
-
   Switch,
   Textarea,
-
   Grid,
   List,
-  Table } from
-'./ui/macos';
+  Table,
+} from './ui/macos';
 import {
   TableHead,
   TableBody,

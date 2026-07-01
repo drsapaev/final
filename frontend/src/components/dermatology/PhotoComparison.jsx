@@ -5,13 +5,11 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import {
-
   Card,
   CardContent,
   Typography,
-
-  Badge } from
-'../ui/macos';
+  Badge,
+} from '../ui/macos';
 import {
   ArrowLeftRight,
 

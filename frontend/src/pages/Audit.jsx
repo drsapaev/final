@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
-import { AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input,
+} from '../components/ui/macos';
 
 /**
  * Аудит: список последних действий пользователей.

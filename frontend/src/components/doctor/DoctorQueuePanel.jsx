@@ -19,12 +19,12 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSLoadingSkeleton,
+  Button,
+  Badge,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert } from
-'../ui/macos';
+  Alert,
+} from '../ui/macos';
 import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
@@ -345,7 +345,7 @@ const DoctorQueuePanel = ({
   if (loading && !queueData) {
     return (
       <MacOSCard style={{ padding: '24px' }}>
-        <MacOSLoadingSkeleton type="card" count={3} />
+        <Skeleton type="card" count={3} />
       </MacOSCard>);
 
   }
@@ -364,7 +364,7 @@ const DoctorQueuePanel = ({
     <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Сообщения */}
       {message.text &&
-      <MacOSAlert
+      <Alert
         type={message.type === 'success' ? 'success' : 'error'}
         title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
         description={message.text}
@@ -418,9 +418,9 @@ const DoctorQueuePanel = ({
             }}>
               Статус очереди:
             </div>
-            <MacOSBadge variant={queueData.opened_at ? 'success' : 'warning'}>
+            <Badge variant={queueData.opened_at ? 'success' : 'warning'}>
               {queueData.opened_at ? 'Открыта' : 'Не открыта'}
-            </MacOSBadge>
+            </Badge>
           </div>
         </div>
 
@@ -517,10 +517,10 @@ const DoctorQueuePanel = ({
             }}>
               Пациенты в очереди
             </h3>
-            <MacOSButton variant="outline" onClick={loadQueueData}>
+            <Button variant="outline" onClick={loadQueueData}>
               <RefreshCw size={14} style={{ marginRight: '4px' }} />
               Обновить
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -619,9 +619,9 @@ const DoctorQueuePanel = ({
                         alignItems: 'center',
                         gap: '8px'
                       }}>
-                          <MacOSBadge variant="outline">
+                          <Badge variant="outline">
                             {source.icon} {source.label}
-                          </MacOSBadge>
+                          </Badge>
                           <span style={{
                           fontSize: 'var(--mac-font-size-xs)',
                           color: 'var(--mac-text-tertiary)'
@@ -640,10 +640,10 @@ const DoctorQueuePanel = ({
                   }}>
                       {/* Статус */}
                       <div style={{ textAlign: 'center' }}>
-                        <MacOSBadge variant={status.color}>
+                        <Badge variant={status.color}>
                           <StatusIcon size={14} style={{ marginRight: '4px' }} />
                           {status.label}
-                        </MacOSBadge>
+                        </Badge>
                         {entry.called_at &&
                       <div style={{
                         fontSize: 'var(--mac-font-size-xs)',
@@ -658,7 +658,7 @@ const DoctorQueuePanel = ({
                       {/* Действия */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {canCall &&
-                      <MacOSButton
+                      <Button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCallPatient(entry.id);
@@ -666,11 +666,11 @@ const DoctorQueuePanel = ({
                         
                             <Play size={14} style={{ marginRight: '4px' }} />
                             Вызвать
-                          </MacOSButton>
+                          </Button>
                       }
 
                         {canStartVisit &&
-                      <MacOSButton
+                      <Button
                         variant="outline"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -679,11 +679,11 @@ const DoctorQueuePanel = ({
                         
                             <Activity size={14} style={{ marginRight: '4px' }} />
                             Начать
-                          </MacOSButton>
+                          </Button>
                       }
 
                         {canComplete &&
-                      <MacOSButton
+                      <Button
                         variant="success"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -692,7 +692,7 @@ const DoctorQueuePanel = ({
                         
                             <CheckCircle size={14} style={{ marginRight: '4px' }} />
                             Завершить
-                          </MacOSButton>
+                          </Button>
                       }
                       </div>
                     </div>

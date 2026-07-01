@@ -14,8 +14,8 @@ import {
   Alert,
   Progress,
   Badge,
-  CircularProgress } from
-'../ui/macos';
+  CircularProgress,
+} from '../ui/macos';
 import {
   BarChart3,
   Smile,

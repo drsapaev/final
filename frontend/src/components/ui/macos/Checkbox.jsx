@@ -1,130 +1,148 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Check } from 'lucide-react';
 import PropTypes from 'prop-types';
 
 const Checkbox = React.forwardRef(({
-  checked: checkedProp,
-  defaultChecked = false,
-  onChange,
-  disabled = false,
+  className,
+  style,
+  size = 'md',
+  variant = 'default',
+  error,
+  disabled,
   label,
   description,
-  size = 'default',
-  variant = 'default',
-  className = '',
-  style = {},
-  id,
+  checked,
+  onChange,
   ...props
 }, ref) => {
-  void variant;
-  const [isChecked, setIsChecked] = useState(checkedProp ?? defaultChecked);
-
-  useEffect(() => {
-    if (typeof checkedProp === 'boolean') setIsChecked(checkedProp);
-  }, [checkedProp]);
-
-  const sizes = {
-    small: 14,
-    default: 16,
-    large: 18
+  const sizeStyles = {
+    sm: {
+      width: '16px',
+      height: '16px',
+      fontSize: 'var(--mac-font-size-xs)'
+    },
+    md: {
+      width: '20px',
+      height: '20px',
+      fontSize: 'var(--mac-font-size-sm)'
+    },
+    lg: {
+      width: '24px',
+      height: '24px',
+      fontSize: 'var(--mac-font-size-base)'
+    }
   };
 
-  const dimension = sizes[size] || sizes.default;
-  const controlId = id || `chk_${Math.random().toString(36).slice(2)}`;
-
-  const handleToggle = (e) => {
-    if (disabled) return;
-    const next = !isChecked;
-    if (typeof checkedProp !== 'boolean') setIsChecked(next);
-    onChange && onChange(next, e);
+  const variantStyles = {
+    default: {
+      border: '2px solid var(--mac-border)',
+      background: checked ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
+      color: checked ? 'white' : 'var(--mac-text-primary)'
+    },
+    filled: {
+      border: '2px solid transparent',
+      background: checked ? 'var(--mac-accent-blue)' : 'var(--mac-bg-secondary)',
+      color: checked ? 'white' : 'var(--mac-text-primary)'
+    },
+    error: {
+      border: '2px solid var(--mac-error)',
+      background: checked ? 'var(--mac-error)' : 'var(--mac-bg-primary)',
+      color: checked ? 'white' : 'var(--mac-text-primary)'
+    }
   };
 
-  const wrapperStyles = {
-    display: 'grid',
-    gridTemplateColumns: `${dimension}px 1fr`,
+  const currentVariant = error ? 'error' : variant;
+  const currentSize = sizeStyles[size];
+  const currentVariantStyle = variantStyles[currentVariant];
+
+  const checkboxStyle = {
+    display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    justifyContent: 'center',
+    borderRadius: 'var(--mac-radius-sm)',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+    position: 'relative',
+    ...currentSize,
+    ...currentVariantStyle,
+    ...(disabled && {
+      opacity: 0.6
+    }),
     ...style
   };
 
-  const boxStyles = {
-    width: dimension,
-    height: dimension,
-    borderRadius: '4px',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: 'var(--mac-border)',
-    background: 'var(--mac-bg-elev-1)',
-    position: 'relative',
-    boxShadow: 'var(--mac-shadow-1)',
-    transition: 'all 160ms cubic-bezier(0.2,0.8,0.2,1)'
+  const labelStyle = {
+    marginLeft: '8px',
+    fontSize: currentSize.fontSize,
+    fontWeight: 'var(--mac-font-weight-medium)',
+    color: disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    userSelect: 'none'
   };
 
-  const boxStylesChecked = isChecked ? {
-    borderColor: 'var(--mac-accent-blue-500)',
-    background: 'var(--mac-accent-blue-500)',
-    boxShadow: '0 0 0 2px color-mix(in srgb, var(--mac-accent-blue-500), transparent 70%)'
-  } : {};
-
-  const checkStyles = {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    transform: 'translate(-50%, -50%) scale(1)',
-    color: 'var(--mac-bg-primary)',
-    opacity: isChecked ? 1 : 0,
-    transition: 'opacity var(--mac-duration-fast) var(--mac-ease)',
-    pointerEvents: 'none'
-  };
-
-  const labelStyles = {
-    display: 'flex',
-    flexDirection: 'column'
-  };
-
-  const titleStyles = {
-    fontSize: '13px',
-    color: 'var(--mac-text-primary)',
-    lineHeight: 1.3
-  };
-
-  const descStyles = {
-    fontSize: '11px',
+  const descriptionStyle = {
+    marginLeft: '28px',
+    fontSize: 'var(--mac-font-size-xs)',
     color: 'var(--mac-text-secondary)',
-    marginTop: '2px'
+    marginTop: '2px',
+    lineHeight: '1.4'
   };
+
+  const handleClick = () => {
+    if (!disabled && onChange) {
+      onChange(!checked);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.key === ' ' || e.key === 'Enter') && !disabled) {
+      e.preventDefault();
+      onChange && onChange(!checked);
+    }
+  };
+
+  const iconSize = size === 'sm' ? 10 : size === 'md' ? 12 : 14;
 
   return (
-    <label className={`mac-checkbox ${className}`} style={wrapperStyles} htmlFor={controlId} aria-disabled={disabled}>
-      <input
-        ref={ref}
-        id={controlId}
-        type="checkbox"
-        checked={!!isChecked}
-        onChange={handleToggle}
-        disabled={disabled}
-        className="mac-checkbox-input"
-        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
-        {...props}
-      />
-      <span className="mac-checkbox-box" aria-hidden style={{ ...boxStyles, ...boxStylesChecked }} />
-      <span className="mac-checkbox-label" style={labelStyles}>
-        {label && <span style={titleStyles}>{label}</span>}
-        {description && <span style={descStyles}>{description}</span>}
-      </span>
-      <svg width={dimension} height={dimension} viewBox="0 0 20 20" style={checkStyles} aria-hidden>
-        <path d="M5 10.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <style>{`
-        .mac-checkbox:hover .mac-checkbox-box { box-shadow: var(--mac-shadow-2); }
-        .mac-checkbox-input:focus-visible + .mac-checkbox-box { outline: 2px solid color-mix(in srgb, var(--mac-accent-blue-500), transparent 60%); outline-offset: 2px; }
-        @media (prefers-reduced-motion: reduce) {
-          .mac-checkbox-box { transition: none; }
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'flex-start' }}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={disabled ? -1 : 0}
+        role="checkbox"
+        aria-checked={checked}
+        aria-disabled={disabled}>
+        
+        <div
+          ref={ref}
+          className={className}
+          style={checkboxStyle}
+          {...props}>
+          
+          {checked &&
+          <Check
+            size={iconSize}
+            style={{
+              color: 'white',
+              strokeWidth: 2.5
+            }} />
+
+          }
+        </div>
+        {label &&
+        <label style={labelStyle}>
+            {label}
+          </label>
         }
-      `}</style>
-    </label>
-  );
+      </div>
+      {description &&
+      <div style={descriptionStyle}>
+          {description}
+        </div>
+      }
+    </div>);
+
 });
 
 
@@ -132,10 +150,9 @@ Checkbox.propTypes = {
   ...(Checkbox.propTypes || {}),
   checked: PropTypes.any,
   className: PropTypes.any,
-  defaultChecked: PropTypes.any,
   description: PropTypes.any,
   disabled: PropTypes.any,
-  id: PropTypes.any,
+  error: PropTypes.any,
   label: PropTypes.any,
   onChange: PropTypes.any,
   size: PropTypes.any,
@@ -146,4 +163,3 @@ Checkbox.propTypes = {
 Checkbox.displayName = 'Checkbox';
 
 export default Checkbox;
-

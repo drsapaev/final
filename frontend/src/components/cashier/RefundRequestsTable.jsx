@@ -18,7 +18,9 @@ import {
   User,
   CreditCard
 } from 'lucide-react';
-import { AppEmpty, AppError, AppLoading, Badge, Button, MacOSTable, Select } from '../ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select,
+} from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
@@ -420,7 +422,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       )}
 
       {!loading && requests.length > 0 && (
-        <MacOSTable
+        <Table
           columns={columns}
           data={requests}
           sortable={false}

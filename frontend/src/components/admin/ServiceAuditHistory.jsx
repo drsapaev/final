@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
+  Button,
+  Badge,
   AppEmpty,
   AppError,
-  AppLoading
+  AppLoading,
 } from '../ui/macos';
 
 const ServiceAuditHistory = ({ serviceId, serviceName }) => {
@@ -186,7 +186,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           title="Не удалось загрузить историю изменений"
           description={errorMessage}
           action={
-            <MacOSButton
+            <Button
               variant="outline"
               size="sm"
               aria-label={`Повторить загрузку. ${refreshHistoryLabel}`}
@@ -194,7 +194,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
             >
               <RefreshCw size={14} style={{ marginRight: '6px' }} />
               Повторить
-            </MacOSButton>
+            </Button>
           }
         />
       </MacOSCard>
@@ -254,7 +254,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
             )}
           </div>
         </div>
-        <MacOSButton
+        <Button
           variant="outline"
           size="sm"
           aria-label={refreshHistoryLabel}
@@ -262,7 +262,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         >
           <RefreshCw size={14} style={{ marginRight: '6px' }} />
           Обновить
-        </MacOSButton>
+        </Button>
       </div>
 
       <div
@@ -315,9 +315,9 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                     }}>
                       {getActionLabel(item.action)}
                     </span>
-                    <MacOSBadge variant="outline" size="sm">
+                    <Badge variant="outline" size="sm">
                       {item.action}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
 
                   <div style={{

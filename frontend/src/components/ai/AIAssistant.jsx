@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Card, CardContent, Typography, Alert, Badge, CircularProgress, Button } from '../../components/ui/macos';
+import {
+  Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
+} from '../ui/macos';
 import { ChevronDown, ChevronUp, Brain, CheckCircle, Copy, RefreshCw } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import { apiClient } from '../../api/client';

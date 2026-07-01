@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon } from '../ui/macos';
+import {
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+} from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 
 const blankField = () => ({

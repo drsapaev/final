@@ -24,8 +24,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import MacOSEmptyState from '../ui/macos/MacOSEmptyState.jsx';
-import MacOSLoadingSkeleton from '../ui/macos/MacOSLoadingSkeleton.jsx';
-import MacOSButton from '../ui/macos/MacOSButton.jsx';
+import Skeleton from '../ui/macos/Skeleton.jsx';
+import Button from '../ui/macos/Button.jsx';
 
 const DEFAULT_SKELETON_ROWS = 4;
 
@@ -61,7 +61,7 @@ export function StateWrapper({
     return (
       <div style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {Array.from({ length: skeletonRows }).map((_, i) => (
-          <MacOSLoadingSkeleton
+          <Skeleton
             key={i}
             height={skeletonHeight}
             width="100%"
@@ -82,10 +82,10 @@ export function StateWrapper({
         message={errMsg}
         action={
           onRetry ? (
-            <MacOSButton variant="outline" size="md" onClick={onRetry}>
+            <Button variant="outline" size="md" onClick={onRetry}>
               <RefreshCw size={14} style={{ marginRight: 6 }} />
               Повторить
-            </MacOSButton>
+            </Button>
           ) : null
         }
       />
@@ -129,14 +129,14 @@ export function StateWrapper({
             Не удалось обновить данные. Показаны последние сохранённые значения.
           </span>
           {onRetry && (
-            <MacOSButton
+            <Button
               variant="outline"
               size="sm"
               onClick={onRetry}
             >
               <RefreshCw size={12} style={{ marginRight: 4 }} />
               Повторить
-            </MacOSButton>
+            </Button>
           )}
         </div>
       )}

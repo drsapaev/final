@@ -13,7 +13,9 @@ import {
   Award } from
 
 'lucide-react';
-import { Card as MacOSCard } from '../ui/macos';
+import {
+  Card as MacOSCard,
+} from '../ui/macos';
 import PropTypes from 'prop-types';
 
 

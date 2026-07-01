@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
+  Button,
+  Badge,
+  Input,
   Select,
   SegmentedControl,
-  MacOSLoadingSkeleton,
-  MacOSEmptyState } from
-
-'../ui/macos';
+  Skeleton,
+  MacOSEmptyState,
+} from '../ui/macos';
 import {
   Activity,
   Wifi,
@@ -319,7 +318,7 @@ const MedicalEquipmentManager = () => {
       }}>
           Обзор оборудования
         </h3>
-        <MacOSButton
+        <Button
         onClick={() => {loadDevices();loadOverview();}}
         disabled={loading}
         style={{
@@ -330,7 +329,7 @@ const MedicalEquipmentManager = () => {
         
           <RefreshCw size={16} />
           {loading ? 'Загрузка...' : 'Обновить'}
-        </MacOSButton>
+        </Button>
       </div>
 
       {overview ?
@@ -401,7 +400,7 @@ const MedicalEquipmentManager = () => {
           </MacOSCard>
         </div> :
 
-    <MacOSLoadingSkeleton type="card" count={4} />
+    <Skeleton type="card" count={4} />
     }
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
@@ -430,13 +429,13 @@ const MedicalEquipmentManager = () => {
                   {getDeviceTypeName(type)}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MacOSBadge variant="outline">{stats.total}</MacOSBadge>
-                  <MacOSBadge variant="success">{stats.online}</MacOSBadge>
+                  <Badge variant="outline">{stats.total}</Badge>
+                  <Badge variant="success">{stats.online}</Badge>
                 </div>
               </div>
         ) :
 
-        <MacOSLoadingSkeleton type="text" count={3} />
+        <Skeleton type="text" count={3} />
         }
         </MacOSCard>
 
@@ -450,30 +449,30 @@ const MedicalEquipmentManager = () => {
             Быстрые действия
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <MacOSButton
+            <Button
             onClick={() => setActiveTab('devices')}
             variant="outline"
             style={{ justifyContent: 'flex-start' }}>
             
               <Settings size={16} style={{ marginRight: '8px' }} />
               Управление устройствами
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
             onClick={() => setActiveTab('measurements')}
             variant="outline"
             style={{ justifyContent: 'flex-start' }}>
             
               <BarChart3 size={16} style={{ marginRight: '8px' }} />
               Просмотр измерений
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
             onClick={() => setActiveTab('measurement')}
             variant="outline"
             style={{ justifyContent: 'flex-start' }}>
             
               <Activity size={16} style={{ marginRight: '8px' }} />
               Выполнить измерение
-            </MacOSButton>
+            </Button>
           </div>
         </MacOSCard>
       </div>
@@ -489,10 +488,10 @@ const MedicalEquipmentManager = () => {
         color: 'var(--mac-text-primary)',
         margin: 0
       }}>Устройства</h3>
-        <MacOSButton onClick={loadDevices} disabled={loading}>
+        <Button onClick={loadDevices} disabled={loading}>
           <RefreshCw size={16} style={{ marginRight: '8px' }} />
           {loading ? 'Загрузка...' : 'Обновить'}
-        </MacOSButton>
+        </Button>
       </div>
 
       {/* Фильтры */}
@@ -552,7 +551,7 @@ const MedicalEquipmentManager = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: '8px'
           }}>Местоположение</label>
-            <MacOSInput
+            <Input
             id="location-filter"
             value={filters.location}
             onChange={(e) => setFilters({ ...filters, location: e.target.value })}
@@ -585,9 +584,9 @@ const MedicalEquipmentManager = () => {
                   }}>{getDeviceTypeName(device.device_type)}</p>
                   </div>
                 </div>
-                <MacOSBadge variant={getStatusBadgeVariant(device.status)}>
+                <Badge variant={getStatusBadgeVariant(device.status)}>
                   {getStatusText(device.status)}
-                </MacOSBadge>
+                </Badge>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)', marginBottom: '16px' }}>
@@ -599,16 +598,16 @@ const MedicalEquipmentManager = () => {
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {device.status === 'offline' ?
-              <MacOSButton
+              <Button
                 size="sm"
                 onClick={() => connectDevice(device.id)}
                 style={{ display: 'flex', alignItems: 'center' }}>
                 
                     <Wifi size={16} style={{ marginRight: '4px' }} />
                     Подключить
-                  </MacOSButton> :
+                  </Button> :
 
-              <MacOSButton
+              <Button
                 size="sm"
                 variant="outline"
                 onClick={() => disconnectDevice(device.id)}
@@ -616,10 +615,10 @@ const MedicalEquipmentManager = () => {
                 
                     <WifiOff size={16} style={{ marginRight: '4px' }} />
                     Отключить
-                  </MacOSButton>
+                  </Button>
               }
 
-                <MacOSButton
+                <Button
                 size="sm"
                 variant="outline"
                 onClick={() => calibrateDevice(device.id)}
@@ -627,16 +626,16 @@ const MedicalEquipmentManager = () => {
                 
                   <Wrench size={16} style={{ marginRight: '4px' }} />
                   Калибровка
-                </MacOSButton>
+                </Button>
 
-                <MacOSButton
+                <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setSelectedDevice(device)}>
                 
                   <Settings size={16} style={{ marginRight: '4px' }} />
                   Подробнее
-                </MacOSButton>
+                </Button>
               </div>
             </MacOSCard>);
 
@@ -698,7 +697,7 @@ const MedicalEquipmentManager = () => {
               color: 'var(--mac-text-primary)',
               marginBottom: '8px'
             }}>ID пациента (опционально)</label>
-              <MacOSInput
+              <Input
               id="measurement-patient"
               value={measurementForm.patient_id}
               onChange={(e) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
@@ -706,14 +705,14 @@ const MedicalEquipmentManager = () => {
             
             </div>
 
-            <MacOSButton
+            <Button
             onClick={takeMeasurement}
             disabled={!measurementForm.device_id}
             style={{ width: '100%' }}>
             
               <Activity size={16} style={{ marginRight: '8px' }} />
               Выполнить измерение
-            </MacOSButton>
+            </Button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -742,7 +741,7 @@ const MedicalEquipmentManager = () => {
                         <DeviceIcon size={16} style={{ color: 'var(--mac-blue)' }} />
                         <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>{device.name}</span>
                       </div>
-                      <MacOSBadge variant="success">Готов</MacOSBadge>
+                      <Badge variant="success">Готов</Badge>
                     </div>);
 
             })}
@@ -772,14 +771,14 @@ const MedicalEquipmentManager = () => {
             margin: 0
           }}>История измерений</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <MacOSButton onClick={loadMeasurements} disabled={loading}>
+            <Button onClick={loadMeasurements} disabled={loading}>
               <RefreshCw size={16} style={{ marginRight: '8px' }} />
               Обновить
-            </MacOSButton>
-            <MacOSButton variant="outline">
+            </Button>
+            <Button variant="outline">
               <Download size={16} style={{ marginRight: '8px' }} />
               Экспорт
-            </MacOSButton>
+            </Button>
           </div>
         </div>
 
@@ -810,9 +809,9 @@ const MedicalEquipmentManager = () => {
               
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <MacOSButton onClick={loadMeasurements}>
+              <Button onClick={loadMeasurements}>
                 Применить фильтры
-              </MacOSButton>
+              </Button>
             </div>
           </div>
         </MacOSCard>
@@ -824,14 +823,14 @@ const MedicalEquipmentManager = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <MacOSBadge variant="outline">{getDeviceTypeName(measurement.device_type)}</MacOSBadge>
+                    <Badge variant="outline">{getDeviceTypeName(measurement.device_type)}</Badge>
                     <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       {new Date(measurement.timestamp).toLocaleString()}
                     </span>
                     {measurement.quality_score &&
-                  <MacOSBadge variant={measurement.quality_score > 0.8 ? 'success' : 'warning'}>
+                  <Badge variant={measurement.quality_score > 0.8 ? 'success' : 'warning'}>
                         Качество: {Math.round(measurement.quality_score * 100)}%
-                      </MacOSBadge>
+                      </Badge>
                   }
                   </div>
 
@@ -986,9 +985,9 @@ const MedicalEquipmentManager = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <strong>Статус:</strong>
-                  <MacOSBadge variant={getStatusBadgeVariant(selectedDevice.status)} style={{ marginLeft: '8px' }}>
+                  <Badge variant={getStatusBadgeVariant(selectedDevice.status)} style={{ marginLeft: '8px' }}>
                     {getStatusText(selectedDevice.status)}
-                  </MacOSBadge>
+                  </Badge>
                 </div>
                 <div><strong>Местоположение:</strong> {selectedDevice.location || 'Не указано'}</div>
                 <div><strong>Тип подключения:</strong> {selectedDevice.connection_type}</div>
@@ -1008,9 +1007,9 @@ const MedicalEquipmentManager = () => {
                   {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]) =>
               <div key={test} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span>{test}</span>
-                      <MacOSBadge variant={result.passed ? 'success' : 'destructive'}>
+                      <Badge variant={result.passed ? 'success' : 'destructive'}>
                         {result.passed ? 'Пройден' : 'Ошибка'}
-                      </MacOSBadge>
+                      </Badge>
                     </div>
               )}
                 </div>
@@ -1018,27 +1017,27 @@ const MedicalEquipmentManager = () => {
           }
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <MacOSButton
+              <Button
               onClick={() => runDiagnostics(selectedDevice.id)}
               disabled={selectedDevice.status !== 'online'}>
               
                 <AlertTriangle size={16} style={{ marginRight: '8px' }} />
                 Диагностика
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               onClick={() => calibrateDevice(selectedDevice.id)}
               disabled={selectedDevice.status !== 'online'}
               variant="outline">
               
                 <Wrench size={16} style={{ marginRight: '8px' }} />
                 Калибровка
-              </MacOSButton>
-              <MacOSButton
+              </Button>
+              <Button
               variant="outline"
               onClick={() => setSelectedDevice(null)}>
               
                 Закрыть
-              </MacOSButton>
+              </Button>
             </div>
           </div>
         </div>

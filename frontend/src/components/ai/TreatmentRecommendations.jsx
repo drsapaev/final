@@ -19,14 +19,11 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea } from
-
-
-
-'../ui/macos';
+  Button,
+  Input,
+  Select,
+  Textarea,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
@@ -156,7 +153,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Возраст пациента
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={treatmentPlanData.patient_data.age}
               onChange={(e) => setTreatmentPlanData((prev) => ({
@@ -177,7 +174,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Пол
               </label>
-              <MacOSSelect
+              <Select
               value={treatmentPlanData.patient_data.gender}
               onChange={(e) => setTreatmentPlanData((prev) => ({
                 ...prev,
@@ -201,7 +198,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Вес (кг)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={treatmentPlanData.patient_data.weight}
               onChange={(e) => setTreatmentPlanData((prev) => ({
@@ -222,7 +219,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Диагноз
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={treatmentPlanData.diagnosis}
               onChange={(e) => setTreatmentPlanData((prev) => ({
@@ -252,7 +249,7 @@ const TreatmentRecommendations = () => {
             <AlertCircle style={{ width: '16px', height: '16px' }} />
             Аллергии
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={treatmentPlanData.patient_data.allergies.join(', ')}
           onChange={(e) => setTreatmentPlanData((prev) => ({
@@ -283,7 +280,7 @@ const TreatmentRecommendations = () => {
             <FileText style={{ width: '16px', height: '16px' }} />
             Сопутствующие заболевания
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={treatmentPlanData.patient_data.comorbidities.join(', ')}
           onChange={(e) => setTreatmentPlanData((prev) => ({
@@ -299,7 +296,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Generating treatment plan' : 'Generate treatment plan'}
           aria-label={loading ? 'Generating treatment plan' : 'Generate treatment plan'}
@@ -328,7 +325,7 @@ const TreatmentRecommendations = () => {
                 Создать план лечения
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -368,7 +365,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={medicationData.patient_profile.age}
               onChange={(e) => setMedicationData((prev) => ({
@@ -388,7 +385,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Состояние
               </label>
-              <MacOSInput
+              <Input
               type="text"
               value={medicationData.condition}
               onChange={(e) => setMedicationData((prev) => ({
@@ -418,7 +415,7 @@ const TreatmentRecommendations = () => {
             <FileText style={{ width: '16px', height: '16px' }} />
             Текущие препараты
           </h4>
-          <MacOSTextarea
+          <Textarea
           value={medicationData.current_medications.map((med) => `${med.name} ${med.dosage} ${med.frequency}`).join('\n')}
           onChange={(e) => {
             const lines = e.target.value.split('\n').filter(Boolean);
@@ -442,7 +439,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Optimizing medication therapy' : 'Optimize medication therapy'}
           aria-label={loading ? 'Optimizing medication therapy' : 'Optimize medication therapy'}
@@ -471,7 +468,7 @@ const TreatmentRecommendations = () => {
                 Оптимизировать терапию
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -496,7 +493,7 @@ const TreatmentRecommendations = () => {
             <TrendingUp style={{ width: '16px', height: '16px' }} />
             Текущие симптомы
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={effectivenessData.patient_response.symptoms.join(', ')}
           onChange={(e) => setEffectivenessData((prev) => ({
@@ -542,7 +539,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Качество жизни (1-10)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               min="1"
               max="10"
@@ -564,7 +561,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Приверженность лечению (%)
               </label>
-              <MacOSInput
+              <Input
               type="number"
               min="0"
               max="100"
@@ -580,7 +577,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Assessing treatment effectiveness' : 'Assess treatment effectiveness'}
           aria-label={loading ? 'Assessing treatment effectiveness' : 'Assess treatment effectiveness'}
@@ -609,7 +606,7 @@ const TreatmentRecommendations = () => {
                 Оценить эффективность
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -649,7 +646,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Возраст
               </label>
-              <MacOSInput
+              <Input
               type="number"
               value={lifestyleData.patient_profile.age}
               onChange={(e) => setLifestyleData((prev) => ({
@@ -669,7 +666,7 @@ const TreatmentRecommendations = () => {
             }}>
                 ИМТ
               </label>
-              <MacOSInput
+              <Input
               type="number"
               step="0.1"
               value={lifestyleData.patient_profile.bmi}
@@ -690,7 +687,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Уровень активности
               </label>
-              <MacOSSelect
+              <Select
               value={lifestyleData.patient_profile.activity_level}
               onChange={(e) => setLifestyleData((prev) => ({
                 ...prev,
@@ -715,7 +712,7 @@ const TreatmentRecommendations = () => {
             }}>
                 Курение
               </label>
-              <MacOSSelect
+              <Select
               value={lifestyleData.patient_profile.smoking_status}
               onChange={(e) => setLifestyleData((prev) => ({
                 ...prev,
@@ -749,7 +746,7 @@ const TreatmentRecommendations = () => {
             <AlertCircle style={{ width: '16px', height: '16px' }} />
             Заболевания
           </h4>
-          <MacOSInput
+          <Input
           type="text"
           value={lifestyleData.conditions.join(', ')}
           onChange={(e) => setLifestyleData((prev) => ({
@@ -762,7 +759,7 @@ const TreatmentRecommendations = () => {
         </MacOSCard>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <MacOSButton
+          <Button
           type="button"
           title={loading ? 'Generating lifestyle recommendations' : 'Get lifestyle recommendations'}
           aria-label={loading ? 'Generating lifestyle recommendations' : 'Get lifestyle recommendations'}
@@ -791,7 +788,7 @@ const TreatmentRecommendations = () => {
                 Получить рекомендации
               </>
           }
-          </MacOSButton>
+          </Button>
         </div>
       </div>
     </MacOSCard>;
@@ -845,14 +842,14 @@ const TreatmentRecommendations = () => {
             <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
           </h3>
-          <MacOSButton
+          <Button
             onClick={exportResult}
             variant="outline"
             style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
 
             <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
-          </MacOSButton>
+          </Button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

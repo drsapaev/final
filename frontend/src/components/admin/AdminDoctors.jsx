@@ -8,13 +8,12 @@ import notify from '../../services/notify';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
 import { useConfirm } from '../common/ConfirmDialog';
 import {
-  MacOSBadge,
-  MacOSButton,
+  Badge,
+  Button,
   MacOSCard,
   MacOSEmptyState,
-  MacOSInput,
-  MacOSLoadingSkeleton,
-  Button,
+  Input,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import logger from '../../utils/logger';
@@ -215,9 +214,9 @@ const AdminDoctors = () => {
               Аккаунты врачей, специализации, кабинеты и онлайн-лимиты.
             </p>
           </div>
-          <MacOSButton onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
+          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
             Добавить врача
-          </MacOSButton>
+          </Button>
         </div>
 
         <div
@@ -228,7 +227,7 @@ const AdminDoctors = () => {
             marginBottom: '24px',
           }}
         >
-          <MacOSInput
+          <Input
             type="text"
             placeholder="Поиск врачей..."
             value={searchTerm}
@@ -237,7 +236,7 @@ const AdminDoctors = () => {
             iconPosition="left"
             aria-label="Поиск врачей"
           />
-          <MacOSInput
+          <Input
             type="text"
             placeholder="Специализация..."
             value={filterSpecialization}
@@ -262,16 +261,16 @@ const AdminDoctors = () => {
 
         <div style={{ overflowX: 'auto' }}>
           {loading ? (
-            <MacOSLoadingSkeleton type="table" count={5} />
+            <Skeleton type="table" count={5} />
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
               title="Ошибка загрузки врачей"
               description="Не удалось загрузить список врачей. Проверьте соединение и попробуйте снова."
               action={
-                <MacOSButton onClick={refresh} startIcon={<RefreshCw size={16} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
                   Обновить
-                </MacOSButton>
+                </Button>
               }
             />
           ) : doctors.length === 0 ? (
@@ -284,9 +283,9 @@ const AdminDoctors = () => {
                   : 'В системе пока нет врачей.'
               }
               action={
-                <MacOSButton onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
+                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
                   Добавить первого врача
-                </MacOSButton>
+                </Button>
               }
             />
           ) : (
@@ -376,33 +375,33 @@ const AdminDoctors = () => {
                             </p>
                           ) : null}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                            <MacOSBadge variant={doctor.user?.is_active === false ? 'warning' : 'success'}>
+                            <Badge variant={doctor.user?.is_active === false ? 'warning' : 'success'}>
                               {doctor.user?.is_active === false ? 'Аккаунт неактивен' : 'Аккаунт активен'}
-                            </MacOSBadge>
-                            <MacOSBadge variant={doctor.cabinet ? 'info' : 'warning'}>
+                            </Badge>
+                            <Badge variant={doctor.cabinet ? 'info' : 'warning'}>
                               {doctor.cabinet ? `Кабинет ${doctor.cabinet}` : 'Кабинет не задан'}
-                            </MacOSBadge>
+                            </Badge>
                           </div>
                         </div>
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <MacOSBadge variant="info">
+                      <Badge variant="info">
                         {doctor.specialty || doctor.specialization || 'Не указано'}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <MacOSBadge variant="success">
+                      <Badge variant="success">
                         {getDepartmentLabel(doctor.specialty || doctor.department)}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={textCellStyle}>
                       {doctor.experience ? `${doctor.experience} лет` : 'Не указано'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <MacOSBadge variant={doctor.active ? 'success' : 'warning'}>
+                      <Badge variant={doctor.active ? 'success' : 'warning'}>
                         {doctor.active ? 'Активен' : 'Неактивен'}
-                      </MacOSBadge>
+                      </Badge>
                     </td>
                     <td style={textCellStyle}>{doctor.patientsCount || 0} пациентов</td>
                     <td

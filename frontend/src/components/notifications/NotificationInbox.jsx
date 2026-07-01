@@ -7,7 +7,9 @@ import {
   Search,
   Sparkles
 } from 'lucide-react';
-import { Select } from '../ui/macos';
+import {
+  Select,
+} from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 

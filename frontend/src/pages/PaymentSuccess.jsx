@@ -9,7 +9,9 @@ import {
   Receipt,
   Share2,
 } from 'lucide-react';
-import { Alert, Badge, Button, Card, CardContent } from '../components/ui/macos';
+import {
+  Alert, Badge, Button, Card, CardContent,
+} from '../components/ui/macos';
 
 // API клиент
 import { api as apiClient } from '../api/client';

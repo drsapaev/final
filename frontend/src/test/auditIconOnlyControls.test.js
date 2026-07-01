@@ -133,7 +133,7 @@ describe('icon-only controls accessibility audit', () => {
     const { report } = runAudit(
       `
         export function Example() {
-          return <MacOSButton type="button" aria-label="Close"><XIcon /></MacOSButton>;
+          return <Button type="button" aria-label="Close"><XIcon /></Button>;
         }
       `,
       ['--include-components'],

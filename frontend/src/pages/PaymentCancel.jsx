@@ -1,6 +1,8 @@
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Box, Card, CardContent, Typography, Button, Alert } from '../components/ui/macos';
+import {
+  Box, Card, CardContent, Typography, Button, Alert,
+} from '../components/ui/macos';
 import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
 
 const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';

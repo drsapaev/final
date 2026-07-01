@@ -21,17 +21,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSTextarea,
-  MacOSCheckbox,
+  Button,
+  Badge,
+  Input,
+  Textarea,
+  Checkbox,
   MacOSPagination,
-  MacOSModal,
-
+  Modal,
   Select,
-  Switch } from
-'../ui/macos';
+  Switch,
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import { getApiOrigin } from '../../api/runtime';
@@ -838,16 +837,16 @@ const DepartmentManagement = () => {
                             Управление отделениями
                         </h2>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <MacOSButton
+                            <Button
                 variant="primary"
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
                                 <Plus size={16} style={{ marginRight: '8px' }} />
                                 Добавить отделение
-                            </MacOSButton>
+                            </Button>
 
-                            <MacOSButton
+                            <Button
                 variant="secondary"
                 size="default"
                 onClick={handleExport}
@@ -855,10 +854,10 @@ const DepartmentManagement = () => {
                 
                                 <Download size={16} style={{ marginRight: '8px' }} />
                                 Экспорт
-                            </MacOSButton>
+                            </Button>
 
                             <label style={{ position: 'relative' }}>
-                                <MacOSButton
+                                <Button
                   variant="secondary"
                   size="default"
                   as="span"
@@ -867,7 +866,7 @@ const DepartmentManagement = () => {
                   
                                     <Upload size={16} style={{ marginRight: '8px' }} />
                                     Импорт
-                                </MacOSButton>
+                                </Button>
                                 <input
                   type="file"
                   aria-label="Import departments from CSV"
@@ -897,7 +896,7 @@ const DepartmentManagement = () => {
           }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
                             <Search size={16} style={{ color: 'var(--mac-text-secondary)' }} />
-                            <MacOSInput
+                            <Input
                 placeholder="Поиск по названию или ключу..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -917,14 +916,14 @@ const DepartmentManagement = () => {
               options={SORT_OPTIONS}
               style={{ minWidth: '140px' }} />
 
-                        <MacOSButton
+                        <Button
               variant="secondary"
               size="sm"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               title={sortOrder === 'asc' ? 'По возрастанию' : 'По убыванию'}>
               
                             {sortOrder === 'asc' ? '↑' : '↓'}
-                        </MacOSButton>
+                        </Button>
                     </div>
 
                     {showAddForm &&
@@ -944,7 +943,7 @@ const DepartmentManagement = () => {
                             </h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                 <div>
-                                    <MacOSInput
+                                    <Input
                   placeholder="Название (русский)"
                   value={formData.name_ru}
                   onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
@@ -961,7 +960,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div>
-                                    <MacOSInput
+                                    <Input
                   placeholder="Название (узбекский)"
                   value={formData.name_uz}
                   onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
@@ -978,7 +977,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div>
-                                    <MacOSInput
+                                    <Input
                   placeholder="Ключ (например, cardio)"
                   value={formData.key}
                   onChange={(e) => setFormData({ ...formData, key: e.target.value })}
@@ -998,7 +997,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div>
-                                    <MacOSInput
+                                    <Input
                   type="number"
                   placeholder="Порядок отображения"
                   value={formData.display_order}
@@ -1035,7 +1034,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div>
-                                    <MacOSInput
+                                    <Input
                   type="color"
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
@@ -1051,7 +1050,7 @@ const DepartmentManagement = () => {
                                     </label>
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <MacOSTextarea
+                                    <Textarea
                   placeholder="Описание отделения (опционально)"
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -1088,7 +1087,7 @@ const DepartmentManagement = () => {
                                 </h4>
 
                                 <div style={{ marginBottom: '16px' }}>
-                                    <MacOSCheckbox
+                                    <Checkbox
                   checked={serviceMapping.create_service}
                   onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
                   label="Создать новую услугу при создании отделения" />
@@ -1098,7 +1097,7 @@ const DepartmentManagement = () => {
                                 {serviceMapping.create_service &&
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                         <div>
-                                            <MacOSInput
+                                            <Input
                     placeholder="Название услуги"
                     value={serviceMapping.service_name}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
@@ -1111,14 +1110,14 @@ const DepartmentManagement = () => {
                     options={CATEGORY_OPTIONS} />
                                         </div>
                                         <div>
-                                            <MacOSInput
+                                            <Input
                     placeholder="Код услуги (например, K01, L01)"
                     value={serviceMapping.service_code_pattern}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
                   
                                         </div>
                                         <div>
-                                            <MacOSInput
+                                            <Input
                     type="number"
                     placeholder="Цена услуги"
                     value={serviceMapping.service_price}
@@ -1126,7 +1125,7 @@ const DepartmentManagement = () => {
                   
                                         </div>
                                         <div style={{ gridColumn: '1 / -1' }}>
-                                            <MacOSInput
+                                            <Input
                     placeholder="Queue tag (опционально, например: ecg, cardiology_common)"
                     value={serviceMapping.queue_tag}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
@@ -1156,18 +1155,18 @@ const DepartmentManagement = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                                <MacOSButton variant="primary" onClick={handleAddDepartment}>
+                                <Button variant="primary" onClick={handleAddDepartment}>
                                     <Save size={16} style={{ marginRight: '8px' }} />
                                     Сохранить
-                                </MacOSButton>
-                                <MacOSButton variant="secondary" onClick={() => {
+                                </Button>
+                                <Button variant="secondary" onClick={() => {
                 setShowAddForm(false);
                 setFormData(DEFAULT_FORM);
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
                                     <X size={16} style={{ marginRight: '8px' }} />
                                     Отмена
-                                </MacOSButton>
+                                </Button>
                             </div>
                         </div>
           }
@@ -1193,34 +1192,34 @@ const DepartmentManagement = () => {
                                 Выбрано: {selectedDepartments.length}
                             </span>
 
-                            <MacOSButton
+                            <Button
               variant="danger"
               size="sm"
               onClick={handleBulkDelete}>
               
                                 <Trash2 size={14} style={{ marginRight: '6px' }} />
                                 Удалить
-                            </MacOSButton>
+                            </Button>
 
-                            <MacOSButton
+                            <Button
               variant="success"
               size="sm"
               onClick={() => handleBulkActivate(true)}>
               
                                 <CheckCircle size={14} style={{ marginRight: '6px' }} />
                                 Активировать
-                            </MacOSButton>
+                            </Button>
 
-                            <MacOSButton
+                            <Button
               variant="warning"
               size="sm"
               onClick={() => handleBulkActivate(false)}>
               
                                 <XCircle size={14} style={{ marginRight: '6px' }} />
                                 Деактивировать
-                            </MacOSButton>
+                            </Button>
 
-                            <MacOSButton
+                            <Button
               variant="secondary"
               size="sm"
               onClick={() => {
@@ -1230,7 +1229,7 @@ const DepartmentManagement = () => {
               
                                 <X size={14} style={{ marginRight: '6px' }} />
                                 Очистить
-                            </MacOSButton>
+                            </Button>
                         </div>
           }
 
@@ -1258,7 +1257,7 @@ const DepartmentManagement = () => {
                     color: 'var(--mac-text-primary)',
                     width: '40px'
                   }}>
-                                        <MacOSCheckbox
+                                        <Checkbox
                       checked={selectAll}
                       onChange={(e) => handleSelectAll(e.target.checked)} />
                     
@@ -1342,7 +1341,7 @@ const DepartmentManagement = () => {
                       }}>
                       
                                             <td style={{ padding: '12px 16px' }}>
-                                                <MacOSCheckbox
+                                                <Checkbox
                           checked={selectedDepartments.includes(dept.id)}
                           onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)} />
                         
@@ -1390,10 +1389,10 @@ const DepartmentManagement = () => {
                                                 </div>
                                             </td>
                                             <td style={{ padding: '12px 16px' }}>
-                                                <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
+                                                <Badge variant="secondary">{dept.key || dept.code}</Badge>
                                             </td>
                                             <td style={{ padding: '12px 16px' }}>
-                                                <MacOSInput
+                                                <Input
                           type="number"
                           value={dept.display_order || 999}
                           onChange={(e) => {
@@ -1415,7 +1414,7 @@ const DepartmentManagement = () => {
                                             </td>
                                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                    <MacOSButton
+                                                    <Button
                             size="sm"
                             variant="secondary"
                             aria-label={`Edit department ${dept.name_ru || dept.name || dept.key}`}
@@ -1423,8 +1422,8 @@ const DepartmentManagement = () => {
                             title="Редактировать отделение">
                             
                                                         <Edit2 size={16} />
-                                                    </MacOSButton>
-                                                    <MacOSButton
+                                                    </Button>
+                                                    <Button
                             size="sm"
                             variant="danger"
                             aria-label={`Delete department ${dept.name_ru || dept.name || dept.key}`}
@@ -1432,7 +1431,7 @@ const DepartmentManagement = () => {
                             title="Удалить отделение">
                             
                                                         <Trash2 size={16} />
-                                                    </MacOSButton>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>);
@@ -1500,7 +1499,7 @@ const DepartmentManagement = () => {
             </MacOSCard>
 
             {/* Модальное окно редактирования отделения */}
-            <MacOSModal
+            <Modal
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
@@ -1514,7 +1513,7 @@ const DepartmentManagement = () => {
         
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
-                        <MacOSInput
+                        <Input
               label="Название (русский)"
               placeholder="Название (русский)"
               value={formData.name_ru}
@@ -1532,7 +1531,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div>
-                        <MacOSInput
+                        <Input
               label="Название (узбекский)"
               placeholder="Название (узбекский)"
               value={formData.name_uz}
@@ -1550,7 +1549,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div>
-                        <MacOSInput
+                        <Input
               label="Ключ"
               placeholder="Ключ (например, cardio)"
               value={formData.key}
@@ -1571,7 +1570,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div>
-                        <MacOSInput
+                        <Input
               label="Порядок отображения"
               type="number"
               placeholder="Порядок отображения"
@@ -1609,7 +1608,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div>
-                        <MacOSInput
+                        <Input
               label="Цвет"
               type="color"
               value={formData.color}
@@ -1618,7 +1617,7 @@ const DepartmentManagement = () => {
             
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
-                        <MacOSTextarea
+                        <Textarea
               label="Описание"
               placeholder="Описание отделения (опционально)"
               value={formData.description || ''}
@@ -1656,7 +1655,7 @@ const DepartmentManagement = () => {
                     </h4>
 
                     <div style={{ marginBottom: '16px' }}>
-                        <MacOSCheckbox
+                        <Checkbox
               checked={serviceMapping.create_service}
               onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
               label="Создать новую услугу" />
@@ -1666,7 +1665,7 @@ const DepartmentManagement = () => {
                     {serviceMapping.create_service &&
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <div>
-                                <MacOSInput
+                                <Input
                 label="Название услуги"
                 placeholder="Название услуги"
                 value={serviceMapping.service_name}
@@ -1689,7 +1688,7 @@ const DepartmentManagement = () => {
                 options={CATEGORY_OPTIONS} />
                             </div>
                             <div>
-                                <MacOSInput
+                                <Input
                 label="Код услуги"
                 placeholder="Код услуги (например, K01, L01)"
                 value={serviceMapping.service_code_pattern}
@@ -1697,7 +1696,7 @@ const DepartmentManagement = () => {
               
                             </div>
                             <div>
-                                <MacOSInput
+                                <Input
                 label="Цена услуги"
                 type="number"
                 placeholder="Цена услуги"
@@ -1706,7 +1705,7 @@ const DepartmentManagement = () => {
               
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
-                                <MacOSInput
+                                <Input
                 label="Queue tag (опционально)"
                 placeholder="Queue tag (например: ecg, cardiology_common)"
                 value={serviceMapping.queue_tag}
@@ -1744,7 +1743,7 @@ const DepartmentManagement = () => {
           paddingTop: '16px',
           borderTop: '1px solid var(--mac-border)'
         }}>
-                    <MacOSButton
+                    <Button
             variant="secondary"
             onClick={() => {
               setShowEditModal(false);
@@ -1755,16 +1754,16 @@ const DepartmentManagement = () => {
             }}>
             
                         Отмена
-                    </MacOSButton>
-                    <MacOSButton
+                    </Button>
+                    <Button
             variant="primary"
             onClick={handleUpdateDepartment}>
             
                         <Save size={16} style={{ marginRight: '8px' }} />
                         Сохранить изменения
-                    </MacOSButton>
+                    </Button>
                 </div>
-            </MacOSModal>
+            </Modal>
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
             {confirmDialog}
         </div>

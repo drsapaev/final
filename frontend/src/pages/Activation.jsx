@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
-import { AppEmpty, AppError, AppLoading, Button, Select } from '../components/ui/macos';
+import {
+  AppEmpty, AppError, AppLoading, Button, Select,
+} from '../components/ui/macos';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';

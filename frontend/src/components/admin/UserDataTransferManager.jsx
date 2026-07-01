@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, MacOSInput, MacOSCheckbox, SegmentedControl } from '../ui/macos';
+import {
+  Card, Button, Input, Checkbox, SegmentedControl,
+} from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
@@ -250,7 +252,7 @@ const UserDataTransferManager = () => {
         </h3>
         
         <div style={{ position: 'relative' }}>
-          <MacOSInput
+          <Input
           type="text"
           placeholder="Введите имя, телефон или email..."
           value={searchQuery}
@@ -535,7 +537,7 @@ const UserDataTransferManager = () => {
         onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
         onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
           
-              <MacOSCheckbox
+              <Checkbox
             checked={selectedDataTypes.includes(dataType.key)}
             onChange={(checked) => {
               if (checked) {

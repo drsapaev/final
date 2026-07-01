@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSCheckbox,
-  Select
+  Button,
+  Input,
+  Checkbox,
+  Select,
 } from '../ui/macos';
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
@@ -168,9 +168,9 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
               )}
             </>
           )}
-          <MacOSButton onClick={onComplete}>
+          <Button onClick={onComplete}>
             Закрыть
-          </MacOSButton>
+          </Button>
         </div>
       </MacOSCard>
     );
@@ -281,7 +281,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                       }}>
                         {field.label}
                       </label>
-                      <MacOSInput
+                      <Input
                         type="number"
                         value={updates[fieldKey] || ''}
                         onChange={(e) => handleFieldChange(fieldKey, parseFloat(e.target.value) || 0)}
@@ -322,7 +322,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
                 if (field.type === 'boolean') {
                   return (
-                    <MacOSCheckbox
+                    <Checkbox
                       key={fieldKey}
                       id={fieldKey}
                       checked={updates[fieldKey] || false}
@@ -348,7 +348,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
           }}>
             Комментарий (опционально)
           </label>
-          <MacOSInput
+          <Input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -364,17 +364,17 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
         justifyContent: 'flex-end',
         gap: '12px'
       }}>
-        <MacOSButton variant="outline" onClick={onCancel} disabled={loading}>
+        <Button variant="outline" onClick={onCancel} disabled={loading}>
           <X size={16} style={{ marginRight: '8px' }} />
           Отменить
-        </MacOSButton>
-        <MacOSButton
+        </Button>
+        <Button
           onClick={handleSubmit}
           disabled={loading || selectedFields.size === 0}
         >
           <Save size={16} style={{ marginRight: '8px' }} />
           {loading ? 'Сохранение...' : `Обновить ${selectedServices.length} услуг`}
-        </MacOSButton>
+        </Button>
       </div>
     </MacOSCard>
   );

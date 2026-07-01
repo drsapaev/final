@@ -14,15 +14,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  MacOSButton,
-  MacOSInput,
-  MacOSCheckbox,
-  MacOSLoadingSkeleton,
+  Button,
+  Input,
+  Checkbox,
+  Skeleton,
   MacOSEmptyState,
-  MacOSAlert,
-  MacOSBadge,
-  MacOSModal,
-  MacOSStatCard
+  Alert,
+  Badge,
+  Modal,
+  MacOSStatCard,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
@@ -119,7 +119,7 @@ const BenefitSettings = () => {
               Настройки льгот
             </h2>
           </div>
-          <MacOSLoadingSkeleton height="600px" />
+          <Skeleton height="600px" />
         </MacOSCard>
       </div>
     );
@@ -150,10 +150,10 @@ const BenefitSettings = () => {
             title="Не удалось загрузить настройки"
             description="Проверьте подключение к серверу и попробуйте обновить страницу"
             action={
-              <MacOSButton onClick={loadSettings} variant="primary">
+              <Button onClick={loadSettings} variant="primary">
                 <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Попробовать снова
-              </MacOSButton>
+              </Button>
             }
           />
         </MacOSCard>
@@ -171,7 +171,7 @@ const BenefitSettings = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Критическая ошибка */}
           {error && (
-            <MacOSAlert
+            <Alert
               type="error"
               title="Ошибка загрузки"
               message={error}
@@ -221,7 +221,7 @@ const BenefitSettings = () => {
                 </div>
               )}
 
-              <MacOSButton
+              <Button
                 onClick={loadSettings}
                 disabled={loading}
                 variant="outline"
@@ -238,7 +238,7 @@ const BenefitSettings = () => {
                   animation: loading ? 'spin 1s linear infinite' : 'none'
                 }} />
                 Обновить
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -277,12 +277,12 @@ const BenefitSettings = () => {
                     }}>
                       Повторные визиты
                     </h3>
-                    <MacOSBadge
+                    <Badge
                       variant={settings.repeat_visit_discount > 0 ? 'success' : 'secondary'}
                       size="sm"
                     >
                       {settings.repeat_visit_discount > 0 ? 'Активны' : 'Неактивны'}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
                   <p style={{
                     fontSize: 'var(--mac-font-size-sm)',
@@ -317,7 +317,7 @@ const BenefitSettings = () => {
                         transform: 'translateY(-50%)',
                         color: 'var(--mac-text-tertiary)'
                       }} />
-                      <MacOSInput
+                      <Input
                         type="number"
                         min="1"
                         max="365"
@@ -370,7 +370,7 @@ const BenefitSettings = () => {
                         transform: 'translateY(-50%)',
                         color: 'var(--mac-text-tertiary)'
                       }} />
-                      <MacOSInput
+                      <Input
                         type="number"
                         min="0"
                         max="100"
@@ -469,12 +469,12 @@ const BenefitSettings = () => {
                     }}>
                       Льготные визиты
                     </h3>
-                    <MacOSBadge
+                    <Badge
                       variant={settings.benefit_consultation_free ? 'success' : 'warning'}
                       size="sm"
                     >
                       {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
-                    </MacOSBadge>
+                    </Badge>
                   </div>
                   <p style={{
                     fontSize: 'var(--mac-font-size-sm)',
@@ -490,7 +490,7 @@ const BenefitSettings = () => {
                 {/* Льготные консультации бесплатны */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <MacOSCheckbox
+                    <Checkbox
                       checked={settings.benefit_consultation_free}
                       onChange={(checked) => handleInputChange('benefit_consultation_free', checked)}
                     />
@@ -518,7 +518,7 @@ const BenefitSettings = () => {
                 {/* Автоодобрение All Free */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <MacOSCheckbox
+                    <Checkbox
                       checked={settings.all_free_auto_approve}
                       onChange={(checked) => handleInputChange('all_free_auto_approve', checked)}
                     />
@@ -647,7 +647,7 @@ const BenefitSettings = () => {
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {hasChanges() && (
-                <MacOSButton
+                <Button
                   onClick={resetSettings}
                   variant="outline"
                   disabled={saving}
@@ -659,10 +659,10 @@ const BenefitSettings = () => {
                   }}
                 >
                   Отменить
-                </MacOSButton>
+                </Button>
               )}
 
-              <MacOSButton
+              <Button
                 onClick={saveSettings}
                 disabled={saving || !hasChanges()}
                 style={{
@@ -684,7 +684,7 @@ const BenefitSettings = () => {
                   <Save style={{ width: '16px', height: '16px' }} />
                 )}
                 {saving ? 'Сохранение...' : 'Сохранить настройки'}
-              </MacOSButton>
+              </Button>
             </div>
           </div>
 
@@ -788,7 +788,7 @@ const BenefitSettings = () => {
       </MacOSCard>
 
       {/* Модальное окно подтверждения */}
-      <MacOSModal
+      <Modal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title="Подтверждение изменений"
@@ -810,14 +810,14 @@ const BenefitSettings = () => {
             justifyContent: 'flex-end',
             gap: '12px'
           }}>
-            <MacOSButton
+            <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}
               disabled={saving}
             >
               Отмена
-            </MacOSButton>
-            <MacOSButton
+            </Button>
+            <Button
               onClick={confirmSave}
               disabled={saving}
               aria-label="Confirm benefit settings save"
@@ -842,10 +842,10 @@ const BenefitSettings = () => {
                   Подтвердить
                 </>
               )}
-            </MacOSButton>
+            </Button>
           </div>
         </div>
-      </MacOSModal>
+      </Modal>
     </div>
   );
 };

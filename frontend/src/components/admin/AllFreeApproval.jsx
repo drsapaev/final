@@ -15,7 +15,9 @@ import {
   Package,
   Bell } from
 'lucide-react';
-import { Card, Badge, Button, Select } from '../ui/macos';
+import {
+  Card, Badge, Button, Select,
+} from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';

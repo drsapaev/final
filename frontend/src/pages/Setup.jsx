@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { MacOSButton, MacOSCard } from '../components/ui/macos';
+import {
+  Button, MacOSCard,
+} from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
 import logger from '../utils/logger';
 
@@ -341,9 +343,9 @@ export default function Setup() {
                 </button>
               </div>
             ) : null}
-            <MacOSButton type="submit" variant="primary" disabled={isSubmitDisabled} title={submitTitle}>
+            <Button type="submit" variant="primary" disabled={isSubmitDisabled} title={submitTitle}>
               {status.loading ? 'Сохраняем...' : 'Завершить настройку'}
-            </MacOSButton>
+            </Button>
           </div>
         </form>
       </MacOSCard>
