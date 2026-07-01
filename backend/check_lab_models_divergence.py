@@ -219,21 +219,34 @@ def main() -> int:
                 LIMIT 5
             """)).fetchall()
 
-            print(f"  {'Patient ID':<12}  {'Имя':<30}  {'Битых':>6}  {'Последний finalize':<20}")
-            print(f"  {'-'*12}  {'-'*30}  {'-'*6}  {'-'*20}")
+            # P-01: маскируем PII (имена пациентов) — CodeQL alert: вывод
+            # sensitive data в clear text. Скрипт может попасть в логи,
+            # видимые другим сотрудникам. Достаточно patient_id для поиска
+            # в admin-панели + первая буква имени для различения.
+            # first_name/last_name остаются в SELECT только для mask_name.
+            def mask_name(first, last):
+                first = (first or "").strip()
+                last = (last or "").strip()
+                if not first and not last:
+                    return "—"
+                masked_first = first[:1] + "." if first else ""
+                masked_last = last[:1] + "." if last else ""
+                return f"{masked_first} {masked_last}".strip()
+
+            print(f"  {'Patient ID':<12}  {'Имя (маск.)':<14}  {'Битых':>6}  {'Последний finalize':<20}")
+            print(f"  {'-'*12}  {'-'*14}  {'-'*6}  {'-'*20}")
             for row in rows:
                 # row = (patient_id, first_name, last_name, broken_count, last_finalized)
                 patient_id = row[0]
-                name = f"{row[1] or ''} {row[2] or ''}".strip() or "—"
+                masked = mask_name(row[1], row[2])
                 broken_count = row[3]
                 last_fin = str(row[4])[:19] if row[4] else "—"
-                print(f"  {patient_id:<12}  {name:<30}  {broken_count:>6}  {last_fin:<20}")
-            # Упрощённый список для копирования:
+                print(f"  {patient_id:<12}  {masked:<14}  {broken_count:>6}  {last_fin:<20}")
+            # Упрощённый список для копирования (только patient_id, без PII):
             print()
-            print("  Упрощённый список для копирования:")
+            print("  Упрощённый список для копирования (только patient_id):")
             for row in rows:
-                name = f"{row[1] or ''} {row[2] or ''}".strip() or "—"
-                print(f"    patient_id={row[0]}  {name}  битых={row[3]}")
+                print(f"    patient_id={row[0]}  битых={row[3]}")
 
         # === 6. Сводка ===
         print("\n" + "=" * 70)
