@@ -34,6 +34,20 @@ async function request(path, options = {}) {
 }
 
 export const labReportingApi = {
+  // P-03 fix: lab-specific façade для очереди лаборатории.
+  // Раньше LabPanel делал прямой fetch к /registrar/queues/today?department=lab.
+  // Теперь использует этот метод — собственный контракт, собственная RBAC,
+  // нормализация в lab-специфичный формат на backend.
+  // Возвращает { entries: [...], total, date, timezone }.
+  listQueueToday(targetDate = null) {
+    const search = new URLSearchParams();
+    if (targetDate) {
+      search.set('target_date', targetDate);
+    }
+    const suffix = search.size ? `?${search.toString()}` : '';
+    return request(`/lab/queue/today${suffix}`);
+  },
+
   listOrders(params = {}) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {

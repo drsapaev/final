@@ -237,6 +237,114 @@ def list_lab_orders(
     return service.list_orders(status=status, patient_id=patient_id, limit=limit, offset=offset)
 
 
+# P-03 fix: lab-specific façade для очереди лаборатории.
+#
+# Раньше frontend (LabPanel.jsx:207) делал прямой fetch к
+# /registrar/queues/today?department=lab. Это создавало 3 проблемы:
+#   1. Жёсткая связка: любое изменение формата ответа registrar endpoint
+#      молча ломало панель лаборатории (regression-тесты registrar этого
+#      не покрывали).
+#   2. RBAC-конфликт: если админ убирал роль Lab из /registrar/queues,
+#      лаборатория «слепла» без видимой причины.
+#   3. Бизнес-логика фильтрации «что считать лабораторной записью»
+#      была размазана между backend (department=lab) и frontend
+#      (formatAppointmentEntry normalize).
+#
+# Façade решает все 3 проблемы: собственный контракт, собственная RBAC,
+# нормализация в lab-специфичный формат на backend.
+#
+# Внутренне делегирует к существующей функции get_today_queues из
+# registrar_integration, чтобы не дублировать ~1700 строк логики.
+# Возвращает плоский массив записей (а не nested queues[]) — это
+# упрощает frontend и убирает промежуточную нормализацию.
+@router.get("/queue/today")
+def list_lab_queue_today(
+    target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD), по умолчанию сегодня"),
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Lab", "Doctor")),
+):
+    """
+    Получить лабораторную очередь на указанную дату.
+
+    Façade над /registrar/queues/today?department=lab с собственным
+    контрактом и RBAC. Возвращает плоский массив записей, нормализованных
+    в формат, ожидаемый LabPanel (с latest_lab_report, service_details и т.д.).
+
+    Доступ: Admin, Lab, Doctor.
+    """
+    # Импортируем внутри функции, чтобы избежать circular import
+    # (registrar_integration импортирует много зависимостей).
+    from app.api.v1.endpoints.registrar_integration import get_today_queues
+
+    # Делегируем к существующей функции с явным department=lab.
+    # current_user передаём как есть — RBAC уже проверена этим endpoint'ом.
+    raw_payload = get_today_queues(
+        target_date=target_date,
+        department="lab",
+        db=db,
+        current_user=user,
+    )
+
+    # Нормализуем nested {queues: [{entries: [...]}]} → плоский массив.
+    # Каждая запись получает поля, которые frontend ожидает после
+    # formatAppointmentEntry (см. LabPanel.jsx:35).
+    flat_entries = []
+    for queue in raw_payload.get("queues", []):
+        queue_specialty = queue.get("specialty")
+        for entry in queue.get("entries", []):
+            # Если registrar endpoint уже отдал latest_lab_report — берём как есть.
+            # Если нет — оставляем null; frontend сам подтянет через
+            # /lab/report-instances?patient_id=... при выборе записи.
+            latest_lab_report = entry.get("latest_lab_report")
+
+            flat_entries.append({
+                # Идентификаторы
+                "id": entry.get("id"),
+                "appointment_id": entry.get("appointment_id"),
+                "visit_id": entry.get("visit_id"),
+                "patient_id": entry.get("patient_id"),
+                # Пациент
+                "patient_fio": entry.get("patient_name")
+                    or entry.get("patient_fio")
+                    or "",
+                "patient_phone": entry.get("phone", ""),
+                "patient_birth_year": entry.get("patient_birth_year", ""),
+                "address": entry.get("address", ""),
+                # Услуги
+                "services": entry.get("services", []),
+                "service_codes": entry.get("service_codes", []),
+                "service_details": entry.get("service_details", []),
+                "service_name": entry.get("service_name", ""),
+                "service_id": entry.get("service_id"),
+                # Статусы
+                "status": entry.get("status"),
+                "queue_status": entry.get("status"),
+                "status_source": "queue",
+                "specialty": queue_specialty,
+                "payment_status": entry.get("payment_status"),
+                # Время
+                "appointment_time": entry.get("visit_time", "")
+                    or entry.get("appointment_time", ""),
+                "created_at": entry.get("created_at"),
+                # Лабораторный бланк (если registrar его отдал)
+                "latest_lab_report": latest_lab_report,
+                "lab_report_status": latest_lab_report.get("status") if latest_lab_report else None,
+                "report_status_source": "lab-report" if latest_lab_report else None,
+                "report_instance_id": latest_lab_report.get("id") if latest_lab_report else None,
+                "report_template_name": latest_lab_report.get("template_name", "") if latest_lab_report else "",
+                "flagged_findings_count": latest_lab_report.get("flagged_findings_count", 0) if latest_lab_report else 0,
+                "critical_findings_count": latest_lab_report.get("critical_findings_count", 0) if latest_lab_report else 0,
+                "max_flag_severity": latest_lab_report.get("max_flag_severity") if latest_lab_report else None,
+            })
+
+    return {
+        "entries": flat_entries,
+        "total": len(flat_entries),
+        "date": raw_payload.get("date"),
+        "timezone": raw_payload.get("timezone", "Asia/Tashkent"),
+    }
+
+
 @router.get("/catalog/units", response_model=list[LabCatalogUnitOut])
 def list_lab_catalog_units(
     db: Session = Depends(get_db),
