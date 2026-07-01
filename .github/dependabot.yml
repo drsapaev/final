@@ -27,12 +27,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-        excludes:
-          - "fastapi"
-          - "pydantic"
-          - "SQLAlchemy"
-          - "alembic"
-          - "psycopg"
     ignore:
       # Major versions: manual review required (breaking changes likely)
       - dependency-name: "*"
@@ -115,12 +109,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-        excludes:
-          # Keep these as standalone PRs (security-sensitive or breaking-prone)
-          - "react"
-          - "react-dom"
-          - "react-router"
-          - "react-router-dom"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
