@@ -29,6 +29,8 @@ import {
 import LabStatusStepper from './LabStatusStepper';
 import LabReportActionsBar from './LabReportActionsBar';
 import LabReportHistoryPanel from './LabReportHistoryPanel';
+// P-01 fix: AI-анализ перенесён из LabResultsManager в LabReportWorkbench.
+import LabReportAIAnalysis from './LabReportAIAnalysis';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -456,20 +458,30 @@ export default function LabReportWorkbench({
                 </div>
 
                 {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
-                <LabReportActionsBar
-                  saving={saving}
-                  busyAction={busyAction}
-                  canSaveDraft={canSaveDraft}
-                  canMarkReady={canMarkReady}
-                  canFinalize={canFinalize}
-                  canRevise={canRevise}
-                  canPrint={canPrint}
-                  onSaveDraft={handleSaveDraft}
-                  onMarkReady={handleMarkReady}
-                  onFinalize={handleFinalize}
-                  onRevise={handleRevise}
-                  onPrint={handlePrint}
-                />
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <LabReportActionsBar
+                    saving={saving}
+                    busyAction={busyAction}
+                    canSaveDraft={canSaveDraft}
+                    canMarkReady={canMarkReady}
+                    canFinalize={canFinalize}
+                    canRevise={canRevise}
+                    canPrint={canPrint}
+                    onSaveDraft={handleSaveDraft}
+                    onMarkReady={handleMarkReady}
+                    onFinalize={handleFinalize}
+                    onRevise={handleRevise}
+                    onPrint={handlePrint}
+                  />
+                  {/* P-01 fix: AI-анализ бланка. Перенесён из LabResultsManager
+                      с сохранением P-02 fix (блокировка при отсутствии возраста/пола).
+                      Использует patient_snapshot из activeInstance — отдельный
+                      запрос GET /patients/{id} не нужен. */}
+                  <LabReportAIAnalysis
+                    activeInstance={activeInstance}
+                    notify={notify}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
