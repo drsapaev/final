@@ -554,8 +554,8 @@ const styles = {
   },
   tabActive: {
     color: '#fff',
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: 'var(--mac-accent-blue, #3b82f6)',
+    borderColor: 'var(--mac-accent-blue, #3b82f6)',
   },
   results: {
     maxWidth: 1000,
@@ -608,7 +608,7 @@ const styles = {
   patientId: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#3b82f6',
+    color: 'var(--mac-accent-blue, #3b82f6)',
     backgroundColor: '#eff6ff',
     padding: '4px 8px',
     borderRadius: 6,
