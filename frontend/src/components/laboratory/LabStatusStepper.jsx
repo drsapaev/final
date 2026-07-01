@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { Icon } from '../../ui/macos';
+import { Icon } from '../ui/macos';
 
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
