@@ -17,6 +17,7 @@ from app.models.lab import (
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
+    LabResult,
 )
 from app.models.patient import Patient
 from app.models.service import Service
@@ -86,6 +87,108 @@ class TestLabReportingService:
         assert revised.status == "DRAFT"
         assert revised.supersedes_instance_id == printed_twice.id
         assert len(revised.values) == len(printed_twice.values)
+
+    def test_finalize_creates_legacy_lab_result_projection(
+        self, db_session, test_patient, test_visit
+    ):
+        """P-01 bridge: finalize() должен создавать LabResult projection
+        для legacy потребителей (mobile app, EMR, statistics).
+
+        Проверяет:
+          - После finalize в lab_results появляются записи
+          - Количество = количеству заполненных LabReportValue
+          - Маппинг полей корректный (test_name, value, unit, ref_range)
+          - abnormal = True для значений с resolved_flag
+          - Idempotent: повторный вызов не создаёт дубликаты
+        """
+        test_patient.sex = "M"
+        test_patient.birth_date = date(1990, 1, 1)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        templates = service.list_templates()
+        cbc_template = next(template for template in templates if template.code == "cbc_oak")
+
+        instance = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": cbc_template.id,
+            }
+        )
+
+        instance, updated_values = service.bulk_upsert_values(
+            instance.id,
+            [
+                {"field_key": "hgb", "value_text": "100"},  # below ref → flag
+                {"field_key": "wbc", "value_text": "5.2"},  # within ref → no flag
+            ],
+        )
+
+        # Очищаем возможные legacy LabResult для чистоты теста
+        db_session.execute(
+            delete(LabResult).where(LabResult.order_id == instance.order_id)
+        )
+        db_session.commit()
+
+        # До finalize — нет LabResult projection
+        before_count = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert before_count == 0, "LabResult не должен существовать до finalize"
+
+        # Act: finalize должен создать projection
+        finalized = service.finalize(instance.id)
+        assert finalized.status == "FINALIZED"
+
+        # Assert: созданы 2 LabResult (по числу заполненных values)
+        legacy_results = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .order_by(LabResult.test_code)
+            .all()
+        )
+        assert len(legacy_results) == 2, (
+            f"Expected 2 LabResult projections, got {len(legacy_results)}"
+        )
+
+        # Проверяем маппинг полей
+        hgb_legacy = next(r for r in legacy_results if r.test_code == "hgb")
+        wbc_legacy = next(r for r in legacy_results if r.test_code == "wbc")
+
+        # hgb: value=100, abnormal=True (ниже референса 110-160)
+        assert hgb_legacy.value == "100"
+        assert hgb_legacy.abnormal is True, (
+            "hgb=100 ниже референса 110-160, должен быть abnormal=True"
+        )
+        assert hgb_legacy.ref_range is not None, "ref_range должен быть заполнен"
+        assert hgb_legacy.test_name, "test_name должен быть не пустой"
+
+        # wbc: value=5.2, abnormal=False (в пределах референса)
+        assert wbc_legacy.value == "5.2"
+        assert wbc_legacy.abnormal is False, (
+            "wbc=5.2 в пределах референса, должен быть abnormal=False"
+        )
+
+        # Idempotent: повторный finalize невозможен (state machine),
+        # но проверим, что повторный вызов _sync_legacy_lab_results
+        # не создаёт дубликаты (защита по existing check).
+        # Для этого вызовем приватный метод напрямую с тем же instance.
+        field_map = service._field_map(finalized.template_version)
+        service._sync_legacy_lab_results(finalized, field_map)
+        db_session.commit()
+
+        after_idempotent_count = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert after_idempotent_count == 2, (
+            f"Повторный sync не должен создавать дубликаты, "
+            f"expected 2, got {after_idempotent_count}"
+        )
 
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient
