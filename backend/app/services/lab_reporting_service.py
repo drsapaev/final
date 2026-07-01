@@ -735,9 +735,19 @@ class LabReportingService:
             if effective_value in (None, ""):
                 continue
 
-            # value_numeric имеет приоритет для numeric fields, иначе value_text
+            # value_numeric имеет приоритет для numeric fields, иначе value_text.
+            # Нормализуем Decimal: LabReportValue.value_numeric хранится как
+            # Numeric(18, 4), поэтому str(Decimal('100')) = '100.0000'.
+            # Для legacy LabResult.value (String(128)) убираем trailing zeros,
+            # чтобы mobile app показывал '100', а не '100.0000'.
             if value.value_numeric is not None:
-                result_value = str(value.value_numeric)
+                numeric_str = str(value.value_numeric)
+                # Decimal('100.0000') → '100', Decimal('5.2000') → '5.2'
+                if '.' in numeric_str:
+                    numeric_str = numeric_str.rstrip('0').rstrip('.')
+                    if not numeric_str or numeric_str == '-':
+                        numeric_str = '0'
+                result_value = numeric_str
             else:
                 result_value = value.value_text or ""
 
