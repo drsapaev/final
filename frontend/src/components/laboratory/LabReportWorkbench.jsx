@@ -6,7 +6,6 @@ import {
 import { labReportingApi } from '../../api/labReporting';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';
-import { useNavigationGuard } from '../../hooks/useNavigationGuard';
 import {
   formatLabStatus,
   formatSeverityLabel,
@@ -89,13 +88,20 @@ export default function LabReportWorkbench({
     return false;
   }, [activeInstance, draftValues, signerSnapshot]);
 
-  // Navigation guard: предотвращает потерю данных при refresh/close/switch.
-  // isDirty уже возвращает false если нет activeInstance — отдельная
-  // проверка canEditActiveInstance не нужна (она определяется ниже).
-  useNavigationGuard({
-    isDirty,
-    message: 'В бланке есть несохранённые изменения. Уйти со страницы?',
-  });
+  // Navigation guard: предотвращает потерю данных при refresh/close.
+  // Используем beforeunload напрямую (без useNavigationGuard) —
+  // useNavigationGuard требует <Router> context, что ломает unit-тесты.
+  // Переключение табов внутри SPA не теряет state (LabPanel хранит
+  // selectedAppointment/activeInstance в useState).
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const publishedTemplates = useMemo(
     () => templates.filter((template) => template.published_version_id || template.draft_version_id),
