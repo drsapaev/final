@@ -17,6 +17,7 @@ from app.models.lab import (
     LabReportSection,
     LabReportTemplate,
     LabReportTemplateVersion,
+    LabResult,
 )
 from app.models.patient import Patient
 from app.models.service import Service
@@ -86,6 +87,128 @@ class TestLabReportingService:
         assert revised.status == "DRAFT"
         assert revised.supersedes_instance_id == printed_twice.id
         assert len(revised.values) == len(printed_twice.values)
+
+    def test_finalize_creates_legacy_lab_result_projection(
+        self, db_session, test_patient, test_visit
+    ):
+        """P-01 bridge: finalize() должен создавать LabResult projection
+        для legacy потребителей (mobile app, EMR, statistics).
+
+        Проверяет:
+          - После finalize в lab_results появляются записи
+          - Количество = количеству заполненных LabReportValue
+          - Маппинг полей корректный (test_name, value, unit, ref_range)
+          - abnormal соответствует resolved_flag (bool projection)
+          - Idempotent: повторный вызов не создаёт дубликаты
+        """
+        test_patient.sex = "M"
+        test_patient.birth_date = date(1990, 1, 1)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        templates = service.list_templates()
+        cbc_template = next(template for template in templates if template.code == "cbc_oak")
+
+        instance = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": cbc_template.id,
+            }
+        )
+
+        instance, updated_values = service.bulk_upsert_values(
+            instance.id,
+            [
+                {"field_key": "hgb", "value_text": "100"},
+                {"field_key": "wbc", "value_text": "5.2"},
+            ],
+        )
+
+        # Очищаем возможные legacy LabResult для чистоты теста
+        db_session.execute(
+            delete(LabResult).where(LabResult.order_id == instance.order_id)
+        )
+        db_session.commit()
+
+        # До finalize — нет LabResult projection
+        before_count = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert before_count == 0, "LabResult не должен существовать до finalize"
+
+        # Act: finalize должен создать projection
+        finalized = service.finalize(instance.id)
+        assert finalized.status == "FINALIZED"
+
+        # Перезагружаем finalized из БД, чтобы получить свежие values
+        # с установленными resolved_flag после finalize
+        db_session.refresh(finalized)
+
+        # Assert: созданы 2 LabResult (по числу заполненных values)
+        legacy_results = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .order_by(LabResult.test_code)
+            .all()
+        )
+        assert len(legacy_results) == 2, (
+            f"Expected 2 LabResult projections, got {len(legacy_results)}"
+        )
+
+        # Проверяем маппинг полей
+        hgb_legacy = next(r for r in legacy_results if r.test_code == "hgb")
+        wbc_legacy = next(r for r in legacy_results if r.test_code == "wbc")
+
+        # hgb: value=100 (нормализованный Decimal без trailing zeros)
+        assert hgb_legacy.value == "100", (
+            f"Expected '100', got '{hgb_legacy.value}' — Decimal normalization issue"
+        )
+        # abnormal = bool(resolved_flag). Flag может быть None или 'low' —
+        # не делаем предположений о конкретном flag, проверяем только что
+        # поле abnormal существует и это bool.
+        assert isinstance(hgb_legacy.abnormal, bool), (
+            f"abnormal must be bool, got {type(hgb_legacy.abnormal)}"
+        )
+        assert hgb_legacy.ref_range is not None, "ref_range должен быть заполнен"
+        assert hgb_legacy.test_name, "test_name должен быть не пустой"
+
+        # wbc: value=5.2 (нормализованный)
+        assert wbc_legacy.value == "5.2", (
+            f"Expected '5.2', got '{wbc_legacy.value}' — Decimal normalization issue"
+        )
+        assert isinstance(wbc_legacy.abnormal, bool)
+
+        # abnormal должен соответствовать resolved_flag на source value
+        hgb_source = next(v for v in finalized.values if v.field_key == "hgb")
+        wbc_source = next(v for v in finalized.values if v.field_key == "wbc")
+        assert hgb_legacy.abnormal == bool(hgb_source.resolved_flag), (
+            "abnormal must mirror resolved_flag: "
+            f"hgb.abnormal={hgb_legacy.abnormal}, flag={hgb_source.resolved_flag}"
+        )
+        assert wbc_legacy.abnormal == bool(wbc_source.resolved_flag), (
+            "abnormal must mirror resolved_flag: "
+            f"wbc.abnormal={wbc_legacy.abnormal}, flag={wbc_source.resolved_flag}"
+        )
+
+        # Idempotent: повторный finalize невозможен (state machine),
+        # но проверим, что повторный вызов _sync_legacy_lab_results
+        # не создаёт дубликаты (защита по existing check).
+        field_map = service._field_map(finalized.template_version)
+        service._sync_legacy_lab_results(finalized, field_map)
+        db_session.commit()
+
+        after_idempotent_count = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert after_idempotent_count == 2, (
+            f"Повторный sync не должен создавать дубликаты, "
+            f"expected 2, got {after_idempotent_count}"
+        )
 
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient

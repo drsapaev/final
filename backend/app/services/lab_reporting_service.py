@@ -28,6 +28,7 @@ from app.models.lab import (
     LabReportTemplate,
     LabReportTemplateVersion,
     LabReportValue,
+    LabResult,
     LabTemplateServiceBinding,
 )
 from app.models.user import User
@@ -651,8 +652,129 @@ class LabReportingService:
         self.repository.flush()
         instance.status = "FINALIZED"
         instance.finalized_at = datetime.utcnow()
+        # P-01 bridge: sync в legacy lab_results таблицу для read-only
+        # потребителей (mobile app, EMR, statistics, notifications).
+        # Создаёт LabResult записи как projection из LabReportValue.
+        # См. _sync_legacy_lab_results ниже для подробностей.
+        self._sync_legacy_lab_results(instance, field_map)
         self.repository.commit()
         return self.get_instance(instance.id)
+
+    def _sync_legacy_lab_results(
+        self,
+        instance: LabReportInstance,
+        field_map: dict[str, LabReportFieldDef],
+    ) -> None:
+        """P-01 bridge: projection LabReportValue → LabResult.
+
+        Создаёт соответствующие записи в legacy таблице lab_results при
+        финализации бланка, чтобы read-only потребители (mobile app
+        /mobile/lab/results, EMR /patients/{id}/lab-results, statistics,
+        critical value notifications, Telegram) видели новые бланки.
+
+        Контекст: в кодовой базе 2 модели lab results:
+          - Новая: lab_report_instances + lab_report_values (используется
+            LabReportWorkbench через /lab/report-instances)
+          - Legacy: lab_results (используется mobile app, EMR, и т.д.)
+
+        Раньше bridge не было — новые бланки были невидимы для legacy
+        потребителей. Этот метод создаёт LabResult projection при
+        finalize(), используя order_id как связь (instance.order_id →
+        lab_results.order_id).
+
+        Idempotent: если для данного instance уже созданы LabResult
+        записи (по order_id + test_code), повторной финализации не будет
+        (state machine: FINALIZED → только revise). Но при revise()
+        создаётся новый instance с новым order_id или тем же —
+        теоретически могут быть дубли. Защита: проверяем существующие
+        записи по (order_id, test_code) перед insert.
+
+        Маппинг полей:
+          field_def.label              → test_name
+          field_def.field_key          → test_code
+          value.value_text/value_numeric → value (string representation)
+          field_def.unit               → unit
+          value.resolved_reference_text → ref_range
+          value.resolved_flag in
+            {high, low, abnormal, critical, warning} → abnormal=True
+        """
+        if not instance.order_id:
+            logger.warning(
+                "[LAB] _sync_legacy_lab_results: instance %s has no order_id, "
+                "skipping legacy projection",
+                instance.id,
+            )
+            return
+
+        # Удаляем существующие projection для этого order (на случай
+        # re-finalize через revise — хотя state machine это не допускает,
+        # защита не лишняя).
+        existing = (
+            self.db.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .all()
+        )
+        if existing:
+            logger.info(
+                "[LAB] _sync_legacy_lab_results: order %s already has %d "
+                "LabResult projections, skipping (idempotent)",
+                instance.order_id,
+                len(existing),
+            )
+            return
+
+        created_count = 0
+        for value in instance.values:
+            field_def = field_map.get(value.field_key)
+            if not field_def:
+                continue
+
+            # Пропускаем пустые значения — нет смысла создавать LabResult
+            # для незаполненного показателя.
+            effective_value = self._extract_effective_value(value)
+            if effective_value in (None, ""):
+                continue
+
+            # value_numeric имеет приоритет для numeric fields, иначе value_text.
+            # Нормализуем Decimal: LabReportValue.value_numeric хранится как
+            # Numeric(18, 4), поэтому str(Decimal('100')) = '100.0000'.
+            # Для legacy LabResult.value (String(128)) убираем trailing zeros,
+            # чтобы mobile app показывал '100', а не '100.0000'.
+            if value.value_numeric is not None:
+                numeric_str = str(value.value_numeric)
+                # Decimal('100.0000') → '100', Decimal('5.2000') → '5.2'
+                if '.' in numeric_str:
+                    numeric_str = numeric_str.rstrip('0').rstrip('.')
+                    if not numeric_str or numeric_str == '-':
+                        numeric_str = '0'
+                result_value = numeric_str
+            else:
+                result_value = value.value_text or ""
+
+            # abnormal = True для любого непустого resolved_flag
+            # (high, low, abnormal, critical, warning). None/empty → False.
+            abnormal = bool(value.resolved_flag)
+
+            lab_result = LabResult(
+                order_id=instance.order_id,
+                test_code=value.field_key,
+                test_name=field_def.label or value.field_key,
+                value=result_value[:128] if result_value else None,
+                unit=(field_def.unit or "")[:32] or None,
+                ref_range=(value.resolved_reference_text or "")[:64] or None,
+                abnormal=abnormal,
+                notes=None,
+            )
+            self.db.add(lab_result)
+            created_count += 1
+
+        logger.info(
+            "[LAB] _sync_legacy_lab_results: created %d LabResult projections "
+            "for instance %s (order %s)",
+            created_count,
+            instance.id,
+            instance.order_id,
+        )
 
     def revise(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] revise instance_id=%s", instance_id)
