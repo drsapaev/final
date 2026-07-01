@@ -122,10 +122,27 @@ export default function LabPanel() {
   const [activeInstance, setActiveInstance] = useState(null);
   const [templateResolution, setTemplateResolution] = useState(null);
   const [templateResolutionLoading, setTemplateResolutionLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  // QW-4 fix: message теперь содержит опциональный retryAction — функцию,
+  // которая вызывается при клике «Повторить» в Alert. Раньше ошибки
+  // показывались на 5 секунд без возможности восстановиться — пользователь
+  // переключал таб и не видел сообщения. Теперь:
+  //   - errors показываются 12 секунд (вместо 5)
+  //   - info/success — 5 секунд (как раньше)
+  //   - error с retryAction показывает кнопку «Повторить»
+  //   - любой клик по Alert закрывает его
+  const [message, setMessage] = useState({ type: '', text: '', retryAction: null, retryLabel: '' });
 
-  const notify = useCallback((type, text) => {
-    setMessage({ type, text });
+  const notify = useCallback((type, text, options = {}) => {
+    setMessage({
+      type,
+      text,
+      retryAction: typeof options.retryAction === 'function' ? options.retryAction : null,
+      retryLabel: options.retryLabel || 'Повторить',
+    });
+  }, []);
+
+  const dismissMessage = useCallback(() => {
+    setMessage({ type: '', text: '', retryAction: null, retryLabel: '' });
   }, []);
 
   const mergeResolvedVisitIntoState = useCallback((appointmentId, visitId) => {
@@ -234,7 +251,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить лабораторную очередь. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, 'Не удалось загрузить лабораторную очередь. Проверьте соединение и попробуйте снова.'),
+        // QW-4 fix: кнопка «Повторить» в Alert.
+        { retryAction: () => loadLabAppointments(), retryLabel: 'Загрузить снова' }
       );
     } finally {
       setAppointmentsLoading(false);
@@ -261,7 +280,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadTemplates failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить шаблоны лаборатории. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, 'Не удалось загрузить шаблоны лаборатории. Проверьте соединение и попробуйте снова.'),
+        // QW-4 fix: кнопка «Повторить» в Alert.
+        { retryAction: () => loadTemplates(), retryLabel: 'Загрузить снова' }
       );
     }
   }, [notify, selectedTemplate?.id]);
@@ -278,7 +299,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadReportHistory failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить историю лабораторных бланков. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, 'Не удалось загрузить историю лабораторных бланков. Проверьте соединение и попробуйте снова.'),
+        // QW-4 fix: кнопка «Повторить» в Alert.
+        { retryAction: () => loadReportHistory(patientId), retryLabel: 'Загрузить снова' }
       );
     }
   }, [notify]);
@@ -291,7 +314,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadRecentReports failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить список лабораторных бланков. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, 'Не удалось загрузить список лабораторных бланков. Проверьте соединение и попробуйте снова.'),
+        // QW-4 fix: кнопка «Повторить» в Alert.
+        { retryAction: () => loadRecentReports(), retryLabel: 'Загрузить снова' }
       );
     }
   }, [notify]);
@@ -369,7 +394,17 @@ export default function LabPanel() {
     if (!message.text) {
       return undefined;
     }
-    const timer = window.setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    // QW-4 fix: errors показываются дольше (12 сек), т.к. требуют внимания;
+    // info/success — 5 сек. Если есть retryAction, не скрываем автоматически
+    // (пользователь должен либо нажать «Повторить», либо закрыть вручную).
+    if (message.retryAction) {
+      return undefined;
+    }
+    const delay = message.type === 'error' ? 12000 : 5000;
+    const timer = window.setTimeout(
+      () => setMessage({ type: '', text: '', retryAction: null, retryLabel: '' }),
+      delay
+    );
     return () => window.clearTimeout(timer);
   }, [message]);
 
@@ -394,6 +429,50 @@ export default function LabPanel() {
         minHeight: '100%'
       }}
     >
+      {/* P-13 fix: skip-to-content link для keyboard-пользователей.
+          Скрыт визуально, появляется при фокусе. Позволяет перескочить
+          tablist и попасть прямо к содержимому активного таба. */}
+      <a
+        href={`#${LAB_PANEL_TABLIST_ID}`}
+        style={{
+          position: 'absolute',
+          left: -9999,
+          top: 'auto',
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          padding: 0,
+          margin: 0,
+          clip: 'rect(0 0 0 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+        onFocus={(e) => {
+          e.target.style.cssText = [
+            'position:fixed',
+            'top:8px',
+            'left:8px',
+            'width:auto',
+            'height:auto',
+            'overflow:visible',
+            'padding:8px 16px',
+            'margin:0',
+            'clip:auto',
+            'white-space:nowrap',
+            'background:var(--mac-accent)',
+            'color:white',
+            'border-radius:8px',
+            'z-index:9999',
+            'font-weight:600',
+            'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
+          ].join(';');
+        }}
+        onBlur={(e) => {
+          e.target.style.cssText = '';
+        }}
+      >
+        Перейти к навигации по табам
+      </a>
       <Card variant="filled" padding="none">
         <CardHeader
           style={{
@@ -458,7 +537,41 @@ export default function LabPanel() {
             aria-live={message.type === 'error' ? 'assertive' : 'polite'}
             style={{ padding: '16px', background: 'var(--mac-bg-secondary)' }}
           >
-            <Alert severity={message.type === 'error' ? 'error' : 'info'}>{message.text}</Alert>
+            {/* QW-4 fix: Alert с кнопками «Повторить» (если есть retryAction)
+                и «Закрыть». Раньше Alert только показывал текст — теперь
+                пользователь может восстановиться после ошибки одним кликом. */}
+            <Alert
+              severity={message.type === 'error' ? 'error' : 'info'}
+              action={(
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {message.retryAction && (
+                    <Button
+                      size="small"
+                      variant="primary"
+                      onClick={() => {
+                        const action = message.retryAction;
+                        dismissMessage();
+                        // Небольшая задержка, чтобы UI успел обновиться
+                        setTimeout(() => action(), 0);
+                      }}
+                    >
+                      <Icon name="arrow.clockwise" size={14} />
+                      {message.retryLabel || 'Повторить'}
+                    </Button>
+                  )}
+                  <Button
+                    size="small"
+                    variant="outline"
+                    onClick={dismissMessage}
+                    aria-label="Закрыть уведомление"
+                  >
+                    <Icon name="xmark" size={14} />
+                  </Button>
+                </div>
+              )}
+            >
+              {message.text}
+            </Alert>
           </CardContent>
         )}
       </Card>
