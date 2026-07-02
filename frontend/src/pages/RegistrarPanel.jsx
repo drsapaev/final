@@ -25,6 +25,8 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 import { getRegistrarTranslator } from './registrarTranslations';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
+// Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
+import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -474,40 +476,11 @@ const RegistrarPanel = () => {
   // jarring, blocking, and lacked a date picker.
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
-  const resolveRescheduleVisitId = useCallback((appointmentRow) => {
-    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || null;
-  }, []);
-  const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
-    if (!appointmentRow) return;
-
-    const idsToRemove = new Set();
-    [appointmentRow.id, appointmentRow.visit_id, appointmentRow.visitId, appointmentRow.appointment_id, appointmentRow.queue_entry_id, visitId].forEach((id) => {
-      if (id !== undefined && id !== null) {
-        idsToRemove.add(String(id));
-      }
-    });
-    [appointmentRow.visit_ids, appointmentRow.appointment_ids, appointmentRow.queue_entry_ids].forEach((ids) => {
-      if (Array.isArray(ids)) {
-        ids.forEach((id) => {
-          if (id !== undefined && id !== null) {
-            idsToRemove.add(String(id));
-          }
-        });
-      }
-    });
-    if (Array.isArray(appointmentRow.aggregated_ids)) {
-      appointmentRow.aggregated_ids.forEach((id) => {
-        if (id !== undefined && id !== null) {
-          idsToRemove.add(String(id));
-        }
-      });
-    }
-
-    setAppointments((prev) => prev.filter((apt) => {
-      const candidateIds = [apt.id, apt.visit_id, apt.visitId, apt.appointment_id, apt.queue_entry_id];
-      return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
-    }));
-  }, []);
+  // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
+  const {
+    resolveRescheduleVisitId,
+    removeRescheduledAppointmentFromView,
+  } = useRegistrarReschedule({ setAppointments });
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const appointmentOverridesRef = useRef({});
   // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).

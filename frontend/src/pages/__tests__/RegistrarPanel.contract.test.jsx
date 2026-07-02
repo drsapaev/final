@@ -7,15 +7,26 @@ import { describe, expect, it } from 'vitest';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.jsx');
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js.
-// Contract tests must read both files because they verify that certain
+// Decomp step 2: hotkeys extracted to ./registrar/useRegistrarHotkeys.js.
+// Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
+// Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
 const registrarHelpersPath = path.resolve(__dirname, '../registrar/registrarHelpers.js');
+const useRegistrarHotkeysPath = path.resolve(__dirname, '../registrar/useRegistrarHotkeys.js');
+const useRegistrarReschedulePath = path.resolve(__dirname, '../registrar/useRegistrarReschedule.js');
 
 const readRegistrarPanelSource = () => fs.readFileSync(registrarPanelPath, 'utf8');
 const readRegistrarHelpersSource = () => fs.readFileSync(registrarHelpersPath, 'utf8');
-const readRegistrarSourceTree = () =>
-  `${readRegistrarPanelSource()}\n\n// ─── registrarHelpers.js ───\n\n${readRegistrarHelpersSource()}`;
+const readRegistrarSourceTree = () => [
+  readRegistrarPanelSource(),
+  '// ─── registrarHelpers.js ───',
+  readRegistrarHelpersSource(),
+  '// ─── useRegistrarHotkeys.js ───',
+  fs.readFileSync(useRegistrarHotkeysPath, 'utf8'),
+  '// ─── useRegistrarReschedule.js ───',
+  fs.readFileSync(useRegistrarReschedulePath, 'utf8'),
+].join('\n\n');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {
   const start = source.indexOf(startMarker);
