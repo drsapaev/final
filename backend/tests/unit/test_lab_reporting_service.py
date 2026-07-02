@@ -210,6 +210,66 @@ class TestLabReportingService:
             f"expected 2, got {after_idempotent_count}"
         )
 
+    def test_backfill_creates_projection_for_already_finalized_instance(
+        self, db_session, test_patient, test_visit
+    ):
+        """P-01 backfill: _sync_legacy_lab_results работает для уже-финализированных
+        instances (без повторного finalize). Это сценарий backfill script:
+        instance финализирован ДО bridge, bridge создаёт projection post-hoc.
+        """
+        test_patient.sex = "M"
+        test_patient.birth_date = date(1990, 1, 1)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        templates = service.list_templates()
+        cbc_template = next(t for t in templates if t.code == "cbc_oak")
+
+        instance = service.create_instance({
+            "patient_id": test_patient.id,
+            "visit_id": test_visit.id,
+            "template_id": cbc_template.id,
+        })
+
+        instance, _ = service.bulk_upsert_values(
+            instance.id,
+            [
+                {"field_key": "hgb", "value_text": "120"},
+                {"field_key": "wbc", "value_text": "6.0"},
+            ],
+        )
+
+        # Финализируем (bridge создаёт LabResult projection)
+        finalized = service.finalize(instance.id)
+        assert finalized.status == "FINALIZED"
+
+        # Удаляем LabResult (симулируем instance, финализированный ДО bridge)
+        db_session.execute(
+            delete(LabResult).where(LabResult.order_id == instance.order_id)
+        )
+        db_session.commit()
+
+        before = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert before == 0, "LabResult должен быть удалён для теста backfill"
+
+        # Backfill: вызываем _sync_legacy_lab_results напрямую
+        field_map = service._field_map(finalized.template_version)
+        service._sync_legacy_lab_results(finalized, field_map)
+        db_session.commit()
+
+        after = (
+            db_session.query(LabResult)
+            .filter(LabResult.order_id == instance.order_id)
+            .count()
+        )
+        assert after == 2, (
+            f"Backfill должен создать 2 LabResult, got {after}"
+        )
+
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient
     ):
