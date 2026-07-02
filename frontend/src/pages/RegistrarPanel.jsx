@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import PropTypes from 'prop-types';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -33,6 +33,8 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
 import QueueView from './registrar/views/QueueView';
+// Strategic Direction 3: navigation helpers for canonical nested routes
+import { getViewFromPath } from './registrar/registrarNavigation';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
@@ -103,7 +105,14 @@ const RegistrarPanel = () => {
   // Основные состояния
   const [activeTab, setActiveTab] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const currentView = useMemo(() => {
+    // Strategic Direction 3: prefer canonical path-derived view
+    // (/registrar/welcome, /registrar/queue) over legacy ?view= query param.
+    const pathView = getViewFromPath(location.pathname);
+    if (pathView) return pathView;
+
+    // Backward compatibility: legacy ?view= query param
     const explicitView = searchParams.get('view');
     if (explicitView === 'welcome' || explicitView === 'queue') {
       return explicitView;
@@ -115,7 +124,7 @@ const RegistrarPanel = () => {
     }
 
     return explicitView;
-  }, [searchParams]);
+  }, [searchParams, location.pathname]);
   const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
   const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
   const todayStr = getLocalDateString();
