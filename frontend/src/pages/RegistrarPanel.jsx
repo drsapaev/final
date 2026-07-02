@@ -2031,11 +2031,7 @@ const RegistrarPanel = () => {
                               }
                             }} />
 
-                              <div style={{
-                            display: 'flex',
-                            gap: '8px',
-                            flexWrap: 'wrap'
-                          }}>
+                              <div className="registrar-flex-wrap" style={{ gap: '8px' }}>
                                 <button
                               type="button"
                               onClick={() => {
@@ -2131,11 +2127,7 @@ const RegistrarPanel = () => {
                           {/* QW-04: empty state 1 of 3 (session-expired / empty-queue). */}
                     {/* Full unification deferred — requires EmptyState.jsx migration */}
                     {/* from Tailwind/native to macOS design system first. */}
-                    <div style={{
-                      fontSize: '48px',
-                      marginBottom: '16px',
-                      opacity: 0.3
-                    }}>
+                    <div className="registrar-empty-icon-lg">
                             {!tokenManager.hasToken() ?
                       <Icon name="lock" size="large" /> :
                       <Icon name="doc.text" size="large" />}
@@ -2339,11 +2331,7 @@ const RegistrarPanel = () => {
 
                 <div style={registrarWorkflowActionsStyle}>
                   {statusFilterLabel &&
-                  <Badge variant="warning" style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--mac-spacing-1)'
-                  }}>
+                  <Badge variant="warning" className="registrar-inline-flex-tight">
                       <Icon name="magnifyingglass" size="small" />
                       Фильтр: {statusFilterLabel}
                     </Badge>
@@ -2360,12 +2348,8 @@ const RegistrarPanel = () => {
                     setShowWizard(true);
                   }}
                   aria-label="Создать новую запись из рабочего списка регистратора"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--mac-spacing-2)',
-                    flexShrink: 0
-                  }}>
+                  className="registrar-inline-flex"
+                  style={{ flexShrink: 0 }}>
                     <Icon name="plus" size="small" className="registrar-text-white" />
                     {t('new_appointment')}
                   </Button>
