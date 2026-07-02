@@ -215,7 +215,6 @@ const RegistrarPanel = () => {
   // Состояния для управления данными
   const [appointments, setAppointments] = useState([]);
   // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
-  const [rawEntries] = useState([]);
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'error' (QW-03: 'demo' removed)
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   // QW-01 fix: bulk-action state removed — checkboxes were already disabled
@@ -500,7 +499,6 @@ const RegistrarPanel = () => {
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
-  const appointmentOverridesRef = useRef({});
   // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
   // EN translations added (previously missing — EN users saw RU fallback).
   // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx
@@ -575,7 +573,6 @@ const RegistrarPanel = () => {
     setDoctors,
     setServices,
     setDynamicDepartments,
-    appointmentOverridesRef,
   });
 
 
@@ -1457,13 +1454,13 @@ const RegistrarPanel = () => {
       return [tabKey];
     };
 
-    // Если выбрана конкретная вкладка (не "Все отделения"), используем rawEntries с фильтрацией по queue_tag
+    // Если выбрана конкретная вкладка (не "Все отделения"), используем appointments с фильтрацией по queue_tag
     if (activeTab) {
       // ⭐ SSOT: queue_tags from API profiles, not hardcoded
       const possibleTags = getQueueTagsForTab(activeTab);
 
-      // Фильтруем rawEntries по queue_tag вкладки
-      const entriesForTab = (rawEntries && rawEntries.length > 0 ? rawEntries : appointments).filter((entry) => {
+      // Фильтруем appointments по queue_tag вкладки
+      const entriesForTab = (appointments).filter((entry) => {
         // Определяем queue_tag записи
         const entryQueueTag = (
         entry.queue_tag ||
@@ -1496,7 +1493,7 @@ const RegistrarPanel = () => {
       const sorted = sortRegistrarRowsForPresentation(entriesForTab);
 
       logger.info('⭐ FIX 16: Вкладка', activeTab, '- найдено', sorted.length, 'записей из',
-      rawEntries?.length || 0, 'rawEntries');
+      appointments.length, 'appointments');
 
       // ⭐ FIX 16: Подробный лог queue_time для каждой entry
       sorted.forEach((entry, idx) => {
@@ -1577,7 +1574,7 @@ const RegistrarPanel = () => {
 
     // Presentation-only order on a copy; backend remains owner of queue facts.
     return sortRegistrarRowsForPresentation(appointments);
-  }, [appointments, rawEntries, activeTab, statusFilter, searchQuery, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
+  }, [appointments, activeTab, statusFilter, searchQuery, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
   filteredAppointmentsRef.current = filteredAppointments;
@@ -2262,7 +2259,7 @@ const RegistrarPanel = () => {
                     {(appointmentsLoading || filteredAppointments.length > 0) &&
                   <EnhancedAppointmentsTable
                     data={filteredAppointments}
-                    rawEntries={rawEntries} // ⭐ SSOT FIX: Сырые данные для полного Tooltip
+                    rawEntries={appointments} // ⭐ SSOT FIX: Сырые данные для полного Tooltip
                     loading={appointmentsLoading}
                     theme={theme}
                     language={language}

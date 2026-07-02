@@ -22,7 +22,6 @@
  * @param {Function} deps.setDoctors - state setter for doctors array
  * @param {Function} deps.setServices - state setter for services object
  * @param {Function} deps.setDynamicDepartments - state setter for departments
- * @param {Object} deps.appointmentOverridesRef - ref to overrides object
  */
 import { useCallback } from 'react';
 import { api } from '../../api/client';
@@ -41,7 +40,6 @@ export const useRegistrarData = ({
   setDoctors,
   setServices,
   setDynamicDepartments,
-  appointmentOverridesRef,
 }) => {
   // ───────────────────────────────────────────────────────────
   // loadIntegratedData: parallel fetch of doctors + services + departments
@@ -230,18 +228,9 @@ export const useRegistrarData = ({
         }
       }
 
-      // Применяем локальные оверрайды (например, после оплаты), чтобы не было отката
-      const overrideKey = String(enrichedApt.id);
-      const ov = appointmentOverridesRef.current[overrideKey];
-      if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-        enrichedApt = {
-          ...enrichedApt,
-          status: ov.status !== undefined ? ov.status : enrichedApt.status,
-          payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status,
-        };
-      } else if (ov) {
-        delete appointmentOverridesRef.current[overrideKey];
-      }
+      // R-29 fix: override block removed — appointmentOverridesRef was dead code
+      // (never populated). Local overrides after payment are handled by
+      // loadAppointments silent refresh instead.
       enrichedApt = {
         ...enrichedApt,
         visit_type: enrichedApt.visit_type ?? null,
@@ -254,7 +243,7 @@ export const useRegistrarData = ({
       return enrichedApt;
     }));
     return enrichedAppointments;
-  }, [fetchPatientData, appointmentOverridesRef]);
+  };
 
   return {
     loadIntegratedData,

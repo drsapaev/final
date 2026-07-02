@@ -375,7 +375,7 @@ export const buildPostWizardPaymentRow = (wizardResult) => {
     can_mark_paid: totalAmount > 0,
     can_print_ticket: true,
     invoice_id: wizardResult.invoice_id ?? null,
-    patient_fio: firstVisit.patient_name || 'Patient',
+    patient_fio: firstVisit.patient_name || 'Пациент',
     services,
     queue_number: firstQueueNumber?.queue_number ?? null,
     number: firstQueueNumber?.queue_number ?? null,
