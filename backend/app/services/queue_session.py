@@ -64,9 +64,10 @@ def get_or_create_session_id(
     ).first()
 
     if existing and existing.session_id:
+        # R-40: session_id не логируется — CodeQL flagged как sensitive data.
         logger.debug(
-            "[get_or_create_session_id] Reusing session_id=%s for patient=%d, queue=%d",
-            existing.session_id, patient_id, target_queue_id
+            "[get_or_create_session_id] Reusing existing session for patient=%d, queue=%d",
+            patient_id, target_queue_id
         )
         return existing.session_id
 
@@ -77,9 +78,10 @@ def get_or_create_session_id(
     import secrets
     new_session_id = secrets.token_urlsafe(16)
 
+    # R-40: session_id не логируется — CodeQL flagged как sensitive data.
     logger.info(
-        "[get_or_create_session_id] Created new session_id=%s for patient=%d, queue=%d",
-        new_session_id, patient_id, target_queue_id
+        "[get_or_create_session_id] Created new session for patient=%d, queue=%d",
+        patient_id, target_queue_id
     )
 
     return new_session_id
