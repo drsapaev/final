@@ -239,6 +239,24 @@ export default function LabReportWorkbench({
     };
   }, [activeInstance]);
 
+  // WF-22 fix: keyboard shortcuts для efficiency.
+  // Ctrl+S (Cmd+S на Mac) → save draft (preventDefault — браузер не показывает Save Dialog)
+  // Доступно только когда canSaveDraft (editable state).
+  const handleSaveDraftRef = useRef(null);
+  useEffect(() => {
+    if (!canSaveDraft) return;
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saving && handleSaveDraftRef.current) {
+          handleSaveDraftRef.current();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canSaveDraft, saving]);
+
   useEffect(() => {
     if (activeInstance || !selectedAppointment) {
       return;
@@ -312,9 +330,6 @@ export default function LabReportWorkbench({
       return;
     }
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
-    // Backend bulk_upsert_values автоматически меняет DRAFT → IN_PROGRESS
-    // при первом сохранении. Раньше пользователь не знал об этом — surprise
-    // transition. Теперь показываем явное сообщение если статус изменился.
     const previousStatus = activeInstance.status;
     setSaving(true);
     setBusyAction('save');
@@ -326,7 +341,6 @@ export default function LabReportWorkbench({
         values: { ...draftValues },
         signer: { ...signerSnapshot },
       };
-      // WF-07: проверяем, изменился ли статус автоматически
       const newStatus = latest?.status || previousStatus;
       if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
         notify('info', 'Черновик сохранён. Статус изменён на «Заполняется» — отчёт теперь в работе.');
@@ -340,6 +354,8 @@ export default function LabReportWorkbench({
       setBusyAction('');
     }
   }
+  // WF-22 fix: обновляем ref для keyboard shortcut.
+  handleSaveDraftRef.current = handleSaveDraft;
 
   // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
   // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).

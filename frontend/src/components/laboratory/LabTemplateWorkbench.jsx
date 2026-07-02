@@ -217,6 +217,8 @@ export default function LabTemplateWorkbench({
   onTemplatesChanged,
   notify
 }) {
+  // WF-21 fix: search в списке шаблонов для консистентности с LabQueueWorkbench.
+  const [templateSearch, setTemplateSearch] = useState('');
   const [draftVersion, setDraftVersion] = useState(hydrateVersion(null));
   const [newTemplate, setNewTemplate] = useState({
     code: '',
@@ -492,8 +494,50 @@ export default function LabTemplateWorkbench({
             </Button>
           </div>
 
+          {/* WF-21 fix: search для консистентности с LabQueueWorkbench */}
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <input
+              type="search"
+              value={templateSearch}
+              onChange={(e) => setTemplateSearch(e.target.value)}
+              placeholder="Поиск по названию, коду, семейству…"
+              aria-label="Поиск шаблонов"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: '14px',
+                outline: 'none',
+              }}
+            />
+            {templateSearch && (
+              <button
+                type="button"
+                onClick={() => setTemplateSearch('')}
+                aria-label="Очистить поиск"
+                style={{
+                  position: 'absolute', right: '8px', top: '50%',
+                  transform: 'translateY(-50%)', background: 'none',
+                  border: 'none', cursor: 'pointer',
+                  color: 'var(--mac-text-muted)', fontSize: '16px',
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+
           <div style={{ display: 'grid', gap: '8px' }}>
-            {templates.map((template) => (
+            {templates
+              .filter((t) => {
+                if (!templateSearch.trim()) return true;
+                const q = templateSearch.trim().toLowerCase();
+                return [t.name, t.code, t.family].some((f) => (f || '').toLowerCase().includes(q));
+              })
+              .map((template) => (
               <button
                 key={template.id}
                 type="button"
