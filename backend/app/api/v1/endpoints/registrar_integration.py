@@ -1445,6 +1445,93 @@ def _load_queue_data_for_date(db: Session, target_day: "date") -> tuple:
     return visits, appointments, online_entries
 
 
+
+
+def _detect_ecg_services(services: list) -> tuple[bool, int, int]:
+    """R-22: Detect ECG services in a visit's service list.
+
+    Checks by queue_tag, service name, and service code.
+
+    Returns:
+        tuple of (has_ecg, ecg_count, non_ecg_count)
+    """
+    from app.services.service_mapping import get_service_code
+
+    has_ecg = False
+    ecg_count = 0
+    non_ecg_count = 0
+
+    for service in services:
+        is_ecg = False
+
+        # Check by queue_tag
+        if service.queue_tag == 'ecg':
+            is_ecg = True
+
+        # Check by service name
+        elif service.name:
+            name_lower = str(service.name).lower()
+            if 'экг' in name_lower or 'ecg' in name_lower:
+                is_ecg = True
+
+        # Check by service code
+        if not is_ecg and service.service_code:
+            code_upper = str(service.service_code).upper()
+            if 'ECG' in code_upper or 'ЭКГ' in code_upper:
+                is_ecg = True
+
+        if is_ecg:
+            has_ecg = True
+            ecg_count += 1
+        else:
+            non_ecg_count += 1
+
+    return has_ecg, ecg_count, non_ecg_count
+
+
+def _ensure_specialty_queue(
+    queues_by_specialty: dict,
+    specialty: str,
+    doctor_id: int | None,
+) -> None:
+    """R-22: Ensure a specialty queue exists in the grouping dict."""
+    if specialty not in queues_by_specialty:
+        queues_by_specialty[specialty] = {
+            "entries": [],
+            "doctor": None,
+            "doctor_id": doctor_id,
+        }
+
+
+def _get_visit_queue_time(
+    db: Session, visit: Any
+) -> Any:
+    """R-22: Get queue_time from linked OnlineQueueEntry for a visit."""
+    from app.models.online_queue import OnlineQueueEntry
+    try:
+        queue_entry = (
+            db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.visit_id == visit.id,
+                OnlineQueueEntry.patient_id == visit.patient_id,
+            )
+            .order_by(OnlineQueueEntry.id.asc())
+            .first()
+        )
+        if queue_entry and queue_entry.queue_time:
+            return queue_entry.queue_time
+    except Exception:
+        pass
+    return None
+
+
+def _get_visit_created_at(visit: Any) -> Any:
+    """R-22: Get created_at from visit, preferring confirmed_at if available."""
+    if hasattr(visit, 'confirmed_at') and visit.confirmed_at:
+        return visit.confirmed_at
+    return visit.created_at
+
+
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
 
 
@@ -1561,81 +1648,8 @@ def get_today_queues(
                 else []
             )
 
-            # [OK] Проверяем, есть ли ЭКГ в услугах (по queue_tag, названию и коду)
-            has_ecg = False
-            ecg_services_count = 0
-            non_ecg_services_count = 0
-
-            logger.debug(
-                "get_today_queues: Проверка ЭКГ для Visit %d, услуг: %d",
-                visit.id,
-                len(services),
-            )
-            for service in services:
-                is_ecg_service = False
-                service_name = service.name or 'N/A'
-                # [OK] SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
-                service_code_val = (
-                    get_service_code(
-                        {
-                            'service_code': getattr(service, 'service_code', None),
-                        }
-                    )
-                    or 'N/A'
-                )
-                queue_tag_val = service.queue_tag or 'N/A'
-
-                # Проверяем по queue_tag
-                if service.queue_tag == 'ecg':
-                    is_ecg_service = True
-                    logger.debug(
-                        "get_today_queues: ЭКГ найдено по queue_tag: %s (код: %s)",
-                        service_name,
-                        service_code_val,
-                    )
-                # Проверяем по названию услуги
-                elif service.name:
-                    service_name_lower = str(service.name).lower()
-                    if 'экг' in service_name_lower or 'ecg' in service_name_lower:
-                        is_ecg_service = True
-                        logger.debug(
-                            "get_today_queues: ЭКГ найдено по названию: %s (код: %s, queue_tag: %s)",
-                            service_name,
-                            service_code_val,
-                            queue_tag_val,
-                        )
-                # Проверяем по коду услуги
-                if not is_ecg_service:
-                    if service.service_code:
-                        service_code_upper = str(service.service_code).upper()
-                        if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
-                            is_ecg_service = True
-                            logger.debug(
-                                "get_today_queues: ЭКГ найдено по service_code: %s (код: %s)",
-                                service_name,
-                                service_code_val,
-                            )
-                    elif service.service_code:
-                        service_code_upper = str(service.service_code).upper()
-                        if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
-                            is_ecg_service = True
-                            logger.debug(
-                                "get_today_queues: ЭКГ найдено по code: %s (код: %s)",
-                                service_name,
-                                service_code_val,
-                            )
-
-                if is_ecg_service:
-                    has_ecg = True
-                    ecg_services_count += 1
-                else:
-                    non_ecg_services_count += 1
-                    logger.debug(
-                        "get_today_queues: Не ЭКГ: %s (код: %s, queue_tag: %s)",
-                        service_name,
-                        service_code_val,
-                        queue_tag_val,
-                    )
+            # R-22: ECG detection extracted to helper
+            has_ecg, ecg_services_count, non_ecg_services_count = _detect_ecg_services(services)
 
             # Только ЭКГ: если есть ЭКГ услуги и нет не-ЭКГ услуг
             has_only_ecg = has_ecg and non_ecg_services_count == 0
@@ -1656,27 +1670,15 @@ def get_today_queues(
                 # Визит содержит и ЭКГ и другие услуги - разделяем:
                 # 1. Создаем запись для ЭКГ в очередь echokg (только ЭКГ услуги)
                 specialty_ecg = "echokg"
-                if specialty_ecg not in queues_by_specialty:
-                    queues_by_specialty[specialty_ecg] = {
-                        "entries": [],
-                        "doctor": None,
-                        "doctor_id": visit.doctor_id,
-                    }
+                # R-22: ensure ECG queue exists
+                _ensure_specialty_queue(queues_by_specialty, specialty_ecg, visit.doctor_id)
 
-                visit_created_at = (
-                    visit.confirmed_at or visit.created_at
-                    if hasattr(visit, 'confirmed_at')
-                    else visit.created_at
-                )
+                # R-22: created_at extraction moved to helper
+                visit_created_at = _get_visit_created_at(visit)
 
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
-                visit_queue_time = None
-                try:
-                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
-                    if queue_entry_row and queue_entry_row.queue_time:
-                        visit_queue_time = queue_entry_row.queue_time
-                except Exception:
-                    pass  # Тихая ошибка - используем created_at как fallback
+                # R-22: queue_time extraction moved to helper
+                visit_queue_time = _get_visit_queue_time(db, visit)
 
                 queues_by_specialty[specialty_ecg]["entries"].append(
                     {
@@ -1691,26 +1693,14 @@ def get_today_queues(
 
                 # 2. Создаем запись для кардиолога в очередь cardiology (без ЭКГ услуг)
                 specialty = "cardiology"
-                if specialty not in queues_by_specialty:
-                    queues_by_specialty[specialty] = {
-                        "entries": [],
-                        "doctor": None,
-                        "doctor_id": visit.doctor_id,
-                    }
-                visit_created_at = (
-                    visit.confirmed_at or visit.created_at
-                    if hasattr(visit, 'confirmed_at')
-                    else visit.created_at
-                )
+                # R-22: ensure queue exists
+                _ensure_specialty_queue(queues_by_specialty, specialty, visit.doctor_id)
+                # R-22: created_at extraction moved to helper
+                visit_created_at = _get_visit_created_at(visit)
 
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
-                visit_queue_time = None
-                try:
-                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
-                    if queue_entry_row and queue_entry_row.queue_time:
-                        visit_queue_time = queue_entry_row.queue_time
-                except Exception:
-                    pass  # Тихая ошибка - используем created_at как fallback
+                # R-22: queue_time extraction moved to helper
+                visit_queue_time = _get_visit_queue_time(db, visit)
 
                 queues_by_specialty[specialty]["entries"].append(
                     {
@@ -1727,27 +1717,15 @@ def get_today_queues(
                 # Только ЭКГ - идёт в echokg
                 specialty = "echokg"
 
-                if specialty not in queues_by_specialty:
-                    queues_by_specialty[specialty] = {
-                        "entries": [],
-                        "doctor": None,
-                        "doctor_id": visit.doctor_id,
-                    }
+                # R-22: ensure queue exists
+                _ensure_specialty_queue(queues_by_specialty, specialty, visit.doctor_id)
 
-                visit_created_at = (
-                    visit.confirmed_at or visit.created_at
-                    if hasattr(visit, 'confirmed_at')
-                    else visit.created_at
-                )
+                # R-22: created_at extraction moved to helper
+                visit_created_at = _get_visit_created_at(visit)
 
                 # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
-                visit_queue_time = None
-                try:
-                    queue_entry_row = _same_patient_queue_entry_for_visit(visit)
-                    if queue_entry_row and queue_entry_row.queue_time:
-                        visit_queue_time = queue_entry_row.queue_time
-                except Exception:
-                    pass  # Тихая ошибка - используем created_at как fallback
+                # R-22: queue_time extraction moved to helper
+                visit_queue_time = _get_visit_queue_time(db, visit)
 
                 queues_by_specialty[specialty]["entries"].append(
                     {
