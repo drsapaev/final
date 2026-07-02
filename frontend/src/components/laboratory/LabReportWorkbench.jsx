@@ -126,8 +126,8 @@ export default function LabReportWorkbench({
   const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
   const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit');
   const canSaveDraft = hasLabReportAction(activeInstance, 'save_draft');
-  const canMarkReady = hasLabReportAction(activeInstance, 'mark_ready');
-  const canFinalize = hasLabReportAction(activeInstance, 'finalize');
+  // WF-round5: Mark Ready убран — был функционально пустой операцией.
+  const canFinalize = hasLabReportAction(activeInstance, 'finalize'); // Утвердить
   const canRevise = hasLabReportAction(activeInstance, 'revise');
   const canPrint = hasLabReportAction(activeInstance, 'print');
 
@@ -163,7 +163,7 @@ export default function LabReportWorkbench({
       return;
     }
     if (resolutionHasBlockingGap) {
-      notify('error', 'Для выбранных услуг нет настроенного лабораторного бланка. Добавьте mapping service_code -> template.');
+      notify('error', 'Для выбранных услуг нет настроенного лабораторного отчёта. Добавьте mapping service_code -> template.');
       return;
     }
     setSaving(true);
@@ -187,7 +187,7 @@ export default function LabReportWorkbench({
       await onRefreshHistory(selectedAppointment.patient_id);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', options.successMessage || 'Новый лабораторный бланк создан.');
+      notify('success', options.successMessage || 'Новый лабораторный отчёт создан.');
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -308,7 +308,7 @@ export default function LabReportWorkbench({
 
   async function handleSaveDraft() {
     if (!activeInstance) {
-      notify('error', 'Сначала создайте или откройте бланк.');
+      notify('error', 'Сначала создайте или откройте отчёт.');
       return;
     }
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
@@ -329,7 +329,7 @@ export default function LabReportWorkbench({
       // WF-07: проверяем, изменился ли статус автоматически
       const newStatus = latest?.status || previousStatus;
       if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
-        notify('info', 'Черновик сохранён. Статус изменён на «Заполняется» — бланк теперь в работе.');
+        notify('info', 'Черновик сохранён. Статус изменён на «Заполняется» — отчёт теперь в работе.');
       } else {
         notify('success', 'Черновик сохранён.');
       }
@@ -341,25 +341,8 @@ export default function LabReportWorkbench({
     }
   }
 
-  async function handleMarkReady() {
-    if (!activeInstance) return;
-    setSaving(true);
-    setBusyAction('ready');
-    try {
-      const latest = await persistDraft();
-      const ready = await labReportingApi.markReady((latest || activeInstance).id);
-      onInstanceChange(ready);
-      await onRefreshHistory(ready.patient_id);
-      await onRefreshRecentReports?.();
-      await onQueueChanged?.();
-      notify('success', 'Бланк отмечен как готовый.');
-    } catch (error) {
-      notify('error', error.message);
-    } finally {
-      setSaving(false);
-      setBusyAction('');
-    }
-  }
+  // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
+  // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
 
   async function handleFinalize() {
     if (!activeInstance) return;
@@ -367,12 +350,12 @@ export default function LabReportWorkbench({
     // единственный путь правки — revise (создание нового instance).
     // Показываем confirmation dialog с объяснением последствий.
     const ok = await confirm({
-      title: 'Финализация бланка',
-      message: 'После финализации бланк становится неизменяемым.',
+      title: 'Утверждение отчёта',
+      message: 'После утверждения отчёт становится неизменяемым.',
       description: 'Редактирование полей и подписей будет заблокировано. ' +
-        'Для исправления потребуется создать новую ревизию (копию бланка). ' +
+        'Для исправления потребуется создать исправленную версию. ' +
         'Действие нельзя отменить.',
-      confirmLabel: 'Финализировать',
+      confirmLabel: 'Утвердить',
       cancelLabel: 'Отмена',
       intent: 'primary',
     });
@@ -386,7 +369,7 @@ export default function LabReportWorkbench({
       await onRefreshHistory(finalized.patient_id);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', 'Бланк финализирован.');
+      notify('success', 'Отчёт утверждён.');
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -404,7 +387,7 @@ export default function LabReportWorkbench({
       onInstanceChange(revised);
       await onRefreshHistory(revised.patient_id);
       await onRefreshRecentReports?.();
-      notify('success', 'Создана ревизия бланка.');
+      notify('success', 'Создана исправленная версия отчёта.');
     } catch (error) {
       notify('error', error.message);
     } finally {
@@ -419,10 +402,10 @@ export default function LabReportWorkbench({
     setBusyAction('print');
     setPrintFeedback({
       severity: 'info',
-      text: 'Отправляю лабораторный бланк на печать...'
+      text: 'Отправляю лабораторный отчёт на печать...'
     });
     try {
-      notify('info', 'Пытаюсь отправить бланк на принтер...');
+      notify('info', 'Пытаюсь отправить отчёт на принтер...');
 
       const printResult = await printService.printLabResults(
         buildLabPrintPayload(activeInstance, selectedAppointment)
@@ -436,11 +419,11 @@ export default function LabReportWorkbench({
         await onQueueChanged?.();
         setPrintFeedback({
           severity: 'success',
-          text: `Лабораторный бланк отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+          text: `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         });
         notify(
           'success',
-          `Лабораторный бланк отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+          `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         );
         return;
       }
@@ -477,7 +460,7 @@ export default function LabReportWorkbench({
           severity: 'warning',
           text: 'PDF сформирован, но новая вкладка заблокирована. ' +
             'Разрешите pop-up для этого сайта и нажмите «Печать» снова, ' +
-            'чтобы обновить статус бланка.'
+            'чтобы обновить статус отчёта.'
         });
         notify('warning', 'PDF сформирован, но вкладка заблокирована. Статус печати не обновлён.');
       }
@@ -500,15 +483,15 @@ export default function LabReportWorkbench({
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '16px' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Icon name="doc.text" size={20} />
-            Редактор лабораторного бланка
+            Редактор лабораторного отчёта
           </CardTitle>
         </CardHeader>
         <CardContent style={{ padding: '16px', background: 'var(--mac-bg-secondary)', display: 'grid', gap: '16px' }}>
           {!selectedAppointment && !activeInstance ? (
             <Alert severity="info">
               {recentReports.length > 0
-                ? 'Выберите пациента из очереди или откройте уже существующий лабораторный бланк из списка ниже.'
-                : 'Выберите пациента из очереди или откройте уже существующий лабораторный бланк.'}
+                ? 'Выберите пациента из очереди или откройте уже существующий лабораторный отчёт из списка ниже.'
+                : 'Выберите пациента из очереди или откройте уже существующий лабораторный отчёт.'}
             </Alert>
           ) : !activeInstance ? (
             <div style={{ display: 'grid', gap: '12px' }}>
@@ -531,23 +514,23 @@ export default function LabReportWorkbench({
                 </div>
               )}
               {templateResolutionLoading && (
-                <Alert severity="info">Подбираю доступные бланки для выбранного визита...</Alert>
+                <Alert severity="info">Подбираю доступные отчёты для выбранного визита...</Alert>
               )}
               {!templateResolutionLoading && templateResolution?.default_template && (
                 <Alert severity="info">
-                  Рекомендуемый бланк: <strong>{templateResolution.default_template.name}</strong>
+                  Рекомендуемый отчёт: <strong>{templateResolution.default_template.name}</strong>
                 </Alert>
               )}
               {!templateResolutionLoading && templateResolution?.unmapped_service_codes?.length > 0 && (
                 <Alert severity={resolvedTemplates.length > 0 ? 'warning' : 'error'}>
-                  Ненастроенные service codes: {templateResolution.unmapped_service_codes.join(', ')}
+                  Ненастроенные услуги визита: {templateResolution.unmapped_service_codes.join(', ')}
                 </Alert>
               )}
               {!templateResolutionLoading && resolutionHasBlockingGap && (
                 <Alert severity="error">
-                  Для выбранного визита не найдено ни одного допустимого бланка.
+                  Для выбранного визита не найдено ни одного допустимого отчёта.
                   Настройте mapping услуги к шаблону (требуется роль Admin)
-                  или создайте бланк без привязки к услугам.
+                  или создайте отчёт без привязки к услугам.
                   <div style={{ marginTop: '8px' }}>
                     <Button
                       size="small"
@@ -562,18 +545,18 @@ export default function LabReportWorkbench({
               {/* WF-11 fix: warning когда escape hatch активен */}
               {!templateResolutionLoading && escapeHatchActive && (
                 <Alert severity="warning">
-                  Создание бланка без привязки к услугам визита. Убедитесь,
+                  Создание отчёта без привязки к услугам визита. Убедитесь,
                   что выбрали правильный шаблон — проверка соответствия отключена.
                 </Alert>
               )}
               {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
                 <Alert severity="info">
-                  Единственный допустимый бланк найден: <strong>{singleAllowedTemplate.name}</strong>. Нажмите «Создать бланк», чтобы открыть его для заполнения.
+                  Единственный допустимый отчёт найден: <strong>{singleAllowedTemplate.name}</strong>. Нажмите «Создать отчёт», чтобы открыть его для заполнения.
                 </Alert>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
                 <label style={{ display: 'grid', gap: '6px' }}>
-                  <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый бланк' : 'Шаблон бланка'}</span>
+                  <span>{serviceContextPresent && !escapeHatchActive ? 'Допустимый отчёт' : 'Шаблон отчёта'}</span>
                   <select
                     className="macos-input"
                     value={selectedTemplateId}
@@ -594,7 +577,7 @@ export default function LabReportWorkbench({
                   disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
                   <Icon name="plus.rectangle.on.folder" size={16} />
-                  {busyAction === 'create' ? 'Создаю...' : 'Создать бланк'}
+                  {busyAction === 'create' ? 'Создаю...' : 'Создать отчёт'}
                 </Button>
               </div>
             </div>
@@ -610,13 +593,13 @@ export default function LabReportWorkbench({
                     <Badge variant="info">{activeInstance.template?.name}</Badge>
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
-                    Визит: {activeInstance.visit_id || 'без визита'} | Бланк #{activeInstance.id}
+                    Визит: {activeInstance.visit_id || 'без визита'} | Отчёт #{activeInstance.id}
                     {/* WF-04 fix: показываем supersedes relationship для audit trail.
-                        Если этот бланк — ревизия другого, лаборант видит связь.
+                        Если этот отчёт — ревизия другого, лаборант видит связь.
                         Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
                     {activeInstance.supersedes_instance_id && (
                       <span style={{ marginLeft: '8px', color: 'var(--mac-accent)' }}>
-                        ← ревизия бланка #{activeInstance.supersedes_instance_id}
+                        ← исправленная версия отчёта #{activeInstance.supersedes_instance_id}
                       </span>
                     )}
                   </div>
@@ -631,13 +614,11 @@ export default function LabReportWorkbench({
                     saving={saving}
                     busyAction={busyAction}
                     canSaveDraft={canSaveDraft}
-                    canMarkReady={canMarkReady}
                     // WF-10 fix: Finalize disabled пока есть missing required fields.
                     canFinalize={canFinalizeWithValidation}
                     canRevise={canRevise}
                     canPrint={canPrint}
                     onSaveDraft={handleSaveDraft}
-                    onMarkReady={handleMarkReady}
                     onFinalize={handleFinalize}
                     onRevise={handleRevise}
                     onPrint={handlePrint}

@@ -9,7 +9,7 @@ const statusLabels = {
   DRAFT: 'Черновик',
   IN_PROGRESS: 'Заполняется',
   READY: 'Готов',
-  FINALIZED: 'Финализирован',
+  FINALIZED: 'Утверждён',
   PRINTED: 'Напечатан'
 };
 

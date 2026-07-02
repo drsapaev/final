@@ -17,7 +17,7 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 const tabs = [
   { id: 'queue', label: 'Очередь', icon: 'testtube.2' },
   { id: 'templates', label: 'Шаблоны', icon: 'rectangle.stack.badge.plus' },
-  { id: 'reports', label: 'Бланки', icon: 'doc.text' }
+  { id: 'reports', label: 'Отчёты', icon: 'doc.text' }
 ];
 
 const LAB_PANEL_TITLE_ID = 'lab-panel-title';
@@ -251,7 +251,7 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadReportHistory failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить историю лабораторных бланков. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, 'Не удалось загрузить историю лабораторных отчётов. Проверьте соединение и попробуйте снова.'),
         // QW-4 fix: кнопка «Повторить» в Alert.
         { retryAction: () => loadReportHistory(patientId), retryLabel: 'Загрузить снова' }
       );
@@ -266,7 +266,7 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadRecentReports failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить список лабораторных бланков. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, 'Не удалось загрузить список лабораторных отчётов. Проверьте соединение и попробуйте снова.'),
         // QW-4 fix: кнопка «Повторить» в Alert.
         { retryAction: () => loadRecentReports(), retryLabel: 'Загрузить снова' }
       );
@@ -301,7 +301,7 @@ export default function LabPanel() {
         'error',
         getErrorMessage(
           error,
-          'Не удалось определить доступные бланки для выбранного визита. Проверьте соединение и попробуйте снова.'
+          'Не удалось определить доступные отчёты для выбранного визита. Проверьте соединение и попробуйте снова.'
         )
       );
     } finally {
@@ -324,7 +324,7 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadInstance failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось открыть лабораторный бланк. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, 'Не удалось открыть лабораторный отчёт. Проверьте соединение и попробуйте снова.')
       );
     }
   }, [loadReportHistory, notify, switchTab]);

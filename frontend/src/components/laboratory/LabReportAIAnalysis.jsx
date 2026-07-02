@@ -69,7 +69,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
       return;
     }
     if (!hasResults) {
-      setAiBlockedReason('AI-анализ недоступен: нет заполненных показателей в бланке.');
+      setAiBlockedReason('AI-анализ недоступен: нет заполненных показателей в отчёте.');
       return;
     }
     if (resolvedPatientAge == null) {
@@ -92,7 +92,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
   const handleOpenAIAnalysis = () => {
     if (!activeInstance) return;
     if (!hasResults) {
-      notify('error', 'Сначала заполните хотя бы один показатель в бланке.');
+      notify('error', 'Сначала заполните хотя бы один показатель в отчёте.');
       return;
     }
     if (resolvedPatientAge == null || !resolvedPatientGender) {
@@ -115,7 +115,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
           aiBlockedReason
           || (hasResults
               ? 'AI интерпретация результатов с учётом возраста и пола пациента'
-              : 'Заполните показатели в бланке для активации AI')
+              : 'Заполните показатели в отчёте для активации AI')
         }
       />
 
@@ -129,7 +129,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="h6">
-                AI Интерпретация результатов бланка #{activeInstance.id}
+                AI Интерпретация результатов отчёта #{activeInstance.id}
               </Typography>
               <Button
                 type="button"
