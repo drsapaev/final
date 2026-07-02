@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 ROUTER_MARKER = "# --- API Router moved from app/api/v1/endpoints/"
 
 
@@ -69,6 +71,18 @@ def test_qr_queue_service_avoids_direct_session_calls() -> None:
 
 
 def test_registrar_integration_service_avoids_direct_session_calls() -> None:
+    # R-16: registrar_integration_api_service.py удалён (3152 строки мёртвого
+    # кода — не зарегистрирован, не импортировался). Тест больше не применим.
+    # Если файл будет восстановлен — раскомментировать проверку ниже.
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "registrar_integration_api_service.py"
+    )
+    if not service_path.exists():
+        pytest.skip("registrar_integration_api_service.py was removed (R-16 dead code cleanup)")
+
     logic = _service_logic_block("registrar_integration")
     direct_db_call = re.search(
         r"\bdb\.(query|add|commit|rollback|refresh|execute|delete|flush)\(",
