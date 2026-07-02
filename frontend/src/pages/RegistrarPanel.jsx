@@ -2084,15 +2084,10 @@ const RegistrarPanel = () => {
                                 setTempDateInput(today);
                                 setHistoryDate(today);
                               }}
+                              className="registrar-date-btn"
                               style={{
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
                                 background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor,
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                color: textColor
                               }}>
 
                                   Сегодня
@@ -2104,15 +2099,10 @@ const RegistrarPanel = () => {
                                 setTempDateInput(yesterdayStr);
                                 setHistoryDate(yesterdayStr);
                               }}
+                              className="registrar-date-btn"
                               style={{
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
                                 background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor,
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                color: textColor
                               }}>
 
                                   Вчера
@@ -2126,15 +2116,10 @@ const RegistrarPanel = () => {
                                 setTempDateInput(weekAgoStr);
                                 setHistoryDate(weekAgoStr);
                               }}
+                              className="registrar-date-btn"
                               style={{
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
                                 background: theme === 'light' ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-quaternary)',
-                                color: textColor,
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                color: textColor
                               }}>
 
                                   Неделю назад
@@ -2219,13 +2204,7 @@ const RegistrarPanel = () => {
                     }}>
                             {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
                           </h3>
-                          <p style={{
-                      fontSize: '16px',
-                      color: textColor,
-                      opacity: 0.7,
-                      marginBottom: '24px',
-                      lineHeight: '1.5'
-                    }}>
+                          <p className="registrar-empty-desc-text" style={{ fontSize: '16px', color: textColor }}>
                             {!tokenManager.hasToken() ?
                       'Нажмите "Войти снова", чтобы обновить данные.' :
                       'На сегодня нет записей в очереди.'}
@@ -2294,10 +2273,7 @@ const RegistrarPanel = () => {
                         setWizardInitialData(null); // ✅ Сброс данных
                         setShowWizard(true);
                       }}
-                      style={{
-                        padding: '12px 24px',
-                        fontSize: '14px'
-                      }}>
+                      className="registrar-btn-cta">
 
                             <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
                           </Button>
@@ -2492,12 +2468,7 @@ const RegistrarPanel = () => {
               }}>
                     Очередь пуста
                   </h3>
-                  <p style={{
-                fontSize: '14px',
-                color: textColor,
-                opacity: 0.7,
-                marginBottom: '24px'
-              }}>
+                  <p className="registrar-empty-desc-text" style={{ fontSize: '14px', color: textColor }}>
                     {activeTab ?
                 `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
                 'Сегодня пока нет записей'}
@@ -2505,10 +2476,7 @@ const RegistrarPanel = () => {
                   <Button
                 variant="primary"
                 onClick={() => setShowWizard(true)}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '14px'
-                }}>
+                className="registrar-btn-cta">
 
                     <Icon name="plus" size="small" className="registrar-icon-mr" />Создать первую запись
                   </Button>

@@ -283,3 +283,27 @@
   padding: var(--mac-spacing-4);
   border-top: 1px solid var(--mac-border-secondary);
 }
+
+/* Date quick-select buttons (Сегодня, Вчера, Неделю назад) */
+.registrar-date-btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Button size override (for empty-state CTAs) */
+.registrar-btn-cta {
+  padding: 12px 24px;
+  font-size: 14px;
+}
+
+/* Empty-state description text */
+.registrar-empty-desc-text {
+  color: var(--mac-text-secondary);
+  opacity: 0.7;
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
