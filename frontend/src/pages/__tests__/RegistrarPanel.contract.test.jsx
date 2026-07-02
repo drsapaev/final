@@ -6,8 +6,27 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.jsx');
+// Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js.
+// Decomp step 2: hotkeys extracted to ./registrar/useRegistrarHotkeys.js.
+// Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
+// Contract tests must read all files because they verify that certain
+// functions exist in the registrar panel source tree (not necessarily
+// in the orchestrator file itself).
+const registrarHelpersPath = path.resolve(__dirname, '../registrar/registrarHelpers.js');
+const useRegistrarHotkeysPath = path.resolve(__dirname, '../registrar/useRegistrarHotkeys.js');
+const useRegistrarReschedulePath = path.resolve(__dirname, '../registrar/useRegistrarReschedule.js');
 
 const readRegistrarPanelSource = () => fs.readFileSync(registrarPanelPath, 'utf8');
+const readRegistrarHelpersSource = () => fs.readFileSync(registrarHelpersPath, 'utf8');
+const readRegistrarSourceTree = () => [
+  readRegistrarPanelSource(),
+  '// ─── registrarHelpers.js ───',
+  readRegistrarHelpersSource(),
+  '// ─── useRegistrarHotkeys.js ───',
+  fs.readFileSync(useRegistrarHotkeysPath, 'utf8'),
+  '// ─── useRegistrarReschedule.js ───',
+  fs.readFileSync(useRegistrarReschedulePath, 'utf8'),
+].join('\n\n');
 
 const extractSourceBlock = (source, startMarker, endMarker) => {
   const start = source.indexOf(startMarker);
@@ -19,7 +38,7 @@ const extractSourceBlock = (source, startMarker, endMarker) => {
 
 describe('RegistrarPanel command contract', () => {
   it('uses the backend registrar record action endpoint for queue/payment/status commands', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).toContain("api.post('/registrar/records/actions'");
     expect(source).not.toContain('/registrar/visits/${recordId}/mark-paid');
@@ -31,7 +50,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('passes through registrar queue patient display fields before legacy patient fetch fallback', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const enrichmentBlock = extractSourceBlock(
       source,
       'const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {',
@@ -53,7 +72,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('keeps Registrar table view separate from edit mode', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).toContain('const openRecordPreview = useCallback((row) => {');
     expect(source).toContain('const openRecordEditor = useCallback((row) => {');
@@ -64,7 +83,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('allows edit mode for aggregate all-departments rows while keeping preview separate', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const editBlock = extractSourceBlock(
       source,
       'const openRecordEditor = useCallback((row) => {',
@@ -81,7 +100,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('restores post-wizard payment or ticket handoff for creates and paid edit deltas', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult) => {');
     expect(source).toContain('const normalizeWizardQueueAssignment = (assignment, visitId = null) => {');
@@ -100,7 +119,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('loads Registrar metadata departments through one registrar endpoint', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).toContain("api.get('/registrar/departments?active_only=true')");
     expect(source).not.toContain('/api/v1/departments/active');
@@ -108,7 +127,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('does not fetch unused queue settings in the Registrar metadata bundle', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const loadIntegratedDataBlock = extractSourceBlock(
       source,
       'const loadIntegratedData = useCallback(async () => {',
@@ -124,7 +143,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('filters displayed services by backend department metadata before legacy code prefixes', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const filterBlock = extractSourceBlock(
       source,
       'const filterServicesByDepartment = useCallback((appointment, departmentKey) => {',
@@ -143,14 +162,14 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('does not add a BFF-lite registrar workbench endpoint', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).not.toContain('/api/v1/ui/');
     expect(source).not.toContain('/ui/registrar/workbench');
   });
 
   it('gates record commands through backend-provided available_actions and can flags', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const hasBackendActionBlock = extractSourceBlock(
       source,
       'const hasBackendAction = (record, action) => {',
@@ -174,7 +193,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('does not gate command execution from record type or payment display grouping', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const hasBackendActionBlock = extractSourceBlock(
       source,
       'const hasBackendAction = (record, action) => {',
@@ -201,7 +220,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('uses presentation-only sorting from backend queue_time facts', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
 
     expect(source).toContain('sortRegistrarRowsForPresentation');
     expect(source).toContain('const sorted = sortRegistrarRowsForPresentation(entriesForTab)');
@@ -212,7 +231,7 @@ describe('RegistrarPanel command contract', () => {
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
-    const source = readRegistrarPanelSource();
+    const source = readRegistrarSourceTree();
     const resolverBlock = extractSourceBlock(
       source,
       'const resolveRescheduleVisitId = useCallback((appointmentRow) => {',

@@ -16,351 +16,39 @@ import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
-import { getApiOrigin } from '../api/runtime';
+// Note: getApiOrigin moved to ./registrar/registrarHelpers.js (decomp step 1)
 import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 // QW-06 fix: translations extracted to separate file (was 50+ inline keys).
 import { getRegistrarTranslator } from './registrarTranslations';
+// Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
+import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
+// Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
+import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 
-const API_BASE = getApiOrigin();
-const REGISTRAR_TAB_LABEL_KEYS = {
-  appointments: 'tabs_appointments',
-  cardio: 'tabs_cardio',
-  echokg: 'tabs_echokg',
-  derma: 'tabs_derma',
-  dental: 'tabs_dental',
-  lab: 'tabs_lab',
-  procedures: 'tabs_procedures'
-};
-const REGISTRAR_STATUS_LABEL_KEYS = {
-  scheduled: 'status_scheduled',
-  confirmed: 'status_confirmed',
-  queued: 'status_queued',
-  in_cabinet: 'status_in_cabinet',
-  done: 'status_done',
-  cancelled: 'status_cancelled',
-  no_show: 'status_no_show',
-  paid_pending: 'status_paid_pending',
-  paid: 'status_paid'
-};
-const registrarWorkflowHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 'var(--mac-spacing-4)',
-  flexWrap: 'wrap',
-  padding: 'var(--mac-spacing-4)',
-  marginBottom: 'var(--mac-spacing-4)',
-  background: 'var(--mac-bg-primary)',
-  border: '1px solid var(--mac-separator)',
-  borderRadius: 'var(--mac-radius-lg)',
-  boxShadow: 'var(--mac-shadow-xs)',
-  minWidth: 0
-};
-const registrarWorkflowTitleStyle = {
-  margin: 0,
-  color: 'var(--mac-text-primary)',
-  fontSize: 'var(--mac-font-size-xl)',
-  fontWeight: 'var(--mac-font-weight-semibold)',
-  lineHeight: 1.25
-};
-const registrarWorkflowMetaStyle = {
-  margin: 'var(--mac-spacing-1) 0 0',
-  color: 'var(--mac-text-secondary)',
-  fontSize: 'var(--mac-font-size-sm)',
-  lineHeight: 1.5
-};
-const registrarWorkflowActionsStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 'var(--mac-spacing-2)',
-  flexWrap: 'wrap',
-  minWidth: 0
-};
+// Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
+import {
+  API_BASE,
+  REGISTRAR_TAB_LABEL_KEYS,
+  REGISTRAR_STATUS_LABEL_KEYS,
+  registrarWorkflowHeaderStyle,
+  registrarWorkflowTitleStyle,
+  registrarWorkflowMetaStyle,
+  registrarWorkflowActionsStyle,
+  getRegistrarRecordRefs,
+  findRegistrarRecordBySelectionKey,
+  hasBackendAction,
+  getRegistrarActionForStatus,
+  hasBackendPatientDisplayContract,
+  normalizePatientGender,
+  hasBackendPatientGenderContract,
+  formatPreviewList,
+  buildPostWizardPaymentRow,
+  isMultiRecordAggregateRow,
+} from './registrar/registrarHelpers';
 
-const normalizeRegistrarContractValue = (value) => {
-  if (value === null || value === undefined) return '';
-  return String(value).trim().toLowerCase();
-};
-
-const getRegistrarRecordKind = (record) => normalizeRegistrarContractValue(
-  record?.record_kind ?? record?.source_kind ?? record?.record_type ?? record?.type
-);
-
-const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind(record)) => {
-  if (!record) return null;
-  if (record.canonical_record_id !== undefined && record.canonical_record_id !== null) {
-    return record.canonical_record_id;
-  }
-  if (recordKind === 'visit' && record.visit_id !== undefined && record.visit_id !== null) {
-    return record.visit_id;
-  }
-  if (recordKind === 'online_queue' && record.queue_entry_id !== undefined && record.queue_entry_id !== null) {
-    return record.queue_entry_id;
-  }
-  if (recordKind === 'appointment' && record.appointment_id !== undefined && record.appointment_id !== null) {
-    return record.appointment_id;
-  }
-  return record.id ?? null;
-};
-
-const REGISTRAR_RECORD_KINDS = new Set(['visit', 'online_queue', 'appointment']);
-
-const getRegistrarRecordRefs = (record) => {
-  if (!record) return [];
-
-  const candidates = [];
-  if (Array.isArray(record.grouped_record_refs)) {
-    candidates.push(...record.grouped_record_refs);
-  }
-  if (Array.isArray(record.grouped_records)) {
-    record.grouped_records.forEach((groupedRecord) => {
-      if (groupedRecord?.record_ref) {
-        candidates.push(groupedRecord.record_ref);
-      }
-    });
-  }
-
-  const recordKind = getRegistrarRecordKind(record);
-  const recordId = getRegistrarRecordId(record, recordKind);
-  if (recordKind && recordId !== null && recordId !== undefined) {
-    candidates.push({ record_kind: recordKind, record_id: recordId });
-  }
-
-  const seen = new Set();
-  return candidates.reduce((refs, candidate) => {
-    const kind = getRegistrarRecordKind(candidate);
-    const id = candidate?.record_id ?? candidate?.recordId ?? getRegistrarRecordId(candidate, kind);
-    const numericId = Number(id);
-    if (!REGISTRAR_RECORD_KINDS.has(kind) || !Number.isFinite(numericId) || numericId <= 0) {
-      return refs;
-    }
-    const key = `${kind}:${numericId}`;
-    if (seen.has(key)) {
-      return refs;
-    }
-    seen.add(key);
-    refs.push({ record_kind: kind, record_id: numericId });
-    return refs;
-  }, []);
-};
-
-const getRegistrarSelectionKey = (record) => {
-  const refs = getRegistrarRecordRefs(record);
-  if (refs.length > 0) {
-    return refs.map((ref) => `${ref.record_kind}:${ref.record_id}`).join('|');
-  }
-  return record?.id !== undefined && record?.id !== null ? `legacy:${record.id}` : null;
-};
-
-const findRegistrarRecordBySelectionKey = (records, selectionKey) => {
-  if (!selectionKey) return null;
-  return (records || []).find((record) => getRegistrarSelectionKey(record) === selectionKey) || null;
-};
-
-const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
-
-const hasBackendAction = (record, action) => {
-  if (!record) return false;
-  const normalizedAction = String(action || '').trim();
-  const equivalentActions = new Set([
-    normalizedAction,
-    normalizedAction.replace('_', '-'),
-    normalizedAction.replace('-', '_')
-  ]);
-  if (Array.isArray(record.grouped_records) && record.grouped_records.length > 0) {
-    return record.grouped_records.every((groupedRecord) =>
-      hasBackendAction(groupedRecord, normalizedAction)
-    );
-  }
-  if (Array.isArray(record.available_actions)) {
-    return record.available_actions.some((availableAction) =>
-      equivalentActions.has(String(availableAction || '').trim())
-    );
-  }
-
-  const actionFlagByName = {
-    mark_paid: 'can_mark_paid',
-    start_visit: 'can_start_visit',
-    print_ticket: 'can_print_ticket',
-    complete: 'can_complete',
-    cancel: 'can_cancel'
-  };
-  const flagName = actionFlagByName[normalizedAction.replace('-', '_')];
-  if (flagName && record[flagName] !== undefined) {
-    return Boolean(record[flagName]);
-  }
-
-  return false;
-};
-
-const getRegistrarActionForStatus = (status) => {
-  const normalizedStatus = normalizeRegistrarContractValue(status).replace('-', '_');
-  if (normalizedStatus === 'complete' || normalizedStatus === 'done') return 'complete';
-  if (normalizedStatus === 'paid' || normalizedStatus === 'mark_paid') return 'mark_paid';
-  if (normalizedStatus === 'in_cabinet') return 'start_visit';
-  if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'no_show') return 'cancel';
-  return null;
-};
-
-const hasBackendPatientDisplayContract = (record) => {
-  if (!record) return false;
-  const hasName = Boolean(record.patient_fio || record.patient_name);
-  const hasPhone = hasOwn(record, 'patient_phone') || hasOwn(record, 'phone');
-  const hasBirthYear = hasOwn(record, 'patient_birth_year') || hasOwn(record, 'birth_year');
-  const hasAddress = hasOwn(record, 'address');
-  return hasName && hasPhone && hasBirthYear && hasAddress;
-};
-
-const normalizePatientGender = (record) => (
-  record?.patient_gender ??
-  record?.patient_sex ??
-  record?.gender ??
-  record?.sex ??
-  null
-);
-
-const hasBackendPatientGenderContract = (record) => {
-  const gender = normalizePatientGender(record);
-  return gender !== null && gender !== undefined && String(gender).trim() !== '';
-};
-
-const formatPreviewList = (value) => {
-  if (Array.isArray(value)) {
-    return value.map((item) => {
-      if (typeof item === 'string') return item;
-      return item?.name || item?.service_name || item?.code || item?.queue_name || item?.queue_tag || '';
-    }).filter(Boolean).join(', ');
-  }
-  return value || '';
-};
-
-const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
-
-const resolveWizardQueueEntryId = (assignment) => {
-  if (!assignment || typeof assignment !== 'object') return null;
-  const explicitQueueEntryId = assignment.queue_entry_id ??
-    assignment.original_queue_id ??
-    assignment.doctor_queue_entry_id ??
-    null;
-  if (hasQueueIdentityValue(explicitQueueEntryId)) return explicitQueueEntryId;
-
-  if (hasQueueIdentityValue(assignment.queue_id)) return null;
-
-  return hasQueueIdentityValue(assignment.id) ? assignment.id : null;
-};
-
-const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
-  if (!assignment || typeof assignment !== 'object') return null;
-  const queueEntryId = resolveWizardQueueEntryId(assignment);
-  const queueNumber = assignment.queue_number ??
-    assignment.number ??
-    assignment.ticket_number ??
-    assignment.queue_position ??
-    assignment.queue_no ??
-    null;
-
-  return {
-    ...assignment,
-    id: assignment.queue_id ?? queueEntryId ?? assignment.id ?? null,
-    queue_entry_id: queueEntryId,
-    visit_id: assignment.visit_id ?? (visitId !== null && visitId !== undefined && visitId !== '' ? Number(visitId) : null),
-    queue_number: queueNumber,
-    number: queueNumber
-  };
-};
-
-const flattenWizardQueueNumbers = (queueNumbers) => {
-  if (!queueNumbers) return [];
-
-  if (Array.isArray(queueNumbers)) {
-    return queueNumbers
-      .map((assignment) => normalizeWizardQueueAssignment(assignment, assignment?.visit_id))
-      .filter(Boolean);
-  }
-
-  if (typeof queueNumbers !== 'object') return [];
-
-  return Object.entries(queueNumbers).flatMap(([visitId, assignments]) => {
-    const assignmentList = Array.isArray(assignments) ? assignments : [assignments];
-    return assignmentList
-      .map((assignment) => normalizeWizardQueueAssignment(assignment, visitId))
-      .filter(Boolean);
-  });
-};
-
-const buildPostWizardPaymentRow = (wizardResult) => {
-  if (!wizardResult?.success) return null;
-
-  const visitIds = Array.isArray(wizardResult.visit_ids) ? wizardResult.visit_ids.filter(Boolean) : [];
-  if (visitIds.length === 0) return null;
-
-  const createdVisits = Array.isArray(wizardResult.created_visits) ? wizardResult.created_visits : [];
-  const firstVisit = createdVisits[0] || {};
-  const services = createdVisits.flatMap((visit) =>
-    (Array.isArray(visit.services) ? visit.services : [])
-      .map((service) => service?.name || service?.code)
-      .filter(Boolean)
-  );
-  const queueNumbers = flattenWizardQueueNumbers(wizardResult.queue_numbers);
-  const firstQueueNumber = queueNumbers.find((queueItem) => (
-    queueItem?.queue_number !== null &&
-    queueItem?.queue_number !== undefined &&
-    queueItem?.queue_number !== ''
-  ));
-  const printTickets = (Array.isArray(wizardResult.print_tickets) ? wizardResult.print_tickets : [])
-    .map((ticket, index) => {
-      if (!ticket || typeof ticket !== 'object') return null;
-      const queueNumber = ticket.queue_number ??
-        ticket.number ??
-        ticket.ticket_number ??
-        queueNumbers[index]?.queue_number ??
-        queueNumbers[index]?.number ??
-        null;
-      if (queueNumber === null || queueNumber === undefined || queueNumber === '') return null;
-      return {
-        ...ticket,
-        queue_number: queueNumber
-      };
-    })
-    .filter(Boolean);
-  const totalAmount = Number(wizardResult.total_amount ?? 0);
-
-  return {
-    id: visitIds[0],
-    canonical_record_id: visitIds[0],
-    record_kind: 'visit',
-    visit_id: visitIds[0],
-    visit_ids: visitIds,
-    grouped_record_refs: visitIds.map((visitId) => ({ record_kind: 'visit', record_id: Number(visitId) })),
-    available_actions: ['mark_paid', 'print_ticket'],
-    can_mark_paid: totalAmount > 0,
-    can_print_ticket: true,
-    invoice_id: wizardResult.invoice_id ?? null,
-    patient_fio: firstVisit.patient_name || 'Patient',
-    services,
-    queue_number: firstQueueNumber?.queue_number ?? null,
-    number: firstQueueNumber?.queue_number ?? null,
-    cost: totalAmount,
-    payment_amount: totalAmount,
-    payment_status: totalAmount > 0 ? 'pending' : 'paid',
-    payment_type: null,
-    queue_numbers: queueNumbers,
-    print_tickets: printTickets,
-    created_visits: createdVisits
-  };
-};
-
-const hasMultipleRecordRefs = (value) => Array.isArray(value) && value.filter(Boolean).length > 1;
-
-const isMultiRecordAggregateRow = (row) => (
-  hasMultipleRecordRefs(row?.grouped_record_refs) ||
-  hasMultipleRecordRefs(row?.grouped_records) ||
-  hasMultipleRecordRefs(row?.aggregated_ids)
-);
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -781,40 +469,11 @@ const RegistrarPanel = () => {
   // jarring, blocking, and lacked a date picker.
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
-  const resolveRescheduleVisitId = useCallback((appointmentRow) => {
-    return appointmentRow?.visit_ids?.[0] || appointmentRow?.visit_id || appointmentRow?.visitId || null;
-  }, []);
-  const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
-    if (!appointmentRow) return;
-
-    const idsToRemove = new Set();
-    [appointmentRow.id, appointmentRow.visit_id, appointmentRow.visitId, appointmentRow.appointment_id, appointmentRow.queue_entry_id, visitId].forEach((id) => {
-      if (id !== undefined && id !== null) {
-        idsToRemove.add(String(id));
-      }
-    });
-    [appointmentRow.visit_ids, appointmentRow.appointment_ids, appointmentRow.queue_entry_ids].forEach((ids) => {
-      if (Array.isArray(ids)) {
-        ids.forEach((id) => {
-          if (id !== undefined && id !== null) {
-            idsToRemove.add(String(id));
-          }
-        });
-      }
-    });
-    if (Array.isArray(appointmentRow.aggregated_ids)) {
-      appointmentRow.aggregated_ids.forEach((id) => {
-        if (id !== undefined && id !== null) {
-          idsToRemove.add(String(id));
-        }
-      });
-    }
-
-    setAppointments((prev) => prev.filter((apt) => {
-      const candidateIds = [apt.id, apt.visit_id, apt.visitId, apt.appointment_id, apt.queue_entry_id];
-      return !candidateIds.some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
-    }));
-  }, []);
+  // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
+  const {
+    resolveRescheduleVisitId,
+    removeRescheduledAppointmentFromView,
+  } = useRegistrarReschedule({ setAppointments });
   const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   const appointmentOverridesRef = useRef({});
   // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
@@ -1720,46 +1379,16 @@ const RegistrarPanel = () => {
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
   const filteredAppointmentsRef = useRef([]);
 
-  // Горячие клавиши
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Отладка всех нажатий клавиш
-      logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Target:', e.target.tagName);
-
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        logger.info('Ignoring key press in input/textarea');
-        return;
-      }
-
-      if (e.key === 'Enter') {
-
-
-
-
-
-
-
-
-        // Enter в мастере обрабатывается отдельно в полях ввода
-        // Здесь не обрабатываем, чтобы избежать конфликтов
-      } else if (e.ctrlKey) {if (e.key === 'p') {e.preventDefault();} else if (e.key === 'k') {e.preventDefault();setShowWizard(true);} else if (e.key === '1') {e.preventDefault(); setSearchParams({ view: 'welcome' });} else if (e.key === '2') setActiveTab('appointments');else if (e.key === '3') setActiveTab('cardio');else
-        if (e.key === '4') setActiveTab('derma');else
-        if (e.key === '5') {e.preventDefault(); setSearchParams({ view: 'queue' });}
-        // QW-01 fix: removed Ctrl+A (select all) and Ctrl+D (deselect)
-        // hotkeys — bulk-action UI was unreachable and these only created
-        // dead state. Browser native Ctrl+A (select text) now works normally.
-      } else if (e.altKey) {
-        // QW-01 fix: removed Alt+1/Alt+2/Alt+3 bulk-action hotkeys.
-        // No bulk-action UI exists anymore; these were dead shortcuts.
-      } else if (e.key === 'Escape') {
-        if (showWizard) setShowWizard(false);
-        if (showSlotsModal) setShowSlotsModal(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard, showSlotsModal, appointments]);
+  // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
+  useRegistrarHotkeys({
+    setShowWizard,
+    setShowSlotsModal,
+    setActiveTab,
+    setSearchParams,
+    showWizard,
+    showSlotsModal,
+    appointments,
+  });
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
